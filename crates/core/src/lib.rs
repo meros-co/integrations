@@ -21,9 +21,11 @@
 
 pub mod catalog;
 pub mod events;
+mod http;
 pub mod module;
 mod modules;
 mod session;
+pub mod sse;
 mod udp;
 
 use std::collections::HashMap;
@@ -40,8 +42,7 @@ pub use module::{CommandError, CommandResult, Connection, Outcome};
 pub use session::{DeviceId, DeviceSnapshot};
 
 use events::EventQueue;
-use session::{Session, SessionMsg};
-use udp::SharedUdp;
+use session::{Services, Session, SessionMsg};
 
 /// Events held for a consumer that is not draining them.
 const EVENT_CAPACITY: usize = 10_000;
@@ -88,8 +89,7 @@ pub struct Core {
     catalog: Catalog,
     devices: Mutex<HashMap<DeviceId, DeviceEntry>>,
     next_device: AtomicU64,
-    events: Arc<EventQueue>,
-    shared_udp: Arc<SharedUdp>,
+    services: Arc<Services>,
 }
 
 impl Core {
@@ -106,8 +106,11 @@ impl Core {
             catalog: Catalog::embedded(),
             devices: Mutex::new(HashMap::new()),
             next_device: AtomicU64::new(1),
-            events: Arc::new(EventQueue::new(EVENT_CAPACITY)),
-            shared_udp: Arc::new(SharedUdp::default()),
+            services: Arc::new(Services {
+                events: Arc::new(EventQueue::new(EVENT_CAPACITY)),
+                shared_udp: Default::default(),
+                http: http::HttpClients::new().map_err(std::io::Error::other)?,
+            }),
         })
     }
 
@@ -151,14 +154,7 @@ impl Core {
             state: serde_json::Value::Object(Default::default()),
         }));
         let (tx, rx) = mpsc::channel(256);
-        let session = Session::new(
-            id,
-            host,
-            module,
-            self.events.clone(),
-            snapshot.clone(),
-            self.shared_udp.clone(),
-        );
+        let session = Session::new(id, host, module, self.services.clone(), snapshot.clone());
         self.runtime().spawn(session.run(rx));
         self.devices.lock().unwrap().insert(
             id,
@@ -231,12 +227,12 @@ impl Core {
 
     /// Queued events, without waiting.
     pub fn poll_events(&self, max: usize) -> Vec<Event> {
-        self.events.drain(max)
+        self.services.events.drain(max)
     }
 
     /// Wait for at least one event.
     pub async fn next_events(&self, max: usize) -> Vec<Event> {
-        self.events.next(max).await
+        self.services.events.next(max).await
     }
 
     /// End a session cleanly. Pending commands fail with `Closed`.

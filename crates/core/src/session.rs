@@ -16,8 +16,10 @@ use tokio::time::Instant;
 
 use crate::catalog::Params;
 use crate::events::{Event, EventQueue};
+use crate::http::HttpClients;
 use crate::module::{
-    Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, Key, Module,
+    Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, HttpResponse, Key,
+    Module, RequestId, SseInput,
 };
 use crate::udp::SharedUdp;
 
@@ -52,6 +54,22 @@ pub(crate) enum Inbound {
         socket: Key,
         message: String,
     },
+    Http {
+        id: RequestId,
+        result: Result<HttpResponse, String>,
+    },
+    Sse {
+        stream: Key,
+        generation: u64,
+        input: SseInput,
+    },
+}
+
+/// What every session shares.
+pub(crate) struct Services {
+    pub(crate) events: Arc<EventQueue>,
+    pub(crate) shared_udp: SharedUdp,
+    pub(crate) http: HttpClients,
 }
 
 /// What any consumer can read about a device without asking it.
@@ -76,6 +94,11 @@ struct Pending {
     deadline: Instant,
 }
 
+struct Stream {
+    generation: u64,
+    task: JoinHandle<()>,
+}
+
 pub(crate) struct Session {
     device: DeviceId,
     host: IpAddr,
@@ -83,13 +106,14 @@ pub(crate) struct Session {
     started: Instant,
     timers: HashMap<Key, Instant>,
     sockets: HashMap<Key, Socket>,
+    streams: HashMap<Key, Stream>,
+    next_generation: u64,
     pending: HashMap<CommandId, Pending>,
     next_command: CommandId,
     inbound_tx: mpsc::Sender<Inbound>,
     inbound_rx: mpsc::Receiver<Inbound>,
-    events: Arc<EventQueue>,
+    services: Arc<Services>,
     snapshot: Arc<Mutex<DeviceSnapshot>>,
-    shared_udp: Arc<SharedUdp>,
     last_alive: Option<Instant>,
 }
 
@@ -98,9 +122,8 @@ impl Session {
         device: DeviceId,
         host: IpAddr,
         module: Box<dyn Module>,
-        events: Arc<EventQueue>,
+        services: Arc<Services>,
         snapshot: Arc<Mutex<DeviceSnapshot>>,
-        shared_udp: Arc<SharedUdp>,
     ) -> Session {
         let (inbound_tx, inbound_rx) = mpsc::channel(4096);
         Session {
@@ -110,13 +133,14 @@ impl Session {
             started: Instant::now(),
             timers: HashMap::new(),
             sockets: HashMap::new(),
+            streams: HashMap::new(),
+            next_generation: 1,
             pending: HashMap::new(),
             next_command: 1,
             inbound_tx,
             inbound_rx,
-            events,
+            services,
             snapshot,
-            shared_udp,
             last_alive: None,
         }
     }
@@ -164,6 +188,21 @@ impl Session {
                         Inbound::SocketError { socket, message } => {
                             self.drop_socket(socket);
                             self.module.socket_error(&mut cx, socket, &message);
+                        }
+                        Inbound::Http { id, result } => {
+                            self.module.http_response(&mut cx, id, result);
+                        }
+                        Inbound::Sse { stream, generation, input } => {
+                            // Inputs from a stream since replaced or closed are
+                            // not this stream's.
+                            let current = self.streams.get(stream).map(|s| s.generation);
+                            if current != Some(generation) {
+                                continue;
+                            }
+                            if matches!(input, SseInput::Closed { .. }) {
+                                self.streams.remove(stream);
+                            }
+                            self.module.sse(&mut cx, stream, input);
                         }
                     }
                     self.apply(cx.take()).await;
@@ -226,6 +265,24 @@ impl Session {
                 }
                 Action::UdpSend { socket, to, data } => self.send(socket, to, data).await,
                 Action::UdpClose { socket } => self.drop_socket(socket),
+                Action::Http { id, request } => {
+                    self.services
+                        .http
+                        .spawn_request(id, &request, self.inbound_tx.clone());
+                }
+                Action::SseOpen { stream, request } => {
+                    self.close_stream(stream);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let task = self.services.http.spawn_stream(
+                        stream,
+                        generation,
+                        &request,
+                        self.inbound_tx.clone(),
+                    );
+                    self.streams.insert(stream, Stream { generation, task });
+                }
+                Action::SseClose { stream } => self.close_stream(stream),
                 Action::SetTimer { key, after } => {
                     self.timers
                         .insert(key, Instant::now() + Duration::from_millis(after));
@@ -243,7 +300,7 @@ impl Session {
                         let mut snap = self.snapshot.lock().unwrap();
                         merge_patch(&mut snap.state, &patch);
                     }
-                    self.events.push(Event::State {
+                    self.services.events.push(Event::State {
                         device: self.device,
                         patch,
                     });
@@ -256,7 +313,7 @@ impl Session {
                         changed
                     };
                     if changed {
-                        self.events.push(Event::Connection {
+                        self.services.events.push(Event::Connection {
                             device: self.device,
                             connection,
                         });
@@ -266,13 +323,13 @@ impl Session {
                     let now = Instant::now();
                     if self.last_alive.is_none_or(|t| now - t >= ALIVE_EVERY) {
                         self.last_alive = Some(now);
-                        self.events.push(Event::Alive {
+                        self.services.events.push(Event::Alive {
                             device: self.device,
                         });
                     }
                 }
                 Action::Log { level, message } => {
-                    self.events.push(Event::Log {
+                    self.services.events.push(Event::Log {
                         device: self.device,
                         level,
                         message,
@@ -294,7 +351,8 @@ impl Session {
                 self.sockets.insert(key, Socket::Own { socket, reader });
             }
             Bind::Shared(port) => {
-                self.shared_udp
+                self.services
+                    .shared_udp
                     .register(port, self.host, key, self.inbound_tx.clone())?;
                 self.sockets.insert(key, Socket::Shared { port });
             }
@@ -305,7 +363,7 @@ impl Session {
     async fn send(&mut self, key: Key, to: SocketAddr, data: Vec<u8>) {
         let result = match self.sockets.get(&key) {
             Some(Socket::Own { socket, .. }) => socket.send_to(&data, to).await.map(|_| ()),
-            Some(Socket::Shared { port }) => self.shared_udp.send(*port, to, &data).await,
+            Some(Socket::Shared { port }) => self.services.shared_udp.send(*port, to, &data).await,
             None => return,
         };
         if let Err(e) = result {
@@ -320,10 +378,16 @@ impl Session {
         }
     }
 
+    fn close_stream(&mut self, key: Key) {
+        if let Some(stream) = self.streams.remove(key) {
+            stream.task.abort();
+        }
+    }
+
     fn drop_socket(&mut self, key: Key) {
         match self.sockets.remove(key) {
             Some(Socket::Own { reader, .. }) => reader.abort(),
-            Some(Socket::Shared { port }) => self.shared_udp.unregister(port, self.host),
+            Some(Socket::Shared { port }) => self.services.shared_udp.unregister(port, self.host),
             None => {}
         }
     }
@@ -345,7 +409,11 @@ impl Session {
         for key in keys {
             self.drop_socket(key);
         }
-        self.events.push(Event::Closed {
+        let streams: Vec<Key> = self.streams.keys().copied().collect();
+        for key in streams {
+            self.close_stream(key);
+        }
+        self.services.events.push(Event::Closed {
             device: self.device,
         });
     }

@@ -65,6 +65,46 @@ pub enum CommandError {
 
 pub type CommandResult = Result<Outcome, CommandError>;
 
+/// Identifies one HTTP request within a module; the module allocates it.
+pub type RequestId = u64;
+
+/// An HTTP request a module asks the session to make.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HttpRequest {
+    pub method: &'static str,
+    pub url: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Option<Vec<u8>>,
+    /// Overall deadline for the response. `None` only for streams.
+    pub timeout: Option<Millis>,
+    /// Accept a certificate that does not chain to a trusted root, such as a
+    /// device's self-signed one. The connection is still encrypted; the peer is
+    /// not authenticated.
+    pub accept_invalid_certs: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HttpResponse {
+    pub status: u16,
+    pub body: Vec<u8>,
+}
+
+/// What happens on a server-sent event stream.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SseInput {
+    /// The server accepted the request and the stream is open.
+    Opened,
+    Event(crate::sse::SseEvent),
+    /// Bytes arrived, whether or not they completed an event. Keepalive
+    /// comments are proof of life too.
+    Activity,
+    /// The stream ended. `status` is set when the server refused to open it.
+    Closed {
+        status: Option<u16>,
+        reason: String,
+    },
+}
+
 /// Where a UDP socket binds locally.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Bind {
@@ -107,6 +147,18 @@ pub enum Action {
     },
     UdpClose {
         socket: Key,
+    },
+    Http {
+        id: RequestId,
+        request: HttpRequest,
+    },
+    /// Open a server-sent event stream, replacing any open under this key.
+    SseOpen {
+        stream: Key,
+        request: HttpRequest,
+    },
+    SseClose {
+        stream: Key,
     },
     /// Fire [`Module::timer`] with this key after `after` ms, replacing any
     /// pending timer with the same key.
@@ -175,6 +227,18 @@ impl Cx {
         self.push(Action::UdpClose { socket });
     }
 
+    pub fn http(&mut self, id: RequestId, request: HttpRequest) {
+        self.push(Action::Http { id, request });
+    }
+
+    pub fn sse_open(&mut self, stream: Key, request: HttpRequest) {
+        self.push(Action::SseOpen { stream, request });
+    }
+
+    pub fn sse_close(&mut self, stream: Key) {
+        self.push(Action::SseClose { stream });
+    }
+
     pub fn set_timer(&mut self, key: Key, after: Millis) {
         self.push(Action::SetTimer { key, after });
     }
@@ -228,6 +292,14 @@ pub trait Module: Send + 'static {
         cx.connection(Connection::Disconnected {
             reason: "socket error".into(),
         });
+    }
+
+    fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        let _ = (cx, id, result);
+    }
+
+    fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
+        let _ = (cx, stream, input);
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key);
