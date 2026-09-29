@@ -118,14 +118,18 @@ impl Core {
     /// Start a session. The connection is made in the background; watch
     /// `Connection` events or the snapshot for its progress.
     pub fn open(&self, request: OpenRequest) -> Result<DeviceId, OpenError> {
-        let spec = self
-            .catalog
-            .device(&request.device)
-            .ok_or_else(|| OpenError::UnknownDevice { device: request.device.clone() })?;
-        let model = spec.model(&request.model).ok_or_else(|| OpenError::UnknownModel {
-            device: request.device.clone(),
-            model: request.model.clone(),
-        })?;
+        let spec =
+            self.catalog
+                .device(&request.device)
+                .ok_or_else(|| OpenError::UnknownDevice {
+                    device: request.device.clone(),
+                })?;
+        let model = spec
+            .model(&request.model)
+            .ok_or_else(|| OpenError::UnknownModel {
+                device: request.device.clone(),
+                model: request.model.clone(),
+            })?;
         let settings = catalog::validate(&spec.settings, &request.settings)
             .map_err(|message| OpenError::InvalidSettings { message })?;
         let host = resolve(&request.host)?;
@@ -136,8 +140,10 @@ impl Core {
             channels: model.channels,
             settings,
         };
-        let module = modules::construct(&spec.id, context)
-            .ok_or_else(|| OpenError::NotImplemented { device: spec.id.clone() })?;
+        let module =
+            modules::construct(&spec.id, context).ok_or_else(|| OpenError::NotImplemented {
+                device: spec.id.clone(),
+            })?;
 
         let id = self.next_device.fetch_add(1, Ordering::Relaxed);
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
@@ -156,7 +162,12 @@ impl Core {
         self.runtime().spawn(session.run(rx));
         self.devices.lock().unwrap().insert(
             id,
-            DeviceEntry { spec: spec.id.clone(), model: model.id.clone(), tx, snapshot },
+            DeviceEntry {
+                spec: spec.id.clone(),
+                model: model.id.clone(),
+                tx,
+                snapshot,
+            },
         );
         Ok(id)
     }
@@ -167,11 +178,16 @@ impl Core {
         let (tx, name, params) = {
             let devices = self.devices.lock().unwrap();
             let entry = devices.get(&device).ok_or(CommandError::Closed)?;
-            let spec = self.catalog.device(&entry.spec).expect("open device has a spec");
-            let command_spec = spec
-                .commands
-                .get(command)
-                .ok_or_else(|| CommandError::UnknownCommand { command: command.into() })?;
+            let spec = self
+                .catalog
+                .device(&entry.spec)
+                .expect("open device has a spec");
+            let command_spec =
+                spec.commands
+                    .get(command)
+                    .ok_or_else(|| CommandError::UnknownCommand {
+                        command: command.into(),
+                    })?;
             let model = spec.model(&entry.model).expect("open device has a model");
             if !model.supports.iter().any(|c| c == command) {
                 return Err(CommandError::UnsupportedForModel {
@@ -184,21 +200,33 @@ impl Core {
             (entry.tx.clone(), command.to_string(), params)
         };
         let (reply, result) = oneshot::channel();
-        tx.send(SessionMsg::Command { name, params, reply })
-            .await
-            .map_err(|_| CommandError::Closed)?;
+        tx.send(SessionMsg::Command {
+            name,
+            params,
+            reply,
+        })
+        .await
+        .map_err(|_| CommandError::Closed)?;
         result.await.map_err(|_| CommandError::Closed)?
     }
 
     /// Blocking form of [`Core::execute`], for hosts without an async runtime.
     /// Must not be called from within an async task.
-    pub fn execute_blocking(&self, device: DeviceId, command: &str, params: Params) -> CommandResult {
-        self.runtime().block_on(self.execute(device, command, params))
+    pub fn execute_blocking(
+        &self,
+        device: DeviceId,
+        command: &str,
+        params: Params,
+    ) -> CommandResult {
+        self.runtime()
+            .block_on(self.execute(device, command, params))
     }
 
     pub fn snapshot(&self, device: DeviceId) -> Option<DeviceSnapshot> {
         let devices = self.devices.lock().unwrap();
-        devices.get(&device).map(|e| e.snapshot.lock().unwrap().clone())
+        devices
+            .get(&device)
+            .map(|e| e.snapshot.lock().unwrap().clone())
     }
 
     /// Queued events, without waiting.
@@ -243,7 +271,10 @@ fn resolve(host: &str) -> Result<IpAddr, OpenError> {
     }
     (host, 0)
         .to_socket_addrs()
-        .map_err(|e| OpenError::UnresolvableHost { host: host.into(), message: e.to_string() })?
+        .map_err(|e| OpenError::UnresolvableHost {
+            host: host.into(),
+            message: e.to_string(),
+        })?
         .find(|a| a.is_ipv4())
         .map(|a| a.ip())
         .ok_or_else(|| OpenError::UnresolvableHost {

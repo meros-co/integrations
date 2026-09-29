@@ -21,8 +21,12 @@ async fn simulated_g4() -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut buf = [0u8; 1500];
         loop {
-            let Ok((n, from)) = socket.recv_from(&mut buf).await else { return };
-            let text = String::from_utf8_lossy(&buf[..n]).trim_end_matches('\r').to_string();
+            let Ok((n, from)) = socket.recv_from(&mut buf).await else {
+                return;
+            };
+            let text = String::from_utf8_lossy(&buf[..n])
+                .trim_end_matches('\r')
+                .to_string();
             let reply = match text.split_whitespace().collect::<Vec<_>>().as_slice() {
                 ["Push", ..] => {
                     // Echo, then one cycle of cyclic attributes and the
@@ -96,22 +100,35 @@ async fn g4_receiver_end_to_end() {
     assert_eq!(ch["tx_mute"], false);
 
     // A set is acknowledged by the device's echo.
-    let outcome = core.execute(id, "mute", params(json!({"muted": true}))).await;
+    let outcome = core
+        .execute(id, "mute", params(json!({"muted": true})))
+        .await;
     assert_eq!(outcome, Ok(Outcome::Ack));
 
     // A value the device refuses is reported with its code.
-    let outcome = core.execute(id, "set_af_out", params(json!({"level_db": 5}))).await;
+    let outcome = core
+        .execute(id, "set_af_out", params(json!({"level_db": 5})))
+        .await;
     assert!(matches!(
         outcome,
         Err(CommandError::DeviceError { code: Some(ref c), .. }) if c == "1020"
     ));
 
     // Validation happens before anything is sent.
-    let outcome = core.execute(id, "set_af_out", params(json!({"level_db": 99}))).await;
+    let outcome = core
+        .execute(id, "set_af_out", params(json!({"level_db": 99})))
+        .await;
     assert!(matches!(outcome, Err(CommandError::InvalidParams { .. })));
     let outcome = core.execute(id, "rf_mute", params(json!({}))).await;
-    assert!(matches!(outcome, Err(CommandError::UnsupportedForModel { .. })));
+    assert!(matches!(
+        outcome,
+        Err(CommandError::UnsupportedForModel { .. })
+    ));
 
     core.close(id).await;
-    wait_for(&core, |e| matches!(e, Event::Closed { device } if *device == id)).await;
+    wait_for(
+        &core,
+        |e| matches!(e, Event::Closed { device } if *device == id),
+    )
+    .await;
 }

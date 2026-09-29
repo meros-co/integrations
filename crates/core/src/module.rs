@@ -96,20 +96,40 @@ pub enum Level {
 /// Something a module asks the session to do.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
-    UdpOpen { socket: Key, bind: Bind },
-    UdpSend { socket: Key, to: SocketAddr, data: Vec<u8> },
-    UdpClose { socket: Key },
+    UdpOpen {
+        socket: Key,
+        bind: Bind,
+    },
+    UdpSend {
+        socket: Key,
+        to: SocketAddr,
+        data: Vec<u8>,
+    },
+    UdpClose {
+        socket: Key,
+    },
     /// Fire [`Module::timer`] with this key after `after` ms, replacing any
     /// pending timer with the same key.
-    SetTimer { key: Key, after: Millis },
-    CancelTimer { key: Key },
-    Complete { id: CommandId, result: CommandResult },
+    SetTimer {
+        key: Key,
+        after: Millis,
+    },
+    CancelTimer {
+        key: Key,
+    },
+    Complete {
+        id: CommandId,
+        result: CommandResult,
+    },
     /// Merge into the device state (RFC 7386 JSON merge patch).
     State(Value),
     Connection(Connection),
     /// Heard from the device, whether or not it carried telemetry.
     Alive,
-    Log { level: Level, message: String },
+    Log {
+        level: Level,
+        message: String,
+    },
 }
 
 /// Collects a module's actions for one callback.
@@ -121,7 +141,10 @@ pub struct Cx {
 
 impl Cx {
     pub fn new(now: Millis) -> Cx {
-        Cx { now, actions: Vec::new() }
+        Cx {
+            now,
+            actions: Vec::new(),
+        }
     }
 
     pub fn now(&self) -> Millis {
@@ -141,7 +164,11 @@ impl Cx {
     }
 
     pub fn udp_send(&mut self, socket: Key, to: SocketAddr, data: impl Into<Vec<u8>>) {
-        self.push(Action::UdpSend { socket, to, data: data.into() });
+        self.push(Action::UdpSend {
+            socket,
+            to,
+            data: data.into(),
+        });
     }
 
     pub fn udp_close(&mut self, socket: Key) {
@@ -173,7 +200,10 @@ impl Cx {
     }
 
     pub fn log(&mut self, level: Level, message: impl Into<String>) {
-        self.push(Action::Log { level, message: message.into() });
+        self.push(Action::Log {
+            level,
+            message: message.into(),
+        });
     }
 }
 
@@ -195,7 +225,9 @@ pub trait Module: Send + 'static {
     /// A UDP socket failed; it has been closed.
     fn socket_error(&mut self, cx: &mut Cx, socket: Key, message: &str) {
         let _ = (socket, message);
-        cx.connection(Connection::Disconnected { reason: "socket error".into() });
+        cx.connection(Connection::Disconnected {
+            reason: "socket error".into(),
+        });
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key);

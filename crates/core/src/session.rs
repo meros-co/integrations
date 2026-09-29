@@ -32,13 +32,26 @@ const COMMAND_SAFETY_TIMEOUT: Duration = Duration::from_secs(30);
 const ALIVE_EVERY: Duration = Duration::from_secs(1);
 
 pub(crate) enum SessionMsg {
-    Command { name: String, params: Params, reply: oneshot::Sender<CommandResult> },
-    Close { done: oneshot::Sender<()> },
+    Command {
+        name: String,
+        params: Params,
+        reply: oneshot::Sender<CommandResult>,
+    },
+    Close {
+        done: oneshot::Sender<()>,
+    },
 }
 
 pub(crate) enum Inbound {
-    Datagram { socket: Key, from: SocketAddr, data: Vec<u8> },
-    SocketError { socket: Key, message: String },
+    Datagram {
+        socket: Key,
+        from: SocketAddr,
+        data: Vec<u8>,
+    },
+    SocketError {
+        socket: Key,
+        message: String,
+    },
 }
 
 /// What any consumer can read about a device without asking it.
@@ -49,8 +62,13 @@ pub struct DeviceSnapshot {
 }
 
 enum Socket {
-    Own { socket: Arc<UdpSocket>, reader: JoinHandle<()> },
-    Shared { port: u16 },
+    Own {
+        socket: Arc<UdpSocket>,
+        reader: JoinHandle<()>,
+    },
+    Shared {
+        port: u16,
+    },
 }
 
 struct Pending {
@@ -209,7 +227,8 @@ impl Session {
                 Action::UdpSend { socket, to, data } => self.send(socket, to, data).await,
                 Action::UdpClose { socket } => self.drop_socket(socket),
                 Action::SetTimer { key, after } => {
-                    self.timers.insert(key, Instant::now() + Duration::from_millis(after));
+                    self.timers
+                        .insert(key, Instant::now() + Duration::from_millis(after));
                 }
                 Action::CancelTimer { key } => {
                     self.timers.remove(key);
@@ -224,7 +243,10 @@ impl Session {
                         let mut snap = self.snapshot.lock().unwrap();
                         merge_patch(&mut snap.state, &patch);
                     }
-                    self.events.push(Event::State { device: self.device, patch });
+                    self.events.push(Event::State {
+                        device: self.device,
+                        patch,
+                    });
                 }
                 Action::Connection(connection) => {
                     let changed = {
@@ -234,18 +256,27 @@ impl Session {
                         changed
                     };
                     if changed {
-                        self.events.push(Event::Connection { device: self.device, connection });
+                        self.events.push(Event::Connection {
+                            device: self.device,
+                            connection,
+                        });
                     }
                 }
                 Action::Alive => {
                     let now = Instant::now();
                     if self.last_alive.is_none_or(|t| now - t >= ALIVE_EVERY) {
                         self.last_alive = Some(now);
-                        self.events.push(Event::Alive { device: self.device });
+                        self.events.push(Event::Alive {
+                            device: self.device,
+                        });
                     }
                 }
                 Action::Log { level, message } => {
-                    self.events.push(Event::Log { device: self.device, level, message });
+                    self.events.push(Event::Log {
+                        device: self.device,
+                        level,
+                        message,
+                    });
                 }
             }
         }
@@ -263,7 +294,8 @@ impl Session {
                 self.sockets.insert(key, Socket::Own { socket, reader });
             }
             Bind::Shared(port) => {
-                self.shared_udp.register(port, self.host, key, self.inbound_tx.clone())?;
+                self.shared_udp
+                    .register(port, self.host, key, self.inbound_tx.clone())?;
                 self.sockets.insert(key, Socket::Shared { port });
             }
         }
@@ -278,7 +310,10 @@ impl Session {
         };
         if let Err(e) = result {
             let mut cx = self.cx();
-            cx.log(crate::module::Level::Debug, format!("send to {to} failed: {e}"));
+            cx.log(
+                crate::module::Level::Debug,
+                format!("send to {to} failed: {e}"),
+            );
             self.module.socket_error(&mut cx, key, &e.to_string());
             self.drop_socket(key);
             Box::pin(self.apply(cx.take())).await;
@@ -310,7 +345,9 @@ impl Session {
         for key in keys {
             self.drop_socket(key);
         }
-        self.events.push(Event::Closed { device: self.device });
+        self.events.push(Event::Closed {
+            device: self.device,
+        });
     }
 }
 
@@ -337,7 +374,11 @@ fn spawn_reader(
                     if from.ip() != host {
                         continue;
                     }
-                    let msg = Inbound::Datagram { socket: key, from, data: buf[..n].to_vec() };
+                    let msg = Inbound::Datagram {
+                        socket: key,
+                        from,
+                        data: buf[..n].to_vec(),
+                    };
                     if inbound.send(msg).await.is_err() {
                         return;
                     }
@@ -348,7 +389,10 @@ fn spawn_reader(
                 Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => continue,
                 Err(e) => {
                     let _ = inbound
-                        .send(Inbound::SocketError { socket: key, message: e.to_string() })
+                        .send(Inbound::SocketError {
+                            socket: key,
+                            message: e.to_string(),
+                        })
                         .await;
                     return;
                 }

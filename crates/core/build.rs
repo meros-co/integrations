@@ -7,7 +7,10 @@ use std::{env, fs, path::PathBuf};
 
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let specs_dir = manifest.join("../../specs").canonicalize().expect("specs/ directory");
+    let specs_dir = manifest
+        .join("../../specs")
+        .canonicalize()
+        .expect("specs/ directory");
     println!("cargo:rerun-if-changed={}", specs_dir.display());
 
     let mut entries: Vec<PathBuf> = fs::read_dir(&specs_dir)

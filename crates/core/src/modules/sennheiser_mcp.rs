@@ -12,8 +12,7 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
-    Outcome,
+    Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
 };
 
 /// "Devices of ew G4 series can be set and read via Ethernet at port 53212,
@@ -84,7 +83,11 @@ pub(crate) struct Mcp {
 
 impl Mcp {
     pub(crate) fn new(ctx: OpenContext) -> Mcp {
-        let kind = if ctx.model.starts_with("sr-") { Kind::Transmitter } else { Kind::Receiver };
+        let kind = if ctx.model.starts_with("sr-") {
+            Kind::Transmitter
+        } else {
+            Kind::Receiver
+        };
         Mcp::for_host(ctx.host, kind)
     }
 
@@ -135,7 +138,9 @@ impl Mcp {
                 "no data for 15 s; if the Push echo arrives but no status follows, \
                  enable network control on the device",
             );
-            cx.connection(Connection::Disconnected { reason: "no data for 15 s".into() });
+            cx.connection(Connection::Disconnected {
+                reason: "no data for 15 s".into(),
+            });
         }
 
         self.unanswered_cycles += 1;
@@ -175,7 +180,9 @@ impl Mcp {
 
     fn complete_error(&mut self, cx: &mut Cx, line: &str) -> bool {
         // "1020: Value out of range [ AfOut 125 ]"
-        let Some((code, rest)) = line.split_once(':') else { return false };
+        let Some((code, rest)) = line.split_once(':') else {
+            return false;
+        };
         if code.len() != 4 || !code.bytes().all(|b| b.is_ascii_digit()) {
             return false;
         }
@@ -193,7 +200,10 @@ impl Mcp {
                 let p = self.pending.remove(i);
                 cx.complete(
                     p.id,
-                    Err(CommandError::DeviceError { code: Some(code.into()), message }),
+                    Err(CommandError::DeviceError {
+                        code: Some(code.into()),
+                        message,
+                    }),
                 );
                 self.arm_reply_timer(cx);
             }
@@ -212,13 +222,21 @@ impl Mcp {
             Expect::FirmwareRevision => Ok(Outcome::Value {
                 value: json!(line.strip_prefix("FirmwareRevision").unwrap_or("").trim()),
             }),
-            Expect::RfConfig => Ok(Outcome::Value { value: parse_rf_config(line) }),
+            Expect::RfConfig => Ok(Outcome::Value {
+                value: parse_rf_config(line),
+            }),
         };
         cx.complete(p.id, result);
         self.arm_reply_timer(cx);
     }
 
-    fn parse_line(&self, line: &str, channel: &mut Map<String, Value>, device: &mut Map<String, Value>, tx: &mut TxMute) {
+    fn parse_line(
+        &self,
+        line: &str,
+        channel: &mut Map<String, Value>,
+        device: &mut Map<String, Value>,
+        tx: &mut TxMute,
+    ) {
         let mut parts = line.split_whitespace();
         let Some(keyword) = parts.next() else { return };
         let args: Vec<&str> = parts.collect();
@@ -237,7 +255,11 @@ impl Mcp {
                 if let Some(v) = args.first().and_then(|v| v.parse::<f64>().ok()) {
                     // kHz per TI 1254 p.15. RFDeck also accepts MHz below 1000,
                     // a fallback kept because it cannot misread a kHz value.
-                    let khz = if v < 1000.0 { (v * 1000.0).round() } else { v.round() };
+                    let khz = if v < 1000.0 {
+                        (v * 1000.0).round()
+                    } else {
+                        v.round()
+                    };
                     channel.insert("frequency_khz".into(), json!(khz as i64));
                 }
                 if let (Some(bank), Some(ch)) = (int(1), int(2)) {
@@ -275,8 +297,15 @@ impl Mcp {
             }
             (Kind::Receiver, "RF1" | "RF2") => {
                 if let (Some(min), Some(max), Some(active)) = (int(0), int(1), int(2)) {
-                    let key = if keyword == "RF1" { "antenna_a" } else { "antenna_b" };
-                    rf(channel).insert(key.into(), json!({"min": min, "max": max, "active": active == 1}));
+                    let key = if keyword == "RF1" {
+                        "antenna_a"
+                    } else {
+                        "antenna_b"
+                    };
+                    rf(channel).insert(
+                        key.into(),
+                        json!({"min": min, "max": max, "active": active == 1}),
+                    );
                 }
             }
             (Kind::Receiver, "RF") => {
@@ -442,7 +471,12 @@ impl Module for Mcp {
                 return self.request(cx, id, "RfConfig".into(), Expect::RfConfig);
             }
             other => {
-                cx.complete(id, Err(CommandError::UnknownCommand { command: other.into() }));
+                cx.complete(
+                    id,
+                    Err(CommandError::UnknownCommand {
+                        command: other.into(),
+                    }),
+                );
                 return;
             }
         };
@@ -456,7 +490,11 @@ impl Module for Mcp {
         cx.alive();
 
         let text = String::from_utf8_lossy(data);
-        let lines: Vec<&str> = text.split('\r').map(str::trim).filter(|l| !l.is_empty()).collect();
+        let lines: Vec<&str> = text
+            .split('\r')
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .collect();
 
         // An error reply means the device is reachable but rejected something.
         // It carries no telemetry, so it does not count as connecting.
@@ -586,7 +624,10 @@ mod tests {
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         let actions = cx.take();
-        assert!(actions.contains(&Action::UdpOpen { socket: SOCKET, bind: Bind::Shared(53212) }));
+        assert!(actions.contains(&Action::UdpOpen {
+            socket: SOCKET,
+            bind: Bind::Shared(53212)
+        }));
         assert_eq!(sent(&actions), ["Push 60 500 3\r", "Name\r", "Frequency\r"]);
     }
 
@@ -602,15 +643,24 @@ mod tests {
         );
         assert!(actions.contains(&Action::Connection(Connection::Connected)));
         let ch = &state(&actions)["channels"]["1"];
-        assert_eq!(ch["rf"]["antenna_a"], json!({"min": 25, "max": 65, "active": true}));
-        assert_eq!(ch["rf"]["antenna_b"], json!({"min": 28, "max": 78, "active": false}));
+        assert_eq!(
+            ch["rf"]["antenna_a"],
+            json!({"min": 25, "max": 65, "active": true})
+        );
+        assert_eq!(
+            ch["rf"]["antenna_b"],
+            json!({"min": 28, "max": 78, "active": false})
+        );
         assert_eq!(ch["rf"]["level"], 50);
         assert_eq!(ch["rf"]["pilot"], true);
         assert_eq!(ch["af"]["peak"], 40);
         assert_eq!(ch["battery_percent"], 70);
         assert_eq!(ch["warnings"], json!(["Low_RF_Signal", "Low_Battery"]));
         assert_eq!(ch["config_index"], 234);
-        assert_eq!(ch["mute_flags"], json!({"any": true, "tx": true, "rf": false, "rx": false}));
+        assert_eq!(
+            ch["mute_flags"],
+            json!({"any": true, "tx": true, "rf": false, "rx": false})
+        );
         assert_eq!(ch["tx_mute"], true);
     }
 
@@ -641,14 +691,22 @@ mod tests {
             Action::State(p) => Some(p.clone()),
             _ => None,
         });
-        assert_eq!(patch.unwrap()["channels"]["1"]["battery_percent"], Value::Null);
+        assert_eq!(
+            patch.unwrap()["channels"]["1"]["battery_percent"],
+            Value::Null
+        );
     }
 
     #[test]
     fn set_command_acks_on_echo() {
         let mut m = receiver();
         let mut cx = Cx::new(0);
-        m.command(&mut cx, 7, "set_frequency", &params(json!({"frequency_khz": 822000})));
+        m.command(
+            &mut cx,
+            7,
+            "set_frequency",
+            &params(json!({"frequency_khz": 822000})),
+        );
         assert_eq!(sent(&cx.take()), ["Frequency 822000\r"]);
 
         let actions = feed(&mut m, 100, "Frequency 822000 2 10\r");
@@ -666,10 +724,13 @@ mod tests {
         let actions = feed(&mut m, 50, "1020: Value out of range [ AfOut 5 ] \r");
         assert_eq!(
             completed(&actions),
-            [(3, Err(CommandError::DeviceError {
-                code: Some("1020".into()),
-                message: "Value out of range".into(),
-            }))]
+            [(
+                3,
+                Err(CommandError::DeviceError {
+                    code: Some("1020".into()),
+                    message: "Value out of range".into(),
+                })
+            )]
         );
         assert!(!actions.contains(&Action::Connection(Connection::Connected)));
     }
@@ -684,7 +745,10 @@ mod tests {
         m.timer(&mut cx, REPLY);
         assert_eq!(
             completed(&cx.take()),
-            [(1, Ok(Outcome::Unverified)), (2, Err(CommandError::Timeout))]
+            [
+                (1, Ok(Outcome::Unverified)),
+                (2, Err(CommandError::Timeout))
+            ]
         );
     }
 
@@ -696,9 +760,12 @@ mod tests {
         let actions = feed(&mut m, 10, "RfConfig 566000 608000 25\r");
         assert_eq!(
             completed(&actions),
-            [(1, Ok(Outcome::Value {
-                value: json!([{"min_khz": 566000, "max_khz": 608000, "step_khz": 25}]),
-            }))]
+            [(
+                1,
+                Ok(Outcome::Value {
+                    value: json!([{"min_khz": 566000, "max_khz": 608000, "step_khz": 25}]),
+                })
+            )]
         );
     }
 
@@ -713,7 +780,9 @@ mod tests {
         let mut cx = Cx::new(15_100);
         m.timer(&mut cx, SILENCE);
         let a = cx.take();
-        assert!(a.iter().any(|x| matches!(x, Action::Connection(Connection::Disconnected { .. }))));
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::Connection(Connection::Disconnected { .. }))));
         assert_eq!(sent(&a), ["Push 60 500 3\r"]);
 
         // Cycles two to four: resubscribe, no repeated disconnect.
@@ -730,13 +799,19 @@ mod tests {
         m.timer(&mut cx, SILENCE);
         let a = cx.take();
         assert!(a.contains(&Action::CancelTimer { key: RESUB }));
-        assert!(a.contains(&Action::SetTimer { key: SLOW_PROBE, after: SLOW_PROBE_EVERY }));
+        assert!(a.contains(&Action::SetTimer {
+            key: SLOW_PROBE,
+            after: SLOW_PROBE_EVERY
+        }));
         assert!(sent(&a).is_empty());
 
         // Any packet restores normal renewal.
         let a = feed(&mut m, 90_000, "Msg OK\r");
         assert!(a.contains(&Action::CancelTimer { key: SLOW_PROBE }));
-        assert!(a.contains(&Action::SetTimer { key: RESUB, after: RESUBSCRIBE_EVERY }));
+        assert!(a.contains(&Action::SetTimer {
+            key: RESUB,
+            after: RESUBSCRIBE_EVERY
+        }));
         assert!(a.contains(&Action::Connection(Connection::Connected)));
     }
 
@@ -747,8 +822,11 @@ mod tests {
         m.command(&mut cx, 1, "rf_mute", &params(json!({"muted": true})));
         assert_eq!(sent(&cx.take()), ["Mute 1\r"]);
         // TI 1254 p.9 example for an SR.
-        let ch = &state(&feed(&mut m, 10, "Af 15 25 40 38 5\rStates 0 2\rMsg OK\rConfig 555\r"))
-            ["channels"]["1"];
+        let ch = &state(&feed(
+            &mut m,
+            10,
+            "Af 15 25 40 38 5\rStates 0 2\rMsg OK\rConfig 555\r",
+        ))["channels"]["1"];
         assert_eq!(ch["af"]["levels"], json!([15, 25, 40, 38, 5]));
         assert_eq!(ch["rf_off"], false);
     }

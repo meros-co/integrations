@@ -1,0 +1,134 @@
+spec: 1
+id: sennheiser-digital-6000
+name: Sennheiser Digital 6000 receivers (SSC)
+vendor: Sennheiser
+category: wireless
+implementation: native
+reason: >
+  Telemetry is delivered through subscriptions that expire and must be renewed
+  on a schedule, and a lapsed subscription is only detectable by silence. That
+  is session logic, not data.
+
+source:
+  - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for Digital 6000 (TI 1109 v2.2)
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/41931-en-ti_1109_v2.2_sennheiser_sound_control_protocol_digital_6000_en.pdf
+    note: >
+      Manufacturer document. Transport (UDP, default port 45), subscriptions,
+      the method list, the metering array and its conversion formulae.
+  - title: RFDeck Digital 6000 client and docs/SENNHEISER_D6000_PROTOCOL.md
+    note: >
+      Meros. Subscription lifecycle, renewal at a third of the lifetime, and the
+      silence timeout. Tested against a simulated device only.
+  - title: Bitfocus Companion, companion-module-sennheiser-digital6000
+    url: https://github.com/bitfocus/companion-module-sennheiser-digital6000
+    note: MIT-licensed; cross-check only. Its default port of 6970 is not supported by the document.
+
+settings:
+  port: { type: int, min: 1, max: 65535, default: 45 }
+
+models:
+  - id: em-6000
+    name: Sennheiser EM 6000 two-channel receiver
+    channels: 2
+    supports: [mute, set_frequency, set_af_out, identify, get_frequency_limits]
+    verification: none
+  - id: em-6000-dante
+    name: Sennheiser EM 6000 Dante two-channel receiver
+    channels: 2
+    supports: [mute, set_frequency, set_af_out, identify, get_frequency_limits]
+    verification: none
+
+commands:
+  mute:
+    summary: Mute or unmute a receiver channel's audio
+    params:
+      channel: { type: int, min: 1, max: 2, required: true }
+      muted:   { type: bool, default: true }
+    returns: ack
+
+  set_frequency:
+    summary: >
+      Tune a channel. Returns the frequency the device applied, which differs
+      from the request when the device adapts an out-of-range value.
+    params:
+      channel:       { type: int, min: 1, max: 2, required: true }
+      frequency_khz: { type: int, min: 470100, max: 713900, required: true }
+    returns: value
+
+  set_af_out:
+    summary: >
+      Set a channel's analogue audio output level. Returns the level the device
+      applied.
+    params:
+      channel:  { type: int, min: 1, max: 2, required: true }
+      level_db: { type: int, min: -10, max: 18, required: true }
+    returns: value
+
+  identify:
+    summary: Show "Identified" on the receiver and blink the channel's triangle LED
+    params:
+      channel: { type: int, min: 1, max: 2, default: 1 }
+    returns: ack
+
+  get_frequency_limits:
+    summary: The carrier range the receiver accepts, as {min_khz, max_khz, step_khz}
+    returns: value
+
+state:
+  device.version:               { type: string, description: "Software version, e.g. 1.1.4.74" }
+  device.vendor:                { type: string, description: "Vendor string" }
+  device.product:               { type: string, description: "Product label" }
+  device.name:                  { type: string, description: "Device name" }
+  channels.*.name:              { type: string, description: "Receiver channel name" }
+  channels.*.frequency_khz:     { type: int, unit: kHz, description: "Carrier frequency" }
+  channels.*.mute:              { type: bool, description: "Receiver audio mute" }
+  channels.*.warnings:          { type: array, description: "Active warnings: RFPeak, AFPeak, LowSignal, NoLink, LowBattery, BadClock, NoClock, Aes256Error, AnTxYBNCShorted" }
+  channels.*.transmitter.name:  { type: string, description: "Transmitter name; empty when no transmitter is present" }
+  channels.*.transmitter.type:  { type: array, description: "Transmitter type and frequency range, e.g. [SK A1-A4, 470 MHz, 558 MHz]" }
+  channels.*.transmitter.battery.state:   { type: string, description: "One of 100%, 70%, 30%, low. Battery is absent when no transmitter reports it" }
+  channels.*.transmitter.battery.minutes: { type: int, unit: min, description: "Remaining time; absent when the device reports -:--" }
+  channels.*.rf.antenna_a_dbm:  { type: float, unit: dBm, description: "RF level at antenna 1: (value - 255) / 2" }
+  channels.*.rf.antenna_b_dbm:  { type: float, unit: dBm, description: "RF level at antenna 2" }
+  channels.*.rf.antenna_a_peak: { type: bool, description: "Digital clip in the RF section, held for at least 1 s" }
+  channels.*.rf.antenna_b_peak: { type: bool, description: "As antenna_a_peak, antenna 2" }
+  channels.*.rf.antenna_a_on:   { type: bool, description: "Diversity: antenna 1 on" }
+  channels.*.rf.antenna_b_on:   { type: bool, description: "Diversity: antenna 2 on" }
+  channels.*.rf.lqi:            { type: int, description: "Audio link quality indicator, 0 (worst) to 255 (best)" }
+  channels.*.af.level_dbfs:     { type: float, unit: dBFS, description: "Audio level: (value + 1) / 2 - 128" }
+  channels.*.af.peak:           { type: bool, description: "Digital clip in the audio section, held for at least 1 s" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Telemetry arrives through subscriptions with a 20 s lifetime. A lapsed
+      subscription goes quiet without closing anything, which looks like a
+      healthy receiver on an idle channel. The core renews every 6.7 s and treats
+      15 s of silence as a lost connection.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The default SSC port is 45 (TI 1109 §6.1). The Bitfocus Companion module's
+      default of 6970 does not appear in the document.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Out-of-range setter values are adapted, not rejected: the device applies
+      the nearest valid value and replies with it. set_frequency and set_af_out
+      return the value actually applied.
+
+  - models: [all]
+    severity: info
+    text: >
+      Battery is reported as one of four states, not a percentage, with an
+      optional remaining time. An empty report means no transmitter, and the
+      battery is left absent rather than reported as empty.
+
+  - models: [all]
+    severity: info
+    text: >
+      identify is a read of a read-only method, per TI 1109 §8.41, and always
+      returns true.

@@ -287,7 +287,12 @@ mod tests {
         for spec in catalog.devices.values() {
             for model in &spec.models {
                 for cmd in &model.supports {
-                    assert!(spec.commands.contains_key(cmd), "{}: {} lists unknown {cmd}", spec.id, model.id);
+                    assert!(
+                        spec.commands.contains_key(cmd),
+                        "{}: {} lists unknown {cmd}",
+                        spec.id,
+                        model.id
+                    );
                 }
             }
         }
@@ -311,7 +316,8 @@ mod tests {
 
     #[test]
     fn rejects_control_characters_and_pattern_failures() {
-        let decl = spec("cue: { type: string, max_length: 8, pattern: \"^[0-9.]+$\", required: true }");
+        let decl =
+            spec("cue: { type: string, max_length: 8, pattern: \"^[0-9.]+$\", required: true }");
         assert!(validate(&decl, &params(json!({"cue": "1.5"}))).is_ok());
         assert!(validate(&decl, &params(json!({"cue": "1\r\nDelete"}))).is_err());
         assert!(validate(&decl, &params(json!({"cue": "1A"}))).is_err());

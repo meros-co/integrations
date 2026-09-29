@@ -17,12 +17,19 @@ use crate::session::DeviceId;
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum Event {
-    Connection { device: DeviceId, connection: Connection },
+    Connection {
+        device: DeviceId,
+        connection: Connection,
+    },
     /// An RFC 7386 merge patch against the device's state.
     State { device: DeviceId, patch: Value },
     /// The device was heard from. At most one per device per second.
     Alive { device: DeviceId },
-    Log { device: DeviceId, level: Level, message: String },
+    Log {
+        device: DeviceId,
+        level: Level,
+        message: String,
+    },
     /// The device's session has ended after `close`.
     Closed { device: DeviceId },
     /// State patches were discarded because the consumer fell behind. Read
@@ -99,12 +106,27 @@ mod tests {
     #[test]
     fn overflow_drops_state_patches_not_connection_changes() {
         let q = EventQueue::new(2);
-        q.push(Event::Connection { device: 1, connection: Connection::Connected });
-        q.push(Event::State { device: 1, patch: json!({"a": 1}) });
-        q.push(Event::State { device: 1, patch: json!({"a": 2}) });
+        q.push(Event::Connection {
+            device: 1,
+            connection: Connection::Connected,
+        });
+        q.push(Event::State {
+            device: 1,
+            patch: json!({"a": 1}),
+        });
+        q.push(Event::State {
+            device: 1,
+            patch: json!({"a": 2}),
+        });
         let events = q.drain(10);
         assert_eq!(events[0], Event::Dropped { count: 1 });
         assert!(matches!(events[1], Event::Connection { .. }));
-        assert_eq!(events[2], Event::State { device: 1, patch: json!({"a": 2}) });
+        assert_eq!(
+            events[2],
+            Event::State {
+                device: 1,
+                patch: json!({"a": 2})
+            }
+        );
     }
 }

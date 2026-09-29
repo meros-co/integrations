@@ -51,8 +51,7 @@ impl SharedUdp {
         let entry = match ports.entry(port) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
-                let socket =
-                    Arc::new(bind_shared(port).map_err(|e| format!("bind :{port}: {e}"))?);
+                let socket = Arc::new(bind_shared(port).map_err(|e| format!("bind :{port}: {e}"))?);
                 let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
                 spawn_router(socket.clone(), routes.clone());
                 e.insert(Port { socket, routes })
@@ -60,7 +59,9 @@ impl SharedUdp {
         };
         let mut routes = entry.routes.lock().unwrap();
         if routes.contains_key(&host) {
-            return Err(format!("{host} already has a session on shared port {port}"));
+            return Err(format!(
+                "{host} already has a session on shared port {port}"
+            ));
         }
         routes.insert(host, Route { key, inbound });
         Ok(())
