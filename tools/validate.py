@@ -213,7 +213,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
         expect = command.get("expect") or {}
         returns = command.get("returns", "ack")
-        if returns == "value" and not ({"matches", "json_path", "address"} & set(expect)):
+        if not native and returns == "value" and not ({"matches", "json_path", "address"} & set(expect)):
             errors.append(
                 f"commands.{name}: returns 'value' needs an extractor "
                 f"(matches, json_path or address); use 'fields' or 'text' otherwise"

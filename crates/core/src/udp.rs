@@ -48,13 +48,17 @@ impl SharedUdp {
         inbound: mpsc::Sender<Inbound>,
     ) -> Result<(), String> {
         let mut ports = self.ports.lock().unwrap();
-        if !ports.contains_key(&port) {
-            let socket = Arc::new(bind_shared(port).map_err(|e| format!("bind :{port}: {e}"))?);
-            let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
-            spawn_router(socket.clone(), routes.clone());
-            ports.insert(port, Port { socket, routes });
-        }
-        let mut routes = ports[&port].routes.lock().unwrap();
+        let entry = match ports.entry(port) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(e) => {
+                let socket =
+                    Arc::new(bind_shared(port).map_err(|e| format!("bind :{port}: {e}"))?);
+                let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
+                spawn_router(socket.clone(), routes.clone());
+                e.insert(Port { socket, routes })
+            }
+        };
+        let mut routes = entry.routes.lock().unwrap();
         if routes.contains_key(&host) {
             return Err(format!("{host} already has a session on shared port {port}"));
         }

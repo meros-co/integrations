@@ -8,13 +8,13 @@
 //! # async fn demo() -> Result<(), Box<dyn std::error::Error>> {
 //! let core = Core::new()?;
 //! let device = core.open(OpenRequest {
-//!     device: "sennheiser-g4".into(),
+//!     device: "sennheiser-ew-g3-g4".into(),
 //!     model: "em-300-500-g4".into(),
 //!     host: "192.168.1.40".into(),
 //!     settings: Default::default(),
 //! })?;
 //! let outcome = core
-//!     .execute(device, "mute", json!({"channel": 1, "muted": true}).as_object().unwrap().clone())
+//!     .execute(device, "mute", json!({"muted": true}).as_object().unwrap().clone())
 //!     .await?;
 //! # Ok(()) }
 //! ```

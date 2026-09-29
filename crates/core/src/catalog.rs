@@ -32,6 +32,9 @@ pub struct DeviceSpec {
     pub commands: BTreeMap<String, CommandSpec>,
     #[serde(default)]
     pub quirks: Vec<Quirk>,
+    /// Telemetry fields, keyed by dotted path with `*` for a channel number.
+    #[serde(default)]
+    pub state: BTreeMap<String, StateField>,
     /// Wire behaviour for spec-driven devices, kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub transport: Option<Value>,
@@ -119,6 +122,15 @@ pub enum ParamType {
     Bool,
     Enum,
     String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StateField {
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

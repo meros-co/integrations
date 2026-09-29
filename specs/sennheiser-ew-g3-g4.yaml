@@ -1,0 +1,204 @@
+spec: 1
+id: sennheiser-ew-g3-g4
+name: Sennheiser evolution wireless G3 / G4 (Media Control Protocol)
+vendor: Sennheiser
+category: wireless
+implementation: native
+reason: >
+  Telemetry arrives only while a subscription is renewed, and a device that
+  stops answering must be backed off rather than re-subscribed indefinitely.
+  Both depend on what the device has or has not sent, which is logic, not data.
+
+source:
+  - title: Media control protocol description — stationary devices of the ew 300-500 G4 and ew IEM G4 series (TI 1254 v1.0)
+    author: Sennheiser
+    url: https://www.novelty.fr/wp-content/uploads/downloaded/downloads/materiel_manuels/seinnheiser_em300g4-gw_media-protocol.pdf
+    note: >
+      Manufacturer document, retrieved from a reseller's mirror. Command syntax,
+      replies, error codes, cyclic attribute layouts and the Push lifecycle.
+  - title: RFDeck G3/G4 client
+    note: >
+      Meros. Tested against real G3/G4 racks: the need for Push, resubscribing
+      every 8 s because some firmware drops the subscription early in RF-Mute,
+      the 15 s silence timeout, and backing off an address that never answers.
+      Protocol readings reviewed against TI 1254 on 2026-09-29.
+
+models:
+  - id: em-300-500-g4
+    name: Sennheiser EM 300-500 G4 receiver
+    channels: 1
+    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware]
+    verification: none
+    notes: >
+      Requires firmware 1.7.0 or later. The EM 100 G4 does not support the
+      protocol.
+  - id: sr-iem-g4
+    name: Sennheiser SR IEM G4 transmitter
+    channels: 1
+    supports: [rf_mute, set_frequency, set_name, set_sensitivity, set_mode, get_rf_config, get_firmware]
+    verification: none
+    notes: >
+      An in-ear monitor transmitter. Its Mute stops the RF carrier, so it is
+      exposed as rf_mute rather than mute.
+  - id: em-g3
+    name: Sennheiser evolution wireless G3 receiver
+    channels: 1
+    supports: [mute, set_frequency, set_name, set_squelch, set_af_out, set_equalizer, get_rf_config, get_firmware]
+    verification: none
+    notes: >
+      Believed compatible: MCP is unchanged between G3 and G4 as far as RFDeck's
+      use of it goes. TI 1254 covers G4 only, and no G3 model is recorded as
+      tested.
+
+commands:
+  mute:
+    summary: Mute or unmute the receiver's audio output (Rx-Mute)
+    params:
+      muted: { type: bool, default: true }
+    returns: ack
+
+  rf_mute:
+    summary: Switch the transmitter's RF carrier off (true) or back on (false)
+    params:
+      muted: { type: bool, default: true }
+    returns: ack
+
+  set_frequency:
+    summary: Tune to a carrier frequency
+    params:
+      frequency_khz: { type: int, min: 400000, max: 2000000, required: true }
+    returns: ack
+
+  set_name:
+    summary: Set the device's display name
+    params:
+      name: { type: string, max_length: 64, pattern: "^[ -~]+$", required: true }
+    returns: ack
+
+  set_squelch:
+    summary: Set the squelch threshold in dB; 0 switches squelch off
+    params:
+      squelch_db: { type: int, min: 0, max: 25, required: true }
+    returns: ack
+
+  set_af_out:
+    summary: Set the receiver's audio output level in dB
+    params:
+      level_db: { type: int, min: -24, max: 24, required: true }
+    returns: ack
+
+  set_equalizer:
+    summary: Select the receiver's equalizer preset
+    params:
+      preset: { type: enum, values: [flat, low_cut, low_cut_high_boost, high_boost], required: true }
+    returns: ack
+
+  set_sensitivity:
+    summary: Set the transmitter's input sensitivity in dB
+    params:
+      sensitivity_db: { type: int, min: -42, max: 0, required: true }
+    returns: ack
+
+  set_mode:
+    summary: Switch the transmitter between mono and stereo
+    params:
+      mode: { type: enum, values: [mono, stereo], required: true }
+    returns: ack
+
+  get_rf_config:
+    summary: The frequency blocks the device can tune, as {min_khz, max_khz, step_khz} objects
+    returns: value
+
+  get_firmware:
+    summary: Firmware revision, e.g. "1.20.1"
+    returns: value
+
+state:
+  channels.*.name:            { type: string, description: "Device display name" }
+  channels.*.frequency_khz:   { type: int, unit: kHz, description: "Carrier frequency" }
+  channels.*.bank:            { type: int, description: "Frequency bank: 0 for user bank U1.0, 1-20 presets, 21-26 user banks U1-U6" }
+  channels.*.bank_channel:    { type: int, description: "Channel within the bank; 0 with bank 0" }
+  channels.*.mute:            { type: bool, description: "Receiver Rx-Mute (EM) or RF-Mute (SR), as last reported by Mute" }
+  channels.*.squelch_db:      { type: int, unit: dB, description: "Squelch threshold; 0 is off (EM)" }
+  channels.*.af_out_db:       { type: int, unit: dB, description: "Audio output level (EM)" }
+  channels.*.equalizer:       { type: string, description: "flat, low_cut, low_cut_high_boost or high_boost (EM)" }
+  channels.*.sensitivity_db:  { type: int, unit: dB, description: "Input sensitivity (SR)" }
+  channels.*.mode:            { type: string, description: "mono or stereo (SR)" }
+  channels.*.rf.antenna_a:    { type: object, unit: "%", description: "RF1: {min, max} level since the last cycle and {active} flag. 100% = 40 dBµV; values above 100 occur (EM)" }
+  channels.*.rf.antenna_b:    { type: object, unit: "%", description: "RF2, as antenna_a (EM)" }
+  channels.*.rf.level:        { type: int, unit: "%", description: "Current RF level, 100% = 40 dBµV; may exceed 100 (EM)" }
+  channels.*.rf.active_antenna: { type: int, description: "1 or 2 (EM)" }
+  channels.*.rf.pilot:        { type: bool, description: "Pilot signal currently detected (EM)" }
+  channels.*.af.peak:         { type: int, unit: "%", description: "Audio level; 0% = -50 dB, 100% = peak; may exceed 100 (EM)" }
+  channels.*.af.peak_hold:    { type: int, unit: "%", description: "Peak-hold level, as peak (EM)" }
+  channels.*.af.levels:       { type: array, unit: "%", description: "SR: the raw Af values — two path levels, then two peak-hold levels" }
+  channels.*.mute_flags:      { type: object, description: "EM States: {any, tx, rf, rx} mutes seen during the last cycle" }
+  channels.*.tx_mute:         { type: bool, description: "The transmitter is muted: States bit 1, or TX_Mute in Msg (EM)" }
+  channels.*.pilot_flag:      { type: int, description: "EM States pilot flag: 0 none, 1 permanent, 2 changed during the cycle" }
+  channels.*.rf_off:          { type: bool, description: "SR: RF currently off (States first value)" }
+  channels.*.battery_percent: { type: int, unit: "%", description: "Transmitter battery: 0 (low), 30, 70 or 100. Absent when the receiver has no battery telegram (EM)" }
+  channels.*.warnings:        { type: array, description: "Active warnings from Msg; empty when Msg is OK" }
+  channels.*.config_index:    { type: int, description: "Increments on every configuration change, 0-999, wrapping" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Telemetry flows only while a Push subscription is renewed. When it lapses
+      the device goes quiet without closing anything, which looks like a healthy
+      receiver with nothing to report. The core renews every 8 s and reports the
+      device disconnected after 15 s of silence.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The protocol uses UDP port 53212 in both directions, so every G3/G4 device
+      shares one local socket bound to 53212. Another application bound to that
+      port on the same machine competes for the replies.
+
+  - models: [all]
+    severity: warning
+    text: >
+      An address that has never answered is tried four times and then only every
+      30 s. Repeatedly subscribing to an address that now belongs to other
+      equipment has locked up DMX/Art-Net nodes on venue networks.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Network control must be enabled on the device. Until it is, the device
+      ignores the protocol entirely, which presents as an unreachable address.
+
+  - models: [sr-iem-g4]
+    severity: critical
+    text: >
+      rf_mute switches off the transmitter's carrier. Every receiver on that
+      frequency loses its signal, so a performer's in-ear mix stops.
+
+  - models: [em-300-500-g4, em-g3]
+    severity: info
+    text: >
+      Set commands are acknowledged by the device echoing the instruction, and
+      rejected with a numbered error such as "1020: Value out of range". A
+      command with no reply within 1 s reports unverified rather than failure.
+
+  - models: [em-300-500-g4, em-g3]
+    severity: info
+    text: >
+      TI 1254's bit table for States gives bit 1 as TX mute, but two of its own
+      examples disagree with the table. tx_mute uses bit 1 only, which the table
+      and the "States 9" example agree on; mute_flags carries all four bits for
+      review against hardware.
+
+  - models: [em-300-500-g4, em-g3]
+    severity: info
+    text: >
+      Squelch accepts 0 or 5-25 dB in 2 dB steps, and AF out -24 to +24 dB in
+      3 dB steps. Values between steps are rejected by the device with error
+      1020 rather than rounded.
+
+  - models: [em-g3]
+    severity: warning
+    text: >
+      No manufacturer document covering G3 has been found, and no G3 model is
+      recorded as tested. Behaviour is assumed identical to G4.
