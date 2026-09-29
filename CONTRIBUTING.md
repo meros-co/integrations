@@ -64,6 +64,21 @@ send: { address: /cue/{cue}/start }       # parse error
 Block style needs no quoting as long as the value does not begin with a brace.
 `tools/validate.py` catches this, since the file will not parse.
 
+YAML 1.1 also reads some bare words as other types. A parameter named `on`,
+`off`, `yes` or `no` loads as a boolean key, and a bare number key such as a
+response code loads as an integer. The file parses, but the entry is silently
+renamed:
+
+```yaml
+params:
+  on: { type: bool }        # loads as True: — the parameter "on" does not exist
+  enabled: { type: bool }   # use a different name
+codes:
+  "104": disk full          # quote numeric keys
+```
+
+`tools/validate.py` rejects any key that does not load as a string.
+
 ## Review checklist
 
 A spec change reaches every consuming product at once, so review is not a

@@ -8,8 +8,12 @@ A spec describes a control protocol as data. An interpreter library reads the
 spec and talks to the device, so protocol details are defined once instead of
 reimplemented per language.
 
-**Status:** format v1. Three specs published, none hardware-verified. No
-interpreter released yet. The format may still change.
+**Status:** format v1, draft. Fourteen specs published, none hardware-verified.
+No interpreter released yet. The format may still change before the first
+tagged release.
+
+This repository holds specifications only. Interpreters are separate packages,
+one per language, maintained by the products that consume these specs.
 
 ## Rationale
 

@@ -5,8 +5,9 @@ vendor: Blackmagic Design
 category: recorder
 
 source:
-  - title: HyperDeck Ethernet Protocol
-    note: Manufacturer-documented, published in the HyperDeck manual
+  - title: Blackmagic HyperDeck Ethernet Protocol (Developer Information, December 2024)
+    url: https://documents.blackmagicdesign.com/DeveloperManuals/HyperDeckEthernetProtocol.pdf
+    note: Manufacturer-documented. Command syntax, response codes and response framing
 
 transport:
   type: line-tcp
@@ -16,26 +17,30 @@ transport:
   encoding: ascii
   timeout_ms: 2000
   reply: expected
+  reply_framing: headed-block
+  reply_match: "^[12][0-9][0-9] "
   probe: "ping"
 
 models:
   - id: hyperdeck-1-8
     name: HyperDeck (protocol 1.8)
     supports:
-      [record, stop, play, goto_clip, goto_clip_offset, get_transport_info,
-       get_device_info, get_clip_count, get_clips, get_configuration,
-       disk_list, preview_enable, preview_disable]
+      [record, record_named, record_spill, record_spill_to_slot, stop, play,
+       goto_clip, goto_clip_offset, get_transport_info, get_device_info,
+       get_clip_count, get_clips, get_configuration, disk_list, disk_list_slot,
+       preview_enable, preview_disable]
     verification: none
     notes: >
       Play speed range is -1600 to 1600 percent on this protocol version.
   - id: hyperdeck-1-11
     name: HyperDeck (protocol 1.11 and later)
     supports:
-      [record, record_spill, stop, play, goto_clip, goto_clip_offset,
-       get_transport_info, get_device_info, get_clip_count, get_clips,
-       get_configuration, disk_list, preview_enable, preview_disable,
-       get_playrange, set_playrange, set_playrange_frames, clear_playrange,
-       set_playback_stop_mode]
+      [record, record_named, record_spill, record_spill_to_slot, stop, play,
+       goto_clip, goto_clip_offset, get_transport_info, get_device_info,
+       get_clip_count, get_clips, get_configuration, disk_list, disk_list_slot,
+       preview_enable, preview_disable, get_playrange, set_playrange_clip,
+       set_playrange_clips, set_playrange_timecode, set_playrange_frames,
+       clear_playrange, set_playback_stop_mode]
     verification: none
     notes: >
       Play speed range is -5000 to 5000 percent. Playrange and stop-mode
@@ -43,18 +48,30 @@ models:
 
 commands:
   record:
-    summary: Start recording, optionally naming the clip
+    summary: Start recording from the current input
+    send: "record"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  record_named:
+    summary: Start recording a named clip
     params:
-      name: { type: string, max_length: 128 }
+      name: { type: string, max_length: 128, required: true }
     send: "record: name: {name}"
     expect: { code_range: [200, 299] }
     returns: ack
 
   record_spill:
-    summary: Continue recording onto another slot
+    summary: Continue the current recording on the next slot
+    send: "record spill"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  record_spill_to_slot:
+    summary: Continue the current recording on a specific slot
     params:
-      slot_id: { type: int, min: 1, max: 8 }
-    send: "record spill: slot id: {slot_id}"
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "record: spill: slot id: {slot_id}"
     expect: { code_range: [200, 299] }
     returns: ack
 
@@ -92,34 +109,41 @@ commands:
   get_transport_info:
     send: "transport info"
     expect: { code_range: [200, 299] }
-    returns: value
+    returns: fields
 
   get_device_info:
     send: "device info"
     expect: { code_range: [200, 299] }
-    returns: value
+    returns: fields
 
   get_clip_count:
     send: "clips count"
-    expect: { code_range: [200, 299] }
+    expect: { code_range: [200, 299], matches: "clip count: ([0-9]+)" }
     returns: value
 
   get_clips:
     send: "clips get"
     expect: { code_range: [200, 299] }
-    returns: value
+    returns: text
 
   get_configuration:
     send: "configuration"
     expect: { code_range: [200, 299] }
-    returns: value
+    returns: fields
 
   disk_list:
+    summary: List clips on the active disk
+    send: "disk list"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  disk_list_slot:
+    summary: List clips on the disk in a specific slot
     params:
-      slot_id: { type: int, min: 1, max: 8 }
+      slot_id: { type: int, min: 1, max: 8, required: true }
     send: "disk list: slot id: {slot_id}"
     expect: { code_range: [200, 299] }
-    returns: value
+    returns: text
 
   preview_enable:
     send: "preview: enable: true"
@@ -134,18 +158,36 @@ commands:
   get_playrange:
     send: "playrange"
     expect: { code_range: [200, 299] }
-    returns: value
+    returns: text
 
-  set_playrange:
+  set_playrange_clip:
+    summary: Restrict playback to a single clip
     params:
       clip_id: { type: int, min: 1, max: 9999, required: true }
-      in:      { type: string, max_length: 32 }
-      out:     { type: string, max_length: 32 }
-    send: "playrange set: clip id: {clip_id} in: {in} out: {out}"
+    send: "playrange set: clip id: {clip_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_playrange_clips:
+    summary: Restrict playback to a run of clips starting at clip_id
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+      count:   { type: int, min: 1, max: 9999, required: true }
+    send: "playrange set: clip id: {clip_id} count: {count}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_playrange_timecode:
+    summary: Restrict playback to a timecode range
+    params:
+      in:  { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+      out: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "playrange set: in: {in} out: {out}"
     expect: { code_range: [200, 299] }
     returns: ack
 
   set_playrange_frames:
+    summary: Restrict playback to a range of timeline frames
     params:
       timeline_in:  { type: int, min: 0, required: true }
       timeline_out: { type: int, min: 0, required: true }
@@ -166,24 +208,28 @@ commands:
     returns: ack
 
 codes:
-  100: syntax error
-  101: unsupported parameter
-  102: invalid value
-  103: unsupported
-  104: disk full
-  105: no disk
-  106: disk error
-  107: timeline empty
-  108: internal error
-  109: out of range
-  110: no input
-  111: remote control disabled
-  120: connection rejected
-  150: invalid state
-  151: invalid codec
-  160: invalid format
-  161: invalid token
-  162: format not prepared
+  "100": syntax error
+  "101": unsupported parameter
+  "102": invalid value
+  "103": unsupported
+  "104": disk full
+  "105": no disk
+  "106": disk error
+  "107": timeline empty
+  "108": internal error
+  "109": out of range
+  "110": no input
+  "111": remote control disabled
+  "112": clip not found
+  "120": connection failed
+  "121": authentication failed
+  "122": authentication required
+  "150": invalid state
+  "151": invalid codec
+  "160": invalid format
+  "161": invalid token
+  "162": format not prepared
+  "163": parameterized single line command not supported
 
 quirks:
   - models: [all]
@@ -199,6 +245,19 @@ quirks:
       Play speed limits differ by protocol version: +/-1600 percent on 1.8,
       +/-5000 on 1.11 and later. Sending a value outside the device's range
       returns 109 out of range.
+
+  - models: [all]
+    severity: info
+    text: >
+      Asynchronous 5xx messages can arrive at any time, starting with "500
+      connection info:" on connect. They are not replies to the pending command
+      and are skipped when matching a response.
+
+  - models: [all]
+    severity: info
+    text: >
+      A relative goto past the first or last clip clamps to that clip rather
+      than failing.
 
   - models: [all]
     severity: info

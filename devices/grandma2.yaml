@@ -7,6 +7,11 @@ category: lighting
 source:
   - title: grandMA2 telnet remote command-line reference
     note: Manufacturer-documented console command syntax
+  - title: grandMA2 User Manual, Go keyword
+    url: https://help2.malighting.com/grandMA2/en/help/key_keyword_go.html
+  - title: grandMA2 User Manual, Select keyword
+    url: https://help2.malighting.com/Page/grandMA2/keyword_select/en/3.9
+    note: The selected executor is the target of executor commands given without one
 
 transport:
   type: line-tcp
@@ -27,30 +32,47 @@ on_connect:
 models:
   - id: grandma2
     name: grandMA2 console
-    supports: [go, go_back, goto_cue, fire_macro, command]
+    supports: [go, go_executor, go_back, go_back_executor, goto_cue, goto_cue_executor, fire_macro, command]
     verification: none
   - id: grandma2-onpc
     name: grandMA2 onPC
-    supports: [go, go_back, goto_cue, fire_macro, command]
+    supports: [go, go_executor, go_back, go_back_executor, goto_cue, goto_cue_executor, fire_macro, command]
     verification: none
 
 commands:
   go:
+    summary: Go on the selected executor
+    send: "Go"
+    returns: none
+
+  go_executor:
     params:
-      executor: { type: int, min: 1, max: 9999 }
+      executor: { type: int, min: 1, max: 9999, required: true }
     send: "Go Executor {executor}"
     returns: none
 
   go_back:
+    summary: Go back on the selected executor
+    send: "GoBack"
+    returns: none
+
+  go_back_executor:
     params:
-      executor: { type: int, min: 1, max: 9999 }
+      executor: { type: int, min: 1, max: 9999, required: true }
     send: "GoBack Executor {executor}"
     returns: none
 
   goto_cue:
+    summary: Jump to a cue on the selected executor
+    params:
+      cue: { type: string, max_length: 16, pattern: "^[0-9.]+$", required: true }
+    send: "Goto Cue {cue}"
+    returns: none
+
+  goto_cue_executor:
     params:
       cue:      { type: string, max_length: 16, pattern: "^[0-9.]+$", required: true }
-      executor: { type: int, min: 1, max: 9999 }
+      executor: { type: int, min: 1, max: 9999, required: true }
     send: "Goto Cue {cue} Executor {executor}"
     returns: none
 
@@ -86,8 +108,15 @@ quirks:
     severity: warning
     text: >
       The command entry point accepts arbitrary console syntax, including
-      destructive operations such as Delete and Store. Interpreters strip CR and
-      LF to prevent injecting a second command, but cannot validate intent.
+      destructive operations such as Delete and Store. Interpreters reject CR and LF
+      to prevent injecting a second command, but cannot validate intent.
+
+  - models: [all]
+    severity: info
+    text: >
+      go, go_back and goto_cue act on whichever executor is selected on the
+      console, which an operator can change at any time. Use the _executor
+      variants where the target must be fixed.
 
   - models: [all]
     severity: info

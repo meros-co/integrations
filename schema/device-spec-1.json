@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/meros-co/meros-device-spec/schema/device-spec-1.json",
-  "title": "Meros Device Spec v1",
+  "title": "Meros Device Spec v1 (draft)",
   "type": "object",
   "required": ["spec", "id", "name", "vendor", "category", "source", "models"],
   "additionalProperties": false,
@@ -66,7 +66,23 @@
         "oneOf": [
           { "type": "string" },
           { "$ref": "#/$defs/oscSend" },
-          { "$ref": "#/$defs/httpSend" }
+          { "$ref": "#/$defs/httpSend" },
+          {
+            "type": "object",
+            "required": ["send", "when_set"],
+            "additionalProperties": false,
+            "description": "Sent only when the named setting is non-empty. Decided from configuration before connecting, never from a device reply.",
+            "properties": {
+              "send": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "$ref": "#/$defs/oscSend" },
+                  { "$ref": "#/$defs/httpSend" }
+                ]
+              },
+              "when_set": { "type": "string" }
+            }
+          }
         ]
       }
     },
@@ -108,6 +124,14 @@
             "encoding": { "enum": ["ascii", "utf-8"], "default": "ascii" },
             "timeout_ms": { "type": "integer", "minimum": 1 },
             "reply": { "enum": ["expected", "none"], "default": "expected" },
+            "reply_framing": {
+              "enum": ["line", "block", "headed-block"],
+              "description": "How a reply is delimited. Defaults to 'block' for framing: block, otherwise 'line'."
+            },
+            "reply_match": {
+              "type": "string",
+              "description": "RE2-safe regex. A message matching it is a command reply; any other message is unsolicited."
+            },
             "probe": { "type": "string" }
           },
           "required": ["port", "framing"],
@@ -177,6 +201,7 @@
         "summary": { "type": "string" },
         "params": {
           "type": "object",
+          "propertyNames": { "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$" },
           "additionalProperties": { "$ref": "#/$defs/param" }
         },
         "send": {
@@ -199,7 +224,7 @@
           ]
         },
         "expect": { "$ref": "#/$defs/expect" },
-        "returns": { "enum": ["ack", "value", "none"], "default": "ack" }
+        "returns": { "enum": ["ack", "value", "fields", "text", "none"], "default": "ack" }
       }
     },
 
@@ -274,6 +299,17 @@
           "maxItems": 2,
           "items": { "type": "integer" },
           "description": "Inclusive success range for a leading numeric response code."
+        },
+        "address": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "OSC only. Templated address the reply must carry."
+        },
+        "arg": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "OSC only. Index of the reply argument returned as the value."
         }
       }
     },

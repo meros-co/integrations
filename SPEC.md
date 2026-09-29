@@ -1,4 +1,7 @@
-# Meros Device Spec — format v1
+# Meros Device Spec — format v1 (draft)
+
+The format is pre-release. It may change without a version bump until the
+first tagged release; after that, `spec:` changes on any incompatible change.
 
 A device spec describes how to control one family of third-party hardware or
 software. An interpreter reads the spec and drives the device without
@@ -61,6 +64,35 @@ transport:
 
 `reply: none` marks a device that never acknowledges over TCP (RossTalk).
 Interpreters report `unverified` for those writes, as with `osc-udp`.
+
+#### Replies
+
+`reply_framing` says how a reply is delimited, which can differ from how a
+command is sent:
+
+| Value | Reply ends at | Example |
+|---|---|---|
+| `line` | The transport terminator or delimiter | Kramer P3000, Shure |
+| `block` | A blank line | Blackmagic Videohub |
+| `headed-block` | The end of the first line, unless that line ends in `:`, in which case a blank line | Blackmagic HyperDeck: `200 ok`, or `208 transport info:` followed by fields |
+
+It defaults to `block` for `framing: block` and to `line` otherwise.
+
+`reply_match` is an RE2-safe regex separating replies from unsolicited
+messages. A device that pushes status at any time (HyperDeck's `5xx` messages,
+including its connection banner) would otherwise have that push consumed as
+the answer to the pending command. When `reply_match` is set, an inbound message
+that does not match it is never taken as a command reply.
+
+```yaml
+transport:
+  type: line-tcp
+  port: 9993
+  framing: terminated
+  terminator: crlf
+  reply_framing: headed-block
+  reply_match: "^[12][0-9][0-9] "
+```
 
 ### `osc-udp`
 
@@ -133,6 +165,19 @@ there is no branching on the response, no retry and no negotiation. Protocols
 whose connection setup depends on what the device answers are native cases —
 see the [escape hatch](#escape-hatch).
 
+A step can be limited to installations that configure a setting:
+
+```yaml
+on_connect:
+  - when_set: passcode
+    send: { address: /connect, args: [ { value: "{settings.passcode}", type: string } ] }
+```
+
+The step is sent only when `passcode` is non-empty. This is decided from the
+operator's configuration before the socket opens, never from anything the device
+sends. QLab needs it: a workspace without a passcode expects no `/connect`, and
+repeated wrong passcodes, including an empty one, add a growing delay.
+
 ## 3. Models and capabilities
 
 A spec covers a device family. Differences between models are expressed as data.
@@ -173,7 +218,7 @@ commands:
     send: "< SET {channel} AUDIO_MUTE {muted:on_off} >"
     expect:
       contains: "REP"
-    returns: ack               # ack | value | none
+    returns: ack               # ack | value | fields | text | none
 ```
 
 ### Parameter types
@@ -190,10 +235,49 @@ Values outside the declared range are rejected before transmission. Interpreters
 do not clamp, because a clamped value masks a caller error and produces a
 different device state than the caller requested.
 
+### Templates
+
+Every string in `send`, `on_connect` and `probe` is a template. Substitution is
+`{param}` for a command parameter or `{settings.name}` for a setting, optionally
+followed by directives after `:`.
+
+**Every substituted value is always present.** A parameter used in a template
+must be `required` or have a `default`. A protocol clause that exists only when
+a value is given, such as HyperDeck's `record` and `record: name: {name}`,
+becomes two commands: `record` and `record_named`. The format has no optional
+segments, because an optional segment is a conditional. `tools/validate.py`
+enforces this.
+
+Without a directive, values render as follows:
+
+| Type | Rendering |
+|---|---|
+| `int` | Decimal, `-` for negatives, no leading zeros |
+| `bool` | `true` / `false` |
+| `enum` | The value exactly as listed in `values` |
+| `string` | The value unchanged |
+| `float` | No default. A float rendered as text needs a `.Nf` directive. A float that is the whole value of an OSC `float` argument is sent as a number and needs none |
+
+Floats have no default text form because languages disagree on one (`0.1` vs
+`0.10000000000000001`, `1` vs `1.0`).
+
+**String values containing a control character (U+0000–U+001F) are rejected**
+before transmission. A CR or LF in a label would otherwise end the command and
+start another. Rejecting rather than stripping follows the no-clamping rule
+above.
+
+Encoding depends on where the value lands:
+
+| Location | Encoding |
+|---|---|
+| Line/TCP payload, OSC address, OSC string argument | None; text encoded per `encoding` |
+| HTTP `path` | Percent-encoded as a path segment (RFC 3986 unreserved characters kept) |
+| HTTP `query` value | Percent-encoded as a query value |
+| HTTP `raw_query` | None. Only `int`, `float`, `bool`, `enum`, or a `string` with a `pattern`, may appear here |
+
 ### Formatting directives
 
-Substitution is `{param}`, with an optional directive after `:`. The set is
-closed.
+The directive set is closed.
 
 | Directive | Effect |
 |---|---|
@@ -204,6 +288,9 @@ closed.
 | `upper`, `lower` | String case |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Integer with an explicit leading sign: `7` → `+7`, `-7` → `-7` |
+| `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75` |
+
+Offsets apply before formatting, and directives apply left to right.
 
 `bool10` covers flags whose sense is inverted relative to the parameter name,
 such as the X32's `mix/on` where `0` is muted.
@@ -228,6 +315,22 @@ commands:
 ```
 
 OSC argument types: `int`, `float`, `string`, `blob`.
+
+A query is a message carrying no arguments. For a device that answers on the
+same address, the spec declares the reply address, and the value is the
+argument at index `arg` (default 0):
+
+```yaml
+commands:
+  get_channel_name:
+    params:
+      channel: { type: int, min: 1, max: 32, required: true }
+    send: { address: "/ch/{channel:02d}/config/name" }
+    expect: { address: "/ch/{channel:02d}/config/name", arg: 0 }
+    returns: value
+```
+
+Inbound messages on other addresses are not the reply.
 
 ### Multi-message commands
 
@@ -276,6 +379,8 @@ expect:
   status: 200               # HTTP only
   json_path: "$.transport.status"   # HTTP JSON only
   code_range: [200, 299]    # leading numeric response code
+  address: /ch/01/config/name       # OSC only: the reply's address
+  arg: 0                    # OSC only: argument returned as the value
 ```
 
 `not_contains` covers devices that acknowledge by not complaining. Kramer
@@ -306,8 +411,12 @@ response carrying the raw code. This is the Blackmagic HyperDeck shape.
 | Value | Result |
 |---|---|
 | `ack` | Boolean. True when `expect` matched |
-| `value` | Captured value: regex group 1, or the `json_path` result |
+| `value` | Captured value: regex group 1, the `json_path` result, or the OSC argument. Requires one of `matches`, `json_path` or `address` |
+| `fields` | Map of `key: value` lines from the reply body, split at the first `: `. For HyperDeck-style replies such as `208 transport info:` |
+| `text` | The reply body as text: for `headed-block`, the lines after the first; otherwise the whole reply |
 | `none` | No acknowledgement available. Interpreter reports `unverified` |
+
+`json_path: "$"` returns the whole JSON body.
 
 ## 6. Quirks
 
@@ -339,7 +448,7 @@ the device's reply. They live in `vectors/<spec-id>/<command>.yaml`.
 spec: behringer-x32
 command: mute_channel
 input: { channel: 7, muted: true }
-expect_wire_hex: "2f63682f30372f6d69782f6f6e0000002c690000 00000000"
+expect_wire_hex: "2f63682f30372f6d69782f6f6e0000002c69000000000000"
 notes: OSC address /ch/07/mix/on, int arg 0
 ```
 
@@ -358,6 +467,10 @@ rather than described:
 spec: 1
 id: blackmagic-atem
 name: Blackmagic ATEM
+vendor: Blackmagic Design
+category: switcher
+source:
+  - title: …
 implementation: native        # carries no commands
 reason: >
   Proprietary UDP with stateful session handshake, per-packet sequencing and
@@ -365,6 +478,11 @@ reason: >
 native:
   crate: meros-device-atem
   bindings: [rust, node-napi, python-cffi, cpp]
+models:
+  - id: atem-mini
+    name: ATEM Mini
+    supports: []              # a native spec has no commands to list
+    verification: none
 ```
 
 A `native` spec still carries `models`, `quirks` and vectors, so the shared
