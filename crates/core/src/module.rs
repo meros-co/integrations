@@ -122,7 +122,13 @@ pub enum Bind {
 pub enum Connection {
     Connecting,
     Connected,
-    Disconnected { reason: String },
+    Disconnected {
+        reason: String,
+    },
+    /// Reachable, but the device refused the configured credentials.
+    Unauthorized {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

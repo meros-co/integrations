@@ -73,6 +73,10 @@ pub(crate) struct Services {
 }
 
 /// What any consumer can read about a device without asking it.
+///
+/// `state` is the last known state and is kept across disconnections, so a
+/// consumer can still show a device's configuration while it is offline.
+/// Whether it is current is `connection`'s answer, not the state's.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DeviceSnapshot {
     pub connection: Connection,

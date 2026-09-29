@@ -1,0 +1,116 @@
+spec: 1
+id: sennheiser-ew-dx
+name: Sennheiser Evolution Wireless Digital EW-DX receivers (SSCv2)
+vendor: Sennheiser
+category: wireless
+implementation: native
+reason: >
+  Telemetry is a server-sent event stream whose subscriptions are added using a
+  session id the device issues when the stream opens, and a quiet stream has to
+  be told apart from a dead one by probing. Both depend on what the device
+  sends.
+
+source:
+  - title: Sennheiser Sound Control Protocol v2 (SSCv2), 06/2023
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/40447-en-06_2023_sennheiser_sound_control_protocol_v2_tccm_en.pdf
+    note: >
+      HTTPS on port 443, HTTP Basic authentication as user "api", and the
+      subscription lifecycle: GET /api/ssc/state/subscriptions opens the stream,
+      and PUT .../{sessionUUID}/add subscribes resources.
+  - title: Sennheiser Control Cockpit, Sennheiser Sound Control Protocols (SSCv1 and SSCv2)
+    url: https://docs.cloud.sennheiser.com/en-us/control-cockpit/control-cockpit/ssc-protocols.html
+    note: SSCv2 uses HTTPS (TLS 1.3) and is enabled per device under 3rd Party Access.
+  - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for EW-DX, 03/2023
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/40838-en-ew-dx_sound_control_protocol_03_2023_en.pdf
+    note: Units for the same quantities under SSCv1 (frequency in kHz, battery gauge in percent).
+  - title: RFDeck EW-DX client (SSCClient.ts)
+    note: >
+      Meros. Tested against real EW-DX receivers on OpenAPI 1.7 firmware: the
+      /api/channel/{id} resources, the SSE subscription, and mute. Reviewed
+      with the RFDeck agent on 2026-09-29 (RFDeck docs/INTEGRATIONS_CORE_REVIEW.md).
+
+settings:
+  password: { type: string, secret: true, required: true }
+  port:     { type: int, min: 1, max: 65535, default: 443 }
+
+models:
+  - id: em-2
+    name: Sennheiser EW-DX EM 2 receiver
+    channels: 2
+    supports: [mute]
+    verification: none
+  - id: em-2-dante
+    name: Sennheiser EW-DX EM 2 Dante receiver
+    channels: 2
+    supports: [mute]
+    verification: none
+  - id: em-4-dante
+    name: Sennheiser EW-DX EM 4 Dante receiver
+    channels: 4
+    supports: [mute]
+    verification: none
+
+commands:
+  mute:
+    summary: Mute or unmute a receiver channel
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      muted:   { type: bool, default: true }
+    returns: ack
+
+state:
+  device.identity:                   { type: object, description: "The /api/device/identity resource as the device returns it" }
+  channels.*.name:                   { type: string, description: "Channel name" }
+  channels.*.mute:                   { type: bool, description: "Receiver mute" }
+  channels.*.frequency_khz:          { type: int, unit: kHz, description: "Carrier frequency, from /api/rf/channels/{id}" }
+  channels.*.rf.quality_pct:         { type: int, unit: "%", description: "Signal quality indicator, 0-100" }
+  channels.*.af.level_dbfs:          { type: float, unit: dBFS, description: "Audio level" }
+  channels.*.warnings:               { type: object, description: "The /api/channel/{id}/warnings resource as the device returns it" }
+  channels.*.transmitter:            { type: object, description: "Absent until known; null when no transmitter is linked (the battery resource answers 422)" }
+  channels.*.transmitter.battery_percent: { type: int, unit: "%", description: "Battery gauge, 0-100" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API is unavailable until third-party access is enabled on the device in
+      Sennheiser Control Cockpit, with a password set. Requests are then
+      authenticated as user "api" with that password. A wrong or missing password
+      is reported as unauthorized, not as an unreachable device.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The device presents a self-signed certificate, so it is accepted without
+      verification. The connection is encrypted but the device is not
+      authenticated; on an untrusted network another host could impersonate it.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Only mute is exposed. Gain, frequency, identify and network settings have
+      no documented SSCv2 path, and the legacy paths RFDeck used for them are the
+      scheme that returned 404 for mute on OpenAPI 1.7 firmware. They are omitted
+      rather than sent to paths that may fail.
+
+  - models: [all]
+    severity: info
+    text: >
+      Telemetry arrives only when a value changes. A quiet stream is checked by
+      requesting /api/ssc/version after 3 s of silence; two failed checks in a
+      row are treated as a lost connection.
+
+  - models: [all]
+    severity: info
+    text: >
+      A receiver with both a control and a Dante interface answers on both with
+      the same identity. Open it by its control interface address.
+
+  - models: [em-4-dante]
+    severity: info
+    text: >
+      Channels are 1-based here and 0-based in the API (/api/channel/0 is
+      channel 1). Subscriptions cover every channel of the model; RFDeck's
+      original client subscribed channels 1 and 2 only.
