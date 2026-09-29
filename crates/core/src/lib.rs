@@ -22,6 +22,7 @@
 pub mod catalog;
 pub mod events;
 mod http;
+pub mod json;
 pub mod module;
 mod modules;
 mod session;
@@ -228,6 +229,11 @@ impl Core {
     /// Queued events, without waiting.
     pub fn poll_events(&self, max: usize) -> Vec<Event> {
         self.services.events.drain(max)
+    }
+
+    /// Make a pending [`Core::next_events`] return, empty if nothing is queued.
+    pub fn interrupt_events(&self) {
+        self.services.events.interrupt();
     }
 
     /// Wait for at least one event.

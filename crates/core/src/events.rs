@@ -4,7 +4,7 @@
 //! host's idiom. Nothing calls into a host from the core's threads.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -45,6 +45,7 @@ pub struct EventQueue {
     queue: Mutex<VecDeque<Event>>,
     notify: Notify,
     dropped: AtomicU64,
+    interrupted: AtomicBool,
     capacity: usize,
 }
 
@@ -54,6 +55,7 @@ impl EventQueue {
             queue: Mutex::new(VecDeque::new()),
             notify: Notify::new(),
             dropped: AtomicU64::new(0),
+            interrupted: AtomicBool::new(false),
             capacity,
         }
     }
@@ -85,12 +87,20 @@ impl EventQueue {
         out
     }
 
-    /// Wait until at least one event is queued, then take up to `max`.
+    /// Make a pending or the next call to [`EventQueue::next`] return, empty if
+    /// nothing is queued, so a consumer waiting on events can stop.
+    pub fn interrupt(&self) {
+        self.interrupted.store(true, Ordering::Release);
+        self.notify.notify_one();
+    }
+
+    /// Wait until at least one event is queued, then take up to `max`. Returns
+    /// empty only after [`EventQueue::interrupt`].
     pub async fn next(&self, max: usize) -> Vec<Event> {
         loop {
             let notified = self.notify.notified();
             let batch = self.drain(max);
-            if !batch.is_empty() {
+            if !batch.is_empty() || self.interrupted.swap(false, Ordering::AcqRel) {
                 return batch;
             }
             notified.await;
