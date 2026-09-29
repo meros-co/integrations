@@ -1,0 +1,96 @@
+spec: 1
+id: grandma2
+name: MA Lighting grandMA2
+vendor: MA Lighting
+category: lighting
+
+source:
+  - title: grandMA2 telnet remote command-line reference
+    note: Manufacturer-documented console command syntax
+
+transport:
+  type: line-tcp
+  port: 30000
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: none
+
+settings:
+  username: { type: string, default: administrator }
+  password: { type: string, secret: true, default: admin }
+
+on_connect:
+  - "login {settings.username} {settings.password}"
+
+models:
+  - id: grandma2
+    name: grandMA2 console
+    supports: [go, go_back, goto_cue, fire_macro, command]
+    verification: none
+  - id: grandma2-onpc
+    name: grandMA2 onPC
+    supports: [go, go_back, goto_cue, fire_macro, command]
+    verification: none
+
+commands:
+  go:
+    params:
+      executor: { type: int, min: 1, max: 9999 }
+    send: "Go Executor {executor}"
+    returns: none
+
+  go_back:
+    params:
+      executor: { type: int, min: 1, max: 9999 }
+    send: "GoBack Executor {executor}"
+    returns: none
+
+  goto_cue:
+    params:
+      cue:      { type: string, max_length: 16, pattern: "^[0-9.]+$", required: true }
+      executor: { type: int, min: 1, max: 9999 }
+    send: "Goto Cue {cue} Executor {executor}"
+    returns: none
+
+  fire_macro:
+    params:
+      macro: { type: int, min: 1, max: 9999, required: true }
+    send: "Go Macro {macro}"
+    returns: none
+
+  command:
+    summary: Raw console command-line input
+    params:
+      line: { type: string, max_length: 256, required: true }
+    send: "{line}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      The console login has not been verified against hardware. If the login
+      sequence or its prompt handling is wrong, the connection appears
+      established and every subsequent command is silently discarded.
+
+  - models: [all]
+    severity: warning
+    text: >
+      There is no structured acknowledgement. The console echoes command
+      feedback as free text, so success cannot be distinguished from a rejected
+      command. All commands are unverified.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The command entry point accepts arbitrary console syntax, including
+      destructive operations such as Delete and Store. Interpreters strip CR and
+      LF to prevent injecting a second command, but cannot validate intent.
+
+  - models: [all]
+    severity: info
+    text: >
+      Default credentials are administrator/admin. Consoles in production
+      frequently have these changed, and a failed login is not reported.

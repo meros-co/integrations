@@ -1,0 +1,83 @@
+spec: 1
+id: kramer-p3000
+name: Kramer Protocol 3000 matrices
+vendor: Kramer Electronics
+category: router
+
+source:
+  - title: Kramer Protocol 3000 reference
+    note: Manufacturer-documented
+
+transport:
+  type: line-tcp
+  port: 5000
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  probe: "#MODEL?"
+
+models:
+  - id: p3000-generic
+    name: Kramer matrix or switcher speaking Protocol 3000
+    supports: [route_video, route_audio, get_model]
+    verification: none
+
+commands:
+  route_video:
+    summary: Route an input to an output on the video layer
+    params:
+      input:  { type: int, min: 0, max: 256, required: true }
+      output: { type: int, min: 1, max: 256, required: true }
+    send: "#ROUTE 1,{output},{input}"
+    expect: { not_contains: "ERR" }
+    returns: ack
+
+  route_audio:
+    summary: Route an input to an output on the audio layer
+    params:
+      input:  { type: int, min: 0, max: 256, required: true }
+      output: { type: int, min: 1, max: 256, required: true }
+    send: "#ROUTE 2,{output},{input}"
+    expect: { not_contains: "ERR" }
+    returns: ack
+
+  get_model:
+    send: "#MODEL?"
+    expect: { matches: "@MODEL\\s+(.+)" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      ROUTE arguments are layer,destination,source. Destination precedes source,
+      which is the reverse of most routing protocols. Transposing them routes
+      the wrong way without erroring when both indices are valid.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Commands are terminated by CR alone, not CRLF. Sending CRLF appends a
+      stray character to the next command on some firmware.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Success has no single token. Replies look like "~01@ROUTE 1,2,3 OK" and
+      failures carry "ERR", so acknowledgement is the absence of ERR rather than
+      the presence of OK.
+
+  - models: [all]
+    severity: info
+    text: >
+      Layer 1 is video and layer 2 is audio. Input 0 disconnects the output on
+      most models.
+
+  - models: [all]
+    severity: info
+    text: >
+      Port and channel counts vary widely across the Protocol 3000 range. The
+      ranges here are protocol limits, not a specific model's capability; a
+      route to a non-existent port returns ERR.

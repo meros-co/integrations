@@ -1,0 +1,81 @@
+spec: 1
+id: etc-eos
+name: ETC Eos family
+vendor: Electronic Theatre Controls
+category: lighting
+
+source:
+  - title: Eos Family Show Control User Guide
+    note: Manufacturer-documented OSC implementation
+
+transport:
+  type: osc-tcp
+  port: 3032
+  framing: length-prefixed
+  timeout_ms: 2000
+  probe: /eos/ping
+
+models:
+  - id: eos
+    name: ETC Eos / Ion / Gio / Element (Eos family)
+    supports: [go, fire_cue, set_submaster, fire_macro]
+    verification: none
+
+commands:
+  go:
+    summary: Press and release the Go key
+    send:
+      - { address: /eos/key/go_0, args: [ { value: "1.0", type: float } ] }
+      - { address: /eos/key/go_0, args: [ { value: "0.0", type: float } ] }
+    returns: none
+
+  fire_cue:
+    summary: Fire a specific cue in a cue list
+    params:
+      cue_list: { type: int, min: 1, max: 999, default: 1 }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9.]+$", required: true }
+    send: { address: "/eos/cue/{cue_list}/{cue}/fire" }
+    returns: none
+
+  set_submaster:
+    params:
+      submaster: { type: int, min: 1, max: 999, required: true }
+      level:     { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /eos/sub/{submaster}
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  fire_macro:
+    params:
+      macro: { type: int, min: 1, max: 99999, required: true }
+    send:
+      address: /eos/macro/fire
+      args: [ { value: "{macro}", type: int } ]
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Key presses are a down/up pair: 1.0 then 0.0 on the same address. Sending
+      only the down message leaves the key held, which on Go blocks subsequent
+      presses until a release arrives.
+
+  - models: [all]
+    severity: info
+    text: >
+      /eos/ping is echoed back, so it serves as a liveness probe that confirms
+      an Eos console specifically rather than just an open TCP port.
+
+  - models: [all]
+    severity: info
+    text: >
+      OSC over TCP here uses 4-byte packet-length framing, not SLIP.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Cue numbers are decimal and may contain a point (cue 1.5). The parameter
+      is a string for that reason; treating it as a number loses trailing zeros
+      and changes which cue fires.

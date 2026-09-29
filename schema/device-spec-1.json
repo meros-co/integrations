@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/meros-co/meros-device-spec/schema/device-spec-1.json",
+  "title": "Meros Device Spec v1",
+  "type": "object",
+  "required": ["spec", "id", "name", "vendor", "category", "source", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "spec": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "vendor": { "type": "string", "minLength": 1 },
+    "category": {
+      "enum": ["mixer", "router", "recorder", "switcher", "camera", "lighting", "playback", "wireless", "display", "other"]
+    },
+    "implementation": {
+      "enum": ["spec", "native"],
+      "default": "spec",
+      "description": "'native' marks a protocol not expressible as data; such a spec carries no commands."
+    },
+    "reason": { "type": "string", "description": "Required when implementation is 'native'." },
+    "native": {
+      "type": "object",
+      "required": ["crate"],
+      "additionalProperties": false,
+      "properties": {
+        "crate": { "type": "string" },
+        "bindings": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "source": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["title"],
+        "additionalProperties": false,
+        "properties": {
+          "title": { "type": "string" },
+          "author": { "type": "string" },
+          "url": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "transport": { "$ref": "#/$defs/transport" },
+    "settings": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "enum": ["int", "float", "bool", "enum", "string"] },
+          "values": { "type": "array", "items": { "type": "string" } },
+          "default": {},
+          "secret": { "type": "boolean", "default": false },
+          "required": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "on_connect": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          { "$ref": "#/$defs/oscSend" },
+          { "$ref": "#/$defs/httpSend" }
+        ]
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/model" }
+    },
+    "commands": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$" },
+      "additionalProperties": { "$ref": "#/$defs/command" }
+    },
+    "codes": {
+      "type": "object",
+      "description": "Device-wide map of numeric response code to failure message, used with expect.code_range.",
+      "propertyNames": { "pattern": "^[0-9]+$" },
+      "additionalProperties": { "type": "string" }
+    },
+    "quirks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/quirk" }
+    }
+  },
+
+  "$defs": {
+    "transport": {
+      "type": "object",
+      "required": ["type"],
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "line-tcp" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "framing": { "enum": ["delimited", "terminated", "block", "length-prefixed"] },
+            "open": { "type": "string" },
+            "close": { "type": "string" },
+            "terminator": { "enum": ["cr", "crlf", "lf"] },
+            "encoding": { "enum": ["ascii", "utf-8"], "default": "ascii" },
+            "timeout_ms": { "type": "integer", "minimum": 1 },
+            "reply": { "enum": ["expected", "none"], "default": "expected" },
+            "probe": { "type": "string" }
+          },
+          "required": ["port", "framing"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "osc-udp" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "timeout_ms": { "type": "integer", "minimum": 1 },
+            "reply": { "enum": ["to-source", "none"], "default": "none" },
+            "probe": { "type": "string" }
+          },
+          "required": ["port"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "osc-tcp" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "framing": { "enum": ["slip", "length-prefixed"] },
+            "timeout_ms": { "type": "integer", "minimum": 1 },
+            "probe": { "type": "string" }
+          },
+          "required": ["port", "framing"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "http" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "scheme": { "enum": ["http", "https"], "default": "http" },
+            "auth": { "enum": ["none", "basic", "digest", "bearer", "query-token"], "default": "none" },
+            "timeout_ms": { "type": "integer", "minimum": 1 },
+            "probe": { "$ref": "#/$defs/httpSend" }
+          },
+          "required": ["port"],
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "supports", "verification"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "name": { "type": "string" },
+        "channels": { "type": "integer", "minimum": 0 },
+        "dcas": { "type": "integer", "minimum": 0 },
+        "supports": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allow-list of command keys. A command absent here MUST be refused for this model."
+        },
+        "verification": { "enum": ["none", "bench", "field"] },
+        "notes": { "type": "string" }
+      }
+    },
+
+    "command": {
+      "type": "object",
+      "required": ["send"],
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "params": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/param" }
+        },
+        "send": {
+          "oneOf": [
+            { "type": "string", "description": "line-tcp payload template" },
+            { "$ref": "#/$defs/oscSend" },
+            { "$ref": "#/$defs/httpSend" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "description": "Ordered sequence; all messages must succeed.",
+              "items": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "$ref": "#/$defs/oscSend" },
+                  { "$ref": "#/$defs/httpSend" }
+                ]
+              }
+            }
+          ]
+        },
+        "expect": { "$ref": "#/$defs/expect" },
+        "returns": { "enum": ["ack", "value", "none"], "default": "ack" }
+      }
+    },
+
+    "param": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["int", "float", "bool", "enum", "string"] },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "max_length": { "type": "integer", "minimum": 1 },
+        "pattern": { "type": "string" },
+        "default": {},
+        "required": { "type": "boolean", "default": false }
+      }
+    },
+
+    "oscSend": {
+      "type": "object",
+      "required": ["address"],
+      "additionalProperties": false,
+      "properties": {
+        "address": { "type": "string", "pattern": "^/" },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["value", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "value": { "type": "string" },
+              "type": { "enum": ["int", "float", "string", "blob"] }
+            }
+          }
+        }
+      }
+    },
+
+    "httpSend": {
+      "type": "object",
+      "required": ["method", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
+        "path": { "type": "string", "pattern": "^/" },
+        "raw_query": {
+          "type": "string",
+          "description": "Sent verbatim, never re-encoded. For positional CGI arguments."
+        },
+        "query": { "type": "object", "additionalProperties": { "type": "string" } },
+        "body": { "type": "string" },
+        "content_type": { "type": "string" }
+      },
+      "not": { "required": ["raw_query", "query"] }
+    },
+
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "contains": { "type": "string" },
+        "not_contains": { "type": "string" },
+        "matches": { "type": "string", "description": "RE2-safe regex; capture group 1 is the returned value." },
+        "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "json_path": { "type": "string" },
+        "code_range": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "integer" },
+          "description": "Inclusive success range for a leading numeric response code."
+        }
+      }
+    },
+
+    "quirk": {
+      "type": "object",
+      "required": ["models", "severity", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Model ids, or the single entry 'all'."
+        },
+        "severity": { "enum": ["info", "warning", "critical"] },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

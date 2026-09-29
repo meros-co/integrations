@@ -1,0 +1,124 @@
+spec: 1
+id: ptzoptics
+name: PTZOptics cameras
+vendor: PTZOptics
+category: camera
+
+# HTTP-CGI device with positional rather than key/value query arguments.
+
+source:
+  - title: PTZOptics HTTP-CGI command sheet
+    note: Manufacturer-published
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe:
+    method: GET
+    path: /cgi-bin/ptzctrl.cgi
+    raw_query: "ptzcmd&ptzstop&1&1"
+
+models:
+  - id: ptzoptics-generic
+    name: PTZOptics (HTTP-CGI generation)
+    supports: [move, stop_move, zoom_in, zoom_out, stop_zoom, recall_preset, save_preset, home]
+    verification: none
+
+commands:
+  move:
+    summary: Begin a continuous pan/tilt move; runs until stop_move
+    params:
+      direction:  { type: enum, values: [up, down, left, right, leftup, rightup, leftdown, rightdown], required: true }
+      pan_speed:  { type: int, min: 1, max: 24, default: 10 }
+      tilt_speed: { type: int, min: 1, max: 20, default: 10 }
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&{direction}&{pan_speed}&{tilt_speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  stop_move:
+    summary: Stop pan/tilt motion
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&ptzstop&1&1"
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_in:
+    params: { speed: { type: int, min: 1, max: 7, default: 5 } }
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&zoomin&{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_out:
+    params: { speed: { type: int, min: 1, max: 7, default: 5 } }
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&zoomout&{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  stop_zoom:
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&zoomstop&0"
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset:
+    params: { preset: { type: int, min: 0, max: 89, required: true } }
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&poscall&{preset}"
+    expect: { status: 200 }
+    returns: ack
+
+  save_preset:
+    summary: Overwrite a preset with the current position
+    params: { preset: { type: int, min: 0, max: 89, required: true } }
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&posset&{preset}"
+    expect: { status: 200 }
+    returns: ack
+
+  home:
+    send:
+      method: GET
+      path: /cgi-bin/ptzctrl.cgi
+      raw_query: "ptzcmd&home"
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Query arguments are positional and ampersand-separated. "ptzcmd&poscall&3"
+      is not a key/value query string; an HTTP client that parses and re-encodes
+      it will corrupt the command. Transmitted via raw_query, unmodified.
+
+  - models: [all]
+    severity: warning
+    text: >
+      move starts continuous motion that runs until stop_move. A caller that
+      issues move without a paired stop leaves the camera panning to its limit.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A 200 response indicates the request was accepted, not that the camera
+      executed it. The protocol has no execution acknowledgement.

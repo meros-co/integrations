@@ -1,0 +1,130 @@
+spec: 1
+id: behringer-x32
+name: Behringer X32 / Midas M32
+vendor: Behringer
+category: mixer
+
+source:
+  - title: Unofficial X32/M32 OSC Remote Protocol
+    author: Patrick-Gilles Maillot
+    note: >
+      Community-documented, not a manufacturer specification. Treat every
+      address as unverified until a vector is recorded from real hardware.
+
+transport:
+  type: osc-udp
+  port: 10023
+  timeout_ms: 500
+  reply: to-source
+  probe: /info
+
+models:
+  - id: x32
+    name: Behringer X32
+    channels: 32
+    dcas: 8
+    supports: [set_channel_fader, mute_channel, set_dca_fader, mute_dca, set_main_fader, mute_main]
+    verification: none
+  - id: x32-compact
+    name: Behringer X32 Compact
+    channels: 32
+    dcas: 8
+    supports: [set_channel_fader, mute_channel, set_dca_fader, mute_dca, set_main_fader, mute_main]
+    verification: none
+  - id: x32-rack
+    name: Behringer X32 Rack
+    channels: 32
+    dcas: 8
+    supports: [set_channel_fader, mute_channel, set_dca_fader, mute_dca, set_main_fader, mute_main]
+    verification: none
+  - id: m32
+    name: Midas M32
+    channels: 32
+    dcas: 8
+    supports: [set_channel_fader, mute_channel, set_dca_fader, mute_dca, set_main_fader, mute_main]
+    verification: none
+
+commands:
+  set_channel_fader:
+    summary: Set an input channel fader position
+    params:
+      channel: { type: int, min: 1, max: 32, required: true }
+      level:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_channel:
+    summary: Mute or unmute an input channel
+    params:
+      channel: { type: int, min: 1, max: 32, required: true }
+      muted:   { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  set_dca_fader:
+    summary: Set a DCA fader position
+    params:
+      dca:   { type: int, min: 1, max: 8, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /dca/{dca}/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_dca:
+    summary: Mute or unmute a DCA
+    params:
+      dca:   { type: int, min: 1, max: 8, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /dca/{dca}/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  set_main_fader:
+    summary: Set the main stereo fader position
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /main/st/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_main:
+    summary: Mute or unmute the main stereo bus
+    params:
+      muted: { type: bool, default: true }
+    send:
+      address: /main/st/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      mix/on is inverted: 0 is muted, 1 is passing audio. The address name and
+      the mute sense are opposite. Handled here by the bool10 directive.
+
+  - models: [all]
+    severity: info
+    text: >
+      The console replies to the requesting socket, so /info serves as the
+      liveness probe. No separate keepalive channel is required.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Scene and snippet recall are omitted. The addresses are
+      community-documented but unverified, and an incorrect scene recall on a
+      live console is not recoverable in time. Add only with a recorded vector.
+
+  - models: [all]
+    severity: info
+    text: >
+      Fader values are 0.0-1.0 fader position, not dB. The position-to-dB curve
+      is non-linear, so the raw value cannot be displayed as a dB figure.

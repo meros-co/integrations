@@ -1,0 +1,80 @@
+spec: 1
+id: resolume
+name: Resolume Arena / Avenue
+vendor: Resolume
+category: playback
+
+source:
+  - title: Resolume OSC reference
+    note: Manufacturer-documented
+
+transport:
+  type: osc-udp
+  port: 7000
+  timeout_ms: 500
+  reply: none
+
+models:
+  - id: arena
+    name: Resolume Arena
+    supports: [trigger_clip, trigger_column, clear_layer, set_layer_opacity]
+    verification: none
+  - id: avenue
+    name: Resolume Avenue
+    supports: [trigger_clip, trigger_column, clear_layer, set_layer_opacity]
+    verification: none
+
+commands:
+  trigger_clip:
+    summary: Connect a clip in a layer
+    params:
+      layer: { type: int, min: 1, max: 99, required: true }
+      clip:  { type: int, min: 1, max: 99, required: true }
+    send:
+      address: /composition/layers/{layer}/clips/{clip}/connect
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  trigger_column:
+    summary: Connect a whole column
+    params:
+      column: { type: int, min: 1, max: 99, required: true }
+    send:
+      address: /composition/columns/{column}/connect
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  clear_layer:
+    params:
+      layer: { type: int, min: 1, max: 99, required: true }
+    send:
+      address: /composition/layers/{layer}/clear
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  set_layer_opacity:
+    params:
+      layer:   { type: int, min: 1, max: 99, required: true }
+      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /composition/layers/{layer}/video/opacity/values
+      args: [ { value: "{opacity}", type: float } ]
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Resolume never replies to OSC input. No command can be confirmed, and a
+      wrong layer or clip index fails silently rather than erroring.
+
+  - models: [all]
+    severity: info
+    text: >
+      Layers and clips are 1-based, matching the Resolume interface.
+
+  - models: [all]
+    severity: info
+    text: >
+      Trigger addresses take a value of 1. Sending the address with no argument
+      does not connect the clip.

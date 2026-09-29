@@ -1,0 +1,80 @@
+spec: 1
+id: propresenter
+name: ProPresenter 7
+vendor: Renewed Vision
+category: playback
+
+source:
+  - title: ProPresenter API
+    note: Manufacturer-published OpenAPI specification
+
+transport:
+  type: http
+  port: 50000
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /version }
+
+models:
+  - id: propresenter-7
+    name: ProPresenter 7
+    supports: [next_slide, previous_slide, clear_layer, get_version, get_active_presentation]
+    verification: none
+
+commands:
+  next_slide:
+    send: { method: GET, path: /v1/trigger/next }
+    expect: { status: 200 }
+    returns: ack
+
+  previous_slide:
+    send: { method: GET, path: /v1/trigger/previous }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_layer:
+    params:
+      layer:
+        type: enum
+        values: [audio, props, messages, announcements, slide, media, video_input]
+        required: true
+    send: { method: GET, path: "/v1/clear/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_version:
+    send: { method: GET, path: /version }
+    expect: { status: 200 }
+    returns: value
+
+  get_active_presentation:
+    send: { method: GET, path: /v1/presentation/active }
+    expect: { status: 200 }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API port is configurable in ProPresenter's Network settings and is
+      disabled by default. 50000 is the default once enabled, not a guarantee.
+
+  - models: [all]
+    severity: info
+    text: >
+      /version is unversioned and answers whether or not a presentation is open,
+      which makes it the reliable liveness probe. The control endpoints are
+      under /v1.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A 200 response confirms the trigger was accepted. It does not confirm that
+      a slide advanced; at the end of a presentation the call still succeeds.
+
+  - models: [all]
+    severity: info
+    text: >
+      ProPresenter also exposes a WebSocket interface used elsewhere for live
+      state. This spec covers the HTTP API only; the two are separate surfaces.

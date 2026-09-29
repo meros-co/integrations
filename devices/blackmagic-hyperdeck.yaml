@@ -1,0 +1,213 @@
+spec: 1
+id: blackmagic-hyperdeck
+name: Blackmagic HyperDeck
+vendor: Blackmagic Design
+category: recorder
+
+source:
+  - title: HyperDeck Ethernet Protocol
+    note: Manufacturer-documented, published in the HyperDeck manual
+
+transport:
+  type: line-tcp
+  port: 9993
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  probe: "ping"
+
+models:
+  - id: hyperdeck-1-8
+    name: HyperDeck (protocol 1.8)
+    supports:
+      [record, stop, play, goto_clip, goto_clip_offset, get_transport_info,
+       get_device_info, get_clip_count, get_clips, get_configuration,
+       disk_list, preview_enable, preview_disable]
+    verification: none
+    notes: >
+      Play speed range is -1600 to 1600 percent on this protocol version.
+  - id: hyperdeck-1-11
+    name: HyperDeck (protocol 1.11 and later)
+    supports:
+      [record, record_spill, stop, play, goto_clip, goto_clip_offset,
+       get_transport_info, get_device_info, get_clip_count, get_clips,
+       get_configuration, disk_list, preview_enable, preview_disable,
+       get_playrange, set_playrange, set_playrange_frames, clear_playrange,
+       set_playback_stop_mode]
+    verification: none
+    notes: >
+      Play speed range is -5000 to 5000 percent. Playrange and stop-mode
+      commands require this protocol version.
+
+commands:
+  record:
+    summary: Start recording, optionally naming the clip
+    params:
+      name: { type: string, max_length: 128 }
+    send: "record: name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  record_spill:
+    summary: Continue recording onto another slot
+    params:
+      slot_id: { type: int, min: 1, max: 8 }
+    send: "record spill: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  stop:
+    send: "stop"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  play:
+    summary: Play at a speed given as a percentage of normal
+    params:
+      single_clip: { type: bool, default: true }
+      loop:        { type: bool, default: false }
+      speed:       { type: int, min: -5000, max: 5000, default: 100 }
+    send: "play: single clip: {single_clip} loop: {loop} speed: {speed}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip:
+    summary: Jump to a clip by 1-based id
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+    send: "goto: clip id: {clip_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_offset:
+    summary: Jump forward or backward relative to the current clip
+    params:
+      offset: { type: int, min: -999, max: 999, required: true }
+    send: "goto: clip id: {offset:signed}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_transport_info:
+    send: "transport info"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  get_device_info:
+    send: "device info"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  get_clip_count:
+    send: "clips count"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  get_clips:
+    send: "clips get"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  get_configuration:
+    send: "configuration"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  disk_list:
+    params:
+      slot_id: { type: int, min: 1, max: 8 }
+    send: "disk list: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  preview_enable:
+    send: "preview: enable: true"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  preview_disable:
+    send: "preview: enable: false"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_playrange:
+    send: "playrange"
+    expect: { code_range: [200, 299] }
+    returns: value
+
+  set_playrange:
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+      in:      { type: string, max_length: 32 }
+      out:     { type: string, max_length: 32 }
+    send: "playrange set: clip id: {clip_id} in: {in} out: {out}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_playrange_frames:
+    params:
+      timeline_in:  { type: int, min: 0, required: true }
+      timeline_out: { type: int, min: 0, required: true }
+    send: "playrange set: timeline in: {timeline_in} timeline out: {timeline_out}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  clear_playrange:
+    send: "playrange clear"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_playback_stop_mode:
+    params:
+      mode: { type: enum, values: [lastframe, nextframe, black], required: true }
+    send: "play option: stop mode: {mode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+codes:
+  100: syntax error
+  101: unsupported parameter
+  102: invalid value
+  103: unsupported
+  104: disk full
+  105: no disk
+  106: disk error
+  107: timeline empty
+  108: internal error
+  109: out of range
+  110: no input
+  111: remote control disabled
+  120: connection rejected
+  150: invalid state
+  151: invalid codec
+  160: invalid format
+  161: invalid token
+  162: format not prepared
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Responses begin with a numeric code. 200-299 is success, 100-199 is
+      failure. A success code may be followed by a multi-line payload, as with
+      "205 clips info:".
+
+  - models: [all]
+    severity: warning
+    text: >
+      Play speed limits differ by protocol version: +/-1600 percent on 1.8,
+      +/-5000 on 1.11 and later. Sending a value outside the device's range
+      returns 109 out of range.
+
+  - models: [all]
+    severity: info
+    text: >
+      Sending "quit" before closing the socket makes the deck release the
+      session immediately rather than waiting for a timeout.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Code 111, remote control disabled, means the deck is in local mode. No
+      transport command will succeed until remote is enabled on the front panel.

@@ -1,0 +1,152 @@
+spec: 1
+id: shure-wireless
+name: Shure networked wireless receivers
+vendor: Shure
+category: wireless
+
+# Merged from two prior implementations: Imperio's PHP ShureWireless driver
+# (ULX-D / QLX-D / Axient) and RFDeck's TypeScript ShureClient (SLX-D /
+# Axient / PSM1000). The quirks below originate from the RFDeck work.
+
+source:
+  - title: Shure Axient Digital command strings documentation
+    note: Manufacturer PDF
+  - title: Shure SLX-D command strings documentation
+    note: >
+      Manufacturer PDF. Its introduction shows the Axient sample layout while
+      the SLX-D section defines a different one; the specific section wins and
+      both known open-source implementations agree with it.
+  - title: RFDeck docs/SHURE_PROTOCOL.md
+    note: Meros internal; cross-checked against Companion and micboard
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  probe: "< GET 1 CHAN_NAME >"
+
+models:
+  - id: ulxd
+    name: Shure ULX-D
+    channels: 4
+    supports: [mute, set_gain, get_battery_bars, get_channel_name, get_frequency, flash]
+    verification: none
+  - id: qlxd
+    name: Shure QLX-D
+    channels: 2
+    supports: [mute, set_gain, get_battery_bars, get_channel_name, get_frequency, flash]
+    verification: none
+  - id: axtd
+    name: Shure Axient Digital
+    channels: 4
+    supports: [mute, set_gain, get_battery_bars, get_channel_name, get_frequency, flash]
+    verification: none
+  - id: slxd
+    name: Shure SLX-D
+    channels: 2
+    supports: [set_gain, get_battery_bars, get_channel_name, get_frequency]
+    verification: none
+    notes: >
+      Omits mute and flash: SLX-D has no mute command, and no flash command is
+      documented for it.
+  - id: psm1000
+    name: Shure PSM1000 (IEM transmitter)
+    channels: 2
+    supports: [get_channel_name, get_frequency]
+    verification: none
+    notes: >
+      A transmitter, not a receiver: no received RF and no transmitter battery
+      to report. Audio input level is its only live telemetry, and no
+      retrievable specification defines that value's format, so it is not
+      modelled here.
+
+commands:
+  mute:
+    summary: Mute or unmute a receiver channel
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      muted:   { type: bool, default: true }
+    send: "< SET {channel} AUDIO_MUTE {muted:on_off} >"
+    expect: { contains: "REP" }
+    returns: ack
+
+  set_gain:
+    summary: Set channel audio gain in dB
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      gain:    { type: int, min: -18, max: 42, required: true }
+    send: "< SET {channel} AUDIO_GAIN {gain} >"
+    expect: { contains: "REP" }
+    returns: ack
+
+  get_battery_bars:
+    summary: Transmitter battery level, in bars (not a percentage)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send: "< GET {channel} BATT_BARS >"
+    expect: { matches: "BATT_BARS (\\d+)" }
+    returns: value
+
+  get_channel_name:
+    summary: Channel display name
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send: "< GET {channel} CHAN_NAME >"
+    expect: { matches: "CHAN_NAME \\{?([^}>]*)" }
+    returns: value
+
+  get_frequency:
+    summary: Channel frequency in kHz
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send: "< GET {channel} FREQUENCY >"
+    expect: { matches: "FREQUENCY (\\d+)" }
+    returns: value
+
+  flash:
+    summary: Flash the receiver front panel to identify the physical unit
+    params:
+      on: { type: bool, default: true }
+    send: "< SET FLASH {on:on_off} >"
+    expect: { contains: "REP" }
+    returns: ack
+
+quirks:
+  - models: [slxd]
+    severity: critical
+    text: >
+      SLX-D has no mute command. Interpreters refuse mute for this model.
+      Setting gain to minimum is not an equivalent substitute: it is audible on
+      transients and does not persist across a power cycle.
+
+  - models: [slxd]
+    severity: warning
+    text: >
+      Command strings are disabled by default. Until network control is enabled
+      on the receiver it accepts the TCP connection and returns nothing, which
+      presents identically to having selected the wrong model.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Metered values carry a -120 offset. Values read without applying it are
+      display scaling, not dBFS. Some open-source implementations use
+      reverse-engineered thresholds rather than the documented conversion.
+
+  - models: [axtd, slxd]
+    severity: warning
+    text: >
+      Identify the family by the MODEL string, not by whether the unit answers
+      MODEL at all. SLX-D answers it. Presence-based detection classifies SLX-D
+      as Axient and then misparses its shorter sample layout, reading audio peak
+      as channel quality and RF level as an antenna status string.
+
+  - models: [slxd]
+    severity: info
+    text: >
+      Reports battery in bars only, with no charge percentage, antenna status or
+      channel quality. Two channels rather than four.

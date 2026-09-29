@@ -1,0 +1,99 @@
+spec: 1
+id: aja-kipro
+name: AJA Ki Pro recorders
+vendor: AJA Video Systems
+category: recorder
+
+source:
+  - title: AJA REST automation guide
+    note: Manufacturer-documented
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe:
+    method: GET
+    path: /config
+    query: { action: get, paramid: eParamID_TransportState }
+
+models:
+  - id: kipro
+    name: AJA Ki Pro
+    supports: [record, stop, play, set_clip_name, get_transport_state]
+    verification: none
+  - id: kipro-go
+    name: AJA Ki Pro GO
+    supports: [record, stop, play, set_clip_name, get_transport_state]
+    verification: none
+
+commands:
+  record:
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "3" }
+    expect: { status: 200 }
+    returns: ack
+
+  play:
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop:
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "4" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_clip_name:
+    params:
+      name: { type: string, max_length: 64, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_CustomClipName, value: "{name}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_transport_state:
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_TransportState }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Transport commands are numeric parameter values, not names: 1 is play, 3
+      is record, 4 is stop. The numbers are not sequential or mnemonic and a
+      wrong value is accepted with a 200 response.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Everything is a GET against /config with action=set. A URL logged or
+      replayed from a proxy will re-trigger the transport command.
+
+  - models: [all]
+    severity: info
+    text: >
+      get_transport_state returns both value and value_name; value_name is the
+      human-readable form and is preferred where present.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A clip name is applied to the next recording, not the current one.
+      Setting it mid-record has no effect on the take in progress.

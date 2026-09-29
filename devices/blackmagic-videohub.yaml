@@ -1,0 +1,129 @@
+spec: 1
+id: blackmagic-videohub
+name: Blackmagic Smart Videohub
+vendor: Blackmagic Design
+category: router
+
+source:
+  - title: Videohub Ethernet Protocol
+    note: Manufacturer-documented, published in the Videohub manual
+
+transport:
+  type: line-tcp
+  port: 9990
+  framing: block
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+
+models:
+  - id: smart-videohub
+    name: Blackmagic Smart Videohub (all sizes)
+    supports:
+      - set_route
+      - set_input_label
+      - set_output_label
+      - lock_output
+      - unlock_output
+      - force_unlock_output
+      - set_take_mode
+    verification: none
+
+commands:
+  set_route:
+    summary: Route an input to an output
+    params:
+      input:  { type: int, min: 1, max: 288, required: true }
+      output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      VIDEO OUTPUT ROUTING:
+      {output:-1} {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_input_label:
+    params:
+      input: { type: int, min: 1, max: 288, required: true }
+      label: { type: string, max_length: 60, required: true }
+    send: |
+      INPUT LABELS:
+      {input:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_output_label:
+    params:
+      output: { type: int, min: 1, max: 288, required: true }
+      label:  { type: string, max_length: 60, required: true }
+    send: |
+      OUTPUT LABELS:
+      {output:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+
+  lock_output:
+    summary: Lock an output as owned by this client
+    params:
+      output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      VIDEO OUTPUT LOCKS:
+      {output:-1} O
+    expect: { contains: "ACK" }
+    returns: ack
+
+  unlock_output:
+    summary: Release a lock held by this client
+    params:
+      output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      VIDEO OUTPUT LOCKS:
+      {output:-1} U
+    expect: { contains: "ACK" }
+    returns: ack
+
+  force_unlock_output:
+    summary: Release a lock held by another client
+    params:
+      output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      VIDEO OUTPUT LOCKS:
+      {output:-1} F
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_take_mode:
+    summary: Enable or disable take mode on the router
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Take Mode: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Inputs and outputs are 0-based on the wire. Operator-facing numbering is
+      1-based, matching the front panel and the labels. Handled by the -1 offset
+      in each command; an interpreter that omits it routes to the wrong output.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Commands are multi-line blocks terminated by a blank line. A partial block
+      leaves the parser waiting rather than erroring.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Locks are per-client. An output locked by another client reports "L" and
+      cannot be released with unlock_output; force_unlock_output overrides it
+      and will take routing control away from whoever holds it.
+
+  - models: [all]
+    severity: info
+    text: >
+      Label text is free-form. Newlines injected into a label would terminate
+      the block early, so interpreters strip CR and LF from label parameters.

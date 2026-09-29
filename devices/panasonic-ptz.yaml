@@ -1,0 +1,129 @@
+spec: 1
+id: panasonic-ptz
+name: Panasonic AW-series PTZ cameras
+vendor: Panasonic
+category: camera
+
+source:
+  - title: Panasonic AW-series HTTP control command reference
+    note: Manufacturer-documented CGI interface
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe:
+    method: GET
+    path: /cgi-bin/aw_ptz
+    query: { cmd: "#O", res: "1" }
+
+models:
+  - id: aw-series
+    name: Panasonic AW-series PTZ
+    supports: [move, stop_move, zoom, stop_zoom, recall_preset, save_preset, power]
+    verification: none
+
+commands:
+  move:
+    summary: Continuous pan/tilt; 50 is stop on each axis
+    params:
+      pan_speed:  { type: int, min: 1, max: 99, required: true }
+      tilt_speed: { type: int, min: 1, max: 99, required: true }
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#PTS{pan_speed:02d}{tilt_speed:02d}", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_move:
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#PTS5050", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom:
+    summary: Continuous zoom; 50 stops
+    params:
+      speed: { type: int, min: 1, max: 99, required: true }
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#Z{speed:02d}", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_zoom:
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#Z50", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset:
+    params:
+      preset: { type: int, min: 1, max: 100, required: true }
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#R{preset:-1:02d}", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  save_preset:
+    summary: Overwrite a preset with the current position
+    params:
+      preset: { type: int, min: 1, max: 100, required: true }
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#M{preset:-1:02d}", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  power:
+    params:
+      on: { type: bool, required: true }
+    send:
+      method: GET
+      path: /cgi-bin/aw_ptz
+      query: { cmd: "#O{on:bool01}", res: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Speeds are two-digit values where 50 is neutral, 01 is full speed one way
+      and 99 is full speed the other. A speed of 0 is not stop; 50 is stop.
+
+  - models: [all]
+    severity: critical
+    text: >
+      Presets are 0-based on the wire while the camera menu numbers them from 1.
+      Preset 1 is #R00. Handled by the -1 offset; without it every recall is off
+      by one.
+
+  - models: [all]
+    severity: warning
+    text: >
+      move starts continuous motion that runs until stop_move. A caller that
+      issues move without a paired stop leaves the camera panning to its limit.
+
+  - models: [all]
+    severity: warning
+    text: >
+      save_preset overwrites the stored position immediately with no
+      confirmation step, and the previous position cannot be recovered.
+
+  - models: [all]
+    severity: info
+    text: >
+      res=1 requests a response body. Omitting it changes the reply shape on
+      some firmware.

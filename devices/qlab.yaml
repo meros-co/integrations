@@ -1,0 +1,103 @@
+spec: 1
+id: qlab
+name: Figure 53 QLab
+vendor: Figure 53
+category: playback
+
+source:
+  - title: QLab OSC dictionary
+    note: Manufacturer-documented
+
+transport:
+  type: osc-udp
+  port: 53000
+  timeout_ms: 500
+  reply: none
+
+settings:
+  passcode: { type: string, secret: true }
+
+on_connect:
+  - { address: /connect, args: [ { value: "{settings.passcode}", type: string } ] }
+
+models:
+  - id: qlab-5
+    name: QLab 5
+    supports: [go, stop, pause, resume, panic, start_cue, stop_cue, next_cue, previous_cue]
+    verification: none
+  - id: qlab-4
+    name: QLab 4
+    supports: [go, stop, pause, resume, panic, start_cue, stop_cue, next_cue, previous_cue]
+    verification: none
+
+commands:
+  go:
+    summary: Fire the cue at the playhead
+    send: { address: /go }
+    returns: none
+
+  stop:
+    send: { address: /stop }
+    returns: none
+
+  pause:
+    send: { address: /pause }
+    returns: none
+
+  resume:
+    send: { address: /resume }
+    returns: none
+
+  panic:
+    summary: Fade out and stop everything
+    send: { address: /panic }
+    returns: none
+
+  start_cue:
+    params:
+      cue: { type: string, max_length: 32, pattern: "^[A-Za-z0-9._-]+$", required: true }
+    send: { address: "/cue/{cue}/start" }
+    returns: none
+
+  stop_cue:
+    params:
+      cue: { type: string, max_length: 32, pattern: "^[A-Za-z0-9._-]+$", required: true }
+    send: { address: "/cue/{cue}/stop" }
+    returns: none
+
+  next_cue:
+    summary: Move the playhead forward without firing
+    send: { address: /playhead/next }
+    returns: none
+
+  previous_cue:
+    send: { address: /playhead/previous }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      QLab replies to UDP port 53001 on the caller rather than to the sending
+      socket, so a request/response client sees no answer. All commands are
+      treated as unverified; no write can be confirmed through this transport.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A passcoded workspace rejects commands until /connect has been sent with
+      the passcode. Rejection is silent, given the reply behaviour above, so a
+      wrong passcode presents identically to a working connection.
+
+  - models: [all]
+    severity: info
+    text: >
+      Cue numbers are alphanumeric with dots, dashes and underscores. The
+      parameter pattern rejects anything else, since an unescaped character
+      would alter the OSC address rather than fail.
+
+  - models: [all]
+    severity: critical
+    text: >
+      panic fades and stops every running cue in the workspace. It is not a
+      pause and is not scoped to the current cue list.

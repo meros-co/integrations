@@ -1,0 +1,105 @@
+spec: 1
+id: rosstalk
+name: Ross Video switchers (RossTalk)
+vendor: Ross Video
+category: switcher
+
+source:
+  - title: RossTalk protocol reference
+    note: Manufacturer-documented
+
+transport:
+  type: line-tcp
+  port: 7788
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: none
+
+models:
+  - id: carbonite
+    name: Ross Carbonite
+    supports: [select_program, select_preset, cut, auto_transition, fade_to_black, custom_control, gpi]
+    verification: none
+  - id: graphite
+    name: Ross Graphite
+    supports: [select_program, select_preset, cut, auto_transition, fade_to_black, custom_control, gpi]
+    verification: none
+  - id: acuity
+    name: Ross Acuity
+    supports: [select_program, select_preset, cut, auto_transition, fade_to_black, custom_control, gpi]
+    verification: none
+
+commands:
+  select_program:
+    summary: Set the program bus source on an M/E
+    params:
+      source: { type: int, min: 1, max: 999, required: true }
+      me:     { type: int, min: 1, max: 8, default: 1 }
+    send: "XPT ME:{me}:PGM:IN:{source}"
+    returns: none
+
+  select_preset:
+    summary: Set the preset bus source on an M/E
+    params:
+      source: { type: int, min: 1, max: 999, required: true }
+      me:     { type: int, min: 1, max: 8, default: 1 }
+    send: "XPT ME:{me}:PST:IN:{source}"
+    returns: none
+
+  cut:
+    params:
+      me: { type: int, min: 1, max: 8, default: 1 }
+    send: "MECUT ME:{me}"
+    returns: none
+
+  auto_transition:
+    params:
+      me: { type: int, min: 1, max: 8, default: 1 }
+    send: "MEAUTO ME:{me}"
+    returns: none
+
+  fade_to_black:
+    send: "FTB"
+    returns: none
+
+  custom_control:
+    params:
+      bank: { type: int, min: 1, max: 99, required: true }
+      cc:   { type: int, min: 1, max: 99, required: true }
+    send: "CC {bank}:{cc}"
+    returns: none
+
+  gpi:
+    params:
+      number: { type: int, min: 1, max: 99, required: true }
+    send: "GPI {number}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      RossTalk sends no acknowledgements. Every command is unverified: a
+      malformed command, a non-existent source and a successful take are
+      indistinguishable to the sender.
+
+  - models: [all]
+    severity: critical
+    text: >
+      These commands act on a live switcher immediately. select_program changes
+      what is on air with no transition and no confirmation step.
+
+  - models: [all]
+    severity: info
+    text: >
+      Custom controls are addressed as bank:number and their behaviour is
+      defined on the switcher, not by this protocol. The same CC fires different
+      actions on different installations.
+
+  - models: [all]
+    severity: info
+    text: >
+      Source numbering follows the switcher's configured input mapping, which
+      may not match physical connector numbering.
