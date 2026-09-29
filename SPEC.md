@@ -4,12 +4,12 @@ The format is pre-release. It may change without a version bump until the
 first tagged release; after that, `spec:` changes on any incompatible change.
 
 A device spec describes how to control one family of third-party hardware or
-software. An interpreter reads the spec and drives the device without
+software. The core's spec engine reads the spec and drives the device without
 device-specific code.
 
 The format has no conditionals, loops, expressions or scripting. Every construct
-is a closed vocabulary. Protocols that need logic are out of scope and use the
-[escape hatch](#escape-hatch) instead.
+is a closed vocabulary. Protocols that need logic are implemented as
+[native modules](#native-modules) instead.
 
 ## 1. Document shape
 
@@ -34,7 +34,7 @@ quirks: [ … ]                 # §6, optional
 
 ## 2. Transports
 
-One transport per spec. Interpreters implement each transport once.
+One transport per spec. The core implements each transport once.
 
 ### `line-tcp`
 
@@ -63,7 +63,7 @@ transport:
 `terminated` requires `terminator`: `cr`, `crlf` or `lf`.
 
 `reply: none` marks a device that never acknowledges over TCP (RossTalk).
-Interpreters report `unverified` for those writes, as with `osc-udp`.
+The core reports `unverified` for those writes, as with `osc-udp`.
 
 #### Replies
 
@@ -108,7 +108,7 @@ transport:
 ```
 
 `reply: none` marks a device that never acknowledges (QLab, Resolume).
-Interpreters report `unverified` for writes to such devices rather than success.
+The core reports `unverified` for writes to such devices rather than success.
 
 ### `osc-tcp`
 
@@ -149,7 +149,7 @@ settings:
   password: { type: string, secret: true, default: admin }
 ```
 
-`secret: true` marks a value interpreters must not log or echo.
+`secret: true` marks a value the core never logs or echoes.
 
 `on_connect` is an ordered list of messages sent once after the socket opens,
 before any command. It references settings as `{settings.<name>}`.
@@ -163,7 +163,7 @@ This covers grandMA2's console login and QLab's workspace passcode
 (`/connect` with the passcode). It is a fixed sequence, not a handshake:
 there is no branching on the response, no retry and no negotiation. Protocols
 whose connection setup depends on what the device answers are native cases —
-see the [escape hatch](#escape-hatch).
+see [native modules](#native-modules).
 
 A step can be limited to installations that configure a setting:
 
@@ -198,7 +198,7 @@ models:
       No mute command exists in the SLX-D command set.
 ```
 
-`supports` is an allow-list of `commands` keys. An interpreter refuses a command
+`supports` is an allow-list of `commands` keys. The core refuses a command
 not listed for the resolved model and reports the reason. Sending an unsupported
 command would otherwise return success while the device ignores it.
 
@@ -231,8 +231,8 @@ commands:
 | `enum` | `values`, `default` |
 | `string` | `max_length`, `pattern` (RE2-safe), `default` |
 
-Values outside the declared range are rejected before transmission. Interpreters
-do not clamp, because a clamped value masks a caller error and produces a
+Values outside the declared range are rejected before transmission. The core
+does not clamp, because a clamped value masks a caller error and produces a
 different device state than the caller requested.
 
 ### Templates
@@ -298,7 +298,7 @@ such as the X32's `mix/on` where `0` is muted.
 Offsets exist because several protocols number from zero while operators count
 from one: Videohub inputs and outputs, and Panasonic PTZ presets, are all
 0-based on the wire. Declaring the offset keeps the operator-facing parameter
-1-based without each interpreter reimplementing the conversion.
+1-based without each consumer reimplementing the conversion.
 
 ### OSC commands
 
@@ -366,7 +366,7 @@ commands:
 ```
 
 `raw_query` is transmitted without re-encoding, for devices taking positional
-`&`-separated arguments. Use `query: {k: v}` for key/value APIs; interpreters
+`&`-separated arguments. Use `query: {k: v}` for key/value APIs; the core
 URL-encode that form. A spec sets one or the other, not both.
 
 ## 5. Responses
@@ -390,7 +390,7 @@ failure, with no single success token to match on.
 ### Numeric response codes
 
 Devices that answer with a leading status code declare the success range and a
-message table, so every interpreter reports the same diagnosis.
+message table, so every failure carries the same diagnosis.
 
 ```yaml
 expect:
@@ -414,7 +414,7 @@ response carrying the raw code. This is the Blackmagic HyperDeck shape.
 | `value` | Captured value: regex group 1, the `json_path` result, or the OSC argument. Requires one of `matches`, `json_path` or `address` |
 | `fields` | Map of `key: value` lines from the reply body, split at the first `: `. For HyperDeck-style replies such as `208 transport info:` |
 | `text` | The reply body as text: for `headed-block`, the lines after the first; otherwise the whole reply |
-| `none` | No acknowledgement available. Interpreter reports `unverified` |
+| `none` | No acknowledgement available. The core reports `unverified` |
 
 `json_path: "$"` returns the whole JSON body.
 
@@ -441,7 +441,7 @@ quirks:
 
 ## 7. Conformance vectors
 
-Vectors record the bytes a correct interpreter produces and, where available,
+Vectors record the bytes the core must produce and, where available,
 the device's reply. They live in `vectors/<spec-id>/<command>.yaml`.
 
 ```yaml
@@ -453,15 +453,23 @@ notes: OSC address /ch/07/mix/on, int arg 0
 ```
 
 A spec change that alters wire format updates its vectors in the same commit.
-Consumers run vectors in CI, so a change that breaks an implementation fails
-before release.
+The core's test suite runs every vector, so a change that alters wire format
+without updating its vectors fails before release.
 
 See [vectors/README.md](vectors/README.md) for the full vector format.
 
-## Escape hatch
+## Native modules
 
-Protocols requiring session state, sequencing or conditional logic are declared
-rather than described:
+Protocols requiring session state, sequencing or logic that depends on what the
+device replies are implemented as Rust modules in the core, not as data. The
+format stays free of control flow; the logic lives in reviewed, tested code
+instead.
+
+A native device still has a spec. It carries everything except wire behaviour:
+models, commands with their parameters and return types, settings, quirks and
+sources. That keeps the catalogue identical for both kinds of device, and gives
+the Rust module's parameter validation the same single source as spec-driven
+commands.
 
 ```yaml
 spec: 1
@@ -471,23 +479,23 @@ vendor: Blackmagic Design
 category: switcher
 source:
   - title: …
-implementation: native        # carries no commands
+implementation: native
 reason: >
   Proprietary UDP with stateful session handshake, per-packet sequencing and
   retransmission.
-native:
-  crate: meros-device-atem
-  bindings: [rust, node-napi, python-cffi, cpp]
 models:
   - id: atem-mini
     name: ATEM Mini
-    supports: []              # a native spec has no commands to list
+    supports: [cut]
     verification: none
+commands:
+  cut:
+    summary: Cut the preview source to program
+    params:
+      me: { type: int, min: 1, max: 4, default: 1 }
+    returns: ack
 ```
 
-A `native` spec still carries `models`, `quirks` and vectors, so the shared
-knowledge and conformance suite cover it even though the implementation does
-not live here.
-
-Known native cases: Blackmagic ATEM, Sennheiser Digital 6000 (subscription
-renewal), Ember+ (BER/S101 framing), Dante (no public protocol).
+A native spec's commands have no `send`, `expect` or `transport`; the module
+defines those. `reason` says why the protocol cannot be expressed as data.
+Vectors apply to native modules exactly as to spec-driven ones.

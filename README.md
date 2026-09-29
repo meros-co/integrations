@@ -1,33 +1,37 @@
-# meros-device-spec
+# integrations
 
-Declarative specifications for controlling third-party production hardware and
-software: audio consoles, video routers, recorders, switchers, cameras, lighting
-desks, wireless receivers and playback software.
+One implementation of control and telemetry for third-party production hardware
+and software: audio consoles, video routers, recorders, switchers, cameras,
+lighting desks, wireless systems and playback software.
 
-A spec describes a control protocol as data. An interpreter library reads the
-spec and talks to the device, so protocol details are defined once instead of
-reimplemented per language.
-
-**Status:** format v1, draft. Fourteen specs published, none hardware-verified.
-No interpreter released yet. The format may still change before the first
-tagged release.
-
-This repository holds specifications only. Interpreters are separate packages,
-one per language, maintained by the products that consume these specs.
+**Status:** pre-release. The format and the core are under construction. No
+model is hardware-verified, and nothing here is ready for a show.
 
 ## Rationale
 
-Meros products are written in PHP, TypeScript, Rust, Go, Python, C++ and C. A
-shared library cannot span those, so protocol code has been written more than
-once for the same device. Duplicated implementations diverge: the Shure wireless
-protocol was implemented twice internally, and only one of the two recorded that
-SLX-D has no mute command. The other reports success for a command the receiver
-ignores.
+The same device protocol written separately in several products diverges.
+Internally, the Shure wireless protocol was implemented twice, and only one of
+the two recorded that SLX-D has no mute command; the other reports success for a
+command the receiver ignores. Sharing a description of the protocol is not
+enough either: two interpreters of the same description are still two
+implementations, each with its own bugs.
 
-Specs are data, so every language reads the same file and inherits the same
-corrections.
+So every integration here has exactly one implementation, in a Rust core that
+owns the whole conversation with the device: sockets, TLS, framing, replies,
+subscriptions, reconnection. Products in other languages use that same compiled
+core through a binding, and bindings only convert calls and data.
 
-## Format
+## How a device is implemented
+
+| Kind | For | Written as |
+|---|---|---|
+| Spec-driven | Protocols made of fixed messages and fixed replies | A YAML spec in `specs/`, run by the core's spec engine |
+| Native | Protocols needing real logic: handshakes, sequencing, subscriptions | A Rust module in the core, plus a YAML spec carrying its models, commands and quirks |
+
+Both kinds present the same catalogue and the same API. A consumer cannot tell
+which kind a device is.
+
+A spec-driven command:
 
 ```yaml
 commands:
@@ -40,20 +44,36 @@ commands:
       args: [ { value: "{muted:bool10}", type: int } ]
 ```
 
-`bool10` inverts the boolean: the X32 treats `mix/on` as `0` for muted.
-
-Full definition in [SPEC.md](SPEC.md).
+`bool10` inverts the boolean: the X32 treats `mix/on` as `0` for muted. The full
+format is in [SPEC.md](SPEC.md).
 
 ## Layout
 
 ```
-devices/      one spec per device family
-vectors/      conformance vectors: exact bytes per command
+specs/        one YAML spec per device family
+vectors/      conformance vectors: exact bytes per command, used as core test fixtures
 schema/       JSON Schema for specs
-tools/        validator
+crates/       the Rust core
+bindings/     C, Node, Python and sidecar deliveries of the core
+tools/        spec validator
 ```
 
-## Published specs
+## Deliveries
+
+| Delivery | Package | Status |
+|---|---|---|
+| Rust | `meros-integrations` crate | in progress |
+| C | static library and header | planned |
+| Node | `@meros/integrations` | in progress |
+| Python | `meros-integrations` wheels | planned |
+| Sidecar | `meros-integrations serve`, a local JSON-RPC service | planned |
+
+Every delivery runs the same core and behaves identically.
+
+Pin an exact version. A release changes what every consumer sends to customer
+hardware, so it should never be picked up automatically in a show-critical path.
+
+## Specs
 
 | Spec | Devices | Transport | Verification |
 |---|---|---|---|
@@ -86,21 +106,6 @@ Promotion to `bench` or `field` requires a conformance vector recorded from the
 device. Documentation alone is not sufficient: one manufacturer PDF referenced
 here gives two different sample layouts in two sections.
 
-## Consuming a spec
-
-Interpreters are published separately, one per language.
-
-| Language | Package | Status |
-|---|---|---|
-| PHP | `meros-device-php` | not started |
-| TypeScript | `meros-device-ts` | not started |
-| Rust | `meros-device-rs` | not started |
-| Python | `meros-device-py` | not started |
-| Go | `meros-device-go` | not started |
-
-Pin a version. A spec change alters what every consumer sends to customer
-hardware, so it should not be picked up automatically in a show-critical path.
-
 ## Validation
 
 ```
@@ -108,34 +113,26 @@ pip install pyyaml jsonschema
 python tools/validate.py
 ```
 
-Checks each spec against the JSON Schema plus cross-field rules: command
-references in `supports`, model references in `quirks`, unique spec ids, and
-whether a claimed verification status has vectors behind it.
+Checks each spec against the JSON Schema plus cross-field rules: template
+references and directives, command references in `supports`, model references
+in `quirks`, unique spec ids, and whether a claimed verification status has
+vectors behind it.
 
-## Scope
-
-Protocols that require conditionals, sequencing or session state are out of
-scope and are not forced into the format. Known cases:
+## Out of scope
 
 | Protocol | Reason |
 |---|---|
-| Blackmagic ATEM | Proprietary UDP with session handshake, sequencing, retransmission |
-| Sennheiser Digital 6000 | Subscription lifecycle with periodic renewal |
-| Ember+ (Wisycom) | BER/S101 framing, Glow object model |
 | Dante | No public protocol |
-
-These get a `native` spec carrying models, quirks and vectors, with the
-implementation in code. See the escape hatch in [SPEC.md](SPEC.md).
 
 ## Contributing
 
-Corrections, quirks, verification runs and new specs are welcome. Meros owns
+Corrections, quirks, verification runs and new devices are welcome. Meros owns
 this repository and reviews and merges all changes. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The licence covers this repository's contents:
-specs, vectors, schema and tooling. It does not extend to the devices described
-or their manufacturers' trademarks. Contribute observed behaviour and documented
-facts, not code copied from other projects.
+MIT, see [LICENSE](LICENSE). The licence covers this repository's contents. It
+does not extend to the devices described or their manufacturers' trademarks.
+Contribute observed behaviour and documented facts, not code copied from other
+projects.

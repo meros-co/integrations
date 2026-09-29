@@ -157,16 +157,26 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     settings: dict = doc.get("settings") or {}
     native = doc.get("implementation") == "native"
 
+    if not commands:
+        errors.append("a device requires at least one command")
+
     if native:
+        # Wire behaviour lives in the Rust module; the spec is catalogue only.
         if not doc.get("reason"):
             errors.append("implementation: native requires a 'reason'")
-        if commands:
-            errors.append("implementation: native must not declare commands")
+        for key in ("transport", "on_connect", "codes"):
+            if key in doc:
+                errors.append(f"implementation: native must not declare '{key}'")
+        for name, command in commands.items():
+            for key in ("send", "expect"):
+                if key in command:
+                    errors.append(f"commands.{name}: a native command must not declare '{key}'")
     else:
         if not doc.get("transport"):
             errors.append("a spec-implemented device requires a 'transport'")
-        if not commands:
-            errors.append("a spec-implemented device requires at least one command")
+        for name, command in commands.items():
+            if "send" not in command:
+                errors.append(f"commands.{name}: a spec-driven command requires 'send'")
 
     model_ids = set()
     for model in doc.get("models", []):
@@ -174,7 +184,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
         # Every supported command must exist.
         unknown = set(model.get("supports", [])) - set(commands)
-        if unknown and not native:
+        if unknown:
             errors.append(
                 f"model '{model['id']}' claims unknown command(s): {sorted(unknown)}"
             )
@@ -198,7 +208,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     # Templates: commands, connection setup and the probe.
     for name, command in commands.items():
         params = command.get("params") or {}
-        for context, text in template_strings(command["send"]):
+        for context, text in template_strings(command.get("send", [])):
             errors += check_template(context, text, params, settings, f"commands.{name}")
 
         expect = command.get("expect") or {}
@@ -232,9 +242,9 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
 def main() -> int:
     schema = json.loads((ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
-    files = sorted(glob.glob(str(ROOT / "devices" / "*.yaml")))
+    files = sorted(glob.glob(str(ROOT / "specs" / "*.yaml")))
     if not files:
-        print("no specs found in devices/")
+        print("no specs found in specs/")
         return 1
 
     failed = False

@@ -1,8 +1,8 @@
 # Conformance vectors
 
-A vector records the bytes a correct interpreter produces for a given command
-and input, and where the device answers, its reply. Every language
-implementation tests against the same vectors.
+A vector records the bytes the core must produce for a given command and
+input, and where the device answers, its reply. The core's test suite runs every
+vector.
 
 ```
 vectors/<spec-id>/<command>.yaml
@@ -10,12 +10,12 @@ vectors/<spec-id>/<command>.yaml
 
 ## Purpose
 
-Specs define intended behaviour; vectors record observed behaviour. Independent
-implementations agreeing with each other proves nothing if they share a misread
-of the documentation. Agreement with a recorded transcript does.
+Specs define intended behaviour; vectors record observed behaviour. Code that
+agrees with its own reading of the documentation proves nothing if the reading
+is wrong. Agreement with a recorded transcript does.
 
-Vectors also gate spec changes. A fix reaches every consumer at once, so
-consumers run vectors in CI to catch a wire-format change before release.
+Vectors also gate changes. A fix reaches every consuming product at once, so a
+wire-format change that does not update its vectors fails CI before release.
 
 ## Format
 
