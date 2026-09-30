@@ -24,22 +24,28 @@ function simulatedEm6000() {
   return new Promise((resolve) => socket.bind(0, '127.0.0.1', () => resolve(socket)));
 }
 
-function once(core, predicate) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timed out')), 5000);
-    core.on('event', function listener(event) {
-      if (predicate(event)) {
-        clearTimeout(timer);
-        core.off('event', listener);
-        resolve(event);
-      }
-    });
-  });
+// Records every event from the moment it is attached, so a wait can match an
+// event that arrived before the wait began. Events come in batches: waiting
+// for "connected" and only then listening for the first state patch misses a
+// patch delivered in the same batch.
+function recorder(core) {
+  const seen = [];
+  core.on('event', (event) => seen.push(event));
+  return async function until(predicate) {
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const found = seen.find(predicate);
+      if (found) return found;
+      if (Date.now() > deadline) throw new Error('timed out');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
 }
 
 test('drives a device through the binding', async () => {
   const device = await simulatedEm6000();
   const core = new Core();
+  const until = recorder(core);
   try {
     const id = core.open({
       device: 'sennheiser-digital-6000',
@@ -48,8 +54,8 @@ test('drives a device through the binding', async () => {
       port: device.address().port,
     });
 
-    await once(core, (e) => e.event === 'connection' && e.device === id && e.connection.status === 'connected');
-    await once(core, (e) => e.event === 'state' && e.patch.channels?.['1']?.name === 'Lead');
+    await until((e) => e.event === 'connection' && e.device === id && e.connection.status === 'connected');
+    await until((e) => e.event === 'state' && e.patch.channels?.['1']?.name === 'Lead');
     assert.strictEqual(core.snapshot(id).state.channels['1'].frequency_khz, 606000);
 
     assert.deepStrictEqual(await core.execute(id, 'mute', { channel: 1, muted: true }), { kind: 'ack' });
