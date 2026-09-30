@@ -18,10 +18,10 @@ use crate::catalog::Params;
 use crate::events::{Event, EventQueue};
 use crate::http::HttpClients;
 use crate::module::{
-    Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, HttpResponse, Key,
+    Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, HttpResponse, Key, Level,
     Module, RequestId, SseInput, TcpInput,
 };
-use crate::udp::SharedUdp;
+use crate::udp::{Buffers, SharedUdp, RECV_BUFFER, SEND_BUFFER};
 
 pub type DeviceId = u64;
 
@@ -376,6 +376,27 @@ impl Session {
         }
     }
 
+    /// Say what the OS granted for a shared port's buffers, since a short
+    /// receive buffer drops telemetry silently.
+    fn report_buffers(&self, port: u16, granted: Buffers) {
+        let short = granted.receive < RECV_BUFFER;
+        let mut message = format!(
+            "shared UDP port {port}: receive buffer {} bytes granted of {RECV_BUFFER} requested, \
+             send buffer {} of {SEND_BUFFER}",
+            granted.receive, granted.send
+        );
+        if short {
+            message.push_str(
+                "; bursts of telemetry may be dropped. On Linux, raise net.core.rmem_max",
+            );
+        }
+        self.services.events.push(Event::Log {
+            device: self.device,
+            level: if short { Level::Warning } else { Level::Info },
+            message,
+        });
+    }
+
     async fn open_socket(&mut self, key: Key, bind: Bind) -> Result<(), String> {
         self.drop_socket(key);
         match bind {
@@ -388,13 +409,16 @@ impl Session {
                 self.sockets.insert(key, Socket::Own { socket, reader });
             }
             Bind::Shared(port) => {
-                self.services.shared_udp.register(
+                let bound = self.services.shared_udp.register(
                     self.services.bind_address,
                     port,
                     self.host,
                     key,
                     self.inbound_tx.clone(),
                 )?;
+                if let Some(buffers) = bound {
+                    self.report_buffers(port, buffers);
+                }
                 self.sockets.insert(key, Socket::Shared { port });
             }
         }

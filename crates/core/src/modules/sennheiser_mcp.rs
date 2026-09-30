@@ -167,6 +167,7 @@ impl Mcp {
     /// Heard from the device: every packet proves it is there, not only the first.
     fn heard(&mut self, cx: &mut Cx) {
         self.unanswered_cycles = 0;
+        self.disconnect_reported = false;
         if self.backed_off {
             self.backed_off = false;
             cx.cancel_timer(SLOW_PROBE);
@@ -486,7 +487,6 @@ impl Module for Mcp {
 
     fn datagram(&mut self, cx: &mut Cx, _socket: Key, _from: SocketAddr, data: &[u8]) {
         cx.set_timer(SILENCE, SILENCE_TIMEOUT);
-        self.disconnect_reported = false;
         cx.alive();
 
         let text = String::from_utf8_lossy(data);
@@ -813,6 +813,98 @@ mod tests {
             after: RESUBSCRIBE_EVERY
         }));
         assert!(a.contains(&Action::Connection(Connection::Connected)));
+    }
+
+    fn disconnects(actions: &[Action]) -> usize {
+        actions
+            .iter()
+            .filter(|x| matches!(x, Action::Connection(Connection::Disconnected { .. })))
+            .count()
+    }
+
+    /// Every G3/G4 fault RFDeck found on a rig lived in a transition, so the
+    /// whole cycle is walked twice as one sequence (RFDeck review item N.4):
+    /// connect, loss, retries, backoff, recovery, and loss again. Each of these
+    /// fails if its fix is removed: disconnect only reported before the first
+    /// connection; recovery that runs once per lifetime; a retry counter that
+    /// stops advancing because the silence timer is not re-armed.
+    #[test]
+    fn connect_loss_backoff_recovery_and_loss_again() {
+        let mut m = receiver();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let mut now = 100;
+        let a = feed(&mut m, now, "Msg OK\r");
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+
+        for round in 1..=2 {
+            // Loss: reported once, then the subscription is retried with the
+            // silence timer re-armed each time.
+            let mut reported = 0;
+            for attempt in 1..=ATTEMPTS_BEFORE_BACKOFF {
+                now += SILENCE_TIMEOUT;
+                let mut cx = Cx::new(now);
+                m.timer(&mut cx, SILENCE);
+                let a = cx.take();
+                reported += disconnects(&a);
+                assert_eq!(
+                    sent(&a),
+                    ["Push 60 500 3\r"],
+                    "round {round}, attempt {attempt}"
+                );
+                assert!(
+                    a.contains(&Action::SetTimer {
+                        key: SILENCE,
+                        after: SILENCE_TIMEOUT
+                    }),
+                    "round {round}, attempt {attempt}: silence timer re-armed"
+                );
+
+                // A device error while offline is not telemetry: it neither
+                // recovers the device nor reports the loss a second time.
+                let a = feed(&mut m, now + 1, "1020: Value out of range [ AfOut 125 ]\r");
+                assert!(!a.iter().any(|x| matches!(x, Action::Connection(_))));
+            }
+            assert_eq!(reported, 1, "round {round}: one disconnect per loss");
+
+            // Backoff: renewal stops, slow probing starts.
+            now += SILENCE_TIMEOUT;
+            let mut cx = Cx::new(now);
+            m.timer(&mut cx, SILENCE);
+            let a = cx.take();
+            assert_eq!(disconnects(&a), 0);
+            assert!(a.contains(&Action::CancelTimer { key: RESUB }));
+            assert!(
+                a.contains(&Action::SetTimer {
+                    key: SLOW_PROBE,
+                    after: SLOW_PROBE_EVERY
+                }),
+                "round {round}: backed off"
+            );
+
+            now += SLOW_PROBE_EVERY;
+            let mut cx = Cx::new(now);
+            m.timer(&mut cx, SLOW_PROBE);
+            assert_eq!(sent(&cx.take()), ["Push 60 500 3\r", "Name\r"]);
+
+            // Recovery on the next packet, in every round.
+            now += 100;
+            let a = feed(&mut m, now, "Name Lead\r");
+            assert!(
+                a.contains(&Action::Connection(Connection::Connected)),
+                "round {round}: recovered"
+            );
+            assert!(a.contains(&Action::SetTimer {
+                key: SILENCE,
+                after: SILENCE_TIMEOUT
+            }));
+            assert!(a.contains(&Action::CancelTimer { key: SLOW_PROBE }));
+            assert!(a.contains(&Action::SetTimer {
+                key: RESUB,
+                after: RESUBSCRIBE_EVERY
+            }));
+            now += 100;
+        }
     }
 
     #[test]
