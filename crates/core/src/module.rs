@@ -105,6 +105,17 @@ pub enum SseInput {
     },
 }
 
+/// What happens on a TCP connection.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TcpInput {
+    Connected,
+    Data(Vec<u8>),
+    /// The connection failed or ended. It is gone; open it again to retry.
+    Closed {
+        reason: String,
+    },
+}
+
 /// Where a UDP socket binds locally.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Bind {
@@ -129,6 +140,9 @@ pub enum Connection {
     Unauthorized {
         reason: String,
     },
+    /// The protocol offers no way to tell whether the device is there: it never
+    /// replies. Commands are sent and reported `unverified`.
+    Unmonitored,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -152,6 +166,18 @@ pub enum Action {
         data: Vec<u8>,
     },
     UdpClose {
+        socket: Key,
+    },
+    /// Connect, replacing any connection open under this key.
+    TcpOpen {
+        socket: Key,
+        to: SocketAddr,
+    },
+    TcpSend {
+        socket: Key,
+        data: Vec<u8>,
+    },
+    TcpClose {
         socket: Key,
     },
     Http {
@@ -233,6 +259,21 @@ impl Cx {
         self.push(Action::UdpClose { socket });
     }
 
+    pub fn tcp_open(&mut self, socket: Key, to: SocketAddr) {
+        self.push(Action::TcpOpen { socket, to });
+    }
+
+    pub fn tcp_send(&mut self, socket: Key, data: impl Into<Vec<u8>>) {
+        self.push(Action::TcpSend {
+            socket,
+            data: data.into(),
+        });
+    }
+
+    pub fn tcp_close(&mut self, socket: Key) {
+        self.push(Action::TcpClose { socket });
+    }
+
     pub fn http(&mut self, id: RequestId, request: HttpRequest) {
         self.push(Action::Http { id, request });
     }
@@ -300,6 +341,10 @@ pub trait Module: Send + 'static {
         });
     }
 
+    fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
+        let _ = (cx, socket, input);
+    }
+
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
         let _ = (cx, id, result);
     }
@@ -321,6 +366,8 @@ pub trait Module: Send + 'static {
 #[derive(Debug, Clone)]
 pub struct OpenContext {
     pub host: std::net::IpAddr,
+    /// Overrides the protocol's default port.
+    pub port: Option<u16>,
     pub model: String,
     pub channels: Option<u32>,
     pub settings: Params,

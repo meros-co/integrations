@@ -9,6 +9,8 @@ export interface OpenRequest {
   model: string;
   /** IP address or hostname. */
   host: string;
+  /** The device's port, when it is not the protocol's default. */
+  port?: number;
   /** Settings declared by the spec, such as a password. */
   settings?: Record<string, unknown>;
 }
@@ -24,7 +26,9 @@ export type Connection =
   | { status: 'connected' }
   | { status: 'disconnected'; reason: string }
   /** Reachable, but the device refused the configured credentials. */
-  | { status: 'unauthorized'; reason: string };
+  | { status: 'unauthorized'; reason: string }
+  /** The protocol never replies, so presence cannot be known. */
+  | { status: 'unmonitored' };
 
 export interface Snapshot {
   connection: Connection;

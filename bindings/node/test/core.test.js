@@ -45,7 +45,7 @@ test('drives a device through the binding', async () => {
       device: 'sennheiser-digital-6000',
       model: 'em-6000',
       host: '127.0.0.1',
-      settings: { port: device.address().port },
+      port: device.address().port,
     });
 
     await once(core, (e) => e.event === 'connection' && e.device === id && e.connection.status === 'connected');

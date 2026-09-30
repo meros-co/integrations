@@ -81,6 +81,7 @@ async fn g4_receiver_end_to_end() {
             device: "sennheiser-ew-g3-g4".into(),
             model: "em-300-500-g4".into(),
             host: DEVICE_IP.to_string(),
+            port: None,
             settings: Default::default(),
         })
         .unwrap();

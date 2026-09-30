@@ -70,11 +70,7 @@ pub(crate) struct D6000 {
 
 impl D6000 {
     pub(crate) fn new(ctx: OpenContext) -> D6000 {
-        let port = ctx
-            .settings
-            .get("port")
-            .and_then(Value::as_u64)
-            .unwrap_or(45) as u16;
+        let port = ctx.port.unwrap_or(45);
         D6000::for_device(SocketAddr::new(ctx.host, port), ctx.channels.unwrap_or(2))
     }
 

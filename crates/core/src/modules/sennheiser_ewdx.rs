@@ -75,11 +75,7 @@ impl Ewdx {
             .get("password")
             .and_then(Value::as_str)
             .unwrap_or("");
-        let port = ctx
-            .settings
-            .get("port")
-            .and_then(Value::as_u64)
-            .unwrap_or(443) as u16;
+        let port = ctx.port.unwrap_or(443);
         Ewdx::for_device(ctx.host, port, password, ctx.channels.unwrap_or(2))
     }
 

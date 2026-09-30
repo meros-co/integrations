@@ -50,17 +50,22 @@ transport:
   encoding: ascii             # ascii | utf-8
   timeout_ms: 2000
   reply: expected             # expected | none
-  probe: "< GET 1 CHAN_NAME >"   # liveness check; any reply means reachable
+  probe: "GET 1 CHAN_NAME"    # liveness check; any reply means reachable
 ```
 
 | Framing | Shape | Example |
 |---|---|---|
-| `delimited` | Payload wrapped in `open`/`close` | Shure: `< GET 1 CHAN_NAME >` |
+| `delimited` | Payload wrapped in `open`/`close` | Shure: `GET 1 CHAN_NAME` is sent as `< GET 1 CHAN_NAME >` |
 | `terminated` | Payload plus `terminator` | Kramer P3000 (`cr`), RossTalk and HyperDeck (`crlf`) |
 | `block` | Multi-line payload ended by a blank line | Blackmagic Videohub |
 | `length-prefixed` | Payload preceded by a byte count | — |
 
 `terminated` requires `terminator`: `cr`, `crlf` or `lf`.
+
+Templates and `probe` hold the payload only; the framing is added when the
+message is sent. A `delimited` reply is the text from `open` to `close`; for
+the other framings, CR, LF and CRLF all end a received line, whichever the
+device uses.
 
 `reply: none` marks a device that never acknowledges over TCP (RossTalk).
 The core reports `unverified` for those writes, as with `osc-udp`.
@@ -215,7 +220,7 @@ commands:
     params:
       channel: { type: int, min: 1, max: 4, required: true }
       muted:   { type: bool, default: true }
-    send: "< SET {channel} AUDIO_MUTE {muted:on_off} >"
+    send: "SET {channel} AUDIO_MUTE {muted:on_off}"
     expect:
       contains: "REP"
     returns: ack               # ack | value | fields | text | none
@@ -272,7 +277,7 @@ Encoding depends on where the value lands:
 |---|---|
 | Line/TCP payload, OSC address, OSC string argument | None; text encoded per `encoding` |
 | HTTP `path` | Percent-encoded as a path segment (RFC 3986 unreserved characters kept) |
-| HTTP `query` value | Percent-encoded as a query value |
+| HTTP `query` value | Percent-encoded as a query value; pairs are sent in the order the spec lists them |
 | HTTP `raw_query` | None. Only `int`, `float`, `bool`, `enum`, or a `string` with a `pattern`, may appear here |
 
 ### Formatting directives

@@ -225,7 +225,8 @@ fn open(core: &Core, port: u16, password: &str) -> u64 {
         device: "sennheiser-ew-dx".into(),
         model: "em-2".into(),
         host: DEVICE_IP.to_string(),
-        settings: params(json!({"password": password, "port": port})),
+        port: Some(port),
+        settings: params(json!({ "password": password })),
     })
     .unwrap()
 }

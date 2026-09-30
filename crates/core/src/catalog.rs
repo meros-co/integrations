@@ -38,6 +38,11 @@ pub struct DeviceSpec {
     /// Wire behaviour for spec-driven devices, kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub transport: Option<Value>,
+    #[serde(default, skip_serializing)]
+    pub on_connect: Vec<Value>,
+    /// Numeric response code to failure message, used with `code_range`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub codes: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

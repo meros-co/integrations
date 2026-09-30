@@ -106,7 +106,8 @@ async fn em6000_end_to_end() {
             device: "sennheiser-digital-6000".into(),
             model: "em-6000".into(),
             host: DEVICE_IP.to_string(),
-            settings: params(json!({"port": port})),
+            port: Some(port),
+            settings: Default::default(),
         })
         .unwrap();
 

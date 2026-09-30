@@ -11,6 +11,7 @@
 //!     device: "sennheiser-ew-g3-g4".into(),
 //!     model: "em-300-500-g4".into(),
 //!     host: "192.168.1.40".into(),
+//!     port: None,
 //!     settings: Default::default(),
 //! })?;
 //! let outcome = core
@@ -20,6 +21,7 @@
 //! ```
 
 pub mod catalog;
+mod engine;
 pub mod events;
 mod http;
 pub mod json;
@@ -27,6 +29,7 @@ pub mod module;
 mod modules;
 mod session;
 pub mod sse;
+mod tcp;
 mod udp;
 
 use std::collections::HashMap;
@@ -57,6 +60,10 @@ pub struct OpenRequest {
     pub model: String,
     /// IP address or hostname. A hostname is resolved once, when opened.
     pub host: String,
+    /// The device's port, when it is not the protocol's default: many devices
+    /// let an operator change it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
     /// Per-installation settings declared by the spec, such as passwords.
     #[serde(default)]
     pub settings: Params,
@@ -73,8 +80,8 @@ pub enum OpenError {
     InvalidSettings { message: String },
     #[error("cannot resolve host '{host}': {message}")]
     UnresolvableHost { host: String, message: String },
-    #[error("device '{device}' is not implemented yet")]
-    NotImplemented { device: String },
+    #[error("device '{device}' cannot be driven: {reason}")]
+    NotImplemented { device: String, reason: String },
 }
 
 struct DeviceEntry {
@@ -140,13 +147,15 @@ impl Core {
 
         let context = module::OpenContext {
             host,
+            port: request.port,
             model: model.id.clone(),
             channels: model.channels,
             settings,
         };
         let module =
-            modules::construct(&spec.id, context).ok_or_else(|| OpenError::NotImplemented {
+            modules::construct(spec, context).map_err(|reason| OpenError::NotImplemented {
                 device: spec.id.clone(),
+                reason,
             })?;
 
         let id = self.next_device.fetch_add(1, Ordering::Relaxed);

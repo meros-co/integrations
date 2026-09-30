@@ -19,7 +19,7 @@ use crate::events::{Event, EventQueue};
 use crate::http::HttpClients;
 use crate::module::{
     Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, HttpResponse, Key,
-    Module, RequestId, SseInput,
+    Module, RequestId, SseInput, TcpInput,
 };
 use crate::udp::SharedUdp;
 
@@ -62,6 +62,11 @@ pub(crate) enum Inbound {
         stream: Key,
         generation: u64,
         input: SseInput,
+    },
+    Tcp {
+        socket: Key,
+        generation: u64,
+        input: TcpInput,
     },
 }
 
@@ -111,6 +116,7 @@ pub(crate) struct Session {
     timers: HashMap<Key, Instant>,
     sockets: HashMap<Key, Socket>,
     streams: HashMap<Key, Stream>,
+    tcp: HashMap<Key, crate::tcp::Connection>,
     next_generation: u64,
     pending: HashMap<CommandId, Pending>,
     next_command: CommandId,
@@ -138,6 +144,7 @@ impl Session {
             timers: HashMap::new(),
             sockets: HashMap::new(),
             streams: HashMap::new(),
+            tcp: HashMap::new(),
             next_generation: 1,
             pending: HashMap::new(),
             next_command: 1,
@@ -208,6 +215,16 @@ impl Session {
                             }
                             self.module.sse(&mut cx, stream, input);
                         }
+                        Inbound::Tcp { socket, generation, input } => {
+                            let current = self.tcp.get(socket).map(|c| c.generation);
+                            if current != Some(generation) {
+                                continue;
+                            }
+                            if matches!(input, TcpInput::Closed { .. }) {
+                                self.tcp.remove(socket);
+                            }
+                            self.module.tcp(&mut cx, socket, input);
+                        }
                     }
                     self.apply(cx.take()).await;
                 }
@@ -269,6 +286,20 @@ impl Session {
                 }
                 Action::UdpSend { socket, to, data } => self.send(socket, to, data).await,
                 Action::UdpClose { socket } => self.drop_socket(socket),
+                Action::TcpOpen { socket, to } => {
+                    self.close_tcp(socket);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let connection =
+                        crate::tcp::spawn(socket, generation, to, self.inbound_tx.clone());
+                    self.tcp.insert(socket, connection);
+                }
+                Action::TcpSend { socket, data } => {
+                    if let Some(c) = self.tcp.get(socket) {
+                        let _ = c.writer.send(data);
+                    }
+                }
+                Action::TcpClose { socket } => self.close_tcp(socket),
                 Action::Http { id, request } => {
                     self.services
                         .http
@@ -382,6 +413,12 @@ impl Session {
         }
     }
 
+    fn close_tcp(&mut self, key: Key) {
+        if let Some(c) = self.tcp.remove(key) {
+            c.task.abort();
+        }
+    }
+
     fn close_stream(&mut self, key: Key) {
         if let Some(stream) = self.streams.remove(key) {
             stream.task.abort();
@@ -412,6 +449,10 @@ impl Session {
         let keys: Vec<Key> = self.sockets.keys().copied().collect();
         for key in keys {
             self.drop_socket(key);
+        }
+        let tcp: Vec<Key> = self.tcp.keys().copied().collect();
+        for key in tcp {
+            self.close_tcp(key);
         }
         let streams: Vec<Key> = self.streams.keys().copied().collect();
         for key in streams {

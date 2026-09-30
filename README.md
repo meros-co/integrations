@@ -4,8 +4,10 @@ One implementation of control and telemetry for third-party production hardware
 and software: audio consoles, video routers, recorders, switchers, cameras,
 lighting desks, wireless systems and playback software.
 
-**Status:** pre-release. The format and the core are under construction. No
-model is hardware-verified, and nothing here is ready for a show.
+**Status:** pre-release. The core drives every spec in `specs/`: the
+spec-driven ones through its spec engine and the Sennheiser families through
+native modules. All of it is tested against simulated devices only. No model is
+hardware-verified, and nothing here is ready for a show.
 
 ## Rationale
 
@@ -62,9 +64,9 @@ tools/        spec validator
 
 | Delivery | Package | Status |
 |---|---|---|
-| Rust | `meros-integrations` crate | in progress |
+| Rust | `meros-integrations` crate | working; unreleased |
 | C | static library and header | planned |
-| Node | `@meros/integrations` | in progress |
+| Node | `@meros/integrations` | working; unreleased |
 | Python | `meros-integrations` wheels | planned |
 | Sidecar | `meros-integrations serve`, a local JSON-RPC service | planned |
 
@@ -91,6 +93,9 @@ hardware, so it should never be picked up automatically in a show-critical path.
 | `resolume` | Resolume Arena, Avenue | OSC/UDP 7000 | none |
 | `rosstalk` | Ross Carbonite, Graphite, Acuity | Line/TCP 7788 | none |
 | `shure-wireless` | Shure ULX-D, QLX-D, Axient Digital, SLX-D, PSM1000 | Line/TCP 2202 | none |
+| `sennheiser-ew-dx` | Sennheiser EW-DX EM 2, EM 2 Dante, EM 4 Dante | HTTPS + SSE (SSCv2), native | none |
+| `sennheiser-ew-g3-g4` | Sennheiser EM 300-500 G4, SR IEM G4, EM 300-500 G3 | MCP over UDP 53212, native | none |
+| `sennheiser-digital-6000` | Sennheiser EM 6000, EM 6000 Dante | SSC over UDP 45, native | none |
 
 ## Verification
 
@@ -106,11 +111,12 @@ Promotion to `bench` or `field` requires a conformance vector recorded from the
 device. Documentation alone is not sufficient: one manufacturer PDF referenced
 here gives two different sample layouts in two sections.
 
-## Validation
+## Building and testing
 
 ```
+cargo test                      # the core: modules, spec engine, every vector
 pip install pyyaml jsonschema
-python tools/validate.py
+python tools/validate.py        # every spec against the schema and format rules
 ```
 
 Checks each spec against the JSON Schema plus cross-field rules: template
