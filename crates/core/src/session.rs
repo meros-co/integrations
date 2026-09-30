@@ -509,8 +509,19 @@ impl Session {
         // Sends only: a stopping module may cancel subscriptions, but nothing
         // else it asks for can matter any more.
         for action in cx.take() {
-            if let Action::UdpSend { socket, to, data } = action {
-                self.send(socket, to, data).await;
+            match action {
+                Action::UdpSend { socket, to, data } => self.send(socket, to, data).await,
+                Action::TcpSend { socket, data } => {
+                    if let Some(c) = self.tcp.get(socket) {
+                        let _ = c.writer.send(data);
+                    }
+                }
+                Action::WsSend { socket, text } => {
+                    if let Some(c) = self.ws.get(socket) {
+                        let _ = c.writer.send(crate::ws::Outgoing::Text(text));
+                    }
+                }
+                _ => {}
             }
         }
         for (_, p) in self.pending.drain() {
@@ -520,9 +531,20 @@ impl Session {
         for key in keys {
             self.drop_socket(key);
         }
-        let tcp: Vec<Key> = self.tcp.keys().copied().collect();
-        for key in tcp {
-            self.close_tcp(key);
+        // Let each connection write what the module queued (a subscription
+        // cancelled, a QUIT) before it closes, within a second.
+        for (_, c) in self.tcp.drain() {
+            let crate::tcp::Connection { writer, task, .. } = c;
+            drop(writer);
+            tokio::spawn(async move {
+                let abort = task.abort_handle();
+                if tokio::time::timeout(Duration::from_secs(1), task)
+                    .await
+                    .is_err()
+                {
+                    abort.abort();
+                }
+            });
         }
         let streams: Vec<Key> = self.streams.keys().copied().collect();
         for key in streams {
