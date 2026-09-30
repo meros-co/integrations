@@ -6,6 +6,7 @@ mod obs;
 mod sennheiser_d6000;
 mod sennheiser_ewdx;
 mod sennheiser_mcp;
+mod vmix;
 
 use std::sync::Arc;
 
@@ -27,6 +28,7 @@ pub(crate) fn construct(
         "sennheiser-digital-6000" => Ok(Box::new(sennheiser_d6000::D6000::new(context))),
         "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
+        "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         other => Err(format!("no native module for '{other}'")),
     }

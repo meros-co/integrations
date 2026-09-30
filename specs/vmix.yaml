@@ -1,0 +1,218 @@
+spec: 1
+id: vmix
+name: vMix
+vendor: StudioCoast
+category: switcher
+implementation: native
+reason: >
+  The TCP API mixes line replies with replies whose header gives a byte count
+  for the data that follows, and pushes subscribed tally and activator events
+  at any time, including between a request and its reply. Replies are paired
+  with requests by order, one request at a time.
+
+source:
+  - title: vMix Help, TCP API
+    author: StudioCoast
+    url: https://www.vmix.com/help29/TCPAPI.html
+    note: >
+      Manufacturer document. Port 8099, CRLF lines, the <command> <status or
+      length> [response] reply grammar, one request at a time, FUNCTION,
+      TALLY, ACTS, XML, SUBSCRIBE, and events arriving between requests and
+      replies.
+  - title: vMix Help, Shortcut Function Reference and Developer API
+    author: StudioCoast
+    url: https://www.vmix.com/help29/ShortcutFunctionReference.html
+    note: >
+      Function names and their parameters: Input as a number, title or key,
+      Duration in ms, SetVolume 0-100, SetFader 0-255, the optional stream
+      number, and the XML state document.
+  - title: Bitfocus Companion, companion-module-studiocoast-vmix
+    url: https://github.com/bitfocus/companion-module-studiocoast-vmix
+    note: >
+      MIT-licensed; cross-check only. The unsolicited VERSION OK line on
+      connect, activator message shapes, and URL-encoded function values.
+  - title: TallyArbiter vMix source
+    url: https://github.com/josephdadams/TallyArbiter
+    note: MIT-licensed; the tally string's first digit is input 1.
+  - title: Tally vMix client (tally/vMix.cpp)
+    note: Meros. SUBSCRIBE TALLY and the digit-per-input tally line.
+
+models:
+  - id: vmix
+    name: vMix (any edition with the TCP API)
+    supports: [cut, fade, transition, cut_direct, set_program, set_preview, quick_play,
+               overlay_in, overlay_out, overlays_off, fade_to_black, start_recording,
+               stop_recording, start_streaming, stop_streaming, start_external,
+               stop_external, start_multicorder, stop_multicorder, set_input_mute,
+               set_volume, set_text, play, pause, start_script, set_fader]
+    verification: none
+
+commands:
+  cut:
+    summary: Cut preview to program, or cut straight to an input when one is given
+    params:
+      input: { type: string, max_length: 256 }
+    returns: ack
+
+  fade:
+    summary: Fade preview to program, or fade to an input when one is given
+    params:
+      duration_ms: { type: int, min: 0, max: 60000, default: 500 }
+      input:       { type: string, max_length: 256 }
+    returns: ack
+
+  transition:
+    summary: Press one of the four transition buttons
+    params:
+      number: { type: int, min: 1, max: 4, required: true }
+    returns: ack
+
+  cut_direct:
+    summary: Cut an input to program without changing preview
+    params:
+      input: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  set_program:
+    summary: Send an input to program (vMix ActiveInput)
+    params:
+      input: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  set_preview:
+    summary: Send an input to preview
+    params:
+      input: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  quick_play:
+    summary: Quick-play an input to program with the default transition
+    params:
+      input: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  overlay_in:
+    summary: Transition an input into an overlay channel
+    params:
+      overlay: { type: int, min: 1, max: 8, required: true }
+      input:   { type: string, max_length: 256, required: true }
+    returns: ack
+
+  overlay_out:
+    summary: Transition an overlay channel out
+    params:
+      overlay: { type: int, min: 1, max: 8, required: true }
+    returns: ack
+
+  overlays_off:
+    summary: Cut every overlay channel off immediately
+    returns: ack
+
+  fade_to_black:
+    summary: Toggle fade to black
+    returns: ack
+
+  start_recording:   { summary: Start recording, returns: ack }
+  stop_recording:    { summary: Stop recording, returns: ack }
+  start_streaming:
+    summary: Start streaming, one stream or all
+    params:
+      stream: { type: int, min: 1, max: 5 }
+    returns: ack
+  stop_streaming:
+    summary: Stop streaming, one stream or all
+    params:
+      stream: { type: int, min: 1, max: 5 }
+    returns: ack
+  start_external:    { summary: Start the external output, returns: ack }
+  stop_external:     { summary: Stop the external output, returns: ack }
+  start_multicorder: { summary: Start MultiCorder, returns: ack }
+  stop_multicorder:  { summary: Stop MultiCorder, returns: ack }
+
+  set_input_mute:
+    summary: Mute or unmute an input's audio
+    params:
+      input: { type: string, max_length: 256, required: true }
+      muted: { type: bool, default: true }
+    returns: ack
+
+  set_volume:
+    summary: Set an input's volume, 0 to 100
+    params:
+      input:  { type: string, max_length: 256, required: true }
+      volume: { type: int, min: 0, max: 100, required: true }
+    returns: ack
+
+  set_text:
+    summary: Set a title field's text
+    params:
+      input: { type: string, max_length: 256, required: true }
+      field: { type: string, max_length: 256, required: true }
+      text:  { type: string, max_length: 4096, required: true }
+    returns: ack
+
+  play:
+    summary: Play an input
+    params:
+      input: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  pause:
+    summary: Pause an input
+    params:
+      input: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  start_script:
+    summary: Start a vMix script by name
+    params:
+      name: { type: string, max_length: 256, required: true }
+    returns: ack
+
+  set_fader:
+    summary: Move the transition T-bar, 0 to 255 (255 completes the transition)
+    params:
+      position: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+
+state:
+  device.version:          { type: string, description: "vMix version" }
+  device.edition:          { type: string, description: "vMix edition" }
+  program:                 { type: int, description: "Input number on program" }
+  preview:                 { type: int, description: "Input number on preview" }
+  inputs.*.title:          { type: string, description: "Input title, keyed by input number" }
+  inputs.*.type:           { type: string, description: "Input type, such as Capture, Video or GT" }
+  inputs.*.key:            { type: string, description: "Input GUID, stable across renumbering" }
+  inputs.*.playing:        { type: bool, description: "Input playing" }
+  inputs.*.muted:          { type: bool, description: "Input audio muted; absent for inputs without audio" }
+  inputs.*.volume:         { type: float, description: "Input volume, 0 to 100; absent for inputs without audio" }
+  tally.*.program:         { type: bool, description: "Input on program, keyed by input number (main mix)" }
+  tally.*.preview:         { type: bool, description: "Input on preview (main mix)" }
+  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by overlay number; absent when empty" }
+  recording:               { type: bool, description: "Recording" }
+  streaming:               { type: bool, description: "Streaming (any stream)" }
+  external:                { type: bool, description: "External output running" }
+  multicorder:             { type: bool, description: "MultiCorder running" }
+  fade_to_black:           { type: bool, description: "Faded to black" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Inputs are given as a number, the exact title (case-sensitive), or the
+      input's key from the state. Numbers change when inputs are added or
+      removed; keys do not.
+
+  - models: [all]
+    severity: info
+    text: >
+      Tally, program, preview, playing, mute and the output flags are pushed as
+      they change (SUBSCRIBE TALLY and ACTS). Titles, volumes and overlays come
+      from the full XML state, read on connection and every 10 seconds.
+
+  - models: [all]
+    severity: info
+    text: >
+      The TCP API documents no authentication, and none is sent. vMix restricts
+      the TCP API to the local network by default ("Restrict access to LAN
+      only").
