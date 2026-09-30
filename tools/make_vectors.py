@@ -246,6 +246,26 @@ http(PA, "recall_preset", {"preset": 1}, "GET", "/cgi-bin/aw_ptz?cmd=%23R00&res=
 http(PA, "save_preset", {"preset": 100}, "GET", "/cgi-bin/aw_ptz?cmd=%23M99&res=1")
 http(PA, "power", {"power_on": True}, "GET", "/cgi-bin/aw_ptz?cmd=%23O1&res=1")
 
+# TriCaster: GET /v1/shortcut?name=NAME&value=VALUE (Automation and
+# Integration Guide p.63).
+T = "newtek-tricaster"
+for command, query in [("take", "name=main_take"), ("auto", "name=main_auto"),
+                       ("background_take", "name=main_background_take"),
+                       ("background_auto", "name=main_background_auto"),
+                       ("start_recording", "name=record_start"), ("stop_recording", "name=record_stop"),
+                       ("start_streaming", "name=streaming_toggle&value=1"),
+                       ("stop_streaming", "name=streaming_toggle&value=0"),
+                       ("stop_all_macros", "name=stop_all_macros")]:
+    http(T, command, {}, "GET", f"/v1/shortcut?{query}")
+http(T, "set_program", {"source": "input3"}, "GET", "/v1/shortcut?name=main_a_row_named_input&value=input3",
+     http_reply={"status": 200, "body": ""}, expect_result={"ok": {"kind": "ack"}})
+http(T, "set_preview", {"source": "ddr1"}, "GET", "/v1/shortcut?name=main_b_row_named_input&value=ddr1")
+http(T, "dsk_take", {"dsk": 2}, "GET", "/v1/shortcut?name=main_dsk2_take")
+http(T, "dsk_auto", {"dsk": 1}, "GET", "/v1/shortcut?name=main_dsk1_auto")
+http(T, "ddr_play", {"ddr": 2}, "GET", "/v1/shortcut?name=ddr2_play")
+http(T, "ddr_stop", {"ddr": 2}, "GET", "/v1/shortcut?name=ddr2_stop")
+http(T, "play_macro", {"name": "Open Show"}, "GET", "/v1/shortcut?name=play_macro_byname&value=Open%20Show")
+
 # AJA Ki Pro: key/value query.
 A = "aja-kipro"
 http(A, "record", {}, "GET", "/config?action=set&paramid=eParamID_TransportCommand&value=3")

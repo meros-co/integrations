@@ -1,0 +1,207 @@
+spec: 1
+id: newtek-tricaster
+name: NewTek / Vizrt TriCaster
+vendor: NewTek (Vizrt)
+category: switcher
+
+source:
+  - title: NewTek Automation and Integration Guide (January 2022)
+    author: NewTek
+    url: https://downloads.newtek.com/LiveProductionSystems/Legacy/AE/Automation%20and%20Integration%20Guide.pdf
+    note: >
+      Manufacturer document. The HTTP interface (p.62-64): GET
+      /v1/shortcut?name=&value=, /v1/live; shortcut naming (p.16-18) including
+      main_background_auto, main_dskN_take, main_a_row_named_input, and
+      play_macro_byname (p.59-60); password protection with admin/admin by
+      default (p.63).
+  - title: TriCaster User Guides 8-4 and 8-5 (Vizion, Mini, TriCaster), section 4.1
+    author: Vizrt
+    note: The Live Panel password covers web pages and network control, on by default as admin/admin.
+  - title: TriCaster shortcuts_cfg.xml, as republished by Jon Jones
+    url: https://jonjones.co/blog/full-list-of-all-tricaster-macros/
+    note: >
+      Third-party copy of the product's own shortcut dictionary, which the guide
+      names as authoritative (p.17). record_start, record_stop,
+      streaming_toggle values, ddrN_play and ddrN_stop.
+  - title: Bitfocus Companion, companion-module-newtek-tricaster
+    url: https://github.com/bitfocus/companion-module-newtek-tricaster
+    note: MIT-licensed; cross-check only. Uses the same shortcut names over HTTP on port 80.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: basic
+  timeout_ms: 4000
+  probe: { method: GET, path: /v1/live }
+
+settings:
+  # The Live Panel password; the guide gives admin / admin as the default.
+  username: { type: string, default: admin }
+  password: { type: string, secret: true, default: admin }
+
+models:
+  - id: tricaster-advanced-edition
+    name: TriCaster 410, 460, 860, 8000 and Mini on Advanced Edition
+    supports: [take, auto, background_take, background_auto, set_program, set_preview,
+               dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
+               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros]
+    verification: none
+  - id: tricaster-8
+    name: TriCaster TC1, TC2 Elite, Mini 4K / X and Vizion (software 7 and 8)
+    supports: [take, auto, background_take, background_auto, set_program, set_preview,
+               dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
+               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros]
+    verification: none
+
+commands:
+  take:
+    summary: Take every delegated layer, as the Take button does
+    send: { method: GET, path: /v1/shortcut, query: { name: main_take } }
+    expect: { status: 200 }
+    returns: ack
+
+  auto:
+    summary: Auto-transition every delegated layer, as the Auto button does
+    send: { method: GET, path: /v1/shortcut, query: { name: main_auto } }
+    expect: { status: 200 }
+    returns: ack
+
+  background_take:
+    summary: Take the background (program and preview rows) only
+    send: { method: GET, path: /v1/shortcut, query: { name: main_background_take } }
+    expect: { status: 200 }
+    returns: ack
+
+  background_auto:
+    summary: Auto-transition the background only
+    send: { method: GET, path: /v1/shortcut, query: { name: main_background_auto } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_program:
+    summary: >
+      Select a source on the program row by its internal name, such as input1,
+      ddr1, gfx1 or bfr2
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true }
+    send:
+      method: GET
+      path: /v1/shortcut
+      query: { name: main_a_row_named_input, value: "{source}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_preview:
+    summary: Select a source on the preview row by its internal name
+    params:
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true }
+    send:
+      method: GET
+      path: /v1/shortcut
+      query: { name: main_b_row_named_input, value: "{source}" }
+    expect: { status: 200 }
+    returns: ack
+
+  dsk_take:
+    summary: Take a downstream key layer on or off
+    params:
+      dsk: { type: int, min: 1, max: 4, required: true }
+    send: { method: GET, path: /v1/shortcut, query: { name: "main_dsk{dsk}_take" } }
+    expect: { status: 200 }
+    returns: ack
+
+  dsk_auto:
+    summary: Auto-transition a downstream key layer on or off
+    params:
+      dsk: { type: int, min: 1, max: 4, required: true }
+    send: { method: GET, path: /v1/shortcut, query: { name: "main_dsk{dsk}_auto" } }
+    expect: { status: 200 }
+    returns: ack
+
+  start_recording:
+    summary: Start recording, if not already recording
+    send: { method: GET, path: /v1/shortcut, query: { name: record_start } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_recording:
+    summary: Stop recording
+    send: { method: GET, path: /v1/shortcut, query: { name: record_stop } }
+    expect: { status: 200 }
+    returns: ack
+
+  start_streaming:
+    summary: Start streaming
+    send: { method: GET, path: /v1/shortcut, query: { name: streaming_toggle, value: "1" } }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_streaming:
+    summary: Stop streaming
+    send: { method: GET, path: /v1/shortcut, query: { name: streaming_toggle, value: "0" } }
+    expect: { status: 200 }
+    returns: ack
+
+  ddr_play:
+    summary: Play a DDR media player
+    params:
+      ddr: { type: int, min: 1, max: 4, required: true }
+    send: { method: GET, path: /v1/shortcut, query: { name: "ddr{ddr}_play" } }
+    expect: { status: 200 }
+    returns: ack
+
+  ddr_stop:
+    summary: Stop a DDR media player
+    params:
+      ddr: { type: int, min: 1, max: 4, required: true }
+    send: { method: GET, path: /v1/shortcut, query: { name: "ddr{ddr}_stop" } }
+    expect: { status: 200 }
+    returns: ack
+
+  play_macro:
+    summary: Run a macro by name
+    params:
+      name: { type: string, max_length: 128, required: true }
+    send:
+      method: GET
+      path: /v1/shortcut
+      query: { name: play_macro_byname, value: "{name}" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_all_macros:
+    summary: Stop every running macro
+    send: { method: GET, path: /v1/shortcut, query: { name: stop_all_macros } }
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The Live Panel password is on by default (admin / admin) and covers the
+      HTTP interface. A wrong password is not retried: the first 401 marks the
+      device unauthorized until it is opened again with corrected settings.
+      The guide recommends Digest authentication; the core sends Basic, which
+      is what an htpasswd file serves. If a system insists on Digest, the only
+      way in is to turn the Live Panel password off.
+
+  - models: [all]
+    severity: info
+    text: >
+      An ack is HTTP 200: the TriCaster accepted the shortcut. The response
+      body is not documented, so whether the shortcut applied is not confirmed.
+
+  - models: [all]
+    severity: info
+    text: >
+      Source names are the TriCaster's internal names (input1, ddr1, gfx1,
+      bfr2, black, and so on), not the display names. The sources a system has
+      depend on the model; /v1/dictionary?key=tally lists them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Tally and other live state (the tally dictionary and the change
+      notification WebSocket) are not implemented yet.
