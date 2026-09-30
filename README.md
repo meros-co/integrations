@@ -81,6 +81,7 @@ hardware, so it should never be picked up automatically in a show-critical path.
 |---|---|---|---|
 | `aja-kipro` | AJA Ki Pro, Ki Pro GO | HTTP REST | none |
 | `behringer-x32` | Behringer X32/Compact/Rack, Midas M32 | OSC/UDP 10023 | none |
+| `behringer-wing` | Behringer WING, WING Compact, WING Rack | OSC/UDP 2223 | none |
 | `blackmagic-hyperdeck` | HyperDeck (protocol 1.8, 1.11+) | Line/TCP 9993, numeric codes | none |
 | `blackmagic-videohub` | Smart Videohub family | Block/TCP 9990 | none |
 | `etc-eos` | ETC Eos, Ion, Gio, Element | OSC/TCP 3032 | none |

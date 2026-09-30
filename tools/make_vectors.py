@@ -170,6 +170,33 @@ binary(X, "get_channel_name", {"channel": 1}, osc("/ch/01/config/name"),
        expect_result={"ok": {"kind": "value", "value": "Kick"}})
 binary(X, "set_channel_name", {"channel": 12, "name": "Vox"}, osc("/ch/12/config/name", ("s", "Vox")))
 
+# Behringer WING: OSC over UDP 2223, 1-based strip numbers, faders in dB,
+# mute as int 1/0 (WING Remote Protocols p.22, p.47-66).
+W = "behringer-wing"
+for stem, node, n in [("channel", "ch", 40), ("aux", "aux", 8), ("bus", "bus", 16),
+                      ("main", "main", 4), ("matrix", "mtx", 8), ("dca", "dca", 16)]:
+    binary(W, f"set_{stem}_fader", {stem: n, "level_db": -3.0}, osc(f"/{node}/{n}/fdr", ("f", -3.0)),
+           expect_result={"ok": {"kind": "unverified"}})
+    binary(W, f"mute_{stem}", {stem: 1, "muted": True}, osc(f"/{node}/1/mute", ("i", 1)))
+    binary(W, f"get_{stem}_name", {stem: 2}, osc(f"/{node}/2/name"),
+           device_reply_hex=hexs(osc(f"/{node}/2/name", ("s", "Vocals"))),
+           expect_result={"ok": {"kind": "value", "value": "Vocals"}})
+    binary(W, f"set_{stem}_name", {stem: 3, "name": "Pad"}, osc(f"/{node}/3/name", ("s", "Pad")))
+# A float query answers ,sff: display text, raw 0-1 position, dB (p.21).
+binary(W, "get_channel_fader", {"channel": 1}, osc("/ch/1/fdr"),
+       device_reply_hex=hexs(osc("/ch/1/fdr", ("s", "-2.0"), ("f", 0.7), ("f", -2.0))),
+       expect_result={"ok": {"kind": "value", "value": -2.0}})
+# An int query answers ,sfi: display text, raw, int (p.21).
+binary(W, "get_channel_mute", {"channel": 1}, osc("/ch/1/mute"),
+       device_reply_hex=hexs(osc("/ch/1/mute", ("s", "1"), ("f", 1.0), ("i", 1))),
+       expect_result={"ok": {"kind": "value", "value": 1}})
+binary(W, "mute_group", {"group": 8, "muted": False}, osc("/mgrp/8/mute", ("i", 0)))
+binary(W, "recall_scene", {"scene": 5},
+       [osc("/$ctl/lib/$actionidx", ("i", 5)), osc("/$ctl/lib/$action", ("s", "GO"))])
+binary(W, "get_console_info", {}, osc("/?"),
+       device_reply_hex=hexs(osc("/?", ("s", "WING,192.168.1.71,PGM,ngc-full,NO_SERIAL,1.07.2"))),
+       expect_result={"ok": {"kind": "value", "value": "WING,192.168.1.71,PGM,ngc-full,NO_SERIAL,1.07.2"}})
+
 # QLab: OSC over UDP, no replies to the sender.
 Q = "qlab"
 for command, address in [("go", "/go"), ("stop", "/stop"), ("pause", "/pause"), ("resume", "/resume"),

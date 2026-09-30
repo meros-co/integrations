@@ -1,0 +1,392 @@
+spec: 1
+id: behringer-wing
+name: Behringer WING
+vendor: Behringer
+category: mixer
+
+source:
+  - title: WING Remote Protocols, V3.0.6-27 (firmware 3.0.6-27 and later)
+    author: Patrick-Gilles Maillot, published by Music Tribe
+    url: https://cdn-media.empowertribe.com/f255e02a7d164692b3ac2aff862cfcad/WING%20Remote%20Protocols%20FW%203.0.6.pdf
+    note: >
+      Manufacturer-hosted document. OSC on UDP 2223 with replies to the sender's
+      port (p.16, p.19); queries without arguments and their ,s / ,sff / ,sfi
+      replies (p.19-21); sets and the absence of any echo (p.22); the address
+      tree and its ranges (p.47-66); scene recall through /$ctl/lib (p.88); the
+      /? identification query (p.20).
+  - title: Bitfocus Companion, companion-module-behringer-wing
+    url: https://github.com/bitfocus/companion-module-behringer-wing
+    note: >
+      MIT-licensed; cross-check only. Same strip counts on all three models,
+      /? for discovery, scene recall as $actionidx then $action GO, and a
+      re-query after every set because the console does not echo.
+  - title: Basin OSC client (backend/app/services/osc/client.py)
+    note: >
+      Meros. Reads /ch/N/name on UDP 2223. Not yet run against hardware.
+
+transport:
+  type: osc-udp
+  port: 2223
+  timeout_ms: 500
+  reply: to-source
+  probe: /?
+
+models:
+  - id: wing
+    name: Behringer WING
+    channels: 40
+    supports: [set_channel_fader, mute_channel, get_channel_name, set_channel_name,
+               set_aux_fader, mute_aux, get_aux_name, set_aux_name, set_bus_fader,
+               mute_bus, get_bus_name, set_bus_name, set_main_fader, mute_main,
+               get_main_name, set_main_name, set_matrix_fader, mute_matrix,
+               get_matrix_name, set_matrix_name, set_dca_fader, mute_dca, get_dca_name,
+               set_dca_name, get_channel_fader, get_channel_mute, mute_group,
+               recall_scene, get_console_info]
+    verification: none
+  - id: wing-compact
+    name: Behringer WING Compact
+    channels: 40
+    supports: [set_channel_fader, mute_channel, get_channel_name, set_channel_name,
+               set_aux_fader, mute_aux, get_aux_name, set_aux_name, set_bus_fader,
+               mute_bus, get_bus_name, set_bus_name, set_main_fader, mute_main,
+               get_main_name, set_main_name, set_matrix_fader, mute_matrix,
+               get_matrix_name, set_matrix_name, set_dca_fader, mute_dca, get_dca_name,
+               set_dca_name, get_channel_fader, get_channel_mute, mute_group,
+               recall_scene, get_console_info]
+    verification: none
+  - id: wing-rack
+    name: Behringer WING Rack
+    channels: 40
+    supports: [set_channel_fader, mute_channel, get_channel_name, set_channel_name,
+               set_aux_fader, mute_aux, get_aux_name, set_aux_name, set_bus_fader,
+               mute_bus, get_bus_name, set_bus_name, set_main_fader, mute_main,
+               get_main_name, set_main_name, set_matrix_fader, mute_matrix,
+               get_matrix_name, set_matrix_name, set_dca_fader, mute_dca, get_dca_name,
+               set_dca_name, get_channel_fader, get_channel_mute, mute_group,
+               recall_scene, get_console_info]
+    verification: none
+
+commands:
+  set_channel_fader:
+    summary: Set an input channel's fader level in dB
+    params:
+      channel: { type: int, min: 1, max: 40, required: true }
+      level_db: { type: float, min: -144.0, max: 10.0, required: true }
+    send:
+      address: /ch/{channel}/fdr
+      args: [ { value: "{level_db}", type: float } ]
+    returns: none
+
+  mute_channel:
+    summary: Mute or unmute an input channel
+    params:
+      channel: { type: int, min: 1, max: 40, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /ch/{channel}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_channel_name:
+    summary: Read an input channel's name. Empty when the strip has not been named.
+    params:
+      channel: { type: int, min: 1, max: 40, required: true }
+    send: { address: "/ch/{channel}/name" }
+    expect: { address: "/ch/{channel}/name", arg: 0 }
+    returns: value
+
+  set_channel_name:
+    summary: Name an input channel
+    params:
+      channel: { type: int, min: 1, max: 40, required: true }
+      name: { type: string, max_length: 16, required: true }
+    send:
+      address: /ch/{channel}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_aux_fader:
+    summary: Set an aux input's fader level in dB
+    params:
+      aux: { type: int, min: 1, max: 8, required: true }
+      level_db: { type: float, min: -144.0, max: 10.0, required: true }
+    send:
+      address: /aux/{aux}/fdr
+      args: [ { value: "{level_db}", type: float } ]
+    returns: none
+
+  mute_aux:
+    summary: Mute or unmute an aux input
+    params:
+      aux: { type: int, min: 1, max: 8, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /aux/{aux}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_aux_name:
+    summary: Read an aux input's name. Empty when the strip has not been named.
+    params:
+      aux: { type: int, min: 1, max: 8, required: true }
+    send: { address: "/aux/{aux}/name" }
+    expect: { address: "/aux/{aux}/name", arg: 0 }
+    returns: value
+
+  set_aux_name:
+    summary: Name an aux input
+    params:
+      aux: { type: int, min: 1, max: 8, required: true }
+      name: { type: string, max_length: 16, required: true }
+    send:
+      address: /aux/{aux}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_bus_fader:
+    summary: Set a mix bus's fader level in dB
+    params:
+      bus: { type: int, min: 1, max: 16, required: true }
+      level_db: { type: float, min: -144.0, max: 10.0, required: true }
+    send:
+      address: /bus/{bus}/fdr
+      args: [ { value: "{level_db}", type: float } ]
+    returns: none
+
+  mute_bus:
+    summary: Mute or unmute a mix bus
+    params:
+      bus: { type: int, min: 1, max: 16, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_bus_name:
+    summary: Read a mix bus's name. Empty when the strip has not been named.
+    params:
+      bus: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/bus/{bus}/name" }
+    expect: { address: "/bus/{bus}/name", arg: 0 }
+    returns: value
+
+  set_bus_name:
+    summary: Name a mix bus
+    params:
+      bus: { type: int, min: 1, max: 16, required: true }
+      name: { type: string, max_length: 16, required: true }
+    send:
+      address: /bus/{bus}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_main_fader:
+    summary: Set a main's fader level in dB
+    params:
+      main: { type: int, min: 1, max: 4, required: true }
+      level_db: { type: float, min: -144.0, max: 10.0, required: true }
+    send:
+      address: /main/{main}/fdr
+      args: [ { value: "{level_db}", type: float } ]
+    returns: none
+
+  mute_main:
+    summary: Mute or unmute a main
+    params:
+      main: { type: int, min: 1, max: 4, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /main/{main}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_main_name:
+    summary: Read a main's name. Empty when the strip has not been named.
+    params:
+      main: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/main/{main}/name" }
+    expect: { address: "/main/{main}/name", arg: 0 }
+    returns: value
+
+  set_main_name:
+    summary: Name a main
+    params:
+      main: { type: int, min: 1, max: 4, required: true }
+      name: { type: string, max_length: 16, required: true }
+    send:
+      address: /main/{main}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_matrix_fader:
+    summary: Set a matrix's fader level in dB
+    params:
+      matrix: { type: int, min: 1, max: 8, required: true }
+      level_db: { type: float, min: -144.0, max: 10.0, required: true }
+    send:
+      address: /mtx/{matrix}/fdr
+      args: [ { value: "{level_db}", type: float } ]
+    returns: none
+
+  mute_matrix:
+    summary: Mute or unmute a matrix
+    params:
+      matrix: { type: int, min: 1, max: 8, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /mtx/{matrix}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_matrix_name:
+    summary: Read a matrix's name. Empty when the strip has not been named.
+    params:
+      matrix: { type: int, min: 1, max: 8, required: true }
+    send: { address: "/mtx/{matrix}/name" }
+    expect: { address: "/mtx/{matrix}/name", arg: 0 }
+    returns: value
+
+  set_matrix_name:
+    summary: Name a matrix
+    params:
+      matrix: { type: int, min: 1, max: 8, required: true }
+      name: { type: string, max_length: 16, required: true }
+    send:
+      address: /mtx/{matrix}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_dca_fader:
+    summary: Set a DCA's fader level in dB
+    params:
+      dca: { type: int, min: 1, max: 16, required: true }
+      level_db: { type: float, min: -144.0, max: 10.0, required: true }
+    send:
+      address: /dca/{dca}/fdr
+      args: [ { value: "{level_db}", type: float } ]
+    returns: none
+
+  mute_dca:
+    summary: Mute or unmute a DCA
+    params:
+      dca: { type: int, min: 1, max: 16, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /dca/{dca}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_dca_name:
+    summary: Read a DCA's name. Empty when the strip has not been named.
+    params:
+      dca: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/dca/{dca}/name" }
+    expect: { address: "/dca/{dca}/name", arg: 0 }
+    returns: value
+
+  set_dca_name:
+    summary: Name a DCA
+    params:
+      dca: { type: int, min: 1, max: 16, required: true }
+      name: { type: string, max_length: 8, required: true }
+    send:
+      address: /dca/{dca}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  get_channel_fader:
+    summary: Read an input channel's fader level in dB (-144 is -oo)
+    params:
+      channel: { type: int, min: 1, max: 40, required: true }
+    send: { address: "/ch/{channel}/fdr" }
+    expect: { address: "/ch/{channel}/fdr", arg: 2 }
+    returns: value
+
+  get_channel_mute:
+    summary: Read an input channel's mute, 1 muted and 0 not
+    params:
+      channel: { type: int, min: 1, max: 40, required: true }
+    send: { address: "/ch/{channel}/mute" }
+    expect: { address: "/ch/{channel}/mute", arg: 2 }
+    returns: value
+
+  mute_group:
+    summary: Mute or unmute a mute group
+    params:
+      group: { type: int, min: 1, max: 8, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /mgrp/{group}/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  recall_scene:
+    summary: >
+      Load a scene of the open show by its number in the show's scene list.
+      A show must be open on the console.
+    params:
+      scene: { type: int, min: 1, max: 16384, required: true }
+    send:
+      - { address: "/$ctl/lib/$actionidx", args: [ { value: "{scene}", type: int } ] }
+      - { address: "/$ctl/lib/$action", args: [ { value: "GO", type: string } ] }
+    returns: none
+
+  get_console_info:
+    summary: >
+      The console's identification string: WING,<ip>,<name>,<model>,<serial>,<firmware>
+    send: { address: "/?" }
+    expect: { address: "/?", arg: 0 }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The console does not echo a set (Remote Protocols p.22), so sets report
+      unverified. Read the value back with the matching get command to confirm
+      it.
+
+  - models: [all]
+    severity: info
+    text: >
+      Fader values are dB, from -144 (shown as -oo) to +10, in 1024 steps. A
+      query answers with the display text, the raw 0-1 position and the dB
+      value; the get commands return the dB value. The raw position is not
+      linear in dB.
+
+  - models: [all]
+    severity: info
+    text: >
+      A strip's name is empty until someone names it. The console may still
+      display a name taken from the linked input source; that is the read-only
+      /ch/N/$name, which these commands do not read.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Only one OSC subscription exists on a console, and it goes to whichever
+      client asked last (Remote Protocols p.16, p.30). The core does not
+      subscribe, so it does not take the subscription from Companion or any
+      other client. Queries and sets are unaffected.
+
+  - models: [all]
+    severity: warning
+    text: >
+      recall_scene loads the scene at that position in the open show's scene
+      list, by setting /$ctl/lib/$actionidx and then sending GO. With no show
+      open nothing is recalled, and the console gives no reply either way.
+
+  - models: [all]
+    severity: info
+    text: >
+      /$ctl/OSC/ronly on the console makes OSC read-only. Sets are then ignored;
+      the document does not say whether an error is returned.
+
+  - models: [all]
+    severity: info
+    text: >
+      Port 2222 carries the console's native binary protocol and discovery
+      (send the five bytes WING? for an ASCII reply). The /? query here returns
+      the same identification string over OSC. The X32's /xinfo and /xremote do
+      not exist on the WING.
