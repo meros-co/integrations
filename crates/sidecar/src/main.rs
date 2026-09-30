@@ -49,40 +49,39 @@ struct App {
 
 type Shared = Arc<App>;
 
-fn authorized(app: &App, headers: &HeaderMap) -> Result<(), Response> {
+fn authorized(app: &App, headers: &HeaderMap) -> bool {
     let given = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "));
     // Constant-time comparison: the token guards control of show equipment.
-    let ok = given.is_some_and(|g| {
+    given.is_some_and(|g| {
         g.len() == app.token.len()
             && g.bytes()
                 .zip(app.token.bytes())
                 .fold(0u8, |acc, (a, b)| acc | (a ^ b))
                 == 0
-    });
-    if ok {
-        Ok(())
-    } else {
-        Err((
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error": {"error": "unauthorized"}})),
-        )
-            .into_response())
-    }
+    })
+}
+
+fn unauthorized() -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({"error": {"error": "unauthorized"}})),
+    )
+        .into_response()
 }
 
 async fn catalog(State(app): State<Shared>, headers: HeaderMap) -> Response {
-    if let Err(r) = authorized(&app, &headers) {
-        return r;
+    if !authorized(&app, &headers) {
+        return unauthorized();
     }
     Json(api::catalog(&app.core)).into_response()
 }
 
 async fn open(State(app): State<Shared>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    if let Err(r) = authorized(&app, &headers) {
-        return r;
+    if !authorized(&app, &headers) {
+        return unauthorized();
     }
     Json(api::open(&app.core, &body)).into_response()
 }
@@ -100,8 +99,8 @@ async fn execute(
     headers: HeaderMap,
     Json(body): Json<Execute>,
 ) -> Response {
-    if let Err(r) = authorized(&app, &headers) {
-        return r;
+    if !authorized(&app, &headers) {
+        return unauthorized();
     }
     Json(api::execute(&app.core, body.device, &body.command, &body.params).await).into_response()
 }
@@ -111,8 +110,8 @@ async fn snapshot(
     headers: HeaderMap,
     Path(device): Path<u64>,
 ) -> Response {
-    if let Err(r) = authorized(&app, &headers) {
-        return r;
+    if !authorized(&app, &headers) {
+        return unauthorized();
     }
     Json(api::snapshot(&app.core, device)).into_response()
 }
@@ -123,8 +122,8 @@ struct Close {
 }
 
 async fn close(State(app): State<Shared>, headers: HeaderMap, Json(body): Json<Close>) -> Response {
-    if let Err(r) = authorized(&app, &headers) {
-        return r;
+    if !authorized(&app, &headers) {
+        return unauthorized();
     }
     app.core.close(body.device).await;
     Json(json!({})).into_response()
@@ -141,15 +140,14 @@ async fn events(
     headers: HeaderMap,
     Query(q): Query<EventsQuery>,
 ) -> Response {
-    if let Err(r) = authorized(&app, &headers) {
-        return r;
+    if !authorized(&app, &headers) {
+        return unauthorized();
     }
     let max = q.max.unwrap_or(256).clamp(1, 10_000);
     let wait = Duration::from_millis(q.wait_ms.unwrap_or(25_000)).min(MAX_WAIT);
-    let events = match tokio::time::timeout(wait, app.core.next_events(max)).await {
-        Ok(events) => events,
-        Err(_) => Vec::new(),
-    };
+    let events = tokio::time::timeout(wait, app.core.next_events(max))
+        .await
+        .unwrap_or_default();
     Json(api::events(&events)).into_response()
 }
 
