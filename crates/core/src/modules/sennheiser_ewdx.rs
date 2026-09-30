@@ -24,9 +24,6 @@ const SUBSCRIBE_TIMEOUT: Millis = 5_000;
 const MUTE_TIMEOUT: Millis = 3_000;
 /// Retry after an unreachable device or a dropped stream.
 const RETRY_AFTER: Millis = 1_000;
-/// Retry less often after a rejected password: it will not change by itself,
-/// but an operator may fix it on the device.
-const UNAUTHORIZED_RETRY_AFTER: Millis = 30_000;
 /// Liveness: a stream quiet this long is checked with a request.
 const QUIET_AFTER: Millis = 3_000;
 const LIVENESS_CHECK_EVERY: Millis = 1_000;
@@ -66,6 +63,12 @@ pub(crate) struct Ewdx {
     last_activity: Millis,
     liveness_in_flight: bool,
     strikes: u32,
+    /// Set once the device refuses the credential. Terminal: nothing is sent
+    /// again. A refused password is never retried on any schedule, because
+    /// repeated failed authentications have locked an EW-DX out until it was
+    /// re-adopted in Control Cockpit (RFDeck review item O). The host
+    /// re-opens the device with a corrected password.
+    refused: Option<String>,
 }
 
 impl Ewdx {
@@ -98,6 +101,7 @@ impl Ewdx {
             last_activity: 0,
             liveness_in_flight: false,
             strikes: 0,
+            refused: None,
         }
     }
 
@@ -135,16 +139,38 @@ impl Ewdx {
         self.send(cx, Purpose::Probe, request);
     }
 
-    fn lost(&mut self, cx: &mut Cx, connection: Connection, retry: Millis) {
+    fn stop_everything(&mut self, cx: &mut Cx) {
         cx.sse_close(STREAM);
         cx.cancel_timer(LIVENESS);
+        cx.cancel_timer(RETRY);
         self.phase = Phase::Idle;
         self.connected = false;
         self.session = None;
         self.strikes = 0;
         self.liveness_in_flight = false;
-        cx.connection(connection);
-        cx.set_timer(RETRY, retry);
+    }
+
+    /// The device is unreachable or the stream dropped: try again shortly.
+    fn lost(&mut self, cx: &mut Cx, reason: String) {
+        self.stop_everything(cx);
+        cx.connection(Connection::Disconnected { reason });
+        cx.set_timer(RETRY, RETRY_AFTER);
+    }
+
+    /// The device refused the credential: stop, and never present it again.
+    fn refuse(&mut self, cx: &mut Cx, reason: &str) {
+        if self.refused.is_some() {
+            return;
+        }
+        self.stop_everything(cx);
+        self.refused = Some(reason.to_string());
+        cx.log(
+            Level::Warning,
+            format!("{reason}; no further requests until the device is opened again with a corrected password"),
+        );
+        cx.connection(Connection::Unauthorized {
+            reason: reason.into(),
+        });
     }
 
     fn open_stream(&mut self, cx: &mut Cx) {
@@ -301,6 +327,16 @@ fn is_success(status: u16) -> bool {
     (200..300).contains(&status)
 }
 
+/// A credential refusal, from any request or the stream. 403 is a refusal too:
+/// the password authenticated but is not allowed to do what the core needs.
+fn refusal(status: Option<u16>) -> Option<&'static str> {
+    match status {
+        Some(401) => Some("the device rejected the third-party password"),
+        Some(403) => Some("the third-party password is not allowed to use this API"),
+        _ => None,
+    }
+}
+
 impl Module for Ewdx {
     fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
@@ -308,6 +344,15 @@ impl Module for Ewdx {
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
+        if let Some(reason) = &self.refused {
+            cx.complete(
+                id,
+                Err(CommandError::Auth {
+                    message: reason.clone(),
+                }),
+            );
+            return;
+        }
         if !self.connected {
             cx.complete(id, Err(CommandError::NotConnected));
             return;
@@ -349,7 +394,26 @@ impl Module for Ewdx {
         let Some(purpose) = self.requests.remove(&id) else {
             return;
         };
+        if self.refused.is_some() {
+            if let Purpose::Mute { command } = purpose {
+                let message = self.refused.clone().unwrap_or_default();
+                cx.complete(command, Err(CommandError::Auth { message }));
+            }
+            return;
+        }
         let status = result.as_ref().ok().map(|r| r.status);
+        if let Some(reason) = refusal(status) {
+            if let Purpose::Mute { command } = purpose {
+                cx.complete(
+                    command,
+                    Err(CommandError::Auth {
+                        message: reason.into(),
+                    }),
+                );
+            }
+            self.refuse(cx, reason);
+            return;
+        }
         let body = result
             .as_ref()
             .ok()
@@ -361,13 +425,6 @@ impl Module for Ewdx {
                     return;
                 }
                 match (status, &body) {
-                    (Some(401), _) => self.lost(
-                        cx,
-                        Connection::Unauthorized {
-                            reason: "the device rejected the third-party password".into(),
-                        },
-                        UNAUTHORIZED_RETRY_AFTER,
-                    ),
                     // A JSON body is what separates an SSCv2 device from any
                     // other HTTPS server at the address.
                     (Some(s), Some(Value::Object(_))) if is_success(s) => {
@@ -382,16 +439,10 @@ impl Module for Ewdx {
                         self.send(cx, Purpose::Identity, request);
                         self.open_stream(cx);
                     }
-                    (Some(s), _) => self.lost(
-                        cx,
-                        Connection::Disconnected {
-                            reason: format!("not an SSCv2 device (HTTP {s})"),
-                        },
-                        RETRY_AFTER,
-                    ),
+                    (Some(s), _) => self.lost(cx, format!("not an SSCv2 device (HTTP {s})")),
                     (None, _) => {
                         let reason = result.err().unwrap_or_default();
-                        self.lost(cx, Connection::Disconnected { reason }, RETRY_AFTER);
+                        self.lost(cx, reason);
                     }
                 }
             }
@@ -430,27 +481,20 @@ impl Module for Ewdx {
             },
             Purpose::Liveness => {
                 self.liveness_in_flight = false;
+                // Any answer proves the device is there; a refusal never
+                // reaches this point.
                 if status.is_some() {
                     self.heard(cx);
                 } else {
                     self.strikes += 1;
                     if self.strikes >= LIVENESS_STRIKES {
-                        self.lost(
-                            cx,
-                            Connection::Disconnected {
-                                reason: "unreachable behind a silent stream".into(),
-                            },
-                            RETRY_AFTER,
-                        );
+                        self.lost(cx, "unreachable behind a silent stream".into());
                     }
                 }
             }
             Purpose::Mute { command } => {
                 let outcome = match (status, result) {
                     (Some(s), _) if is_success(s) => Ok(Outcome::Ack),
-                    (Some(401), _) => Err(CommandError::Auth {
-                        message: "the device rejected the third-party password".into(),
-                    }),
                     (Some(s), Ok(response)) => Err(CommandError::DeviceError {
                         code: Some(s.to_string()),
                         message: String::from_utf8_lossy(&response.body).into_owned(),
@@ -464,6 +508,9 @@ impl Module for Ewdx {
     }
 
     fn sse(&mut self, cx: &mut Cx, _stream: Key, input: SseInput) {
+        if self.refused.is_some() {
+            return;
+        }
         match input {
             SseInput::Opened => {
                 self.heard(cx);
@@ -499,31 +546,16 @@ impl Module for Ewdx {
                     self.apply(cx, &data);
                 }
             }
-            SseInput::Closed { status, reason } => {
-                let connection = match status {
-                    Some(401) => Connection::Unauthorized {
-                        reason: "the device rejected the third-party password".into(),
-                    },
-                    Some(403) => Connection::Unauthorized {
-                        reason: "the password is not allowed to subscribe".into(),
-                    },
-                    _ => Connection::Disconnected {
-                        reason: format!("subscription stream: {reason}"),
-                    },
-                };
-                let retry = if status.is_some_and(|s| s == 401 || s == 403) {
-                    UNAUTHORIZED_RETRY_AFTER
-                } else {
-                    RETRY_AFTER
-                };
-                self.lost(cx, connection, retry);
-            }
+            SseInput::Closed { status, reason } => match refusal(status) {
+                Some(refused) => self.refuse(cx, refused),
+                None => self.lost(cx, format!("subscription stream: {reason}")),
+            },
         }
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         match key {
-            RETRY => self.probe(cx),
+            RETRY if self.refused.is_none() => self.probe(cx),
             LIVENESS => {
                 if self.phase != Phase::Streaming {
                     return;
@@ -633,8 +665,44 @@ mod tests {
         assert!(probe.accept_invalid_certs);
     }
 
+    fn params(v: Value) -> Params {
+        v.as_object().unwrap().clone()
+    }
+
+    fn unauthorized(actions: &[Action]) -> bool {
+        actions
+            .iter()
+            .any(|x| matches!(x, Action::Connection(Connection::Unauthorized { .. })))
+    }
+
+    fn sends_anything(actions: &[Action]) -> bool {
+        actions.iter().any(|a| {
+            matches!(
+                a,
+                Action::Http { .. } | Action::SseOpen { .. } | Action::SetTimer { .. }
+            )
+        })
+    }
+
+    /// Commands after a refusal fail with Auth and send nothing.
+    fn assert_refused(d: &mut Ewdx) {
+        let mut cx = Cx::new(90_000);
+        d.command(
+            &mut cx,
+            7,
+            "mute",
+            &params(json!({"channel": 1, "muted": true})),
+        );
+        let a = cx.take();
+        assert!(!sends_anything(&a));
+        assert!(matches!(
+            completed(&a)[0],
+            (7, Err(CommandError::Auth { .. }))
+        ));
+    }
+
     #[test]
-    fn a_rejected_password_is_unauthorized_and_retried_slowly() {
+    fn a_rejected_password_is_terminal() {
         let mut d = device();
         let mut cx = Cx::new(0);
         d.start(&mut cx);
@@ -642,13 +710,95 @@ mod tests {
         let mut cx = Cx::new(10);
         d.http_response(&mut cx, probe, status(401));
         let a = cx.take();
-        assert!(a
-            .iter()
-            .any(|x| matches!(x, Action::Connection(Connection::Unauthorized { .. }))));
-        assert!(a.contains(&Action::SetTimer {
-            key: RETRY,
-            after: UNAUTHORIZED_RETRY_AFTER
-        }));
+        assert!(unauthorized(&a));
+        // No retry on any schedule: repeated failures can lock the device's
+        // third-party access (RFDeck review item O).
+        assert!(!sends_anything(&a));
+        assert!(a.contains(&Action::CancelTimer { key: RETRY }));
+        // A stray retry timer does nothing either.
+        let mut cx = Cx::new(60_000);
+        d.timer(&mut cx, RETRY);
+        assert!(!sends_anything(&cx.take()));
+        assert_refused(&mut d);
+    }
+
+    #[test]
+    fn a_refusal_on_the_stream_is_terminal() {
+        for code in [401, 403] {
+            let (mut d, _) = streaming();
+            let mut cx = Cx::new(30);
+            d.sse(
+                &mut cx,
+                STREAM,
+                SseInput::Closed {
+                    status: Some(code),
+                    reason: format!("HTTP {code}"),
+                },
+            );
+            let a = cx.take();
+            assert!(unauthorized(&a), "HTTP {code}");
+            assert!(!sends_anything(&a), "HTTP {code}");
+            assert_refused(&mut d);
+        }
+    }
+
+    #[test]
+    fn a_refused_liveness_check_is_not_proof_of_life() {
+        let (mut d, _) = streaming();
+        let mut cx = Cx::new(20 + QUIET_AFTER + 1);
+        d.timer(&mut cx, LIVENESS);
+        let (check, _) = requests(&cx.take())
+            .into_iter()
+            .find(|(_, r)| r.url.ends_with("/api/ssc/version"))
+            .unwrap();
+        let mut cx = Cx::new(20 + QUIET_AFTER + 2);
+        d.http_response(&mut cx, check, status(401));
+        let a = cx.take();
+        assert!(!a.contains(&Action::Alive));
+        assert!(unauthorized(&a));
+        assert!(!sends_anything(&a));
+        assert_refused(&mut d);
+    }
+
+    #[test]
+    fn a_refused_subscription_or_fetch_is_terminal() {
+        let (mut d, actions) = streaming();
+        let reqs = requests(&actions);
+        let (subscribe, _) = reqs.iter().find(|(_, r)| r.method == "PUT").unwrap();
+        let (fetch, _) = reqs.iter().find(|(_, r)| r.method == "GET").unwrap();
+        let mut cx = Cx::new(30);
+        d.http_response(&mut cx, *subscribe, status(403));
+        let a = cx.take();
+        assert!(unauthorized(&a));
+        assert!(a.contains(&Action::SseClose { stream: STREAM }));
+        assert!(!sends_anything(&a));
+        // Responses still in flight report nothing further.
+        let mut cx = Cx::new(31);
+        d.http_response(&mut cx, *fetch, status(401));
+        assert!(cx.take().is_empty());
+        assert_refused(&mut d);
+    }
+
+    #[test]
+    fn a_mute_refused_mid_session_fails_with_auth_and_stops() {
+        let (mut d, _) = streaming();
+        let mut cx = Cx::new(50);
+        d.command(
+            &mut cx,
+            3,
+            "mute",
+            &params(json!({"channel": 1, "muted": true})),
+        );
+        let (put, _) = requests(&cx.take())[0].clone();
+        let mut cx = Cx::new(60);
+        d.http_response(&mut cx, put, status(401));
+        let a = cx.take();
+        assert!(matches!(
+            completed(&a)[0],
+            (3, Err(CommandError::Auth { .. }))
+        ));
+        assert!(unauthorized(&a));
+        assert_refused(&mut d);
     }
 
     #[test]

@@ -24,6 +24,8 @@ const GOOD_AUTH: &str = "Basic YXBpOnNlY3JldA==";
 struct Device {
     mute: [bool; 2],
     subscribed: Vec<String>,
+    /// Requests that carried the wrong credential.
+    refused: usize,
 }
 
 fn tls_acceptor() -> tokio_rustls::TlsAcceptor {
@@ -109,6 +111,7 @@ async fn simulated_ewdx() -> (u16, Arc<Mutex<Device>>) {
                     };
 
                     if headers.get("authorization").map(String::as_str) != Some(GOOD_AUTH) {
+                        device.lock().unwrap().refused += 1;
                         let _ = write.write_all(respond(401, json!({})).as_bytes()).await;
                         continue;
                     }
@@ -266,9 +269,11 @@ async fn ewdx_end_to_end() {
     core.close(id).await;
 }
 
+/// A refused password is presented once and never again: repeated failures can
+/// lock the device's third-party access (RFDeck review item O).
 #[tokio::test(flavor = "multi_thread")]
-async fn ewdx_wrong_password_is_unauthorized() {
-    let (port, _device) = simulated_ewdx().await;
+async fn ewdx_wrong_password_is_unauthorized_and_never_retried() {
+    let (port, device) = simulated_ewdx().await;
     let core = Core::new().unwrap();
     let id = open(&core, port, "wrong");
 
@@ -279,5 +284,10 @@ async fn ewdx_wrong_password_is_unauthorized() {
     let outcome = core
         .execute(id, "mute", params(json!({"channel": 1})))
         .await;
-    assert_eq!(outcome, Err(CommandError::NotConnected));
+    assert!(matches!(outcome, Err(CommandError::Auth { .. })));
+
+    // Well past the one-second retry of an unreachable device.
+    tokio::time::sleep(Duration::from_millis(2_500)).await;
+    assert_eq!(device.lock().unwrap().refused, 1);
+    core.close(id).await;
 }

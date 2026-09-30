@@ -126,6 +126,10 @@ pub(crate) struct SpecEngine {
     framer: Option<Framer>,
     packets: Option<PacketReader>,
     next_request: RequestId,
+    /// Set when the device refuses the configured credential. Terminal: the
+    /// credential is never presented again, since repeated failures can lock
+    /// a device out. The host re-opens the device with corrected settings.
+    refused: Option<String>,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -237,6 +241,7 @@ impl SpecEngine {
             framer: None,
             packets: None,
             next_request: 1,
+            refused: None,
         })
     }
 
@@ -529,6 +534,36 @@ impl SpecEngine {
         }
     }
 
+    /// The device refused the credential: fail everything, stop all traffic,
+    /// and report it until the device is opened again.
+    fn refuse(&mut self, cx: &mut Cx, reason: String) {
+        let auth = CommandError::Auth {
+            message: reason.clone(),
+        };
+        cx.cancel_timer(REPLY);
+        if let Some(id) = self.current.take().and_then(|f| f.id) {
+            cx.complete(id, Err(auth.clone()));
+        }
+        for job in self.queue.drain(..) {
+            if let Some(id) = job.id {
+                cx.complete(id, Err(auth.clone()));
+            }
+        }
+        cx.cancel_timer(PROBE);
+        cx.cancel_timer(RECONNECT);
+        cx.log(
+            Level::Warning,
+            format!("{reason}; no further requests until the device is opened again with corrected settings"),
+        );
+        self.set_link(
+            cx,
+            Connection::Unauthorized {
+                reason: reason.clone(),
+            },
+        );
+        self.refused = Some(reason);
+    }
+
     fn heard(&mut self, cx: &mut Cx) {
         self.last_heard = cx.now();
         cx.alive();
@@ -739,6 +774,11 @@ impl Module for SpecEngine {
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
+        if let Some(reason) = &self.refused {
+            let message = reason.clone();
+            cx.complete(id, Err(CommandError::Auth { message }));
+            return;
+        }
         self.queue.push_back(Job {
             id: Some(id),
             name: name.to_string(),
@@ -784,7 +824,21 @@ impl Module for SpecEngine {
         if !ours {
             return;
         }
+        let credentialed = matches!(
+            self.transport,
+            Transport::Http {
+                basic_auth: true,
+                ..
+            }
+        );
         match result {
+            Ok(response) if credentialed && matches!(response.status, 401 | 403) => self.refuse(
+                cx,
+                format!(
+                    "the device refused the credential (HTTP {})",
+                    response.status
+                ),
+            ),
             Ok(response) => self.reply(
                 cx,
                 Reply::Http {
@@ -805,6 +859,9 @@ impl Module for SpecEngine {
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key) {
+        if self.refused.is_some() {
+            return;
+        }
         match key {
             REPLY => {
                 let Some(flight) = self.current.take() else {
@@ -851,3 +908,84 @@ impl Module for SpecEngine {
 
 #[cfg(test)]
 mod vectors;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::catalog::Catalog;
+    use crate::module::Action;
+    use serde_json::json;
+    use std::net::Ipv4Addr;
+
+    /// ProPresenter's HTTP spec, switched to basic auth.
+    fn credentialed() -> SpecEngine {
+        let mut spec = Catalog::embedded().device("propresenter").unwrap().clone();
+        spec.transport.as_mut().unwrap()["auth"] = json!("basic");
+        let settings = json!({"username": "u", "password": "wrong"})
+            .as_object()
+            .unwrap()
+            .clone();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings,
+            },
+        )
+        .unwrap()
+    }
+
+    fn http_ids(actions: &[Action]) -> Vec<RequestId> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::Http { id, .. } => Some(*id),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_refused_credential_stops_probing_and_fails_commands() {
+        let mut e = credentialed();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let probe = http_ids(&cx.take())[0];
+
+        let mut cx = Cx::new(10);
+        e.http_response(
+            &mut cx,
+            probe,
+            Ok(HttpResponse {
+                status: 401,
+                body: Vec::new(),
+            }),
+        );
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::Connection(Connection::Unauthorized { .. }))));
+        assert!(!a.contains(&Action::Alive));
+        assert!(a.contains(&Action::CancelTimer { key: PROBE }));
+
+        // The probe timer, if it fires anyway, sends nothing.
+        let mut cx = Cx::new(PROBE_WHEN_IDLE + 10);
+        e.timer(&mut cx, PROBE);
+        assert!(cx.take().is_empty());
+
+        let mut cx = Cx::new(PROBE_WHEN_IDLE + 20);
+        e.command(&mut cx, 5, "anything", &Params::new());
+        let a = cx.take();
+        assert!(http_ids(&a).is_empty());
+        assert!(matches!(
+            &a[..],
+            [Action::Complete {
+                id: 5,
+                result: Err(CommandError::Auth { .. })
+            }]
+        ));
+    }
+}
