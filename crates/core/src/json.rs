@@ -7,7 +7,17 @@
 
 use serde_json::{json, Value};
 
-use crate::{CommandResult, Core, DeviceId, OpenError, OpenRequest, Params};
+use crate::{CommandResult, Core, CoreOptions, DeviceId, OpenError, OpenRequest, Params};
+
+/// Parse core options. `null` or absent means the defaults.
+pub fn core_options(value: &Value) -> Result<CoreOptions, String> {
+    match value {
+        Value::Null => Ok(CoreOptions::default()),
+        other => {
+            serde_json::from_value(other.clone()).map_err(|e| format!("invalid core options: {e}"))
+        }
+    }
+}
 
 /// `{"device": <id>}` or `{"error": {...}}`.
 pub fn open(core: &Core, request: &Value) -> Value {

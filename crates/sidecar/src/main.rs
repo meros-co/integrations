@@ -7,6 +7,7 @@
 //!
 //! ```text
 //! meros-integrations serve [--listen 127.0.0.1:47800] [--token-file PATH]
+//!                          [--bind-address ADDR]
 //! ```
 //!
 //! | Method and path              | Body / query                          | Returns                    |
@@ -182,6 +183,7 @@ fn load_or_create_token(path: &PathBuf) -> std::io::Result<String> {
 struct Args {
     listen: SocketAddr,
     token_file: PathBuf,
+    options: meros_integrations::CoreOptions,
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -190,21 +192,30 @@ fn parse_args() -> Result<Args, String> {
         Some("serve") => {}
         _ => {
             return Err(
-                "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH]".into(),
+                "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR]".into(),
             )
         }
     }
     let mut listen: SocketAddr = DEFAULT_LISTEN.parse().unwrap();
     let mut token_file = PathBuf::from("meros-integrations.token");
+    let mut options = meros_integrations::CoreOptions::default();
     while let Some(flag) = args.next() {
         let value = args.next().ok_or(format!("{flag} needs a value"))?;
         match flag.as_str() {
             "--listen" => listen = value.parse().map_err(|e| format!("--listen: {e}"))?,
             "--token-file" => token_file = PathBuf::from(value),
+            "--bind-address" => {
+                options.bind_address =
+                    Some(value.parse().map_err(|e| format!("--bind-address: {e}"))?)
+            }
             other => return Err(format!("unknown flag {other}")),
         }
     }
-    Ok(Args { listen, token_file })
+    Ok(Args {
+        listen,
+        token_file,
+        options,
+    })
 }
 
 fn main() {
@@ -219,7 +230,7 @@ fn main() {
         eprintln!("cannot read or create {}: {e}", args.token_file.display());
         std::process::exit(1);
     });
-    let core = Core::new().expect("start core");
+    let core = Core::with_options(args.options).expect("start core");
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

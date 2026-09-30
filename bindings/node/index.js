@@ -27,9 +27,18 @@ class IntegrationsError extends Error {
  * 'connection', 'state', 'alive', 'log', 'closed', 'dropped'.
  */
 class Core extends EventEmitter {
-  #native = new NativeCore();
+  #native;
   #pumping = false;
   #disposed = false;
+
+  /**
+   * @param {{ bindAddress?: string }} [options] bindAddress: the local network
+   *   interface for device traffic; every interface when absent.
+   */
+  constructor(options = {}) {
+    super();
+    this.#native = new NativeCore(options.bindAddress ? { bind_address: options.bindAddress } : null);
+  }
 
   catalog() {
     return this.#native.catalog();

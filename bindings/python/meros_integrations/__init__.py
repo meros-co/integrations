@@ -35,8 +35,11 @@ class IntegrationsError(Exception):
 class Core:
     """Every open device, one runtime, one event queue. Thread-safe."""
 
-    def __init__(self) -> None:
-        self._native = NativeCore()
+    def __init__(self, bind_address: Optional[str] = None) -> None:
+        """bind_address: the local network interface for device traffic;
+        every interface when None."""
+        options = json.dumps({"bind_address": bind_address}) if bind_address else None
+        self._native = NativeCore(options)
 
     def catalog(self) -> dict[str, Any]:
         return json.loads(self._native.catalog())

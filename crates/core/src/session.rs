@@ -73,6 +73,8 @@ pub(crate) enum Inbound {
 /// What every session shares.
 pub(crate) struct Services {
     pub(crate) events: Arc<EventQueue>,
+    /// Local address every UDP socket binds to.
+    pub(crate) bind_address: IpAddr,
     pub(crate) shared_udp: SharedUdp,
     pub(crate) http: HttpClients,
 }
@@ -378,7 +380,7 @@ impl Session {
         self.drop_socket(key);
         match bind {
             Bind::Ephemeral => {
-                let socket = UdpSocket::bind(("0.0.0.0", 0))
+                let socket = UdpSocket::bind((self.services.bind_address, 0))
                     .await
                     .map_err(|e| format!("bind: {e}"))?;
                 let socket = Arc::new(socket);
@@ -386,9 +388,13 @@ impl Session {
                 self.sockets.insert(key, Socket::Own { socket, reader });
             }
             Bind::Shared(port) => {
-                self.services
-                    .shared_udp
-                    .register(port, self.host, key, self.inbound_tx.clone())?;
+                self.services.shared_udp.register(
+                    self.services.bind_address,
+                    port,
+                    self.host,
+                    key,
+                    self.inbound_tx.clone(),
+                )?;
                 self.sockets.insert(key, Socket::Shared { port });
             }
         }

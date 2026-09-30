@@ -20,6 +20,9 @@ typedef struct MiCore MiCore;
 
 /* Start a core, with its own threads. NULL if it cannot start. */
 MiCore *mi_core_new(void);
+/* options: {"bind_address":"<local interface address>"}, or NULL for defaults.
+ * NULL if the options are invalid or the core cannot start. */
+MiCore *mi_core_new_with_options(const char *options);
 void mi_core_free(MiCore *core);
 void mi_string_free(char *s);
 

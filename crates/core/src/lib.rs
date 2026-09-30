@@ -100,10 +100,25 @@ pub struct Core {
     services: Arc<Services>,
 }
 
+/// How a core is set up. Every field has a default suitable for most hosts.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CoreOptions {
+    /// The local address UDP sockets bind to: the network interface device
+    /// traffic uses. Absent means every interface. A venue with separate
+    /// control and Dante networks sets its control interface here, so
+    /// devices that answer on both are only heard on one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bind_address: Option<IpAddr>,
+}
+
 impl Core {
     /// Start the core on its own runtime, independent of any runtime the host
     /// may have. Every API call can be made from any thread.
     pub fn new() -> std::io::Result<Core> {
+        Core::with_options(CoreOptions::default())
+    }
+
+    pub fn with_options(options: CoreOptions) -> std::io::Result<Core> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .thread_name("meros-integrations")
@@ -116,6 +131,9 @@ impl Core {
             next_device: AtomicU64::new(1),
             services: Arc::new(Services {
                 events: Arc::new(EventQueue::new(EVENT_CAPACITY)),
+                bind_address: options
+                    .bind_address
+                    .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
                 shared_udp: Default::default(),
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
             }),

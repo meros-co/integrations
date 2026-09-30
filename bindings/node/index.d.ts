@@ -69,7 +69,13 @@ export class IntegrationsError extends Error {
   readonly detail: { error: ErrorCode; message: string; [key: string]: unknown };
 }
 
+export interface CoreOptions {
+  /** The local network interface address for device traffic; every interface when absent. */
+  bindAddress?: string;
+}
+
 export class Core extends EventEmitter {
+  constructor(options?: CoreOptions);
   catalog(): { devices: Record<string, unknown> };
   open(request: OpenRequest): DeviceId;
   execute(device: DeviceId, command: string, params?: Record<string, unknown>): Promise<Outcome>;

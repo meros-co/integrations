@@ -6,7 +6,7 @@
 //! datagrams routed to the session for their source address.
 
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 
 use socket2::{Domain, Protocol, Socket, Type};
@@ -42,6 +42,7 @@ impl SharedUdp {
     /// first use. Must be called from within the runtime.
     pub(crate) fn register(
         &self,
+        bind_address: IpAddr,
         port: u16,
         host: IpAddr,
         key: Key,
@@ -51,7 +52,9 @@ impl SharedUdp {
         let entry = match ports.entry(port) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
-                let socket = Arc::new(bind_shared(port).map_err(|e| format!("bind :{port}: {e}"))?);
+                let socket = Arc::new(
+                    bind_shared(bind_address, port).map_err(|e| format!("bind :{port}: {e}"))?,
+                );
                 let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
                 spawn_router(socket.clone(), routes.clone());
                 e.insert(Port { socket, routes })
@@ -82,13 +85,13 @@ impl SharedUdp {
     }
 }
 
-fn bind_shared(port: u16) -> std::io::Result<UdpSocket> {
+fn bind_shared(address: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
     let _ = socket.set_recv_buffer_size(RECV_BUFFER);
     let _ = socket.set_send_buffer_size(SEND_BUFFER);
     socket.set_nonblocking(true)?;
-    socket.bind(&SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port).into())?;
+    socket.bind(&SocketAddr::new(address, port).into())?;
     UdpSocket::from_std(socket.into())
 }
 

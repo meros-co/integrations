@@ -25,8 +25,16 @@ struct NativeCore {
 #[pymethods]
 impl NativeCore {
     #[new]
-    fn new() -> PyResult<Self> {
-        Core::new()
+    #[pyo3(signature = (options=None))]
+    fn new(options: Option<&str>) -> PyResult<Self> {
+        let options = match options {
+            Some(text) => serde_json::from_str(text)
+                .map_err(|e| e.to_string())
+                .and_then(|v| api::core_options(&v))
+                .map_err(PyRuntimeError::new_err)?,
+            None => Default::default(),
+        };
+        Core::with_options(options)
             .map(|core| NativeCore { core })
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }

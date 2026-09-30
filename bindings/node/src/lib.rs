@@ -30,9 +30,12 @@ fn device_id(device: f64) -> Result<u64> {
 
 #[napi]
 impl NativeCore {
+    /// `options`: `{bindAddress?}` as CoreOptions JSON (`bind_address`).
     #[napi(constructor)]
-    pub fn new() -> Result<Self> {
-        let core = Core::new().map_err(|e| Error::from_reason(e.to_string()))?;
+    pub fn new(options: Option<Value>) -> Result<Self> {
+        let options =
+            json::core_options(&options.unwrap_or(Value::Null)).map_err(Error::from_reason)?;
+        let core = Core::with_options(options).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(NativeCore {
             core: Arc::new(core),
         })

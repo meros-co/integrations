@@ -1,14 +1,19 @@
 //! A G4 receiver simulated on real UDP, driven through the public API.
 //!
-//! The simulated device listens on 127.0.0.2:53212 so that it and the core's
-//! shared socket (0.0.0.0:53212) can coexist on one machine. It answers the way
+//! The simulated device listens on 127.0.0.2:53212 and the core binds
+//! 127.0.0.1:53212: two distinct addresses on the protocol's fixed port, which
+//! every OS allows side by side. (A wildcard core socket beside the device's
+//! would need address reuse on both sockets on Linux, and on macOS could send
+//! from 127.0.0.2 so the reply loops back to the device.) It answers the way
 //! TI 1254 describes: echoes set instructions, streams cyclic attributes while
 //! subscribed, and rejects out-of-range values with numbered errors.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
-use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
+use meros_integrations::{
+    CommandError, Connection, Core, CoreOptions, Event, OpenRequest, Outcome,
+};
 use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
@@ -74,7 +79,10 @@ fn params(v: Value) -> meros_integrations::Params {
 #[tokio::test(flavor = "multi_thread")]
 async fn g4_receiver_end_to_end() {
     let _device = simulated_g4().await;
-    let core = Core::new().unwrap();
+    let core = Core::with_options(CoreOptions {
+        bind_address: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+    })
+    .unwrap();
 
     let id = core
         .open(OpenRequest {

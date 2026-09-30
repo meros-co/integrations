@@ -56,6 +56,29 @@ pub extern "C" fn mi_core_new() -> *mut MiCore {
     .unwrap_or(std::ptr::null_mut())
 }
 
+/// Start a core with options, as CoreOptions JSON (`{"bind_address":"..."}`),
+/// or NULL for the defaults. Returns NULL if the options are invalid or the
+/// core cannot start.
+///
+/// # Safety
+/// `options` must be NULL or a NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn mi_core_new_with_options(options: *const c_char) -> *mut MiCore {
+    catch_unwind(AssertUnwindSafe(|| {
+        let Ok(value) = read_json(options) else {
+            return std::ptr::null_mut();
+        };
+        let Ok(options) = api::core_options(&value) else {
+            return std::ptr::null_mut();
+        };
+        match Core::with_options(options) {
+            Ok(core) => Box::into_raw(Box::new(MiCore { core })),
+            Err(_) => std::ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(std::ptr::null_mut())
+}
+
 /// # Safety
 /// `core` must come from `mi_core_new` and not be used afterwards.
 #[no_mangle]
