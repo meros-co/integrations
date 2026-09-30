@@ -1,6 +1,7 @@
 //! Device modules: the spec engine for spec-driven devices, and a hand-written
 //! module for each native one.
 
+mod atem;
 mod obs;
 mod sennheiser_d6000;
 mod sennheiser_ewdx;
@@ -24,6 +25,7 @@ pub(crate) fn construct(
     match spec.id.as_str() {
         "sennheiser-ew-g3-g4" => Ok(Box::new(sennheiser_mcp::Mcp::new(context))),
         "sennheiser-digital-6000" => Ok(Box::new(sennheiser_d6000::D6000::new(context))),
+        "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         other => Err(format!("no native module for '{other}'")),
