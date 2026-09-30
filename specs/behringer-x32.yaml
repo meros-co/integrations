@@ -121,6 +121,38 @@ commands:
       args: [ { value: "{name}", type: string } ]
     returns: none
 
+telemetry:
+  # /xremote asks the console to send every parameter change to this client
+  # for 10 seconds; it is renewed every 9. Values arrive when they change: the
+  # console sends no initial state for /xremote.
+  subscribe:
+    send: ["/xremote"]
+    every_ms: 9000
+  updates:
+    - address: "^/ch/(\\d\\d)/mix/on$"
+      state: { "channels.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/ch/(\\d\\d)/mix/fader$"
+      state: { "channels.{1}.fader": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/config/name$"
+      state: { "channels.{1}.name": "{arg0}" }
+    - address: "^/dca/(\\d)/on$"
+      state: { "dcas.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/dca/(\\d)/fader$"
+      state: { "dcas.{1}.fader": "{arg0}" }
+    - address: "^/main/st/mix/on$"
+      state: { "main.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/main/st/mix/fader$"
+      state: { "main.fader": "{arg0}" }
+
+state:
+  channels.*.mute:  { type: bool, description: "Channel muted (mix/on inverted), keyed by channel number" }
+  channels.*.fader: { type: float, description: "Channel fader position 0-1, not dB" }
+  channels.*.name:  { type: string, description: "Channel scribble-strip name" }
+  dcas.*.mute:      { type: bool, description: "DCA muted" }
+  dcas.*.fader:     { type: float, description: "DCA fader position 0-1" }
+  main.mute:        { type: bool, description: "Main stereo bus muted" }
+  main.fader:       { type: float, description: "Main stereo fader position 0-1" }
+
 quirks:
   - models: [all]
     severity: critical

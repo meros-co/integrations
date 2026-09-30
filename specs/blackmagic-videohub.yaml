@@ -102,6 +102,47 @@ commands:
     expect: { contains: "ACK" }
     returns: ack
 
+telemetry:
+  # The router sends its whole state as status blocks when a client connects,
+  # and the changed block after every change, from any client or the panel.
+  # Numbers are 0-based on the wire and 1-based in the state.
+  updates:
+    - header: "^PROTOCOL PREAMBLE:$"
+      fields:
+        Version: device.protocol_version
+    - header: "^VIDEOHUB DEVICE:$"
+      fields:
+        Model name: device.model
+        Video inputs: device.inputs
+        Video outputs: device.outputs
+    - header: "^INPUT LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "inputs.{1:+1}.label": "{2}" }
+    - header: "^OUTPUT LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "outputs.{1:+1}.label": "{2}" }
+    - header: "^VIDEO OUTPUT ROUTING:$"
+      each_line: "^(\\d+) (\\d+)$"
+      state: { "outputs.{1:+1}.input": "{2:+1}" }
+    - header: "^VIDEO OUTPUT LOCKS:$"
+      each_line: "^(\\d+) ([OLU])$"
+      state:
+        "outputs.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^CONFIGURATION:$"
+      fields:
+        Take Mode: { path: take_mode, map: { "true": true, "false": false } }
+
+state:
+  device.protocol_version: { type: string, description: "Videohub protocol version" }
+  device.model:            { type: string, description: "Model name the router reports" }
+  device.inputs:           { type: int, description: "Number of video inputs" }
+  device.outputs:          { type: int, description: "Number of video outputs" }
+  inputs.*.label:          { type: string, description: "Input label, keyed by input number from 1" }
+  outputs.*.label:         { type: string, description: "Output label, keyed by output number from 1" }
+  outputs.*.input:         { type: int, description: "Input routed to the output, numbered from 1" }
+  outputs.*.lock:          { type: string, description: "ours (locked by this client), other (locked by another client) or unlocked" }
+  take_mode:               { type: bool, description: "Take mode" }
+
 quirks:
   - models: [all]
     severity: critical

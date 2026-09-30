@@ -231,6 +231,38 @@ codes:
   "162": format not prepared
   "163": parameterized single line command not supported
 
+telemetry:
+  # "notify: transport: true" makes the deck send "508 transport info:" whenever
+  # the transport changes; "transport info" asks once on connection. Both
+  # answers carry the same fields.
+  subscribe:
+    send: ["notify: transport: true"]
+  poll:
+    send: ["transport info"]
+  updates:
+    - header: "^[25]08 transport info:$"
+      fields:
+        status: transport.status
+        speed: transport.speed
+        slot id: transport.slot
+        clip id: transport.clip
+        single clip: { path: transport.single_clip, map: { "true": true, "false": false } }
+        loop: { path: transport.loop, map: { "true": true, "false": false } }
+        timecode: transport.timecode
+        display timecode: transport.display_timecode
+        video format: transport.video_format
+
+state:
+  transport.status:           { type: string, description: "preview, stopped, play, forward, rewind, jog, shuttle or record" }
+  transport.speed:            { type: int, unit: "%", description: "Play speed" }
+  transport.slot:             { type: int, description: "Active slot" }
+  transport.clip:             { type: int, description: "Current clip; absent when none" }
+  transport.single_clip:      { type: bool, description: "Single-clip playback" }
+  transport.loop:             { type: bool, description: "Loop playback" }
+  transport.timecode:         { type: string, description: "Timecode" }
+  transport.display_timecode: { type: string, description: "Timecode on the front panel" }
+  transport.video_format:     { type: string, description: "Video format, such as 1080p30" }
+
 quirks:
   - models: [all]
     severity: warning

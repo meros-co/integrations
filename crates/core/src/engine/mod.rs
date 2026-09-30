@@ -12,6 +12,7 @@
 mod expect;
 mod framing;
 mod osc;
+mod telemetry;
 pub(crate) mod template;
 
 use std::collections::{BTreeMap, VecDeque};
@@ -34,6 +35,8 @@ const SOCKET: Key = "device";
 const REPLY: Key = "reply";
 const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
+const RENEW: Key = "telemetry-renew";
+const POLL: Key = "telemetry-poll";
 
 const DEFAULT_TIMEOUT: Millis = 2_000;
 /// A device silent this long, with nothing in flight, is probed.
@@ -109,6 +112,9 @@ struct Job {
     id: Option<CommandId>,
     name: String,
     params: Params,
+    /// For an internal job without a command: the message to send, such as a
+    /// telemetry subscription. Without one, an internal job is the probe.
+    item: Option<Value>,
 }
 
 pub(crate) struct SpecEngine {
@@ -126,6 +132,7 @@ pub(crate) struct SpecEngine {
     framer: Option<Framer>,
     packets: Option<PacketReader>,
     next_request: RequestId,
+    telemetry: telemetry::Telemetry,
     /// Set when the device refuses the configured credential. Terminal: the
     /// credential is never presented again, since repeated failures can lock
     /// a device out. The host re-opens the device with corrected settings.
@@ -226,6 +233,7 @@ impl SpecEngine {
         };
 
         let probe = t.get("probe").cloned();
+        let telemetry = telemetry::Telemetry::parse(spec.telemetry.as_ref(), &spec.state)?;
         Ok(SpecEngine {
             spec,
             host: ctx.host,
@@ -241,6 +249,7 @@ impl SpecEngine {
             framer: None,
             packets: None,
             next_request: 1,
+            telemetry,
             refused: None,
         })
     }
@@ -371,8 +380,11 @@ impl SpecEngine {
         ) = match job.id {
             // A probe: any reply at all means the device is there.
             None => {
-                let probe = self.probe.clone().ok_or("no probe")?;
-                (vec![probe], Map::new(), "ack".into(), &empty_specs)
+                let item = match &job.item {
+                    Some(item) => item.clone(),
+                    None => self.probe.clone().ok_or("no probe")?,
+                };
+                (vec![item], Map::new(), "ack".into(), &empty_specs)
             }
             Some(_) => {
                 let command = spec.commands.get(&job.name).ok_or("unknown command")?;
@@ -602,6 +614,7 @@ impl SpecEngine {
             Transport::OscUdp { .. } => {
                 cx.udp_open(SOCKET, Bind::Ephemeral);
                 self.send_on_connect(cx);
+                self.start_telemetry(cx);
                 if replies && self.probe.is_some() {
                     self.enqueue_probe(cx);
                 } else {
@@ -629,6 +642,8 @@ impl SpecEngine {
         );
         cx.tcp_close(SOCKET);
         cx.cancel_timer(PROBE);
+        cx.cancel_timer(RENEW);
+        cx.cancel_timer(POLL);
         self.set_link(cx, Connection::Disconnected { reason });
         cx.set_timer(RECONNECT, self.backoff);
         self.backoff = (self.backoff * 2).min(RECONNECT_MAX);
@@ -682,11 +697,72 @@ impl SpecEngine {
             id: None,
             name: String::new(),
             params: Params::new(),
+            item: None,
         });
         self.pump(cx);
     }
 
+    /// Send telemetry messages. On a line transport whose device answers, each
+    /// goes through the command queue so its reply is not mistaken for a
+    /// command's; otherwise it is sent straight away, like `on_connect`.
+    fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>) {
+        let queued = matches!(self.transport, Transport::LineTcp { replies: true, .. });
+        for item in items {
+            if queued {
+                self.queue.push_back(Job {
+                    id: None,
+                    name: String::new(),
+                    params: Params::new(),
+                    item: Some(item),
+                });
+                continue;
+            }
+            let item = match (&item, &self.transport) {
+                (Value::String(address), Transport::OscUdp { .. } | Transport::OscTcp { .. }) => {
+                    serde_json::json!({ "address": address })
+                }
+                _ => item,
+            };
+            let empty = Params::new();
+            let empty_specs = BTreeMap::new();
+            let values = self.values(&empty, &empty_specs);
+            match self.build(&item, &values) {
+                Ok(Outgoing::Bytes(bytes)) => match &self.transport {
+                    Transport::OscUdp { port, .. } => {
+                        cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
+                    }
+                    _ => cx.tcp_send(SOCKET, bytes),
+                },
+                Ok(Outgoing::Http(_)) => {
+                    cx.log(Level::Warning, "telemetry over HTTP is not implemented")
+                }
+                Err(e) => cx.log(Level::Warning, format!("telemetry message not sent: {e}")),
+            }
+        }
+        self.pump(cx);
+    }
+
+    /// After connecting: subscribe, poll once, and schedule both.
+    fn start_telemetry(&mut self, cx: &mut Cx) {
+        if self.telemetry.is_empty() {
+            return;
+        }
+        let subscribe = self.telemetry.subscribe.clone();
+        let poll = self.telemetry.poll.clone();
+        self.send_telemetry(cx, subscribe);
+        self.send_telemetry(cx, poll);
+        if let Some(every) = self.telemetry.renew_every {
+            cx.set_timer(RENEW, every);
+        }
+        if let Some(every) = self.telemetry.poll_every {
+            cx.set_timer(POLL, every);
+        }
+    }
+
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
+        if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Text(&message)) {
+            cx.state(patch);
+        }
         let waiting = matches!(
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Text)
@@ -713,6 +789,12 @@ impl SpecEngine {
 
     fn inbound_osc(&mut self, cx: &mut Cx, packet: &[u8]) {
         for message in osc::decode(packet) {
+            if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Osc {
+                address: &message.address,
+                args: &message.args,
+            }) {
+                cx.state(patch);
+            }
             let matches = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Osc(None)) => true,
                 Some(Await::Osc(Some(address))) => *address == message.address,
@@ -783,6 +865,7 @@ impl Module for SpecEngine {
             id: Some(id),
             name: name.to_string(),
             params: params.clone(),
+            item: None,
         });
         self.pump(cx);
     }
@@ -795,6 +878,7 @@ impl Module for SpecEngine {
                 self.send_on_connect(cx);
                 self.set_link(cx, Connection::Connected);
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
+                self.start_telemetry(cx);
                 self.pump(cx);
             }
             TcpInput::Data(bytes) => {
@@ -897,6 +981,20 @@ impl Module for SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             RECONNECT => self.connect(cx),
+            RENEW => {
+                let items = self.telemetry.subscribe.clone();
+                self.send_telemetry(cx, items);
+                if let Some(every) = self.telemetry.renew_every {
+                    cx.set_timer(RENEW, every);
+                }
+            }
+            POLL => {
+                let items = self.telemetry.poll.clone();
+                self.send_telemetry(cx, items);
+                if let Some(every) = self.telemetry.poll_every {
+                    cx.set_timer(POLL, every);
+                }
+            }
             _ => {}
         }
     }

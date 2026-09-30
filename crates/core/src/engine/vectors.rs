@@ -126,9 +126,79 @@ fn expected_wire(v: &Value) -> Option<Vec<Wire>> {
     None
 }
 
+/// A telemetry vector: what the engine sends on connecting, and the state an
+/// inbound message produces.
+fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
+    let spec_id = v["spec"].as_str().ok_or("no spec")?;
+    let spec = catalog
+        .device(spec_id)
+        .ok_or(format!("unknown spec {spec_id}"))?;
+    let model = &spec.models[0];
+    let settings =
+        validate(&spec.settings, &Default::default()).map_err(|e| format!("settings: {e}"))?;
+    let ctx = OpenContext {
+        host: HOST,
+        port: None,
+        model: model.id.clone(),
+        channels: model.channels,
+        settings,
+    };
+    let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
+    let mut cx = Cx::new(0);
+    engine.start(&mut cx);
+    let mut connected = cx.take();
+    if connected
+        .iter()
+        .any(|a| matches!(a, Action::TcpOpen { .. }))
+    {
+        let mut cx = Cx::new(1);
+        engine.tcp(&mut cx, "device", TcpInput::Connected);
+        connected = cx.take();
+    }
+    let expect_connect = if let Some(w) = v.get("expect_connect_wire") {
+        Some(expected_wire(&json!({ "expect_wire": w })).unwrap())
+    } else {
+        v.get("expect_connect_wire_hex")
+            .map(|w| expected_wire(&json!({ "expect_wire_hex": w })).unwrap())
+    };
+    if let Some(expected) = expect_connect {
+        let sent = wire(&connected);
+        if sent != expected {
+            return Err(format!(
+                "connect wire mismatch\n  expected {expected:?}\n  sent     {sent:?}"
+            ));
+        }
+    }
+
+    let mut cx = Cx::new(3);
+    if let Some(text) = v.get("inbound").and_then(Value::as_str) {
+        engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
+    } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
+        engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &unhex(h));
+    }
+    let mut state = json!({});
+    for a in cx.take() {
+        if let Action::State(p) = a {
+            crate::session::merge_patch(&mut state, &p);
+        }
+    }
+    let expected = v
+        .get("expect_state")
+        .ok_or("vector states no expect_state")?;
+    if &state != expected {
+        return Err(format!(
+            "state mismatch\n  expected {expected}\n  got      {state}"
+        ));
+    }
+    Ok(())
+}
+
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let text = std::fs::read_to_string(path).unwrap();
     let v: Value = serde_yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
+    if v.get("inbound").is_some() || v.get("inbound_hex").is_some() {
+        return run_telemetry(&v, catalog);
+    }
     let spec_id = v["spec"].as_str().ok_or("no spec")?;
     let command = v["command"].as_str().ok_or("no command")?;
     let spec = catalog
@@ -194,6 +264,18 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     if started.iter().any(|a| matches!(a, Action::UdpSend { .. })) && engine.current.is_some() {
         let probe_reply = super::osc::encode("/probe-reply", &[]);
         engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &probe_reply);
+    }
+    // Telemetry subscriptions on a line transport are queued ahead of
+    // commands. Complete them with a plain success reply, so the vector sees
+    // only its command. HyperDeck is the only such spec; its success is
+    // "200 ok".
+    let mut guard = 0;
+    while engine.current.as_ref().is_some_and(|f| f.id.is_none()) && guard < 16 {
+        engine.tcp(&mut cx, "device", TcpInput::Data(b"200 ok\r\n".to_vec()));
+        guard += 1;
+    }
+    if engine.current.as_ref().is_some_and(|f| f.id.is_none()) {
+        return Err("the connection sequence did not complete".into());
     }
     cx.take();
 
@@ -315,11 +397,10 @@ fn every_spec_driven_command_has_a_vector() {
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
         let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
-        covered.insert(format!(
-            "{}/{}",
-            v["spec"].as_str().unwrap(),
-            v["command"].as_str().unwrap()
-        ));
+        let Some(command) = v["command"].as_str() else {
+            continue;
+        };
+        covered.insert(format!("{}/{command}", v["spec"].as_str().unwrap()));
     }
     let missing: Vec<String> = catalog
         .devices
@@ -333,4 +414,39 @@ fn every_spec_driven_command_has_a_vector() {
         "commands without a vector:\n{}",
         missing.join("\n")
     );
+}
+
+#[test]
+fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
+    let catalog = Catalog::embedded();
+    let mut covered = std::collections::BTreeSet::new();
+    for f in vector_files() {
+        let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
+        if v.get("inbound").is_some() || v.get("inbound_hex").is_some() {
+            covered.insert(v["spec"].as_str().unwrap().to_string());
+        }
+    }
+    for spec in catalog.devices.values() {
+        if spec.implementation != crate::catalog::Implementation::Spec {
+            continue;
+        }
+        let model = &spec.models[0];
+        let ctx = OpenContext {
+            host: HOST,
+            port: None,
+            model: model.id.clone(),
+            channels: model.channels,
+            settings: validate(&spec.settings, &Default::default()).unwrap_or_default(),
+        };
+        if let Err(e) = SpecEngine::new(Arc::new(spec.clone()), ctx) {
+            panic!("{}: {e}", spec.id);
+        }
+        if spec.telemetry.is_some() {
+            assert!(
+                covered.contains(&spec.id),
+                "{} has telemetry but no telemetry vector",
+                spec.id
+            );
+        }
+    }
 }

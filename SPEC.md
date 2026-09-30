@@ -28,9 +28,19 @@ transport: { … }              # §2
 models: [ … ]                 # §3, at least one
 commands: { … }               # §4
 quirks: [ … ]                 # §6, optional
+state: { … }                  # the state the device reports, optional
+telemetry: { … }              # §8, optional
 ```
 
 `id` is the consumer-facing identifier. It does not change once published.
+
+`state` declares every state path the device reports, with its type, unit and
+meaning, keyed by dotted path with `*` for a number such as a channel:
+
+```yaml
+state:
+  outputs.*.input: { type: int, description: "Input routed to the output, numbered from 1" }
+```
 
 ## 2. Transports
 
@@ -469,6 +479,72 @@ The core's test suite runs every vector, so a change that alters wire format
 without updating its vectors fails before release.
 
 See [vectors/README.md](vectors/README.md) for the full vector format.
+
+A telemetry vector, `vectors/<spec-id>/telemetry-<name>.yaml`, states an
+inbound message and the state it must produce, and optionally what the core
+sends on connecting:
+
+```yaml
+spec: blackmagic-videohub
+telemetry: routing
+inbound: "VIDEO OUTPUT ROUTING:\n0 5\n1 0\n\n"      # inbound_hex for OSC
+expect_state: { outputs: { "1": { input: 6 }, "2": { input: 1 } } }
+```
+
+Every spec with a `telemetry` section has at least one.
+
+## 8. Telemetry
+
+`telemetry` says how the device's own messages become state. The paths it
+writes must be declared in `state` (§1), whose `type` decides how each value
+is converted: `int`, `float`, `bool` (from `true` / `false`, or through a
+`map`) or `string`. A value that does not convert is not assigned; the core
+never guesses.
+
+```yaml
+telemetry:
+  subscribe:                       # sent after connecting
+    send: ["/xremote"]
+    every_ms: 9000                 # and again at this interval
+  poll:                            # queries; their replies go through the rules
+    send: ["transport info"]
+    every_ms: 5000                 # omit to ask once, on connecting
+  updates:
+    - header: "^VIDEO OUTPUT ROUTING:$"      # a block's first line
+      each_line: "^(\\d+) (\\d+)$"             # applied to every following line
+      state: { "outputs.{1:+1}.input": "{2:+1}" }
+```
+
+`send` items are the same as a command's. On a line transport whose device
+answers, they go through the command queue like commands, so their replies are
+never taken as a command's reply; otherwise they are sent straight away.
+
+Every inbound message is offered to every rule: pushed changes and replies to
+commands alike, since a reply to a query carries the same data. A rule is one
+of:
+
+| Rule | Matches | Captures |
+|---|---|---|
+| `match` | The whole message, by regex | `{1}`, `{2}`, … |
+| `header` + `each_line` | A block whose first line matches `header`; `each_line` is applied to each following line | per line: `{1}`, `{2}`, … |
+| `header` + `fields` | A block whose first line matches `header`; the following lines are `name: value` | `fields` maps each name to a state path |
+| `address` | An OSC message whose address matches | `{1}`, … from the address; `{arg0}`, `{arg1}`, … the arguments |
+
+`state` maps a path template to a value template. Both use the template rules
+of §4: a numeric capture is an integer, so `{1:+1}` converts a 0-based wire
+number to 1-based. A value in the device's own words is converted with a map,
+and a wire value the map does not list is not assigned:
+
+```yaml
+    - address: "^/ch/(\\d\\d)/mix/on$"
+      state: { "channels.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - header: "^[25]08 transport info:$"
+      fields:
+        status: transport.status
+        single clip: { path: transport.single_clip, map: { "true": true, "false": false } }
+```
+
+Telemetry over HTTP (polling JSON) is not yet part of the format.
 
 ## Native modules
 

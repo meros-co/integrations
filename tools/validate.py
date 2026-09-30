@@ -164,7 +164,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         # Wire behaviour lives in the Rust module; the spec is catalogue only.
         if not doc.get("reason"):
             errors.append("implementation: native requires a 'reason'")
-        for key in ("transport", "on_connect", "codes"):
+        for key in ("transport", "on_connect", "codes", "telemetry"):
             if key in doc:
                 errors.append(f"implementation: native must not declare '{key}'")
         for name, command in commands.items():
@@ -232,11 +232,44 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         for context, text in template_strings(step):
             errors += check_template(context, text, {}, settings, f"on_connect[{i}]", conditional)
 
+    errors += telemetry_checks(doc)
+
     probe = (doc.get("transport") or {}).get("probe")
     if probe is not None:
         for context, text in template_strings(probe):
             errors += check_template(context, text, {}, settings, "transport.probe")
 
+    return errors
+
+
+def telemetry_checks(doc: dict) -> list[str]:
+    """Every path a telemetry rule writes must be declared in 'state', so its
+    type is known, and every regex must compile."""
+    errors: list[str] = []
+    telemetry = doc.get("telemetry") or {}
+    declared = [key.split(".") for key in (doc.get("state") or {})]
+
+    def is_declared(path: str) -> bool:
+        parts = ["*" if "{" in seg else seg for seg in path.split(".")]
+        return any(
+            len(d) == len(parts) and all(a == "*" or a == b for a, b in zip(d, parts))
+            for d in declared
+        )
+
+    for i, rule in enumerate(telemetry.get("updates", [])):
+        where = f"telemetry.updates[{i}]"
+        for key in ("match", "header", "each_line", "address"):
+            if key in rule:
+                try:
+                    re.compile(rule[key])
+                except re.error as e:
+                    errors.append(f"{where}.{key}: {e}")
+        paths = list((rule.get("state") or {}).keys())
+        for field in (rule.get("fields") or {}).values():
+            paths.append(field if isinstance(field, str) else field.get("path", ""))
+        for path in paths:
+            if not is_declared(path):
+                errors.append(f"{where}: '{path}' is not declared in 'state'")
     return errors
 
 

@@ -40,6 +40,9 @@ pub struct DeviceSpec {
     pub transport: Option<Value>,
     #[serde(default, skip_serializing)]
     pub on_connect: Vec<Value>,
+    /// Subscriptions, polls and update rules for spec-driven telemetry.
+    #[serde(default, skip_serializing)]
+    pub telemetry: Option<Value>,
     /// Numeric response code to failure message, used with `code_range`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub codes: BTreeMap<String, String>,

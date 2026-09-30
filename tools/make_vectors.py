@@ -61,6 +61,12 @@ def binary(spec, command, input, wire, **extra):
     V.append({"spec": spec, "command": command, "input": input, "expect_wire_hex": wires, **extra})
 
 
+def telemetry(spec, name, **fields):
+    """An inbound message and the state it must produce; optionally what the
+    engine sends on connecting."""
+    V.append({"spec": spec, "telemetry": name, **fields})
+
+
 def http(spec, command, input, method, target, **extra):
     V.append({
         "spec": spec, "command": command, "input": input,
@@ -275,10 +281,44 @@ http(PP, "get_version", {}, "GET", "/version",
 http(PP, "get_active_presentation", {}, "GET", "/v1/presentation/active")
 
 
+# ── Telemetry ─────────────────────────────────────────────────────────────
+# Videohub: status blocks on connect and after every change; 0-based on the
+# wire, 1-based in the state (Videohub Ethernet Protocol).
+telemetry(VH, "routing", inbound="VIDEO OUTPUT ROUTING:\n0 5\n1 0\n\n",
+          expect_state={"outputs": {"1": {"input": 6}, "2": {"input": 1}}})
+telemetry(VH, "labels", inbound="INPUT LABELS:\n0 Camera 1\n1 Camera 2\n\n",
+          expect_state={"inputs": {"1": {"label": "Camera 1"}, "2": {"label": "Camera 2"}}})
+telemetry(VH, "locks", inbound="VIDEO OUTPUT LOCKS:\n0 O\n1 L\n2 U\n\n",
+          expect_state={"outputs": {"1": {"lock": "ours"}, "2": {"lock": "other"}, "3": {"lock": "unlocked"}}})
+telemetry(VH, "device", inbound="VIDEOHUB DEVICE:\nDevice present: true\nModel name: Smart Videohub 12G 40x40\n"
+          "Video inputs: 40\nVideo outputs: 40\n\n",
+          expect_state={"device": {"model": "Smart Videohub 12G 40x40", "inputs": 40, "outputs": 40}})
+telemetry(VH, "take-mode", inbound="CONFIGURATION:\nTake Mode: true\n\n", expect_state={"take_mode": True})
+
+# HyperDeck: notify on connect, then transport info; the asynchronous 508 and
+# the 208 reply carry the same fields (HyperDeck Ethernet Protocol).
+telemetry(H, "transport", expect_connect_wire=["notify: transport: true\r\n"],
+          inbound="508 transport info:\r\nstatus: play\r\nspeed: 100\r\nslot id: 1\r\nclip id: 3\r\n"
+          "single clip: false\r\nloop: true\r\ntimecode: 00:00:10:00\r\n\r\n",
+          expect_state={"transport": {"status": "play", "speed": 100, "slot": 1, "clip": 3,
+                                      "single_clip": False, "loop": True, "timecode": "00:00:10:00"}})
+
+# X32: /xremote on connect; pushed changes arrive on the same addresses as sets.
+# The /info liveness probe follows the subscription.
+telemetry(X, "channel-mute", expect_connect_wire_hex=[hexs(osc("/xremote")), hexs(osc("/info"))],
+          inbound_hex=hexs(osc("/ch/07/mix/on", ("i", 0))),
+          expect_state={"channels": {"7": {"mute": True}}})
+telemetry(X, "channel-name", inbound_hex=hexs(osc("/ch/12/config/name", ("s", "Vox"))),
+          expect_state={"channels": {"12": {"name": "Vox"}}})
+telemetry(X, "main-fader", inbound_hex=hexs(osc("/main/st/mix/fader", ("f", 0.5))),
+          expect_state={"main": {"fader": 0.5}})
+
+
 def main() -> None:
     written = set()
     for v in V:
-        path = ROOT / "vectors" / v["spec"] / f"{v['command']}.yaml"
+        name = v["command"] if "command" in v else f"telemetry-{v['telemetry']}"
+        path = ROOT / "vectors" / v["spec"] / f"{name}.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
         body = yaml.safe_dump(v, sort_keys=False, allow_unicode=True, width=100)
         path.write_text(body, encoding="utf-8", newline="\n")
