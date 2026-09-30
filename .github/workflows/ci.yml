@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The G3/G4 test puts a simulated device on 127.0.0.2, which macOS does
+      # not route until the address is added to the loopback interface.
+      - if: runner.os == 'macOS'
+        run: sudo ifconfig lo0 alias 127.0.0.2 up
+
+      - run: pip install pyyaml jsonschema
+      - run: python tools/validate.py
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+      - name: Node binding
+        working-directory: bindings/node
+        run: |
+          node scripts/build.mjs --debug
+          npm test
+
+      - name: Python binding
+        working-directory: bindings/python
+        run: |
+          python build_dev.py
+          python -m unittest discover -s tests

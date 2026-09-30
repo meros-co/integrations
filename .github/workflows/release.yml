@@ -1,0 +1,72 @@
+name: release
+
+# Builds every delivery for every supported platform when a version is tagged.
+# Consumers pin an exact version; nothing here is published automatically to a
+# package registry.
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+          - { os: macos-13, target: x86_64-apple-darwin }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sidecar, C library and Node addon
+        shell: bash
+        run: |
+          cargo build --release -p meros-integrations-sidecar -p meros-integrations-c -p meros-integrations-node
+          (cd bindings/node && node scripts/build.mjs)
+          mkdir -p dist
+          cp bindings/node/*.node dist/
+          cp bindings/c/include/meros_integrations.h dist/
+          for f in target/release/meros-integrations target/release/meros-integrations.exe \
+                   target/release/libmeros_integrations_c.a target/release/meros_integrations_c.lib \
+                   target/release/libmeros_integrations_c.so target/release/libmeros_integrations_c.dylib \
+                   target/release/meros_integrations_c.dll; do
+            [ -f "$f" ] && cp "$f" dist/ || true
+          done
+
+      - name: Python wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          command: build
+          args: --release --out ../../dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meros-integrations-${{ matrix.target }}
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Package per platform
+        run: |
+          cd artifacts
+          for d in */; do tar -czf "${d%/}.tar.gz" -C "$d" .; done
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.tar.gz
