@@ -216,6 +216,12 @@ impl Core {
         result.await.map_err(|_| CommandError::Closed)?
     }
 
+    /// Run a future on the core's runtime and wait for it, for bindings whose
+    /// host has no async runtime. Must not be called from within an async task.
+    pub fn block_on<F: std::future::Future>(&self, future: F) -> F::Output {
+        self.runtime().block_on(future)
+    }
+
     /// Blocking form of [`Core::execute`], for hosts without an async runtime.
     /// Must not be called from within an async task.
     pub fn execute_blocking(
