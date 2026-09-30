@@ -84,7 +84,7 @@ impl Framer {
                 ReplyFraming::Block => {
                     if line.is_empty() {
                         if !self.block.is_empty() {
-                            out.push(self.block.drain(..).collect::<Vec<_>>().join("\n"));
+                            out.push(std::mem::take(&mut self.block).join("\n"));
                         }
                     } else {
                         self.block.push(line);
@@ -94,7 +94,7 @@ impl Framer {
                     if self.in_block {
                         if line.is_empty() {
                             self.in_block = false;
-                            out.push(self.block.drain(..).collect::<Vec<_>>().join("\n"));
+                            out.push(std::mem::take(&mut self.block).join("\n"));
                         } else {
                             self.block.push(line);
                         }
