@@ -68,7 +68,7 @@ tools/        spec validator
 | C | static library and header | planned |
 | Node | `@meros/integrations` | working; unreleased |
 | Python | `meros-integrations` wheels | planned |
-| Sidecar | `meros-integrations serve`, a local JSON-RPC service | planned |
+| Sidecar | `meros-integrations serve`, a local HTTP service | working; unreleased |
 
 Every delivery runs the same core and behaves identically.
 
