@@ -1,0 +1,162 @@
+spec: 1
+id: obs-studio
+name: OBS Studio (obs-websocket 5)
+vendor: OBS Project
+category: switcher
+implementation: native
+reason: >
+  JSON messages over a WebSocket, opened with a handshake whose reply depends
+  on what the server sends: a salted SHA-256 challenge when a password is set.
+  Replies are matched to requests by an id the client chooses.
+
+source:
+  - title: obs-websocket 5.x protocol documentation (docs/generated/protocol.md)
+    author: OBS Project
+    url: https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md
+    note: >
+      Manufacturer document, read as documentation only. Port 4455, the
+      obswebsocket.json subprotocol, the Hello / Identify / Identified
+      handshake and its authentication string, event subscription flags,
+      request and response messages, request status codes, close code 4009
+      for failed authentication, and every request and event used here.
+  - title: Tally OBS client (tally/OBS.cpp)
+    note: Meros. Scene-based tally from program and preview scene changes.
+
+settings:
+  # The server password from OBS's WebSocket Server Settings; empty when
+  # authentication is turned off there.
+  password: { type: string, secret: true }
+
+models:
+  - id: obs-studio-28
+    name: OBS Studio 28 or later (built-in obs-websocket 5)
+    supports: [set_program_scene, set_preview_scene, transition, set_studio_mode,
+               set_transition, set_transition_duration, start_stream, stop_stream,
+               start_record, stop_record, pause_record, resume_record,
+               start_virtualcam, stop_virtualcam, save_replay_buffer,
+               set_input_mute, set_input_volume, trigger_hotkey, get_scenes]
+    verification: none
+
+commands:
+  set_program_scene:
+    summary: Put a scene on program
+    params:
+      scene: { type: string, required: true }
+    returns: ack
+
+  set_preview_scene:
+    summary: Put a scene on preview. Studio mode must be on.
+    params:
+      scene: { type: string, required: true }
+    returns: ack
+
+  transition:
+    summary: Take preview to program with the current transition. Studio mode must be on.
+    returns: ack
+
+  set_studio_mode:
+    summary: Turn studio mode on or off
+    params:
+      enabled: { type: bool, required: true }
+    returns: ack
+
+  set_transition:
+    summary: Choose the current scene transition by name
+    params:
+      name: { type: string, required: true }
+    returns: ack
+
+  set_transition_duration:
+    summary: Set the current transition's duration
+    params:
+      duration_ms: { type: int, min: 50, max: 20000, required: true }
+    returns: ack
+
+  start_stream:   { summary: Start streaming, returns: ack }
+  stop_stream:    { summary: Stop streaming, returns: ack }
+  start_record:   { summary: Start recording, returns: ack }
+  stop_record:    { summary: Stop recording, returns: ack }
+  pause_record:   { summary: Pause the recording, returns: ack }
+  resume_record:  { summary: Resume a paused recording, returns: ack }
+  start_virtualcam: { summary: Start the virtual camera, returns: ack }
+  stop_virtualcam:  { summary: Stop the virtual camera, returns: ack }
+  save_replay_buffer:
+    summary: Save the replay buffer. The replay buffer must be running.
+    returns: ack
+
+  set_input_mute:
+    summary: Mute or unmute an audio input
+    params:
+      input: { type: string, required: true }
+      muted: { type: bool, default: true }
+    returns: ack
+
+  set_input_volume:
+    summary: Set an audio input's volume
+    params:
+      input:     { type: string, required: true }
+      volume_db: { type: float, min: -100, max: 26, required: true }
+    returns: ack
+
+  trigger_hotkey:
+    summary: Trigger a hotkey by its internal name, such as OBSBasic.StartStreaming
+    params:
+      name: { type: string, required: true }
+    returns: ack
+
+  get_scenes:
+    summary: The scene names, in the order OBS's scene list shows them (top first)
+    returns: value
+
+state:
+  device.obs_version:          { type: string, description: "OBS Studio version" }
+  device.websocket_version:    { type: string, description: "obs-websocket version" }
+  device.platform:             { type: string, description: "Operating system OBS runs on" }
+  program_scene:               { type: string, description: "Scene on program" }
+  preview_scene:               { type: string, description: "Scene on preview; absent when studio mode is off" }
+  studio_mode:                 { type: bool, description: "Studio mode" }
+  scenes:                      { type: array, description: "Scene names, top of the list first" }
+  transition.name:             { type: string, description: "Current scene transition" }
+  transition.duration_ms:      { type: int, unit: ms, description: "Current transition duration, when the transition has one" }
+  streaming.active:            { type: bool, description: "Streaming output running" }
+  streaming.reconnecting:      { type: bool, description: "Streaming output reconnecting" }
+  streaming.duration_ms:       { type: int, unit: ms, description: "Time streaming, polled every 5 s" }
+  streaming.congestion:        { type: float, description: "Output congestion, 0-1, polled" }
+  streaming.bytes:             { type: int, unit: bytes, description: "Bytes sent, polled" }
+  streaming.skipped_frames:    { type: int, description: "Frames skipped by the output, polled" }
+  streaming.total_frames:      { type: int, description: "Frames delivered by the output, polled" }
+  recording.active:            { type: bool, description: "Recording output running" }
+  recording.paused:            { type: bool, description: "Recording paused" }
+  recording.duration_ms:       { type: int, unit: ms, description: "Time recording, polled" }
+  recording.bytes:             { type: int, unit: bytes, description: "Bytes written, polled" }
+  virtualcam.active:           { type: bool, description: "Virtual camera running" }
+  inputs.*.muted:              { type: bool, description: "Input muted, keyed by input name; audio inputs only" }
+  inputs.*.volume_db:          { type: float, unit: dB, description: "Input volume, keyed by input name; audio inputs only" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A wrong password is not retried. OBS closes the connection with code
+      4009; the core reports unauthorized and sends nothing further until the
+      device is opened again with a corrected password.
+
+  - models: [all]
+    severity: info
+    text: >
+      Preview and the transition command need studio mode. Without it, OBS
+      refuses them with request status 506 (studio mode not active), reported as
+      a device error.
+
+  - models: [all]
+    severity: info
+    text: >
+      Inputs are keyed by name, and OBS lets a user rename them. A rename is
+      reported as the old name removed and the new name added.
+
+  - models: [all]
+    severity: info
+    text: >
+      OBS 27 and earlier shipped obs-websocket 4, a different protocol on port
+      4444, unless the version 5 plugin was installed. Only version 5 is
+      supported.

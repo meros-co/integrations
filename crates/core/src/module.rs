@@ -116,6 +116,31 @@ pub enum TcpInput {
     },
 }
 
+/// A WebSocket a module asks the session to open.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WsRequest {
+    /// `ws://host:port/path`.
+    pub url: String,
+    /// Extra handshake headers, such as `Sec-WebSocket-Protocol`.
+    pub headers: Vec<(String, String)>,
+}
+
+/// What happens on a WebSocket.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WsInput {
+    Opened,
+    Text(String),
+    Binary(Vec<u8>),
+    /// A ping or pong arrived: proof of life, nothing to handle.
+    Activity,
+    /// The connection failed or ended. `code` is the close code the peer sent,
+    /// if it sent one. It is gone; open it again to retry.
+    Closed {
+        code: Option<u16>,
+        reason: String,
+    },
+}
+
 /// Where a UDP socket binds locally.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Bind {
@@ -178,6 +203,18 @@ pub enum Action {
         data: Vec<u8>,
     },
     TcpClose {
+        socket: Key,
+    },
+    /// Open a WebSocket, replacing any open under this key.
+    WsOpen {
+        socket: Key,
+        request: WsRequest,
+    },
+    WsSend {
+        socket: Key,
+        text: String,
+    },
+    WsClose {
         socket: Key,
     },
     Http {
@@ -274,6 +311,21 @@ impl Cx {
         self.push(Action::TcpClose { socket });
     }
 
+    pub fn ws_open(&mut self, socket: Key, request: WsRequest) {
+        self.push(Action::WsOpen { socket, request });
+    }
+
+    pub fn ws_send(&mut self, socket: Key, text: impl Into<String>) {
+        self.push(Action::WsSend {
+            socket,
+            text: text.into(),
+        });
+    }
+
+    pub fn ws_close(&mut self, socket: Key) {
+        self.push(Action::WsClose { socket });
+    }
+
     pub fn http(&mut self, id: RequestId, request: HttpRequest) {
         self.push(Action::Http { id, request });
     }
@@ -342,6 +394,10 @@ pub trait Module: Send + 'static {
     }
 
     fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
+        let _ = (cx, socket, input);
+    }
+
+    fn ws(&mut self, cx: &mut Cx, socket: Key, input: WsInput) {
         let _ = (cx, socket, input);
     }
 

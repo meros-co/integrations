@@ -19,7 +19,7 @@ use crate::events::{Event, EventQueue};
 use crate::http::HttpClients;
 use crate::module::{
     Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, HttpResponse, Key, Level,
-    Module, RequestId, SseInput, TcpInput,
+    Module, RequestId, SseInput, TcpInput, WsInput,
 };
 use crate::udp::{Buffers, SharedUdp, RECV_BUFFER, SEND_BUFFER};
 
@@ -67,6 +67,11 @@ pub(crate) enum Inbound {
         socket: Key,
         generation: u64,
         input: TcpInput,
+    },
+    Ws {
+        socket: Key,
+        generation: u64,
+        input: WsInput,
     },
 }
 
@@ -119,6 +124,7 @@ pub(crate) struct Session {
     sockets: HashMap<Key, Socket>,
     streams: HashMap<Key, Stream>,
     tcp: HashMap<Key, crate::tcp::Connection>,
+    ws: HashMap<Key, crate::ws::Connection>,
     next_generation: u64,
     pending: HashMap<CommandId, Pending>,
     next_command: CommandId,
@@ -147,6 +153,7 @@ impl Session {
             sockets: HashMap::new(),
             streams: HashMap::new(),
             tcp: HashMap::new(),
+            ws: HashMap::new(),
             next_generation: 1,
             pending: HashMap::new(),
             next_command: 1,
@@ -227,6 +234,16 @@ impl Session {
                             }
                             self.module.tcp(&mut cx, socket, input);
                         }
+                        Inbound::Ws { socket, generation, input } => {
+                            let current = self.ws.get(socket).map(|c| c.generation);
+                            if current != Some(generation) {
+                                continue;
+                            }
+                            if matches!(input, WsInput::Closed { .. }) {
+                                self.ws.remove(socket);
+                            }
+                            self.module.ws(&mut cx, socket, input);
+                        }
                     }
                     self.apply(cx.take()).await;
                 }
@@ -302,6 +319,20 @@ impl Session {
                     }
                 }
                 Action::TcpClose { socket } => self.close_tcp(socket),
+                Action::WsOpen { socket, request } => {
+                    self.close_ws(socket);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let connection =
+                        crate::ws::spawn(socket, generation, request, self.inbound_tx.clone());
+                    self.ws.insert(socket, connection);
+                }
+                Action::WsSend { socket, text } => {
+                    if let Some(c) = self.ws.get(socket) {
+                        let _ = c.writer.send(crate::ws::Outgoing::Text(text));
+                    }
+                }
+                Action::WsClose { socket } => self.close_ws(socket),
                 Action::Http { id, request } => {
                     self.services
                         .http
@@ -449,6 +480,15 @@ impl Session {
         }
     }
 
+    /// Send a close frame and let the connection's task end by itself.
+    fn close_ws(&mut self, key: Key) {
+        if let Some(c) = self.ws.remove(key) {
+            if c.writer.send(crate::ws::Outgoing::Close).is_err() {
+                c.task.abort();
+            }
+        }
+    }
+
     fn close_stream(&mut self, key: Key) {
         if let Some(stream) = self.streams.remove(key) {
             stream.task.abort();
@@ -487,6 +527,10 @@ impl Session {
         let streams: Vec<Key> = self.streams.keys().copied().collect();
         for key in streams {
             self.close_stream(key);
+        }
+        let ws: Vec<Key> = self.ws.keys().copied().collect();
+        for key in ws {
+            self.close_ws(key);
         }
         self.services.events.push(Event::Closed {
             device: self.device,

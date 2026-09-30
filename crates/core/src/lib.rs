@@ -31,6 +31,7 @@ mod session;
 pub mod sse;
 mod tcp;
 mod udp;
+mod ws;
 
 use std::collections::HashMap;
 use std::net::{IpAddr, ToSocketAddrs};

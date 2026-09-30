@@ -96,6 +96,7 @@ hardware, so it should never be picked up automatically in a show-critical path.
 | `sennheiser-ew-dx` | Sennheiser EW-DX EM 2, EM 2 Dante, EM 4 Dante | HTTPS + SSE (SSCv2), native | none |
 | `sennheiser-ew-g3-g4` | Sennheiser EM 300-500 G4, SR IEM G4, EM 300-500 G3 | MCP over UDP 53212, native | none |
 | `sennheiser-digital-6000` | Sennheiser EM 6000, EM 6000 Dante | SSC over UDP 45, native | none |
+| `obs-studio` | OBS Studio 28 and later | obs-websocket 5 over WebSocket 4455, native | none |
 
 ## Verification
 
