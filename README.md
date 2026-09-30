@@ -67,7 +67,7 @@ tools/        spec validator
 | Rust | `meros-integrations` crate | working; unreleased |
 | C | static library and header (`bindings/c`) | working; unreleased |
 | Node | `@meros/integrations` | working; unreleased |
-| Python | `meros-integrations` wheels | planned |
+| Python | `meros-integrations` (`bindings/python`) | working; unreleased |
 | Sidecar | `meros-integrations serve`, a local HTTP service | working; unreleased |
 
 Every delivery runs the same core and behaves identically.
