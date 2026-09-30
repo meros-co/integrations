@@ -68,20 +68,6 @@ def http(spec, command, input, method, target, **extra):
     })
 
 
-# Shure: "< " payload " >" (Shure command strings documentation).
-S = "shure-wireless"
-text(S, "mute", {"channel": 1, "muted": True}, "< SET 1 AUDIO_MUTE ON >",
-     device_reply="< REP 1 AUDIO_MUTE ON >", expect_result={"ok": {"kind": "ack"}})
-text(S, "set_gain", {"channel": 2, "gain": -3}, "< SET 2 AUDIO_GAIN -3 >")
-text(S, "get_battery_bars", {"channel": 1}, "< GET 1 BATT_BARS >",
-     device_reply="< REP 1 BATT_BARS 004 >", expect_result={"ok": {"kind": "value", "value": "004"}})
-text(S, "get_channel_name", {"channel": 1}, "< GET 1 CHAN_NAME >",
-     device_reply="< REP 1 CHAN_NAME {Pulpit        } >",
-     expect_result={"ok": {"kind": "value", "value": "Pulpit        "}})
-text(S, "get_frequency", {"channel": 4}, "< GET 4 FREQUENCY >",
-     device_reply="< REP 4 FREQUENCY 0578350 >", expect_result={"ok": {"kind": "value", "value": "0578350"}})
-text(S, "flash", {}, "< SET FLASH ON >")
-
 # HyperDeck: payload + CRLF (Blackmagic HyperDeck Ethernet Protocol).
 H = "blackmagic-hyperdeck"
 text(H, "record", {}, "record\r\n", device_reply="200 ok\r\n", expect_result={"ok": {"kind": "ack"}})

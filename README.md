@@ -94,7 +94,7 @@ hardware, so it should never be picked up automatically in a show-critical path.
 | `qlab` | QLab 4, QLab 5 | OSC/UDP 53000 | none |
 | `resolume` | Resolume Arena, Avenue | OSC/UDP 7000 | none |
 | `rosstalk` | Ross Carbonite, Graphite, Acuity | Line/TCP 7788 | none |
-| `shure-wireless` | Shure ULX-D, QLX-D, Axient Digital, SLX-D, PSM1000 | Line/TCP 2202 | none |
+| `shure-wireless` | Shure Axient Digital, ULX-D, QLX-D, SLX-D, PSM1000 | Command strings over TCP 2202, native | none |
 | `vmix` | vMix | TCP API 8099, native | none |
 | `sennheiser-ew-dx` | Sennheiser EW-DX EM 2, EM 2 Dante, EM 4 Dante | HTTPS + SSE (SSCv2), native | none |
 | `sennheiser-ew-g3-g4` | Sennheiser EM 300-500 G4, SR IEM G4, EM 300-500 G3 | MCP over UDP 53212, native | none |

@@ -99,56 +99,6 @@ async fn hyperdeck_over_tcp() {
     ));
 }
 
-/// A Shure receiver: delimited framing both ways.
-#[tokio::test(flavor = "multi_thread")]
-async fn shure_over_tcp() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let port = listener.local_addr().unwrap().port();
-    tokio::spawn(async move {
-        let (mut stream, _) = listener.accept().await.unwrap();
-        let mut buf = [0u8; 256];
-        loop {
-            let n = tokio::io::AsyncReadExt::read(&mut stream, &mut buf)
-                .await
-                .unwrap_or(0);
-            if n == 0 {
-                return;
-            }
-            let text = String::from_utf8_lossy(&buf[..n]).to_string();
-            let reply = text
-                .replace(
-                    "< GET 1 CHAN_NAME >",
-                    "< REP 1 CHAN_NAME {Pulpit        } >",
-                )
-                .replace("< SET 1 AUDIO_MUTE ON >", "< REP 1 AUDIO_MUTE ON >");
-            stream.write_all(reply.as_bytes()).await.unwrap();
-        }
-    });
-
-    let core = Core::new().unwrap();
-    let id = open(&core, "shure-wireless", "ulxd", port);
-    wait_connected(&core, id).await;
-    assert_eq!(
-        core.execute(id, "get_channel_name", params(json!({"channel": 1})))
-            .await,
-        Ok(Outcome::Value {
-            value: json!("Pulpit        ")
-        })
-    );
-    assert_eq!(
-        core.execute(id, "mute", params(json!({"channel": 1, "muted": true})))
-            .await,
-        Ok(Outcome::Ack)
-    );
-    // SLX-D has no mute: refused, never sent.
-    let slxd = open(&core, "shure-wireless", "slxd", port);
-    assert!(matches!(
-        core.execute(slxd, "mute", params(json!({"channel": 1})))
-            .await,
-        Err(CommandError::UnsupportedForModel { .. })
-    ));
-}
-
 /// An X32: OSC over UDP, replying to the sender.
 #[tokio::test(flavor = "multi_thread")]
 async fn x32_over_udp() {

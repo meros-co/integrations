@@ -1,152 +1,224 @@
 spec: 1
 id: shure-wireless
-name: Shure networked wireless receivers
+name: Shure networked wireless (command strings)
 vendor: Shure
 category: wireless
-
-# Merged from two prior implementations: Imperio's PHP ShureWireless driver
-# (ULX-D / QLX-D / Axient) and RFDeck's TypeScript ShureClient (SLX-D /
-# Axient / PSM1000). The quirks below originate from the RFDeck work.
+implementation: native
+reason: >
+  Telemetry is a periodic SAMPLE message whose layout differs by family and,
+  on Axient Digital, by how many antennas the channel reports (read from the
+  antenna status field), with per-family conversion offsets and sentinel
+  values that mean "unknown". Metering is a per-channel subscription that has
+  to be turned off again before disconnecting.
 
 source:
-  - title: Shure Axient Digital command strings documentation
-    note: Manufacturer PDF
-  - title: Shure SLX-D command strings documentation
+  - title: Axient Digital — Command Strings (preliminary, 2 May 2018)
+    author: Shure
+    url: https://content-files.shure.com/Pubs/AD4D/Axient_Digital_network_string_commands.pdf
     note: >
-      Manufacturer PDF. Its introduction shows the Axient sample layout while
-      the SLX-D section defines a different one; the specific section wins and
-      both known open-source implementations agree with it.
-  - title: RFDeck docs/SHURE_PROTOCOL.md
-    note: Meros internal; cross-checked against Companion and micboard
+      Manufacturer document. TCP 2202; GET / SET / REP / SAMPLE; REP sent
+      unprompted on change; GET n ALL; AUDIO_GAIN 000-060 offset by 18 (p.6);
+      CHAN_NAME 31 characters; FLASH per device and per channel; METER_RATE
+      five characters, 00000 off (p.14); the SAMPLE layouts including
+      Quadversity and FD-C (p.15-16); dBFS and dBm = reported - 120; 255
+      unknown; TX_BATT_MINS sentinels 65533-65535.
+  - title: ULX-D Command Strings (Shure Applications Engineering, 12 Jan 2018)
+    author: Shure
+    url: https://content-files.shure.com/Pubs/ulx/ulx-d-network-string-commands.pdf
+    note: >
+      Manufacturer document. ULX-D and QLX-D names (BATT_BARS, BATT_CHARGE,
+      BATT_RUN_TIME), AUDIO_GAIN 000-060 minus 18, CHAN_NAME 8 characters,
+      FLASH ON / OFF, and < SAMPLE x ALL nn aaa eee > with RF level minus 128
+      for dBm and an audio level of 000-050 with no units given.
+  - title: RFDeck docs/SHURE_PROTOCOL.md and hardware/shure/protocol.ts
+    note: >
+      Meros. Framing on angle brackets, per-family names and offsets, the
+      SLX-D sample (< SAMPLE ch ALL audPeak audRms rfRssi >, offset 120, no
+      mute), and the PSM1000 dialect (REPORT, bare strings, CRLF, RF_MUTE 1/0,
+      no GET ALL), each cited there to Shure's SLX-D and PSM1000 documents,
+      which could not be retrieved for this spec. Not yet run against
+      hardware.
+  - title: Imperio ShureWireless driver
+    note: Meros. The earlier spec-driven version of this integration.
+  - title: micboard, wirelessboard and Bitfocus Companion's Shure module
+    note: Cross-checks cited by RFDeck; no code copied.
 
-transport:
-  type: line-tcp
-  port: 2202
-  framing: delimited
-  open: "< "
-  close: " >"
-  encoding: ascii
-  timeout_ms: 2000
-  probe: "GET 1 CHAN_NAME"
+settings:
+  # Metering interval per channel in milliseconds: 100 to 65535, or 0 for no
+  # metering. The receiver sends one SAMPLE per channel per interval.
+  meter_interval_ms: { type: int, min: 0, max: 65535, default: 1000 }
 
 models:
-  - id: ulxd
-    name: Shure ULX-D
+  - id: ad4d
+    name: Shure Axient Digital AD4D (2 channels)
+    channels: 2
+    supports: [mute, set_gain, set_frequency, set_channel_name, flash]
+    verification: none
+  - id: ad4q
+    name: Shure Axient Digital AD4Q (4 channels)
     channels: 4
-    supports: [mute, set_gain, get_battery_bars, get_channel_name, get_frequency, flash]
+    supports: [mute, set_gain, set_frequency, set_channel_name, flash]
     verification: none
-  - id: qlxd
-    name: Shure QLX-D
+  - id: ulxd4
+    name: Shure ULX-D ULXD4 (1 channel)
+    channels: 1
+    supports: [mute, set_gain, set_frequency, set_channel_name, flash]
+    verification: none
+  - id: ulxd4d
+    name: Shure ULX-D ULXD4D (2 channels)
     channels: 2
-    supports: [mute, set_gain, get_battery_bars, get_channel_name, get_frequency, flash]
+    supports: [mute, set_gain, set_frequency, set_channel_name, flash]
     verification: none
-  - id: axtd
-    name: Shure Axient Digital
+  - id: ulxd4q
+    name: Shure ULX-D ULXD4Q (4 channels)
     channels: 4
-    supports: [mute, set_gain, get_battery_bars, get_channel_name, get_frequency, flash]
+    supports: [mute, set_gain, set_frequency, set_channel_name, flash]
     verification: none
-  - id: slxd
-    name: Shure SLX-D
+  - id: qlxd4
+    name: Shure QLX-D QLXD4 (1 channel)
+    channels: 1
+    supports: [mute, set_gain, set_frequency, set_channel_name, flash]
+    verification: none
+  - id: slxd4
+    name: Shure SLX-D SLXD4 (1 channel)
+    channels: 1
+    supports: [set_frequency, set_channel_name]
+    verification: none
+  - id: slxd4d
+    name: Shure SLX-D SLXD4D (2 channels)
     channels: 2
-    supports: [set_gain, get_battery_bars, get_channel_name, get_frequency]
+    supports: [set_frequency, set_channel_name]
     verification: none
-    notes: >
-      Omits mute and flash: SLX-D has no mute command, and no flash command is
-      documented for it.
-  - id: psm1000
-    name: Shure PSM1000 (IEM transmitter)
+  - id: p10t
+    name: Shure PSM1000 P10T IEM transmitter (2 channels)
     channels: 2
-    supports: [get_channel_name, get_frequency]
+    supports: [rf_mute, set_frequency]
     verification: none
-    notes: >
-      A transmitter, not a receiver: no received RF and no transmitter battery
-      to report. Audio input level is its only live telemetry, and no
-      retrievable specification defines that value's format, so it is not
-      modelled here.
 
 commands:
   mute:
-    summary: Mute or unmute a receiver channel
+    summary: Mute or unmute a receiver channel's audio
     params:
       channel: { type: int, min: 1, max: 4, required: true }
       muted:   { type: bool, default: true }
-    send: "SET {channel} AUDIO_MUTE {muted:on_off}"
-    expect: { contains: "REP" }
+    returns: ack
+
+  rf_mute:
+    summary: Mute or unmute a PSM1000 channel's RF output
+    params:
+      channel: { type: int, min: 1, max: 2, required: true }
+      muted:   { type: bool, default: true }
     returns: ack
 
   set_gain:
-    summary: Set channel audio gain in dB
+    summary: Set a channel's audio gain in dB, -18 to +42
     params:
       channel: { type: int, min: 1, max: 4, required: true }
-      gain:    { type: int, min: -18, max: 42, required: true }
-    send: "SET {channel} AUDIO_GAIN {gain}"
-    expect: { contains: "REP" }
+      gain_db: { type: int, min: -18, max: 42, required: true }
     returns: ack
 
-  get_battery_bars:
-    summary: Transmitter battery level, in bars (not a percentage)
+  set_frequency:
+    summary: Tune a channel
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-    send: "GET {channel} BATT_BARS"
-    expect: { matches: "BATT_BARS (\\d+)" }
-    returns: value
+      channel:       { type: int, min: 1, max: 4, required: true }
+      frequency_khz: { type: int, min: 100000, max: 9999999, required: true }
+    returns: ack
 
-  get_channel_name:
-    summary: Channel display name
+  set_channel_name:
+    summary: Name a channel. 31 characters on Axient Digital, 8 on ULX-D and QLX-D.
     params:
       channel: { type: int, min: 1, max: 4, required: true }
-    send: "GET {channel} CHAN_NAME"
-    expect: { matches: "CHAN_NAME \\{?([^}>]*)" }
-    returns: value
-
-  get_frequency:
-    summary: Channel frequency in kHz
-    params:
-      channel: { type: int, min: 1, max: 4, required: true }
-    send: "GET {channel} FREQUENCY"
-    expect: { matches: "FREQUENCY (\\d+)" }
-    returns: value
+      name:    { type: string, max_length: 31, pattern: "^[^{}<>]*$", required: true }
+    returns: ack
 
   flash:
-    summary: Flash the receiver front panel to identify the physical unit
+    summary: Flash the receiver's front panel to find it in the rack
     params:
       enabled: { type: bool, default: true }
-    send: "SET FLASH {enabled:on_off}"
-    expect: { contains: "REP" }
     returns: ack
 
+state:
+  device.model:                     { type: string, description: "MODEL (Axient Digital, SLX-D)" }
+  device.id:                        { type: string, description: "DEVICE_ID, or DEVICE_NAME on the PSM1000" }
+  device.firmware:                  { type: string, description: "FW_VER" }
+  device.rf_band:                   { type: string, description: "RF_BAND (Axient Digital, SLX-D)" }
+  device.high_density:              { type: bool, description: "TRANSMISSION_MODE HIGH_DENSITY (Axient) or HIGH_DENSITY ON (ULX-D)" }
+  channels.*.name:                  { type: string, description: "Channel name, padding removed" }
+  channels.*.frequency_khz:         { type: int, unit: kHz, description: "Carrier frequency" }
+  channels.*.mute:                  { type: bool, description: "Audio mute (receivers)" }
+  channels.*.rf_mute:               { type: bool, description: "RF output mute (PSM1000)" }
+  channels.*.gain_db:               { type: int, unit: dB, description: "Audio gain, -18 to +42" }
+  channels.*.quality:               { type: int, description: "Channel quality 0-5 (Axient Digital); absent when unknown" }
+  channels.*.af.rms_dbfs:           { type: int, unit: dBFS, description: "Audio RMS (Axient Digital, SLX-D)" }
+  channels.*.af.peak_dbfs:          { type: int, unit: dBFS, description: "Audio peak (Axient Digital, SLX-D)" }
+  channels.*.af.level:              { type: int, description: "ULX-D / QLX-D audio level, 0-50. Shure gives the range but no units, so no dBFS figure is derived" }
+  channels.*.af.input_meter_left:   { type: int, description: "PSM1000 AUDIO_IN_LVL_L as reported. Shure documents no units or scale" }
+  channels.*.af.input_meter_right:  { type: int, description: "PSM1000 AUDIO_IN_LVL_R as reported" }
+  channels.*.rf.rssi_dbm.*:         { type: int, unit: dBm, description: "Received level per antenna (a, b, c, d); one figure, under a, on ULX-D, QLX-D and SLX-D" }
+  channels.*.rf.antennas.*:         { type: string, description: "Per antenna: off, red or blue (Axient Digital); on or off (ULX-D, QLX-D)" }
+  channels.*.transmitter.battery_bars:    { type: int, description: "0-5; absent when unknown" }
+  channels.*.transmitter.battery_percent: { type: int, unit: "%", description: "Charge 0-100; absent when unknown or not reported (SLX-D)" }
+  channels.*.transmitter.battery_minutes: { type: int, unit: min, description: "Runtime; absent when unknown, calculating or in a battery communication warning" }
+
 quirks:
-  - models: [slxd]
+  - models: [slxd4, slxd4d]
     severity: critical
     text: >
-      SLX-D has no mute command. mute is refused for this model.
-      Setting gain to minimum is not an equivalent substitute: it is audible on
-      transients and does not persist across a power cycle.
+      SLX-D has no mute command, so mute is not offered. Setting gain to
+      minimum is not an equivalent: it is audible on transients and does not
+      survive a power cycle.
 
-  - models: [slxd]
+  - models: [slxd4, slxd4d]
     severity: warning
     text: >
-      Command strings are disabled by default. Until network control is enabled
-      on the receiver it accepts the TCP connection and returns nothing, which
-      presents identically to having selected the wrong model.
+      Command strings are disabled by default on SLX-D. Until network control
+      is enabled on the receiver it accepts the TCP connection and answers
+      nothing; the core reports it as disconnected with that as the likely
+      reason, rather than as connected and silent.
+
+  - models: [slxd4, slxd4d]
+    severity: info
+    text: >
+      Gain and flash are not offered on SLX-D: its command document could not
+      be retrieved to confirm their format. They are one line to add once it
+      is checked.
 
   - models: [all]
     severity: warning
     text: >
-      Metered values carry a -120 offset. Values read without applying it are
-      display scaling, not dBFS. Some open-source implementations use
-      reverse-engineered thresholds rather than the documented conversion.
+      Values are converted with each family's documented offset: Axient
+      Digital and SLX-D report dBFS and dBm as value - 120, ULX-D and QLX-D
+      report RF as value - 128. Gain is value - 18 on the wire. 255 (and
+      65533-65535 for battery minutes) mean unknown and are reported as
+      absent, never as a reading.
 
-  - models: [axtd, slxd]
-    severity: warning
-    text: >
-      Identify the family by the MODEL string, not by whether the unit answers
-      MODEL at all. SLX-D answers it. Presence-based detection classifies SLX-D
-      as Axient and then misparses its shorter sample layout, reading audio peak
-      as channel quality and RF level as an antenna status string.
-
-  - models: [slxd]
+  - models: [ad4q]
     severity: info
     text: >
-      Reports battery in bars only, with no charge percentage, antenna status or
-      channel quality. Two channels rather than four.
+      With Quadversity on, a channel reports four antennas (a to d); the count
+      is read from the SAMPLE's antenna status field rather than assumed. With
+      frequency diversity combined (FD-C), a second RF section follows; only
+      the first is reported.
+
+  - models: [all]
+    severity: info
+    text: >
+      REP messages arrive whenever a value changes, from the front panel or
+      Wireless Workbench too, so everything except metering is live without
+      polling. The core also asks for everything again every 30 seconds, to
+      recover changes made while it was disconnected. Metering is turned off
+      on every channel before the core disconnects.
+
+  - models: [ulxd4, ulxd4d, ulxd4q, qlxd4]
+    severity: info
+    text: >
+      ULX-D and QLX-D report RF, audio and antenna state only inside SAMPLE,
+      and only one RF figure per channel. With metering off (interval 0) those
+      values are never reported.
+
+  - models: [p10t]
+    severity: info
+    text: >
+      The PSM1000 is a transmitter: no received RF and no transmitter battery.
+      It answers REPORT rather than REP, sends string values without braces,
+      and has no GET ALL, so its parameters are asked for one at a time.
