@@ -95,6 +95,8 @@ hardware, so it should never be picked up automatically in a show-critical path.
 | `resolume` | Resolume Arena, Avenue | OSC/UDP 7000 | none |
 | `rosstalk` | Ross Carbonite, Graphite, Acuity | Line/TCP 7788 | none |
 | `shure-wireless` | Shure Axient Digital, ULX-D, QLX-D, SLX-D, PSM1000 | Command strings over TCP 2202, native | none |
+| `tsl-umd-display` | Tally displays and multiviewers (TSL UMD V3.1, V4.0, V5.0) | UDP, or TCP for V5.0; sends; native | none |
+| `tsl-umd-listener` | Tally from a switcher (TSL UMD V3.1, V4.0, V5.0) | UDP; receives; native | none |
 | `vmix` | vMix | TCP API 8099, native | none |
 | `sennheiser-ew-dx` | Sennheiser EW-DX EM 2, EM 2 Dante, EM 4 Dante | HTTPS + SSE (SSCv2), native | none |
 | `sennheiser-ew-g3-g4` | Sennheiser EM 300-500 G4, SR IEM G4, EM 300-500 G3 | MCP over UDP 53212, native | none |

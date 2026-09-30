@@ -1,0 +1,90 @@
+spec: 1
+id: tsl-umd-display
+name: TSL UMD tally sent to displays and multiviewers
+vendor: TSL Products
+category: display
+implementation: native
+reason: >
+  Binary packets whose layout, checksum and framing differ by protocol
+  version, including V4.0's checksum over the V3.1 bytes and V5.0's DLE/STX
+  byte stuffing over TCP.
+
+source:
+  - title: TSL UMD Protocols (V3.1, V4.0, V5.0), 19/09/09
+    author: TSL Products
+    url: https://tslproducts.com/wp-content/uploads/Manuals/Control/tsl-umd-protocol.pdf
+    note: >
+      Manufacturer document. Packet layouts for all three versions; V3.1 and
+      V4.0 over UDP carry one serial packet per datagram; V5.0 over TCP is
+      wrapped with DLE (0xFE) / STX (0x02) and DLE stuffed as DLE/DLE.
+
+models:
+  - id: tsl-3-1
+    name: TSL UMD V3.1 over UDP
+    supports: [set_display]
+    verification: none
+  - id: tsl-4-0
+    name: TSL UMD V4.0 over UDP
+    supports: [set_display]
+    verification: none
+  - id: tsl-5-0-udp
+    name: TSL UMD V5.0 over UDP
+    supports: [set_display]
+    verification: none
+  - id: tsl-5-0-tcp
+    name: TSL UMD V5.0 over TCP
+    supports: [set_display]
+    verification: none
+
+settings:
+  # V5.0 only: send text as UTF-16LE instead of ASCII.
+  unicode: { type: bool, default: false }
+
+commands:
+  set_display:
+    summary: >
+      Set one display's text, tallies and brightness. V3.1 and V4.0 address
+      0-126 and send 16 characters (padded or cut); V5.0 addresses 0-65534 on a
+      screen, and 65535 broadcasts.
+    params:
+      index:      { type: int, min: 0, max: 65535, required: true }
+      screen:     { type: int, min: 0, max: 65535, default: 0 }
+      text:       { type: string, max_length: 256, default: "" }
+      brightness: { type: int, min: 0, max: 3, default: 3 }
+      lh:         { type: enum, values: ["off", red, green, amber], default: "off" }
+      text_tally: { type: enum, values: ["off", red, green, amber], default: "off" }
+      rh:         { type: enum, values: ["off", red, green, amber], default: "off" }
+      lamps:      { type: int, min: 0, max: 15, default: 0 }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      TSL is one-way: displays never answer, so every command reports
+      unverified, and a UDP display is unmonitored.
+
+  - models: [tsl-3-1]
+    severity: info
+    text: >
+      V3.1 has only four on/off tallies (lamps, bits 1-4 as 1, 2, 4, 8) and no
+      colours; lh, text_tally and rh are not sent.
+
+  - models: [tsl-4-0]
+    severity: info
+    text: >
+      V4.0 sends lamps in the control byte and lh, text_tally and rh as the
+      left display's colour tallies. The right display's colour tallies are
+      sent as off.
+
+  - models: [tsl-5-0-udp, tsl-5-0-tcp]
+    severity: info
+    text: >
+      V5.0 has no lamps; they are not sent. screen 65535 and index 65535 are
+      broadcasts.
+
+  - models: [all]
+    severity: warning
+    text: >
+      TSL defines no port. The port is required when the device is opened.
+      V3.1 and V4.0 text is printable ASCII; other characters are sent as "?".

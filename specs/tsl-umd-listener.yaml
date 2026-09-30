@@ -1,0 +1,67 @@
+spec: 1
+id: tsl-umd-listener
+name: TSL UMD tally received from a switcher
+vendor: TSL Products
+category: other
+implementation: native
+reason: >
+  The core receives rather than sends: it listens on a UDP port for one
+  switcher, tells the three protocol versions apart by each packet's shape,
+  and decodes binary fields whose layout differs by version.
+
+source:
+  - title: TSL UMD Protocols (V3.1, V4.0, V5.0), 19/09/09
+    author: TSL Products
+    url: https://tslproducts.com/wp-content/uploads/Manuals/Control/tsl-umd-protocol.pdf
+    note: >
+      Manufacturer document. V3.1: header 0x80 + address, control byte (tally
+      bits 0-3, brightness bits 4-5), 16 ASCII characters. V4.0: checksum,
+      VBC and two XDATA bytes of 2-bit colour tallies (LH, text, RH) for the
+      left and right displays. V5.0: little-endian PBC, VER, FLAGS (bit 0
+      UTF-16LE), SCREEN, then display messages of INDEX, CONTROL (RH, text and
+      LH tally, brightness, bit 15 control data) and LENGTH-prefixed text; UDP
+      packets up to 2048 bytes; 0xFFFF broadcast.
+  - title: Tally TSL receivers (tally/TSLUMD3.cpp, TSLUMD4.cpp, TSLUMD5.cpp)
+    note: Meros. A UDP listener on an operator-chosen port; TSL has no standard port.
+
+models:
+  - id: tsl-umd
+    name: TSL UMD V3.1, V4.0 or V5.0 over UDP (detected per packet)
+    supports: []
+    verification: none
+
+state:
+  protocol:                              { type: string, description: "Version of the last packet: 3.1, 4.0 or 5.0" }
+  screens.*.displays.*.text:             { type: string, description: "Display text, keyed by screen (0 for V3.1 and V4.0) and 0-based display index or address" }
+  screens.*.displays.*.brightness:       { type: int, description: "0-3" }
+  screens.*.displays.*.tally.lh:         { type: string, description: "Left-hand tally: off, red, green or amber (V5.0; V4.0 left display)" }
+  screens.*.displays.*.tally.text:       { type: string, description: "Text tally: off, red, green or amber" }
+  screens.*.displays.*.tally.rh:         { type: string, description: "Right-hand tally: off, red, green or amber" }
+  screens.*.displays.*.right_display.lh: { type: string, description: "V4.0 right display's left-hand tally" }
+  screens.*.displays.*.right_display.text: { type: string, description: "V4.0 right display's text tally" }
+  screens.*.displays.*.right_display.rh: { type: string, description: "V4.0 right display's right-hand tally" }
+  screens.*.displays.*.lamps.*:          { type: bool, description: "V3.1 and V4.0 tally bits 1-4 (the control byte's four on/off tallies)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      TSL defines no port. Open the device with the switcher's address as host
+      and the UDP port the switcher sends to as port; the port is required.
+      Several switchers can send to one port: each is its own device, told
+      apart by source address.
+
+  - models: [all]
+    severity: info
+    text: >
+      TSL is one-way, so the core cannot tell a quiet switcher from a missing
+      one. The connection is reported as unmonitored; each packet is reported
+      as alive.
+
+  - models: [all]
+    severity: info
+    text: >
+      V5.0 broadcast (display or screen 0xFFFF) is applied to every display
+      already known on that screen. V5.0 control data and screen control
+      messages are undefined in V5.0 and are ignored. TSL V5.0 over TCP is not
+      received yet; UDP only.

@@ -157,8 +157,9 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     settings: dict = doc.get("settings") or {}
     native = doc.get("implementation") == "native"
 
-    if not commands:
-        errors.append("a device requires at least one command")
+    if not commands and not doc.get("state"):
+        # A receive-only device (a tally listener) has state and no commands.
+        errors.append("a device requires at least one command, or declared state")
 
     if native:
         # Wire behaviour lives in the Rust module; the spec is catalogue only.

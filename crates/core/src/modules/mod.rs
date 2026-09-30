@@ -7,6 +7,7 @@ mod sennheiser_d6000;
 mod sennheiser_ewdx;
 mod sennheiser_mcp;
 mod shure;
+mod tsl;
 mod vmix;
 
 use std::sync::Arc;
@@ -30,6 +31,15 @@ pub(crate) fn construct(
         "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
+        // TSL defines no port, so the host must give one.
+        "tsl-umd-listener" => match context.port {
+            Some(port) => Ok(Box::new(tsl::Listener::new(port))),
+            None => Err("TSL UMD has no standard port: give the port to listen on".into()),
+        },
+        "tsl-umd-display" => match context.port {
+            Some(port) => Ok(Box::new(tsl::Sender::new(&context, port))),
+            None => Err("TSL UMD has no standard port: give the display's port".into()),
+        },
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         other => Err(format!("no native module for '{other}'")),
