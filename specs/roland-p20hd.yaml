@@ -1,0 +1,587 @@
+spec: 1
+id: roland-p20hd
+name: Roland P-20HD (LAN control)
+vendor: Roland
+category: recorder
+
+# The P-20HD instant replayer's LAN/RS-232 command set: the same grammar as
+# the V-60HD (roland-v60hd), "stx" + three letters + optional ":" arguments +
+# ";", acknowledged by the byte ACK (06H) or refused with NAK (15H), with its
+# own commands and a user ID and password login over LAN.
+source:
+  - title: "P-20HD Reference Manual, Version 2.00 and later, edition 02 (PDF dated 2025-05-27)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/P-20HD_reference_v20_eng02_W.pdf
+    note: >
+      Manufacturer document. LAN interface (TCP 8023), user ID (4-8
+      characters) and password (8-12 characters) p.52; remote control
+      setup (LAN, Remote Control, PC), the login order, ACK on success and
+      the five-minute idle disconnect p.53; command format (stx, ACK 06H, NAK
+      15H, XON/XOFF), network, operation commands p.77; system and inquiry
+      commands, ERR codes p.78.
+  - title: Bitfocus companion-module-roland-p20hd (MIT), index.js
+    url: https://github.com/bitfocus/companion-module-roland-p20hd
+    note: >
+      Open code read for corroboration only: STX + command + ";" with no line
+      ending, ACK and NAK as single bytes, USR answered by ACK before PSS is
+      sent, a NAK after PSS meaning a wrong password.
+
+transport:
+  type: line-tcp
+  port: 8023
+  # Sent as STX, the command, then ";" (p.77), with no line ending.
+  framing: delimited
+  open: "\u0002"
+  close: ";"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  reply_framing: terminated
+  reply_terminators: [";", "\u0006", "\u0015"]
+  # Operation commands are answered ACK (or NAK, ERR:n;); VER and the inquiry
+  # commands are answered by their data frame alone (p.77-78).
+  reply_match: '^[\x02\x11\x13]*(\x06|\x15|ERR:[0-9]+;|VER:|Q[A-Z]{2}:)'
+  probe: "ACS"
+
+settings:
+  user_id:
+    type: string
+    default: ""
+    max_length: 8
+    pattern: '^([\x21-\x7e]{4,8})?$'
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 12
+    pattern: '^([\x21-\x7e]{8,12})?$'
+
+# "Transmit the user ID command ... Transmit the password command ... Once
+# the ACK (06H) response is verified, the connection is established" (p.53).
+# The manual gives no prompt, so the steps are sent on connecting. A NAK
+# (15H) is the documented refusal (p.77).
+on_connect:
+  - when_set: user_id
+    send: "USR:{settings.user_id}"
+    refused: '^\x15$'
+  - when_set: password
+    send: "PSS:{settings.password}"
+    refused: '^\x15$'
+
+models:
+  - id: p-20hd
+    name: Roland P-20HD Video Instant Replayer
+    supports:
+      - quit
+      - record_start
+      - record_stop
+      - play
+      - pause
+      - jog
+      - shuttle
+      - set_playback_speed
+      - set_speed_range
+      - set_in_point
+      - set_out_point
+      - create_clip
+      - select_clip
+      - play_clip
+      - cue_clip
+      - delete_clip
+      - set_bookmark
+      - delete_bookmark
+      - select_input
+      - select_output
+      - next_bookmark
+      - previous_bookmark
+      - timeline_start
+      - timeline_end
+      - select_playlist
+      - play_playlist
+      - stop_auto_play
+      - add_clip_to_palette
+      - play_still
+      - stop_still
+      - play_audio
+      - stop_audio
+      - set_audio_level
+      - active_sense
+      - get_version
+      - shut_down
+      - get_project_open
+      - get_mode
+      - get_recording
+      - get_playback
+      - get_playback_speed
+      - get_speed_range
+      - get_in_point
+      - get_input
+      - get_output
+      - get_audio_level
+      - get_selected_playlist
+      - get_selected_clip
+      - get_cued_playlist
+      - get_cued_clip
+      - get_clip_available
+      - get_audio_clip_available
+      - get_still_available
+      - get_clip_count
+    verification: none
+    notes: >
+      Commands from Reference Manual version 2.00.
+
+commands:
+  quit:
+    summary: "End communication (QIT)"
+    send: "QIT"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  record_start:
+    summary: "Start recording (REC)"
+    send: "REC"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  record_stop:
+    summary: "Stop recording (RES)"
+    send: "RES"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  play:
+    summary: "Start playback (PLY)"
+    send: "PLY"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  pause:
+    summary: "Pause (PUS)"
+    send: "PUS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  jog:
+    summary: "Jog one step: 1 forward, -1 reverse (JOG)"
+    params:
+      direction: { type: int, min: -1, max: 1, required: true }
+    send: "JOG:{direction}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  shuttle:
+    summary: "Shuttle: -8 (x-128) to 8 (x128) in powers of two, 0 stopped (SHT)"
+    params:
+      speed: { type: int, min: -8, max: 8, required: true }
+    send: "SHT:{speed}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_playback_speed:
+    summary: "Change the playback speed, 0-100 (SPC)"
+    params:
+      speed: { type: int, min: 0, max: 100, required: true }
+    send: "SPC:{speed}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_speed_range:
+    summary: "Switch the playback speed range: false [SPEED RANGE] unlit, true lit (SPR)"
+    params:
+      lit: { type: bool, required: true }
+    send: "SPR:{lit:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_in_point:
+    summary: "Set the IN point: false replay video, true live in video (MIN)"
+    params:
+      live: { type: bool, required: true }
+    send: "MIN:{live:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_out_point:
+    summary: "Set the OUT point: false replay video, true live in video (MOT)"
+    params:
+      live: { type: bool, required: true }
+    send: "MOT:{live:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  create_clip:
+    summary: "Create a clip: false replay video, true live in video (MCL)"
+    params:
+      live: { type: bool, required: true }
+    send: "MCL:{live:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_clip:
+    summary: "Select a clip in the clip list (1-512) or a palette (1-64) (CLS)"
+    params:
+      clip: { type: int, min: 1, max: 512, required: true }
+    send: "CLS:{clip}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  play_clip:
+    summary: "Start playback of the selected clip (APC)"
+    send: "APC"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  cue_clip:
+    summary: "Cue up a clip in the clip list (1-512) or a palette (1-64) (CLQ)"
+    params:
+      clip: { type: int, min: 1, max: 512, required: true }
+    send: "CLQ:{clip}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  delete_clip:
+    summary: "Delete a clip in the clip list (1-512) or a palette (1-64) (CLD)"
+    params:
+      clip: { type: int, min: 1, max: 512, required: true }
+    send: "CLD:{clip}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_bookmark:
+    summary: "Set a bookmark: false replay video, true live in video (BMK)"
+    params:
+      live: { type: bool, required: true }
+    send: "BMK:{live:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  delete_bookmark:
+    summary: "Delete a bookmark (DMK)"
+    send: "DMK"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_input:
+    summary: "Switch input: 1 LIVE IN 1, 2 LIVE IN 2, 3 PinP, 4 SPLIT (SLI)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true }
+    send: "SLI:{input}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_output:
+    summary: "Switch output: false replay video, true live in video (SLO)"
+    params:
+      live: { type: bool, required: true }
+    send: "SLO:{live:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  next_bookmark:
+    summary: "Jump to the next bookmark (JNB)"
+    send: "JNB"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  previous_bookmark:
+    summary: "Jump to the previous bookmark (JPB)"
+    send: "JPB"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  timeline_start:
+    summary: "Jump to the beginning of the timeline (JTP)"
+    send: "JTP"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  timeline_end:
+    summary: "Jump to the end of the timeline (JED)"
+    send: "JED"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_playlist:
+    summary: "Select a playlist: 0 clip list, 1-8 palettes 1-8 (PLS)"
+    params:
+      playlist: { type: int, min: 0, max: 8, required: true }
+    send: "PLS:{playlist}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  play_playlist:
+    summary: "Start playlist playback from a clip in the clip list (1-512) or a palette (1-64) (APL)"
+    params:
+      clip: { type: int, min: 1, max: 512, required: true }
+    send: "APL:{clip}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  stop_auto_play:
+    summary: "Stop auto-play (SAP)"
+    send: "SAP"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  add_clip_to_palette:
+    summary: "Add the current clip to palette 1-8 (ATP)"
+    params:
+      palette: { type: int, min: 1, max: 8, required: true }
+    send: "ATP:{palette}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  play_still:
+    summary: "Play still image clip 1-16 (STP)"
+    params:
+      still: { type: int, min: 1, max: 16, required: true }
+    send: "STP:{still}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  stop_still:
+    summary: "Stop the still image clip (STS)"
+    send: "STS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  play_audio:
+    summary: "Play audio clip 1-16 (AUP)"
+    params:
+      audio: { type: int, min: 1, max: 16, required: true }
+    send: "AUP:{audio}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  stop_audio:
+    summary: "Stop the audio clip (AUS)"
+    send: "AUS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_audio_level:
+    summary: "Set the audio level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (VOL)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "VOL:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  active_sense:
+    summary: "Active sensing (ACS)"
+    send: "ACS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_version:
+    summary: "Version; answered by the VER frame alone (VER)"
+    send: "VER"
+    expect: { matches: '^[\x02\x11\x13]*VER:[^,;]*,([^;]+);' }
+    returns: value
+
+  shut_down:
+    summary: "Shut down the unit (EXT)"
+    send: "EXT"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_project_open:
+    summary: "Whether a project is open: 0 no, 1 yes (QPJ)"
+    send: "QPJ"
+    expect: { matches: '^[\x02\x11\x13]*QPJ:(-?\d+);' }
+    returns: value
+
+  get_mode:
+    summary: "Project recording/playback mode: 0 resolution, 1 frame rate (QMD)"
+    send: "QMD"
+    expect: { matches: '^[\x02\x11\x13]*QMD:(-?\d+);' }
+    returns: value
+
+  get_recording:
+    summary: "Recording status: 0 stopped, 1 recording (QRC)"
+    send: "QRC"
+    expect: { matches: '^[\x02\x11\x13]*QRC:(-?\d+);' }
+    returns: value
+
+  get_playback:
+    summary: "Playback status: 0 paused, 1 playing, 2 playing a clip, 3 playing a playlist (QPL)"
+    send: "QPL"
+    expect: { matches: '^[\x02\x11\x13]*QPL:(-?\d+);' }
+    returns: value
+
+  get_playback_speed:
+    summary: "Playback speed, -100 to 100 (QSP)"
+    send: "QSP"
+    expect: { matches: '^[\x02\x11\x13]*QSP:(-?\d+);' }
+    returns: value
+
+  get_speed_range:
+    summary: "Playback range: 0 [SPEED RANGE] unlit, 1 lit (QSR)"
+    send: "QSR"
+    expect: { matches: '^[\x02\x11\x13]*QSR:(-?\d+);' }
+    returns: value
+
+  get_in_point:
+    summary: "Whether an IN point is set: 0 no, 1 yes (QMI)"
+    send: "QMI"
+    expect: { matches: '^[\x02\x11\x13]*QMI:(-?\d+);' }
+    returns: value
+
+  get_input:
+    summary: "Input selection: 1 LIVE IN 1, 2 LIVE IN 2, 3 PinP, 4 SPLIT (QIS)"
+    send: "QIS"
+    expect: { matches: '^[\x02\x11\x13]*QIS:(-?\d+);' }
+    returns: value
+
+  get_output:
+    summary: "Output selection: 0 replay video, 1 live in video (QOS)"
+    send: "QOS"
+    expect: { matches: '^[\x02\x11\x13]*QOS:(-?\d+);' }
+    returns: value
+
+  get_audio_level:
+    summary: "Audio level, -801 (-INF) to 100 (QAL)"
+    send: "QAL"
+    expect: { matches: '^[\x02\x11\x13]*QAL:(-?\d+);' }
+    returns: value
+
+  get_selected_playlist:
+    summary: "Playlist of the selected clip: 0 clip list, 1-8 palettes (QPS)"
+    send: "QPS"
+    expect: { matches: '^[\x02\x11\x13]*QPS:(-?\d+);' }
+    returns: value
+
+  get_selected_clip:
+    summary: "Number of the selected clip (QCS)"
+    send: "QCS"
+    expect: { matches: '^[\x02\x11\x13]*QCS:(-?\d+);' }
+    returns: value
+
+  get_cued_playlist:
+    summary: "Playlist of the cued-up clip: 0 clip list, 1-8 palettes (QPQ)"
+    send: "QPQ"
+    expect: { matches: '^[\x02\x11\x13]*QPQ:(-?\d+);' }
+    returns: value
+
+  get_cued_clip:
+    summary: "Number of the cued-up clip (QCQ)"
+    send: "QCQ"
+    expect: { matches: '^[\x02\x11\x13]*QCQ:(-?\d+);' }
+    returns: value
+
+  get_clip_available:
+    summary: "Whether a clip exists at a position: playlist 0 clip list (1-512) or 1-8 palette (1-64); 0 no, 1 yes (QCX)"
+    params:
+      playlist: { type: int, min: 0, max: 8, required: true }
+      clip: { type: int, min: 1, max: 512, required: true }
+    send: "QCX:{playlist},{clip}"
+    expect: { matches: '^[\x02\x11\x13]*QCX:(-?\d+);' }
+    returns: value
+
+  get_audio_clip_available:
+    summary: "Whether audio clip 1-16 exists: 0 no, 1 yes (QAX)"
+    params:
+      audio: { type: int, min: 1, max: 16, required: true }
+    send: "QAX:{audio}"
+    expect: { matches: '^[\x02\x11\x13]*QAX:(-?\d+);' }
+    returns: value
+
+  get_still_available:
+    summary: "Whether still image clip 1-16 exists: 0 no, 1 yes (QSX)"
+    params:
+      still: { type: int, min: 1, max: 16, required: true }
+    send: "QSX:{still}"
+    expect: { matches: '^[\x02\x11\x13]*QSX:(-?\d+);' }
+    returns: value
+
+  get_clip_count:
+    summary: "Number of clips in a playlist: 0 clip list (0-512), 1-8 palette (0-64) (QNC)"
+    params:
+      playlist: { type: int, min: 0, max: 8, required: true }
+    send: "QNC:{playlist}"
+    expect: { matches: '^[\x02\x11\x13]*QNC:(-?\d+);' }
+    returns: value
+telemetry:
+  # Nothing is pushed. The inquiry replies land in state when asked; there is
+  # no scheduled poll (see the login quirk).
+  updates:
+    - match: '^[\x02\x11\x13]*QPJ:([01]);'
+      state: { "project.open": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^[\x02\x11\x13]*QMD:(\d+);'
+      state: { "project.mode": "{1}" }
+    - match: '^[\x02\x11\x13]*QRC:([01]);'
+      state: { "recording": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^[\x02\x11\x13]*QPL:(\d+);'
+      state: { "playback.status": "{1}" }
+    - match: '^[\x02\x11\x13]*QSP:(-?\d+);'
+      state: { "playback.speed": "{1}" }
+    - match: '^[\x02\x11\x13]*QSR:([01]);'
+      state: { "playback.speed_range": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^[\x02\x11\x13]*QMI:([01]);'
+      state: { "in_point_set": { value: "{1}", map: { "1": true, "0": false } } }
+    - match: '^[\x02\x11\x13]*QIS:(\d+);'
+      state: { "input": "{1}" }
+    - match: '^[\x02\x11\x13]*QOS:(\d+);'
+      state: { "output": "{1}" }
+    - match: '^[\x02\x11\x13]*QAL:(-?\d+);'
+      state: { "audio.level": "{1}" }
+    - match: '^[\x02\x11\x13]*QPS:(\d+);'
+      state: { "selected.playlist": "{1}" }
+    - match: '^[\x02\x11\x13]*QCS:(\d+);'
+      state: { "selected.clip": "{1}" }
+    - match: '^[\x02\x11\x13]*QPQ:(\d+);'
+      state: { "cued.playlist": "{1}" }
+    - match: '^[\x02\x11\x13]*QCQ:(\d+);'
+      state: { "cued.clip": "{1}" }
+    - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  project.open:         { type: bool, description: "A project is open" }
+  project.mode:         { type: int, description: "Recording/playback mode: 0 resolution, 1 frame rate" }
+  recording:            { type: bool, description: "Recording" }
+  playback.status:      { type: int, description: "0 paused, 1 playing, 2 playing a clip, 3 playing a playlist" }
+  playback.speed:       { type: int, description: "Playback speed, -100 to 100" }
+  playback.speed_range: { type: bool, description: "[SPEED RANGE] lit" }
+  in_point_set:         { type: bool, description: "An IN point is set" }
+  input:                { type: int, description: "1 LIVE IN 1, 2 LIVE IN 2, 3 PinP, 4 SPLIT" }
+  output:               { type: int, description: "0 replay video, 1 live in video" }
+  audio.level:          { type: int, unit: "0.1 dB", description: "Audio level, -800 to 100, or -801 for -INF" }
+  selected.playlist:    { type: int, description: "Playlist of the selected clip: 0 clip list, 1-8 palettes" }
+  selected.clip:        { type: int, description: "Number of the selected clip" }
+  cued.playlist:        { type: int, description: "Playlist of the cued-up clip: 0 clip list, 1-8 palettes" }
+  cued.clip:            { type: int, description: "Number of the cued-up clip" }
+  device.model:         { type: string, description: "Model name from VER" }
+  device.version:       { type: string, description: "Version from VER" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      LAN control needs MENU, LAN, Remote Control set to PC, and a user ID
+      (4-8 characters) and password (8-12 characters) set under User Account
+      (p.52-53). The session logs in with USR then PSS; ACK confirms each and
+      NAK (15H) refuses, which marks the device unauthorized. The manual gives
+      no prompt to wait for, and both steps are sent on connecting without
+      waiting for the first ACK (the Bitfocus module waits). The core does not
+      consume the two login ACKs, so they can be taken as the replies to the
+      first commands queued after connecting; for that reason this spec polls
+      nothing on a schedule.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The P-20HD closes the connection when no command arrives for five
+      minutes after authentication (p.53). The probe (ACS, active sensing) is
+      sent when the device has been silent for ten seconds, which keeps the
+      session open.
+
+  - models: [all]
+    severity: info
+    text: >
+      Operation commands are answered by ACK; the inquiry commands and VER are
+      answered by their data frame alone (p.78), and return its value. ERR:0
+      syntax error, ERR:4 invalid, ERR:5 out of range. Clip numbers are 1-512
+      in the clip list and 1-64 in a palette; the commands accept 1-512 and
+      the unit answers ERR:5 beyond a palette's range. EXT shuts the unit
+      down. XON/XOFF flow control is RS-232 only (p.78).

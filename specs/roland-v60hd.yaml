@@ -1,0 +1,477 @@
+spec: 1
+id: roland-v60hd
+name: Roland V-60HD (LAN control)
+vendor: Roland
+category: switcher
+
+# The V-60HD's LAN/RS-232 command set: "stx" + three letters + optional
+# ":" and comma-separated numbers + ";" (Reference Manual p.20). A command is
+# acknowledged by the single control byte ACK (06H) with no line ending, and
+# data replies end in ";" with no line ending either. The XS-62S uses the same
+# grammar with a different command list and is roland-xs62s.
+source:
+  - title: "V-60HD Reference Manual, Version 3.1 and later, edition 04 (© 2020, PDF dated 2022-04-11)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/V-60HD_reference_v31_eng04_W.pdf
+    note: >
+      Manufacturer document. RS-232/GPI menu, PANEL INFORMATION p.11; LAN
+      CONTROL menu p.13; LAN interface (Telnet, TCP 8023) and command format
+      (stx, ACK 06H, XON/XOFF) p.20; video commands p.21, audio commands p.22,
+      system commands, QPL, TLY, VER and ERR codes p.23.
+  - title: Bitfocus companion-module-roland-v60hd (MIT), src/utils.js
+    url: https://github.com/bitfocus/companion-module-roland-v60hd
+    note: >
+      Open code read for corroboration only: commands sent as STX + command +
+      ";" with no line ending, the acknowledgement a bare 06H byte at the end
+      of a reply, data replies split on ";".
+
+transport:
+  type: line-tcp
+  port: 8023
+  # Sent as STX, the command, then ";" (p.20), with no line ending.
+  framing: delimited
+  open: "\u0002"
+  close: ";"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Replies are delimited by ";" or are the bare ACK byte.
+  reply_framing: terminated
+  reply_terminators: [";", "\u0006"]
+  # A command's reply is ACK or ERR:n; (p.21-23). Data frames (QAL, QPL, TLY)
+  # come before their ACK and go to the telemetry rules only. VER is answered
+  # by its data frame alone (p.23).
+  reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;|VER:)'
+  probe: "ACS"
+
+models:
+  - id: v-60hd
+    name: Roland V-60HD Multi-Format Video Switcher
+    supports:
+      - select_pgm
+      - select_pst
+      - select_aux
+      - set_transition
+      - set_transition_time
+      - cut
+      - auto
+      - press_pinp1
+      - press_pinp2
+      - press_split
+      - press_dsk
+      - press_dsk_pvw
+      - press_auto_mixing
+      - press_output_fade
+      - set_pinp1_position
+      - set_pinp2_position
+      - set_split_position
+      - set_dsk_source
+      - set_dsk_level
+      - set_dsk_gain
+      - set_ch6_input
+      - set_sdi_out1_bus
+      - set_sdi_out2_bus
+      - set_hdmi_out1_bus
+      - set_hdmi_out2_bus
+      - set_input_level
+      - set_master_level
+      - set_aux_level
+      - set_input_delay
+      - get_audio_level
+      - press_input_mute
+      - press_input_solo
+      - set_hdcp
+      - set_test_pattern
+      - set_test_tone
+      - recall_memory
+      - get_panel_status
+      - get_tally
+      - active_sense
+      - get_version
+    verification: none
+    notes: >
+      Eight channels: 1-4 SDI IN, 5 HDMI IN, 6 HDMI/RGB IN, 7-8 STILL/BKG.
+      Commands from Reference Manual version 3.1.
+
+commands:
+  # ── Video (Reference Manual p.21)
+  select_pgm:
+    summary: "Select the final output (PGM) channel 1-8: 1-4 SDI IN, 5 HDMI IN, 6 HDMI/RGB IN, 7-8 STILL/BKG (PGM)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "PGM:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_pst:
+    summary: "Select the preset (PST) channel 1-8 (PST)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "PST:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_aux:
+    summary: "Select the channel sent to the AUX bus, 1-8 (AUX)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "AUX:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_transition:
+    summary: "Select the transition effect: 0 MIX, 1 WIPE 1, 2 WIPE 2 (TRS)"
+    params:
+      effect: { type: int, min: 0, max: 2, required: true }
+    send: "TRS:{effect}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set the video transition time, 0-40 tenths of a second (TIM)"
+    params:
+      time: { type: int, min: 0, max: 40, required: true }
+    send: "TIM:{time}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  cut:
+    summary: "Press the [CUT] button (CUT)"
+    send: "CUT"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  auto:
+    summary: "Press the [AUTO] button (ATO)"
+    send: "ATO"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_pinp1:
+    summary: "Press the [PinP 1] button (P1S)"
+    send: "P1S"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_pinp2:
+    summary: "Press the [PinP 2] button (P2S)"
+    send: "P2S"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_split:
+    summary: "Press the [SPLIT] button (SPS)"
+    send: "SPS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_dsk:
+    summary: "Press the [DSK] button (DSK)"
+    send: "DSK"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_dsk_pvw:
+    summary: "Press the DSK [PVW] button (DVW)"
+    send: "DVW"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_auto_mixing:
+    summary: "Press the [AUTO MIXING] button (ATM)"
+    send: "ATM"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_output_fade:
+    summary: "Press the [OUTPUT FADE] button (FDE)"
+    send: "FDE"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_pinp1_position:
+    summary: "Position the [PinP 1] inset: horizontal -450 to 450, vertical -400 to 400 (PP1)"
+    params:
+      h: { type: int, min: -450, max: 450, required: true }
+      v: { type: int, min: -400, max: 400, required: true }
+    send: "PP1:{h},{v}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_pinp2_position:
+    summary: "Position the [PinP 2] inset: horizontal -450 to 450, vertical -400 to 400 (PP2)"
+    params:
+      h: { type: int, min: -450, max: 450, required: true }
+      v: { type: int, min: -400, max: 400, required: true }
+    send: "PP2:{h},{v}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_split_position:
+    summary: "Split positions of the PGM and PST video, -250 to 250 each; horizontal for V-CENTER, vertical for H-CENTER (SPT)"
+    params:
+      pgm: { type: int, min: -250, max: 250, required: true }
+      pst: { type: int, min: -250, max: 250, required: true }
+    send: "SPT:{pgm},{pst}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_source:
+    summary: "Set the DSK logo or image channel, 1-8 (DSS)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "DSS:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_level:
+    summary: "Set the DSK key level, 0-255 (KYL)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "KYL:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_gain:
+    summary: "Set the DSK key gain, 0-255 (KYG)"
+    params:
+      gain: { type: int, min: 0, max: 255, required: true }
+    send: "KYG:{gain}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_ch6_input:
+    summary: "Select the channel 6 input connector: false HDMI, true RGB/COMPONENT (IPS)"
+    params:
+      rgb: { type: bool, required: true }
+    send: "IPS:{rgb:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_sdi_out1_bus:
+    summary: "Assign SDI OUT 1: 0 PGM, 1 PVW, 2 AUX (OS1)"
+    params:
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "OS1:{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_sdi_out2_bus:
+    summary: "Assign SDI OUT 2: 0 PGM, 1 PVW, 2 AUX (OS2)"
+    params:
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "OS2:{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_hdmi_out1_bus:
+    summary: "Assign HDMI OUT 1: 0 PGM, 1 PVW, 2 AUX (OH1)"
+    params:
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "OH1:{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_hdmi_out2_bus:
+    summary: "Assign HDMI OUT 2: 0 PGM, 1 PVW, 2 AUX (OH2)"
+    params:
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "OH2:{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  # ── Audio (p.22)
+  set_input_level:
+    summary: "Set an input audio level; inputs 0 AUDIO IN 1, 1 AUDIO IN 2, 2 AUDIO IN 3, 3 AUDIO IN 4, 4 AUDIO IN 5/6, 5-8 SDI IN 1-4, 9 HDMI IN 5, 10 HDMI IN 6; level -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (IAL)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "IAL:{input},{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_master_level:
+    summary: "Set the master out level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (OAL)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OAL:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_aux_level:
+    summary: "Set the AUX bus audio level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (OAX)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OAX:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_input_delay:
+    summary: "Set an input audio delay; inputs 0-4 (AUDIO IN 1-4, 5/6); 0-120 (0.0-12.0 frames) (ADT)"
+    params:
+      input: { type: int, min: 0, max: 4, required: true }
+      delay: { type: int, min: 0, max: 120, required: true }
+    send: "ADT:{input},{delay}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_audio_level:
+    summary: "Ask for a volume level; 0-10 inputs as IAL, 11 and 12 the AUX bus and master (the manual lists both orders), 13 all (QAL)"
+    params:
+      channel: { type: int, min: 0, max: 13, required: true }
+    send: "QAL:{channel}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_input_mute:
+    summary: "Press an input audio mute; inputs 0 AUDIO IN 1, 1 AUDIO IN 2, 2 AUDIO IN 3, 3 AUDIO IN 4, 4 AUDIO IN 5/6, 5-8 SDI IN 1-4, 9 HDMI IN 5, 10 HDMI IN 6 (IAM)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+    send: "IAM:{input}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  press_input_solo:
+    summary: "Press an input audio solo; inputs 0 AUDIO IN 1, 1 AUDIO IN 2, 2 AUDIO IN 3, 3 AUDIO IN 4, 4 AUDIO IN 5/6, 5-8 SDI IN 1-4, 9 HDMI IN 5, 10 HDMI IN 6 (IAS)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+    send: "IAS:{input}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  # ── System (p.23)
+  set_hdcp:
+    summary: "Set HDCP on or off (HCP)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "HCP:{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_test_pattern:
+    summary: "Set the test pattern: 0 OFF, 1 75% COLOR BAR, 2 100% COLOR BAR, 3 RAMP, 4 STEP, 5 HATCH (TPT)"
+    params:
+      pattern: { type: int, min: 0, max: 5, required: true }
+    send: "TPT:{pattern}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_test_tone:
+    summary: "Set the test tone: 0 OFF, 1-3 -20/-10/0 dB at 1 kHz, 4-6 -20/-10/0 dB at 400 Hz (TTN)"
+    params:
+      tone: { type: int, min: 0, max: 6, required: true }
+    send: "TTN:{tone}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  recall_memory:
+    summary: "Call up preset memory 1-8 (MEM)"
+    params:
+      memory: { type: int, min: 1, max: 8, required: true }
+    send: "MEM:{memory:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_panel_status:
+    summary: "Ask for panel status: 0 PGM, 1 PST, 2 AUX, 3 PinP/SPLIT, 4 DSK, 5 OUTPUT FADE, 6 video fade level, 7 all (QPL)"
+    params:
+      item: { type: int, min: 0, max: 7, required: true }
+    send: "QPL:{item}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_tally:
+    summary: "Cross-point status of channels 1-8: 0 dark, 1 red, 2 green (TLY)"
+    send: "TLY"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  active_sense:
+    summary: "Check the switcher is responding (ACS)"
+    send: "ACS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version; answered by the VER frame alone (VER)"
+    send: "VER"
+    expect: { matches: '^[\x02\x11\x13]*VER:[^,;]*,([^;]+);' }
+    returns: value
+
+telemetry:
+  # With PANEL INFORMATION on (menu RS-232/GPI, p.11), the switcher sends
+  # QPL with every value whenever the panel changes. The manual names the
+  # RS-232 connector for this, so the full status is also asked every second.
+  subscribe:
+    send: ["VER"]
+  poll:
+    send: ["QPL:7", "TLY"]
+    every_ms: 1000
+  updates:
+    - match: '^[\x02\x11\x13]*QPL:(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+);'
+      state:
+        "program.xpt": "{1:+1}"
+        "preview.xpt": "{2:+1}"
+        "aux.xpt": "{3:+1}"
+        "composition": "{4}"
+        "dsk": { value: "{5}", map: { "1": true, "0": false } }
+        "output_fade": { value: "{6}", map: { "1": true, "0": false } }
+        "fader.level": "{7}"
+    - match: '^[\x02\x11\x13]*TLY:([0-9, ]+);'
+      state: { "tally": "{1}" }
+    - match: '^[\x02\x11\x13]*QAL:(-?\d+(?:, ?-?\d+){12});'
+      state: { "audio.levels": "{1}" }
+    - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  program.xpt:   { type: int, description: "Final output (PGM/A bus) channel, 1-8" }
+  preview.xpt:   { type: int, description: "Preset (PST/B bus) channel, 1-8" }
+  aux.xpt:       { type: int, description: "AUX bus channel, 1-8" }
+  composition:   { type: int, description: "0 off, 1 [PinP 1], 2 [PinP 2], 3 [SPLIT]" }
+  dsk:           { type: bool, description: "[DSK] on" }
+  output_fade:   { type: bool, description: "[OUTPUT FADE] lit" }
+  fader.level:   { type: int, description: "Video fade level, 0-2047" }
+  tally:         { type: string, description: "Cross-point status of channels 1-8, comma-separated: 0 dark, 1 red, 2 green" }
+  audio.levels:  { type: string, unit: "0.1 dB", description: "Every volume level from QAL:13, comma-separated in the manual's order (-801 is -INF)" }
+  device.model:  { type: string, description: "Model name from VER" }
+  device.version: { type: string, description: "Version from VER" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for ACK after each command before sending the next (p.21); the
+      queue does this. ACK is the single byte 06H with no line ending, and
+      data replies end in ";" with no line ending, both handled by the reply
+      terminators. A query's data frame (QAL, QPL, TLY) comes before its ACK,
+      so those queries return ack and their values are in state. QPL and QAL
+      for one item answer a bare value that does not say which item it is,
+      so only the all-items forms (QPL:7, QAL:13) reach state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire numbers are 0-based; cross-points 1-8 and memories 1-8 here are
+      converted. ERR:0 syntax error, ERR:4 invalid (controlled by another
+      setting), ERR:5 out of range. XON (11H) and XOFF (13H) flow control may
+      appear before a frame. VER is not followed by ACK (p.23).
+
+  - models: [all]
+    severity: info
+    text: >
+      The manual is inconsistent about QAL: the parameter list gives 11 MASTER
+      OUT, 12 AUX and 12 ALL, the reply list 11 AUX, 12 MASTER OUT and 13 all;
+      its examples print "stxQAL:stxQPL:0,1,0,1,1,0;" for QPL and "TLY:1, 2,
+      0, ..." with spaces. The P1S, P2S, SPS, DSK, DVW, ATM, FDE, IAM and IAS
+      commands press a button (toggle); there is no command to set them to a
+      given state. The audio delay is in tenths of a frame.
+
+  - models: [all]
+    severity: info
+    text: >
+      PANEL INFORMATION (menu RS-232/GPI, p.11) makes the switcher send the
+      QPL all-items frame on every panel change; the manual describes it for
+      the RS-232 connector, and the XS-62S manual for both RS-232 and LAN.
+      Whether the V-60HD also sends it over LAN is not stated, so the status
+      is polled as well. No password protects the LAN port.

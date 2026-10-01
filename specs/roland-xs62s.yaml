@@ -1,0 +1,610 @@
+spec: 1
+id: roland-xs62s
+name: Roland XS-62S (LAN control)
+vendor: Roland
+category: switcher
+
+# The XS-62S's LAN/RS-232 command set: the same grammar as the V-60HD
+# (roland-v60hd), "stx" + three letters + optional ":" arguments + ";",
+# acknowledged by the single byte ACK (06H), with a different command list.
+source:
+  - title: "XS-62S Reference Manual, Version 3.1 and later, edition 02 (PDF dated 2022-04-08)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/XS-62S_reference_v31_eng02_W.pdf
+    note: >
+      Manufacturer document. RS-232/GPIO menu and RS-232 PNL INFO p.14; LAN
+      interface (Telnet, TCP 8023) and command format p.26; video commands
+      p.27-28, audio commands p.28-29, system commands, QPL, TLY, VER and ERR
+      codes p.29; commands by operation mode (PGM-PST, DISSOLVE, MATRIX) p.30.
+
+transport:
+  type: line-tcp
+  port: 8023
+  # Sent as STX, the command, then ";" (p.26), with no line ending.
+  framing: delimited
+  open: "\u0002"
+  close: ";"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  reply_framing: terminated
+  reply_terminators: [";", "\u0006"]
+  # A command's reply is ACK or ERR:n; (p.27-29). Data frames, VER's
+  # included, come before their ACK and go to the telemetry rules only.
+  reply_match: '^[\x02\x11\x13]*(\x06|ERR:[0-9]+;)'
+  probe: "ACS"
+
+models:
+  - id: xs-62s
+    name: Roland XS-62S Multi-Format AV Mixer
+    supports:
+      - select_pgm
+      - select_pst
+      - select_aux
+      - set_transition
+      - set_transition_time
+      - cut
+      - take
+      - set_pinp
+      - set_split
+      - set_dsk
+      - set_dsk_preview
+      - set_auto_mixing
+      - set_freeze
+      - get_bus_channel
+      - set_edid
+      - set_input_scaling
+      - set_scaler_resolution
+      - get_scaler_resolution
+      - set_scaler_scaling
+      - set_hdmi_color_space
+      - set_hdmi_signal
+      - set_pinp_position
+      - set_split_position
+      - set_dsk_source
+      - set_dsk_level
+      - set_dsk_gain
+      - set_ch6_input
+      - get_ch6_input
+      - set_output_bus
+      - get_output_bus
+      - set_pgm_input_level
+      - set_pvw_input_level
+      - set_master_level
+      - set_pvw_level
+      - set_aux_level
+      - set_input_delay
+      - get_audio_level
+      - set_audio_output_bus
+      - get_audio_output_bus
+      - set_input_mute
+      - set_input_solo
+      - set_hdcp
+      - set_test_pattern
+      - set_test_tone
+      - recall_memory
+      - get_panel_status
+      - pulse_gpo
+      - set_gpo
+      - set_mode
+      - camera_recall
+      - get_tally
+      - get_version
+      - active_sense
+    verification: none
+    notes: >
+      Eight channels: 1-4 SDI IN, 5 HDMI IN, 6 HDMI/ANLG IN, 7-8 STILL/BKG.
+      Commands from Reference Manual version 3.1.
+
+commands:
+  # ── Video (Reference Manual p.27-28)
+  select_pgm:
+    summary: "Select the PGM/1 channel 1-8: 1-4 SDI IN, 5 HDMI IN, 6 HDMI/ANLG IN, 7-8 STL/BKG (PGM)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "PGM:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_pst:
+    summary: "Select the PVW/2 channel 1-8; ERR:4 in DISSOLVE mode (PST)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "PST:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  select_aux:
+    summary: "Select the AUX/3 channel 1-8 (AUX)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "AUX:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_transition:
+    summary: "Select the transition effect: 0 MIX, 1 MIX, 2 WIPE, as printed (TRS)"
+    params:
+      effect: { type: int, min: 0, max: 2, required: true }
+    send: "TRS:{effect}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set the video transition time, 0-40 tenths of a second (TIM)"
+    params:
+      time: { type: int, min: 0, max: 40, required: true }
+    send: "TIM:{time}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  cut:
+    summary: "Cut transition; PGM-PST mode only (CUT)"
+    send: "CUT"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  take:
+    summary: "Press the [TAKE] button; PGM-PST mode only (TAK)"
+    send: "TAK"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_pinp:
+    summary: "Set [PinP]: 0 OFF, 1 PVW ON, 2 PGM ON (PPS)"
+    params:
+      state: { type: int, min: 0, max: 2, required: true }
+    send: "PPS:{state}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_split:
+    summary: "Set SPLIT: 0 OFF, 1 PVW ON, 2 PGM ON (SPS)"
+    params:
+      state: { type: int, min: 0, max: 2, required: true }
+    send: "SPS:{state}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk:
+    summary: "Set DSK on or off (DSK)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "DSK:{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_preview:
+    summary: "Preview the DSK result on the multi-view, on or off (DVW)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "DVW:{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_auto_mixing:
+    summary: "Set the [AUTO MIXING] button on or off (ATM)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "ATM:{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_freeze:
+    summary: "Set the [FREEZE] button on or off (FRZ)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "FRZ:{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_bus_channel:
+    summary: "Ask which channel a bus carries: 0 PGM/1, 1 PVW/2, 2 AUX/3 (QVC)"
+    params:
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "QVC:{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_edid:
+    summary: "Set the EDID of 0 HDMI IN 5, 1 HDMI IN 6 or 2 RGB IN 6: 0 INTERNAL, 1 SVGA, 2 XGA, 3 WXGA, 4 FWXGA, 5 SXGA, 6 SXGA+, 7 UXGA, 8 WUXGA, 9 720p, 10 1080i, 11 1080p (0-8 for RGB) (EDD)"
+    params:
+      input: { type: int, min: 0, max: 2, required: true }
+      edid: { type: int, min: 0, max: 11, required: true }
+    send: "EDD:{input},{edid}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_input_scaling:
+    summary: "Set the scaling of 0 HDMI IN 5, 1 HDMI IN 6 or 2 RGB IN 6: 0 FULL, 1 LETTERBOX, 2 CROP, 3 DOT BY DOT, 4 MANUAL (VIA)"
+    params:
+      input: { type: int, min: 0, max: 2, required: true }
+      type: { type: int, min: 0, max: 4, required: true }
+    send: "VIA:{input},{type}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_scaler_resolution:
+    summary: "Set the scaler out resolution: 0 480p/576p, 1 720p, 2 1080p, 3 SVGA, 4 XGA, 5 WXGA, 6 SXGA, 7 FWXGA, 8 SXGA+, 9 UXGA, 10 WUXGA (VOR)"
+    params:
+      resolution: { type: int, min: 0, max: 10, required: true }
+    send: "VOR:{resolution}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_scaler_resolution:
+    summary: "Ask for the scaler out resolution (QVR)"
+    send: "QVR"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_scaler_scaling:
+    summary: "Set the scaler out scaling: 0 FULL, 1 LETTERBOX, 2 CROP, 3 DOT BY DOT, 4 MANUAL (VOA)"
+    params:
+      type: { type: int, min: 0, max: 4, required: true }
+    send: "VOA:{type}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_hdmi_color_space:
+    summary: "Set the color space of HDMI OUT 1-3 (0-2): 0 YCC, 1 RGB LMT, 2 RGB FULL (VOC)"
+    params:
+      output: { type: int, min: 0, max: 2, required: true }
+      space: { type: int, min: 0, max: 2, required: true }
+    send: "VOC:{output},{space}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_hdmi_signal:
+    summary: "Set the signal of HDMI OUT 1-3 (0-2): false DVI-D, true HDMI (VOD)"
+    params:
+      output: { type: int, min: 0, max: 2, required: true }
+      hdmi: { type: bool, required: true }
+    send: "VOD:{output},{hdmi:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_pinp_position:
+    summary: "Position the PinP inset: horizontal -450 to 450, vertical -400 to 400 (PIP)"
+    params:
+      h: { type: int, min: -450, max: 450, required: true }
+      v: { type: int, min: -400, max: 400, required: true }
+    send: "PIP:{h},{v}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_split_position:
+    summary: "Split positions of the PGM and PVW video, -250 to 250 each (SPT)"
+    params:
+      pgm: { type: int, min: -250, max: 250, required: true }
+      pst: { type: int, min: -250, max: 250, required: true }
+    send: "SPT:{pgm},{pst}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_source:
+    summary: "Set the DSK logo or image channel, 1-8 (DSS)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "DSS:{xpt:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_level:
+    summary: "Set the DSK key level, 0-255 (KYL)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "KYL:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_dsk_gain:
+    summary: "Set the DSK key gain, 0-255 (KYG)"
+    params:
+      gain: { type: int, min: 0, max: 255, required: true }
+    send: "KYG:{gain}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_ch6_input:
+    summary: "Select the channel 6 input connector: false HDMI, true RGB/COMPONENT (IPS)"
+    params:
+      rgb: { type: bool, required: true }
+    send: "IPS:{rgb:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_ch6_input:
+    summary: "Ask for the channel 6 input connector: 0 HDMI, 1 RGB/COMPONENT, 2 COMPOSITE (QIP)"
+    send: "QIP"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_output_bus:
+    summary: "Set the bus of the video output connector: 0 PGM, 1 PVW, 2 AUX; the manual names no connector (VOS)"
+    params:
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "VOS:{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_output_bus:
+    summary: "Ask for the bus of an output: 0 SDI OUT 1, 1 SDI OUT 2, 2-4 HDMI OUT 1-3 (QVS)"
+    params:
+      output: { type: int, min: 0, max: 4, required: true }
+    send: "QVS:{output}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  # ── Audio (p.28-29)
+  set_pgm_input_level:
+    summary: "Set an input level of the PGM/1 bus audio; inputs 0 AUDIO IN 1, 1 AUDIO IN 2, 2 AUDIO IN 3, 3 AUDIO IN 4, 4 AUDIO IN 5/6, 5-8 SDI IN 1-4, 9 HDMI IN 5, 10 HDMI IN 6; level -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (IL1)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "IL1:{input},{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_pvw_input_level:
+    summary: "Set an input level of the PVW/2 bus audio; inputs as IL1; level -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (IL2)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "IL2:{input},{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_master_level:
+    summary: "Set the master out level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (OL1)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OL1:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_pvw_level:
+    summary: "Set the PVW/2 bus output level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (OL2)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OL2:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_aux_level:
+    summary: "Set the AUX/3 bus output level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (OL3)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OL3:{level}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_input_delay:
+    summary: "Set an input audio delay; inputs 0-4; 0-120 (0.0-12.0 frames) (ADT)"
+    params:
+      input: { type: int, min: 0, max: 4, required: true }
+      delay: { type: int, min: 0, max: 120, required: true }
+    send: "ADT:{input},{delay}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_audio_level:
+    summary: "Ask for a volume level: 0-10 inputs, 11 MASTER OUT, 12 PVW/2, 13 AUX/3, 14 all (QAL)"
+    params:
+      channel: { type: int, min: 0, max: 14, required: true }
+    send: "QAL:{channel}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_audio_output_bus:
+    summary: "Assign 0 AUDIO OUT XLR, 1 AUDIO OUT RCA or 2 PHONES to 0 PGM/1, 1 PVW/2 or 2 AUX/3 (AOS)"
+    params:
+      output: { type: int, min: 0, max: 2, required: true }
+      bus: { type: int, min: 0, max: 2, required: true }
+    send: "AOS:{output},{bus}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_audio_output_bus:
+    summary: "Ask for the bus of an audio output, 0-2 (QAS)"
+    params:
+      output: { type: int, min: 0, max: 2, required: true }
+    send: "QAS:{output}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_input_mute:
+    summary: "Set an input audio mute; inputs 0 AUDIO IN 1, 1 AUDIO IN 2, 2 AUDIO IN 3, 3 AUDIO IN 4, 4 AUDIO IN 5/6, 5-8 SDI IN 1-4, 9 HDMI IN 5, 10 HDMI IN 6 (IAM)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+      enabled: { type: bool, required: true }
+    send: "IAM:{input},{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_input_solo:
+    summary: "Set an input audio solo; inputs 0 AUDIO IN 1, 1 AUDIO IN 2, 2 AUDIO IN 3, 3 AUDIO IN 4, 4 AUDIO IN 5/6, 5-8 SDI IN 1-4, 9 HDMI IN 5, 10 HDMI IN 6 (IAS)"
+    params:
+      input: { type: int, min: 0, max: 10, required: true }
+      enabled: { type: bool, required: true }
+    send: "IAS:{input},{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  # ── System (p.29)
+  set_hdcp:
+    summary: "Set HDCP on or off (HCP)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "HCP:{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_test_pattern:
+    summary: "Set the test pattern: 0 OFF, 1 75% COLOR BAR, 2 100% COLOR BAR, 3 RAMP, 4 STEP, 5 HATCH (TPT)"
+    params:
+      pattern: { type: int, min: 0, max: 5, required: true }
+    send: "TPT:{pattern}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_test_tone:
+    summary: "Set the test tone: 0 OFF, 1-3 -20/-10/0 dB at 1 kHz, 4-6 -20/-10/0 dB at 400 Hz (TTN)"
+    params:
+      tone: { type: int, min: 0, max: 6, required: true }
+    send: "TTN:{tone}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  recall_memory:
+    summary: "Call up preset memory 1-8 (MEM)"
+    params:
+      memory: { type: int, min: 1, max: 8, required: true }
+    send: "MEM:{memory:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_panel_status:
+    summary: "Ask for panel status: 0 PGM/1, 1 PVW/2, 2 AUX/3, 3 PinP/SPLIT, 4 DSK, 5 FREEZE, 6 video fade level, 7 all (QPL)"
+    params:
+      item: { type: int, min: 0, max: 7, required: true }
+    send: "QPL:{item}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  pulse_gpo:
+    summary: "Output GPO 1-4 when its GPO TYPE is ONE SHOT (GPO:a,1)"
+    params:
+      gpo: { type: int, min: 1, max: 4, required: true }
+    send: "GPO:{gpo:-1},1"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_gpo:
+    summary: "Set GPO 1-4 on or off when its GPO TYPE is ALT (GPO:a,b)"
+    params:
+      gpo: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "GPO:{gpo:-1},{enabled:bool01}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  set_mode:
+    summary: "Set the video transition mode: 0 PGM-PST, 1 DISSOLVE, 2 MATRIX (MOD)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "MOD:{mode}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  camera_recall:
+    summary: "Recall memory 1-8 on camera ID 0-6 (CAM)"
+    params:
+      camera: { type: int, min: 0, max: 6, required: true }
+      memory: { type: int, min: 1, max: 8, required: true }
+    send: "CAM:{camera},{memory:-1}"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_tally:
+    summary: "Cross-point status of channels 1-8: 0 dark, 1 red, 2 green (TLY)"
+    send: "TLY"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  get_version:
+    summary: "Version; the reply is followed by ACK (VER)"
+    send: "VER"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+  active_sense:
+    summary: "Check the switcher is responding (ACS)"
+    send: "ACS"
+    expect: { contains: "\u0006" }
+    returns: ack
+
+telemetry:
+  # With RS-232 PNL INFO on (menu RS-232/GPIO, p.14) the mixer sends the QPL
+  # all-items frame from the RS-232 and CONTROL (LAN) connectors whenever the
+  # cross-point or other status changes. The status is also asked every
+  # second, for installations that leave it off.
+  subscribe:
+    send: ["VER"]
+  poll:
+    send: ["QPL:7", "TLY"]
+    every_ms: 1000
+  updates:
+    - match: '^[\x02\x11\x13]*QPL:(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+);'
+      state:
+        "program.xpt": "{1:+1}"
+        "preview.xpt": "{2:+1}"
+        "aux.xpt": "{3:+1}"
+        "composition": "{4}"
+        "dsk": { value: "{5}", map: { "1": true, "0": false } }
+        "freeze": { value: "{6}", map: { "1": true, "0": false } }
+        "fader.level": "{7}"
+    - match: '^[\x02\x11\x13]*QVC:([0-2]),(\d+);'
+      state: { "buses.{1:+1}.xpt": "{2:+1}" }
+    - match: '^[\x02\x11\x13]*QVR:(\d+);'
+      state: { "scaler.resolution": "{1}" }
+    - match: '^[\x02\x11\x13]*QIP:(\d+);'
+      state: { "ch6_input": "{1}" }
+    - match: '^[\x02\x11\x13]*QVS:(\d+),(\d+);'
+      state: { "video_outputs.{1}.bus": "{2}" }
+    - match: '^[\x02\x11\x13]*QAS:(\d+),(\d+);'
+      state: { "audio_outputs.{1}.bus": "{2}" }
+    - match: '^[\x02\x11\x13]*TLY:([0-9, ]+);'
+      state: { "tally": "{1}" }
+    - match: '^[\x02\x11\x13]*QAL:(-?\d+(?:, ?-?\d+){13});'
+      state: { "audio.levels": "{1}" }
+    - match: '^[\x02\x11\x13]*VER:([^,;]*),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  program.xpt:         { type: int, description: "PGM/1 channel, 1-8" }
+  preview.xpt:         { type: int, description: "PVW/2 channel, 1-8" }
+  aux.xpt:             { type: int, description: "AUX/3 channel, 1-8" }
+  composition:         { type: int, description: "0 off, 1 [PinP], 2 [SPLIT]" }
+  dsk:                 { type: bool, description: "[DSK] on" }
+  freeze:              { type: bool, description: "[FREEZE] on" }
+  fader.level:         { type: int, description: "Video fade level, 0-2047" }
+  buses.*.xpt:         { type: int, description: "Channel 1-8 on a bus from QVC: bus 1 PGM/1, 2 PVW/2, 3 AUX/3" }
+  scaler.resolution:   { type: int, description: "Scaler out resolution code, as set_scaler_resolution" }
+  ch6_input:           { type: int, description: "Channel 6 input: 0 HDMI, 1 RGB/COMPONENT, 2 COMPOSITE" }
+  video_outputs.*.bus: { type: int, description: "Bus of an output, keyed by wire index (0 SDI OUT 1, 1 SDI OUT 2, 2-4 HDMI OUT 1-3): 0 PGM, 1 PVW, 2 AUX, 3 MULTI-VIEW" }
+  audio_outputs.*.bus: { type: int, description: "Bus of an audio output, keyed by wire index (0 XLR, 1 RCA, 2 PHONES): 0 PGM/1, 1 PVW/2, 2 AUX/3" }
+  tally:               { type: string, description: "Cross-point status of channels 1-8, comma-separated: 0 dark, 1 red, 2 green" }
+  audio.levels:        { type: string, unit: "0.1 dB", description: "Every volume level from QAL:14, comma-separated: inputs 0-10, MASTER OUT, PVW/2, AUX/3 (-801 is -INF)" }
+  device.model:        { type: string, description: "Model field of VER (printed empty in the manual)" }
+  device.version:      { type: string, description: "Version from VER" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for ACK after each command before sending the next (p.27); the
+      queue does this. ACK is the single byte 06H with no line ending and data
+      replies end in ";" with no line ending. A query's data frame comes
+      before its ACK, so queries return ack and their values are in state.
+      QPL and QAL for one item answer a bare value that does not say which
+      item it is, so only the all-items forms (QPL:7, QAL:14) reach state.
+
+  - models: [all]
+    severity: warning
+    text: >
+      What works depends on the operation mode (set_mode, p.30): in DISSOLVE
+      mode PST, CUT and TAK answer ERR:4; in MATRIX mode CUT, TAK, PPS, SPS,
+      DSK and DVW answer ERR:4 and switching is by fade to black.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire numbers are 0-based; cross-points, memories and GPOs here are
+      converted. ERR:0 syntax error, ERR:4 invalid, ERR:5 out of range. The
+      manual leaves some forms open: VOS takes only the bus (0 PGM, 1 PVW,
+      2 AUX) and names no output connector, although QVS asks per connector;
+      IL2 is printed "stxIL2:a;" while listing both a and b, and is sent here
+      with both, as IL1; TRS lists 0 and 1 both as MIX; VER is printed
+      "stxVER:,a;" with an empty model field. No password protects the LAN
+      port.

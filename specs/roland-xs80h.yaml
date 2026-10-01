@@ -1,0 +1,559 @@
+spec: 1
+id: roland-xs80h
+name: Roland XS-82H / XS-83H / XS-84H (LAN control)
+vendor: Roland
+category: router
+
+# The XS-82H/83H/84H matrix switchers' command set: three upper-case letters,
+# optional ":" and comma-separated numbers, then ";" (Reference Manual p.21).
+# Over LAN a CR follows the ";". Replies are "ACK;", "ERR:n;" or a status
+# frame, ended by ";" with no line ending documented.
+source:
+  - title: "XS-82H / XS-83H / XS-84H Reference Manual, Version 3.00 and later, edition 03 (PDF dated 2021-08-19)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/zip/XS-82H_83H_84H_reference_v30_eng03_W.pdf
+    note: >
+      Manufacturer document (the PDF itself states "Version 3.15 and later").
+      Command overview, ";" CR terminator, RS-232C settings and LAN control
+      (TCP 8023) p.21; received commands p.22-23; sent commands (ACK, ERR,
+      ITS, OTS, CTS, KLS, VER) p.24.
+
+transport:
+  type: line-tcp
+  port: 8023
+  # Commands carry their ";"; a CR follows over LAN (p.21: "When using
+  # RS-232C, no CR is required").
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  reply_framing: terminated
+  reply_terminators: [";"]
+  # Every frame the unit sends answers a command (p.24): ACK, ERR, or the
+  # status frame of ITS, OTS, CTS, KLS or VER.
+  reply_match: '^[\x02\x11\x13]*(ACK;|ERR:[0-9]+;|ITS:|OTS:|CTS:|KLS:|VER:)'
+  probe: "ACS;"
+
+models:
+  - id: xs-82h
+    name: Roland XS-82H Multi-Format AV Matrix Switcher
+    supports:
+      - set_input_type
+      - set_input_color_space
+      - set_input_hdcp
+      - set_input_aspect
+      - set_output_select
+      - set_output_resolution
+      - set_output_hdcp
+      - set_output_color_space
+      - set_output_signal
+      - route_av
+      - route_video
+      - route_audio
+      - set_output_off
+      - set_hdmi_input_level
+      - set_analog_input_level
+      - set_output_level
+      - set_hdmi_input_mute
+      - set_analog_input_mute
+      - set_output_mute
+      - set_output_delay
+      - set_mode
+      - recall_preset
+      - get_input_status
+      - get_output_status
+      - get_crosspoint
+      - auto_take
+      - set_output1_send
+      - set_output2_send
+      - set_output3_send
+      - set_output4_send
+      - set_rgb_edid
+      - set_hdmi_edid
+      - set_panel_lock
+      - set_key_lock_mode
+      - get_key_lock
+      - get_version
+      - active_sense
+    verification: none
+    notes: >
+      Eight inputs and 2 outputs; the manual writes the output ranges for four.
+  - id: xs-83h
+    name: Roland XS-83H Multi-Format AV Matrix Switcher
+    supports:
+      - set_input_type
+      - set_input_color_space
+      - set_input_hdcp
+      - set_input_aspect
+      - set_output_select
+      - set_output_resolution
+      - set_output_hdcp
+      - set_output_color_space
+      - set_output_signal
+      - route_av
+      - route_video
+      - route_audio
+      - set_output_off
+      - set_hdmi_input_level
+      - set_analog_input_level
+      - set_output_level
+      - set_hdmi_input_mute
+      - set_analog_input_mute
+      - set_output_mute
+      - set_output_delay
+      - set_mode
+      - recall_preset
+      - get_input_status
+      - get_output_status
+      - get_crosspoint
+      - auto_take
+      - set_output1_send
+      - set_output2_send
+      - set_output3_send
+      - set_output4_send
+      - set_rgb_edid
+      - set_hdmi_edid
+      - set_panel_lock
+      - set_key_lock_mode
+      - get_key_lock
+      - get_version
+      - active_sense
+    verification: none
+    notes: >
+      Eight inputs and 3 outputs; the manual writes the output ranges for four.
+  - id: xs-84h
+    name: Roland XS-84H Multi-Format AV Matrix Switcher
+    supports:
+      - set_input_type
+      - set_input_color_space
+      - set_input_hdcp
+      - set_input_aspect
+      - set_output_select
+      - set_output_resolution
+      - set_output_hdcp
+      - set_output_color_space
+      - set_output_signal
+      - route_av
+      - route_video
+      - route_audio
+      - set_output_off
+      - set_hdmi_input_level
+      - set_analog_input_level
+      - set_output_level
+      - set_hdmi_input_mute
+      - set_analog_input_mute
+      - set_output_mute
+      - set_output_delay
+      - set_mode
+      - recall_preset
+      - get_input_status
+      - get_output_status
+      - get_crosspoint
+      - auto_take
+      - set_output1_send
+      - set_output2_send
+      - set_output3_send
+      - set_output4_send
+      - set_rgb_edid
+      - set_hdmi_edid
+      - set_panel_lock
+      - set_key_lock_mode
+      - get_key_lock
+      - get_version
+      - active_sense
+    verification: none
+    notes: >
+      Eight inputs and 4 outputs; the manual writes the output ranges for four.
+
+commands:
+  set_input_type:
+    summary: "Select the type of input channel 1-8: 0 HDMI, 1 RGB/COMPONENT, 2 COMPOSITE, 3 YC, 4-7 STILL1-4, 8 SHARE (VIS)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      type: { type: int, min: 0, max: 8, required: true }
+    send: "VIS:{input:-1},{type};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_color_space:
+    summary: "Select the color space of input channel 1-8: 0 Auto, 1 RGB (0-255), 2 RGB (16-235), 3 YCC (SD), 4 YCC (HD) (VIC)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      space: { type: int, min: 0, max: 4, required: true }
+    send: "VIC:{input:-1},{space};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_hdcp:
+    summary: "Enable or disable HDCP on input channel 1-8 (VIH)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, required: true }
+    send: "VIH:{input:-1},{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_aspect:
+    summary: "Set the aspect of input channel 1-8: 0 Full, 1 Letterbox, 2 Crop, 3 Dot by Dot, 4 Manual (VIA)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      aspect: { type: int, min: 0, max: 4, required: true }
+    send: "VIA:{input:-1},{aspect};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_select:
+    summary: "OUTPUT SELECT of output channel 1-4: 0 Auto, 1 HDMI, 2 HDBaseT (VOS)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      select: { type: int, min: 0, max: 2, required: true }
+    send: "VOS:{output:-1},{select};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_resolution:
+    summary: "Output resolution of output channel 1-4: 0 480i 4:3/576i 4:3, 1 480i 16:9/576i 16:9, 2 480p 4:3/576p 4:3, 3 480p 16:9/576p 16:9, 4 720/59.94P, 5 1080/59.94i, 6 1080/59.94P, 7 640x480, 8 800x600, 9 1024x768, 10 1280x768, 11 1280x800, 12 1366x768, 13 1280x1024, 15 1600x1200, 16 1920x1200 (VOR)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      resolution: { type: int, min: 0, max: 16, required: true }
+    send: "VOR:{output:-1},{resolution};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_hdcp:
+    summary: "Enable or disable HDCP on output channel 1-4 (VOH)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "VOH:{output:-1},{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_color_space:
+    summary: "Color space of output channel 1-4: 0 Auto, 1 RGB (0-255), 2 RGB (16-235), 3 YCC (444), 4 YCC (422) (VOC)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      space: { type: int, min: 0, max: 4, required: true }
+    send: "VOC:{output:-1},{space};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_signal:
+    summary: "Signal type of output channel 1-4: false DVI-D, true HDMI (VOD)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      hdmi: { type: bool, required: true }
+    send: "VOD:{output:-1},{hdmi:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  route_av:
+    summary: "Route video and audio of input 1-8 to output 1-4 (OAV)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "OAV:{output:-1},{input:-1};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  route_video:
+    summary: "Route the video of input 1-8 to output 1-4 (OVS)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "OVS:{output:-1},{input:-1};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  route_audio:
+    summary: "Route the audio of input 1-8 to output 1-4 (OAS)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "OAS:{output:-1},{input:-1};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_off:
+    summary: "Set the [OFF] button of output 1-4 (OFS)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      pressed: { type: bool, required: true }
+    send: "OFS:{output:-1},{pressed:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_hdmi_input_level:
+    summary: "Level of HDMI INPUT audio of input 1-8, 0-127 (IDL)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "IDL:{input:-1},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_analog_input_level:
+    summary: "Level of AUDIO INPUT audio of input 1-8, 0-127 (IAL)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "IAL:{input:-1},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_level:
+    summary: "Audio output level of output 1-4, 0-127 (OAL)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "OAL:{output:-1},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_hdmi_input_mute:
+    summary: "Mute HDMI INPUT audio of input 1-8 (IDM)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, required: true }
+    send: "IDM:{input:-1},{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_analog_input_mute:
+    summary: "Mute AUDIO INPUT audio of input 1-8 (IAM)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, required: true }
+    send: "IAM:{input:-1},{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_mute:
+    summary: "Mute the audio of output 1-4 (OAM)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "OAM:{output:-1},{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_delay:
+    summary: "Audio delay of output 1-4, 0-170 ms (ADT)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      delay: { type: int, min: 0, max: 170, required: true }
+    send: "ADT:{output:-1},{delay};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_mode:
+    summary: "Video output mode: 0 MATRIX, 1-3 MULTI-2..4, 4-6 SPAN-2..4, 7-10 ROTATION-L1..L4, 11-14 ROTATION-R1..R4, 15 4K-1, 16 4K-2, 17 DISSOLVE-1, 18 PGM-PST, 19 2 x PGM-PST, 20 3 x PGM-PST, 21 DUAL DISSOLVE, 22 DUAL PGM-PST (MOD)"
+    params:
+      mode: { type: int, min: 0, max: 22, required: true }
+    send: "MOD:{mode};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  recall_preset:
+    summary: "Call up preset 1-32 (PSE)"
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "PSE:{preset:-1};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_input_status:
+    summary: "State of input 1-8: channel, type, color space, HDCP, aspect, as the reply's comma list (ITS)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "ITS:{input:-1};"
+    expect: { matches: '^[\x02\x11\x13]*ITS:([^;]*);' }
+    returns: value
+
+  get_output_status:
+    summary: "State of output 1-4: channel, OUTPUT SELECT, resolution, HDCP, color space, signal, as the reply's comma list (OTS)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+    send: "OTS:{output:-1};"
+    expect: { matches: '^[\x02\x11\x13]*OTS:([^;]*);' }
+    returns: value
+
+  get_crosspoint:
+    summary: "Cross-point of output 1-4: channel, video input, audio input, [OFF] status, as the reply's comma list (CTS)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+    send: "CTS:{output:-1};"
+    expect: { matches: '^[\x02\x11\x13]*CTS:([^;]*);' }
+    returns: value
+
+  auto_take:
+    summary: "Auto take on output 1-3 in the PGM-PST modes (ATO:a,1)"
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+    send: "ATO:{output:-1},1;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output1_send:
+    summary: "Send level to OUTPUT1 of audio input 1-16 (HDMI-IN1-8, ANALOG-IN1-8), 0-100 % (ASA)"
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+      rate: { type: int, min: 0, max: 100, required: true }
+    send: "ASA:{input:-1},{rate};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output2_send:
+    summary: "Send level to OUTPUT2 of audio input 1-16 (HDMI-IN1-8, ANALOG-IN1-8), 0-100 % (ASB)"
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+      rate: { type: int, min: 0, max: 100, required: true }
+    send: "ASB:{input:-1},{rate};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output3_send:
+    summary: "Send level to OUTPUT3 of audio input 1-16 (HDMI-IN1-8, ANALOG-IN1-8), 0-100 % (ASC)"
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+      rate: { type: int, min: 0, max: 100, required: true }
+    send: "ASC:{input:-1},{rate};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output4_send:
+    summary: "Send level to OUTPUT4 of audio input 1-16 (HDMI-IN1-8, ANALOG-IN1-8), 0-100 % (ASD)"
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+      rate: { type: int, min: 0, max: 100, required: true }
+    send: "ASD:{input:-1},{rate};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_rgb_edid:
+    summary: "EDID of RGB input 1-8: 0 INTERNAL, 1 640x480, 2 800x600, 3 1024x768, 4 1280x768, 5 1280x800, 6 1366x768, 7 1280x1024, 8 1400x1050, 9 1600x1200, 10 1920x1200 (AED)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      edid: { type: int, min: 0, max: 10, required: true }
+    send: "AED:{input:-1},{edid};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_hdmi_edid:
+    summary: "EDID of HDMI input 1-8: 0 INTERNAL, 1 640x480, 2 800x600, 3 1024x768, 4 1280x768, 5 1280x800, 6 1366x768, 7 1280x1024, 8 1400x1050, 9 1600x1200, 10 1920x1200, 11-18 DATA1-8, 19 480i 4:3/576i 4:3, 20 480i 16:9/576i 16:9, 21 480p 4:3/576p 4:3, 22 480p 16:9/576p 16:9, 23 720p, 24 1080i, 25 1080p (DED)"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      edid: { type: int, min: 0, max: 25, required: true }
+    send: "DED:{input:-1},{edid};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_panel_lock:
+    summary: "Set panel lock on or off (PLS)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "PLS:{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_key_lock_mode:
+    summary: "Set a key lock mode on or off: 0 CROSSPOINT, 1 SWITCHING MODE, 2 MENU+EXIT, 3 CURSOR+VALUE, 4 CROSS-NOINPUT, 5 CROSS-OFF, 6-9 CROSS-OUTPUT1-4 (KLM)"
+    params:
+      mode: { type: int, min: 0, max: 9, required: true }
+      enabled: { type: bool, required: true }
+    send: "KLM:{mode},{enabled:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_key_lock:
+    summary: "Key lock state: lock status then the ten modes, as the reply's comma list (KLS)"
+    send: "KLS;"
+    expect: { matches: '^[\x02\x11\x13]*KLS:([^;]*);' }
+    returns: value
+
+  get_version:
+    summary: "Model and version, as the reply's comma list (VER)"
+    send: "VER;"
+    expect: { matches: '^[\x02\x11\x13]*VER:([^;]*);' }
+    returns: value
+
+  active_sense:
+    summary: "Check the unit is operating (ACS)"
+    send: "ACS;"
+    expect: { contains: "ACK;" }
+    returns: ack
+telemetry:
+  # Nothing is pushed. The cross-points of outputs 1-4 are asked every second
+  # (the XS-82H and XS-83H answer the outputs they lack with an error).
+  subscribe:
+    send: ["VER;"]
+  poll:
+    send: ["CTS:0;", "CTS:1;", "CTS:2;", "CTS:3;"]
+    every_ms: 1000
+  updates:
+    - match: '^[\x02\x11\x13]*CTS:(\d+),(\d+),(\d+),([01]);'
+      state:
+        "outputs.{1:+1}.video": "{2:+1}"
+        "outputs.{1:+1}.audio": "{3:+1}"
+        "outputs.{1:+1}.off": { value: "{4}", map: { "1": true, "0": false } }
+    - match: '^[\x02\x11\x13]*ITS:(\d+),(\d+),(\d+),([01]),(\d+);'
+      state:
+        "inputs.{1:+1}.type": "{2}"
+        "inputs.{1:+1}.color_space": "{3}"
+        "inputs.{1:+1}.hdcp": { value: "{4}", map: { "1": true, "0": false } }
+        "inputs.{1:+1}.aspect": "{5}"
+    - match: '^[\x02\x11\x13]*OTS:(\d+),(\d+),(\d+),([01]),(\d+),([01]);'
+      state:
+        "outputs.{1:+1}.select": "{2}"
+        "outputs.{1:+1}.resolution": "{3}"
+        "outputs.{1:+1}.hdcp": { value: "{4}", map: { "1": true, "0": false } }
+        "outputs.{1:+1}.color_space": "{5}"
+        "outputs.{1:+1}.hdmi": { value: "{6}", map: { "1": true, "0": false } }
+    - match: '^[\x02\x11\x13]*KLS:([01]),([01,]+);'
+      state:
+        "panel_lock": { value: "{1}", map: { "1": true, "0": false } }
+        "key_lock_modes": "{2}"
+    - match: '^[\x02\x11\x13]*VER:([^,;]+),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  outputs.*.video:       { type: int, description: "Input 1-8 whose video is on the output" }
+  outputs.*.audio:       { type: int, description: "Input 1-8 whose audio is on the output" }
+  outputs.*.off:         { type: bool, description: "Output [OFF] button on" }
+  outputs.*.select:      { type: int, description: "OUTPUT SELECT: 0 Auto, 1 HDMI, 2 HDBaseT" }
+  outputs.*.resolution:  { type: int, description: "Output resolution code, as set_output_resolution" }
+  outputs.*.hdcp:        { type: bool, description: "Output HDCP enabled" }
+  outputs.*.color_space: { type: int, description: "0 Auto, 1 RGB (0-255), 2 RGB (16-235), 3 YCC (444), 4 YCC (422)" }
+  outputs.*.hdmi:        { type: bool, description: "Signal type HDMI (false: DVI-D)" }
+  inputs.*.type:         { type: int, description: "0 HDMI, 1 RGB/COMPONENT, 2 COMPOSITE, 3 YC, 4-7 STILL1-4, 8 SHARE" }
+  inputs.*.color_space:  { type: int, description: "0 Auto, 1 RGB (0-255), 2 RGB (16-235), 3 YCC (SD), 4 YCC (HD)" }
+  inputs.*.hdcp:         { type: bool, description: "Input HDCP enabled" }
+  inputs.*.aspect:       { type: int, description: "0 Full, 1 Letterbox, 2 Crop, 3 Dot by Dot, 4 Manual" }
+  panel_lock:            { type: bool, description: "Panel lock on" }
+  key_lock_modes:        { type: string, description: "Ten 0/1 flags: Cross Point, Switch Mode, Menu+Exit, Cursor+Value, Cross-Noinput, Cross-Off, Cross-Output1-4" }
+  device.model:          { type: string, description: "Model from VER, XS-82H, XS-83H or XS-84H" }
+  device.version:        { type: string, description: "Version from VER" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for "ACK;" after each command before sending the next (p.21); the
+      queue does this. A reply ends at ";" and the manual documents no line
+      ending after it. ITS, OTS, CTS, KLS and VER are documented as answered
+      by their status frame (p.24) with no ACK; if a unit also sends ACK; after
+      one, that ACK; would be taken as the next command's reply. ERR:0 syntax
+      error, ERR:4 invalid value, ERR:5 out of range.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire numbers are 0-based; inputs, outputs and presets here are 1-based
+      and converted. ATO applies only in the PGM-PST modes: output 1 in
+      PGM-PST, 1-2 in 2 x PGM-PST, 1-3 in 3 x PGM-PST, 1 and 3 in DUAL
+      PGM-PST (p.23). Resolution code 14 is not listed (p.22). PLS:1 does
+      nothing when every KEY LOCK MODE is off (p.23). Status queries return
+      the reply's comma list as one value; the parts are in state. Over
+      RS-232C the menu RS-232C FUNCTION must be RECEIVER; no setting is
+      documented for LAN control, and no password.
