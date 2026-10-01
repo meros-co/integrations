@@ -50,6 +50,17 @@ fn at<'a>(v: &'a Value, path: &str) -> &'a Value {
     path.split('.').fold(v, |node, key| &node[key])
 }
 
+/// Kills the child when dropped, so a failed assertion does not leave a
+/// sidecar running and holding the binary open.
+struct KillOnDrop(Child);
+
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 struct Client {
     base: String,
     token: String,
@@ -106,13 +117,15 @@ async fn the_shared_binding_script() {
         std::process::id()
     ));
     let _ = std::fs::remove_file(&token_file);
-    let mut sidecar = Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
-        .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
-        .arg(&token_file)
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let listening = first_line(&mut sidecar)["listening"]
+    let mut sidecar = KillOnDrop(
+        Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
+            .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+            .arg(&token_file)
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    let listening = first_line(&mut sidecar.0)["listening"]
         .as_str()
         .unwrap()
         .to_string();
@@ -189,7 +202,7 @@ async fn the_shared_binding_script() {
         .iter()
         .any(|e| e["event"] == "connection"));
 
-    let _ = sidecar.kill();
+    drop(sidecar);
     drop(sim.stdin.take());
     let _ = sim.wait();
     let _ = std::fs::remove_file(&token_file);

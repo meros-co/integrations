@@ -75,59 +75,6 @@ def http(spec, command, input, method, target, **extra):
     })
 
 
-# HyperDeck: payload + CRLF (Blackmagic HyperDeck Ethernet Protocol).
-H = "blackmagic-hyperdeck"
-text(H, "record", {}, "record\r\n", device_reply="200 ok\r\n", expect_result={"ok": {"kind": "ack"}})
-text(H, "record_named", {"name": "Take 4"}, "record: name: Take 4\r\n")
-text(H, "record_spill", {}, "record spill\r\n")
-text(H, "record_spill_to_slot", {"slot_id": 2}, "record: spill: slot id: 2\r\n")
-text(H, "stop", {}, "stop\r\n", device_reply="111 remote control disabled\r\n",
-     expect_result={"error": {"error": "device_error", "code": "111"}})
-text(H, "play", {"speed": -50}, "play: single clip: true loop: false speed: -50\r\n")
-text(H, "goto_clip", {"clip_id": 3}, "goto: clip id: 3\r\n")
-text(H, "goto_clip_offset", {"offset": 2}, "goto: clip id: +2\r\n")
-text(H, "get_transport_info", {}, "transport info\r\n",
-     device_reply="208 transport info:\r\nstatus: play\r\nspeed: 100\r\n\r\n",
-     expect_result={"ok": {"kind": "value", "value": {"status": "play", "speed": "100"}}})
-text(H, "get_device_info", {}, "device info\r\n")
-text(H, "get_clip_count", {}, "clips count\r\n",
-     device_reply="214 clips count:\r\nclip count: 7\r\n\r\n", expect_result={"ok": {"kind": "value", "value": "7"}})
-text(H, "get_clips", {}, "clips get\r\n")
-text(H, "get_configuration", {}, "configuration\r\n")
-text(H, "disk_list", {}, "disk list\r\n")
-text(H, "disk_list_slot", {"slot_id": 1}, "disk list: slot id: 1\r\n")
-text(H, "preview_enable", {}, "preview: enable: true\r\n")
-text(H, "preview_disable", {}, "preview: enable: false\r\n")
-text(H, "get_playrange", {}, "playrange\r\n")
-text(H, "set_playrange_clip", {"clip_id": 5}, "playrange set: clip id: 5\r\n")
-text(H, "set_playrange_clips", {"clip_id": 5, "count": 7}, "playrange set: clip id: 5 count: 7\r\n")
-text(H, "set_playrange_timecode", {"in": "00:01:00:00", "out": "00:02:00:00"},
-     "playrange set: in: 00:01:00:00 out: 00:02:00:00\r\n")
-text(H, "set_playrange_frames", {"timeline_in": 0, "timeline_out": 250},
-     "playrange set: timeline in: 0 timeline out: 250\r\n")
-text(H, "clear_playrange", {}, "playrange clear\r\n")
-text(H, "set_playback_stop_mode", {"mode": "black"}, "play option: stop mode: black\r\n")
-
-# Videohub: a block ended by a blank line; inputs and outputs 0-based on the wire.
-VH = "blackmagic-videohub"
-text(VH, "set_route", {"input": 1, "output": 5}, "VIDEO OUTPUT ROUTING:\n4 0\n\n",
-     device_reply="ACK\n\n", expect_result={"ok": {"kind": "ack"}})
-text(VH, "set_input_label", {"input": 2, "label": "Cam 2"}, "INPUT LABELS:\n1 Cam 2\n\n")
-text(VH, "set_output_label", {"output": 1, "label": "PGM"}, "OUTPUT LABELS:\n0 PGM\n\n")
-text(VH, "lock_output", {"output": 3}, "VIDEO OUTPUT LOCKS:\n2 O\n\n")
-text(VH, "unlock_output", {"output": 3}, "VIDEO OUTPUT LOCKS:\n2 U\n\n")
-text(VH, "force_unlock_output", {"output": 3}, "VIDEO OUTPUT LOCKS:\n2 F\n\n")
-text(VH, "set_take_mode", {"enabled": True}, "CONFIGURATION:\nTake Mode: true\n\n")
-
-# Kramer Protocol 3000: payload + CR; destination before source.
-K = "kramer-p3000"
-text(K, "route_video", {"input": 3, "output": 2}, "#ROUTE 1,2,3\r",
-     device_reply="~01@ROUTE 1,2,3 OK\r\n", expect_result={"ok": {"kind": "ack"}})
-text(K, "route_audio", {"input": 0, "output": 1}, "#ROUTE 2,1,0\r",
-     device_reply="~01@ROUTE 2,1,0 ERR 003\r\n", expect_result={"error": {"error": "device_error"}})
-text(K, "get_model", {}, "#MODEL?\r", device_reply="~01@MODEL VS-88UT\r\n",
-     expect_result={"ok": {"kind": "value", "value": "VS-88UT"}})
-
 # RossTalk: payload + CRLF, never acknowledged.
 R = "rosstalk"
 text(R, "select_program", {"source": 4}, "XPT ME:1:PGM:IN:4\r\n", expect_result={"ok": {"kind": "unverified"}})
@@ -148,64 +95,6 @@ text(G, "goto_cue", {"cue": "4.5"}, "Goto Cue 4.5\r\n")
 text(G, "goto_cue_executor", {"cue": "4.5", "executor": 2}, "Goto Cue 4.5 Executor 2\r\n")
 text(G, "fire_macro", {"macro": 10}, "Go Macro 10\r\n")
 text(G, "command", {"line": "Blackout"}, "Blackout\r\n")
-
-# Behringer X32: OSC over UDP.
-X = "behringer-x32"
-binary(X, "set_channel_fader", {"channel": 7, "level": 0.75}, osc("/ch/07/mix/fader", ("f", 0.75)))
-binary(X, "mute_channel", {"channel": 7, "muted": True}, osc("/ch/07/mix/on", ("i", 0)),
-       expect_result={"ok": {"kind": "unverified"}})
-binary(X, "set_dca_fader", {"dca": 2, "level": 0.5}, osc("/dca/2/fader", ("f", 0.5)))
-binary(X, "mute_dca", {"dca": 2, "muted": False}, osc("/dca/2/on", ("i", 1)))
-binary(X, "set_main_fader", {"level": 1.0}, osc("/main/st/mix/fader", ("f", 1.0)))
-binary(X, "mute_main", {"muted": True}, osc("/main/st/mix/on", ("i", 0)))
-binary(X, "get_channel_name", {"channel": 1}, osc("/ch/01/config/name"),
-       device_reply_hex=hexs(osc("/ch/01/config/name", ("s", "Kick"))),
-       expect_result={"ok": {"kind": "value", "value": "Kick"}})
-binary(X, "set_channel_name", {"channel": 12, "name": "Vox"}, osc("/ch/12/config/name", ("s", "Vox")))
-
-# Behringer WING: OSC over UDP 2223, 1-based strip numbers, faders in dB,
-# mute as int 1/0 (WING Remote Protocols p.22, p.47-66).
-W = "behringer-wing"
-for stem, node, n in [("channel", "ch", 40), ("aux", "aux", 8), ("bus", "bus", 16),
-                      ("main", "main", 4), ("matrix", "mtx", 8), ("dca", "dca", 16)]:
-    binary(W, f"set_{stem}_fader", {stem: n, "level_db": -3.0}, osc(f"/{node}/{n}/fdr", ("f", -3.0)),
-           expect_result={"ok": {"kind": "unverified"}})
-    binary(W, f"mute_{stem}", {stem: 1, "muted": True}, osc(f"/{node}/1/mute", ("i", 1)))
-    binary(W, f"get_{stem}_name", {stem: 2}, osc(f"/{node}/2/name"),
-           device_reply_hex=hexs(osc(f"/{node}/2/name", ("s", "Vocals"))),
-           expect_result={"ok": {"kind": "value", "value": "Vocals"}})
-    binary(W, f"set_{stem}_name", {stem: 3, "name": "Pad"}, osc(f"/{node}/3/name", ("s", "Pad")))
-# A float query answers ,sff: display text, raw 0-1 position, dB (p.21).
-binary(W, "get_channel_fader", {"channel": 1}, osc("/ch/1/fdr"),
-       device_reply_hex=hexs(osc("/ch/1/fdr", ("s", "-2.0"), ("f", 0.7), ("f", -2.0))),
-       expect_result={"ok": {"kind": "value", "value": -2.0}})
-# An int query answers ,sfi: display text, raw, int (p.21).
-binary(W, "get_channel_mute", {"channel": 1}, osc("/ch/1/mute"),
-       device_reply_hex=hexs(osc("/ch/1/mute", ("s", "1"), ("f", 1.0), ("i", 1))),
-       expect_result={"ok": {"kind": "value", "value": 1}})
-binary(W, "mute_group", {"group": 8, "muted": False}, osc("/mgrp/8/mute", ("i", 0)))
-binary(W, "recall_scene", {"scene": 5},
-       [osc("/$ctl/lib/$actionidx", ("i", 5)), osc("/$ctl/lib/$action", ("s", "GO"))])
-binary(W, "get_console_info", {}, osc("/?"),
-       device_reply_hex=hexs(osc("/?", ("s", "WING,192.168.1.71,PGM,ngc-full,NO_SERIAL,1.07.2"))),
-       expect_result={"ok": {"kind": "value", "value": "WING,192.168.1.71,PGM,ngc-full,NO_SERIAL,1.07.2"}})
-
-# QLab: OSC over UDP, no replies to the sender.
-Q = "qlab"
-for command, address in [("go", "/go"), ("stop", "/stop"), ("pause", "/pause"), ("resume", "/resume"),
-                         ("panic", "/panic"), ("next_cue", "/playhead/next"),
-                         ("previous_cue", "/playhead/previous")]:
-    binary(Q, command, {}, osc(address))
-binary(Q, "start_cue", {"cue": "12.5"}, osc("/cue/12.5/start"), expect_result={"ok": {"kind": "unverified"}})
-binary(Q, "stop_cue", {"cue": "A1"}, osc("/cue/A1/stop"))
-
-# Resolume: OSC over UDP.
-RS = "resolume"
-binary(RS, "trigger_clip", {"layer": 2, "clip": 3}, osc("/composition/layers/2/clips/3/connect", ("i", 1)))
-binary(RS, "trigger_column", {"column": 4}, osc("/composition/columns/4/connect", ("i", 1)))
-binary(RS, "clear_layer", {"layer": 1}, osc("/composition/layers/1/clear", ("i", 1)))
-binary(RS, "set_layer_opacity", {"layer": 1, "opacity": 0.25},
-       osc("/composition/layers/1/video/opacity/values", ("f", 0.25)))
 
 # ETC Eos: OSC 1.0 over TCP with a 4-byte length prefix.
 E = "etc-eos"
@@ -248,6 +137,19 @@ http(T, "dsk_auto", {"dsk": 1}, "GET", "/v1/shortcut?name=main_dsk1_auto")
 http(T, "ddr_play", {"ddr": 2}, "GET", "/v1/shortcut?name=ddr2_play")
 http(T, "ddr_stop", {"ddr": 2}, "GET", "/v1/shortcut?name=ddr2_stop")
 http(T, "play_macro", {"name": "Open Show"}, "GET", "/v1/shortcut?name=play_macro_byname&value=Open%20Show")
+http(T, "shortcut", {"name": "main_take"}, "GET", "/v1/shortcut?name=main_take")
+http(T, "shortcut_with_value", {"name": "main_a_row", "value": "3"}, "GET", "/v1/shortcut?name=main_a_row&value=3")
+http(T, "trigger", {"name": "Lower Third"}, "GET", "/v1/trigger?name=Lower%20Third")
+http(T, "set_datalink", {"key": "%Score%", "value": "2-1"}, "GET", "/v1/datalink?key=%25Score%25&value=2-1")
+telemetry(T, "switcher", inbound_http={
+    "path": "/v1/dictionary?key=switcher",
+    "body": '<switcher_update main_source="BFR4" preview_source="INPUT1"/>'},
+    expect_state={"switcher": {"program": "BFR4", "preview": "INPUT1"}})
+telemetry(T, "shortcut-states", inbound_http={
+    "path": "/v1/dictionary?key=shortcut_states",
+    "body": '<shortcut_states><shortcut_state name="record_toggle" value="1" type="bool" sender="unknown"/>'
+            '<shortcut_state name="input1_long_name" value="Camera 1" type="" sender="unknown"/></shortcut_states>'},
+    expect_state={"shortcuts": {"record_toggle": "1", "input1_long_name": "Camera 1"}})
 
 # AJA Ki Pro: key/value query.
 A = "aja-kipro"
@@ -318,27 +220,6 @@ telemetry(PP, "timers", inbound_http={"path": "/v1/timers/current", "body": json
 
 
 # ── Telemetry ─────────────────────────────────────────────────────────────
-# Videohub: status blocks on connect and after every change; 0-based on the
-# wire, 1-based in the state (Videohub Ethernet Protocol).
-telemetry(VH, "routing", inbound="VIDEO OUTPUT ROUTING:\n0 5\n1 0\n\n",
-          expect_state={"outputs": {"1": {"input": 6}, "2": {"input": 1}}})
-telemetry(VH, "labels", inbound="INPUT LABELS:\n0 Camera 1\n1 Camera 2\n\n",
-          expect_state={"inputs": {"1": {"label": "Camera 1"}, "2": {"label": "Camera 2"}}})
-telemetry(VH, "locks", inbound="VIDEO OUTPUT LOCKS:\n0 O\n1 L\n2 U\n\n",
-          expect_state={"outputs": {"1": {"lock": "ours"}, "2": {"lock": "other"}, "3": {"lock": "unlocked"}}})
-telemetry(VH, "device", inbound="VIDEOHUB DEVICE:\nDevice present: true\nModel name: Smart Videohub 12G 40x40\n"
-          "Video inputs: 40\nVideo outputs: 40\n\n",
-          expect_state={"device": {"model": "Smart Videohub 12G 40x40", "inputs": 40, "outputs": 40}})
-telemetry(VH, "take-mode", inbound="CONFIGURATION:\nTake Mode: true\n\n", expect_state={"take_mode": True})
-
-# HyperDeck: notify on connect, then transport info; the asynchronous 508 and
-# the 208 reply carry the same fields (HyperDeck Ethernet Protocol).
-telemetry(H, "transport", expect_connect_wire=["notify: transport: true\r\n"],
-          inbound="508 transport info:\r\nstatus: play\r\nspeed: 100\r\nslot id: 1\r\nclip id: 3\r\n"
-          "single clip: false\r\nloop: true\r\ntimecode: 00:00:10:00\r\n\r\n",
-          expect_state={"transport": {"status": "play", "speed": 100, "slot": 1, "clip": 3,
-                                      "single_clip": False, "loop": True, "timecode": "00:00:10:00"}})
-
 # TriCaster: the tally dictionary (Automation and Integration Guide p.67-68).
 telemetry("newtek-tricaster", "tally", inbound_http={
     "path": "/v1/dictionary?key=tally",
@@ -353,15 +234,6 @@ telemetry("aja-kipro", "transport", inbound_http={
     "body": '{"paramid":"eParamID_TransportState","value":"2","value_name":"Recording"}'},
     expect_state={"transport": {"state": "Recording"}})
 
-# X32: /xremote on connect; pushed changes arrive on the same addresses as sets.
-# The subscription, then the first of the one-at-a-time queries for current values.
-telemetry(X, "channel-mute", expect_connect_wire_hex=[hexs(osc("/xremote")), hexs(osc("/ch/01/mix/on"))],
-          inbound_hex=hexs(osc("/ch/07/mix/on", ("i", 0))),
-          expect_state={"channels": {"7": {"mute": True}}})
-telemetry(X, "channel-name", inbound_hex=hexs(osc("/ch/12/config/name", ("s", "Vox"))),
-          expect_state={"channels": {"12": {"name": "Vox"}}})
-telemetry(X, "main-fader", inbound_hex=hexs(osc("/main/st/mix/fader", ("f", 0.5))),
-          expect_state={"main": {"fader": 0.5}})
 
 
 # Large per-device sets, one file each, written in this file's helpers.

@@ -282,20 +282,27 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         let probe_reply = super::osc::encode("/probe-reply", &[]);
         engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &probe_reply);
     }
-    // Telemetry subscriptions and queries are queued ahead of
-    // commands. Complete them with a plain success reply, so the vector sees
-    // only its command. HyperDeck is the only such spec; its success is
-    // "200 ok".
-    // OSC telemetry queries are queued too; each is answered on its address.
+    // Telemetry subscriptions and queries are queued ahead of commands.
+    // Complete them with a plain success reply, so the vector sees only its
+    // command: "200 ok" (HyperDeck), or a Protocol 3000 device line where the
+    // transport takes only lines matching its reply_match as replies. OSC
+    // telemetry queries are answered on their own address.
+    let success: &[u8] = match &engine.transport {
+        super::Transport::LineTcp {
+            reply_match: Some(re),
+            ..
+        } if !re.is_match("200 ok") => b"~01@ok\r\n",
+        _ => b"200 ok\r\n",
+    };
     let mut guard = 0;
-    while engine.current.as_ref().is_some_and(|f| f.id.is_none()) && guard < 1024 {
+    while engine.current.as_ref().is_some_and(|f| f.id.is_none()) && guard < 65536 {
         let awaiting = engine.current.as_ref().and_then(|f| f.awaiting.as_ref());
         match awaiting {
             Some(super::Await::Osc(address)) => {
                 let reply = super::osc::encode(address.as_deref().unwrap_or("/probe-reply"), &[]);
                 engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &reply);
             }
-            _ => engine.tcp(&mut cx, "device", TcpInput::Data(b"200 ok\r\n".to_vec())),
+            _ => engine.tcp(&mut cx, "device", TcpInput::Data(success.to_vec())),
         }
         guard += 1;
     }
