@@ -1,39 +1,36 @@
 # integrations
 
-One implementation of control and telemetry for third-party production hardware
-and software: audio consoles, video routers, recorders, switchers, cameras,
-lighting desks, wireless systems and playback software.
+Control and monitoring for production equipment: audio consoles, video
+switchers and routers, cameras, recorders, lighting desks, wireless
+microphones, projectors and playback software.
 
-**Status:** pre-release. The core drives every spec in `specs/`: the
-spec-driven ones through its spec engine and the Sennheiser families through
-native modules. All of it is tested against simulated devices only. No model is
-hardware-verified, and nothing here is ready for a show.
+Each device is implemented once, in a Rust library, and used from Rust, C,
+Node, Python or a local HTTP service.
 
-## Rationale
+This project is pre-release. Every integration is written from the
+manufacturer's documentation and tested against simulated devices. None has
+been tested against real hardware yet.
 
-The same device protocol written separately in several products diverges.
-Internally, the Shure wireless protocol was implemented twice, and only one of
-the two recorded that SLX-D has no mute command; the other reports success for a
-command the receiver ignores. Sharing a description of the protocol is not
-enough either: two interpreters of the same description are still two
-implementations, each with its own bugs.
+## Using it
 
-So every integration here has exactly one implementation, in a Rust core that
-owns the whole conversation with the device: sockets, TLS, framing, replies,
-subscriptions, reconnection. Products in other languages use that same compiled
-core through a binding, and bindings only convert calls and data.
+| Package | Name |
+|---|---|
+| Rust | `meros-integrations` (`crates/core`) |
+| C | static library and header (`bindings/c`) |
+| Node | `@meros/integrations` (`bindings/node`) |
+| Python | `meros-integrations` (`bindings/python`) |
+| HTTP service | `meros-integrations serve` (`crates/sidecar`) |
 
-## How a device is implemented
+All of them run the same library, so a device behaves the same way whichever
+one you use.
 
-| Kind | For | Written as |
-|---|---|---|
-| Spec-driven | Protocols made of fixed messages and fixed replies | A YAML spec in `specs/`, run by the core's spec engine |
-| Native | Protocols needing real logic: handshakes, sequencing, subscriptions | A Rust module in the core, plus a YAML spec carrying its models, commands and quirks |
+Pin an exact version. A new release can change what is sent to your hardware.
 
-Both kinds present the same catalogue and the same API. A consumer cannot tell
-which kind a device is.
+## How devices are described
 
-A spec-driven command:
+Most devices are described in a YAML file in `specs/`: their models, commands,
+parameters, replies and the state they report. The library reads these files
+and talks to the device. A command looks like this:
 
 ```yaml
 commands:
@@ -46,36 +43,15 @@ commands:
       args: [ { value: "{muted:bool10}", type: int } ]
 ```
 
-`bool10` inverts the boolean: the X32 treats `mix/on` as `0` for muted. The full
-format is in [SPEC.md](SPEC.md).
+The X32 uses `0` for muted on `mix/on`, so `bool10` inverts the value. The
+format is documented in [SPEC.md](SPEC.md).
 
-## Layout
+Devices whose protocols need more than fixed messages and replies, such as
+handshakes, sessions or binary framing, are written in Rust instead. They
+still have a YAML file listing their models, commands and quirks, so every
+device looks the same to whoever uses the library.
 
-```
-specs/        one YAML spec per device family
-vectors/      conformance vectors: exact bytes per command, used as core test fixtures
-schema/       JSON Schema for specs
-crates/       the Rust core
-bindings/     C, Node, Python and sidecar deliveries of the core
-tools/        spec validator
-```
-
-## Deliveries
-
-| Delivery | Package | Status |
-|---|---|---|
-| Rust | `meros-integrations` crate | working; unreleased |
-| C | static library and header (`bindings/c`) | working; unreleased |
-| Node | `@meros/integrations` | working; unreleased |
-| Python | `meros-integrations` (`bindings/python`) | working; unreleased |
-| Sidecar | `meros-integrations serve`, a local HTTP service | working; unreleased |
-
-Every delivery runs the same core and behaves identically.
-
-Pin an exact version. A release changes what every consumer sends to customer
-hardware, so it should never be picked up automatically in a show-critical path.
-
-## Specs
+## Devices
 
 | Spec | Devices | Transport | Models | Commands |
 |---|---|---|---|---|
@@ -149,51 +125,49 @@ hardware, so it should never be picked up automatically in a show-critical path.
 | `yamaha-rm` | Yamaha RM series (RM-CR, RM-CG, RM-TT, RM-WAP) | Line/TCP 49280 | 5 | 495 |
 | `yamaha-tf` | Yamaha TF series digital mixing consoles (Remote Control Protocol, TCP 49280) | Line/TCP 49280 | 4 | 15 |
 
-Every model is currently `none` (see Verification): written from manufacturer
-documentation, not yet run against hardware.
+Specs marked `native` are implemented in Rust.
 
 ## Verification
 
-Each model carries a verification status.
+Each model records how far it has been tested.
 
 | Status | Meaning |
 |---|---|
-| `none` | Written from documentation. Not tested against hardware |
-| `bench` | Exercised against the physical device |
-| `field` | Running in a production installation |
+| `none` | Written from documentation, not tested against hardware |
+| `bench` | Tested against the device |
+| `field` | In use in a production installation |
 
-Promotion to `bench` or `field` requires a conformance vector recorded from the
-device. Documentation alone is not sufficient: one manufacturer PDF referenced
-here gives two different sample layouts in two sections.
+A model moves to `bench` or `field` only with a conformance vector recorded
+from the device. Every model is currently `none`.
+
+## Repository layout
+
+```
+specs/      one YAML file per device family
+schema/     JSON Schema for the spec format
+vectors/    expected bytes for each command, used by the tests
+crates/     the Rust library, the HTTP service and a device simulator
+bindings/   C, Node and Python bindings
+tools/      spec validator and vector generator
+```
 
 ## Building and testing
 
 ```
-cargo test                      # the core: modules, spec engine, every vector
+cargo test
 pip install pyyaml jsonschema
-python tools/validate.py        # every spec against the schema and format rules
+python tools/validate.py
 ```
 
-Checks each spec against the JSON Schema plus cross-field rules: template
-references and directives, command references in `supports`, model references
-in `quirks`, unique spec ids, and whether a claimed verification status has
-vectors behind it.
-
-## Out of scope
-
-| Protocol | Reason |
-|---|---|
-| Dante | No public protocol |
+`cargo test` runs the library's tests, including every conformance vector.
+`validate.py` checks each spec against the schema and the format's rules.
 
 ## Contributing
 
-Corrections, quirks, verification runs and new devices are welcome. Meros owns
-this repository and reviews and merges all changes. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Corrections, undocumented device behaviour, test results from real hardware
+and new devices are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The licence covers this repository's contents. It
-does not extend to the devices described or their manufacturers' trademarks.
-Contribute observed behaviour and documented facts, not code copied from other
-projects.
+MIT, see [LICENSE](LICENSE). Product names and trademarks belong to their
+owners.
