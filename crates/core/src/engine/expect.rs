@@ -89,6 +89,40 @@ pub(crate) fn evaluate(
         }
     }
 
+    // An OSC reply's JSON is the string argument at `arg` (QLab); any other
+    // reply's is its body.
+    let arg = expect.get("arg").and_then(Value::as_u64).unwrap_or(0) as usize;
+    let wants_json = expect.contains_key("json_path") || expect.contains_key("json_equals");
+    let json: Option<Value> = if wants_json {
+        let source = match reply {
+            Reply::Osc { args } => args.get(arg).and_then(Value::as_str).map(str::to_string),
+            _ => Some(text.clone()),
+        };
+        Some(
+            source
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .ok_or_else(|| CommandError::DeviceError {
+                    code: None,
+                    message: "reply is not JSON".into(),
+                })?,
+        )
+    } else {
+        None
+    };
+    if let (Some(doc), Some(wanted)) = (&json, expect.get("json_equals").and_then(Value::as_object))
+    {
+        for (path, want) in wanted {
+            let got = json_path(doc, path);
+            if got != Some(want) {
+                let got = got.map_or("nothing".to_string(), Value::to_string);
+                return Err(CommandError::DeviceError {
+                    code: None,
+                    message: format!("reply has {path} = {got}, expected {want}"),
+                });
+            }
+        }
+    }
+
     let mut value: Option<Value> = None;
     if let Some(pattern) = expect.get("matches").and_then(Value::as_str) {
         let re = Regex::new(pattern).map_err(|e| CommandError::DeviceError {
@@ -100,19 +134,13 @@ pub(crate) fn evaluate(
             None => return fail(format!("unexpected reply: {}", first_line(&text))),
         }
     }
-    if let Some(path) = expect.get("json_path").and_then(Value::as_str) {
-        let json: Value = serde_json::from_str(&text).map_err(|_| CommandError::DeviceError {
-            code: None,
-            message: "reply is not JSON".into(),
-        })?;
-        match json_path(&json, path) {
+    if let (Some(doc), Some(path)) = (&json, expect.get("json_path").and_then(Value::as_str)) {
+        match json_path(doc, path) {
             Some(v) => value = Some(v.clone()),
             None => return fail(format!("reply has no {path}")),
         }
-    }
-    if let Reply::Osc { args } = reply {
-        let index = expect.get("arg").and_then(Value::as_u64).unwrap_or(0) as usize;
-        value = args.get(index).cloned();
+    } else if let Reply::Osc { args } = reply {
+        value = args.get(arg).cloned();
     }
 
     match returns {
@@ -237,6 +265,41 @@ mod tests {
             Ok(Outcome::Value {
                 value: json!({"error": "none", "status": "done"})
             })
+        );
+    }
+
+    #[test]
+    fn json_inside_an_osc_argument() {
+        let e = expect(
+            json!({"address": "/reply/cue/1/name", "json_path": "$.data",
+                              "json_equals": {"$.status": "ok"}}),
+        );
+        let reply = |status: &str| Reply::Osc {
+            args: vec![json!(format!(
+                r#"{{"workspace_id":"w","address":"/cue/1/name","status":"{status}","data":"Intro"}}"#
+            ))],
+        };
+        assert_eq!(
+            evaluate(&e, "value", &codes(), &reply("ok"), false),
+            Ok(Outcome::Value {
+                value: json!("Intro")
+            })
+        );
+        assert_eq!(
+            evaluate(&e, "value", &codes(), &reply("denied"), false),
+            Err(CommandError::DeviceError {
+                code: None,
+                message: r#"reply has $.status = "denied", expected "ok""#.into()
+            })
+        );
+        // Without json keys, an OSC reply still returns its argument.
+        let plain = expect(json!({"address": "/x", "arg": 1}));
+        let r = Reply::Osc {
+            args: vec![json!("a"), json!(2)],
+        };
+        assert_eq!(
+            evaluate(&plain, "value", &codes(), &r, false),
+            Ok(Outcome::Value { value: json!(2) })
         );
     }
 

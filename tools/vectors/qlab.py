@@ -16,11 +16,12 @@ def q(command, input, address, *args, **extra):
     binary(Q, command, input, slip(osc(address, *args)), **extra)
 
 
-def q_reply(address, data):
+def q_reply(address, data, status="ok"):
     """A /reply/... message as the dictionary describes it: one JSON string."""
     body = json.dumps({"workspace_id": "1B11984A-3EBC-4A9C-A004-B9E3AA32DA6B",
-                       "address": address, "status": "ok", "data": data})
-    return osc("/reply" + address, ("s", body)), body
+                       "address": address, "status": status, "data": data})
+    # A query returns data (SPEC.md §5, json_path on an OSC argument).
+    return osc("/reply" + address, ("s", body)), data
 
 
 UID = "1B11984A-3EBC-4A9C-A004-B9E3AA32DA6B"
@@ -88,6 +89,10 @@ q("get_selection_is_playhead", {}, "/selectionIsPlayhead", model="qlab-4")
 q("toggle_selection_is_playhead", {}, "/toggleSelectionIsPlayhead", model="qlab-4")
 q("set_current_cue_list", {"cue_list": "Main"}, "/currentCueList", ("s", "Main"))
 q("set_current_cue_list_by_id", {"cue_list_id": UID}, f"/currentCueListID/{UID}")
+# A denied reply fails the query (the dictionary's status values).
+reply, _ = q_reply("/workspaces", None, status="denied")
+q("get_workspaces", {}, "/workspaces", device_reply_hex=hexs(reply),
+  expect_result={"error": {"error": "device_error"}})
 reply, body = q_reply("/thump", "thump")
 q("thump", {}, "/thump", device_reply_hex=hexs(reply), expect_result={"ok": {"kind": "value", "value": body}})
 for stem, scope in [("cue_lists", "cueLists"), ("selected_cues", "selectedCues"),

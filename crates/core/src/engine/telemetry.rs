@@ -38,7 +38,13 @@ enum Matcher {
         fields: BTreeMap<String, Assign>,
     },
     /// An OSC message whose address matches; arguments are `{arg0}`, `{arg1}`.
-    Osc(Regex),
+    /// With `json`, the string argument at `json_arg` is parsed as JSON and
+    /// the named paths become captures too.
+    Osc {
+        address: Regex,
+        json: BTreeMap<String, String>,
+        json_arg: usize,
+    },
     /// The JSON reply to an HTTP request whose path matches; `json` names the
     /// values to take, by JSON path.
     HttpJson {
@@ -51,6 +57,20 @@ enum Matcher {
     /// The XML reply to an HTTP request whose path matches; every element
     /// named `element` is one match, its attributes the captures.
     HttpXml { path: Regex, element: String },
+}
+
+/// A rule's `json:` names and JSON paths; empty when it has none.
+fn json_paths(rule: &Value) -> Result<BTreeMap<String, String>, String> {
+    rule.get("json")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .map(|(k, v)| {
+            v.as_str()
+                .map(|s| (k.clone(), s.to_string()))
+                .ok_or(format!("telemetry: json '{k}' must be a JSON path"))
+        })
+        .collect()
 }
 
 #[derive(Debug)]
@@ -166,18 +186,15 @@ impl Telemetry {
             let matcher = if let Some(m) = rule.get("match") {
                 Matcher::Message(regex(m, "match")?)
             } else if let Some(a) = rule.get("address") {
-                Matcher::Osc(regex(a, "address")?)
+                Matcher::Osc {
+                    address: regex(a, "address")?,
+                    json: json_paths(rule)?,
+                    json_arg: rule.get("json_arg").and_then(Value::as_u64).unwrap_or(0) as usize,
+                }
             } else if let Some(p) = rule.get("path") {
                 let path = regex(p, "path")?;
-                if let Some(json) = rule.get("json").and_then(Value::as_object) {
-                    let json = json
-                        .iter()
-                        .map(|(k, v)| {
-                            v.as_str()
-                                .map(|s| (k.clone(), s.to_string()))
-                                .ok_or(format!("telemetry: json '{k}' must be a JSON path"))
-                        })
-                        .collect::<Result<_, _>>()?;
+                if rule.get("json").is_some() {
+                    let json = json_paths(rule)?;
                     let each = rule
                         .get("json_each")
                         .and_then(Value::as_str)
@@ -367,11 +384,32 @@ impl Telemetry {
                         any |= self.assign_all(&rule.assign, &values, &mut patch);
                     }
                 }
-                (Matcher::Osc(re), Inbound::Osc { address, args }) => {
+                (
+                    Matcher::Osc {
+                        address: re,
+                        json,
+                        json_arg,
+                    },
+                    Inbound::Osc { address, args },
+                ) => {
                     if let Some(caps) = re.captures(address) {
                         let mut values = captures(&caps);
                         for (i, a) in args.iter().enumerate() {
                             values.push((format!("arg{i}"), a.clone()));
+                        }
+                        if !json.is_empty() {
+                            let Some(doc) = args
+                                .get(*json_arg)
+                                .and_then(Value::as_str)
+                                .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                            else {
+                                continue;
+                            };
+                            for (name, path) in json {
+                                if let Some(v) = super::expect::json_path(&doc, path) {
+                                    values.push((name.clone(), v.clone()));
+                                }
+                            }
                         }
                         any |= self.assign_all(&rule.assign, &values, &mut patch);
                     }
@@ -624,6 +662,35 @@ mod tests {
             })
             .unwrap();
         assert_eq!(p, json!({"channels": {"7": {"fader": 0.75}}}));
+    }
+
+    #[test]
+    fn json_in_an_osc_argument() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [{
+                "address": "^/reply/cue_id/([^/]+)/name$",
+                "json": {"status": "$.status", "name": "$.data"},
+                "state": {"cues.{1}.name": "{name}"},
+            }]})),
+            &state(json!({"cues.*.name": {"type": "string", "description": "x"}})),
+        )
+        .unwrap();
+        let reply = r#"{"workspace_id":"w","address":"/cue_id/A1/name","status":"ok","data":"Intro"}"#;
+        let p = t
+            .apply(&Inbound::Osc {
+                address: "/reply/cue_id/A1/name",
+                args: &[json!(reply)],
+            })
+            .unwrap();
+        assert_eq!(p, json!({"cues": {"A1": {"name": "Intro"}}}));
+        // An argument that is not JSON matches nothing.
+        assert_eq!(
+            t.apply(&Inbound::Osc {
+                address: "/reply/cue_id/A1/name",
+                args: &[json!("Intro")],
+            }),
+            None
+        );
     }
 
     #[test]

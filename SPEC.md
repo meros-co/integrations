@@ -408,11 +408,18 @@ expect:
   not_contains: "ERR"       # success is the absence of an error marker
   matches: "^OK (\\d+)$"    # RE2-safe regex; capture group 1 is the value
   status: 200               # HTTP only
-  json_path: "$.transport.status"   # HTTP JSON only
+  json_path: "$.transport.status"   # JSON: the HTTP body, or the OSC argument at `arg`
+  json_equals: { "$.status": "ok" } # JSON values the reply must hold
   code_range: [200, 299]    # leading numeric response code
   address: /ch/01/config/name       # OSC only: the reply's address
   arg: 0                    # OSC only: argument returned as the value
 ```
+
+Some OSC devices answer with JSON inside a string argument: QLab replies on
+`/reply/<address>` with `{"status": "ok", "data": ...}`. On an OSC reply,
+`json_path` and `json_equals` read the string argument at `arg` as JSON, so
+`json_path: "$.data"` returns the data and `json_equals: { "$.status": "ok" }`
+fails the command on an error or denied reply.
 
 `not_contains` covers devices that acknowledge by not complaining. Kramer
 Protocol 3000 replies `~01@ROUTE 1,2,3 OK` on success and includes `ERR` on
@@ -543,6 +550,7 @@ of:
 | `header` + `each_line` | A block whose first line matches `header`; `each_line` is applied to each following line | per line: `{1}`, `{2}`, … |
 | `header` + `fields` | A block whose first line matches `header`; the following lines are `name: value` | `fields` maps each name to a state path |
 | `address` | An OSC message whose address matches | `{1}`, … from the address; `{arg0}`, `{arg1}`, … the arguments |
+| `address` + `json` | As `address`, where the string argument at `json_arg` (default 0) holds JSON | as `address`, plus `json` names by JSON path |
 
 `state` maps a path template to a value template. Both use the template rules
 of §4: a numeric capture is an integer, so `{1:+1}` converts a 0-based wire
