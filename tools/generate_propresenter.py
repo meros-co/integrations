@@ -109,6 +109,7 @@ for path, ops in sorted(spec["paths"].items()):
                 op_path = op_path.replace("{" + old_name + "}", "{" + new_name + "}")
             renamed.append(f"{method.upper()} {path}: {holders} -> {path_params}")
         body = None
+        optional_body = False
         rb = op.get("requestBody")
         if rb:
             schema = rb.get("content", {}).get("application/json", {}).get("schema", {})
@@ -126,15 +127,22 @@ for path, ops in sorted(spec["paths"].items()):
                 params["value"] = {"type": "int", "required": True}
                 body = "{value}"
             elif rb.get("required", True):
-                skipped.append(f"{method.upper()} {path} ({name}): structured request body")
-                continue
+                # A structured body: passed as JSON, validated by ProPresenter
+                # against the schema the document gives for it.
+                params["body"] = {"type": "json", "required": True}
+                body = "{body}"
+            else:
+                optional_body = True
         responses = op.get("responses", {})
         status = next((int(c) for c in ("200", "201", "204") if c in responses), 200)
         content = responses.get(str(status), {}).get("content", {})
         returns_value = status == 200 and "application/json" in content
         query = {k: f"{{{k}}}" for k, p in params.items() if p.get("in") == "query"}
+        summary = op.get("summary", "").strip()
+        if body == "{body}":
+            summary += " The body is JSON in the shape the API document gives for this operation."
         commands[name] = {
-            "summary": op.get("summary", "").strip(),
+            "summary": summary,
             "params": params,
             "method": method.upper(),
             "path": op_path,
@@ -143,6 +151,14 @@ for path, ops in sorted(spec["paths"].items()):
             "status": status,
             "returns": "value" if returns_value else "ack",
         }
+        if optional_body:
+            # The body is optional (a message's tokens): a second command
+            # sends one.
+            with_body = dict(commands[name])
+            with_body["params"] = {**params, "body": {"type": "json", "required": True}}
+            with_body["body"] = "{body}"
+            with_body["summary"] = summary + " With a JSON body in the shape the API document gives."
+            commands[name + "_with_body"] = with_body
 
 out = []
 for name, c in commands.items():
@@ -199,8 +215,7 @@ source:
     note: >
       Manufacturer document. Every command here is an operation in it, named by
       its operationId, with its path and query parameters, request body and
-      success status. Operations whose body is a structured object, image
-      endpoints and chunked streams are not included yet.
+      success status. Image endpoints and chunked streams are not included.
 
 transport:
   type: http
@@ -315,10 +330,12 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Not included yet: operations that take a structured body (creating or
-      updating looks, messages with tokens, timers, playlists, props, macros,
-      clear groups, stage layout maps), image and thumbnail endpoints, and the
-      chunked or server-sent status streams. State is polled once a second.
+      Operations that take a structured body (looks, messages with tokens,
+      timers, playlists, props, macros, clear groups, stage layout maps) take
+      it as a JSON parameter, which ProPresenter validates against the shape
+      its API document gives. Image and thumbnail endpoints and the chunked or
+      server-sent status streams are not included. State is polled once a
+      second.
 '''
 (ROOT / "specs" / "propresenter.yaml").write_text(doc, encoding="utf-8", newline="\n")
 print(len(commands), "commands;", len(skipped), "skipped:")

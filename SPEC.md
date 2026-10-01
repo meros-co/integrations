@@ -252,6 +252,7 @@ commands:
 | `bool` | `default` |
 | `enum` | `values`, `default` |
 | `string` | `max_length`, `pattern` (RE2-safe), `default` |
+| `json` | Any JSON value, sent as compact JSON. Only for a request body whose shape the device's own API documents and validates; the command's summary names that schema |
 
 Values outside the declared range are rejected before transmission. The core
 does not clamp, because a clamped value masks a caller error and produces a

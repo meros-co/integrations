@@ -159,6 +159,12 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
             };
             Ok(text.into())
         }
+        ParamType::Json => {
+            if !directives.is_empty() {
+                return Err(format!("directives do not apply to JSON '{name}'"));
+            }
+            Ok(value.to_string())
+        }
         ParamType::Enum | ParamType::String => {
             let mut s = value
                 .as_str()

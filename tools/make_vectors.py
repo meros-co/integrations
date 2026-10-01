@@ -283,7 +283,8 @@ def _pp_vectors() -> None:
     from urllib.parse import quote
 
     doc = yaml.safe_load((ROOT / "specs" / "propresenter.yaml").read_text(encoding="utf-8"))
-    examples = {"int": 2, "float": 15.5, "bool": True, "string": "Song 1"}
+    examples = {"int": 2, "float": 15.5, "bool": True, "string": "Song 1",
+                "json": {"name": "Song 1", "enabled": True}}
     for name, command in doc["commands"].items():
         params = command.get("params") or {}
         values = {}
@@ -297,8 +298,10 @@ def _pp_vectors() -> None:
             target += "?" + "&".join(f"{k}={quote(str(values[k]), safe='')}" for k in send["query"])
         request = {"method": send["method"], "target": target}
         if "body" in send:
-            v = values[next(iter(k for k in params if k in ("value", "enabled")))]
-            if isinstance(v, bool):
+            v = values[next(iter(k for k in params if k in ("value", "enabled", "body")))]
+            if isinstance(v, dict):
+                request["body"] = json.dumps(v, separators=(",", ":"))
+            elif isinstance(v, bool):
                 request["body"] = "true" if v else "false"
             elif isinstance(v, float):
                 request["body"] = f"{v:.3f}"

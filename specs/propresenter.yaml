@@ -14,8 +14,7 @@ source:
     note: >
       Manufacturer document. Every command here is an operation in it, named by
       its operationId, with its path and query parameters, request body and
-      success status. Operations whose body is a structured object, image
-      endpoints and chunked streams are not included yet.
+      success status. Image endpoints and chunked streams are not included.
 
 transport:
   type: http
@@ -44,13 +43,15 @@ models:
                audio_playlist_next_trigger, audio_playlist_previous_trigger,
                audio_playlist_trigger, audio_playlist_item_trigger,
                audio_playlists_get, capture_modes_get, capture_settings_get,
-               capture_status_get, capture_operation, clear_group_get,
-               clear_group_delete, clear_group_trigger, clear_groups_get, clear_layer,
-               find_my_mouse, global_groups_get, library_list_get, library_get,
-               library_trigger, library_trigger_cue, look_get_current, look_get,
-               look_delete, look_trigger, look_get_all, macro_get, macro_delete,
-               macro_trigger, macro_collection_get, macro_collection_delete,
-               macro_collection_get_all, macro_get_all, mask_get, mask_get_all,
+               capture_status_get, capture_operation, clear_group_get, clear_group_set,
+               clear_group_delete, clear_group_trigger, clear_groups_get,
+               clear_group_create, clear_layer, find_my_mouse, global_groups_get,
+               library_list_get, library_get, library_trigger, library_trigger_cue,
+               look_get_current, look_set_current, look_get, look_put, look_delete,
+               look_trigger, look_get_all, look_create, macro_get, macro_set,
+               macro_delete, macro_trigger, macro_collection_get, macro_collection_set,
+               macro_collection_delete, macro_collection_get_all,
+               macro_collection_create, macro_get_all, mask_get, mask_get_all,
                media_playlist_active, media_playlist_active_focus,
                media_playlist_active_next_trigger,
                media_playlist_active_previous_trigger, media_playlist_active_trigger,
@@ -61,8 +62,9 @@ models:
                media_playlist_previous_focus, media_playlist_get, media_playlist_focus,
                media_playlist_next_trigger, media_playlist_previous_trigger,
                media_playlist_trigger, media_playlist_item_trigger,
-               media_playlists_get, message_get, messaage_delete, message_clear,
-               message_trigger, message_get_all, playlist_active_get,
+               media_playlists_get, message_get, message_set, messaage_delete,
+               message_clear, message_trigger, message_trigger_with_body,
+               message_get_all, message_create, playlist_active_get,
                playlist_active_announcement_focus,
                playlist_active_announcement_trigger,
                playlist_active_announcement_item_trigger,
@@ -73,11 +75,11 @@ models:
                playlist_focused_previous, playlist_focused_previous_trigger,
                playlist_focused_trigger, playlist_focused_item_trigger,
                playlist_next_focus, playlist_previous_focus, playlist_get,
-               playlist_focus, playlist_next_trigger, playlist_previous_trigger,
-               playlist_trigger, playlist_item_trigger, playlist_get_all,
-               presentation_get_active, presentation_active_focus,
-               presentation_active_group_trigger, presentation_active_next_trigger,
-               presentation_active_previous_trigger,
+               playlist_put, playlist_create, playlist_focus, playlist_next_trigger,
+               playlist_previous_trigger, playlist_trigger, playlist_item_trigger,
+               playlist_get_all, playlist_create_top_level, presentation_get_active,
+               presentation_active_focus, presentation_active_group_trigger,
+               presentation_active_next_trigger, presentation_active_previous_trigger,
                presentation_active_timeline_status,
                presentation_active_timeline_operation, presentation_active_trigger,
                presentation_active_cue_trigger, presentation_focused,
@@ -90,18 +92,20 @@ models:
                presentation_get, presentation_focus, presentation_group_trigger,
                presentation_next_trigger, presentation_previous_trigger,
                presentation_timeline_operation, presentation_trigger,
-               presentation_cue_trigger, prop_get, prop_delete, prop_pause,
+               presentation_cue_trigger, prop_get, prop_put, prop_delete, prop_pause,
                prop_resume, prop_clear, prop_trigger, prop_collection_get,
-               prop_collection_delete, prop_collection_get_all, prop_get_all,
-               stage_layout_delete, stage_layout_map_get, stage_layouts_get,
+               prop_collection_set, prop_collection_delete, prop_collection_get_all,
+               prop_collection_create, prop_get_all, stage_layout_delete,
+               stage_layout_map_get, stage_layout_map_set, stage_layouts_get,
                stage_message_get, stage_message_show, stage_message_hide,
                stage_screen_layout_get, stage_screen_layout_set, stage_screens_get,
                audience_screens_status_get, audience_screens_status_set,
                layer_status_get, status_screens_get, slide_status_get,
                stage_screens_status_get, stage_screens_status_set, theme_get,
-               theme_slide_get, theme_get_all, timer_get_system_time,
-               timer_get_video_countdown, timer_get, timer_delete, timer_increment,
-               timer_operation, timer_get_all, timer_get_current_times,
+               theme_slide_get, theme_slide_set, theme_get_all, timer_get_system_time,
+               timer_get_video_countdown, timer_get, timer_set, timer_delete,
+               timer_increment, timer_operation, timer_set_and_operation,
+               timer_get_all, timer_create, timer_get_current_times,
                timer_operation_all, transport_auto_advance_get,
                transport_auto_advance_cancel, transport_current_media_get,
                transport_go_to_end, transport_pause, transport_play,
@@ -309,6 +313,14 @@ commands:
     send: { method: GET, path: "/v1/clear/group/{id}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  clear_group_set:
+    summary: "Sets the details of the specified clear group. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/clear/group/{id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   clear_group_delete:
     summary: "Deletes the specified clear group."
     params:
@@ -326,6 +338,13 @@ commands:
   clear_groups_get:
     summary: "Requests a list of all the configured clear groups."
     send: { method: GET, path: "/v1/clear/groups" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  clear_group_create:
+    summary: "Create a clear group with the details specified. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/clear/groups", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   clear_layer:
@@ -379,11 +398,26 @@ commands:
     send: { method: GET, path: "/v1/look/current" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  look_set_current:
+    summary: "Sets the details of the currently live audience look. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/look/current", body: "{body}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
   look_get:
     summary: "Requests the details of the specified audience look."
     params:
       id: { type: string, max_length: 256, required: true }
     send: { method: GET, path: "/v1/look/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  look_put:
+    summary: "Sets the details of the specified audience look. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/look/{id}", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   look_delete:
@@ -405,11 +439,26 @@ commands:
     send: { method: GET, path: "/v1/looks" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  look_create:
+    summary: "Creates a new audience look with the specified details. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/looks", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   macro_get:
     summary: "Requests the details of the specified macro."
     params:
       id: { type: string, max_length: 256, required: true }
     send: { method: GET, path: "/v1/macro/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  macro_set:
+    summary: "Sets the details of the specified macro. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/macro/{id}", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   macro_delete:
@@ -433,6 +482,14 @@ commands:
     send: { method: GET, path: "/v1/macro_collection/{id}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  macro_collection_set:
+    summary: "Sets the details of the specified macro collection. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/macro_collection/{id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   macro_collection_delete:
     summary: "Deletes the specified macro collection and any macros contained within it."
     params:
@@ -443,6 +500,13 @@ commands:
   macro_collection_get_all:
     summary: "Requests a list of all collections and their contents"
     send: { method: GET, path: "/v1/macro_collections" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  macro_collection_create:
+    summary: "Creates a new macro collection with the specified name The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/macro_collections", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   macro_get_all:
@@ -586,6 +650,14 @@ commands:
     send: { method: GET, path: "/v1/message/{id}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  message_set:
+    summary: "Sets the details of the specified message. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/message/{id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   messaage_delete:
     summary: "Deletes the specified message."
     params:
@@ -607,9 +679,24 @@ commands:
     send: { method: POST, path: "/v1/message/{id}/trigger" }
     expect: { status: 204 }
     returns: ack
+  message_trigger_with_body:
+    summary: "Triggers / Shows the specified message. With a JSON body in the shape the API document gives."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/message/{id}/trigger", body: "{body}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
   message_get_all:
     summary: "Requests a list of all configured messages."
     send: { method: GET, path: "/v1/messages" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  message_create:
+    summary: "Creates a new message with specified details. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/messages", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   playlist_active_get:
@@ -705,6 +792,22 @@ commands:
     send: { method: GET, path: "/v1/playlist/{playlist_id}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  playlist_put:
+    summary: "Sets the contents of the specified playlist. The body is JSON in the shape the API document gives for this operation."
+    params:
+      playlist_id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/playlist/{playlist_id}", body: "{body}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+  playlist_create:
+    summary: "Creates a playlist with the specified details underneath the specified playlist or playlist folder. The body is JSON in the shape the API document gives for this operation."
+    params:
+      playlist_id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/playlist/{playlist_id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   playlist_focus:
     summary: "Moves the focus to the specified playlist."
     params:
@@ -744,6 +847,13 @@ commands:
   playlist_get_all:
     summary: "Requests a list of all configured playlists."
     send: { method: GET, path: "/v1/playlists" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  playlist_create_top_level:
+    summary: "Creates a playlist with the specified details. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/playlists", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   presentation_get_active:
@@ -924,6 +1034,14 @@ commands:
     send: { method: GET, path: "/v1/prop/{id}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  prop_put:
+    summary: "Sets the details of the specified prop. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/prop/{id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   prop_delete:
     summary: "Deletes the specified prop."
     params:
@@ -966,6 +1084,14 @@ commands:
     send: { method: GET, path: "/v1/prop_collection/{id}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  prop_collection_set:
+    summary: "Sets the details of the specified prop collection. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/prop_collection/{id}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   prop_collection_delete:
     summary: "Deletes the specified prop collection and any props contained within it."
     params:
@@ -976,6 +1102,13 @@ commands:
   prop_collection_get_all:
     summary: "Requests a list of all collections and their contents"
     send: { method: GET, path: "/v1/prop_collections" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  prop_collection_create:
+    summary: "Creates a new prop collection with the specified name The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/prop_collections", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   prop_get_all:
@@ -995,6 +1128,13 @@ commands:
     send: { method: GET, path: "/v1/stage/layout_map" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  stage_layout_map_set:
+    summary: "Sets the specified stage message to the corresponding stage screens. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/stage/layout_map", body: "{body}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
   stage_layouts_get:
     summary: "Requests a list of the configured stage layouts."
     send: { method: GET, path: "/v1/stage/layouts" }
@@ -1091,6 +1231,15 @@ commands:
     send: { method: GET, path: "/v1/theme/{id}/slides/{theme_slide}" }
     expect: { status: 200, json_path: "$" }
     returns: value
+  theme_slide_set:
+    summary: "Sets the details of the specified theme slide within the specified theme. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      theme_slide: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/theme/{id}/slides/{theme_slide}", body: "{body}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
   theme_get_all:
     summary: "Requests a list of all configured themes and theme slides."
     send: { method: GET, path: "/v1/themes" }
@@ -1111,6 +1260,14 @@ commands:
     params:
       id: { type: string, max_length: 256, required: true }
     send: { method: GET, path: "/v1/timer/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  timer_set:
+    summary: "Sets the details of the specified timer. The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/timer/{id}", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   timer_delete:
@@ -1136,9 +1293,25 @@ commands:
     send: { method: GET, path: "/v1/timer/{id}/{operation}" }
     expect: { status: 204 }
     returns: ack
+  timer_set_and_operation:
+    summary: "Sets the details of the specified timer and performs the requested operation (start, stop, reset). The body is JSON in the shape the API document gives for this operation."
+    params:
+      id: { type: string, max_length: 256, required: true }
+      operation: { type: enum, values: ["start", "stop", "reset"], required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/v1/timer/{id}/{operation}", body: "{body}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
   timer_get_all:
     summary: "Requests the details for all configured timers."
     send: { method: GET, path: "/v1/timers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  timer_create:
+    summary: "Creates a new timer with the specified details. The body is JSON in the shape the API document gives for this operation."
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: "/v1/timers", body: "{body}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
   timer_get_current_times:
@@ -1370,7 +1543,9 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Not included yet: operations that take a structured body (creating or
-      updating looks, messages with tokens, timers, playlists, props, macros,
-      clear groups, stage layout maps), image and thumbnail endpoints, and the
-      chunked or server-sent status streams. State is polled once a second.
+      Operations that take a structured body (looks, messages with tokens,
+      timers, playlists, props, macros, clear groups, stage layout maps) take
+      it as a JSON parameter, which ProPresenter validates against the shape
+      its API document gives. Image and thumbnail endpoints and the chunked or
+      server-sent status streams are not included. State is polled once a
+      second.

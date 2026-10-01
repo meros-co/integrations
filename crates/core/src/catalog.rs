@@ -134,6 +134,9 @@ pub enum ParamType {
     Bool,
     Enum,
     String,
+    /// Any JSON value, for a request body whose shape the device's own API
+    /// documents and validates. Sent as compact JSON.
+    Json,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -244,6 +247,7 @@ fn check_value(name: &str, spec: &ParamSpec, value: &Value) -> Result<(), String
             .as_bool()
             .map(|_| ())
             .ok_or_else(|| format!("'{name}' must be true or false")),
+        ParamType::Json => Ok(()),
         ParamType::Enum => {
             let s = value
                 .as_str()

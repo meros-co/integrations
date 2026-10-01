@@ -89,7 +89,7 @@ hardware, so it should never be picked up automatically in a show-critical path.
 | `grandma2` | grandMA2 console and onPC | Line/TCP 30000 | none |
 | `kramer-p3000` | Kramer Protocol 3000 matrices | Line/TCP 5000 | none |
 | `panasonic-ptz` | Panasonic AW-series PTZ | HTTP-CGI | none |
-| `propresenter` | ProPresenter 7.9 and later (191 API operations) | HTTP API | none |
+| `propresenter` | ProPresenter 7.9 and later (every API operation) | HTTP API | none |
 | `ptzoptics` | PTZOptics cameras | HTTP-CGI | none |
 | `qlab` | QLab 4, QLab 5 | OSC/UDP 53000 | none |
 | `resolume` | Resolume Arena, Avenue | OSC/UDP 7000 | none |
