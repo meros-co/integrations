@@ -1,12 +1,66 @@
 spec: 1
 id: rosstalk
-name: Ross Video switchers (RossTalk)
+name: Ross Video production switchers (RossTalk)
 vendor: Ross Video
 category: switcher
 
+# Transcribed from Ross Video's RossTalk command tables for its production
+# switchers. Ross publishes two switcher dialects under the RossTalk name:
+#
+#   - Carbonite family (Carbonite, Carbonite eXtreme, Carbonite Black, Solo,
+#     Mosaic, UltraChromeHR, Carbonite Ultra, Ultra 60, HyperMax, Code,
+#     Graphite): MEs are addressed as ME-source:ME-number ("MECUT ME:1",
+#     "KEYAUTO MME:2:1").
+#   - Acuity family (Acuity, Ultrix Acuity, Vision): MEs are a bare number
+#     ("MECUT 1", "KEYAUTO 1:4"). Commands whose wire form differs from the
+#     Carbonite form are the acuity_* commands below.
+#
+# Commands that are byte-identical in both tables (CC, FTB, GPI, MNEM and the
+# XPT forms with an ME:n destination) are shared.
+#
+# Not included, because the transport never reads a reply (reply: none) and
+# Ross documents no reply format: HELP, VERSION, KEYSTATE, ACTIVEID,
+# "USERVAR ALLVAR:?", "MEM ?" and the "?" query form of XPT, MS, MNEM,
+# TRANSRATE, TRANSTYPE, TRANSINCL, MVBOX, USERVAR and KEYSHAPED.
+#
+# XPression, Ultrix, openGear, the Ross video servers, AudioEdge and the
+# OverDrive/Caprica "SW ..." RossTalk-IN set are separate command sets on
+# separate products and are not in this spec.
 source:
-  - title: RossTalk protocol reference
-    note: Manufacturer-documented
+  - title: "Carbonite Device DashBoard Setup (online help), RossTalk > Carbonite/Graphite Commands (help build 2026-01-30)"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device-db/Topics/Protocol/External/CNT/RT-CNT-Comm.html
+    note: >
+      Manufacturer document; the current edition of the RossTalk Commands
+      guide (4802DR-403). Port 7788, CR/LF termination, case sensitivity, the
+      ME-source tokens (ME, MME, MSC; Canvas = MSC, Tile = MME), Carbonite
+      Ultra ME numbering (2, 1, P/P) and Table 1 "RossTalk Commands" (CC,
+      CKINIT, CLIP*, *CCVARIABLE, DOWN, FOCUS, FTB, GPI, GPI xx:HIGH/LOW,
+      KEYAUTO*, KEYCUT*, KEYMODE, LOADSET, MEAUTO, MECUT, MEM, MEMSAVE, MNEM,
+      MS, MTLoad/MTTakeIn/MTTakeOut/MTText, MVBOX, MVBOXSHIFT, NEXT, NOOP,
+      NTP, REBOOTALL, SAVESET, SEQI, SEQO, SETCCVARIABLE, TRANSINCL,
+      TRANSRATE, TRANSTYPE, UP, XPT) with the XPT destination and source
+      lists, HyperMax configurable outputs and split-ME sources following it.
+  - title: "Carbonite Device DashBoard Setup (online help), RossTalk > Acuity/Vision Commands (help build 2026-01-30)"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device-db/Topics/Protocol/External/VIS/RT-VIS-Comm.html
+    note: >
+      Manufacturer document. RTalk-IN setup (Network TCP, Server(1) or
+      Server(Many), local port 7788, Cmd Response OFF by default), the MLE
+      note for Vision, case sensitivity, and Table 1 "RossTalk Commands"
+      (ACTIVEID, CAPTURE, CC, CUECLIP, EJECT, FTB, GPI, GPI xx:On/Off,
+      KEYAUTO*, KEYCUT*, KEYSHAPED, KEYSTATE, LOADSET, MEAUTO, MECUT, MEM,
+      MEMSAVE, MNEM, MS, MSPLAY, MVBOX, PAUSE, PLAY, RESETALL, SAVESET,
+      SETVIDMODE, TRANSINCL, TRANSRATE, TRANSTYPE, USERVAR, VERSION, XPT) with
+      the XPT destination and source lists.
+  - title: "Carbonite Device Setup (Legacy) (online help), RossTalk > Carbonite/Graphite Commands and Acuity/Vision Commands"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device/Topics/Protocol/RossTalk/CNT/RT-CNT-Comm.html
+    note: >
+      Manufacturer document, earlier edition. Used only to note where the
+      current edition changed a command: MVBOX processor token OP (now IO),
+      CLIP* commands without a channel, the Acuity TRANSTYPE list (MEDIA, now
+      SEQ) and the Acuity MS example "MS ME:4:2:52" (now "MS 4:2:52").
 
 transport:
   type: line-tcp
@@ -19,62 +73,986 @@ transport:
 
 models:
   - id: carbonite
-    name: Ross Carbonite
-    supports: [select_program, select_preset, cut, auto_transition, fade_to_black, custom_control, gpi]
+    name: Ross Carbonite / Carbonite eXtreme
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+  - id: carbonite-black
+    name: Ross Carbonite Black
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+  - id: carbonite-solo
+    name: Ross Carbonite Solo / Carbonite Solo 13 (CBF-109, CBF-113)
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+    notes: >
+      HDMI inputs are IN:7, IN:8 and IN:9 on the CBF-109 and IN:13 on the
+      CBF-113.
+  - id: carbonite-mosaic
+    name: Ross Carbonite Mosaic
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+    notes: Media-Store channels are numbered 101-136.
+  - id: ultrachromehr
+    name: Ross UltraChromeHR
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+    notes: >
+      Ross lists UltraChromeHR with the Carbonite family and does not say
+      which commands it lacks; the full Carbonite set is listed.
+  - id: carbonite-ultra
+    name: Ross Carbonite Ultra
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+    notes: MEs are 2, 1 and P/P; P/P is the program ME.
+  - id: carbonite-ultra-60
+    name: Ross Carbonite Ultra 60
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set_from, save_set_to, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
+    verification: none
+    notes: >
+      LOADSET and SAVESET take a drive (0 internal, 1-3 USB); the name-only
+      forms are documented as not supported.
+  - id: carbonite-hypermax
+    name: Ross Carbonite HyperMax
+    supports: [custom_control, chroma_key_init_keyer, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, load_set_from, save_set_to, auto_transition, cut, recall_memory,
+               recall_memory_multi, save_memory, save_memory_multi, set_mnemonic, media_store_load_id,
+               multiviewer_box, multiviewer_box_shift, noop, ntp_off, ntp_set, reboot_all, transition_include,
+               transition_rate, transition_type, select_program, select_preset, select_key, select_key_second,
+               select_aux, select_minime, crosspoint]
+    verification: none
+    notes: >
+      Set drives are 0 (NFS) and 1 (USB); the name-only LOADSET/SAVESET use
+      NFS. Split MEs are addressed as 1A, 1B, PPB, PPAB.
+  - id: carbonite-code
+    name: Ross Carbonite Code
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off, key_mode,
+               load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, motiontext_load, motiontext_take_in,
+               motiontext_take_out, motiontext_set_text, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
     verification: none
   - id: graphite
     name: Ross Graphite
-    supports: [select_program, select_preset, cut, auto_transition, fade_to_black, custom_control, gpi]
+    supports: [custom_control, chroma_key_init, clip_load, clip_load_channel, clip_eject, clip_eject_channel,
+               clip_play, clip_play_channel, clip_pause, clip_pause_channel, clip_loop, clip_loop_channel,
+               create_cc_variable, default_cc_variable, delete_cc_variable, set_cc_variable,
+               sequencer_up, sequencer_down, sequencer_focus, sequencer_next, sequence_load, sequence_unload,
+               fade_to_black, gpi, gpi_level, key_auto, key_auto_on, key_auto_off, key_cut, key_cut_on, key_cut_off,
+               key_mode, load_set, save_set, auto_transition, cut, recall_memory, recall_memory_multi, save_memory,
+               save_memory_multi, set_mnemonic, media_store_load, multiviewer_box, multiviewer_box_shift, noop,
+               ntp_off, ntp_set, transition_include, transition_rate, transition_type, select_program,
+               select_preset, select_key, select_key_second, select_aux, select_minime, crosspoint]
     verification: none
+    notes: >
+      RossTalk is off until enabled (Configuration > System > Access >
+      RossTalk = On). The HDMI input is IN:13; XPression channels are the
+      sources XP:n:V and XP:n:A.
   - id: acuity
     name: Ross Acuity
-    supports: [select_program, select_preset, cut, auto_transition, fade_to_black, custom_control, gpi]
+    supports: [acuity_capture, custom_control, vtr_cue_clip, vtr_eject, vtr_play, vtr_pause, fade_to_black, gpi,
+               gpi_set, acuity_key_auto, acuity_key_auto_on, acuity_key_auto_off, acuity_key_cut,
+               acuity_key_cut_on, acuity_key_cut_off, acuity_key_shaped, acuity_load_set, acuity_save_set,
+               acuity_save_set_by_name, acuity_auto_transition, acuity_cut, acuity_recall_memory,
+               acuity_recall_memory_multi, acuity_save_memory, acuity_save_memory_multi, set_mnemonic,
+               acuity_media_store_load, acuity_media_store_play, acuity_multiviewer_box, reset_all,
+               set_video_mode, set_reference_mode, acuity_transition_include, acuity_transition_rate,
+               acuity_transition_type, user_variable_set, user_variable_operate, select_program, select_preset,
+               select_key, select_key_second, acuity_select_aux, crosspoint]
     verification: none
+  - id: ultrix-acuity
+    name: Ross Ultrix Acuity
+    supports: [ultrix_acuity_capture, custom_control, vtr_cue_clip, vtr_eject, vtr_play, vtr_pause, fade_to_black,
+               gpi, gpi_set, acuity_key_auto, acuity_key_auto_on, acuity_key_auto_off, acuity_key_cut,
+               acuity_key_cut_on, acuity_key_cut_off, acuity_key_shaped, acuity_load_set, acuity_save_set,
+               acuity_save_set_by_name, acuity_auto_transition, acuity_cut, acuity_recall_memory,
+               acuity_recall_memory_multi, acuity_save_memory, acuity_save_memory_multi, set_mnemonic,
+               acuity_media_store_load, acuity_media_store_play, acuity_multiviewer_box, reset_all,
+               set_video_mode, set_reference_mode, acuity_transition_include, acuity_transition_rate,
+               acuity_transition_type, user_variable_set, user_variable_operate, select_program, select_preset,
+               select_key, select_key_second, acuity_select_aux, crosspoint]
+    verification: none
+  - id: vision
+    name: Ross Vision
+    supports: [custom_control, vtr_cue_clip, vtr_eject, vtr_play, vtr_pause, fade_to_black, gpi, gpi_set,
+               acuity_key_auto, acuity_key_auto_on, acuity_key_auto_off, acuity_key_cut, acuity_key_cut_on,
+               acuity_key_cut_off, acuity_key_shaped, acuity_load_set, acuity_save_set, acuity_save_set_by_name,
+               acuity_auto_transition, acuity_cut, acuity_recall_memory, acuity_recall_memory_multi,
+               acuity_save_memory, acuity_save_memory_multi, set_mnemonic, acuity_media_store_load,
+               acuity_media_store_play, acuity_multiviewer_box, reset_all, set_video_mode, set_reference_mode,
+               acuity_transition_include, acuity_transition_rate, acuity_transition_type, user_variable_set,
+               user_variable_operate, acuity_select_aux, crosspoint]
+    verification: none
+    notes: >
+      Vision requires MLE where the other switchers take ME, so the XPT
+      commands with a fixed "ME:" destination are not listed; use crosspoint
+      with an MLE destination (MLE:1:PGM).
 
 commands:
+  # ── Shared by both dialects (identical wire form) ─────────────────────────
+  custom_control:
+    summary: Run custom control cc in bank b (CC b:cc)
+    params:
+      bank: { type: int, min: 1, max: 99, required: true }
+      cc:   { type: int, min: 1, max: 99, required: true }
+    send: "CC {bank}:{cc:02d}"
+    returns: none
+
+  fade_to_black:
+    summary: Perform a fade-to-black transition (FTB)
+    send: "FTB"
+    returns: none
+
+  gpi:
+    summary: Perform the action assigned to GPI input xx (GPI xx); no action if the GPI is an output
+    params:
+      number: { type: int, min: 1, max: 99, required: true }
+    send: "GPI {number:02d}"
+    returns: none
+
+  set_mnemonic:
+    summary: Set the mnemonic name of a video source, such as IN:6 (MNEM source:new-name)
+    params:
+      source: { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+      name:   { type: string, required: true }
+    send: "MNEM {source}:{name}"
+    returns: none
+
   select_program:
-    summary: Set the program bus source on an M/E
+    summary: Select input n on the program bus of an ME (XPT ME:me:PGM:IN:n)
     params:
       source: { type: int, min: 1, max: 999, required: true }
-      me:     { type: int, min: 1, max: 8, default: 1 }
+      me:     { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
     send: "XPT ME:{me}:PGM:IN:{source}"
     returns: none
 
   select_preset:
-    summary: Set the preset bus source on an M/E
+    summary: Select input n on the preset bus of an ME (XPT ME:me:PST:IN:n)
     params:
       source: { type: int, min: 1, max: 999, required: true }
-      me:     { type: int, min: 1, max: 8, default: 1 }
+      me:     { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
     send: "XPT ME:{me}:PST:IN:{source}"
     returns: none
 
-  cut:
+  select_key:
+    summary: Select input n on a key bus of an ME (XPT ME:me:KEY:k:IN:n)
     params:
-      me: { type: int, min: 1, max: 8, default: 1 }
-    send: "MECUT ME:{me}"
+      source: { type: int, min: 1, max: 999, required: true }
+      key:    { type: int, min: 1, max: 99, required: true }
+      me:     { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "XPT ME:{me}:KEY:{key}:IN:{source}"
+    returns: none
+
+  select_key_second:
+    summary: Select input n on a key's second channel, the alpha, backside or second DVE channel (XPT ME:me:KEY:k:KEYBUS:2:IN:n)
+    params:
+      source: { type: int, min: 1, max: 999, required: true }
+      key:    { type: int, min: 1, max: 99, required: true }
+      me:     { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "XPT ME:{me}:KEY:{key}:KEYBUS:2:IN:{source}"
+    returns: none
+
+  crosspoint:
+    summary: >
+      Select any documented source on any documented destination (XPT
+      vid-dest:vid-source). Destinations such as AUX:2, ME:1:PGM, ME:1:PST,
+      ME:3:KEY:2, MME:1 (Acuity AUX:bank:aux, Vision MLE:n:PGM); sources such
+      as IN:6, BK, BG, CLN, CLIP, PGM, PV, AUX:1, ME:1:CLN, ME:1:KEY:2:A, MS:1,
+      CK:1, CKA:1, CAN:1, SCN:1, XP:1:V (Acuity GS:1, MS:me:ch, MVA:1, BG:n)
+    params:
+      destination: { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)+$', required: true }
+      source:      { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "XPT {destination}:{source}"
+    returns: none
+
+  # ── Carbonite family ──────────────────────────────────────────────────────
+  chroma_key_init:
+    summary: Initialize chroma key engine n (CKINIT n); not HyperMax
+    params:
+      chroma_key: { type: int, min: 1, max: 99, required: true }
+    send: "CKINIT {chroma_key}"
+    returns: none
+
+  chroma_key_init_keyer:
+    summary: Initialize the chroma key engine on a keyer (CKINIT ME-source:ME-number:keyer); HyperMax only
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "CKINIT {me_type}:{me}:{key}"
+    returns: none
+
+  clip_load:
+    summary: Load a clip by name into the clip player, on a system with a single clip player (CLIPLOAD clip-name)
+    params:
+      clip: { type: string, pattern: '^[^:]+$', required: true }
+    send: "CLIPLOAD {clip}"
+    returns: none
+
+  clip_load_channel:
+    summary: Load a clip by name into clip player channel n (CLIPLOAD clip-name:channel)
+    params:
+      clip:    { type: string, pattern: '^[^:]+$', required: true }
+      channel: { type: int, min: 1, max: 99, required: true }
+    send: "CLIPLOAD {clip}:{channel}"
+    returns: none
+
+  clip_eject:
+    summary: Eject the clip from the clip player, single clip player (CLIPEJECT)
+    send: "CLIPEJECT"
+    returns: none
+
+  clip_eject_channel:
+    summary: Eject the clip from clip player channel n (CLIPEJECT channel)
+    params:
+      channel: { type: int, min: 1, max: 99, required: true }
+    send: "CLIPEJECT {channel}"
+    returns: none
+
+  clip_play:
+    summary: Play the loaded clip, single clip player (CLIPPLAY)
+    send: "CLIPPLAY"
+    returns: none
+
+  clip_play_channel:
+    summary: Play the clip loaded in clip player channel n (CLIPPLAY channel)
+    params:
+      channel: { type: int, min: 1, max: 99, required: true }
+    send: "CLIPPLAY {channel}"
+    returns: none
+
+  clip_pause:
+    summary: Pause the clip, single clip player (CLIPPAUSE)
+    send: "CLIPPAUSE"
+    returns: none
+
+  clip_pause_channel:
+    summary: Pause the clip in clip player channel n (CLIPPAUSE channel)
+    params:
+      channel: { type: int, min: 1, max: 99, required: true }
+    send: "CLIPPAUSE {channel}"
+    returns: none
+
+  clip_loop:
+    summary: Turn clip looping on or off, single clip player (CLIPLOOPON / CLIPLOOPOFF)
+    params:
+      loop: { type: bool, default: true }
+    send: "CLIPLOOP{loop:on_off}"
+    returns: none
+
+  clip_loop_channel:
+    summary: Turn looping on or off for clip player channel n (CLIPLOOPON channel / CLIPLOOPOFF channel)
+    params:
+      channel: { type: int, min: 1, max: 99, required: true }
+      loop:    { type: bool, default: true }
+    send: "CLIPLOOP{loop:on_off} {channel}"
+    returns: none
+
+  create_cc_variable:
+    summary: Create a custom control variable with a current and a default value (CREATECCVARIABLE name:current:default)
+    params:
+      name:    { type: string, pattern: '^[^:]+$', required: true }
+      current: { type: int, required: true }
+      default_value: { type: int, required: true }
+    send: "CREATECCVARIABLE {name}:{current}:{default_value}"
+    returns: none
+
+  default_cc_variable:
+    summary: Reset a custom control variable to its default value (DEFAULTCCVARIABLE name)
+    params:
+      name: { type: string, pattern: '^[^:]+$', required: true }
+    send: "DEFAULTCCVARIABLE {name}"
+    returns: none
+
+  delete_cc_variable:
+    summary: Delete a custom control variable (DELETECCVARIABLE name)
+    params:
+      name: { type: string, pattern: '^[^:]+$', required: true }
+    send: "DELETECCVARIABLE {name}"
+    returns: none
+
+  set_cc_variable:
+    summary: Set the current value of a custom control variable (SETCCVARIABLE name:value)
+    params:
+      name:  { type: string, pattern: '^[^:]+$', required: true }
+      value: { type: int, required: true }
+    send: "SETCCVARIABLE {name}:{value}"
+    returns: none
+
+  sequencer_up:
+    summary: Move the next-event selection up one event in a sequencer (UP sequencer)
+    params:
+      sequencer: { type: int, min: 1, max: 99, required: true }
+    send: "UP {sequencer}"
+    returns: none
+
+  sequencer_down:
+    summary: Move the next-event selection down one event in a sequencer (DOWN sequencer)
+    params:
+      sequencer: { type: int, min: 1, max: 99, required: true }
+    send: "DOWN {sequencer}"
+    returns: none
+
+  sequencer_focus:
+    summary: Move the next-event selection to event n in a sequencer (FOCUS sequencer:event)
+    params:
+      sequencer: { type: int, min: 1, max: 99, required: true }
+      event:     { type: int, min: 1, max: 9999, required: true }
+    send: "FOCUS {sequencer}:{event}"
+    returns: none
+
+  sequencer_next:
+    summary: Run the selected event in a sequencer and advance the selection (NEXT sequencer)
+    params:
+      sequencer: { type: int, min: 1, max: 99, required: true }
+    send: "NEXT {sequencer}"
+    returns: none
+
+  sequence_load:
+    summary: Load sequence seq into a sequencer (SEQI sequencer:seq)
+    params:
+      sequencer: { type: int, min: 1, max: 99, required: true }
+      sequence:  { type: int, min: 1, max: 9999, required: true }
+    send: "SEQI {sequencer}:{sequence}"
+    returns: none
+
+  sequence_unload:
+    summary: Unload the sequence from a sequencer (SEQO sequencer)
+    params:
+      sequencer: { type: int, min: 1, max: 99, required: true }
+    send: "SEQO {sequencer}"
+    returns: none
+
+  gpi_level:
+    summary: Perform the action of GPI input xx on a HIGH or LOW signal edge (GPI xx:HIGH / GPI xx:LOW); Graphite only
+    params:
+      number: { type: int, min: 1, max: 99, required: true }
+      level:  { type: enum, values: [HIGH, LOW], required: true }
+    send: "GPI {number:02d}:{level}"
+    returns: none
+
+  key_auto:
+    summary: Auto-transition a key, toggling it on or off air (KEYAUTO ME-source:ME-number:keyer)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYAUTO {me_type}:{me}:{key}"
+    returns: none
+
+  key_auto_on:
+    summary: Auto-transition a key on air; nothing happens if it is already on air (KEYAUTOON ME-source:ME-number:keyer)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYAUTOON {me_type}:{me}:{key}"
+    returns: none
+
+  key_auto_off:
+    summary: Auto-transition a key off air; nothing happens if it is already off air (KEYAUTOOFF ME-source:ME-number:keyer)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYAUTOOFF {me_type}:{me}:{key}"
+    returns: none
+
+  key_cut:
+    summary: Cut a key, toggling it on or off air (KEYCUT ME-source:ME-number:keyer)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYCUT {me_type}:{me}:{key}"
+    returns: none
+
+  key_cut_on:
+    summary: Cut a key on air; nothing happens if it is already on air (KEYCUTON ME-source:ME-number:keyer)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYCUTON {me_type}:{me}:{key}"
+    returns: none
+
+  key_cut_off:
+    summary: Cut a key off air; nothing happens if it is already off air (KEYCUTOFF ME-source:ME-number:keyer)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYCUTOFF {me_type}:{me}:{key}"
+    returns: none
+
+  key_mode:
+    summary: Set a key's mode to NORMAL (key setup's shaped/unshaped), ADDITIVE or FULL (KEYMODE ME-source:ME-number:keyer:mode)
+    params:
+      key:     { type: int, min: 1, max: 99, required: true }
+      mode:    { type: enum, values: [NORMAL, ADDITIVE, FULL], required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "KEYMODE {me_type}:{me}:{key}:{mode}"
+    returns: none
+
+  load_set:
+    summary: Recall a set by name, from USB (HyperMax NFS) (LOADSET name); not Ultra 60
+    params:
+      name: { type: string, pattern: '^[^:]+$', required: true }
+    send: "LOADSET {name}"
+    returns: none
+
+  load_set_from:
+    summary: Recall a set by name from a drive, 0 internal/NFS or 1-3 USB (LOADSET location:name); Ultra 60 and HyperMax
+    params:
+      location: { type: int, min: 0, max: 3, required: true }
+      name:     { type: string, pattern: '^[^:]+$', required: true }
+    send: "LOADSET {location}:{name}"
+    returns: none
+
+  save_set:
+    summary: Store the switcher settings to a set by name, on USB (HyperMax NFS) (SAVESET name); not Ultra 60
+    params:
+      name: { type: string, pattern: '^[^:]+$', required: true }
+    send: "SAVESET {name}"
+    returns: none
+
+  save_set_to:
+    summary: Store the switcher settings to a named set on a drive, 0 internal/NFS or 1-3 USB (SAVESET location:name); Ultra 60 and HyperMax
+    params:
+      location: { type: int, min: 0, max: 3, required: true }
+      name:     { type: string, pattern: '^[^:]+$', required: true }
+    send: "SAVESET {location}:{name}"
     returns: none
 
   auto_transition:
+    summary: Perform an auto transition of the next-transition elements on an ME, MiniME or MultiScreen (MEAUTO ME-source:ME-number)
     params:
-      me: { type: int, min: 1, max: 8, default: 1 }
-    send: "MEAUTO ME:{me}"
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "MEAUTO {me_type}:{me}"
     returns: none
 
-  fade_to_black:
-    send: "FTB"
-    returns: none
-
-  custom_control:
+  cut:
+    summary: Perform a cut of the next-transition elements on an ME, MiniME or MultiScreen (MECUT ME-source:ME-number)
     params:
-      bank: { type: int, min: 1, max: 99, required: true }
-      cc:   { type: int, min: 1, max: 99, required: true }
-    send: "CC {bank}:{cc}"
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "MECUT {me_type}:{me}"
     returns: none
 
-  gpi:
+  recall_memory:
+    summary: Recall memory m of bank b on one ME, MiniME or MultiScreen (MEM bm:ME-source:ME-number)
+    params:
+      bank:    { type: int, min: 0, max: 99, required: true }
+      memory:  { type: int, min: 0, max: 9, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "MEM {bank}{memory}:{me_type}:{me}"
+    returns: none
+
+  recall_memory_multi:
+    summary: Recall memory m of bank b on several outputs at once, targets such as ME:2:MME:1:CK:1 (MEM bm:targets)
+    params:
+      bank:    { type: int, min: 0, max: 99, required: true }
+      memory:  { type: int, min: 0, max: 9, required: true }
+      targets: { type: string, pattern: '^(ME|MME|MSC|CK):[0-9A-Z/]+(:(ME|MME|MSC|CK):[0-9A-Z/]+)*$', required: true }
+    send: "MEM {bank}{memory}:{targets}"
+    returns: none
+
+  save_memory:
+    summary: Store memory m of bank b from one ME, MiniME or MultiScreen (MEMSAVE bm:ME-source:ME-number)
+    params:
+      bank:    { type: int, min: 0, max: 99, required: true }
+      memory:  { type: int, min: 0, max: 9, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "MEMSAVE {bank}{memory}:{me_type}:{me}"
+    returns: none
+
+  save_memory_multi:
+    summary: Store memory m of bank b from several outputs at once, targets such as ME:1:MME:3 (MEMSAVE bm:targets)
+    params:
+      bank:    { type: int, min: 0, max: 99, required: true }
+      memory:  { type: int, min: 0, max: 9, required: true }
+      targets: { type: string, pattern: '^(ME|MME|MSC|CK):[0-9A-Z/]+(:(ME|MME|MSC|CK):[0-9A-Z/]+)*$', required: true }
+    send: "MEMSAVE {bank}{memory}:{targets}"
+    returns: none
+
+  media_store_load:
+    summary: Load still or animation media-ID from drive 0 internal or 1-3 USB into a Media-Store channel (MS channel:location:media-ID)
+    params:
+      channel:  { type: int, min: 1, max: 136, required: true }
+      location: { type: int, min: 0, max: 3, required: true }
+      media:    { type: int, min: 0, max: 999, required: true }
+    send: "MS {channel}:{location}:{media:03d}"
+    returns: none
+
+  media_store_load_id:
+    summary: Load still or animation media-ID from NFS into a Media-Store channel (MS channel:media-ID); HyperMax only
+    params:
+      channel: { type: int, min: 1, max: 136, required: true }
+      media:   { type: int, min: 0, max: 999, required: true }
+    send: "MS {channel}:{media:03d}"
+    returns: none
+
+  motiontext_load:
+    summary: Load MotionText preset p from bank b (MTLoad bank:preset); Carbonite Code only
+    params:
+      bank:   { type: int, min: 1, max: 99, required: true }
+      preset: { type: int, min: 1, max: 999, required: true }
+    send: "MTLoad {bank}:{preset}"
+    returns: none
+
+  motiontext_take_in:
+    summary: Take In the loaded MotionText preset (MTTakeIn); Carbonite Code only
+    send: "MTTakeIn"
+    returns: none
+
+  motiontext_take_out:
+    summary: Take Out the loaded MotionText preset (MTTakeOut); Carbonite Code only
+    send: "MTTakeOut"
+    returns: none
+
+  motiontext_set_text:
+    summary: Replace the text of text box n in the loaded MotionText preset; the text may not contain a colon (MTText text-box:text); Carbonite Code only
+    params:
+      text_box: { type: int, min: 1, max: 99, required: true }
+      text:     { type: string, pattern: '^[^:]*$', required: true }
+    send: "MTText {text_box}:{text}"
+    returns: none
+
+  multiviewer_box:
+    summary: Select a source, such as IN:6 or AUX:2, in a box of the Video Processor (VP) or I/O (IO) MultiViewer (MVBOX VP|IO:MultiViewer:box:source)
+    params:
+      processor:   { type: enum, values: [VP, IO], required: true }
+      multiviewer: { type: int, min: 1, max: 99, required: true }
+      box:         { type: int, min: 1, max: 99, required: true }
+      source:      { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "MVBOX {processor}:{multiviewer}:{box}:{source}"
+    returns: none
+
+  multiviewer_box_shift:
+    summary: Select a source in a shifted box of the VP or IO MultiViewer (MVBOXSHIFT VP|IO:MultiViewer:box:source)
+    params:
+      processor:   { type: enum, values: [VP, IO], required: true }
+      multiviewer: { type: int, min: 1, max: 99, required: true }
+      box:         { type: int, min: 1, max: 99, required: true }
+      source:      { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "MVBOXSHIFT {processor}:{multiviewer}:{box}:{source}"
+    returns: none
+
+  noop:
+    summary: No operation, to keep the connection open (NOOP)
+    send: "NOOP"
+    returns: none
+
+  ntp_off:
+    summary: Turn off the NTP server (NTP OFF)
+    send: "NTP OFF"
+    returns: none
+
+  ntp_set:
+    summary: Add an NTP server address (NTP SET:address)
+    params:
+      address: { type: string, pattern: '^[A-Za-z0-9.-]+$', required: true }
+    send: "NTP SET:{address}"
+    returns: none
+
+  reboot_all:
+    summary: Reboot all SDPE blades in the frame (REBOOTALL); HyperMax only
+    send: "REBOOTALL"
+    returns: none
+
+  transition_include:
+    summary: Replace the next-transition selection with background (B) and/or keys, such as B:2:3 (TRANSINCL ME-source:ME-number:incl:...)
+    params:
+      include: { type: string, pattern: '^(B|[0-9]{1,2})(:(B|[0-9]{1,2}))*$', required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "TRANSINCL {me_type}:{me}:{include}"
+    returns: none
+
+  transition_rate:
+    summary: Set the transition rate in frames (TRANSRATE ME-source:ME-number:rate)
+    params:
+      rate:    { type: int, min: 0, max: 999, required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "TRANSRATE {me_type}:{me}:{rate}"
+    returns: none
+
+  transition_type:
+    summary: Set the transition type to dissolve, DVE, media wipe or wipe (TRANSTYPE ME-source:ME-number:type)
+    params:
+      type:    { type: enum, values: [DISS, DVE, MEDIA, WIPE], required: true }
+      me_type: { type: enum, values: [ME, MME, MSC], default: ME }
+      me:      { type: string, pattern: '^([1-9][0-9]?|P/P|PP)(A|B|AB)?$', default: "1" }
+    send: "TRANSTYPE {me_type}:{me}:{type}"
+    returns: none
+
+  select_aux:
+    summary: Select input n on aux bus a (XPT AUX:a:IN:n)
+    params:
+      aux:    { type: int, min: 1, max: 99, required: true }
+      source: { type: int, min: 1, max: 999, required: true }
+    send: "XPT AUX:{aux}:IN:{source}"
+    returns: none
+
+  select_minime:
+    summary: Select input n on MiniME output m (XPT MME:m:IN:n)
+    params:
+      minime: { type: int, min: 1, max: 99, required: true }
+      source: { type: int, min: 1, max: 999, required: true }
+    send: "XPT MME:{minime}:IN:{source}"
+    returns: none
+
+  # ── Acuity family (Acuity, Ultrix Acuity, Vision) ─────────────────────────
+  acuity_capture:
+    summary: Capture a source, PVW or AUX:bank:aux, to RAM or disk on a Media-Store channel for n frames (CAPTURE DISK/RAM:channel:source:frames); Acuity only
+    params:
+      target:  { type: enum, values: [DISK, RAM], required: true }
+      channel: { type: int, min: 1, max: 99, required: true }
+      source:  { type: string, pattern: '^(PVW|AUX:[0-9]+:[0-9]+)$', required: true }
+      frames:  { type: int, min: 1, max: 99999, required: true }
+    send: "CAPTURE {target}:{channel}:{source}:{frames}"
+    returns: none
+
+  ultrix_acuity_capture:
+    summary: Capture an ME's preview or program output on a Media-Store channel (CAPTURE ME:source:channel); Ultrix Acuity only
+    params:
+      me:      { type: int, min: 1, max: 8, required: true }
+      source:  { type: enum, values: [PV, PGM, PGMB, PGMC, PGMD, PGME, PGMF], required: true }
+      channel: { type: int, min: 1, max: 99, required: true }
+    send: "CAPTURE {me}:{source}:{channel}"
+    returns: none
+
+  vtr_cue_clip:
+    summary: Send the VTR/VDCP cue-clip command to the server channel assigned to a source, such as IN:7 (CUECLIP vid-source:clip-name)
+    params:
+      source: { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+      clip:   { type: string, required: true }
+    send: "CUECLIP {source}:{clip}"
+    returns: none
+
+  vtr_eject:
+    summary: Send the VTR/VDCP eject command to the server channel assigned to a source (EJECT vid-source)
+    params:
+      source: { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "EJECT {source}"
+    returns: none
+
+  vtr_play:
+    summary: Send the VTR/VDCP play command to the server channel assigned to a source (PLAY vid-source)
+    params:
+      source: { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "PLAY {source}"
+    returns: none
+
+  vtr_pause:
+    summary: Send the VTR/VDCP pause command to the server channel assigned to a source (PAUSE vid-source)
+    params:
+      source: { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "PAUSE {source}"
+    returns: none
+
+  gpi_set:
+    summary: Set GPI xx on or off (GPI xx:1 / GPI xx:0)
     params:
       number: { type: int, min: 1, max: 99, required: true }
-    send: "GPI {number}"
+      state:  { type: bool, required: true }
+    send: "GPI {number:02d}:{state:bool01}"
+    returns: none
+
+  acuity_key_auto:
+    summary: Auto-transition key k on ME n, toggling it (KEYAUTO ME:keyer)
+    params:
+      me:  { type: int, min: 1, max: 8, required: true }
+      key: { type: int, min: 1, max: 99, required: true }
+    send: "KEYAUTO {me}:{key}"
+    returns: none
+
+  acuity_key_auto_on:
+    summary: Auto-transition key k on ME n on air if it is not already (KEYAUTOON ME:keyer)
+    params:
+      me:  { type: int, min: 1, max: 8, required: true }
+      key: { type: int, min: 1, max: 99, required: true }
+    send: "KEYAUTOON {me}:{key}"
+    returns: none
+
+  acuity_key_auto_off:
+    summary: Auto-transition key k on ME n off air if it is on air (KEYAUTOOFF ME:keyer)
+    params:
+      me:  { type: int, min: 1, max: 8, required: true }
+      key: { type: int, min: 1, max: 99, required: true }
+    send: "KEYAUTOOFF {me}:{key}"
+    returns: none
+
+  acuity_key_cut:
+    summary: Cut key k on ME n, toggling it (KEYCUT ME:keyer)
+    params:
+      me:  { type: int, min: 1, max: 8, required: true }
+      key: { type: int, min: 1, max: 99, required: true }
+    send: "KEYCUT {me}:{key}"
+    returns: none
+
+  acuity_key_cut_on:
+    summary: Cut key k on ME n on air if it is not already (KEYCUTON ME:keyer)
+    params:
+      me:  { type: int, min: 1, max: 8, required: true }
+      key: { type: int, min: 1, max: 99, required: true }
+    send: "KEYCUTON {me}:{key}"
+    returns: none
+
+  acuity_key_cut_off:
+    summary: Cut key k on ME n off air if it is on air (KEYCUTOFF ME:keyer)
+    params:
+      me:  { type: int, min: 1, max: 8, required: true }
+      key: { type: int, min: 1, max: 99, required: true }
+    send: "KEYCUTOFF {me}:{key}"
+    returns: none
+
+  acuity_key_shaped:
+    summary: Turn shaped keying on or off for key k on ME n (KEYSHAPED ME:keyer:ON/OFF)
+    params:
+      me:     { type: int, min: 1, max: 8, required: true }
+      key:    { type: int, min: 1, max: 99, required: true }
+      shaped: { type: bool, required: true }
+    send: "KEYSHAPED {me}:{key}:{shaped:on_off}"
+    returns: none
+
+  acuity_load_set:
+    summary: Load a setup by name from the USB drive or hard drive (LOADSET USB/HD:setname)
+    params:
+      drive: { type: enum, values: [USB, HD], required: true }
+      name:  { type: string, pattern: '^[^:]+$', required: true }
+    send: "LOADSET {drive}:{name}"
+    returns: none
+
+  acuity_save_set:
+    summary: Save the switcher settings to setup number n with a name on the USB drive or hard drive (SAVESET USB/HD:setup:setname)
+    params:
+      drive: { type: enum, values: [USB, HD], required: true }
+      setup: { type: int, min: 0, max: 999, required: true }
+      name:  { type: string, pattern: '^[^:]+$', required: true }
+    send: "SAVESET {drive}:{setup}:{name}"
+    returns: none
+
+  acuity_save_set_by_name:
+    summary: Save the switcher settings over the setup with a matching name (SAVESET USB/HD:setname)
+    params:
+      drive: { type: enum, values: [USB, HD], required: true }
+      name:  { type: string, pattern: '^[^:]+$', required: true }
+    send: "SAVESET {drive}:{name}"
+    returns: none
+
+  acuity_auto_transition:
+    summary: Perform an auto transition of the next-transition elements on ME n (MEAUTO ME)
+    params:
+      me: { type: int, min: 1, max: 8, default: 1 }
+    send: "MEAUTO {me}"
+    returns: none
+
+  acuity_cut:
+    summary: Perform a cut of the next-transition elements on ME n (MECUT ME)
+    params:
+      me: { type: int, min: 1, max: 8, default: 1 }
+    send: "MECUT {me}"
+    returns: none
+
+  acuity_recall_memory:
+    summary: Recall memory m of bank b on ME n (MEM bm:ME)
+    params:
+      bank:   { type: int, min: 0, max: 99, required: true }
+      memory: { type: int, min: 0, max: 9, required: true }
+      me:     { type: int, min: 1, max: 8, default: 1 }
+    send: "MEM {bank}{memory}:{me}"
+    returns: none
+
+  acuity_recall_memory_multi:
+    summary: Recall memory m of bank b on several MEs, such as 2:1 (MEM bm:ME:ME...)
+    params:
+      bank:   { type: int, min: 0, max: 99, required: true }
+      memory: { type: int, min: 0, max: 9, required: true }
+      mes:    { type: string, pattern: '^[1-8](:[1-8])*$', required: true }
+    send: "MEM {bank}{memory}:{mes}"
+    returns: none
+
+  acuity_save_memory:
+    summary: Store memory m of bank b from ME n (MEMSAVE bm:ME)
+    params:
+      bank:   { type: int, min: 0, max: 99, required: true }
+      memory: { type: int, min: 0, max: 9, required: true }
+      me:     { type: int, min: 1, max: 8, default: 1 }
+    send: "MEMSAVE {bank}{memory}:{me}"
+    returns: none
+
+  acuity_save_memory_multi:
+    summary: Store memory m of bank b from several MEs, such as 1:2:4 (MEMSAVE bm:ME:ME...)
+    params:
+      bank:   { type: int, min: 0, max: 99, required: true }
+      memory: { type: int, min: 0, max: 9, required: true }
+      mes:    { type: string, pattern: '^[1-8](:[1-8])*$', required: true }
+    send: "MEMSAVE {bank}{memory}:{mes}"
+    returns: none
+
+  acuity_media_store_load:
+    summary: Load media item n into a channel of the Global-Store (GS), Global-Store Audio (GSA) or an ME-Store (ME number) (MS media-store:channel:media-ID)
+    params:
+      store:   { type: string, pattern: '^(GS|GSA|[1-8])$', required: true }
+      channel: { type: int, min: 1, max: 99, required: true }
+      media:   { type: int, min: 0, max: 9999, required: true }
+    send: "MS {store}:{channel}:{media}"
+    returns: none
+
+  acuity_media_store_play:
+    summary: Play the media item loaded in a Global-Store, Global-Store Audio or ME-Store channel (MSPLAY media-store:channel)
+    params:
+      store:   { type: string, pattern: '^(GS|GSA|[1-8])$', required: true }
+      channel: { type: int, min: 1, max: 99, required: true }
+    send: "MSPLAY {store}:{channel}"
+    returns: none
+
+  acuity_multiviewer_box:
+    summary: Select a source, such as IN:6, in a box of MultiViewer n (MVBOX MultiViewer:box:source)
+    params:
+      multiviewer: { type: int, min: 1, max: 99, required: true }
+      box:         { type: int, min: 1, max: 99, required: true }
+      source:      { type: string, pattern: '^[A-Z]+(:[A-Z0-9/]+)*$', required: true }
+    send: "MVBOX {multiviewer}:{box}:{source}"
+    returns: none
+
+  reset_all:
+    summary: Perform an ALL+ALL soft reset of the switcher (RESETALL)
+    send: "RESETALL"
+    returns: none
+
+  set_video_mode:
+    summary: Set the switcher's operating video format and frequency, such as "1080i 59.94" or "480i 16x9" (SETVIDMODE VID:format)
+    params:
+      format: { type: string, pattern: '^[0-9]+[ip]( ?[0-9x.]+)?$', required: true }
+    send: "SETVIDMODE VID:{format}"
+    returns: none
+
+  set_reference_mode:
+    summary: Set the expected input reference format and frequency, such as "1080i 50" (SETVIDMODE REF:format)
+    params:
+      format: { type: string, pattern: '^[0-9]+[ip]( ?[0-9x.]+)?$', required: true }
+    send: "SETVIDMODE REF:{format}"
+    returns: none
+
+  acuity_transition_include:
+    summary: Replace the next-transition selection on ME n with background (B) and/or keys, such as B:2:3 (TRANSINCL ME:incl:...)
+    params:
+      me:      { type: int, min: 1, max: 8, required: true }
+      include: { type: string, pattern: '^(B|[0-9]{1,2})(:(B|[0-9]{1,2}))*$', required: true }
+    send: "TRANSINCL {me}:{include}"
+    returns: none
+
+  acuity_transition_rate:
+    summary: Set the transition rate of ME n in frames (TRANSRATE ME:rate)
+    params:
+      me:   { type: int, min: 1, max: 8, required: true }
+      rate: { type: int, min: 0, max: 999, required: true }
+    send: "TRANSRATE {me}:{rate}"
+    returns: none
+
+  acuity_transition_type:
+    summary: Set the transition type of ME n to dissolve, wipe, DVE or sequence (TRANSTYPE ME:type)
+    params:
+      me:   { type: int, min: 1, max: 8, required: true }
+      type: { type: enum, values: [DISS, WIPE, DVE, SEQ], required: true }
+    send: "TRANSTYPE {me}:{type}"
+    returns: none
+
+  user_variable_set:
+    summary: Assign a number to a user variable, creating it if needed (USERVAR name:value)
+    params:
+      name:  { type: string, pattern: '^[^:]+$', required: true }
+      value: { type: int, required: true }
+    send: "USERVAR {name}:{value}"
+    returns: none
+
+  user_variable_operate:
+    summary: Apply + - * / or = with a value to a user variable (USERVAR name:operation:value)
+    params:
+      name:      { type: string, pattern: '^[^:]+$', required: true }
+      operation: { type: enum, values: ["+", "-", "*", "/", "="], required: true }
+      value:     { type: int, required: true }
+    send: "USERVAR {name}:{operation}:{value}"
+    returns: none
+
+  acuity_select_aux:
+    summary: Select input n on aux a of aux bank b (XPT AUX:bank:aux:IN:n)
+    params:
+      bank:   { type: int, min: 1, max: 99, required: true }
+      aux:    { type: int, min: 1, max: 99, required: true }
+      source: { type: int, min: 1, max: 999, required: true }
+    send: "XPT AUX:{bank}:{aux}:IN:{source}"
     returns: none
 
 quirks:
@@ -83,23 +1061,162 @@ quirks:
     text: >
       RossTalk sends no acknowledgements. Every command is unverified: a
       malformed command, a non-existent source and a successful take are
-      indistinguishable to the sender.
+      indistinguishable to the sender. Ross documents replies only for the
+      query and CAPTURE commands, and gives no reply format for any of them.
 
   - models: [all]
     severity: critical
     text: >
-      These commands act on a live switcher immediately. select_program changes
-      what is on air with no transition and no confirmation step.
+      Commands act on a live switcher immediately. select_program and
+      crosspoint change what is on air with no transition and no confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      All commands are case sensitive (Ross: "Note: All commands are case
+      sensitive"). MTLoad, MTTakeIn, MTTakeOut and MTText are mixed case.
 
   - models: [all]
     severity: info
     text: >
-      Custom controls are addressed as bank:number and their behaviour is
-      defined on the switcher, not by this protocol. The same CC fires different
-      actions on different installations.
+      Custom controls (CC bank:cc) and GPI actions are defined on the switcher,
+      not by this protocol; the same number fires different actions on
+      different installations. Ross's syntax line is "CC bcc" but both its
+      examples are "CC 1:05", and GPI is "GPI xx" with the example "GPI 04":
+      both are sent with a colon and a two-digit number as in the examples.
 
   - models: [all]
     severity: info
     text: >
       Source numbering follows the switcher's configured input mapping, which
-      may not match physical connector numbering.
+      may not match physical connector numbering. The documentation does not
+      state per-model limits (MEs, keys, aux buses, GPIs, banks, sequencers,
+      Media-Store channels); the ranges here are wire-format bounds, and a
+      command for hardware the frame lacks is silently ignored.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Memory numbers are "bm", bank digits followed by the memory digit with
+      no separator (MEM 19 = bank 1, memory 9). Ross gives only single-digit
+      bank examples; this spec sends the memory as the final digit, which is
+      unambiguous but unconfirmed for banks of two digits.
+
+  - models: [carbonite, carbonite-black, carbonite-solo, carbonite-mosaic, ultrachromehr, carbonite-hypermax, carbonite-code, graphite]
+    severity: info
+    text: >
+      MEs are numbered 1, 2, 3, with the highest number being the program ME.
+      me_type selects the output kind: ME, MME (MiniME and Tile) or MSC
+      (MultiScreen and Canvas).
+
+  - models: [carbonite-ultra, carbonite-ultra-60]
+    severity: warning
+    text: >
+      Carbonite Ultra numbers its MEs 2, 1 and P/P, with P/P the program ME:
+      KEYAUTO ME:3:4 on Carbonite Black is KEYAUTO ME:P/P:4 on Ultra. Pass
+      me "P/P" for the program ME.
+
+  - models: [carbonite-hypermax]
+    severity: info
+    text: >
+      Split MEs are addressed by suffixing the ME number: A side (1A), B side
+      (1B, PPB) and both (PPAB), as in MECUT ME:1B. Configurable program and
+      preview outputs are the sources ME:n:PGM:1-4 and ME:n:PV:1-4.
+
+  - models: [carbonite-ultra-60, carbonite-hypermax]
+    severity: warning
+    text: >
+      Set locations differ: Ultra 60 uses 0 for the internal drive and 1, 2, 3
+      for USB drives numbered in the order the OS detected them; HyperMax uses
+      0 for NFS and 1 for USB. A USB number can therefore change between
+      boots on Ultra 60.
+
+  - models: [all]
+    severity: info
+    text: >
+      Sets loaded or saved over RossTalk exclude panel personality settings
+      such as colour schemes and user button assignments.
+
+  - models: [all]
+    severity: info
+    text: >
+      TRANSINCL replaces the whole next-transition selection; any existing
+      selections are lost. KEYAUTOON/KEYCUTON and KEYAUTOOFF/KEYCUTOFF do
+      nothing when the key is already in the requested state; KEYAUTO and
+      KEYCUT toggle.
+
+  - models: [all]
+    severity: info
+    text: >
+      Media-Store IDs are sent zero-padded to three digits on the Carbonite
+      family, as in Ross's examples "MS 1:0:002" and "MS 3:035"; Acuity's
+      examples ("MS 4:2:52", "MS GS:1:12") are unpadded and are sent as given.
+      Mosaic numbers Media-Store channels 101-136.
+
+  - models: [carbonite, carbonite-black, carbonite-solo, carbonite-mosaic, ultrachromehr, carbonite-ultra, carbonite-ultra-60, carbonite-hypermax, carbonite-code, graphite]
+    severity: info
+    text: >
+      Clip player commands without a channel are for systems with a single
+      clip player; the earlier edition of the guide documented only those.
+      MVBOX's I/O MultiViewer token is IO in the current guide and OP in the
+      earlier edition. The NTP example in the guide is written "NET SET:",
+      contradicting its own syntax line "NTP SET:address"; NTP SET is sent.
+
+  - models: [carbonite-code]
+    severity: info
+    text: >
+      MTText cannot carry a colon in the text; the spec rejects one.
+
+  - models: [graphite]
+    severity: warning
+    text: >
+      RossTalk must be enabled on Graphite (Configuration > System > Access >
+      RossTalk = On) before it accepts commands on port 7788.
+
+  - models: [acuity, ultrix-acuity, vision]
+    severity: warning
+    text: >
+      The switcher accepts RossTalk only after an RTalk-IN device is assigned
+      to a com port as Network TCP server on local port 7788. Server(1)
+      accepts a single client connection at a time; Server(Many) accepts
+      several. Its "Cmd Response" option (default OFF) is not described
+      further.
+
+  - models: [acuity, ultrix-acuity, vision]
+    severity: critical
+    text: >
+      SETVIDMODE is not validated by the switcher: an unsupported format and
+      frequency combination is accepted. RESETALL performs an ALL+ALL soft
+      reset. Both disrupt output.
+
+  - models: [carbonite-hypermax]
+    severity: critical
+    text: >
+      REBOOTALL reboots every SDPE blade in the frame.
+
+  - models: [vision]
+    severity: warning
+    text: >
+      Ross: "When you are entering commands for Vision, you must use MLE
+      instead of ME. Acuity supports both ME and MLE." This is unambiguous for
+      XPT destinations and sources (use crosspoint with MLE:n:...), but the
+      guide does not say whether it also changes command words such as MECUT
+      or MEAUTO; they are listed as documented.
+
+  - models: [acuity, ultrix-acuity, vision]
+    severity: info
+    text: >
+      Acuity aux buses are addressed by bank and aux (AUX:bank:aux). The
+      Acuity TRANSTYPE list is DISS, WIPE, DVE and SEQ in the current guide;
+      the earlier edition listed MEDIA instead of SEQ. The ME-Store in MS and
+      MSPLAY is the bare ME number in the current examples ("MS 4:2:52"); the
+      earlier edition wrote ME:4. The guide's KEYAUTOOFF and KEYCUTOFF
+      examples are misprinted as KEYAUTOON and KEYCUTON.
+
+  - models: [acuity]
+    severity: info
+    text: >
+      CAPTURE's syntax line is DISK/RAM:channel:source:frames; the earlier
+      edition also showed "CAPTURE 3:PVW:5" without the target, which this
+      spec does not send. The switcher replies when the capture completes, in
+      a format Ross does not document.
