@@ -19,7 +19,11 @@ impl Reply {
     fn text(&self) -> String {
         match self {
             Reply::Text(t) => t.clone(),
-            Reply::Http { body, .. } => String::from_utf8_lossy(body).into_owned(),
+            // A body ends where its text ends: a trailing line break is not part of
+            // the reply ("p1\r\n" from a Panasonic camera).
+            Reply::Http { body, .. } => String::from_utf8_lossy(body)
+                .trim_end_matches(['\r', '\n'])
+                .to_string(),
             Reply::Osc { args } => Value::Array(args.clone()).to_string(),
         }
     }

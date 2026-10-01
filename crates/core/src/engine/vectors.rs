@@ -185,6 +185,10 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         {
             cx.state(patch);
         }
+        // As the engine does: a text reply also goes to the text rules.
+        if let Ok(text) = std::str::from_utf8(body) {
+            engine.apply_text(&mut cx, text);
+        }
     }
     let mut state = json!({});
     for a in cx.take() {

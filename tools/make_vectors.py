@@ -229,16 +229,6 @@ http(P, "recall_preset", {"preset": 3}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&posc
 http(P, "save_preset", {"preset": 89}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&posset&89")
 http(P, "home", {}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&home")
 
-# Panasonic AW: key/value query, '#' percent-encoded, presets 0-based.
-PA = "panasonic-ptz"
-http(PA, "move", {"pan_speed": 99, "tilt_speed": 1}, "GET", "/cgi-bin/aw_ptz?cmd=%23PTS9901&res=1")
-http(PA, "stop_move", {}, "GET", "/cgi-bin/aw_ptz?cmd=%23PTS5050&res=1")
-http(PA, "zoom", {"speed": 25}, "GET", "/cgi-bin/aw_ptz?cmd=%23Z25&res=1")
-http(PA, "stop_zoom", {}, "GET", "/cgi-bin/aw_ptz?cmd=%23Z50&res=1")
-http(PA, "recall_preset", {"preset": 1}, "GET", "/cgi-bin/aw_ptz?cmd=%23R00&res=1")
-http(PA, "save_preset", {"preset": 100}, "GET", "/cgi-bin/aw_ptz?cmd=%23M99&res=1")
-http(PA, "power", {"power_on": True}, "GET", "/cgi-bin/aw_ptz?cmd=%23O1&res=1")
-
 # TriCaster: GET /v1/shortcut?name=NAME&value=VALUE (Automation and
 # Integration Guide p.63).
 T = "newtek-tricaster"
@@ -372,6 +362,11 @@ telemetry(X, "channel-name", inbound_hex=hexs(osc("/ch/12/config/name", ("s", "V
           expect_state={"channels": {"12": {"name": "Vox"}}})
 telemetry(X, "main-fader", inbound_hex=hexs(osc("/main/st/mix/fader", ("f", 0.5))),
           expect_state={"main": {"fader": 0.5}})
+
+
+# Large per-device sets, one file each, written in this file's helpers.
+for extra in sorted((ROOT / "tools" / "vectors").glob("*.py")):
+    exec(compile(extra.read_text(encoding="utf-8"), str(extra), "exec"), globals())
 
 
 def main() -> None:

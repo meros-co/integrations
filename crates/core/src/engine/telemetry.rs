@@ -390,6 +390,12 @@ impl Telemetry {
     ) -> bool {
         let mut params = Params::new();
         let mut specs = BTreeMap::new();
+        // Captures as they arrived, so a string state or a map sees "0800",
+        // not the number 800.
+        let texts: BTreeMap<&str, &str> = values
+            .iter()
+            .filter_map(|(n, v)| v.as_str().map(|s| (n.as_str(), s)))
+            .collect();
         for (name, v) in values {
             let kind = match v {
                 Value::Number(n) if n.is_i64() => ParamType::Int,
@@ -421,11 +427,21 @@ impl Telemetry {
             let Some(kind) = self.kind_of(&path) else {
                 continue;
             };
-            let raw = match sole_value(&a.value, &ctx) {
-                Some((v, _)) => v.clone(),
-                None => match render(&a.value, &ctx, |s| s.to_string()) {
-                    Ok(s) => Value::String(s),
-                    Err(_) => continue,
+            // A value that is one capture, as it arrived.
+            let text = a
+                .value
+                .strip_prefix('{')
+                .and_then(|v| v.strip_suffix('}'))
+                .filter(|n| !n.contains([':', '{', '}']))
+                .and_then(|n| texts.get(n).copied());
+            let raw = match (text, kind) {
+                (Some(t), "string") => Value::String(t.to_string()),
+                _ => match sole_value(&a.value, &ctx) {
+                    Some((v, _)) => v.clone(),
+                    None => match render(&a.value, &ctx, |s| s.to_string()) {
+                        Ok(s) => Value::String(s),
+                        Err(_) => continue,
+                    },
                 },
             };
             let value = match &a.map {
@@ -434,7 +450,7 @@ impl Telemetry {
                         Value::String(s) => s.clone(),
                         other => other.to_string(),
                     };
-                    match map.get(&key) {
+                    match text.and_then(|t| map.get(t)).or_else(|| map.get(&key)) {
                         Some(v) => v.clone(),
                         None => continue,
                     }
@@ -608,6 +624,29 @@ mod tests {
             })
             .unwrap();
         assert_eq!(p, json!({"channels": {"7": {"fader": 0.75}}}));
+    }
+
+    #[test]
+    fn text_captures_keep_their_form_for_strings_and_maps() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"match": "^OSJ:06:([0-9A-F]{4})$", "state": {"shutter": "{1}"}},
+                {"match": "^OGU:([0-9A-F]{2})$", "state": {"gain": {"value": "{1}", "map": {"08": "0dB"}}}},
+            ]})),
+            &state(json!({
+                "shutter": {"type": "string", "description": "x"},
+                "gain": {"type": "string", "description": "x"},
+            })),
+        )
+        .unwrap();
+        assert_eq!(
+            t.apply(&Inbound::Text("OSJ:06:0800")).unwrap(),
+            json!({"shutter": "0800"})
+        );
+        assert_eq!(
+            t.apply(&Inbound::Text("OGU:08")).unwrap(),
+            json!({"gain": "0dB"})
+        );
     }
 
     #[test]
