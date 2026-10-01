@@ -1,12 +1,58 @@
 spec: 1
 id: blackmagic-videohub
-name: Blackmagic Smart Videohub
+name: Blackmagic Videohub
 vendor: Blackmagic Design
 category: router
 
 source:
-  - title: Videohub Ethernet Protocol
-    note: Manufacturer-documented, published in the Videohub manual
+  - title: Blackmagic Videohub Ethernet Protocol v2.3, Developer Information (November 2023)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/DeveloperManuals/VideohubEthernetProtocol.pdf
+    note: >
+      Manufacturer-documented, and the source of every block and command here unless
+      the command says otherwise. Covers Blackmagic Videohub 12G, Universal Videohub and
+      Smart Videohub CleanSwitch 12x12. Block framing, preamble and device block
+      (p.2-3), label blocks (p.3), routing, processing unit and frame buffer blocks
+      (p.4), lock blocks (p.4-5), serial port directions and hardware status (p.5-6),
+      status updates, change requests and ACK/NAK (p.6-7), lock, unlock and forced
+      unlock (p.7), status dump requests and PING (p.8). The protocol text is the same
+      as in the May 2018 Videohub Developer Information
+      (https://documents.blackmagicdesign.com/DeveloperManuals/VideohubDeveloperInformation.pdf).
+  - title: Blackmagic Videohub Installation and Operation Manual (May 2025), Developer Information, Videohub Ethernet Protocol v2.8
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/Videohub12GInstallation.pdf
+    note: >
+      Manufacturer-documented; covers Blackmagic Videohub 12G, Videohub Mini 12G and Smart
+      Videohub CleanSwitch 12x12. Protocol v2.8 adds to v2.3 the device block's Friendly
+      name and Unique ID fields (p.45-46), the NETWORK and NETWORK INTERFACE blocks
+      (p.46), and the CONFIGURATION (Take Mode), TAKE MODE and END PRELUDE blocks (p.50).
+      The rest of its protocol text matches v2.3 (p.45-49). Per-output take or cut bus
+      mode on Videohub 12G, and clean switch on Videohub Mini 12G (p.27).
+  - title: Videohub Installation and Operation Manual (February 2020)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/VideohubInstallation.pdf
+    note: >
+      Manufacturer-documented; page numbers are from the February 2020 edition. Model
+      line-up and port counts: Universal Videohub 288 (p.26) and 72 (p.33); Broadcast,
+      Studio, Compact, Micro and Smart Videohub (p.40-42); Smart Videohub 12x12, 20x20,
+      40x40 and CleanSwitch 12x12 and their front-panel 'use take' setting (p.10-12).
+      Its Developer Information section repeats protocol v2.3.
+  - title: Blackmagic Videohub tech specs
+    author: Blackmagic Design
+    url: https://www.blackmagicdesign.com/products/blackmagicvideohub/techspecs
+    note: >
+      Manufacturer-documented. Current models and SDI input/output counts: Videohub
+      10x10, 20x20, 40x40, 80x80 and 120x120 12G, Videohub Mini 4x2, 6x2 and 8x4 12G,
+      and Smart Videohub CleanSwitch 12x12; each lists the Ethernet Videohub Control
+      Protocol.
+  - title: videohub crate 1.0.1 (omnimatrix), parser
+    author: vifino
+    url: https://github.com/vifino/omnimatrix/tree/main/crates/videohub
+    note: >
+      Community source (MIT licence), used only for the ALARM STATUS block, which
+      Blackmagic does not document; its parser reads that block as "name: status"
+      lines. Its captured CleanSwitch 12x12 dump (protocol 2.8) also corroborates the
+      documented CONFIGURATION and END PRELUDE blocks.
 
 transport:
   type: line-tcp
@@ -16,23 +62,282 @@ transport:
   timeout_ms: 2000
   reply: expected
   reply_match: "^(ACK|NAK)"
+  probe: "PING:"
 
 models:
-  - id: smart-videohub
-    name: Blackmagic Smart Videohub (all sizes)
+  - id: videohub-120x120-12g
+    name: Blackmagic Videohub 120x120 12G
     supports:
-      - set_route
-      - set_input_label
-      - set_output_label
-      - lock_output
-      - unlock_output
-      - force_unlock_output
-      - set_take_mode
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, set_take_mode, set_output_take_mode, get_device_info,
+       get_input_labels, get_output_labels, get_video_output_routing,
+       get_video_output_locks, get_configuration, get_take_mode, get_network,
+       get_network_interface, ping]
     verification: none
+    notes: >
+      120 12G-SDI inputs and 120 12G-SDI outputs; no monitoring or serial ports
+      (Blackmagic tech specs). Take or cut bus mode per output (Videohub manual, May
+      2025, p.27).
+  - id: videohub-80x80-12g
+    name: Blackmagic Videohub 80x80 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, set_take_mode, set_output_take_mode, get_device_info,
+       get_input_labels, get_output_labels, get_video_output_routing,
+       get_video_output_locks, get_configuration, get_take_mode, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      80 12G-SDI inputs and 80 12G-SDI outputs; no monitoring or serial ports
+      (Blackmagic tech specs). Take or cut bus mode per output (Videohub manual, May
+      2025, p.27).
+  - id: videohub-40x40-12g
+    name: Blackmagic Videohub 40x40 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, set_take_mode, set_output_take_mode, get_device_info,
+       get_input_labels, get_output_labels, get_video_output_routing,
+       get_video_output_locks, get_configuration, get_take_mode, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      40 12G-SDI inputs and 40 12G-SDI outputs; no monitoring or serial ports
+      (Blackmagic tech specs). Take or cut bus mode per output (Videohub manual, May
+      2025, p.27).
+  - id: videohub-20x20-12g
+    name: Blackmagic Videohub 20x20 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, set_take_mode, set_output_take_mode, get_device_info,
+       get_input_labels, get_output_labels, get_video_output_routing,
+       get_video_output_locks, get_configuration, get_take_mode, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      20 12G-SDI inputs and 20 12G-SDI outputs; no monitoring or serial ports
+      (Blackmagic tech specs). Take or cut bus mode per output (Videohub manual, May
+      2025, p.27).
+  - id: videohub-10x10-12g
+    name: Blackmagic Videohub 10x10 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, set_take_mode, set_output_take_mode, get_device_info,
+       get_input_labels, get_output_labels, get_video_output_routing,
+       get_video_output_locks, get_configuration, get_take_mode, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      10 12G-SDI inputs and 10 12G-SDI outputs; no monitoring or serial ports
+      (Blackmagic tech specs). Take or cut bus mode per output (Videohub manual, May
+      2025, p.27).
+  - id: videohub-mini-8x4-12g
+    name: Blackmagic Videohub Mini 8x4 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      8 12G-SDI inputs and 4 12G-SDI outputs (Blackmagic tech specs). Supports the
+      Ethernet Videohub Control Protocol per its tech specs. Its outputs have a clean
+      switch setting instead of take mode (Videohub manual, May 2025, p.27), which the
+      protocol does not document.
+  - id: videohub-mini-6x2-12g
+    name: Blackmagic Videohub Mini 6x2 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      6 12G-SDI inputs and 2 12G-SDI outputs (Blackmagic tech specs). Supports the
+      Ethernet Videohub Control Protocol per its tech specs. Its outputs have a clean
+      switch setting instead of take mode (Videohub manual, May 2025, p.27), which the
+      protocol does not document.
+  - id: videohub-mini-4x2-12g
+    name: Blackmagic Videohub Mini 4x2 12G
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, get_network,
+       get_network_interface, ping]
+    verification: none
+    notes: >
+      4 12G-SDI inputs and 2 12G-SDI outputs (Blackmagic tech specs). Supports the
+      Ethernet Videohub Control Protocol per its tech specs. Its outputs have a clean
+      switch setting instead of take mode (Videohub manual, May 2025, p.27), which the
+      protocol does not document.
+  - id: smart-videohub-cleanswitch-12x12
+    name: Smart Videohub CleanSwitch 12x12
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, set_take_mode, get_device_info, get_input_labels,
+       get_output_labels, get_video_output_routing, get_video_output_locks,
+       get_configuration, get_network, get_network_interface, ping]
+    verification: none
+    notes: >
+      12 inputs and 12 outputs, 6G-SDI, with resynchronisation on every input
+      (Blackmagic tech specs). Covered by the May 2025 manual (protocol v2.8); front-
+      panel 'use take' setting (Videohub manual, February 2020, p.11-12). Its RS-422
+      port is a router-control input (Leitch protocol), not a routable serial port.
+  - id: smart-videohub-12x12
+    name: Smart Videohub 12x12 (6G-SDI)
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, ping]
+    verification: none
+    notes: >
+      12 inputs and 12 outputs (Videohub manual, February 2020, p.10). It has a front-
+      panel 'use take' setting (p.11-12), but its manual documents protocol v2.3, which
+      has no take mode block.
+  - id: smart-videohub-20x20
+    name: Smart Videohub 20x20 (6G-SDI)
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, ping]
+    verification: none
+    notes: >
+      20 inputs and 20 outputs (Videohub manual, February 2020, p.10). It has a front-
+      panel 'use take' setting (p.11-12), but its manual documents protocol v2.3, which
+      has no take mode block.
+  - id: smart-videohub-40x40
+    name: Smart Videohub 40x40 (6G-SDI)
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, ping]
+    verification: none
+    notes: >
+      40 inputs and 40 outputs (Videohub manual, February 2020, p.10). It has a front-
+      panel 'use take' setting (p.11-12), but its manual documents protocol v2.3, which
+      has no take mode block.
+  - id: smart-videohub
+    name: Smart Videohub (3G-SDI, 16x16)
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, ping]
+    verification: none
+    notes: >
+      16 SDI inputs and 16 SDI outputs with a 32-button front panel (Videohub manual,
+      February 2020, p.40-42). Front-panel buttons route immediately and override locks.
+  - id: micro-videohub
+    name: Micro Videohub (3G-SDI, 16x16)
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, ping]
+    verification: none
+    notes: >
+      16 SDI inputs and 16 SDI outputs (Videohub manual, February 2020, p.40).
+  - id: compact-videohub
+    name: Compact Videohub (3G-SDI, 40x40)
+    supports:
+      [set_route, set_input_label, set_output_label, lock_output, unlock_output,
+       force_unlock_output, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, ping]
+    verification: none
+    notes: >
+      40 SDI inputs and 40 SDI outputs (Videohub manual, February 2020, p.40).
+  - id: studio-videohub
+    name: Studio Videohub (3G-SDI)
+    supports:
+      [set_route, set_monitoring_route, set_serial_route, set_input_label,
+       set_output_label, set_monitoring_output_label, set_serial_port_label, lock_output,
+       unlock_output, force_unlock_output, lock_monitoring_output,
+       unlock_monitoring_output, force_unlock_monitoring_output, lock_serial_port,
+       unlock_serial_port, force_unlock_serial_port, set_serial_port_direction,
+       get_device_info, get_input_labels, get_output_labels, get_monitoring_output_labels,
+       get_serial_port_labels, get_video_output_routing, get_monitoring_output_routing,
+       get_serial_port_routing, get_video_output_locks, get_monitoring_output_locks,
+       get_serial_port_locks, get_serial_port_directions, ping]
+    verification: none
+    notes: >
+      16 SDI inputs, 32 SDI outputs and 16 bidirectional RS-422 deck control ports
+      (Videohub manual, February 2020, p.40). Served over USB by a Videohub Server
+      computer. The manual does not say how the 32 outputs divide between video and
+      monitoring outputs; the VIDEOHUB DEVICE block reports it.
+  - id: broadcast-videohub
+    name: Broadcast Videohub (3G-SDI)
+    supports:
+      [set_route, set_monitoring_route, set_serial_route, set_input_label,
+       set_output_label, set_monitoring_output_label, set_serial_port_label, lock_output,
+       unlock_output, force_unlock_output, lock_monitoring_output,
+       unlock_monitoring_output, force_unlock_monitoring_output, lock_serial_port,
+       unlock_serial_port, force_unlock_serial_port, set_serial_port_direction,
+       get_device_info, get_input_labels, get_output_labels, get_monitoring_output_labels,
+       get_serial_port_labels, get_video_output_routing, get_monitoring_output_routing,
+       get_serial_port_routing, get_video_output_locks, get_monitoring_output_locks,
+       get_serial_port_locks, get_serial_port_directions, ping]
+    verification: none
+    notes: >
+      72 SDI inputs, 144 SDI outputs and 72 bidirectional RS-422 deck control ports
+      (Videohub manual, February 2020, p.40). Served over USB by a Videohub Server
+      computer. The manual does not say how the 144 outputs divide between video and
+      monitoring outputs; the VIDEOHUB DEVICE block reports it.
+  - id: universal-videohub-72
+    name: Universal Videohub 72
+    supports:
+      [set_route, set_serial_route, set_input_label, set_output_label,
+       set_serial_port_label, lock_output, unlock_output, force_unlock_output,
+       lock_serial_port, unlock_serial_port, force_unlock_serial_port,
+       set_serial_port_direction, get_device_info, get_input_labels, get_output_labels,
+       get_serial_port_labels, get_video_output_routing, get_serial_port_routing,
+       get_video_output_locks, get_serial_port_locks, get_serial_port_directions,
+       get_video_input_status, get_video_output_status, get_serial_port_status,
+       get_alarm_status, ping]
+    verification: none
+    notes: >
+      Up to 72 SDI inputs, 72 SDI outputs and 72 bidirectional RS-422 deck control ports
+      when fully populated (Videohub manual, February 2020, p.33). Pluggable interface
+      cards: sends the hardware status blocks (protocol p.5-6).
+  - id: universal-videohub-288
+    name: Universal Videohub 288
+    supports:
+      [set_route, set_serial_route, set_input_label, set_output_label,
+       set_serial_port_label, lock_output, unlock_output, force_unlock_output,
+       lock_serial_port, unlock_serial_port, force_unlock_serial_port,
+       set_serial_port_direction, get_device_info, get_input_labels, get_output_labels,
+       get_serial_port_labels, get_video_output_routing, get_serial_port_routing,
+       get_video_output_locks, get_serial_port_locks, get_serial_port_directions,
+       get_video_input_status, get_video_output_status, get_serial_port_status,
+       get_alarm_status, ping]
+    verification: none
+    notes: >
+      Up to 288 SDI inputs, 288 SDI outputs and 288 bidirectional RS-422 deck control
+      ports when fully populated (Videohub manual, February 2020, p.26). Pluggable
+      interface cards: sends the hardware status blocks (protocol p.5-6).
+  - id: workgroup-videohub
+    name: Workgroup Videohub
+    supports:
+      [set_route, set_monitoring_route, set_serial_route, set_processing_unit_route,
+       set_frame_buffer_route, set_input_label, set_output_label,
+       set_monitoring_output_label, set_serial_port_label, set_frame_label, lock_output,
+       unlock_output, force_unlock_output, lock_monitoring_output,
+       unlock_monitoring_output, force_unlock_monitoring_output, lock_serial_port,
+       unlock_serial_port, force_unlock_serial_port, lock_processing_unit,
+       unlock_processing_unit, force_unlock_processing_unit, lock_frame_buffer,
+       unlock_frame_buffer, force_unlock_frame_buffer, set_serial_port_direction,
+       get_device_info, get_input_labels, get_output_labels, get_monitoring_output_labels,
+       get_serial_port_labels, get_frame_labels, get_video_output_routing,
+       get_monitoring_output_routing, get_serial_port_routing, get_processing_unit_routing,
+       get_frame_buffer_routing, get_video_output_locks, get_monitoring_output_locks,
+       get_serial_port_locks, get_processing_unit_locks, get_frame_buffer_locks,
+       get_serial_port_directions, ping]
+    verification: none
+    notes: >
+      The only Videohub with processing units and frame buffers (protocol p.4-5). Port
+      counts are not given in the current documents; the VIDEOHUB DEVICE block reports
+      them. Monitoring and serial blocks are listed because the router reports whether
+      it has them.
 
 commands:
   set_route:
-    summary: Route an input to an output
+    summary: Route a video input to a video output
     params:
       input:  { type: int, min: 1, max: 288, required: true }
       output: { type: int, min: 1, max: 288, required: true }
@@ -41,29 +346,118 @@ commands:
       {output:-1} {input:-1}
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.6
+
+  set_monitoring_route:
+    summary: Route a video input to a monitoring output
+    params:
+      input:             { type: int, min: 1, max: 288, required: true }
+      monitoring_output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      VIDEO MONITORING OUTPUT ROUTING:
+      {monitoring_output:-1} {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.6
+
+  set_serial_route:
+    summary: Connect a serial (RS-422 deck control) port to another serial port
+    params:
+      port:        { type: int, min: 1, max: 288, required: true }
+      source_port: { type: int, min: 1, max: 288, required: true }
+    send: |
+      SERIAL PORT ROUTING:
+      {port:-1} {source_port:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.6
+
+  set_processing_unit_route:
+    summary: Route a source to a processing unit (Workgroup Videohub only)
+    params:
+      unit:   { type: int, min: 1, max: 288, required: true }
+      source: { type: int, min: 1, max: 288, required: true }
+    send: |
+      PROCESSING UNIT ROUTING:
+      {unit:-1} {source:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.6
+
+  set_frame_buffer_route:
+    summary: Route a source to a frame buffer (Workgroup Videohub only)
+    params:
+      frame:  { type: int, min: 1, max: 288, required: true }
+      source: { type: int, min: 1, max: 288, required: true }
+    send: |
+      FRAME BUFFER ROUTING:
+      {frame:-1} {source:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.6
 
   set_input_label:
+    summary: Set the label of a video input
     params:
       input: { type: int, min: 1, max: 288, required: true }
-      label: { type: string, max_length: 60, required: true }
+      label: { type: string, required: true }
     send: |
       INPUT LABELS:
       {input:-1} {label}
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3-4 and p.6
 
   set_output_label:
+    summary: Set the label of a video output
     params:
       output: { type: int, min: 1, max: 288, required: true }
-      label:  { type: string, max_length: 60, required: true }
+      label:  { type: string, required: true }
     send: |
       OUTPUT LABELS:
       {output:-1} {label}
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3-4 and p.6
+
+  set_monitoring_output_label:
+    summary: Set the label of a monitoring output
+    params:
+      monitoring_output: { type: int, min: 1, max: 288, required: true }
+      label:             { type: string, required: true }
+    send: |
+      MONITORING OUTPUT LABELS:
+      {monitoring_output:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3-4 and p.6
+
+  set_serial_port_label:
+    summary: Set the label of a serial port
+    params:
+      port:  { type: int, min: 1, max: 288, required: true }
+      label: { type: string, required: true }
+    send: |
+      SERIAL PORT LABELS:
+      {port:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3-4 and p.6
+
+  set_frame_label:
+    summary: Set the label of a frame buffer (Workgroup Videohub only)
+    params:
+      frame: { type: int, min: 1, max: 288, required: true }
+      label: { type: string, required: true }
+    send: |
+      FRAME LABELS:
+      {frame:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3-4 and p.6
 
   lock_output:
-    summary: Lock an output as owned by this client
+    summary: Lock a video output as owned by this client
     params:
       output: { type: int, min: 1, max: 288, required: true }
     send: |
@@ -71,9 +465,10 @@ commands:
       {output:-1} O
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
 
   unlock_output:
-    summary: Release a lock held by this client
+    summary: Release a lock this client holds on a video output
     params:
       output: { type: int, min: 1, max: 288, required: true }
     send: |
@@ -81,9 +476,10 @@ commands:
       {output:-1} U
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
 
   force_unlock_output:
-    summary: Release a lock held by another client
+    summary: Release a lock another client holds on a video output
     params:
       output: { type: int, min: 1, max: 288, required: true }
     send: |
@@ -91,9 +487,154 @@ commands:
       {output:-1} F
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.7
+
+  lock_monitoring_output:
+    summary: Lock a monitoring output as owned by this client
+    params:
+      monitoring_output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      MONITORING OUTPUT LOCKS:
+      {monitoring_output:-1} O
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  unlock_monitoring_output:
+    summary: Release a lock this client holds on a monitoring output
+    params:
+      monitoring_output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      MONITORING OUTPUT LOCKS:
+      {monitoring_output:-1} U
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  force_unlock_monitoring_output:
+    summary: Release a lock another client holds on a monitoring output
+    params:
+      monitoring_output: { type: int, min: 1, max: 288, required: true }
+    send: |
+      MONITORING OUTPUT LOCKS:
+      {monitoring_output:-1} F
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.7
+
+  lock_serial_port:
+    summary: Lock a serial port as owned by this client
+    params:
+      port: { type: int, min: 1, max: 288, required: true }
+    send: |
+      SERIAL PORT LOCKS:
+      {port:-1} O
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  unlock_serial_port:
+    summary: Release a lock this client holds on a serial port
+    params:
+      port: { type: int, min: 1, max: 288, required: true }
+    send: |
+      SERIAL PORT LOCKS:
+      {port:-1} U
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  force_unlock_serial_port:
+    summary: Release a lock another client holds on a serial port
+    params:
+      port: { type: int, min: 1, max: 288, required: true }
+    send: |
+      SERIAL PORT LOCKS:
+      {port:-1} F
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.7
+
+  lock_processing_unit:
+    summary: Lock a processing unit (Workgroup Videohub only) as owned by this client
+    params:
+      unit: { type: int, min: 1, max: 288, required: true }
+    send: |
+      PROCESSING UNIT LOCKS:
+      {unit:-1} O
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  unlock_processing_unit:
+    summary: Release a lock this client holds on a processing unit (Workgroup Videohub only)
+    params:
+      unit: { type: int, min: 1, max: 288, required: true }
+    send: |
+      PROCESSING UNIT LOCKS:
+      {unit:-1} U
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  force_unlock_processing_unit:
+    summary: Release a lock another client holds on a processing unit (Workgroup Videohub only)
+    params:
+      unit: { type: int, min: 1, max: 288, required: true }
+    send: |
+      PROCESSING UNIT LOCKS:
+      {unit:-1} F
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.7
+
+  lock_frame_buffer:
+    summary: Lock a frame buffer (Workgroup Videohub only) as owned by this client
+    params:
+      frame: { type: int, min: 1, max: 288, required: true }
+    send: |
+      FRAME BUFFER LOCKS:
+      {frame:-1} O
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  unlock_frame_buffer:
+    summary: Release a lock this client holds on a frame buffer (Workgroup Videohub only)
+    params:
+      frame: { type: int, min: 1, max: 288, required: true }
+    send: |
+      FRAME BUFFER LOCKS:
+      {frame:-1} U
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4-5 and p.7
+
+  force_unlock_frame_buffer:
+    summary: Release a lock another client holds on a frame buffer (Workgroup Videohub only)
+    params:
+      frame: { type: int, min: 1, max: 288, required: true }
+    send: |
+      FRAME BUFFER LOCKS:
+      {frame:-1} F
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.7
+
+  set_serial_port_direction:
+    summary: Set a serial port's direction to control (In, Workstation), slave (Out, Deck) or auto (Automatic)
+    params:
+      port:      { type: int, min: 1, max: 288, required: true }
+      direction: { type: enum, values: [control, slave, auto], required: true }
+    send: |
+      SERIAL PORT DIRECTIONS:
+      {port:-1} {direction}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 (block form); see quirks
 
   set_take_mode:
-    summary: Enable or disable take mode on the router
+    summary: Turn take mode on or off for the router (CONFIGURATION block)
     params:
       enabled: { type: bool, required: true }
     send: |
@@ -101,10 +642,207 @@ commands:
       Take Mode: {enabled}
     expect: { contains: "ACK" }
     returns: ack
+    # Videohub Installation and Operation Manual (May 2025), Developer Information, protocol v2.8, p.50 (block form); see quirks
+
+  set_output_take_mode:
+    summary: Turn take mode on or off for one output; off is cut bus mode (TAKE MODE block)
+    params:
+      output:  { type: int, min: 1, max: 288, required: true }
+      enabled: { type: bool, required: true }
+    send: |
+      TAKE MODE:
+      {output:-1} {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Installation and Operation Manual (May 2025), Developer Information, protocol v2.8, p.50 (block form); p.27 per-output cut bus; see quirks
+
+  get_device_info:
+    summary: Ask the router to resend its device information; the block follows the ACK and updates state
+    send: "VIDEOHUB DEVICE:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.2-3 and p.8
+
+  get_input_labels:
+    summary: Ask the router to resend its input labels; the block follows the ACK and updates state
+    send: "INPUT LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3 and p.8
+
+  get_output_labels:
+    summary: Ask the router to resend its output labels; the block follows the ACK and updates state
+    send: "OUTPUT LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3 and p.8
+
+  get_monitoring_output_labels:
+    summary: Ask the router to resend its monitoring output labels; the block follows the ACK and updates state
+    send: "MONITORING OUTPUT LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3 and p.8
+
+  get_serial_port_labels:
+    summary: Ask the router to resend its serial port labels; the block follows the ACK and updates state
+    send: "SERIAL PORT LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.3 and p.8
+
+  get_frame_labels:
+    summary: Ask the router to resend its frame buffer labels; the block follows the ACK and updates state
+    send: "FRAME LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_video_output_routing:
+    summary: Ask the router to resend its video output routing; the block follows the ACK and updates state
+    send: "VIDEO OUTPUT ROUTING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_monitoring_output_routing:
+    summary: Ask the router to resend its monitoring output routing; the block follows the ACK and updates state
+    send: "VIDEO MONITORING OUTPUT ROUTING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_serial_port_routing:
+    summary: Ask the router to resend its serial port routing; the block follows the ACK and updates state
+    send: "SERIAL PORT ROUTING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_processing_unit_routing:
+    summary: Ask the router to resend its processing unit routing; the block follows the ACK and updates state
+    send: "PROCESSING UNIT ROUTING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_frame_buffer_routing:
+    summary: Ask the router to resend its frame buffer routing; the block follows the ACK and updates state
+    send: "FRAME BUFFER ROUTING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_video_output_locks:
+    summary: Ask the router to resend its video output locks; the block follows the ACK and updates state
+    send: "VIDEO OUTPUT LOCKS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.4 and p.8
+
+  get_monitoring_output_locks:
+    summary: Ask the router to resend its monitoring output locks; the block follows the ACK and updates state
+    send: "MONITORING OUTPUT LOCKS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 and p.8
+
+  get_serial_port_locks:
+    summary: Ask the router to resend its serial port locks; the block follows the ACK and updates state
+    send: "SERIAL PORT LOCKS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 and p.8
+
+  get_processing_unit_locks:
+    summary: Ask the router to resend its processing unit locks; the block follows the ACK and updates state
+    send: "PROCESSING UNIT LOCKS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 and p.8
+
+  get_frame_buffer_locks:
+    summary: Ask the router to resend its frame buffer locks; the block follows the ACK and updates state
+    send: "FRAME BUFFER LOCKS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 and p.8
+
+  get_serial_port_directions:
+    summary: Ask the router to resend its serial port directions; the block follows the ACK and updates state
+    send: "SERIAL PORT DIRECTIONS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 and p.8
+
+  get_video_input_status:
+    summary: Ask the router to resend its video input hardware status; the block follows the ACK and updates state
+    send: "VIDEO INPUT STATUS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.5 and p.8
+
+  get_video_output_status:
+    summary: Ask the router to resend its video output hardware status; the block follows the ACK and updates state
+    send: "VIDEO OUTPUT STATUS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.6 and p.8
+
+  get_serial_port_status:
+    summary: Ask the router to resend its serial port hardware status; the block follows the ACK and updates state
+    send: "SERIAL PORT STATUS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.6 and p.8
+
+  get_configuration:
+    summary: Ask the router to resend its configuration (take mode); the block follows the ACK and updates state
+    send: "CONFIGURATION:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Installation and Operation Manual (May 2025), Developer Information, protocol v2.8, p.49-50
+
+  get_take_mode:
+    summary: Ask the router to resend its per-output take mode; the block follows the ACK and updates state
+    send: "TAKE MODE:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Installation and Operation Manual (May 2025), Developer Information, protocol v2.8, p.49-50
+
+  get_network:
+    summary: Ask the router to resend its network summary; the block follows the ACK and updates state
+    send: "NETWORK:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Installation and Operation Manual (May 2025), Developer Information, protocol v2.8, p.46 and p.49
+
+  get_network_interface:
+    summary: Ask the router to resend its network interface settings; the block follows the ACK and updates state
+    send: "NETWORK INTERFACE:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Installation and Operation Manual (May 2025), Developer Information, protocol v2.8, p.46 and p.49
+
+  get_alarm_status:
+    summary: Ask the router to resend its alarm (fan and power supply) status; the block follows the ACK and updates state
+    send: "ALARM STATUS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Not in Blackmagic's documents; community-observed block, requested as in p.8
+
+  ping:
+    summary: Check that the Videohub Server is still responding
+    send: "PING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 (November 2023), p.8
 
 telemetry:
-  # The router sends its whole state as status blocks when a client connects,
-  # and the changed block after every change, from any client or the panel.
+  # The Videohub Server sends its whole state as status blocks when a client
+  # connects, then the changed lines of a block after every change made by any
+  # client or panel (p.2-6). A status request (get_*) is answered with ACK and
+  # then the full block, which these same rules read. Nothing needs polling.
   # Numbers are 0-based on the wire and 1-based in the state.
   updates:
     - header: "^PROTOCOL PREAMBLE:$"
@@ -112,67 +850,284 @@ telemetry:
         Version: device.protocol_version
     - header: "^VIDEOHUB DEVICE:$"
       fields:
+        Device present: device.present
         Model name: device.model
+        Friendly name: device.friendly_name
+        Unique ID: device.unique_id
         Video inputs: device.inputs
+        Video processing units: device.processing_units
         Video outputs: device.outputs
+        Video monitoring outputs: device.monitoring_outputs
+        Serial ports: device.serial_ports
     - header: "^INPUT LABELS:$"
       each_line: "^(\\d+) (.*)$"
       state: { "inputs.{1:+1}.label": "{2}" }
     - header: "^OUTPUT LABELS:$"
       each_line: "^(\\d+) (.*)$"
       state: { "outputs.{1:+1}.label": "{2}" }
+    - header: "^MONITORING OUTPUT LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "monitoring_outputs.{1:+1}.label": "{2}" }
+    - header: "^SERIAL PORT LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "serial_ports.{1:+1}.label": "{2}" }
+    - header: "^FRAME LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "frame_buffers.{1:+1}.label": "{2}" }
     - header: "^VIDEO OUTPUT ROUTING:$"
       each_line: "^(\\d+) (\\d+)$"
       state: { "outputs.{1:+1}.input": "{2:+1}" }
+    - header: "^VIDEO MONITORING OUTPUT ROUTING:$"
+      each_line: "^(\\d+) (\\d+)$"
+      state: { "monitoring_outputs.{1:+1}.input": "{2:+1}" }
+    - header: "^SERIAL PORT ROUTING:$"
+      each_line: "^(\\d+) (\\d+)$"
+      state: { "serial_ports.{1:+1}.source_port": "{2:+1}" }
+    - header: "^PROCESSING UNIT ROUTING:$"
+      each_line: "^(\\d+) (\\d+)$"
+      state: { "processing_units.{1:+1}.source": "{2:+1}" }
+    - header: "^FRAME BUFFER ROUTING:$"
+      each_line: "^(\\d+) (\\d+)$"
+      state: { "frame_buffers.{1:+1}.source": "{2:+1}" }
     - header: "^VIDEO OUTPUT LOCKS:$"
       each_line: "^(\\d+) ([OLU])$"
       state:
         "outputs.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^MONITORING OUTPUT LOCKS:$"
+      each_line: "^(\\d+) ([OLU])$"
+      state:
+        "monitoring_outputs.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^SERIAL PORT LOCKS:$"
+      each_line: "^(\\d+) ([OLU])$"
+      state:
+        "serial_ports.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^PROCESSING UNIT LOCKS:$"
+      each_line: "^(\\d+) ([OLU])$"
+      state:
+        "processing_units.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^FRAME BUFFER LOCKS:$"
+      each_line: "^(\\d+) ([OLU])$"
+      state:
+        "frame_buffers.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^SERIAL PORT DIRECTIONS:$"
+      each_line: "^(\\d+) (control|slave|auto)$"
+      state: { "serial_ports.{1:+1}.direction": "{2}" }
+    - header: "^VIDEO INPUT STATUS:$"
+      each_line: "^(\\d+) (None|BNC|Optical)$"
+      state: { "inputs.{1:+1}.hardware": "{2}" }
+    - header: "^VIDEO OUTPUT STATUS:$"
+      each_line: "^(\\d+) (None|BNC|Optical)$"
+      state: { "outputs.{1:+1}.hardware": "{2}" }
+    - header: "^SERIAL PORT STATUS:$"
+      each_line: "^(\\d+) (None|RS422)$"
+      state: { "serial_ports.{1:+1}.hardware": "{2}" }
+    # Protocol v2.8 (May 2025 manual, p.46 and p.50).
+    - header: "^NETWORK:$"
+      fields:
+        Interface Count: network.interface_count
+        Default Interface: network.default_interface
+    - header: "^NETWORK INTERFACE:$"
+      fields:
+        Name: network.interface.name
+        Priority: network.interface.priority
+        MAC Address: network.interface.mac_address
+        Dynamic IP: { path: network.interface.dynamic_ip, map: { "true": true, "false": false } }
+        Current Addresses: network.interface.current_addresses
+        Current Gateway: network.interface.current_gateway
+        Static Addresses: network.interface.static_addresses
+        Static Gateway: network.interface.static_gateway
     - header: "^CONFIGURATION:$"
       fields:
         Take Mode: { path: take_mode, map: { "true": true, "false": false } }
+    - header: "^TAKE MODE:$"
+      each_line: "^(\\d+) (true|false)$"
+      state:
+        "outputs.{1:+1}.take_mode": { value: "{2}", map: { "true": true, "false": false } }
+    - match: "^END PRELUDE:$"
+      state: { device.prelude_complete: "true" }
+    # Not in Blackmagic's documents; community-observed (see sources and quirks).
+    - header: "^ALARM STATUS:$"
+      each_line: "^([^:]+): (.+)$"
+      state: { "alarms.{1}": "{2}" }
 
 state:
-  device.protocol_version: { type: string, description: "Videohub protocol version" }
-  device.model:            { type: string, description: "Model name the router reports" }
-  device.inputs:           { type: int, description: "Number of video inputs" }
-  device.outputs:          { type: int, description: "Number of video outputs" }
-  inputs.*.label:          { type: string, description: "Input label, keyed by input number from 1" }
-  outputs.*.label:         { type: string, description: "Output label, keyed by output number from 1" }
-  outputs.*.input:         { type: int, description: "Input routed to the output, numbered from 1" }
-  outputs.*.lock:          { type: string, description: "ours (locked by this client), other (locked by another client) or unlocked" }
-  take_mode:               { type: bool, description: "Take mode" }
+  device.protocol_version:     { type: string, description: "Protocol version from the preamble, e.g. 2.3" }
+  device.present:              { type: string, description: "Device present: true, false (no router attached to the Videohub Server) or the needs-update value (incompatible router firmware). Nothing further is sent unless it is true" }
+  device.model:                { type: string, description: "Model name the router reports" }
+  device.friendly_name:        { type: string, description: "Friendly name (protocol 2.8)" }
+  device.unique_id:            { type: string, description: "Unique device ID (protocol 2.8)" }
+  device.inputs:               { type: int, description: "Number of video inputs" }
+  device.processing_units:     { type: int, description: "Number of video processing units" }
+  device.outputs:              { type: int, description: "Number of video outputs" }
+  device.monitoring_outputs:   { type: int, description: "Number of video monitoring outputs" }
+  device.serial_ports:         { type: int, description: "Number of serial ports" }
+  device.prelude_complete:     { type: bool, description: "True once END PRELUDE arrives, marking the end of the initial status dump (protocol 2.8)" }
+  inputs.*.label:              { type: string, description: "Input label, keyed by input number from 1" }
+  inputs.*.hardware:           { type: string, description: "Input hardware: None, BNC or Optical (Universal Videohub)" }
+  outputs.*.label:             { type: string, description: "Output label, keyed by output number from 1" }
+  outputs.*.input:             { type: int, description: "Input routed to the output, numbered from 1" }
+  outputs.*.lock:              { type: string, description: "ours (locked from this client's IP address), other (locked by another client) or unlocked" }
+  outputs.*.take_mode:         { type: bool, description: "Output uses the take button (true) or cut bus mode (false) (protocol 2.8)" }
+  outputs.*.hardware:         { type: string, description: "Output hardware: None, BNC or Optical (Universal Videohub)" }
+  monitoring_outputs.*.label:  { type: string, description: "Monitoring output label, numbered from 1" }
+  monitoring_outputs.*.input:  { type: int, description: "Input routed to the monitoring output, numbered from 1" }
+  monitoring_outputs.*.lock:   { type: string, description: "ours, other or unlocked" }
+  serial_ports.*.label:        { type: string, description: "Serial port label, numbered from 1" }
+  serial_ports.*.source_port:  { type: int, description: "Serial port routed to this serial port, numbered from 1" }
+  serial_ports.*.lock:         { type: string, description: "ours, other or unlocked" }
+  serial_ports.*.direction:    { type: string, description: "control (In, Workstation), slave (Out, Deck) or auto (Automatic)" }
+  serial_ports.*.hardware:     { type: string, description: "Serial port hardware: None or RS422 (Universal Videohub)" }
+  processing_units.*.source:   { type: int, description: "Source routed to the processing unit, numbered from 1 (Workgroup Videohub)" }
+  processing_units.*.lock:     { type: string, description: "ours, other or unlocked" }
+  frame_buffers.*.label:       { type: string, description: "Frame buffer label, numbered from 1 (Workgroup Videohub)" }
+  frame_buffers.*.source:      { type: int, description: "Source routed to the frame buffer, numbered from 1 (Workgroup Videohub)" }
+  frame_buffers.*.lock:        { type: string, description: "ours, other or unlocked" }
+  take_mode:                   { type: bool, description: "Take mode from the CONFIGURATION block (protocol 2.8)" }
+  network.interface_count:     { type: int, description: "Number of network interfaces (protocol 2.8)" }
+  network.default_interface:   { type: int, description: "Default network interface, numbered as the router sends it (protocol 2.8)" }
+  network.interface.name:      { type: string, description: "Interface name, e.g. 1 GbE" }
+  network.interface.priority:  { type: int, description: "Interface priority" }
+  network.interface.mac_address: { type: string, description: "MAC address" }
+  network.interface.dynamic_ip: { type: bool, description: "DHCP in use" }
+  network.interface.current_addresses: { type: string, description: "Current IP address/subnet mask" }
+  network.interface.current_gateway: { type: string, description: "Current gateway" }
+  network.interface.static_addresses: { type: string, description: "Configured static IP addresses" }
+  network.interface.static_gateway: { type: string, description: "Configured static gateway" }
+  alarms.*:                    { type: string, description: "Alarm status keyed by the name the router gives it, such as a fan or power supply (undocumented ALARM STATUS block)" }
 
 quirks:
   - models: [all]
     severity: critical
     text: >
-      Inputs and outputs are 0-based on the wire. Operator-facing numbering is
-      1-based, matching the front panel and the labels. Handled by the -1 offset
-      in each command; an implementation that omits it routes to the wrong output.
-
-  - models: [all]
-    severity: info
-    text: >
-      The router answers each command block with ACK or NAK, and separately
-      pushes status blocks (the protocol preamble on connect, and the new state
-      after every change). Only ACK and NAK are taken as command replies.
+      Ports are numbered from zero on the wire, zero being port one on the chassis
+      (p.3). Operator-facing numbering here is 1-based, as on the front panel and in
+      Videohub Control. The -1 offset in each command and +1 in telemetry handle it;
+      an implementation that omits it routes to the wrong port.
 
   - models: [all]
     severity: warning
     text: >
-      Commands are multi-line blocks terminated by a blank line. A partial block
-      leaves the parser waiting rather than erroring.
-
-  - models: [all]
-    severity: warning
-    text: >
-      Locks are per-client. An output locked by another client reports "L" and
-      cannot be released with unlock_output; force_unlock_output overrides it
-      and will take routing control away from whoever holds it.
+      ACK means the request was understood, not that it was carried out (p.6-7).
+      Only the status block that follows confirms a change, and it can differ from
+      the request when other clients change the same port at the same time or the
+      request could not be performed. Take state only from status blocks, never from
+      a request. NAK means the block was not understood.
 
   - models: [all]
     severity: info
     text: >
-      Label text is free-form. Newlines injected into a label would terminate
-      the block early, so labels containing CR or LF are rejected.
+      The server pushes status blocks at any time: the full dump on connecting and
+      the changed lines after every change (p.2, p.6). Only ACK and NAK are taken as
+      command replies. A status request (get_*) is answered with ACK and then the full
+      block (p.8); the block updates state through telemetry, so the command itself
+      returns only the acknowledgement.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Each block ends with a blank line, and the server acts on it only then (p.6).
+      A partial block leaves the server waiting rather than erroring.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Locks belong to the client's IP address: O is owned by this client (locked
+      from the same IP address), L by another client, U unlocked (p.4). A lock held
+      by another client cannot be released with an unlock command; the force_unlock
+      commands send F, which overrides it and takes control from whoever holds it
+      (p.7). Two clients on one IP address share ownership.
+
+  - models: [smart-videohub]
+    severity: warning
+    text: >
+      The Smart Videohub front-panel buttons override any existing route, including
+      destinations locked with Videohub software (Videohub manual, February 2020, p.42).
+
+  - models: [all]
+    severity: info
+    text: >
+      Blocks for ports a router lacks are not sent: no monitoring or serial blocks
+      without those ports (p.3-5), processing unit and frame buffer blocks only on the
+      Workgroup Videohub (p.4-5), hardware status blocks only on Universal Videohubs
+      (p.5). The VIDEOHUB DEVICE block reports the counts. Parameter ranges allow 288,
+      the largest documented router; the document does not say how the server answers
+      a port beyond the router's count, so check device.inputs, device.outputs and the
+      other counts before sending.
+
+  - models: [all]
+    severity: warning
+    text: >
+      When no router is attached to the Videohub Server, or the router needs a
+      firmware update, the device block reports Device present false or the
+      needs-update value and nothing further is sent (p.3). Both editions typeset that
+      value as "needs _ update", so its exact spelling is uncertain; it is kept as sent.
+      When a new router is attached, the server resends every block except the
+      preamble (p.3). Broadcast, Studio and Workgroup Videohubs are shared over USB by
+      a Videohub Server computer, which is the TCP endpoint.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clients must ignore blocks and lines they do not recognise (p.2); compatible
+      protocol changes raise only the minor version. Routers covered by the May 2025
+      manual speak v2.8, whose documented device block omits the processing unit,
+      monitoring and serial counts; routers documented only for v2.3 are not documented
+      to send the v2.8 blocks.
+
+  - models: [universal-videohub-72, universal-videohub-288]
+    severity: info
+    text: >
+      Hardware status blocks (VIDEO INPUT STATUS, VIDEO OUTPUT STATUS, SERIAL PORT
+      STATUS) come only from the server, and again for a card's ports when a card is
+      plugged in or removed; blocks a client sends are ignored (p.6-7).
+
+  - models: [all]
+    severity: info
+    text: >
+      Labels are free text with no documented length limit. A label holding CR or LF
+      would end the block early and is rejected before sending. One block may carry
+      several routes, labels or locks (p.6); these commands send one line per block.
+
+  - models: [studio-videohub, broadcast-videohub, universal-videohub-72, universal-videohub-288, workgroup-videohub]
+    severity: warning
+    text: >
+      The document says clients change labels, locks and routes by sending a block
+      (p.6) but does not say whether SERIAL PORT DIRECTIONS can be set the same way;
+      it describes that block only as status (p.5). set_serial_port_direction sends it
+      in the documented block form; ACK/NAK and the following status block show
+      whether the router accepted it.
+
+  - models: [workgroup-videohub]
+    severity: warning
+    text: >
+      The document gives PROCESSING UNIT ROUTING and FRAME BUFFER ROUTING only by
+      example ("0 5", "0 7", p.4) and does not say what the second number indexes.
+      Here the first number is the processing unit or frame buffer and the second its
+      source, by analogy with the other routing blocks, and the source is offset by
+      one like every other port.
+
+  - models: [videohub-120x120-12g, videohub-80x80-12g, videohub-40x40-12g, videohub-20x20-12g, videohub-10x10-12g, smart-videohub-cleanswitch-12x12]
+    severity: warning
+    text: >
+      The May 2025 manual gives CONFIGURATION (Take Mode) and TAKE MODE only as status
+      the router reports (p.50). It does not say whether a client may set them, nor how
+      the single Take Mode value relates to the per-output TAKE MODE lines.
+      set_take_mode and set_output_take_mode send the blocks in the documented form;
+      ACK/NAK and the following status block show whether the router accepted them.
+      The p.50 examples also omit the blank line before END PRELUDE; every block is
+      taken to end with a blank line, as p.45 states.
+
+  - models: [videohub-120x120-12g, videohub-80x80-12g, videohub-40x40-12g, videohub-20x20-12g, videohub-10x10-12g, videohub-mini-8x4-12g, videohub-mini-6x2-12g, videohub-mini-4x2-12g, smart-videohub-cleanswitch-12x12]
+    severity: info
+    text: >
+      The NETWORK INTERFACE block is documented with a single header and no interface
+      number (p.46), so state holds one interface; a router reporting an Interface
+      Count above 1 would overwrite it. Network settings are reported only: the manual
+      documents no way to change them over this protocol.
+
+  - models: [universal-videohub-72, universal-videohub-288]
+    severity: warning
+    text: >
+      ALARM STATUS is not in Blackmagic's documents. It comes from a community parser
+      (see sources); its names (fans, power supplies) are model-specific and are kept
+      as the router sends them. Whether a router sends it depends on model and firmware.
