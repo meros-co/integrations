@@ -9,7 +9,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use meros_integrations::{Connection, Core, Event, OpenRequest, Outcome};
+use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
 use serde_json::{json, Value};
 use tokio::net::UdpSocket;
 
@@ -198,6 +198,38 @@ async fn atem_end_to_end() {
         core.snapshot(id).unwrap().state["tally"]["2"]["program"],
         true
     );
+
+    // A setting command passes the spec's checks and is acknowledged.
+    let outcome = core
+        .execute(id, "set_mix_rate", params(json!({"me": 1, "rate": 30})))
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    // The spec's range is checked before anything is sent.
+    let outcome = core
+        .execute(id, "set_mix_rate", params(json!({"me": 1, "rate": 0})))
+        .await;
+    assert!(matches!(outcome, Err(CommandError::InvalidParams { .. })));
+    // The ATEM Mini model lists Fairlight commands, but this switcher reported
+    // no Fairlight mixer, so the module refuses it.
+    let outcome = core
+        .execute(
+            id,
+            "set_fairlight_master",
+            params(json!({"fader_gain": 0.0})),
+        )
+        .await;
+    assert!(matches!(
+        outcome,
+        Err(CommandError::UnsupportedForModel { .. })
+    ));
+    // Classic audio is not listed for the ATEM Mini at all.
+    let outcome = core
+        .execute(id, "set_audio_master", params(json!({"gain": 0.0})))
+        .await;
+    assert!(matches!(
+        outcome,
+        Err(CommandError::UnsupportedForModel { .. })
+    ));
 
     core.close(id).await;
 }
