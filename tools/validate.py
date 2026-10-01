@@ -225,6 +225,19 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             errors += check_template("osc-address", expect["address"], params, settings,
                                      f"commands.{name}.expect")
 
+    transport = doc.get("transport") or {}
+    scheme = transport.get("scheme")
+    if isinstance(scheme, dict):
+        decl = settings.get(scheme.get("setting"))
+        if decl is None:
+            errors.append(f"transport.scheme names unknown setting '{scheme.get('setting')}'")
+        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"http", "https"}:
+            errors.append("transport.scheme's setting must be an enum of http and https")
+    if transport.get("auth") == "bearer" and "token" not in settings:
+        errors.append("auth: bearer needs a 'token' setting")
+    if transport.get("auth") in ("basic", "digest") and not {"username", "password"} <= settings.keys():
+        errors.append(f"auth: {transport.get('auth')} needs 'username' and 'password' settings")
+
     listen = (doc.get("transport") or {}).get("listen_port")
     if isinstance(listen, dict) and listen.get("setting") not in settings:
         errors.append(f"transport.listen_port names unknown setting '{listen.get('setting')}'")

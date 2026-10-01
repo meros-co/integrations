@@ -169,9 +169,12 @@ transport:
   probe: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&ptzstop&1&1" }
 ```
 
-With `auth: basic`, the `username` and `password` settings are sent on every
-request, and a Digest challenge in reply is answered as below, for devices
-that can be set to either. With `auth: digest`, requests go without credentials until the device
+With `auth: bearer`, the `token` setting is sent as `Authorization: Bearer
+<token>` on every request (none while it is empty). With `auth: basic`, the
+`username` and `password` settings are sent on every request, and a Digest challenge in reply is answered as below, for devices
+that can be set to either. A device that answers 403 for other reasons (a
+setting that cannot be changed in the current state) narrows the refusal to
+`refusal_status: [401]`. With `auth: digest`, requests go without credentials until the device
 answers 401 with a Digest challenge (RFC 7616: MD5, MD5-sess, SHA-256 or
 SHA-256-sess, with `qop=auth` or none); the request is then repeated once with
 the answer, and later requests to the same device answer the same challenge
@@ -181,6 +184,12 @@ terminal: pending and later commands fail with `auth`, the connection reports
 `unauthorized`, and nothing further is sent until the host opens the device
 again. A credential is never retried on a schedule, because repeated failed
 logins can lock a device out.
+
+Where the operator chooses HTTP or HTTPS on the device, `scheme` names a
+setting instead: `scheme: { setting: scheme }` with `scheme: { type: enum,
+values: [http, https], default: http }`. Devices that serve HTTPS with a
+self-signed certificate declare `accept_invalid_certs: true`: the connection is
+encrypted, but the device's identity is not checked.
 
 ### Settings and connection setup
 

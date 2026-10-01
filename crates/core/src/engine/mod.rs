@@ -69,6 +69,10 @@ enum Transport {
     Http {
         base: String,
         auth: HttpAuth,
+        /// Accept a device's self-signed certificate over HTTPS.
+        accept_invalid_certs: bool,
+        /// Statuses that mean the credential was refused.
+        refusal: Vec<u16>,
     },
 }
 
@@ -78,6 +82,8 @@ enum HttpAuth {
     None,
     Basic,
     Digest,
+    /// The `token` setting as `Authorization: Bearer <token>`.
+    Bearer,
 }
 
 impl Transport {
@@ -237,11 +243,31 @@ impl SpecEngine {
                 },
             },
             "http" => {
-                let scheme = str_field(&t, "scheme").unwrap_or("http");
+                // A scheme, or {setting: name} naming the operator's choice.
+                let scheme = match t.get("scheme") {
+                    None => "http".to_string(),
+                    Some(Value::String(s)) => s.clone(),
+                    Some(Value::Object(o)) => {
+                        let name = o
+                            .get("setting")
+                            .and_then(Value::as_str)
+                            .ok_or("scheme needs http, https or {setting: name}")?;
+                        ctx.settings
+                            .get(name)
+                            .and_then(Value::as_str)
+                            .unwrap_or("http")
+                            .to_string()
+                    }
+                    Some(_) => return Err("scheme needs http, https or {setting: name}".into()),
+                };
+                if scheme != "http" && scheme != "https" {
+                    return Err(format!("scheme '{scheme}' is not http or https"));
+                }
                 let auth = match str_field(&t, "auth").unwrap_or("none") {
                     "none" => HttpAuth::None,
                     "basic" => HttpAuth::Basic,
                     "digest" => HttpAuth::Digest,
+                    "bearer" => HttpAuth::Bearer,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
                 let host = match ctx.host {
@@ -251,6 +277,18 @@ impl SpecEngine {
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
                     auth,
+                    accept_invalid_certs: t
+                        .get("accept_invalid_certs")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                    refusal: match t.get("refusal_status").and_then(Value::as_array) {
+                        Some(list) => list
+                            .iter()
+                            .filter_map(Value::as_u64)
+                            .map(|s| s as u16)
+                            .collect(),
+                        None => vec![401, 403],
+                    },
                 }
             }
             other => return Err(format!("transport '{other}' is not implemented")),
@@ -333,7 +371,12 @@ impl SpecEngine {
                     _ => packet,
                 }))
             }
-            Transport::Http { base, auth } => {
+            Transport::Http {
+                base,
+                auth,
+                accept_invalid_certs,
+                ..
+            } => {
                 let method = str_field(item, "method").unwrap_or("GET");
                 let method: &'static str = match method {
                     "GET" => "GET",
@@ -375,6 +418,12 @@ impl SpecEngine {
                         base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}"));
                     headers.push(("Authorization".to_string(), format!("Basic {token}")));
                 }
+                if *auth == HttpAuth::Bearer {
+                    let token = setting("token");
+                    if !token.is_empty() {
+                        headers.push(("Authorization".to_string(), format!("Bearer {token}")));
+                    }
+                }
                 let body = match str_field(item, "body") {
                     Some(b) => Some(render(b, values, no_escape)?.into_bytes()),
                     None => None,
@@ -388,13 +437,15 @@ impl SpecEngine {
                     headers,
                     body,
                     timeout: Some(self.timeout),
-                    accept_invalid_certs: false,
+                    accept_invalid_certs: *accept_invalid_certs,
                     // Basic devices that answer with a Digest challenge get it
                     // answered too (SPEC.md §2).
-                    digest: (*auth != HttpAuth::None).then_some(Credentials {
-                        username: user,
-                        password: pass,
-                    }),
+                    digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(
+                        Credentials {
+                            username: user,
+                            password: pass,
+                        },
+                    ),
                 }))
             }
         }
@@ -1062,15 +1113,15 @@ impl Module for SpecEngine {
         if !ours {
             return;
         }
-        let credentialed = matches!(
-            self.transport,
-            Transport::Http {
-                auth: HttpAuth::Basic,
-                ..
+        // Any credential the device can refuse: Basic, Digest or a token.
+        let refused = |status: u16| match &self.transport {
+            Transport::Http { auth, refusal, .. } => {
+                *auth != HttpAuth::None && refusal.contains(&status)
             }
-        );
+            _ => false,
+        };
         match result {
-            Ok(response) if credentialed && matches!(response.status, 401 | 403) => self.refuse(
+            Ok(response) if refused(response.status) => self.refuse(
                 cx,
                 format!(
                     "the device refused the credential (HTTP {})",
@@ -1262,6 +1313,47 @@ mod tests {
         actions
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Connected)))
+    }
+
+    #[test]
+    fn bearer_tokens_and_a_chosen_scheme() {
+        let mut spec = Catalog::embedded().device("propresenter").unwrap().clone();
+        let t = spec.transport.as_mut().unwrap();
+        t["auth"] = json!("bearer");
+        t["scheme"] = json!({"setting": "scheme"});
+        t["accept_invalid_certs"] = json!(true);
+        let settings = json!({"token": "abc123", "scheme": "https"});
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: settings.as_object().unwrap().clone(),
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let request = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::Http { request, .. } => Some(request),
+                _ => None,
+            })
+            .expect("the probe");
+        assert!(
+            request.url.starts_with("https://127.0.0.1:"),
+            "{}",
+            request.url
+        );
+        assert!(request.accept_invalid_certs);
+        assert!(request.digest.is_none());
+        assert!(request
+            .headers
+            .contains(&("Authorization".to_string(), "Bearer abc123".to_string())));
     }
 
     #[test]

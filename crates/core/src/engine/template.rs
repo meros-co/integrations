@@ -16,9 +16,7 @@ fn placeholder() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // A name is an identifier, so a literal brace in a JSON body, such as
     // {"status":"toggle"}, is never taken for a placeholder.
-    RE.get_or_init(|| {
-        Regex::new(r#"\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}"#).unwrap()
-    })
+    RE.get_or_init(|| Regex::new(r#"\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}"#).unwrap())
 }
 
 /// Where values come from: a command's parameters and the device's settings,
@@ -307,8 +305,12 @@ mod tests {
         assert_eq!(percent_encode("#PTS 50/50"), "%23PTS%2050%2F50");
         // Literal JSON braces are not placeholders.
         assert_eq!(
-            go(r#"{"status":"toggle","n":{s}}"#, json!({"s": "1"}), "s: { type: string }")
-                .unwrap(),
+            go(
+                r#"{"status":"toggle","n":{s}}"#,
+                json!({"s": "1"}),
+                "s: { type: string }"
+            )
+            .unwrap(),
             r#"{"status":"toggle","n":1}"#
         );
         assert_eq!(
