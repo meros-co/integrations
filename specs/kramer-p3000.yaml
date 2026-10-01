@@ -1,12 +1,37 @@
 spec: 1
 id: kramer-p3000
-name: Kramer Protocol 3000 matrices
+name: Kramer Protocol 3000 matrices and switchers
 vendor: Kramer Electronics
 category: router
 
+# Transcribed from Kramer's Protocol 3000 Reference Guide. Page numbers below
+# are the guide's printed page numbers (the PDF page is six higher).
+#
+# The guide is the protocol's master command list, not any one product's: each
+# product implements a subset, listed in that product's own user manual, and
+# answers "ERR 002" (command not available) to the rest. Operator commands for
+# matrix and presentation switchers are covered here; firmware/FPGA/file
+# loading, EDID, multiviewer/scaler, step-in, I/O gateway, streamer, network
+# configuration, time and audio DSP (EQ, filters, talkover) are not.
 source:
-  - title: Kramer Protocol 3000 reference
-    note: Manufacturer-documented
+  - title: "Protocol 3000 Reference Guide, Version 3.0 (User), P/N 2900-300489 Rev 5 (revision 3.0, 26/7/2017)"
+    author: Kramer Electronics Ltd.
+    url: https://k.kramerav.com/downloads/protocols/protocol_3000_3.0_master_user.pdf
+    note: >
+      Manufacturer document. Transport, framing and syntax p.1-3 (TCP port 5000,
+      host messages "#...CR", device messages "~nn@...CR LF", 64-character limit,
+      every command bidirectional so front-panel actions are reported);
+      extended (X-) syntax, port and signal IDs p.4-7; mandatory system commands
+      p.9-13; system commands p.14-45 (DISPLAY? p.17, HDCP-MOD p.19, HDCP-STAT?
+      p.20, IDV p.21, INFO-IO?/INFO-PRST p.22, LABEL p.23, LOCK-FP p.25, NAME
+      p.27, NAME-RST p.28, PORTS-LIST? and POWER-SAVE p.30, PRST-AUD?/PRST-LOCK
+      p.32, PRST-LST?/PRST-RCL p.33, PRST-STO/PRST-VID? p.34, SIGNAL? and
+      SIGNALS-LIST? p.35, STANDBY p.36, AV-SW-MODE p.15, X-LABEL p.39, X-SIGNAL
+      p.45); switching/routing p.51-56 (AFV p.51, AUD/AV p.52, MATRIX-STATUS?
+      p.53, ROUTE p.54, VID and X-AFV p.55, X-ROUTE p.56); video p.57-68 (VFRZ
+      p.62, VID-PATTERN p.63, VMUTE p.64, X-MUTE p.66); audio p.69-88 (AUD-LVL
+      p.73, AUD-SIGNAL? p.76, MUTE p.83, X-AUD-LVL p.85); device-initiated
+      messages and error codes p.132-133; parameter tables p.136-147.
 
 transport:
   type: line-tcp
@@ -16,68 +41,1149 @@ transport:
   encoding: ascii
   timeout_ms: 2000
   reply: expected
-  probe: "#MODEL?"
+  # Every device message starts with "~" (p.1-2); anything else (such as the
+  # body lines of a multi-line HELP reply) is never a command's reply.
+  reply_match: "^~"
+  # Protocol handshaking, mandatory on every device (p.9): "#" CR, answered
+  # "~nn@ OK".
+  probe: "#"
 
 models:
   - id: p3000-generic
-    name: Kramer matrix or switcher speaking Protocol 3000
-    supports: [route_video, route_audio, get_model]
+    name: Kramer matrix or switcher speaking Protocol 3000 (standard syntax)
+    supports:
+      - handshake
+      - get_model
+      - get_version
+      - get_serial
+      - get_protocol_version
+      - get_build_date
+      - get_io_count
+      - get_preset_count
+      - get_name
+      - set_name
+      - reset_name
+      - identify
+      - reset
+      - factory_reset
+      - route_video
+      - route_audio
+      - route_data
+      - route_ir
+      - route_usb
+      - route_video_all
+      - route_audio_all
+      - get_route_video
+      - get_route_audio
+      - get_route_data
+      - get_route_ir
+      - get_route_usb
+      - legacy_route_video
+      - legacy_route_audio
+      - legacy_route_av
+      - legacy_get_route_video
+      - legacy_get_route_audio
+      - set_audio_follow_video
+      - get_audio_follow_video
+      - set_auto_switch_mode
+      - get_auto_switch_mode
+      - store_preset
+      - recall_preset
+      - get_preset_list
+      - get_preset_video
+      - get_preset_audio
+      - set_preset_lock
+      - get_preset_lock
+      - set_input_label
+      - set_output_label
+      - get_label
+      - set_video_mute
+      - get_video_mute
+      - set_audio_mute
+      - get_audio_mute
+      - set_input_audio_level
+      - set_output_audio_level
+      - set_input_audio_level_keep_mute
+      - set_output_audio_level_keep_mute
+      - get_input_audio_level
+      - get_output_audio_level
+      - set_freeze
+      - get_freeze
+      - set_test_pattern
+      - get_test_pattern
+      - get_signal
+      - get_audio_signal
+      - get_hdcp_status_input
+      - get_hdcp_status_output
+      - set_hdcp_mode
+      - get_hdcp_mode
+      - get_display
+      - set_front_panel_lock
+      - get_front_panel_lock
+      - set_standby
+      - get_standby
+      - set_power_save
+      - get_power_save
     verification: none
+    notes: >
+      The Protocol 3000 command set as the reference guide defines it, without
+      the extended (X-) commands. No product implements all of it: the
+      product's own user manual lists its subset, and a command the product
+      lacks is answered "ERR 002" (command not available). #HELP lists the
+      commands a device supports.
+  - id: p3000-extended
+    name: Kramer product supporting extended Protocol 3000 (X- commands)
+    supports:
+      - handshake
+      - get_model
+      - get_version
+      - get_serial
+      - get_protocol_version
+      - get_build_date
+      - get_io_count
+      - get_preset_count
+      - get_name
+      - set_name
+      - reset_name
+      - identify
+      - reset
+      - factory_reset
+      - route_video
+      - route_audio
+      - route_data
+      - route_ir
+      - route_usb
+      - route_video_all
+      - route_audio_all
+      - get_route_video
+      - get_route_audio
+      - get_route_data
+      - get_route_ir
+      - get_route_usb
+      - legacy_route_video
+      - legacy_route_audio
+      - legacy_route_av
+      - legacy_get_route_video
+      - legacy_get_route_audio
+      - set_audio_follow_video
+      - get_audio_follow_video
+      - set_auto_switch_mode
+      - get_auto_switch_mode
+      - store_preset
+      - recall_preset
+      - get_preset_list
+      - get_preset_video
+      - get_preset_audio
+      - set_preset_lock
+      - get_preset_lock
+      - set_input_label
+      - set_output_label
+      - get_label
+      - set_video_mute
+      - get_video_mute
+      - set_audio_mute
+      - get_audio_mute
+      - set_input_audio_level
+      - set_output_audio_level
+      - set_input_audio_level_keep_mute
+      - set_output_audio_level_keep_mute
+      - get_input_audio_level
+      - get_output_audio_level
+      - set_freeze
+      - get_freeze
+      - set_test_pattern
+      - get_test_pattern
+      - get_signal
+      - get_audio_signal
+      - get_hdcp_status_input
+      - get_hdcp_status_output
+      - set_hdcp_mode
+      - get_hdcp_mode
+      - get_display
+      - set_front_panel_lock
+      - get_front_panel_lock
+      - set_standby
+      - get_standby
+      - set_power_save
+      - get_power_save
+      - route_signal
+      - get_signal_route
+      - get_matrix_status
+      - get_signals_list
+      - get_ports_list
+      - mute_signal
+      - get_signal_mute
+      - set_signal_audio_level
+      - get_signal_audio_level
+      - set_port_label
+      - get_port_label
+      - set_signal_afv
+      - get_signal_afv
+      - get_signal_status
+    verification: none
+    notes: >
+      Newer products (p.4) that add extended Protocol 3000: X- commands
+      addressing ports and signals by ID (IN.HDMI.1, OUT.HDBT.4.VIDEO.1) rather
+      than by number. Which standard commands such a product keeps is listed in
+      its own user manual; #HELP lists them, and X- commands among them mark
+      the product as extended.
 
 commands:
-  route_video:
-    summary: Route an input to an output on the video layer
-    params:
-      input:  { type: int, min: 0, max: 256, required: true }
-      output: { type: int, min: 1, max: 256, required: true }
-    send: "#ROUTE 1,{output},{input}"
-    expect: { not_contains: "ERR" }
-    returns: ack
-
-  route_audio:
-    summary: Route an input to an output on the audio layer
-    params:
-      input:  { type: int, min: 0, max: 256, required: true }
-      output: { type: int, min: 1, max: 256, required: true }
-    send: "#ROUTE 2,{output},{input}"
-    expect: { not_contains: "ERR" }
+  # ── System (mandatory on every device, p.9-13) ──────────────────────────
+  handshake:
+    summary: Protocol handshake; validates the connection (answered "~nn@ OK")
+    send: "#"
+    expect: { matches: '^~\d+@\s*OK', not_contains: "ERR" }
     returns: ack
 
   get_model:
+    summary: Get the device model name (up to 19 printable characters)
     send: "#MODEL?"
-    expect: { matches: "@MODEL\\s+(.+)" }
+    expect: { matches: '^~\d+@MODEL\s+(.+?)\s*$', not_contains: "ERR" }
     returns: value
+
+  get_version:
+    summary: Get the firmware version (major.minor.build, XX.XX.XXXX)
+    send: "#VERSION?"
+    expect: { matches: '^~\d+@VERSION\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_serial:
+    summary: Get the factory serial number (14 decimal digits)
+    send: "#SN?"
+    expect: { matches: '^~\d+@SN\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_protocol_version:
+    summary: Get the Protocol 3000 version the device implements (XX.XX)
+    send: "#PROT-VER?"
+    expect: { matches: '^~\d+@PROT-VER\s+3000:(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_build_date:
+    summary: Get the firmware build date and time (YYYY/MM/DD hh:mm:ss)
+    send: "#BUILD-DATE?"
+    expect: { matches: '^~\d+@BUILD-DATE\s+(.+?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_io_count:
+    summary: Get the number of inputs and outputs, as "IN n,OUT m"
+    send: "#INFO-IO?"
+    expect: { matches: '^~\d+@INFO-IO\??\s+(IN\s+\d+,\s*OUT\s+\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_preset_count:
+    summary: Get the maximum number of video and audio presets, as "VID n,AUD m"
+    send: "#INFO-PRST?"
+    expect: { matches: '^~\d+@INFO-PRST\??\s+(VID\s+\d+,\s*AUD\s+\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_name:
+    summary: Get the machine (DNS) name
+    send: "#NAME?"
+    expect: { matches: '^~\d+@NAME\??\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_name:
+    summary: Set the machine (DNS) name; Administrator permission when security is on
+    params:
+      name: { type: string, max_length: 15, pattern: '^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$', required: true }
+    send: "#NAME {name}"
+    expect: { matches: '^~\d+@NAME\s', not_contains: "ERR" }
+    returns: ack
+
+  reset_name:
+    summary: Reset the machine (DNS) name to the factory default, KRAMER_ plus the last 4 serial digits
+    send: "#NAME-RST"
+    expect: { matches: '^~\d+@NAME-RST\s', not_contains: "ERR" }
+    returns: ack
+
+  identify:
+    summary: Light the device's buttons or LEDs to identify it among similar devices
+    send: "#IDV"
+    expect: { matches: '^~\d+@IDV\s', not_contains: "ERR" }
+    returns: ack
+
+  reset:
+    summary: Restart the device; Administrator permission when security is on
+    send: "#RESET"
+    expect: { matches: '^~\d+@RESET\s', not_contains: "ERR" }
+    returns: ack
+
+  factory_reset:
+    summary: Reset to the factory default configuration, deleting all user data
+    send: "#FACTORY"
+    expect: { matches: '^~\d+@FACTORY\s', not_contains: "ERR" }
+    returns: ack
+
+  # ── Routing (ROUTE, p.54; layers p.140) ─────────────────────────────────
+  route_video:
+    summary: Route an input to an output on the video layer (layer 1)
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE 1,{output},{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  route_audio:
+    summary: Route an input to an output on the audio layer (layer 2)
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE 2,{output},{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  route_data:
+    summary: Route an input to an output on the data layer (layer 3)
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE 3,{output},{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  route_ir:
+    summary: Route an input to an output on the IR layer (layer 4)
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE 4,{output},{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  route_usb:
+    summary: Route an input to an output on the USB layer (layer 5)
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE 5,{output},{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  route_video_all:
+    summary: Route an input to every output on the video layer (destination "*")
+    params:
+      input: { type: int, min: 0, required: true }
+    send: "#ROUTE 1,*,{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  route_audio_all:
+    summary: Route an input to every output on the audio layer (destination "*")
+    params:
+      input: { type: int, min: 0, required: true }
+    send: "#ROUTE 2,*,{input}"
+    expect: { matches: '^~\d+@ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_route_video:
+    summary: Get the input routed to an output on the video layer
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE? 1,{output}"
+    expect: { matches: '^~\d+@ROUTE\s+1,\d+,(\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_route_audio:
+    summary: Get the input routed to an output on the audio layer
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE? 2,{output}"
+    expect: { matches: '^~\d+@ROUTE\s+2,\d+,(\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_route_data:
+    summary: Get the input routed to an output on the data layer
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE? 3,{output}"
+    expect: { matches: '^~\d+@ROUTE\s+3,\d+,(\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_route_ir:
+    summary: Get the input routed to an output on the IR layer
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE? 4,{output}"
+    expect: { matches: '^~\d+@ROUTE\s+4,\d+,(\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_route_usb:
+    summary: Get the input routed to an output on the USB layer
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#ROUTE? 5,{output}"
+    expect: { matches: '^~\d+@ROUTE\s+5,\d+,(\d+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Legacy switching (VID/AUD/AV, p.52-55) ──────────────────────────────
+  legacy_route_video:
+    summary: Switch video with the legacy VID command (input 0 disconnects); prefer route_video
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#VID {input}>{output}"
+    expect: { matches: '^~\d+@VID\s', not_contains: "ERR" }
+    returns: ack
+
+  legacy_route_audio:
+    summary: Switch audio with the legacy AUD command (input 0 disconnects); in AFV mode video switches too
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#AUD {input}>{output}"
+    expect: { matches: '^~\d+@(AUD|AV)\s', not_contains: "ERR" }
+    returns: ack
+
+  legacy_route_av:
+    summary: Switch audio and video together with the legacy AV command (input 0 disconnects)
+    params:
+      input:  { type: int, min: 0, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#AV {input}>{output}"
+    expect: { matches: '^~\d+@AV\s', not_contains: "ERR" }
+    returns: ack
+
+  legacy_get_route_video:
+    summary: Get the video input on an output with the legacy VID? query (0 is disconnected)
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#VID? {output}"
+    expect: { matches: '^~\d+@VID\s+(\d+)>', not_contains: "ERR" }
+    returns: value
+
+  legacy_get_route_audio:
+    summary: Get the audio input on an output with the legacy AUD? query (0 is disconnected)
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#AUD? {output}"
+    expect: { matches: '^~\d+@AUD\s+(\d+)>', not_contains: "ERR" }
+    returns: value
+
+  set_audio_follow_video:
+    summary: Set audio-follow-video (true) or audio breakaway (false); entering AFV resets audio routes to the video routes
+    params:
+      follow: { type: bool, required: true }
+    send: "#AFV {follow:bool10}"
+    expect: { matches: '^~\d+@AFV\s', not_contains: "ERR" }
+    returns: ack
+
+  get_audio_follow_video:
+    summary: Get the AFV mode ("0"/"afv" audio follows video, "1"/"brk" breakaway)
+    send: "#AFV?"
+    expect: { matches: '^~\d+@AFV\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_auto_switch_mode:
+    summary: Set an output's input auto-switch mode on a layer (0 manual, 1 priority, 2 last connected)
+    params:
+      layer:  { type: int, min: 1, max: 5, required: true }
+      output: { type: int, min: 1, required: true }
+      mode:   { type: int, min: 0, max: 2, required: true }
+    send: "#AV-SW-MODE {layer},{output},{mode}"
+    expect: { matches: '^~\d+@AV-SW-MODE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_auto_switch_mode:
+    summary: Get an output's auto-switch mode on a layer (0 manual, 1 priority, 2 last connected)
+    params:
+      layer:  { type: int, min: 1, max: 5, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#AV-SW-MODE? {layer},{output}"
+    expect: { matches: '^~\d+@AV-SW-MODE\s+\d+,\d+,(\d+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Presets (p.32-34) ───────────────────────────────────────────────────
+  store_preset:
+    summary: Store the current connections, volumes and modes in a preset
+    params:
+      preset: { type: int, min: 1, required: true }
+    send: "#PRST-STO {preset}"
+    expect: { matches: '^~\d*@?PRST-STO\s', not_contains: "ERR" }
+    returns: ack
+
+  recall_preset:
+    summary: Recall a stored preset
+    params:
+      preset: { type: int, min: 1, required: true }
+    send: "#PRST-RCL {preset}"
+    expect: { matches: '^~\d*@?PRST-RCL\s', not_contains: "ERR" }
+    returns: ack
+
+  get_preset_list:
+    summary: Get the stored presets, as a comma-separated list of preset numbers
+    send: "#PRST-LST?"
+    expect: { matches: '^~\d+@PRST-LST\s*(.*?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_preset_video:
+    summary: Get the video input a stored preset routes to an output (0 is disconnected)
+    params:
+      preset: { type: int, min: 1, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#PRST-VID? {preset},{output}"
+    expect: { matches: '^~\d*@?PRST-VID\s+\d+,\s*(\d+)>', not_contains: "ERR" }
+    returns: value
+
+  get_preset_audio:
+    summary: Get the audio input a stored preset routes to an output (0 is disconnected)
+    params:
+      preset: { type: int, min: 1, required: true }
+      output: { type: int, min: 1, required: true }
+    send: "#PRST-AUD? {preset},{output}"
+    expect: { matches: '^~\d*@?PRST-AUD\s+\d+,\s*(\d+)>', not_contains: "ERR" }
+    returns: value
+
+  set_preset_lock:
+    summary: Make a preset read-only (true) or writable (false)
+    params:
+      preset: { type: int, min: 1, required: true }
+      locked: { type: bool, required: true }
+    send: "#PRST-LOCK {preset},{locked:on_off}"
+    expect: { matches: '^~\d+@PRST-LOCK\s', not_contains: "ERR" }
+    returns: ack
+
+  get_preset_lock:
+    summary: Get whether a preset is read-only ("ON" or "OFF")
+    params:
+      preset: { type: int, min: 1, required: true }
+    send: "#PRST-LOCK? {preset}"
+    expect: { matches: '^~\d+@PRST-LOCK\s+\d+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Labels (LABEL, p.23) ────────────────────────────────────────────────
+  set_input_label:
+    summary: Set and enable an input's custom label
+    params:
+      input: { type: int, min: 1, required: true }
+      label: { type: string, max_length: 32, pattern: '^[!-~]+$', required: true }
+    send: "#LABEL 0,{input},1,{label}"
+    expect: { matches: '^~\d+@LABEL\s', not_contains: "ERR" }
+    returns: ack
+
+  set_output_label:
+    summary: Set and enable an output's custom label
+    params:
+      output: { type: int, min: 1, required: true }
+      label:  { type: string, max_length: 32, pattern: '^[!-~]+$', required: true }
+    send: "#LABEL 1,{output},1,{label}"
+    expect: { matches: '^~\d+@LABEL\s', not_contains: "ERR" }
+    returns: ack
+
+  get_label:
+    summary: Get a label by port number, as documented (the query carries no input/output stage); returns the label
+    params:
+      port: { type: int, min: 1, required: true }
+    send: "#LABEL? {port}"
+    expect: { matches: '^~\d+@LABEL\s+\d+,\d+,[^,]*,(.*?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  # ── Mutes (VMUTE p.64, MUTE p.83) ───────────────────────────────────────
+  set_video_mute:
+    summary: Disable (mute) or enable video on an output
+    params:
+      output: { type: int, min: 1, required: true }
+      muted:  { type: bool, default: true }
+    send: "#VMUTE {output},{muted:bool01}"
+    expect: { matches: '^~\d+@VMUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_video_mute:
+    summary: Get an output's video mute flag (0 video enabled, 1 video disabled, 2 blank picture)
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#VMUTE? {output}"
+    expect: { matches: '^~\d+@VMUTE\s+\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  set_audio_mute:
+    summary: Mute or unmute audio on an output
+    params:
+      output: { type: int, min: 1, required: true }
+      muted:  { type: bool, default: true }
+    send: "#MUTE {output},{muted:bool01}"
+    expect: { matches: '^~\d+@MUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_audio_mute:
+    summary: Get an output's audio mute ("0"/"OFF" unmuted, "1"/"ON" muted)
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#MUTE? {output}"
+    expect: { matches: '^~\d+@MUTE\s+\d+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Audio levels (AUD-LVL p.73, AUD-SIGNAL? p.76) ───────────────────────
+  set_input_audio_level:
+    summary: Set an input's audio level in dB (input processing stage)
+    params:
+      channel: { type: int, min: 1, required: true }
+      level:   { type: int, min: -80, max: 10, required: true }
+    send: "#AUD-LVL 0,{channel},{level}"
+    expect: { matches: '^~\d+@AUD-LVL\s', not_contains: "ERR" }
+    returns: ack
+
+  set_output_audio_level:
+    summary: Set an output's audio level in dB (output processing stage)
+    params:
+      channel: { type: int, min: 1, required: true }
+      level:   { type: int, min: -80, max: 10, required: true }
+    send: "#AUD-LVL 1,{channel},{level}"
+    expect: { matches: '^~\d+@AUD-LVL\s', not_contains: "ERR" }
+    returns: ack
+
+  set_input_audio_level_keep_mute:
+    summary: Set an input's audio level in dB without changing its mute state (mutebehavior 1)
+    params:
+      channel: { type: int, min: 1, required: true }
+      level:   { type: int, min: -80, max: 10, required: true }
+    send: "#AUD-LVL 0,{channel},{level},1"
+    expect: { matches: '^~\d+@AUD-LVL\s', not_contains: "ERR" }
+    returns: ack
+
+  set_output_audio_level_keep_mute:
+    summary: Set an output's audio level in dB without changing its mute state (mutebehavior 1)
+    params:
+      channel: { type: int, min: 1, required: true }
+      level:   { type: int, min: -80, max: 10, required: true }
+    send: "#AUD-LVL 1,{channel},{level},1"
+    expect: { matches: '^~\d+@AUD-LVL\s', not_contains: "ERR" }
+    returns: ack
+
+  get_input_audio_level:
+    summary: Get an input's audio level in dB
+    params:
+      channel: { type: int, min: 1, required: true }
+    send: "#AUD-LVL? 0,{channel}"
+    expect: { matches: '^~\d+@AUD-LVL\s+0,\d+,\s*(-?\d+(?:\.\d+)?)', not_contains: "ERR" }
+    returns: value
+
+  get_output_audio_level:
+    summary: Get an output's audio level in dB
+    params:
+      channel: { type: int, min: 1, required: true }
+    send: "#AUD-LVL? 1,{channel}"
+    expect: { matches: '^~\d+@AUD-LVL\s+1,\d+,\s*(-?\d+(?:\.\d+)?)', not_contains: "ERR" }
+    returns: value
+
+  # ── Video output controls (VFRZ p.62, VID-PATTERN p.63) ─────────────────
+  set_freeze:
+    summary: Freeze or unfreeze an output's picture
+    params:
+      output: { type: int, min: 1, required: true }
+      frozen: { type: bool, default: true }
+    send: "#VFRZ {output},{frozen:bool01}"
+    expect: { matches: '^~\d+@VFRZ\s', not_contains: "ERR" }
+    returns: ack
+
+  get_freeze:
+    summary: Get an output's freeze state ("0"/"OFF" or "1"/"ON")
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#VFRZ? {output}"
+    expect: { matches: '^~\d+@VFRZ\s+\d+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_test_pattern:
+    summary: Show a test pattern on an output (pattern numbers are product-specific)
+    params:
+      output:  { type: int, min: 1, required: true }
+      pattern: { type: int, min: 1, required: true }
+    send: "#VID-PATTERN {output},{pattern}"
+    expect: { matches: '^~\d+@VID-PATTERN\s', not_contains: "ERR" }
+    returns: ack
+
+  get_test_pattern:
+    summary: Get the test pattern number on an output
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#VID-PATTERN? {output}"
+    expect: { matches: '^~\d+@VID-PATTERN\s+\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Signal, HDCP and sink status (p.17-20, p.35, p.76) ──────────────────
+  get_signal:
+    summary: Get whether an input has a signal (0 no signal, 1 signal)
+    params:
+      input: { type: int, min: 1, required: true }
+    send: "#SIGNAL? {input}"
+    expect: { matches: '^~\d+@SIGNAL\s+\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_audio_signal:
+    summary: Get whether an input has an audio signal (0 no signal, 1 signal present)
+    params:
+      input: { type: int, min: 1, required: true }
+    send: "#AUD-SIGNAL? {input}"
+    expect: { matches: '^~\d+@AUD-SIGNAL\s+\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  get_hdcp_status_input:
+    summary: Get whether an input's signal is HDCP-encrypted ("ON"/"OFF")
+    params:
+      input: { type: int, min: 1, required: true }
+    send: "#HDCP-STAT? 0,{input}"
+    expect: { matches: '^~\d+@HDCP-STAT\s+0,\d+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_hdcp_status_output:
+    summary: Get an output's sink HDCP status ("ON"/"OFF")
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#HDCP-STAT? 1,{output}"
+    expect: { matches: '^~\d+@HDCP-STAT\s+1,\d+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_hdcp_mode:
+    summary: Set an input's HDCP mode (0 off, 1 on, 2 follow input, 3 mirror output); Administrator permission when security is on
+    params:
+      input: { type: int, min: 1, required: true }
+      mode:  { type: int, min: 0, max: 3, required: true }
+    send: "#HDCP-MOD {input},{mode}"
+    expect: { matches: '^~\d+@HDCP-MOD\s', not_contains: "ERR" }
+    returns: ack
+
+  get_hdcp_mode:
+    summary: Get an input's HDCP mode (0 off, 1 on, 2 follow input, 3 mirror output)
+    params:
+      input: { type: int, min: 1, required: true }
+    send: "#HDCP-MOD? {input}"
+    expect: { matches: '^~\d+@HDCP-MOD\s+\d+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_display:
+    summary: Get an output's hot-plug (sink) status (0 not valid, 1 sink valid, 2 sink and EDID valid)
+    params:
+      output: { type: int, min: 1, required: true }
+    send: "#DISPLAY? {output}"
+    expect: { matches: '^~\d+@DISPLAY\s+\d+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Front panel lock, standby and power save (p.25, p.30, p.36) ─────────
+  set_front_panel_lock:
+    summary: Lock or unlock the front panel
+    params:
+      locked: { type: bool, default: true }
+    send: "#LOCK-FP {locked:bool01}"
+    expect: { matches: '^~\d+@LOCK-FP\s', not_contains: "ERR" }
+    returns: ack
+
+  get_front_panel_lock:
+    summary: Get the front panel lock (0 unlocked, 1 locked)
+    send: "#LOCK-FP?"
+    expect: { matches: '^~\d+@LOCK-FP\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_standby:
+    summary: Enter (true) or leave (false) standby
+    params:
+      standby: { type: bool, required: true }
+    send: "#STANDBY {standby:bool01}"
+    expect: { matches: '^~\d+@STANDBY\s', not_contains: "ERR" }
+    returns: ack
+
+  get_standby:
+    summary: Get the standby state ("0"/"OFF" or "1"/"ON")
+    send: "#STANDBY?"
+    expect: { matches: '^~\d+@STANDBY\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_power_save:
+    summary: Activate or deactivate power-save mode; Administrator permission when security is on
+    params:
+      enabled: { type: bool, required: true }
+    send: "#POWER-SAVE {enabled:bool01}"
+    expect: { matches: '^~\d+@POWER-SAVE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_power_save:
+    summary: Get power-save mode ("ON" active, "OFF" inactive)
+    send: "#POWER-SAVE?"
+    expect: { matches: '^~\d+@POWER-SAVE\s+(\S+)', not_contains: "ERR" }
+    returns: value
+
+  # ── Extended Protocol 3000 (X- commands, p.4-7) ─────────────────────────
+  route_signal:
+    summary: Route an input signal to an output signal by signal ID, e.g. OUT.HDBT.4.VIDEO.1 from IN.HDMI.1.VIDEO.1
+    params:
+      output_signal: { type: string, max_length: 24, pattern: '^(OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+(\.[A-Za-z0-9]+\.[0-9]+)?$', required: true }
+      input_signal:  { type: string, max_length: 24, pattern: '^(IN|in|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+(\.[A-Za-z0-9]+\.[0-9]+)?$', required: true }
+    send: "#X-ROUTE {output_signal},{input_signal}"
+    expect: { matches: '^~\d+@X-ROUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_signal_route:
+    summary: Get the input signal ID routed to an output signal ID
+    params:
+      output_signal: { type: string, max_length: 24, pattern: '^(OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+(\.[A-Za-z0-9]+\.[0-9]+)?$', required: true }
+    send: "#X-ROUTE? {output_signal}"
+    expect: { matches: '^~\d+@X-ROUTE\s+[^,]+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_matrix_status:
+    summary: Get the routing of every output as a bracketed list of [output signal ID, input signal ID] pairs
+    send: "#MATRIX-STATUS?"
+    expect: { matches: '^~\d+@MATRIX-STATUS\s*(.*?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_signals_list:
+    summary: Get every signal ID on the device, as a bracketed list
+    send: "#SIGNALS-LIST?"
+    expect: { matches: '^~\d+@SIGNALS-LIST\s*(.*?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  get_ports_list:
+    summary: Get every port ID on the device, as a bracketed list
+    send: "#PORTS-LIST?"
+    expect: { matches: '^~\d+@PORTS-LIST\s*(.*?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  mute_signal:
+    summary: Mute or unmute a signal by signal ID (video or audio, input or output), e.g. OUT.HDMI.1.AUDIO.1
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(IN|in|OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+      muted:  { type: bool, default: true }
+    send: "#X-MUTE {signal},{muted:on_off}"
+    expect: { matches: '^~\d+@X-MUTE\s', not_contains: "ERR" }
+    returns: ack
+
+  get_signal_mute:
+    summary: Get a signal's mute ("ON" or "OFF")
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(IN|in|OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+    send: "#X-MUTE? {signal}"
+    expect: { matches: '^~\d+@X-MUTE\s+[^,]+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  set_signal_audio_level:
+    summary: Set an audio signal's level in dB by signal ID (the product's range lies within -60 to +30)
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(IN|in|OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+      level:  { type: int, min: -60, max: 30, required: true }
+    send: "#X-AUD-LVL {signal},{level}"
+    expect: { matches: '^~\d+@X-AUD-LVL\s', not_contains: "ERR" }
+    returns: ack
+
+  get_signal_audio_level:
+    summary: Get an audio signal's level in dB by signal ID
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(IN|in|OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+    send: "#X-AUD-LVL? {signal}"
+    expect: { matches: '^~\d+@X-AUD-LVL\s+[^,]+,\s*(-?\d+(?:\.\d+)?)', not_contains: "ERR" }
+    returns: value
+
+  set_port_label:
+    summary: Set a port's label by port ID, e.g. OUT.HDMI.5 (no spaces in the label)
+    params:
+      port:  { type: string, max_length: 24, pattern: '^(IN|in|OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+$', required: true }
+      label: { type: string, max_length: 32, pattern: '^[!-~]+$', required: true }
+    send: "#X-LABEL {port},{label}"
+    expect: { matches: '^~\d+@X-LABEL\s', not_contains: "ERR" }
+    returns: ack
+
+  get_port_label:
+    summary: Get a port's label by port ID
+    params:
+      port: { type: string, max_length: 24, pattern: '^(IN|in|OUT|out|BOTH|both)\.[A-Za-z0-9_]+\.[0-9]+$', required: true }
+    send: "#X-LABEL? {port}"
+    expect: { matches: '^~\d+@X-LABEL\s+[^,]+,(.*?)\s*$', not_contains: "ERR" }
+    returns: value
+
+  set_signal_afv:
+    summary: Set audio-follow-video on an output signal by signal ID
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(OUT|out)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+      follow: { type: bool, required: true }
+    send: "#X-AFV {signal},{follow:on_off}"
+    expect: { matches: '^~\d+@X-\s*AFV\s', not_contains: "ERR" }
+    returns: ack
+
+  get_signal_afv:
+    summary: Get audio-follow-video on an output signal ("ON" or "OFF")
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(OUT|out)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+    send: "#X-AFV? {signal}"
+    expect: { matches: '^~\d+@X-\s*AFV\s+[^,]+,\s*(\S+)', not_contains: "ERR" }
+    returns: value
+
+  get_signal_status:
+    summary: Get whether an input signal is present, by signal ID (0 no signal, 1 signal)
+    params:
+      signal: { type: string, max_length: 32, pattern: '^(IN|in)\.[A-Za-z0-9_]+\.[0-9]+\.[A-Za-z0-9]+\.[0-9]+$', required: true }
+    send: "#X-SIGNAL? {signal}"
+    expect: { matches: '^~\d+@\s*X-SIGNAL\??\s+[^,]+,\s*(\d+)', not_contains: "ERR" }
+    returns: value
+
+state:
+  device.model:            { type: string, description: "Model name (MODEL?)" }
+  device.firmware:         { type: string, description: "Firmware version, major.minor.build (VERSION?)" }
+  device.serial:           { type: string, description: "Serial number (SN?)" }
+  device.protocol_version: { type: string, description: "Protocol 3000 version, XX.XX (PROT-VER?)" }
+  device.name:             { type: string, description: "Machine (DNS) name (NAME)" }
+  device.inputs:           { type: int, description: "Number of inputs (INFO-IO?)" }
+  device.outputs:          { type: int, description: "Number of outputs (INFO-IO?)" }
+  device.started:          { type: bool, description: "The device announced \"Protocol Start\" on this connection (sent on start-up)" }
+  presets.video_count:     { type: int, description: "Maximum number of video presets (INFO-PRST)" }
+  presets.audio_count:     { type: int, description: "Maximum number of audio presets (INFO-PRST)" }
+  presets.stored:          { type: string, description: "Stored preset numbers, comma-separated, as the device lists them (PRST-LST?)" }
+  presets.last_recalled:   { type: int, description: "Preset last recalled, from any controller or the front panel" }
+  presets.last_stored:     { type: int, description: "Preset last stored" }
+  presets.*.locked:        { type: bool, description: "The preset is read-only (PRST-LOCK)" }
+  audio_follow_video:      { type: bool, description: "Audio follows video (true) or audio breakaway (false) (AFV)" }
+  front_panel_locked:      { type: bool, description: "Front panel locked (LOCK-FP)" }
+  standby:                 { type: bool, description: "In standby (STANDBY)" }
+  power_save:              { type: bool, description: "Power-save mode active (POWER-SAVE)" }
+  video.outputs.*.input:   { type: int, description: "Input routed to the output on the video layer; 0 is disconnected" }
+  audio.outputs.*.input:   { type: int, description: "Input routed to the output on the audio layer; 0 is disconnected" }
+  data.outputs.*.input:    { type: int, description: "Input routed to the output on the data layer; 0 is disconnected" }
+  ir.outputs.*.input:      { type: int, description: "Input routed to the output on the IR layer; 0 is disconnected" }
+  usb.outputs.*.input:     { type: int, description: "Input routed to the output on the USB layer; 0 is disconnected" }
+  outputs.*.auto_switch.*: { type: int, description: "Auto-switch mode by output then layer number: 0 manual, 1 priority, 2 last connected" }
+  inputs.*.label:          { type: string, description: "Input label (LABEL)" }
+  outputs.*.label:         { type: string, description: "Output label (LABEL)" }
+  inputs.*.signal:         { type: bool, description: "A signal is present on the input (SIGNAL, pushed on change)" }
+  inputs.*.audio_signal:   { type: bool, description: "An audio signal is present on the input (AUD-SIGNAL, pushed on change)" }
+  inputs.*.hdcp:           { type: bool, description: "The input signal is HDCP-encrypted (HDCP-STAT)" }
+  inputs.*.hdcp_mode:      { type: int, description: "Input HDCP mode: 0 off, 1 on, 2 follow input, 3 mirror output (HDCP-MOD)" }
+  outputs.*.hdcp:          { type: bool, description: "The output's sink uses HDCP (HDCP-STAT)" }
+  outputs.*.display:       { type: int, description: "Output hot-plug status: 0 not valid, 1 sink valid, 2 sink and EDID valid (DISPLAY, pushed on change)" }
+  outputs.*.video_mute:    { type: bool, description: "Video disabled on the output (VMUTE 1); a blank-picture mute (2) is not assigned" }
+  outputs.*.audio_mute:    { type: bool, description: "Audio muted on the output (MUTE)" }
+  outputs.*.freeze:        { type: bool, description: "Output picture frozen (VFRZ)" }
+  outputs.*.test_pattern:  { type: int, description: "Test pattern number on the output (VID-PATTERN)" }
+  audio.inputs.*.level:    { type: float, unit: dB, description: "Input audio level (AUD-LVL stage 0)" }
+  audio.outputs.*.level:   { type: float, unit: dB, description: "Output audio level (AUD-LVL stage 1)" }
+  signals.*.*.*.*.*.source: { type: string, description: "Extended routing: input signal ID routed to an output signal, keyed by the output's direction, port type, port index, signal type and signal index (X-ROUTE)" }
+  signals.*.*.*.*.*.mute:   { type: bool, description: "Extended mute of a signal, keyed by direction, port type, port index, signal type and signal index (X-MUTE)" }
+  signals.*.*.*.*.*.level:  { type: float, unit: dB, description: "Extended audio level of a signal, keyed as for mute (X-AUD-LVL)" }
+  signals.*.*.*.*.*.afv:    { type: bool, description: "Extended audio-follow-video of an output signal (X-AFV)" }
+  ports.*.*.*.label:        { type: string, description: "Extended port label, keyed by direction, port type and port index (X-LABEL)" }
+
+telemetry:
+  # Identity is asked once on connecting. Changes are pushed: every command is
+  # bidirectional, so an action from the front panel, IR or another controller
+  # is reported to the controller in the same form as the reply to the command
+  # (p.3), and SIGNAL, AUD-SIGNAL, DISPLAY and HDCP-STAT are sent on every
+  # change (p.17, p.20, p.35, p.76). Rules end in "$" after the value so that an
+  # error reply ("~01@NAME x ERR 003") is never taken as state.
+  poll:
+    send:
+      - "#MODEL?"
+      - "#VERSION?"
+      - "#SN?"
+      - "#PROT-VER?"
+      - "#NAME?"
+      - "#INFO-IO?"
+  updates:
+    - match: '^~\d+@Protocol Start\s*$'
+      state: { "device.started": { value: "Start", map: { Start: true } } }
+    - match: '^~\d+@MODEL\s+(.+?)\s*$'
+      state: { "device.model": "{1}" }
+    - match: '^~\d+@VERSION\s+([0-9.]+)\s*$'
+      state: { "device.firmware": "{1}" }
+    - match: '^~\d+@SN\s+([0-9]+)\s*$'
+      state: { "device.serial": "{1}" }
+    - match: '^~\d+@PROT-VER\s+3000:([0-9.]+)\s*$'
+      state: { "device.protocol_version": "{1}" }
+    - match: '^~\d+@NAME\??\s+([A-Za-z0-9_-]+)\s*$'
+      state: { "device.name": "{1}" }
+    - match: '^~\d+@INFO-IO\??\s+IN\s+(\d+),\s*OUT\s+(\d+)\s*$'
+      state: { "device.inputs": "{1}", "device.outputs": "{2}" }
+    - match: '^~\d+@INFO-PRST\??\s+VID\s+(\d+),\s*AUD\s+(\d+)\s*$'
+      state: { "presets.video_count": "{1}", "presets.audio_count": "{2}" }
+    # Routing: ROUTE layer,dest,src (p.54) and the legacy and device-initiated
+    # VID/AUD/AV in>out (p.52, p.55, p.132).
+    - match: '^~\d+@ROUTE\s+1,(\d+),(\d+)\s*$'
+      state: { "video.outputs.{1}.input": "{2}" }
+    - match: '^~\d+@ROUTE\s+2,(\d+),(\d+)\s*$'
+      state: { "audio.outputs.{1}.input": "{2}" }
+    - match: '^~\d+@ROUTE\s+3,(\d+),(\d+)\s*$'
+      state: { "data.outputs.{1}.input": "{2}" }
+    - match: '^~\d+@ROUTE\s+4,(\d+),(\d+)\s*$'
+      state: { "ir.outputs.{1}.input": "{2}" }
+    - match: '^~\d+@ROUTE\s+5,(\d+),(\d+)\s*$'
+      state: { "usb.outputs.{1}.input": "{2}" }
+    - match: '^~\d+@VID\s+(\d+)>(\d+)\s*$'
+      state: { "video.outputs.{2}.input": "{1}" }
+    - match: '^~\d+@AUD\s+(\d+)>(\d+)\s*$'
+      state: { "audio.outputs.{2}.input": "{1}" }
+    - match: '^~\d+@AV\s+(\d+)>(\d+)\s*$'
+      state: { "video.outputs.{2}.input": "{1}", "audio.outputs.{2}.input": "{1}" }
+    - match: '^~\d+@AFV\s+(\S+)\s*$'
+      state: { "audio_follow_video": { value: "{1}", map: { "0": true, "afv": true, "AFV": true, "1": false, "brk": false, "BRK": false } } }
+    - match: '^~\d+@AV-SW-MODE\s+(\d+),(\d+),(\d+)\s*$'
+      state: { "outputs.{2}.auto_switch.{1}": "{3}" }
+    # Presets (p.32-34). The guide's examples show PRST-STO/PRST-RCL replies
+    # without the "nn@" address, so it is optional here.
+    - match: '^~(?:\d+@)?PRST-RCL\s+(\d+)\s*$'
+      state: { "presets.last_recalled": "{1}" }
+    - match: '^~(?:\d+@)?PRST-STO\s+(\d+)\s*$'
+      state: { "presets.last_stored": "{1}" }
+    - match: '^~\d+@PRST-LST\s*([0-9, ]*?)\s*$'
+      state: { "presets.stored": "{1}" }
+    - match: '^~\d+@PRST-LOCK\s+(\d+),\s*(ON|OFF)\s*$'
+      state: { "presets.{1}.locked": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    # Labels (p.23): stage 0 input, 1 output.
+    - match: '^~\d+@LABEL\s+0,(\d+),[^,]*,(.*?)\s*$'
+      state: { "inputs.{1}.label": "{2}" }
+    - match: '^~\d+@LABEL\s+1,(\d+),[^,]*,(.*?)\s*$'
+      state: { "outputs.{1}.label": "{2}" }
+    # Mutes, levels and output controls.
+    - match: '^~\d+@VMUTE\s+(\d+),\s*([012])\s*$'
+      state: { "outputs.{1}.video_mute": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^~\d+@MUTE\s+(\d+),\s*(\S+)\s*$'
+      state: { "outputs.{1}.audio_mute": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true } } }
+    - match: '^~\d+@AUD-LVL\s+0,(\d+),\s*(-?\d+(?:\.\d+)?)\s*$'
+      state: { "audio.inputs.{1}.level": "{2}" }
+    - match: '^~\d+@AUD-LVL\s+1,(\d+),\s*(-?\d+(?:\.\d+)?)\s*$'
+      state: { "audio.outputs.{1}.level": "{2}" }
+    - match: '^~\d+@VFRZ\s+(\d+),\s*(\S+)\s*$'
+      state: { "outputs.{1}.freeze": { value: "{2}", map: { "0": false, "1": true, "OFF": false, "ON": true } } }
+    - match: '^~\d+@VID-PATTERN\s+(\d+),\s*(\d+)\s*$'
+      state: { "outputs.{1}.test_pattern": "{2}" }
+    # Signal, HDCP and sink status: pushed on every change.
+    - match: '^~\d+@SIGNAL\s+(\d+),\s*([01])\s*$'
+      state: { "inputs.{1}.signal": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^~\d+@AUD-SIGNAL\s+(\d+),\s*([01])\s*$'
+      state: { "inputs.{1}.audio_signal": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^~\d+@HDCP-STAT\s+0,(\d+),\s*(\S+)\s*$'
+      state: { "inputs.{1}.hdcp": { value: "{2}", map: { "ON": true, "OFF": false, "1": true, "0": false } } }
+    - match: '^~\d+@HDCP-STAT\s+1,(\d+),\s*(\S+)\s*$'
+      state: { "outputs.{1}.hdcp": { value: "{2}", map: { "ON": true, "OFF": false, "1": true, "0": false } } }
+    - match: '^~\d+@HDCP-MOD\s+(\d+),\s*([0-3])\s*$'
+      state: { "inputs.{1}.hdcp_mode": "{2}" }
+    - match: '^~\d+@DISPLAY\s+(\d+),\s*([0-2])\s*$'
+      state: { "outputs.{1}.display": "{2}" }
+    # Front panel, standby, power save.
+    - match: '^~\d+@LOCK-FP\s+(\S+)\s*$'
+      state: { "front_panel_locked": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^~\d+@STANDBY\s+(\S+)\s*$'
+      state: { "standby": { value: "{1}", map: { "0": false, "1": true, "OFF": false, "ON": true } } }
+    - match: '^~\d+@POWER-SAVE\s+(\S+)\s*$'
+      state: { "power_save": { value: "{1}", map: { "0": false, "1": true, "OFF": false, "ON": true } } }
+    # Extended (X-) replies and notifications, keyed by the signal ID's fields.
+    - match: '^~\d+@X-ROUTE\s+(OUT|BOTH)\.(\w+)\.(\d+)\.(\w+)\.(\d+),\s*(\S+?)\s*$'
+      state: { "signals.{1}.{2}.{3}.{4}.{5}.source": "{6}" }
+    - match: '^~\d+@X-MUTE\s+(IN|OUT|BOTH)\.(\w+)\.(\d+)\.(\w+)\.(\d+),\s*(ON|OFF)\s*$'
+      state: { "signals.{1}.{2}.{3}.{4}.{5}.mute": { value: "{6}", map: { "ON": true, "OFF": false } } }
+    - match: '^~\d+@X-AUD-LVL\s+(IN|OUT|BOTH)\.(\w+)\.(\d+)\.(\w+)\.(\d+),\s*(-?\d+(?:\.\d+)?)\s*$'
+      state: { "signals.{1}.{2}.{3}.{4}.{5}.level": "{6}" }
+    - match: '^~\d+@X-\s*AFV\s+(OUT)\.(\w+)\.(\d+)\.(\w+)\.(\d+),\s*(ON|OFF)\s*$'
+      state: { "signals.{1}.{2}.{3}.{4}.{5}.afv": { value: "{6}", map: { "ON": true, "OFF": false } } }
+    - match: '^~\d+@X-LABEL\s+(IN|OUT|BOTH)\.(\w+)\.(\d+),(.*?)\s*$'
+      state: { "ports.{1}.{2}.{3}.label": "{4}" }
 
 quirks:
   - models: [all]
     severity: critical
     text: >
-      ROUTE arguments are layer,destination,source. Destination precedes source,
-      which is the reverse of most routing protocols. Transposing them routes
-      the wrong way without erroring when both indices are valid.
+      ROUTE arguments are layer,destination,source (p.54). Destination precedes
+      source, which is the reverse of most routing protocols. Transposing them
+      routes the wrong way without erroring when both indices are valid. The
+      legacy VID/AUD/AV commands are the other way round, input>output.
 
   - models: [all]
     severity: warning
     text: >
-      Commands are terminated by CR alone, not CRLF. Sending CRLF appends a
-      stray character to the next command on some firmware.
+      Host messages end with CR alone; device messages end with CR LF (p.1-2).
+      A command string is limited to 64 characters (p.2-3). Spaces between
+      parameters are ignored by the parser (p.2), so a label or name cannot
+      contain a space, and a comma or "|" in one would split it.
 
   - models: [all]
     severity: warning
     text: >
-      Success has no single token. Replies look like "~01@ROUTE 1,2,3 OK" and
-      failures carry "ERR", so acknowledgement is the absence of ERR rather than
-      the presence of OK.
+      Success has no single token. A command is answered by its own echo in
+      long syntax ("~01@ROUTE 1,2,3"), sometimes followed by OK, and failure by
+      "~nn@CMD ... ERR xxx" or "~nn@ERR xxx" (p.132). Acknowledgement is the
+      echoed command name without ERR. Error codes (p.133): 001 syntax, 002
+      command not available, 003 parameter out of range, 004 unauthorized,
+      005 internal firmware error, 006 busy, 008 timeout, 031 device-specific,
+      033 wrong operation mode, 034 not initialised.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Every command is bidirectional (p.3): when the front panel, IR remote or
+      another controller acts, the device sends the same "~nn@..." message to
+      every connected controller. Such a pushed message can arrive while a
+      command is waiting for its reply and, since both start with "~nn@", the
+      core may take it as that reply. Commands therefore check that the reply
+      echoes their own command name, so a pushed message about a different
+      command fails the command rather than acknowledging it; a pushed message
+      of the same command (another controller routing at the same moment) is
+      indistinguishable.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The reference guide lists the whole protocol, not one product. Each
+      product implements a subset documented in its own user manual and answers
+      ERR 002 to the rest; #HELP lists what a device supports. Port, channel and
+      preset counts are per product: the guide gives no maximum, so none is
+      enforced here, and INFO-IO? and INFO-PRST report the device's counts. A
+      route to a port the product lacks returns ERR 003.
 
   - models: [all]
     severity: info
     text: >
-      Layer 1 is video and layer 2 is audio. Input 0 disconnects the output on
-      most models.
+      Layers (p.140) are 1 video, 2 audio, 3 data, 4 IR, 5 USB. The ROUTE entry
+      (p.54) describes the destination as "* - ALL, x - disconnect, otherwise
+      destination id" and gives no disconnect value for the source; the legacy
+      VID/AUD/AV entries (p.52, p.55) document input 0 as disconnect. Routing
+      input 0 with ROUTE follows the legacy convention and is not confirmed by
+      the ROUTE entry itself.
 
   - models: [all]
     severity: info
     text: >
-      Port and channel counts vary widely across the Protocol 3000 range. The
-      ranges here are protocol limits, not a specific model's capability; a
-      route to a non-existent port returns ERR.
+      In audio-follow-video mode an AUD command also switches video, and the
+      device answers with "~nn@AV" rather than "~nn@AUD" (p.52). Moving from
+      breakaway to AFV resets every audio route to its video route (p.51). In
+      most products a preset stores and recalls video and audio together
+      (p.22).
+
+  - models: [all]
+    severity: info
+    text: >
+      Documentation inconsistencies taken as written: the LABEL query (p.23)
+      carries only a port number, with no input/output stage, although the set
+      and the reply carry one; NAME? is answered "~nn@NAME? name" with the
+      question mark, unlike other queries (p.27); INFO-PRST is listed as
+      "INFO-PRST?" in the command index (p.14) but its syntax box shows
+      "#INFO-PRST" (p.22) — the query form "#INFO-PRST?" is sent here. The
+      PRST-STO/PRST-RCL examples (p.34) show replies without "nn@".
+
+  - models: [all]
+    severity: info
+    text: >
+      VMUTE flag 2 (blank picture) is listed in the Video Mute table (p.138) but
+      the VMUTE entry says it is not supported (p.64); set_video_mute sends 0 or
+      1 only. AUD-LVL "channel" refers to the Audio Channel table (1 master, 2
+      secondary, p.143) on some products and to an input/output number on
+      others; the guide does not say which a given product uses. Its range is
+      -80 to +10 dB, and the optional fourth parameter 1 changes the level
+      without affecting the mute state (p.73).
+
+  - models: [all]
+    severity: info
+    text: >
+      Permission levels apply only when security is enabled with SECUR (p.49-50).
+      NAME, RESET, HDCP-MOD set and POWER-SAVE set are Administrator commands;
+      FACTORY deletes all user data and may need a power cycle (p.10). The
+      LOGIN command's level argument is described only as "End User or Admin"
+      without its wire spelling, so login is not modelled; a device with
+      security on answers unauthorised commands with ERR 004.
+
+  - models: [p3000-extended]
+    severity: info
+    text: >
+      Extended commands address ports as direction.type.index (IN.HDMI.1) and
+      signals as port.signal_type.index (OUT.HDBT.4.VIDEO.1), case-insensitive
+      (p.4-6). In X-ROUTE "VIDEO.1" is implied when omitted, and the reply
+      always gives the full signal ID (p.56). SIGNALS-LIST? and PORTS-LIST? give
+      the IDs a product has. The guide's X-SIGNAL and X-AFV entries carry typing
+      errors in their syntax and examples (a stray space after "@" or "X-"), so
+      their replies are matched leniently.
