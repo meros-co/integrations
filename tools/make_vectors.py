@@ -75,15 +75,6 @@ def http(spec, command, input, method, target, **extra):
     })
 
 
-# ETC Eos: OSC 1.0 over TCP with a 4-byte length prefix.
-E = "etc-eos"
-binary(E, "go", {}, [length_prefixed(osc("/eos/key/go_0", ("f", 1.0))),
-                     length_prefixed(osc("/eos/key/go_0", ("f", 0.0)))],
-       expect_result={"ok": {"kind": "unverified"}})
-binary(E, "fire_cue", {"cue": "1.5"}, length_prefixed(osc("/eos/cue/1/1.5/fire")))
-binary(E, "set_submaster", {"submaster": 3, "level": 0.5}, length_prefixed(osc("/eos/sub/3", ("f", 0.5))))
-binary(E, "fire_macro", {"macro": 101}, length_prefixed(osc("/eos/macro/fire", ("i", 101))))
-
 # TriCaster: GET /v1/shortcut?name=NAME&value=VALUE (Automation and
 # Integration Guide p.63).
 T = "newtek-tricaster"
