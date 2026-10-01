@@ -37,6 +37,9 @@ pub(crate) enum ReplyFraming {
     HeadedBlock,
     /// Text between `open` and `close`, whole, including the delimiters.
     Delimited { open: String, close: String },
+    /// Text up to and including any of these, with no line ending needed:
+    /// Roland's `;`-ended replies and its bare ACK byte.
+    Terminated(Vec<String>),
 }
 
 /// Turns received bytes into complete reply messages.
@@ -61,6 +64,24 @@ impl Framer {
 
     pub(crate) fn feed(&mut self, bytes: &[u8]) -> Vec<String> {
         let mut out = Vec::new();
+        if let ReplyFraming::Terminated(ends) = &self.framing {
+            self.text.push_str(&String::from_utf8_lossy(bytes));
+            loop {
+                let first = ends
+                    .iter()
+                    .filter_map(|e| self.text.find(e.as_str()).map(|at| at + e.len()))
+                    .min();
+                let Some(end) = first else {
+                    break;
+                };
+                let segment: String = self.text.drain(..end).collect();
+                let segment = segment.trim_matches(|c: char| c == '\r' || c == '\n' || c == ' ');
+                if !segment.is_empty() {
+                    out.push(segment.to_string());
+                }
+            }
+            return out;
+        }
         if let ReplyFraming::Delimited { open, close } = &self.framing {
             self.text.push_str(&String::from_utf8_lossy(bytes));
             let (open, close) = (open.trim(), close.trim());
@@ -105,7 +126,7 @@ impl Framer {
                         out.push(line);
                     }
                 }
-                ReplyFraming::Delimited { .. } => unreachable!(),
+                ReplyFraming::Delimited { .. } | ReplyFraming::Terminated(_) => unreachable!(),
             }
         }
         out
@@ -234,6 +255,15 @@ mod tests {
         let mut f = Framer::new(ReplyFraming::Line);
         assert_eq!(f.feed(b"~01@ROUTE 1,2,3 OK\r"), ["~01@ROUTE 1,2,3 OK"]);
         assert_eq!(f.feed(b"\na\nb\r\n"), ["a", "b"]);
+    }
+
+    #[test]
+    fn terminated_replies_need_no_line_ending() {
+        let mut f = Framer::new(ReplyFraming::Terminated(vec![";".into(), "\u{6}".into()]));
+        // A bare ACK byte, a value split across reads, then two at once.
+        assert_eq!(f.feed(b"\x06"), vec!["\u{6}"]);
+        assert_eq!(f.feed(b"\x02VFL:"), Vec::<String>::new());
+        assert_eq!(f.feed(b"a;\r\nACK;"), vec!["\u{2}VFL:a;", "ACK;"]);
     }
 
     #[test]

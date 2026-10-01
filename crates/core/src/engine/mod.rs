@@ -219,6 +219,19 @@ impl SpecEngine {
                     (Some("line"), _) => ReplyFraming::Line,
                     (Some("block"), _) => ReplyFraming::Block,
                     (Some("headed-block"), _) => ReplyFraming::HeadedBlock,
+                    (Some("terminated"), _) => ReplyFraming::Terminated(
+                        t.get("reply_terminators")
+                            .and_then(Value::as_array)
+                            .map(|a| {
+                                a.iter()
+                                    .filter_map(Value::as_str)
+                                    .filter(|s| !s.is_empty())
+                                    .map(str::to_string)
+                                    .collect::<Vec<_>>()
+                            })
+                            .filter(|a| !a.is_empty())
+                            .ok_or("reply_framing terminated needs reply_terminators")?,
+                    ),
                     (None, "block") => ReplyFraming::Block,
                     (None, "delimited") => ReplyFraming::Delimited { open, close },
                     (None, _) => ReplyFraming::Line,

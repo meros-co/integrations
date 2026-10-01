@@ -90,6 +90,7 @@ command is sent:
 | `line` | The transport terminator or delimiter | Kramer P3000, Shure |
 | `block` | A blank line | Blackmagic Videohub |
 | `headed-block` | The end of the first line, unless that line ends in `:`, in which case a blank line | Blackmagic HyperDeck: `200 ok`, or `208 transport info:` followed by fields |
+| `terminated` | The first of `reply_terminators`, kept as part of the message; no line ending is needed | Roland V-60HD: `VFL:a;`, and a bare ACK byte (`reply_terminators: [";", "\u0006"]`) |
 
 It defaults to `block` for `framing: block` and to `line` otherwise.
 
