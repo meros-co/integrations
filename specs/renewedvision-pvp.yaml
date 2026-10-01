@@ -1,0 +1,944 @@
+spec: 1
+id: renewedvision-pvp
+name: ProVideoPlayer 3 (PVP3 HTTP API)
+vendor: Renewed Vision
+category: playback
+
+# Written from the API Reference that PVP itself ships and opens from
+# Preferences > Network > API Reference. Every command is an endpoint of that
+# document, under its /api/0 prefix, with the method, path parameters and
+# request body it gives. The document states no success status; 200 is assumed
+# throughout (see quirks).
+
+source:
+  - title: API Reference (PVP HTTP API, path prefix /api/0)
+    author: Renewed Vision
+    url: https://renewedvision.com/downloads/ProVideoPlayer_3.9_50921503.zip
+    note: >
+      Manufacturer document, retrieved 2026-10-01. Shipped inside the
+      application at ProVideoPlayer.app/Contents/Resources/WebContent/help/api/0/index.html
+      and opened by the "API Reference" button in Preferences > Network. The
+      file is byte-identical in PVP 3.8 (build 50855942, ProVideoPlayer_3.8_50855942.zip,
+      the latest build linked from https://renewedvision.com/provideoplayer/download)
+      and PVP 3.9 (build 50921503). Sections used: Requests (Scheme, Prefix,
+      Authentication, JSON); Data (Playlists, Specific Playlist, Specific Cue,
+      Layers, Specific Layer); Clear, Mute, Unmute, Hide, Unhide (Workspace,
+      Layer); Select (Layer, Playlist); Trigger (Cue in Current Playlist, First
+      Cue in Playlist, Cue in Playlist, Cue in Playlist Targeting Layer);
+      Opacity; Blend Mode; Layer Blending; Layer Preset; Target Set; Effects;
+      Effects Preset; Transitions; Transition Duration; Transport State; Errors.
+  - title: PVP 3 User Guide, version 3.3 (4931), May 10, 2019
+    author: Renewed Vision
+    url: https://renewedvision.com/downloads/PVP3UserGuide.pdf
+    note: >
+      Manufacturer document. p.85 "Network": the REST API is enabled in
+      Preferences > Network, the port is filled automatically and can be
+      changed, "Use HTTPS Connection" forces HTTPS, "Require Authentication"
+      requires an Authentication Token, and the API Reference button opens the
+      full and current documentation. p.75 "Network Backup Triggering" uses
+      the same setting.
+  - title: PVP 3 release notes (3.1 to 3.9)
+    author: Renewed Vision
+    url: http://www.renewedvision.com/update/notes/PVP3Notes3.9.html
+    note: >
+      Manufacturer document. 3.1 introduced the HTTP REST API; 3.2 added
+      setting a transition by name or UUID, clearing effects and effect presets
+      on the workspace, and selecting the live video playlist through the API;
+      3.4.1 fixed the transport API returning the playing file instead of the
+      cue name.
+  - title: companion-module-renewedvision-pvp (src/api.js, src/actions.js), MIT licence
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-renewedvision-pvp
+    note: >
+      Community code, read for corroboration only; no command comes from it.
+      Corroborates the Bearer header and that certificates are not verified
+      over HTTPS, the 0.0 to 1.0 opacity scale, and reports that PVP 3.3.2
+      crashes on a negative layer or cue index or a playlist index below -1
+      (see quirks).
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/0/transitionDuration/workspace }
+
+models:
+  - id: pvp3
+    name: ProVideoPlayer 3 (API Reference as shipped in 3.8 and 3.9)
+    supports: [get_playlists, get_playlist, get_cue, get_layers, get_layer,
+               clear_workspace, clear_layer, mute_workspace, mute_layer,
+               unmute_workspace, unmute_layer, hide_workspace, hide_layer,
+               unhide_workspace, unhide_layer,
+               select_layer, select_layer_target, select_playlist,
+               trigger_cue, trigger_playlist, trigger_playlist_cue, trigger_layer_cue,
+               get_layer_opacity, set_layer_opacity,
+               get_blend_modes, get_layer_blend_mode, set_layer_blend_mode,
+               get_layer_blend, set_layer_blend, set_layer_blend_standard,
+               set_layer_blend_alpha_matte, set_layer_blend_luma_matte,
+               get_layer_presets, get_layer_preset, set_layer_preset,
+               get_target_sets, get_layer_target_set, set_layer_target_set,
+               clear_layer_target_set,
+               get_effects, get_workspace_effects, set_workspace_effects,
+               get_layer_effects, set_layer_effects,
+               get_effects_presets, get_workspace_effects_preset,
+               set_workspace_effects_preset, clear_workspace_effects_preset,
+               get_layer_effects_preset, set_layer_effects_preset,
+               clear_layer_effects_preset,
+               get_transitions, get_workspace_transition, set_workspace_transition,
+               set_workspace_transition_uuid, get_layer_transition, set_layer_transition,
+               set_layer_transition_uuid, clear_layer_transition,
+               get_workspace_transition_duration, set_workspace_transition_duration,
+               get_layer_transition_duration, set_layer_transition_duration,
+               get_workspace_transport_state, get_layer_transport_state]
+    verification: none
+    notes: >
+      macOS only. The HTTP API exists from PVP 3.1; the document describes the
+      API of 3.8 and 3.9. Earlier 3.x releases may lack endpoints (3.2 added
+      transitions by name or UUID and workspace effect clearing).
+
+commands:
+  # ── Data ─────────────────────────────────────────────────────────────────
+  get_playlists:
+    summary: All playlists as a tree (Root, its children and groups), with each playlist's cues by name and UUID (Data > Playlists)
+    send: { method: GET, path: /api/0/data/playlists }
+    expect: { status: 200, json_path: "$.playlist" }
+    returns: value
+
+  get_playlist:
+    summary: One playlist with its cues (Data > Specific Playlist)
+    params:
+      playlist: { type: string, max_length: 256, pattern: "^(-1|[^-].*)$", required: true }
+    send: { method: GET, path: "/api/0/data/playlist/{playlist}" }
+    expect: { status: 200, json_path: "$.playlist" }
+    returns: value
+
+  get_cue:
+    summary: One cue of a playlist, its name and UUID (Data > Specific Cue)
+    params:
+      playlist: { type: string, max_length: 256, pattern: "^(-1|[^-].*)$", required: true }
+      cue:      { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/data/playlist/{playlist}/cue/{cue}" }
+    expect: { status: 200, json_path: "$.playlistItem" }
+    returns: value
+
+  get_layers:
+    summary: Every layer with name, UUID, mute, hidden, opacity, target set, effect preset, effects and transition duration (Data > Layers)
+    send: { method: GET, path: /api/0/data/layers }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_layer:
+    summary: One layer's details (Data > Specific Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/data/layer/{layer}" }
+    expect: { status: 200, json_path: "$.layer" }
+    returns: value
+
+  # ── Clear, mute, hide ────────────────────────────────────────────────────
+  clear_workspace:
+    summary: Clear the workspace (Clear > Workspace)
+    send: { method: POST, path: /api/0/clear/workspace }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_layer:
+    summary: Clear one layer (Clear > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/clear/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  mute_workspace:
+    summary: Mute the workspace (Mute > Workspace)
+    send: { method: POST, path: /api/0/mute/workspace }
+    expect: { status: 200 }
+    returns: ack
+
+  mute_layer:
+    summary: Mute one layer (Mute > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/mute/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  unmute_workspace:
+    summary: Unmute the workspace (Unmute > Workspace)
+    send: { method: POST, path: /api/0/unmute/workspace }
+    expect: { status: 200 }
+    returns: ack
+
+  unmute_layer:
+    summary: Unmute one layer (Unmute > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/unmute/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  hide_workspace:
+    summary: Hide the workspace (Hide > Workspace)
+    send: { method: POST, path: /api/0/hide/workspace }
+    expect: { status: 200 }
+    returns: ack
+
+  hide_layer:
+    summary: Hide one layer (Hide > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/hide/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  unhide_workspace:
+    summary: Unhide the workspace (Unhide > Workspace)
+    send: { method: POST, path: /api/0/unhide/workspace }
+    expect: { status: 200 }
+    returns: ack
+
+  unhide_layer:
+    summary: Unhide one layer (Unhide > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/unhide/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Select ───────────────────────────────────────────────────────────────
+  select_layer:
+    summary: Select a layer for the sidebar preview and layer options (Select > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/select/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  select_layer_target:
+    summary: Select a layer and set whether it is targeted, the optional target query (Select > Layer)
+    params:
+      layer:  { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      target: { type: bool, default: true }
+    send: { method: POST, path: "/api/0/select/layer/{layer}", query: { target: "{target}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  select_playlist:
+    summary: Select a playlist; an index counts top-level playlists only, -1 is the Video Input playlist (Select > Playlist)
+    params:
+      playlist: { type: string, max_length: 256, pattern: "^(-1|[^-].*)$", required: true }
+    send: { method: POST, path: "/api/0/select/playlist/{playlist}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Trigger ──────────────────────────────────────────────────────────────
+  trigger_cue:
+    summary: Trigger a cue, or a video input action, in the current playlist (Trigger > Cue in Current Playlist)
+    params:
+      cue: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/trigger/cue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_playlist:
+    summary: Trigger the first cue of a playlist (Trigger > First Cue in Playlist)
+    params:
+      playlist: { type: string, max_length: 256, pattern: "^(-1|[^-].*)$", required: true }
+    send: { method: POST, path: "/api/0/trigger/playlist/{playlist}" }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_playlist_cue:
+    summary: Trigger a cue, or a video input action, of a given playlist (Trigger > Cue in Playlist)
+    params:
+      playlist: { type: string, max_length: 256, pattern: "^(-1|[^-].*)$", required: true }
+      cue:      { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/trigger/playlist/{playlist}/cue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_layer_cue:
+    summary: Trigger a cue, or a video input action, of a given playlist onto a given layer (Trigger > Cue in Playlist Targeting Layer)
+    params:
+      layer:    { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      playlist: { type: string, max_length: 256, pattern: "^(-1|[^-].*)$", required: true }
+      cue:      { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/trigger/layer/{layer}/playlist/{playlist}/cue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Opacity and blending ─────────────────────────────────────────────────
+  get_layer_opacity:
+    summary: A layer's opacity (double); valid only while the layer uses a standard blend (Opacity > Layer Opacity, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/opacity/layer/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_layer_opacity:
+    summary: Set a layer's opacity, 0.0 to 1.0; a non-standard blend is replaced by Normal (Opacity > Layer Opacity, POST)
+    params:
+      layer:   { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      opacity: { type: float, min: 0, max: 1, required: true }
+    send:
+      method: POST
+      path: "/api/0/opacity/layer/{layer}"
+      body: '{"value":{opacity:.3f}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_blend_modes:
+    summary: Every blend mode, by name and id (Blend Mode > Available Blend Modes)
+    send: { method: GET, path: /api/0/blendMode }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_layer_blend_mode:
+    summary: A layer's blend mode, name and id (Blend Mode > Layer Blend Mode, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/blendMode/layer/{layer}" }
+    expect: { status: 200, json_path: "$.blendMode" }
+    returns: value
+
+  set_layer_blend_mode:
+    summary: Set a layer's blend mode by name, such as "Color Burn" (Blend Mode > Layer Blend Mode, POST)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      mode:  { type: string, max_length: 128, required: true }
+    send:
+      method: POST
+      path: "/api/0/blendMode/layer/{layer}"
+      body: '{"value":{mode:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_layer_blend:
+    summary: A layer's layer blending, its type and base (Layer Blending, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/blend/layer/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_layer_blend:
+    summary: >-
+      Set a layer's layer blending. The body is the document's Layer Blending
+      request body, {"type": Standard | Alpha Matte | Luma Matte | White Matte,
+      "base": the type's structure} (Layer Blending, POST)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      body:  { type: json, required: true }
+    send:
+      method: POST
+      path: "/api/0/blend/layer/{layer}"
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_blend_standard:
+    summary: Set a layer to a standard blend with a blend mode index and opacity (Layer Blending, Base Standard Structure)
+    params:
+      layer:      { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      mode_index: { type: int, min: 0, required: true }
+      opacity:    { type: float, min: 0, max: 1, default: 1.0 }
+    send:
+      method: POST
+      path: "/api/0/blend/layer/{layer}"
+      body: '{"type":"Standard","base":{"modeIndex":{mode_index},"opacity":{opacity:.3f}}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_blend_alpha_matte:
+    summary: Set a layer to an alpha matte, optionally inverted (Layer Blending, Alpha Matte Structure)
+    params:
+      layer:    { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      inverted: { type: bool, default: false }
+    send:
+      method: POST
+      path: "/api/0/blend/layer/{layer}"
+      body: '{"type":"Alpha Matte","base":{"isInverted":{inverted}}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_blend_luma_matte:
+    summary: Set a layer to a luma matte, optionally inverted (Layer Blending, Luma Matte Structure)
+    params:
+      layer:    { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      inverted: { type: bool, default: false }
+    send:
+      method: POST
+      path: "/api/0/blend/layer/{layer}"
+      body: '{"type":"Luma Matte","base":{"isInverted":{inverted}}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Layer presets and target sets ────────────────────────────────────────
+  get_layer_presets:
+    summary: Every layer preset, by id and name (Layer Preset > Available Layer Presets)
+    send: { method: GET, path: /api/0/layerPreset }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_layer_preset:
+    summary: A layer's layer preset (Layer Preset > Layer Preset, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/layerPreset/layer/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_layer_preset:
+    summary: Apply a layer preset, by name, to a layer (Layer Preset > Layer Preset, POST)
+    params:
+      layer:  { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      preset: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: "/api/0/layerPreset/layer/{layer}"
+      body: '{"value":{preset:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_target_sets:
+    summary: Every target set, by name and UUID (Target Set > Available Target Sets)
+    send: { method: GET, path: /api/0/targetSet }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_layer_target_set:
+    summary: The target set active on a layer, which can be nil (Target Set > Layer Target Set, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/targetSet/layer/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_layer_target_set:
+    summary: Set a layer's target set by name (Target Set > Layer Target Set, POST)
+    params:
+      layer:      { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      target_set: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: "/api/0/targetSet/layer/{layer}"
+      body: '{"value":{target_set:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  clear_layer_target_set:
+    summary: Set a layer's target set to nil, sent without a body (Target Set > Layer Target Set, POST, Notes)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: POST, path: "/api/0/targetSet/layer/{layer}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Effects ──────────────────────────────────────────────────────────────
+  get_effects:
+    summary: Every effect available, with its variables (Effects > Available Effects)
+    send: { method: GET, path: /api/0/effects }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_workspace_effects:
+    summary: The effects active on the workspace (Effects > Workspace Effects, GET)
+    send: { method: GET, path: /api/0/effects/workspace }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_workspace_effects:
+    summary: >-
+      Set the effects on the workspace. The body is the document's Workspace
+      Effects request body, {"effect": {"uuid" (required), "name", "enabled",
+      "variables": [{"type", "base": {"value", "max_value", "min_value",
+      "name"}}]}} (Effects > Workspace Effects, POST)
+    params:
+      body: { type: json, required: true }
+    send:
+      method: POST
+      path: /api/0/effects/workspace
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_layer_effects:
+    summary: The effects active on a layer (Effects > Layer Effects, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/effects/layer/{layer}" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_layer_effects:
+    summary: >-
+      Set the effects on a layer. The body is the document's Layer Effects
+      request body, the same shape as for the workspace (Effects > Layer
+      Effects, POST)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      body:  { type: json, required: true }
+    send:
+      method: POST
+      path: "/api/0/effects/layer/{layer}"
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Effect presets ───────────────────────────────────────────────────────
+  get_effects_presets:
+    summary: Every effects preset with its effects (Effects Preset > Available Effects Presets)
+    send: { method: GET, path: /api/0/effectsPreset }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_workspace_effects_preset:
+    summary: The effects preset selected on the workspace, which can be null (Effects Preset > Workspace Effects Presets, GET)
+    send: { method: GET, path: /api/0/effectsPreset/workspace }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_workspace_effects_preset:
+    summary: Select an effects preset on the workspace by UUID (Effects Preset > Workspace Effects Presets, POST)
+    params:
+      preset_uuid: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f-]+$", required: true }
+    send:
+      method: POST
+      path: /api/0/effectsPreset/workspace
+      body: '{"value":{preset_uuid:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  clear_workspace_effects_preset:
+    summary: Select no effects preset on the workspace, value null (Effects Preset > Workspace Effects Presets, POST)
+    send:
+      method: POST
+      path: /api/0/effectsPreset/workspace
+      body: '{"value":null}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_layer_effects_preset:
+    summary: The effects preset selected on a layer, which can be null (Effects Preset > Layer Effects Preset, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/effectsPreset/layer/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_layer_effects_preset:
+    summary: Select an effects preset on a layer by name (Effects Preset > Layer Effects Preset, POST)
+    params:
+      layer:  { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      preset: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: "/api/0/effectsPreset/layer/{layer}"
+      body: '{"value":{preset:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  clear_layer_effects_preset:
+    summary: Select no effects preset on a layer, value null (Effects Preset > Layer Effects Preset, POST)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send:
+      method: POST
+      path: "/api/0/effectsPreset/layer/{layer}"
+      body: '{"value":null}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Transitions ──────────────────────────────────────────────────────────
+  get_transitions:
+    summary: Every transition available, with its variables (Transitions > Available Transitions)
+    send: { method: GET, path: /api/0/transition }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_workspace_transition:
+    summary: The transition selected on the workspace, its name, UUID and enabled flag (Transitions > Workspace Transition, GET)
+    send: { method: GET, path: /api/0/transition/workspace }
+    expect: { status: 200, json_path: "$.transition" }
+    returns: value
+
+  set_workspace_transition:
+    summary: >-
+      Set the workspace transition. The body is the document's Workspace
+      Transition request: its example {"transition": {"uuid", "name",
+      "enabled", "variables"}}, or the keys its table lists, "value" (the
+      transition UUID) and "name" (Transitions > Workspace Transition, POST)
+    params:
+      body: { type: json, required: true }
+    send:
+      method: POST
+      path: /api/0/transition/workspace
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  set_workspace_transition_uuid:
+    summary: Set the workspace transition by UUID, the table's "value" key (Transitions > Workspace Transition, POST)
+    params:
+      transition_uuid: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f-]+$", required: true }
+    send:
+      method: POST
+      path: /api/0/transition/workspace
+      body: '{"value":{transition_uuid:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_layer_transition:
+    summary: The transition selected on a layer, which can be null (Transitions > Layer Transition, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/transition/layer/{layer}" }
+    expect: { status: 200, json_path: "$.transition" }
+    returns: value
+
+  set_layer_transition:
+    summary: >-
+      Set a layer's transition. The body is the document's Layer Transition
+      request, in either form given for the workspace (Transitions > Layer
+      Transition, POST)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      body:  { type: json, required: true }
+    send:
+      method: POST
+      path: "/api/0/transition/layer/{layer}"
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_transition_uuid:
+    summary: Set a layer's transition by UUID, the table's "value" key (Transitions > Layer Transition, POST)
+    params:
+      layer:           { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      transition_uuid: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f-]+$", required: true }
+    send:
+      method: POST
+      path: "/api/0/transition/layer/{layer}"
+      body: '{"value":{transition_uuid:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  clear_layer_transition:
+    summary: Set a layer's transition to null so it uses the master transition (Transitions > Layer Transition, POST)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send:
+      method: POST
+      path: "/api/0/transition/layer/{layer}"
+      body: '{"value":null}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Transition duration ──────────────────────────────────────────────────
+  get_workspace_transition_duration:
+    summary: The workspace transition duration in seconds, 0.0 to 5.0 (Transition Duration > Workspace, GET)
+    send: { method: GET, path: /api/0/transitionDuration/workspace }
+    expect: { status: 200, json_path: "$.transitionDuration.value" }
+    returns: value
+
+  set_workspace_transition_duration:
+    summary: Set the workspace transition duration in seconds, 0.0 to 5.0 (Transition Duration > Workspace, POST)
+    params:
+      seconds: { type: float, min: 0, max: 5, required: true }
+    send:
+      method: POST
+      path: /api/0/transitionDuration/workspace
+      body: '{"value":{seconds:.2f}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  get_layer_transition_duration:
+    summary: A layer's transition duration in seconds, 0.0 to 5.0 (Transition Duration > Layer, GET)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/transitionDuration/layer/{layer}" }
+    expect: { status: 200, json_path: "$.transitionDuration.value" }
+    returns: value
+
+  set_layer_transition_duration:
+    summary: Set a layer's transition duration in seconds, 0.0 to 5.0 (Transition Duration > Layer, POST)
+    params:
+      layer:   { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+      seconds: { type: float, min: 0, max: 5, required: true }
+    send:
+      method: POST
+      path: "/api/0/transitionDuration/layer/{layer}"
+      body: '{"value":{seconds:.2f}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Transport state ──────────────────────────────────────────────────────
+  get_workspace_transport_state:
+    summary: Every layer's transport state, its playing cue and media, elapsed and remaining time, rate, playing and scrubbing (Transport State > Workspace)
+    send: { method: GET, path: /api/0/transportState/workspace }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_layer_transport_state:
+    summary: One layer's transport state (Transport State > Layer)
+    params:
+      layer: { type: string, max_length: 256, pattern: "^[^-].*$", required: true }
+    send: { method: GET, path: "/api/0/transportState/layer/{layer}" }
+    expect: { status: 200, json_path: "$.transportState" }
+    returns: value
+
+telemetry:
+  # The document describes no pushed changes, so state is polled once a
+  # second. The replies to the matching get commands update it too.
+  poll:
+    every_ms: 1000
+    send:
+      - { method: GET, path: /api/0/transportState/workspace }
+      - { method: GET, path: /api/0/data/layers }
+      - { method: GET, path: /api/0/transition/workspace }
+      - { method: GET, path: /api/0/transitionDuration/workspace }
+      - { method: GET, path: /api/0/effectsPreset/workspace }
+      - { method: GET, path: /api/0/data/playlists }
+  updates:
+    - path: "^/api/0/data/layers$"
+      json_each: "$.data"
+      json:
+        uuid: "$.layer.uuid"
+        name: "$.layer.name"
+        muted: "$.layer.isMuted"
+        hidden: "$.layer.isHidden"
+        opacity: "$.layer.opacity"
+        duration: "$.layer.transitionDuration"
+        target_set: "$.layer.targetSetUUID"
+        preset: "$.layer.effectPresetUUID"
+      state:
+        layers.{uuid}.name: "{name}"
+        layers.{uuid}.muted: "{muted}"
+        layers.{uuid}.hidden: "{hidden}"
+        layers.{uuid}.opacity: "{opacity}"
+        layers.{uuid}.transition_duration: "{duration}"
+        layers.{uuid}.target_set_uuid: "{target_set}"
+        layers.{uuid}.effects_preset_uuid: "{preset}"
+    - path: "^/api/0/data/layer/[^/?]+$"
+      json:
+        uuid: "$.layer.uuid"
+        name: "$.layer.name"
+        muted: "$.layer.isMuted"
+        hidden: "$.layer.isHidden"
+        opacity: "$.layer.opacity"
+        duration: "$.layer.transitionDuration"
+        target_set: "$.layer.targetSetUUID"
+        preset: "$.layer.effectPresetUUID"
+      state:
+        layers.{uuid}.name: "{name}"
+        layers.{uuid}.muted: "{muted}"
+        layers.{uuid}.hidden: "{hidden}"
+        layers.{uuid}.opacity: "{opacity}"
+        layers.{uuid}.transition_duration: "{duration}"
+        layers.{uuid}.target_set_uuid: "{target_set}"
+        layers.{uuid}.effects_preset_uuid: "{preset}"
+    - path: "^/api/0/transportState/workspace$"
+      json_each: "$.data"
+      json:
+        uuid: "$.transportState.layer.uuid"
+        playing: "$.transportState.isPlaying"
+        scrubbing: "$.transportState.isScrubbing"
+        elapsed: "$.transportState.timeElapsed"
+        remaining: "$.transportState.timeRemaining"
+        rate: "$.transportState.playbackRate"
+        cue: "$.transportState.playingItem.name"
+        cue_uuid: "$.transportState.playingItem.uuid"
+        media: "$.transportState.playingMedia.name"
+        media_uuid: "$.transportState.playingMedia.uuid"
+        transition: "$.transportState.layer.transition.name"
+        transition_uuid: "$.transportState.layer.transition.uuid"
+      state:
+        layers.{uuid}.playing: "{playing}"
+        layers.{uuid}.scrubbing: "{scrubbing}"
+        layers.{uuid}.time_elapsed: "{elapsed}"
+        layers.{uuid}.time_remaining: "{remaining}"
+        layers.{uuid}.playback_rate: "{rate}"
+        layers.{uuid}.cue: "{cue}"
+        layers.{uuid}.cue_uuid: "{cue_uuid}"
+        layers.{uuid}.media: "{media}"
+        layers.{uuid}.media_uuid: "{media_uuid}"
+        layers.{uuid}.transition: "{transition}"
+        layers.{uuid}.transition_uuid: "{transition_uuid}"
+    - path: "^/api/0/transportState/layer/[^/?]+$"
+      json:
+        uuid: "$.transportState.layer.uuid"
+        playing: "$.transportState.isPlaying"
+        scrubbing: "$.transportState.isScrubbing"
+        elapsed: "$.transportState.timeElapsed"
+        remaining: "$.transportState.timeRemaining"
+        rate: "$.transportState.playbackRate"
+        cue: "$.transportState.playingItem.name"
+        cue_uuid: "$.transportState.playingItem.uuid"
+        transition: "$.transportState.layer.transition.name"
+        transition_uuid: "$.transportState.layer.transition.uuid"
+      state:
+        layers.{uuid}.playing: "{playing}"
+        layers.{uuid}.scrubbing: "{scrubbing}"
+        layers.{uuid}.time_elapsed: "{elapsed}"
+        layers.{uuid}.time_remaining: "{remaining}"
+        layers.{uuid}.playback_rate: "{rate}"
+        layers.{uuid}.cue: "{cue}"
+        layers.{uuid}.cue_uuid: "{cue_uuid}"
+        layers.{uuid}.transition: "{transition}"
+        layers.{uuid}.transition_uuid: "{transition_uuid}"
+    - path: "^/api/0/transition/workspace$"
+      json: { name: "$.transition.name", uuid: "$.transition.uuid" }
+      state:
+        workspace.transition: "{name}"
+        workspace.transition_uuid: "{uuid}"
+    - path: "^/api/0/transitionDuration/workspace$"
+      json: { value: "$.transitionDuration.value" }
+      state:
+        workspace.transition_duration: "{value}"
+    - path: "^/api/0/effectsPreset/workspace$"
+      json: { name: "$.effectPreset.name", uuid: "$.effectPreset.uuid" }
+      state:
+        workspace.effects_preset: "{name}"
+        workspace.effects_preset_uuid: "{uuid}"
+    - path: "^/api/0/data/playlists$"
+      json_each: "$.playlist.children"
+      json: { uuid: "$.uuid", name: "$.name" }
+      state:
+        playlists.{uuid}.name: "{name}"
+
+state:
+  layers.*.name:                { type: string, description: "Layer name, keyed by the layer's UUID" }
+  layers.*.muted:               { type: bool, description: "Layer muted" }
+  layers.*.hidden:              { type: bool, description: "Layer hidden" }
+  layers.*.opacity:             { type: float, description: "Layer opacity, 0.0 to 1.0" }
+  layers.*.transition_duration: { type: float, unit: s, description: "Layer transition duration, 0.0 to 5.0 seconds" }
+  layers.*.target_set_uuid:     { type: string, description: "UUID of the layer's target set; the text null when none" }
+  layers.*.effects_preset_uuid: { type: string, description: "UUID of the layer's effects preset; the text null when none" }
+  layers.*.playing:             { type: bool, description: "The layer's transport is playing" }
+  layers.*.scrubbing:           { type: bool, description: "The layer's transport is being scrubbed" }
+  layers.*.time_elapsed:        { type: float, unit: s, description: "Elapsed time of the layer's playing media" }
+  layers.*.time_remaining:      { type: float, unit: s, description: "Remaining time of the layer's playing media" }
+  layers.*.playback_rate:       { type: float, description: "Playback rate of the layer's transport, 0 when stopped" }
+  layers.*.cue:                 { type: string, description: "Name of the cue playing on the layer" }
+  layers.*.cue_uuid:            { type: string, description: "UUID of the cue playing on the layer" }
+  layers.*.media:               { type: string, description: "Name of the media file playing on the layer (workspace transport state only)" }
+  layers.*.media_uuid:          { type: string, description: "UUID of the media playing on the layer (workspace transport state only)" }
+  layers.*.transition:          { type: string, description: "Name of the layer's transition" }
+  layers.*.transition_uuid:     { type: string, description: "UUID of the layer's transition" }
+  workspace.transition:         { type: string, description: "Name of the workspace (master) transition" }
+  workspace.transition_uuid:    { type: string, description: "UUID of the workspace (master) transition" }
+  workspace.transition_duration: { type: float, unit: s, description: "Workspace transition duration, 0.0 to 5.0 seconds" }
+  workspace.effects_preset:     { type: string, description: "Name of the workspace effects preset" }
+  workspace.effects_preset_uuid: { type: string, description: "UUID of the workspace effects preset" }
+  playlists.*.name:             { type: string, description: "Name of a top-level playlist or playlist group, keyed by its UUID" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API must be enabled in PVP's Preferences > Network (Enable). The port
+      is generated automatically and can be changed there; the document's
+      examples use 8080, which is assumed here, so give the configured port
+      when opening the device. The same setting enables Network Backup
+      Triggering.
+
+  - models: [all]
+    severity: critical
+    text: >
+      "Require Authentication" in Preferences > Network makes PVP accept only
+      requests carrying "Authorization: Bearer <token>", the token generated
+      there. This spec sends no Authorization header, so it works only with
+      Require Authentication off. "Use HTTPS Connection" makes PVP serve the
+      API over HTTPS only (the document's examples use curl -k, so the
+      certificate is not one a client can verify); this spec uses plain HTTP,
+      so it works only with Use HTTPS Connection off.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wherever the API takes a layer, playlist or cue id, it accepts a UUID, a
+      name or an index. A value made only of digits is always taken as an
+      index, never as a name, so a playlist named "2" can be reached only by
+      UUID. Indexes are 0-based. A playlist index counts top-level playlists
+      only; -1 is the Video Input playlist, whose items are video input
+      actions and are triggered by the same trigger commands.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Bitfocus's Companion module for PVP (community code, MIT) reports that
+      PVP 3.3.2 crashes on a negative layer or cue index, or a playlist index
+      below -1. The manufacturer document does not mention this. The id
+      parameters therefore refuse a value beginning with "-", except a
+      playlist's -1; a name beginning with "-" must be given by UUID.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The document lists error statuses (400, 401, 403, 404, 405, 500, 503)
+      but states no success status for any endpoint. HTTP 200 is assumed for
+      every command; a device that answers a POST with another 2xx status
+      would be reported as a failure.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Layer Blending is documented at /blend/layer/{id}. Bitfocus's Companion
+      module (community code) posts the same body to /layerBlend/layer/{id},
+      and the application contains the string "layerBlend/layer/" but not
+      "blend/layer/". This spec follows the document; if PVP answers 404 to
+      get_layer_blend or set_layer_blend*, the document's path is wrong.
+
+  - models: [all]
+    severity: info
+    text: >
+      Ambiguities in the document: the opacity GET reply is described only as
+      "{value}: (double)", so get_layer_opacity returns the whole reply; the
+      transition POST shows a full {"transition": {...}} example but its table
+      lists "value" (UUID) and "name", so set_*_transition take either as JSON
+      and set_*_transition_uuid sends {"value": uuid}; the Layer Blending GET
+      reply shape is not shown; White Matte takes "no additional data" and is
+      set through set_layer_blend. The opacity range 0.0 to 1.0 is taken from
+      the document's examples (layer opacity 1, 0.748, 0.5).
+
+  - models: [all]
+    severity: info
+    text: >
+      Setting a layer's opacity while it uses a matte blend replaces the
+      blend with Normal; reading it is valid only with a standard blend. The
+      blendMode endpoints still work but the document points to Layer
+      Blending as their replacement. An empty target set or effects preset
+      reads as the text "null" in layer data.
+
+  - models: [all]
+    severity: info
+    text: >
+      The document describes no transport commands (play, pause, seek), no way
+      to clear workspace effects, and no change notifications. Transport is
+      read-only here; state is polled once a second. Playlists in groups are
+      not tracked in state, only top-level playlists and groups.
