@@ -1,0 +1,1202 @@
+spec: 1
+id: chamsys-magicq
+name: ChamSys MagicQ / QuickQ
+vendor: ChamSys
+category: lighting
+
+source:
+  - title: MagicQ Manual 1.9.9.x, Open Sound Control (OSC)
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/OSC.html
+    note: >
+      MagicQ Manual 1.9.9.x, "Latest Update, 2026-09-23" (PDF
+      https://docs.chamsys.co.uk/magicq/1.9.9.x/_exports/magicq-1.9.9.x.pdf, pp. 533-538; the
+      newest manual on docs.chamsys.co.uk, retrieved 2026-10-01). OSC "is supported on MagicQ
+      consoles (except MQ40 and MQ40N) and PCs when fully unlocked"; Setup, View Settings, Network
+      sets the mode and transmit/receive ports ("A good default is 9000 transmit and 8000
+      receive"), port 0 disables, transmit IP 0.0.0.0 broadcasts. Table 1, OSC Addresses:
+      /pb/<playback> (float 0.0-1.0 or int 0-100, set fader level), /pb/<playback>/go, /flash (0
+      sets 0%, non-zero 100%), /pause, /release (each with an optional non-zero value),
+      /pb/<playback>/<cue> (jump to cue), /dbo ("0 turns on, non-zero turns off"), /swap (0 add,
+      non-zero swap), /exec/<page>/<item> and /exec/<item> (no argument activate, 0 release or
+      lower encoder, 1 activate or raise encoder, float 0.0-1.0 or int 0-100 fader level),
+      /10Scene/<item>/<zone> and /10Scene/<item> (none or 1 activate, 0 release) and their
+      /toggle forms, /rpc (string with remote Ethernet commands) and /rpc/<commands>, /midi (MIDI
+      bytes), /feedback/off, /feedback/pb, /feedback/exec, /feedback/pb+exec ("Turns feedback on
+      and transmits state of playbacks and executes"). <playback> 1-10; <cue> a number with
+      optional decimal; <page> 1-10 or a grid name; <item> a box number, grid reference (4x3) or
+      item name. Examples "testosc /pb/1/go" and "testosc /pb/1,100". Notes: "MagicQ only supports
+      OSC over UDP"; bundles are received but not sent; the address shown for an Execute item with
+      "//" "is also the address that gets sent when feedback is enabled". TouchOSC: the demo's
+      Load vals button sends /feedback/pb+exec, which also "enables automatic sending of any
+      changes to playbacks and executes", and is used again "after network loss".
+  - title: MagicQ Manual 1.9.9.x, ChamSys Remote Protocol Commands
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/remote_control_commands.html
+    note: >
+      PDF pp. 471-474. Commands are comma-separated values ending in a letter A-Z (or a-z);
+      spaces, tabs and carriage returns are ignored; commands can be sent back to back
+      ("1A2A1S2G3,4I"). Remote playback commands A, R, T, U, G, S, B, F, L, J, P, I, H, X with
+      their parameter ranges (<playback number> "1 and 10 (202 on MagicQ consoles)", <level>
+      0-100, <page number> 0-100, <channel number> 1-32769, <cue id> 1-65536, <cue id dec> 0-99
+      "for Cue ID 1.5 use 50", <button id> 1-10, <zone id> 1-20, <state> 1 pressed, 2 activate, 3
+      release, 4 toggle, 7 cycle, 9 increase, 10 decrease); examples "4,50I" and "8,2,50J". Remote
+      programming commands 01-13, 19-23, 30-32, 40-43, 71, 80-83, 90-94, 112, 911 and 999 ending
+      in H, with <palette id> 1-1024, <Q id> 1-10000, <16 bit> 0/1, <time> seconds, <group
+      number> 1-200, heads 1-6145, <show file id> 0000-9999, <state> 0/1 or 2 toggle, and the
+      attribute number list. Sent here as the /rpc string argument.
+  - title: MagicQ Manual 1.9.9.x, Controlling MagicQ Using UDP/IP
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/remote_control_network.html
+    note: >
+      PDF pp. 475-480. ChamSys Remote Ethernet Protocol (CREP): UDP port 6553 (changeable), the
+      optional CREP header (CREP, version, seq_fwd, seq_bkwd, length), the "no header" modes, rx
+      setting "ChamSys Rem rx"; "not supported when net session mode is in use"; on MagicQ PC/Mac
+      "only enabled when it is connected to a MagicQ Wing or Interface (not MagicDMX)". Q-Sys
+      plugins: QuickQ supports 10 playbacks and 10Scene zone 1..10. Not used as a transport here
+      (see quirks); its command set is reached through /rpc.
+  - title: MagicQ Manual 1.9.9.x, Settings > Network Settings
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/settings.html
+    note: >
+      PDF pp. 633-635. Ethernet Remote Protocol (tx, rx, both, no-header and rx echo variants;
+      default None), Ethernet Remote Port (default 6553), Web Server (default Disabled) and Web
+      Server Port (default 8080), OSC Mode (Disabled, Tx, Rx, Tx and Rx; default Disabled), OSC Tx
+      Port (default 9000), OSC Rx Port (default 8000), OSC Tx IP (0 = broadcast, default 0).
+  - title: MagicQ Manual 1.9.9.x, MIDI; MagicQ Software and Consoles; Remote Control
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/MIDI.html
+    note: >
+      MIDI, PDF p. 496: "for security reasons MagicQ limits the number of playbacks that can be
+      controlled using MIDI and the remote protocols. On MagicQ consoles PB1 to PB34 can be
+      controlled. On MagicQ PC, playbacks PB1 to PB10". MagicQ Software and Consoles, pp. 4-8
+      (introduction.html): MQ500M+ Stadium (and predecessors MQ500M, MQ500), the Compact series
+      MQ50, MQ70, MQ80 (previous MQ40N, MQ60, original MQ70), MagicQ Rack and MagicQ DIN ("supports
+      all MagicQ features including scheduled events, OSC, UDP, and MIDI control"), MagicQ PC/Mac
+      with Wings; MQ250M is named under Power Supply Protection (p. 10). Remote Control via Web
+      Server and Custom Web Server Pages, pp. 466-470 (remote_control_console.html).
+  - title: QuickQ Manual 12.0, Open Sound Control (OSC) and Ethernet Remote Control
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/quickq/12.0/manual/touchosc.html
+    note: >
+      QuickQ Manual 12.0, "Latest Update, 2026-09-23" (PDF
+      https://docs.chamsys.co.uk/quickq/12.0/_exports/quickq-12.0.pdf), OSC p. 73: software 6.0
+      onwards; "QuickQ is hard coded to TX on port 9000 and RX on port 8000. Port number is fixed";
+      Table 1 lists /pb/<playback> (level), /pb/<playback>/go, /flash, /pause, /release,
+      /10scene/<item>/<zone> and /10scene/<item> (none or 1 activate, 0 release), /feedback/off,
+      /feedback/pb, /feedback/exec, /feedback/pb+exec; on a QuickQ 10 the CUE STACK playback is
+      Playback 1 and the two chase playbacks, left to right, are Playbacks 3 and 2; Open Sound
+      Control must be enabled in Settings > Network > Protocols. Ethernet Remote Control p. 74
+      (ethernetremote.html): UDP port 6553, fixed, no header, commands A, R, T, U, G, S, J, L, X.
+      QuickQ Range (introduction.html): QuickQ 10, 20 and 30 consoles, QuickQ Rack, QuickQ DIN,
+      QuickQ Designer ("can not be used to control lights or test remote control"); the QuickQ 10
+      has one playback, the QuickQ 20 and 30 have 10 (p. 40).
+  - title: Bitfocus Companion modules companion-module-chamsys-magicq-osc and companion-module-chamsys-quickq (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-chamsys-magicq-osc
+    note: >
+      Community code, read for corroboration only (both repositories MIT at the top level). ChamSys
+      does not document the format of the feedback messages; these modules parse /pb/<n> with a
+      level 0.0-1.0, /pb/<n>/flash, and /exec/<page>/<item> with a level 0.0-1.0, after sending
+      /feedback/pb+exec, listening on port 9000. The telemetry rules below follow that and are
+      labelled as community-sourced.
+
+# OSC 1.0 over UDP to the console's OSC Rx Port (MagicQ default 8000; QuickQ fixed at 8000). The
+# console never acknowledges, so every command reports unverified. Feedback goes to the
+# console's OSC Tx IP (0 = broadcast) and Tx Port (MagicQ default 9000; QuickQ fixed at 9000),
+# not back to the sender, so it is received on a fixed local port.
+transport:
+  type: osc-udp
+  port: 8000
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 9000 }
+
+models:
+  - id: magicq-mq500m-plus
+    name: MagicQ MQ500M+ Stadium
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq500m
+    name: MagicQ MQ500M Stadium
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq500
+    name: MagicQ MQ500 Stadium
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq250m
+    name: MagicQ MQ250M
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq80
+    name: MagicQ MQ80
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq70
+    name: MagicQ MQ70
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq60
+    name: MagicQ MQ60
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq50
+    name: MagicQ MQ50
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-rack
+    name: MagicQ Rack
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-din
+    name: MagicQ DIN
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-pc
+    name: MagicQ PC / Mac (with a MagicQ Wing or Interface)
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, pb_jump_cue, set_blackout, set_swap_mode,
+      exec_activate_page, exec_set_page, exec_level_page, exec_activate, exec_set, exec_level,
+      tenscene_activate_zone, tenscene_set_zone, tenscene_toggle_zone, tenscene_activate,
+      tenscene_set, tenscene_toggle, feedback_off, feedback_playbacks, feedback_executes,
+      feedback_all, rpc, rpc_activate, rpc_release, rpc_test, rpc_untest, rpc_go, rpc_stop,
+      rpc_fast_back, rpc_fast_forward, rpc_level, rpc_jump_cue, rpc_page, rpc_channel_intensity,
+      rpc_tenscene_button, rpc_tenscene_button_state, rpc_tenscene_zone_button_state,
+      rpc_select_head, rpc_select_head_range, rpc_deselect_head, rpc_deselect_head_range,
+      rpc_deselect_all, rpc_select_group, rpc_set_intensity, rpc_set_intensity_timed,
+      rpc_set_attribute, rpc_set_attribute_timed, rpc_increase_attribute,
+      rpc_increase_attribute_res, rpc_decrease_attribute, rpc_decrease_attribute_res,
+      rpc_clear_programmer, rpc_include_position_palette, rpc_include_colour_palette,
+      rpc_include_beam_palette, rpc_include_cue, rpc_update, rpc_record_position_palette,
+      rpc_record_colour_palette, rpc_record_beam_palette, rpc_record_cue, rpc_next_head,
+      rpc_previous_head, rpc_all_heads, rpc_locate, rpc_lamp_on, rpc_lamp_off, rpc_reset_heads,
+      rpc_remote_trigger, rpc_test_cue, rpc_untest_cue, rpc_test_cue_stack,
+      rpc_test_cue_stack_level, rpc_test_cue_stack_level_cue, rpc_untest_cue_stack, rpc_save_show,
+      rpc_load_show, rpc_load_import, rpc_load_grid, rpc_shutdown, rpc_emergency_hot_takeover
+    ]
+    verification: none
+  - id: quickq-10
+    name: QuickQ 10
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, quickq_tenscene_activate_zone,
+      quickq_tenscene_set_zone, quickq_tenscene_activate, quickq_tenscene_set, feedback_off,
+      feedback_playbacks, feedback_executes, feedback_all
+    ]
+    verification: none
+  - id: quickq-20
+    name: QuickQ 20
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, quickq_tenscene_activate_zone,
+      quickq_tenscene_set_zone, quickq_tenscene_activate, quickq_tenscene_set, feedback_off,
+      feedback_playbacks, feedback_executes, feedback_all
+    ]
+    verification: none
+  - id: quickq-30
+    name: QuickQ 30
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, quickq_tenscene_activate_zone,
+      quickq_tenscene_set_zone, quickq_tenscene_activate, quickq_tenscene_set, feedback_off,
+      feedback_playbacks, feedback_executes, feedback_all
+    ]
+    verification: none
+  - id: quickq-rack
+    name: QuickQ Rack
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, quickq_tenscene_activate_zone,
+      quickq_tenscene_set_zone, quickq_tenscene_activate, quickq_tenscene_set, feedback_off,
+      feedback_playbacks, feedback_executes, feedback_all
+    ]
+    verification: none
+  - id: quickq-din
+    name: QuickQ DIN
+    supports: [
+      pb_level, pb_go, pb_flash, pb_pause, pb_release, quickq_tenscene_activate_zone,
+      quickq_tenscene_set_zone, quickq_tenscene_activate, quickq_tenscene_set, feedback_off,
+      feedback_playbacks, feedback_executes, feedback_all
+    ]
+    verification: none
+
+commands:
+  pb_level:
+    summary: "Set the fader level of playback 1-10, in percent (/pb/<playback>, int 0-100)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      level:    { type: int, min: 0, max: 100, required: true }
+    send: { address: "/pb/{playback}", args: [ { value: "{level}", type: int } ] }
+    returns: none
+
+  pb_go:
+    summary: "Go on playback 1-10 (/pb/<playback>/go, sent without the optional argument)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/pb/{playback}/go" }
+    returns: none
+
+  pb_flash:
+    summary: "Flash playback 1-10: enabled true sets its level to 100%, false to 0% (/pb/<playback>/flash, int 1 or 0)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      enabled:  { type: bool, default: true }
+    send: { address: "/pb/{playback}/flash", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  pb_pause:
+    summary: "Pause playback 1-10 (/pb/<playback>/pause, sent without the optional argument)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/pb/{playback}/pause" }
+    returns: none
+
+  pb_release:
+    summary: "Release playback 1-10 (/pb/<playback>/release, sent without the optional argument)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/pb/{playback}/release" }
+    returns: none
+
+  pb_jump_cue:
+    summary: "Jump to a cue on playback 1-10 (/pb/<playback>/<cue>; the cue is a number with an optional decimal, e.g. 2.5)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      cue:      { type: string, pattern: '^[0-9]{1,5}(\.[0-9]{1,2})?$', required: true }
+    send: { address: "/pb/{playback}/{cue}" }
+    returns: none
+
+  set_blackout:
+    summary: "Desk blackout (/dbo). The manual's table reads \"0 turns on, non-zero turns off\": blackout true sends int 0, false sends int 1 (see quirks)"
+    params:
+      blackout: { type: bool, required: true }
+    send: { address: "/dbo", args: [ { value: "{blackout:bool10}", type: int } ] }
+    returns: none
+
+  set_swap_mode:
+    summary: "Set the playback flash button mode: swap true sends int 1 (swap), false sends int 0 (add) (/swap)"
+    params:
+      swap: { type: bool, required: true }
+    send: { address: "/swap", args: [ { value: "{swap:bool01}", type: int } ] }
+    returns: none
+
+  exec_activate_page:
+    summary: "Activate a button or fader in an Execute Window grid (/exec/<page>/<item>, no argument). page: grid number 1-10 or grid name; item: box number, grid reference such as 4x3, or item name"
+    params:
+      page: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      item: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+    send: { address: "/exec/{page}/{item}" }
+    returns: none
+
+  exec_set_page:
+    summary: "Activate (true, int 1) or release (false, int 0) an Execute Window button or fader; on an encoder 1 raises and 0 lowers (/exec/<page>/<item>)"
+    params:
+      page:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      item:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      active: { type: bool, required: true }
+    send: { address: "/exec/{page}/{item}", args: [ { value: "{active:bool01}", type: int } ] }
+    returns: none
+
+  exec_level_page:
+    summary: "Set an Execute Window fader level as a fraction 0.0-1.0 (/exec/<page>/<item>, float)"
+    params:
+      page:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      item:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/exec/{page}/{item}", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  exec_activate:
+    summary: "Activate a button or fader in the current Execute Window grid (/exec/<item>, no argument). item: box number, grid reference such as 4x3, or item name"
+    params:
+      item: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+    send: { address: "/exec/{item}" }
+    returns: none
+
+  exec_set:
+    summary: "Activate (true, int 1) or release (false, int 0) a button or fader in the current Execute Window grid; on an encoder 1 raises and 0 lowers (/exec/<item>)"
+    params:
+      item:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      active: { type: bool, required: true }
+    send: { address: "/exec/{item}", args: [ { value: "{active:bool01}", type: int } ] }
+    returns: none
+
+  exec_level:
+    summary: "Set a fader level in the current Execute Window grid as a fraction 0.0-1.0 (/exec/<item>, float)"
+    params:
+      item:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/exec/{item}", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  tenscene_activate_zone:
+    summary: "Activate 10Scene button 1-10 in a zone (/10Scene/<item>/<zone>, no argument)"
+    params:
+      item: { type: int, min: 1, max: 10, required: true }
+      zone: { type: int, min: 1, max: 100, required: true }
+    send: { address: "/10Scene/{item}/{zone}" }
+    returns: none
+
+  tenscene_set_zone:
+    summary: "Activate (true, int 1) or release (false, int 0) 10Scene button 1-10 in a zone (/10Scene/<item>/<zone>)"
+    params:
+      item:   { type: int, min: 1, max: 10, required: true }
+      zone:   { type: int, min: 1, max: 100, required: true }
+      active: { type: bool, required: true }
+    send: { address: "/10Scene/{item}/{zone}", args: [ { value: "{active:bool01}", type: int } ] }
+    returns: none
+
+  tenscene_toggle_zone:
+    summary: "Toggle 10Scene button 1-10 in a zone (/10Scene/<item>/<zone>/toggle)"
+    params:
+      item: { type: int, min: 1, max: 10, required: true }
+      zone: { type: int, min: 1, max: 100, required: true }
+    send: { address: "/10Scene/{item}/{zone}/toggle" }
+    returns: none
+
+  tenscene_activate:
+    summary: "Activate 10Scene button 1-10 without a zone (/10Scene/<item>, no argument)"
+    params:
+      item: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/10Scene/{item}" }
+    returns: none
+
+  tenscene_set:
+    summary: "Activate (true, int 1) or release (false, int 0) 10Scene button 1-10 without a zone (/10Scene/<item>)"
+    params:
+      item:   { type: int, min: 1, max: 10, required: true }
+      active: { type: bool, required: true }
+    send: { address: "/10Scene/{item}", args: [ { value: "{active:bool01}", type: int } ] }
+    returns: none
+
+  tenscene_toggle:
+    summary: "Toggle 10Scene button 1-10 without a zone (/10Scene/<item>/toggle)"
+    params:
+      item: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/10Scene/{item}/toggle" }
+    returns: none
+
+  quickq_tenscene_activate_zone:
+    summary: "QuickQ: activate 10Scene button 1-10 in zone 1-10 (/10scene/<item>/<zone>, no argument)"
+    params:
+      item: { type: int, min: 1, max: 10, required: true }
+      zone: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/10scene/{item}/{zone}" }
+    returns: none
+
+  quickq_tenscene_set_zone:
+    summary: "QuickQ: activate (true, int 1) or release (false, int 0) 10Scene button 1-10 in zone 1-10 (/10scene/<item>/<zone>)"
+    params:
+      item:   { type: int, min: 1, max: 10, required: true }
+      zone:   { type: int, min: 1, max: 10, required: true }
+      active: { type: bool, required: true }
+    send: { address: "/10scene/{item}/{zone}", args: [ { value: "{active:bool01}", type: int } ] }
+    returns: none
+
+  quickq_tenscene_activate:
+    summary: "QuickQ: activate 10Scene button 1-10 (/10scene/<item>, no argument)"
+    params:
+      item: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/10scene/{item}" }
+    returns: none
+
+  quickq_tenscene_set:
+    summary: "QuickQ: activate (true, int 1) or release (false, int 0) 10Scene button 1-10 (/10scene/<item>)"
+    params:
+      item:   { type: int, min: 1, max: 10, required: true }
+      active: { type: bool, required: true }
+    send: { address: "/10scene/{item}", args: [ { value: "{active:bool01}", type: int } ] }
+    returns: none
+
+  feedback_off:
+    summary: "Turn OSC feedback off (/feedback/off)"
+    send: { address: "/feedback/off" }
+    returns: none
+
+  feedback_playbacks:
+    summary: "Turn playback feedback on and transmit the state of the playbacks (/feedback/pb)"
+    send: { address: "/feedback/pb" }
+    returns: none
+
+  feedback_executes:
+    summary: "Turn execute feedback on and transmit the state of the Execute Window items (/feedback/exec)"
+    send: { address: "/feedback/exec" }
+    returns: none
+
+  feedback_all:
+    summary: "Turn playback and execute feedback on and transmit the state of both (/feedback/pb+exec)"
+    send: { address: "/feedback/pb+exec" }
+    returns: none
+
+  rpc:
+    summary: "Send ChamSys Remote Protocol commands as text (/rpc, string), e.g. \"1A2A1S2G3,4I\": comma-separated values each ended by a letter A-Z"
+    params:
+      commands: { type: string, pattern: '^[0-9A-Za-z, ]{1,256}$', required: true }
+    send: { address: "/rpc", args: [ { value: "{commands}", type: string } ] }
+    returns: none
+
+  rpc_activate:
+    summary: "Remote protocol: Activate playback (/rpc \"<playback>A\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}A", type: string } ] }
+    returns: none
+
+  rpc_release:
+    summary: "Remote protocol: Release playback (/rpc \"<playback>R\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}R", type: string } ] }
+    returns: none
+
+  rpc_test:
+    summary: "Remote protocol: Test playback (activate with level 100%) (/rpc \"<playback>T\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}T", type: string } ] }
+    returns: none
+
+  rpc_untest:
+    summary: "Remote protocol: Un-test playback (release with level 0%) (/rpc \"<playback>U\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}U", type: string } ] }
+    returns: none
+
+  rpc_go:
+    summary: "Remote protocol: Go on playback (/rpc \"<playback>G\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}G", type: string } ] }
+    returns: none
+
+  rpc_stop:
+    summary: "Remote protocol: Stop (go back) on playback (/rpc \"<playback>S\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}S", type: string } ] }
+    returns: none
+
+  rpc_fast_back:
+    summary: "Remote protocol: Fast back on playback (no fade) (/rpc \"<playback>B\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}B", type: string } ] }
+    returns: none
+
+  rpc_fast_forward:
+    summary: "Remote protocol: Fast forward on playback (no fade) (/rpc \"<playback>F\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback}F", type: string } ] }
+    returns: none
+
+  rpc_level:
+    summary: "Remote protocol: set playback fader level in percent (/rpc \"<playback>,<level>L\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+      level:    { type: int, min: 0, max: 100, required: true }
+    send: { address: "/rpc", args: [ { value: "{playback},{level}L", type: string } ] }
+    returns: none
+
+  rpc_jump_cue:
+    summary: "Remote protocol: jump to cue id <cue>.<cue_dec> on a playback (cue 2.5 is cue 2, cue_dec 50) (/rpc \"<playback>,<cue>,<cue_dec>J\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+      cue:      { type: int, min: 1, max: 65536, required: true }
+      cue_dec:  { type: int, min: 0, max: 99, default: 0 }
+    send: { address: "/rpc", args: [ { value: "{playback},{cue},{cue_dec}J", type: string } ] }
+    returns: none
+
+  rpc_page:
+    summary: "Remote protocol: change playback page (/rpc \"<page>P\")"
+    params:
+      page: { type: int, min: 0, max: 100, required: true }
+    send: { address: "/rpc", args: [ { value: "{page}P", type: string } ] }
+    returns: none
+
+  rpc_channel_intensity:
+    summary: "Remote protocol: set a DMX intensity channel to a level in percent (/rpc \"<channel>,<level>I\")"
+    params:
+      channel: { type: int, min: 1, max: 32769, required: true }
+      level:   { type: int, min: 0, max: 100, required: true }
+    send: { address: "/rpc", args: [ { value: "{channel},{level}I", type: string } ] }
+    returns: none
+
+  rpc_tenscene_button:
+    summary: "Remote protocol: 10Scene zone 1 button 1-10 (/rpc \"<button>X\")"
+    params:
+      button: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/rpc", args: [ { value: "{button}X", type: string } ] }
+    returns: none
+
+  rpc_tenscene_button_state:
+    summary: "Remote protocol: 10Scene zone 1 button press or release; state 1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease (/rpc \"<button>,<state>X\")"
+    params:
+      button: { type: int, min: 1, max: 10, required: true }
+      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true }
+    send: { address: "/rpc", args: [ { value: "{button},{state}X", type: string } ] }
+    returns: none
+
+  rpc_tenscene_zone_button_state:
+    summary: "Remote protocol: 10Scene button press or release in zone 1-20; state 1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease (/rpc \"<zone>,<button>,<state>X\")"
+    params:
+      zone:   { type: int, min: 1, max: 20, required: true }
+      button: { type: int, min: 1, max: 10, required: true }
+      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true }
+    send: { address: "/rpc", args: [ { value: "{zone},{button},{state}X", type: string } ] }
+    returns: none
+
+  rpc_select_head:
+    summary: "Remote programming 01: select a head (/rpc \"01,<head>H\")"
+    params:
+      head: { type: int, min: 1, max: 6145, required: true }
+    send: { address: "/rpc", args: [ { value: "01,{head}H", type: string } ] }
+    returns: none
+
+  rpc_select_head_range:
+    summary: "Remote programming 01: select a range of heads (/rpc \"01,<start>,<end>H\")"
+    params:
+      start: { type: int, min: 1, max: 6145, required: true }
+      end:   { type: int, min: 1, max: 6145, required: true }
+    send: { address: "/rpc", args: [ { value: "01,{start},{end}H", type: string } ] }
+    returns: none
+
+  rpc_deselect_head:
+    summary: "Remote programming 02: deselect a head (/rpc \"02,<head>H\")"
+    params:
+      head: { type: int, min: 1, max: 6145, required: true }
+    send: { address: "/rpc", args: [ { value: "02,{head}H", type: string } ] }
+    returns: none
+
+  rpc_deselect_head_range:
+    summary: "Remote programming 02: deselect a range of heads (/rpc \"02,<start>,<end>H\")"
+    params:
+      start: { type: int, min: 1, max: 6145, required: true }
+      end:   { type: int, min: 1, max: 6145, required: true }
+    send: { address: "/rpc", args: [ { value: "02,{start},{end}H", type: string } ] }
+    returns: none
+
+  rpc_deselect_all:
+    summary: "Remote programming 03: deselect all heads (/rpc \"03H\")"
+    send: { address: "/rpc", args: [ { value: "03H", type: string } ] }
+    returns: none
+
+  rpc_select_group:
+    summary: "Remote programming 04: select group 1-200 (/rpc \"04,<group>H\")"
+    params:
+      group: { type: int, min: 1, max: 200, required: true }
+    send: { address: "/rpc", args: [ { value: "04,{group}H", type: string } ] }
+    returns: none
+
+  rpc_set_intensity:
+    summary: "Remote programming 05: set the intensity of the selected heads, in percent (/rpc \"05,<level>H\")"
+    params:
+      level: { type: int, min: 0, max: 100, required: true }
+    send: { address: "/rpc", args: [ { value: "05,{level}H", type: string } ] }
+    returns: none
+
+  rpc_set_intensity_timed:
+    summary: "Remote programming 05: set the intensity of the selected heads, in percent, over a time in seconds (/rpc \"05,<level>,<time>H\")"
+    params:
+      level: { type: int, min: 0, max: 100, required: true }
+      time:  { type: int, min: 0, max: 3600, required: true }
+    send: { address: "/rpc", args: [ { value: "05,{level},{time}H", type: string } ] }
+    returns: none
+
+  rpc_set_attribute:
+    summary: "Remote programming 06: set an attribute value of the selected heads (/rpc \"06,<attribute>,<value>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+    send: { address: "/rpc", args: [ { value: "06,{attribute},{value}H", type: string } ] }
+    returns: none
+
+  rpc_set_attribute_timed:
+    summary: "Remote programming 06: set an attribute value of the selected heads over a time in seconds (/rpc \"06,<attribute>,<value>,<time>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+      time:      { type: int, min: 0, max: 3600, required: true }
+    send: { address: "/rpc", args: [ { value: "06,{attribute},{value},{time}H", type: string } ] }
+    returns: none
+
+  rpc_increase_attribute:
+    summary: "Remote programming 07: increase an attribute of the selected heads (/rpc \"07,<attribute>,<value>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+    send: { address: "/rpc", args: [ { value: "07,{attribute},{value}H", type: string } ] }
+    returns: none
+
+  rpc_increase_attribute_res:
+    summary: "Remote programming 07: increase an attribute of the selected heads; high_res true changes in 16-bit resolution (1), false in 8-bit (0) (/rpc \"07,<attribute>,<value>,<high_res>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+      high_res:  { type: bool, required: true }
+    send: { address: "/rpc", args: [ { value: "07,{attribute},{value},{high_res:bool01}H", type: string } ] }
+    returns: none
+
+  rpc_decrease_attribute:
+    summary: "Remote programming 08: decrease an attribute of the selected heads (/rpc \"08,<attribute>,<value>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+    send: { address: "/rpc", args: [ { value: "08,{attribute},{value}H", type: string } ] }
+    returns: none
+
+  rpc_decrease_attribute_res:
+    summary: "Remote programming 08: decrease an attribute of the selected heads; high_res true changes in 16-bit resolution (1), false in 8-bit (0) (/rpc \"08,<attribute>,<value>,<high_res>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+      high_res:  { type: bool, required: true }
+    send: { address: "/rpc", args: [ { value: "08,{attribute},{value},{high_res:bool01}H", type: string } ] }
+    returns: none
+
+  rpc_clear_programmer:
+    summary: "Remote programming 09: clear the programmer (/rpc \"09H\")"
+    send: { address: "/rpc", args: [ { value: "09H", type: string } ] }
+    returns: none
+
+  rpc_include_position_palette:
+    summary: "Remote programming 10: include a position palette (/rpc \"10,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: { address: "/rpc", args: [ { value: "10,{palette}H", type: string } ] }
+    returns: none
+
+  rpc_include_colour_palette:
+    summary: "Remote programming 11: include a colour palette (/rpc \"11,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: { address: "/rpc", args: [ { value: "11,{palette}H", type: string } ] }
+    returns: none
+
+  rpc_include_beam_palette:
+    summary: "Remote programming 12: include a beam palette (/rpc \"12,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: { address: "/rpc", args: [ { value: "12,{palette}H", type: string } ] }
+    returns: none
+
+  rpc_include_cue:
+    summary: "Remote programming 13: include a cue (/rpc \"13,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 65536, required: true }
+    send: { address: "/rpc", args: [ { value: "13,{cue}H", type: string } ] }
+    returns: none
+
+  rpc_update:
+    summary: "Remote programming 19: update (/rpc \"19H\")"
+    send: { address: "/rpc", args: [ { value: "19H", type: string } ] }
+    returns: none
+
+  rpc_record_position_palette:
+    summary: "Remote programming 20: record a position palette (/rpc \"20,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: { address: "/rpc", args: [ { value: "20,{palette}H", type: string } ] }
+    returns: none
+
+  rpc_record_colour_palette:
+    summary: "Remote programming 21: record a colour palette (/rpc \"21,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: { address: "/rpc", args: [ { value: "21,{palette}H", type: string } ] }
+    returns: none
+
+  rpc_record_beam_palette:
+    summary: "Remote programming 22: record a beam palette (/rpc \"22,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: { address: "/rpc", args: [ { value: "22,{palette}H", type: string } ] }
+    returns: none
+
+  rpc_record_cue:
+    summary: "Remote programming 23: record a cue (/rpc \"23,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 65536, required: true }
+    send: { address: "/rpc", args: [ { value: "23,{cue}H", type: string } ] }
+    returns: none
+
+  rpc_next_head:
+    summary: "Remote programming 30: next head (/rpc \"30H\")"
+    send: { address: "/rpc", args: [ { value: "30H", type: string } ] }
+    returns: none
+
+  rpc_previous_head:
+    summary: "Remote programming 31: previous head (/rpc \"31H\")"
+    send: { address: "/rpc", args: [ { value: "31H", type: string } ] }
+    returns: none
+
+  rpc_all_heads:
+    summary: "Remote programming 32: all heads (/rpc \"32H\")"
+    send: { address: "/rpc", args: [ { value: "32H", type: string } ] }
+    returns: none
+
+  rpc_locate:
+    summary: "Remote programming 40: locate (/rpc \"40H\")"
+    send: { address: "/rpc", args: [ { value: "40H", type: string } ] }
+    returns: none
+
+  rpc_lamp_on:
+    summary: "Remote programming 41: lamp on (/rpc \"41H\")"
+    send: { address: "/rpc", args: [ { value: "41H", type: string } ] }
+    returns: none
+
+  rpc_lamp_off:
+    summary: "Remote programming 42: lamp off (/rpc \"42H\")"
+    send: { address: "/rpc", args: [ { value: "42H", type: string } ] }
+    returns: none
+
+  rpc_reset_heads:
+    summary: "Remote programming 43: reset (/rpc \"43H\")"
+    send: { address: "/rpc", args: [ { value: "43H", type: string } ] }
+    returns: none
+
+  rpc_remote_trigger:
+    summary: "Remote programming 71: remote trigger; state 0 off, 1 on, 2 toggle (/rpc \"71,<state>H\")"
+    params:
+      state: { type: enum, values: ["0", "1", "2"], required: true }
+    send: { address: "/rpc", args: [ { value: "71,{state}H", type: string } ] }
+    returns: none
+
+  rpc_test_cue:
+    summary: "Remote programming 80: test cue Q 1-10000 in the Cue Store (/rpc \"80,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 10000, required: true }
+    send: { address: "/rpc", args: [ { value: "80,{cue}H", type: string } ] }
+    returns: none
+
+  rpc_untest_cue:
+    summary: "Remote programming 81: untest cue Q 1-10000 in the Cue Store (/rpc \"81,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 10000, required: true }
+    send: { address: "/rpc", args: [ { value: "81,{cue}H", type: string } ] }
+    returns: none
+
+  rpc_test_cue_stack:
+    summary: "Remote programming 82: test a cue stack at 100% from its first cue (/rpc \"82,<stack>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+    send: { address: "/rpc", args: [ { value: "82,{stack}H", type: string } ] }
+    returns: none
+
+  rpc_test_cue_stack_level:
+    summary: "Remote programming 82: test a cue stack at a level in percent from its first cue (/rpc \"82,<stack>,<level>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+      level: { type: int, min: 0, max: 100, required: true }
+    send: { address: "/rpc", args: [ { value: "82,{stack},{level}H", type: string } ] }
+    returns: none
+
+  rpc_test_cue_stack_level_cue:
+    summary: "Remote programming 82: test a cue stack at a level in percent from a cue id (/rpc \"82,<stack>,<level>,<cue>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+      level: { type: int, min: 0, max: 100, required: true }
+      cue:   { type: int, min: 1, max: 65536, required: true }
+    send: { address: "/rpc", args: [ { value: "82,{stack},{level},{cue}H", type: string } ] }
+    returns: none
+
+  rpc_untest_cue_stack:
+    summary: "Remote programming 83: untest a cue stack (/rpc \"83,<stack>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+    send: { address: "/rpc", args: [ { value: "83,{stack}H", type: string } ] }
+    returns: none
+
+  rpc_save_show:
+    summary: "Remote programming 90: save the show as showXXXX.shw (four-digit id 0000-9999) (/rpc \"90,<show>H\")"
+    params:
+      show: { type: int, min: 0, max: 9999, required: true }
+    send: { address: "/rpc", args: [ { value: "90,{show:04d}H", type: string } ] }
+    returns: none
+
+  rpc_load_show:
+    summary: "Remote programming 91: load show showXXXX.shw (four-digit id 0000-9999) (/rpc \"91,<show>H\")"
+    params:
+      show: { type: int, min: 0, max: 9999, required: true }
+    send: { address: "/rpc", args: [ { value: "91,{show:04d}H", type: string } ] }
+    returns: none
+
+  rpc_load_import:
+    summary: "Remote programming 92: load show importXXXX.csv (four-digit id 0000-9999) (/rpc \"92,<file>H\")"
+    params:
+      file: { type: int, min: 0, max: 9999, required: true }
+    send: { address: "/rpc", args: [ { value: "92,{file:04d}H", type: string } ] }
+    returns: none
+
+  rpc_load_grid:
+    summary: "Remote programming 93: load grid gridXXXX.csv (four-digit id 0000-9999) (/rpc \"93,<grid>H\")"
+    params:
+      grid: { type: int, min: 0, max: 9999, required: true }
+    send: { address: "/rpc", args: [ { value: "93,{grid:04d}H", type: string } ] }
+    returns: none
+
+  rpc_shutdown:
+    summary: "Remote programming 94: shutdown; mode 1 normal (close the MagicQ application on PC, power off on a console), 2 power off, 3 reboot. The confirmation bytes 81,117,105,116 (\"Quit\") are part of the command (/rpc \"94,<mode>,81,117,105,116H\")"
+    params:
+      mode: { type: enum, values: ["1", "2", "3"], required: true }
+    send: { address: "/rpc", args: [ { value: "94,{mode},81,117,105,116H", type: string } ] }
+    returns: none
+
+  rpc_emergency_hot_takeover:
+    summary: "Remote programming 112: emergency hot takeover on (1) or off (0); 911 and 999 are documented aliases (/rpc \"112,<enabled>H\")"
+    params:
+      enabled: { type: bool, required: true }
+    send: { address: "/rpc", args: [ { value: "112,{enabled:bool01}H", type: string } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      OSC is off by default. On MagicQ set Setup, View Settings, Network, OSC Mode to "Rx" (or "Tx
+      and Rx" for feedback) and OSC Rx Port to the port the device is registered with (default
+      8000; 0 disables). On QuickQ enable Open Sound Control in Settings > Network > Protocols;
+      its ports are fixed at RX 8000 and TX 9000. Without this the console drops every message
+      and, with no acknowledgement, commands still report unverified.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The console acknowledges nothing over OSC, so every command reports unverified. Use the
+      feedback telemetry to confirm playback and execute changes.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Feedback is sent to the console's OSC Tx IP and Tx Port, not back to the sender. Set OSC Mode
+      to "Tx and Rx", OSC Tx Port to this device's feedback_port (default 9000, the MagicQ default
+      and the QuickQ fixed port), and OSC Tx IP to the host's address or 0 (broadcast). On QuickQ
+      the transmit port is fixed at 9000, so feedback_port must stay 9000. The listen port is
+      shared by every device using it; each datagram is credited to the console it came from.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ChamSys does not document the feedback messages beyond "transmits state of playbacks and
+      executes" and that an Execute item's feedback uses its own OSC address. The address and
+      argument shapes in the telemetry rules (/pb/<n> and /exec/<page>/<item> with a level 0.0-1.0,
+      /pb/<n>/flash) come from the community Bitfocus Companion modules, not from ChamSys. The
+      state is therefore stored as sent: levels as fractions 0.0-1.0, flash as the raw number.
+
+  - models: [all]
+    severity: info
+    text: >
+      /feedback/pb+exec is sent on connecting and every 30 s. The console keeps no session for an
+      OSC sender, and ChamSys's own TouchOSC example re-sends it "if the app gets closed or after
+      network loss"; the repeat is this spec's choice for recovering after a console restart. Each
+      send makes the console transmit the full state of its playbacks and executes.
+
+  - models: [all]
+    severity: info
+    text: >
+      Only playbacks 1-10 and Execute grids 1-10 can be addressed with the built-in OSC addresses
+      ("Only the first 10 playbacks and first 10 execute grids can be controlled"). User-defined OSC
+      triggers in the Macro, View Autom window (address up to 15 characters, OSC Command up to 39)
+      can reach other parts of the show; they are installation-specific and not specced here, but
+      can be sent with any address by a host that knows them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Arguments: MagicQ accepts a float or an int wherever the table does not say. pb_level sends
+      an int 0-100; exec_*_level sends a float 0.0-1.0, because an int 0 or 1 on /exec means
+      release/activate rather than a level. go, pause, release and the no-argument exec and 10Scene
+      commands send no argument (the argument is optional).
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-rack, magicq-din, magicq-pc]
+    severity: warning
+    text: >
+      set_blackout follows the manual's table literally: "/dbo: 0 turns on, non-zero turns off",
+      so blackout true sends 0 and false sends 1. The community Companion module sends 1 for
+      "Black Out On" and 0 for off, the opposite reading. ChamSys does not say which is right;
+      verify on the console before relying on it.
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-rack, magicq-din, magicq-pc]
+    severity: warning
+    text: >
+      rpc and rpc_* carry ChamSys Remote Protocol commands inside /rpc ("Send remote Ethernet
+      command"). The OSC page does not say whether Setup, Network, Ethernet Remote Protocol must
+      also be set to an rx mode for /rpc; the Remote Ethernet Protocol is "not supported when net
+      session mode is in use", which may apply to /rpc as well. Remote programming commands (H)
+      act on the console's programmer and include record, save, load, shutdown (94) and emergency
+      hot takeover (112); intent cannot be validated.
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-rack, magicq-din, magicq-pc]
+    severity: warning
+    text: >
+      Remote-protocol playback numbers are taken as 1-202 ("<playback number> a number between 1
+      and 10 (202 on MagicQ consoles)"). The MIDI chapter says MagicQ limits playbacks controlled
+      by "MIDI and the remote protocols" to PB1-PB34 on consoles and PB1-PB10 on MagicQ PC. The two
+      pages disagree; numbers above 34 may be ignored on consoles, and above 10 on PC.
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-rack, magicq-din, magicq-pc]
+    severity: info
+    text: >
+      Ranges the manual leaves open are bounded here, not documented: attribute values 0-65535
+      (8-bit or 16-bit), times 0-3600 s, cue stack ids 1-10000, and the cue id of remote
+      programming 13, 23 and 82 as the playback table's 1-65536. 10Scene zones for /10Scene are
+      taken as 1-100 (the Q-Sys plugin section's "10Scene zone (1..100)"); the remote protocol's X
+      command documents zones 1-20. Remote programming numbers are sent as the table writes them
+      ("01" to "09"); leading zeros are part of a decimal value either way. Attribute numbers are
+      the table's 0-51 (Intensity 0, Pan 4, Tilt 5, Cyan 16, ...).
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-rack, magicq-din, magicq-pc]
+    severity: info
+    text: >
+      Execute page and item names are limited here to letters, digits and "_+.-" (up to 32
+      characters), so that a name is a valid single OSC address segment; grid references such as
+      4x3 and box numbers fit. Names containing spaces or OSC-reserved characters cannot be
+      addressed and need a number or grid reference instead. Address letter case is as printed:
+      /10Scene on MagicQ, /10scene on QuickQ.
+
+  - models: [magicq-pc]
+    severity: critical
+    text: >
+      MagicQ PC/Mac receives OSC only "when fully unlocked (Unlocked Mode)" ("supported ... on
+      MagicQ PC systems unlocked with a MagicQ Wing or Interface"), and the Remote Ethernet
+      Protocol only with a MagicQ Wing or Interface connected (not MagicDMX). Remote-protocol
+      playbacks are limited to PB1-PB10 on PC.
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-rack, magicq-din]
+    severity: info
+    text: >
+      MQ40 and MQ40N consoles do not support OSC ("except MQ40 and MQ40N") and are not listed;
+      they can be reached only by the UDP Remote Ethernet Protocol on port 6553, which this
+      transport cannot carry.
+
+  - models: [quickq-10, quickq-20, quickq-30, quickq-rack, quickq-din]
+    severity: warning
+    text: >
+      QuickQ accepts only /pb/<n> (level, go, flash, pause, release), /10scene and /feedback over
+      OSC (software 6.0 onwards); there is no /rpc, /exec, /dbo, /swap or jump-to-cue address.
+      Its other commands (activate, release, test, untest, stop, jump to cue, 10Scene state X)
+      exist only on its UDP Ethernet Remote Control (port 6553, fixed, no header), which this
+      transport cannot carry. QuickQ Designer "can not be used to control lights or test remote
+      control" and is not listed.
+
+  - models: [quickq-10]
+    severity: info
+    text: >
+      The QuickQ 10 has one cue stack playback and two chase playbacks: the CUE STACK playback is
+      Playback 1, and the chase playbacks, from left to right as seen at the console, are Playbacks
+      3 and 2. Playbacks 4-10 do not exist on it.
+
+  - models: [quickq-rack, quickq-din]
+    severity: info
+    text: >
+      The QuickQ manual's external control list names "The QuickQ Rack and Consoles"; the QuickQ
+      DIN runs the same software but is not named there. Rack and DIN have no physical playback
+      faders; their 10 playbacks are driven by the front buttons, wall plates and remote control.
+
+state:
+  playbacks.*.level: { type: float, description: "Playback fader level as a fraction 0.0-1.0, from /pb/<n> feedback (community-documented format)" }
+  playbacks.*.flash: { type: float, description: "Playback flash state as the console sends it, 0 off, non-zero on, from /pb/<n>/flash feedback (community-documented format)" }
+  executes.*.*.level: { type: float, description: "Execute Window item level as a fraction 0.0-1.0, by page and item, from /exec/<page>/<item> feedback (community-documented format)" }
+
+telemetry:
+  subscribe:
+    send:
+      - { address: /feedback/pb+exec }
+    every_ms: 30000
+  updates:
+    - address: '^/pb/(\d+)$'
+      state: { "playbacks.{1}.level": "{arg0}" }
+    - address: '^/pb/(\d+)/flash$'
+      state: { "playbacks.{1}.flash": "{arg0}" }
+    - address: '^/exec/([A-Za-z0-9_+-]+)/([A-Za-z0-9_+-]+)$'
+      state: { "executes.{1}.{2}.level": "{arg0}" }
