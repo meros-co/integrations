@@ -1,0 +1,726 @@
+spec: 1
+id: blackmagic-streaming
+name: Blackmagic Web Presenter / Streaming Encoder
+vendor: Blackmagic Design
+category: other
+
+source:
+  - title: Blackmagic Streaming Ethernet Protocol v1.2, Developer Information (January 2026)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/DeveloperManuals/WebPresenterEthernetProtocol.pdf
+    note: >
+      Manufacturer-documented, and the source of every block and command here unless
+      the command says otherwise. Covers Blackmagic Streaming Encoder HD and 4K.
+      Line endings, TCP port 9977, block framing, preamble and END PRELUDE (p.2);
+      status updates, requesting changes, ACK/NACK and the handling of unknown keys
+      and invalid values (p.3); status dump requests and the IDENTITY block (p.4);
+      VERSION and NETWORK blocks (p.5-6); changing network settings and the UI
+      SETTINGS block (p.7-8); STREAM SETTINGS (p.8-9); STREAM XML (p.10-11); STREAM
+      STATE (p.12-13); AUDIO SETTINGS (p.13); SHUTDOWN (p.14).
+  - title: Blackmagic Web Presenter Installation and Operation Manual (May 2024), Developer Information, Blackmagic Web Presenter Ethernet Protocol v1.2
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/BlackmagicWebPresenterManual.pdf
+    note: >
+      Manufacturer-documented; covers Blackmagic Web Presenter HD and 4K (p.5). Its
+      protocol section (p.31-43) is the same text as the Streaming Encoder document
+      with "Web Presenter" for "Streaming Encoder": overview and port (p.31), status
+      updates and changes (p.32), status dump and IDENTITY (p.33), VERSION and
+      NETWORK (p.34-35), network changes and UI SETTINGS (p.36-37), STREAM SETTINGS
+      (p.37-38), STREAM XML (p.39-40), STREAM STATE (p.41-42), AUDIO SETTINGS
+      (p.42), SHUTDOWN (p.43). Web Presenter Control REST API (p.43-55) and
+      Blackmagic Streaming XML Format (p.56).
+  - title: Blackmagic Streaming Processors Installation and Operation Manual (March 2026)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/BlackmagicStreamingManual.pdf
+    note: >
+      Manufacturer-documented; covers Blackmagic Streaming Encoder HD, Streaming
+      Encoder 4K and Streaming Decoder 4K. Its Developer Information repeats the
+      January 2026 Ethernet Protocol v1.2 word for word (p.39-51), then the REST API
+      (p.51-63) and the Streaming XML format (p.64). Neither protocol is documented
+      for the Streaming Decoder 4K.
+  - title: Blackmagic Web Presenter Installation and Operation Manual (April 2021), Developer Information, Blackmagic Web Presenter Ethernet Protocol v1.0
+    author: Blackmagic Design
+    url: https://audioeffetti.com/product/documents/BLM/BDLKWEBPTR4K-05.pdf
+    note: >
+      Manufacturer manual, read through a third-party mirror because the earlier
+      edition is no longer on Blackmagic's site. Source of the protocol v1.0
+      differences only (p.24-34): "available for Blackmagic Web Presenter HD"; the
+      DNS servers are read-only keys of the NETWORK block rather than of each NETWORK
+      INTERFACE block (p.27-28); STREAM SETTINGS has no Password, Current URL or
+      Customizable URL keys (p.30); STREAM STATE has no Cache Used key (p.33); there
+      is no AUDIO SETTINGS block.
+  - title: Blackmagic Streaming REST API, Developer Information (January 2026)
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/DeveloperManuals/RESTAPIBlackmagicWebPresenter.pdf
+    note: >
+      Manufacturer-documented HTTP API on the same products (/control/api/v1/, with a
+      notification websocket). Read to choose between the two protocols; no command
+      here is taken from it. See the quirks for why the TCP protocol was chosen.
+
+transport:
+  type: line-tcp
+  port: 9977
+  framing: block
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: expected
+  reply_match: "^N?ACK\\s*$"
+  probe: "IDENTITY:"
+
+models:
+  - id: web-presenter-hd
+    name: Blackmagic Web Presenter HD
+    supports:
+      [set_label, get_identity, get_version, get_network, get_network_interface,
+       set_network_dhcp, set_network_static, set_network_interface_priority,
+       get_ui_settings, set_locale, set_audio_meter, get_stream_settings,
+       set_video_mode, set_platform, set_server, set_quality_level, set_stream_key,
+       set_stream_password, set_stream_url, set_stream_settings, get_stream_xml,
+       add_stream_xml, remove_stream_xml, remove_all_stream_xml, get_stream_state,
+       start_stream, stop_stream, get_audio_settings, set_monitor_audio_source,
+       reboot, factory_reset]
+    verification: none
+    notes: >
+      12G-SDI input, H.264 streaming converted to 1080p (Web Presenter manual, May
+      2024, p.5). Protocol v1.0 was documented for this model in April 2021; v1.2 in
+      May 2024.
+  - id: web-presenter-4k
+    name: Blackmagic Web Presenter 4K
+    supports:
+      [set_label, get_identity, get_version, get_network, get_network_interface,
+       set_network_dhcp, set_network_static, set_network_interface_priority,
+       get_ui_settings, set_locale, set_audio_meter, get_stream_settings,
+       set_video_mode, set_platform, set_server, set_quality_level, set_stream_key,
+       set_stream_password, set_stream_url, set_stream_settings, get_stream_xml,
+       add_stream_xml, remove_stream_xml, remove_all_stream_xml, get_stream_state,
+       start_stream, stop_stream, get_audio_settings, set_monitor_audio_source,
+       reboot, factory_reset]
+    verification: none
+    notes: >
+      12G-SDI input, streams in Ultra HD up to 2160p60 (Web Presenter manual, May
+      2024, p.5). Its Available Video Modes list therefore differs from the HD
+      example in the document; the device reports it.
+  - id: streaming-encoder-hd
+    name: Blackmagic Streaming Encoder HD
+    supports:
+      [set_label, get_identity, get_version, get_network, get_network_interface,
+       set_network_dhcp, set_network_static, set_network_interface_priority,
+       get_ui_settings, set_locale, set_audio_meter, get_stream_settings,
+       set_video_mode, set_platform, set_server, set_quality_level, set_stream_key,
+       set_stream_password, set_stream_url, set_stream_settings, get_stream_xml,
+       add_stream_xml, remove_stream_xml, remove_all_stream_xml, get_stream_state,
+       start_stream, stop_stream, get_audio_settings, set_monitor_audio_source,
+       reboot, factory_reset]
+    verification: none
+    notes: >
+      SDI input converted down to 1080p (Streaming Processors manual, March 2026,
+      p.7). The document's own IDENTITY example is this model (p.4).
+  - id: streaming-encoder-4k
+    name: Blackmagic Streaming Encoder 4K
+    supports:
+      [set_label, get_identity, get_version, get_network, get_network_interface,
+       set_network_dhcp, set_network_static, set_network_interface_priority,
+       get_ui_settings, set_locale, set_audio_meter, get_stream_settings,
+       set_video_mode, set_platform, set_server, set_quality_level, set_stream_key,
+       set_stream_password, set_stream_url, set_stream_settings, get_stream_xml,
+       add_stream_xml, remove_stream_xml, remove_all_stream_xml, get_stream_state,
+       start_stream, stop_stream, get_audio_settings, set_monitor_audio_source,
+       reboot, factory_reset]
+    verification: none
+    notes: >
+      12G-SDI input, HD and Ultra HD up to 2160p60, H.264 and H.265 (Streaming
+      Processors manual, March 2026, p.7).
+
+commands:
+  # ── Identity and version ──────────────────────────────────────────────
+  set_label:
+    summary: Set the device label (display name) in the IDENTITY block
+    params:
+      label: { type: string, required: true }
+    send: |
+      IDENTITY:
+      Label: {label}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4
+
+  get_identity:
+    summary: Ask the device to resend its IDENTITY block (model, label, unique ID); the block follows the ACK and updates state
+    send: "IDENTITY:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4
+
+  get_version:
+    summary: Ask the device to resend its VERSION block (product ID, hardware and software versions); the block follows the ACK and updates state
+    send: "VERSION:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4-5
+
+  # ── Network ───────────────────────────────────────────────────────────
+  get_network:
+    summary: Ask the device to resend its NETWORK block (interface count, default interface); the block follows the ACK and updates state
+    send: "NETWORK:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4-6
+
+  get_network_interface:
+    summary: Ask the device to resend one NETWORK INTERFACE block (0 Ethernet, 1 tethered smartphone); the block follows the ACK and updates state
+    params:
+      interface: { type: int, min: 0, max: 1, required: true }
+    send: "NETWORK INTERFACE {interface}:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4-6; numbered as the device numbers it
+
+  set_network_dhcp:
+    summary: Use DHCP on a network interface (Dynamic IP true)
+    params:
+      interface: { type: int, min: 0, max: 1, required: true }
+    send: |
+      NETWORK INTERFACE {interface}:
+      Dynamic IP: true
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.7
+
+  set_network_static:
+    summary: Give a network interface a static IP address, subnet mask, gateway and DNS servers (Dynamic IP false)
+    params:
+      interface:   { type: int, min: 0, max: 1, required: true }
+      addresses:   { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+      gateway:     { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+      dns_servers: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}(, ?[0-9]{1,3}(\\.[0-9]{1,3}){3})*$" }
+    send: |
+      NETWORK INTERFACE {interface}:
+      Dynamic IP: false
+      Static Addresses: {addresses}
+      Static Gateway: {gateway}
+      Static DNS Servers: {dns_servers}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.6-7: "supply all static parameters"
+
+  set_network_interface_priority:
+    summary: Set a network interface's priority; the higher number is the higher priority and becomes the default interface
+    params:
+      interface: { type: int, min: 0, max: 1, required: true }
+      priority:  { type: int, min: 0, required: true }
+    send: |
+      NETWORK INTERFACE {interface}:
+      Priority: {priority}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.6 (Priority is Read/Write; block form of p.3)
+
+  # ── UI settings ───────────────────────────────────────────────────────
+  get_ui_settings:
+    summary: Ask the device to resend its UI SETTINGS block (LCD language and audio meter); the block follows the ACK and updates state
+    send: "UI SETTINGS:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4 and p.7
+
+  set_locale:
+    summary: Set the front panel and monitor output language, one of the device's Available Locales (e.g. en_US.UTF-8)
+    params:
+      locale: { type: string, required: true, pattern: "^[a-z]{2}_[A-Z]{2}\\.UTF-8$" }
+    send: |
+      UI SETTINGS:
+      Current Locale: {locale}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.7-8
+
+  set_audio_meter:
+    summary: Set the audio meter type shown on the LCD and monitor output
+    params:
+      meter: { type: enum, values: ["PPM -18dB", "PPM -20dB", "VU -18dB", "VU -20dB"], required: true }
+    send: |
+      UI SETTINGS:
+      Current Audio Meter: {meter}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.7-8: values from the Available Audio Meters example
+
+  # ── Stream settings ───────────────────────────────────────────────────
+  get_stream_settings:
+    summary: Ask the device to resend its STREAM SETTINGS block; the block follows the ACK and updates state
+    send: "STREAM SETTINGS:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4 (the document's own example) and p.8-9
+
+  set_video_mode:
+    summary: Set the input video mode, one of the device's Available Video Modes (e.g. Auto, 1080p59.94)
+    params:
+      mode: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Video Mode: {mode}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.3 (the document's own example) and p.9
+
+  set_platform:
+    summary: Select the streaming platform, from the device's Available Default Platforms or Available Custom Platforms
+    params:
+      platform: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Current Platform: {platform}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.8-9
+
+  set_server:
+    summary: Select the server of the current platform, from the device's Available Servers
+    params:
+      server: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Current Server: {server}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.8-9
+
+  set_quality_level:
+    summary: Select the streaming quality level of the current platform, from the device's Available Quality Levels
+    params:
+      quality: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Current Quality Level: {quality}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.8-9
+
+  set_stream_key:
+    summary: Set the stream key for the streaming platform
+    params:
+      key: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Stream Key: {key}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.8-9
+
+  set_stream_password:
+    summary: Set the passphrase for an encrypted SRT stream (protocol 1.2)
+    params:
+      password: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Password: {password}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.8-9
+
+  set_stream_url:
+    summary: Set the streaming URL; the device accepts it only when the platform reports Customizable URL true (protocol 1.2)
+    params:
+      url: { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Current URL: {url}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.8-9
+
+  set_stream_settings:
+    summary: Set video mode, platform, server, quality level and stream key in one block, as in the document's Twitch example
+    params:
+      mode:     { type: string, required: true }
+      platform: { type: string, required: true }
+      server:   { type: string, required: true }
+      quality:  { type: string, required: true }
+      key:      { type: string, required: true }
+    send: |
+      STREAM SETTINGS:
+      Video Mode: {mode}
+      Current Platform: {platform}
+      Current Server: {server}
+      Current Quality Level: {quality}
+      Stream Key: {key}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.9 ("Changing Stream Settings")
+
+  # ── Custom platforms (Streaming XML) ──────────────────────────────────
+  get_stream_xml:
+    summary: Ask the device to resend its STREAM XML block (loaded custom platform files); the block follows the ACK and updates state
+    send: "STREAM XML:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4 and p.10
+
+  add_stream_xml:
+    summary: Load a Blackmagic Streaming XML file defining custom platforms; the XML must be given on one line (see quirks)
+    params:
+      filename: { type: string, required: true, pattern: "^[^:,\\\\/]+$" }
+      xml:      { type: string, required: true, pattern: "^\\s*<.*>\\s*$" }
+    send: |
+      STREAM XML {filename}:
+      {xml}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.10-11 ("Adding a Stream XML file"); format p.64 of the Streaming Processors manual
+
+  remove_stream_xml:
+    summary: Remove one loaded Streaming XML file
+    params:
+      filename: { type: string, required: true, pattern: "^[^:,\\\\/]+$" }
+    send: |
+      STREAM XML:
+      Action: Remove
+      Files: {filename}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.11
+
+  remove_all_stream_xml:
+    summary: Remove every loaded Streaming XML file
+    send: |
+      STREAM XML:
+      Action: Remove All
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.11
+
+  # ── Streaming ─────────────────────────────────────────────────────────
+  get_stream_state:
+    summary: Ask the device to resend its STREAM STATE block (status, bitrate, duration, cache used); the block follows the ACK and updates state
+    send: "STREAM STATE:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4 and p.12
+
+  start_stream:
+    summary: Start streaming (go on air)
+    send: |
+      STREAM STATE:
+      Action: Start
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.12
+
+  stop_stream:
+    summary: Stop streaming
+    send: |
+      STREAM STATE:
+      Action: Stop
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.13
+
+  # ── Audio ─────────────────────────────────────────────────────────────
+  get_audio_settings:
+    summary: Ask the device to resend its AUDIO SETTINGS block (monitor output audio source); the block follows the ACK and updates state
+    send: "AUDIO SETTINGS:"
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.4 and p.13
+
+  set_monitor_audio_source:
+    summary: Set the monitor output's audio source, one of the device's Available Monitor Out Audio Sources (e.g. Auto, SDI In, Remote Source) (protocol 1.2)
+    params:
+      source: { type: string, required: true }
+    send: |
+      AUDIO SETTINGS:
+      Current Monitor Out Audio Source: {source}
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.13
+
+  # ── Power ─────────────────────────────────────────────────────────────
+  reboot:
+    summary: Reboot the device; the server stops and every client is disconnected
+    send: |
+      SHUTDOWN:
+      Action: Reboot
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.14
+
+  factory_reset:
+    summary: Reset every setting to factory defaults
+    send: |
+      SHUTDOWN:
+      Action: Factory Reset
+    expect: { matches: "^ACK\\s*$" }
+    returns: ack
+    # Streaming Ethernet Protocol v1.2 (January 2026), p.14
+
+telemetry:
+  # The device sends its whole state as blocks on connecting, ending with END
+  # PRELUDE, then the changed keys of a block after any change by any client or
+  # by the device itself (p.2-3). A status request (get_*) is answered with ACK
+  # and then the full block, which these same rules read. STREAM STATE is pushed
+  # only when Status changes; Bitrate, Duration and Cache Used must be polled
+  # (p.12), so that one block is asked for on a schedule.
+  poll:
+    send: ["STREAM STATE:"]
+    every_ms: 1000
+  updates:
+    - header: "^PROTOCOL PREAMBLE:$"
+      fields:
+        Version: device.protocol_version
+    - match: "^END PRELUDE:$"
+      state: { device.prelude_complete: "true" }
+    - header: "^IDENTITY:$"
+      fields:
+        Model: identity.model
+        Label: identity.label
+        Unique ID: identity.unique_id
+    - header: "^VERSION:$"
+      fields:
+        Product ID: version.product_id
+        Hardware Version: version.hardware_version
+        Software Version: version.software_version
+        Software Release: version.software_release
+    - header: "^NETWORK:$"
+      fields:
+        Interface Count: network.interface_count
+        Default Interface: network.default_interface
+        # Protocol 1.0 only (April 2021 manual, p.27-28).
+        Static DNS Servers: network.static_dns_servers
+        Current DNS Servers: network.current_dns_servers
+    - header: "^NETWORK INTERFACE 0:$"
+      fields:
+        Name: network.interfaces.0.name
+        Priority: network.interfaces.0.priority
+        MAC Address: network.interfaces.0.mac_address
+        Dynamic IP: { path: network.interfaces.0.dynamic_ip, map: { "true": true, "false": false } }
+        Current Addresses: network.interfaces.0.current_addresses
+        Current Gateway: network.interfaces.0.current_gateway
+        Current DNS Servers: network.interfaces.0.current_dns_servers
+        Static Addresses: network.interfaces.0.static_addresses
+        Static Gateway: network.interfaces.0.static_gateway
+        Static DNS Servers: network.interfaces.0.static_dns_servers
+    - header: "^NETWORK INTERFACE 1:$"
+      fields:
+        Name: network.interfaces.1.name
+        Priority: network.interfaces.1.priority
+        MAC Address: network.interfaces.1.mac_address
+        Dynamic IP: { path: network.interfaces.1.dynamic_ip, map: { "true": true, "false": false } }
+        Current Addresses: network.interfaces.1.current_addresses
+        Current Gateway: network.interfaces.1.current_gateway
+        Current DNS Servers: network.interfaces.1.current_dns_servers
+        Static Addresses: network.interfaces.1.static_addresses
+        Static Gateway: network.interfaces.1.static_gateway
+        Static DNS Servers: network.interfaces.1.static_dns_servers
+    - header: "^UI SETTINGS:$"
+      fields:
+        Available Locales: ui.available_locales
+        Current Locale: ui.locale
+        Available Audio Meters: ui.available_audio_meters
+        Current Audio Meter: ui.audio_meter
+    - header: "^STREAM SETTINGS:$"
+      fields:
+        Available Video Modes: stream.available_video_modes
+        Video Mode: stream.video_mode
+        Current Platform: stream.platform
+        Current Server: stream.server
+        Current Quality Level: stream.quality_level
+        Stream Key: stream.key
+        Password: stream.password
+        Current URL: stream.url
+        Customizable URL: { path: stream.customizable_url, map: { "true": true, "false": false } }
+        Available Default Platforms: stream.available_default_platforms
+        Available Custom Platforms: stream.available_custom_platforms
+        Available Servers: stream.available_servers
+        Available Quality Levels: stream.available_quality_levels
+    - header: "^STREAM XML:$"
+      fields:
+        Files: stream_xml.files
+    - header: "^STREAM STATE:$"
+      fields:
+        Status: stream_state.status
+        Bitrate: stream_state.bitrate
+        Duration: stream_state.duration
+        Cache Used: stream_state.cache_used
+    - header: "^AUDIO SETTINGS:$"
+      fields:
+        Current Monitor Out Audio Source: audio.monitor_out_source
+        Available Monitor Out Audio Sources: audio.available_monitor_out_sources
+
+state:
+  device.protocol_version:       { type: string, description: "Protocol version from the preamble, e.g. 1.2" }
+  device.prelude_complete:       { type: bool, description: "True once END PRELUDE arrives, marking the end of the initial status dump" }
+  identity.model:                { type: string, description: "Model name, e.g. Blackmagic Streaming Encoder HD" }
+  identity.label:                { type: string, description: "Device label (display name), settable" }
+  identity.unique_id:            { type: string, description: "Device-specific unique identifier, hexadecimal" }
+  version.product_id:            { type: string, description: "Product ID, hexadecimal (e.g. BE73)" }
+  version.hardware_version:      { type: string, description: "Hardware version, hexadecimal" }
+  version.software_version:      { type: string, description: "Software version, hexadecimal" }
+  version.software_release:      { type: string, description: "Software release version, e.g. 3.5" }
+  network.interface_count:       { type: int, description: "Number of network interfaces" }
+  network.default_interface:     { type: int, description: "Default network interface, numbered from 0 as the device numbers it" }
+  network.static_dns_servers:    { type: string, description: "Static DNS servers, comma separated (protocol 1.0 only; per interface from 1.2)" }
+  network.current_dns_servers:   { type: string, description: "Current DNS servers, comma separated (protocol 1.0 only; per interface from 1.2)" }
+  network.interfaces.*.name:     { type: string, description: "Interface name (Ethernet, USBEthernet), keyed by interface number from 0" }
+  network.interfaces.*.priority: { type: int, description: "Interface priority; the higher number is the higher priority" }
+  network.interfaces.*.mac_address: { type: string, description: "MAC address" }
+  network.interfaces.*.dynamic_ip: { type: bool, description: "True for DHCP, false for static IP" }
+  network.interfaces.*.current_addresses: { type: string, description: "Current IPv4 address/subnet mask" }
+  network.interfaces.*.current_gateway: { type: string, description: "Current gateway" }
+  network.interfaces.*.current_dns_servers: { type: string, description: "Current DNS servers, comma separated (protocol 1.2)" }
+  network.interfaces.*.static_addresses: { type: string, description: "Static IPv4 address/subnet mask used when DHCP is off" }
+  network.interfaces.*.static_gateway: { type: string, description: "Static gateway used when DHCP is off" }
+  network.interfaces.*.static_dns_servers: { type: string, description: "Static DNS servers, comma separated (protocol 1.2)" }
+  ui.available_locales:          { type: string, description: "Locales the device offers, comma separated" }
+  ui.locale:                     { type: string, description: "Current front panel and monitor output locale" }
+  ui.available_audio_meters:     { type: string, description: "Audio meter types the device offers, comma separated" }
+  ui.audio_meter:                { type: string, description: "Current audio meter type" }
+  stream.available_video_modes:  { type: string, description: "Video modes the device offers, comma separated" }
+  stream.video_mode:             { type: string, description: "Current video mode, e.g. Auto or 1080p59.94" }
+  stream.platform:               { type: string, description: "Selected streaming platform" }
+  stream.server:                 { type: string, description: "Selected server of the platform" }
+  stream.quality_level:          { type: string, description: "Selected streaming quality level" }
+  stream.key:                    { type: string, description: "Stream key, as the device reports it in clear text" }
+  stream.password:               { type: string, description: "SRT passphrase, as the device reports it in clear text (protocol 1.2)" }
+  stream.url:                    { type: string, description: "Current streaming URL (protocol 1.2)" }
+  stream.customizable_url:       { type: bool, description: "True when the platform accepts a custom URL (protocol 1.2)" }
+  stream.available_default_platforms: { type: string, description: "Built-in platforms, comma separated" }
+  stream.available_custom_platforms: { type: string, description: "Platforms loaded from Streaming XML files, comma separated" }
+  stream.available_servers:      { type: string, description: "Servers of the selected platform, comma separated" }
+  stream.available_quality_levels: { type: string, description: "Quality levels of the selected platform, comma separated" }
+  stream_xml.files:              { type: string, description: "Loaded Streaming XML files, comma separated; empty when none" }
+  stream_state.status:           { type: string, description: "Idle, Connecting, Streaming or Interrupted" }
+  stream_state.bitrate:          { type: int, unit: bit/s, description: "Bitrate of the active stream (polled)" }
+  stream_state.duration:         { type: string, description: "Duration of the active stream, DD:HH:MM:SS (polled)" }
+  stream_state.cache_used:       { type: int, unit: "%", description: "Streaming cache in use (polled; protocol 1.2)" }
+  audio.monitor_out_source:      { type: string, description: "Current monitor output audio source (protocol 1.2)" }
+  audio.available_monitor_out_sources: { type: string, description: "Monitor output audio sources the device offers, comma separated (protocol 1.2)" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Two documented control protocols exist: this Ethernet protocol on TCP 9977 and
+      a REST API on HTTP (/control/api/v1/, January 2026). This spec uses the TCP
+      protocol because it covers more of the device (label, network, LCD language
+      and meter, reboot and factory reset have no REST equivalent) and pushes
+      changes, while the REST API's push channel is a websocket this format has no
+      transport for. The REST API alone reports effectiveVideoFormat, a Flushing
+      stream status, each platform's full server and profile configuration, and the
+      content of a loaded XML file.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ACK means only that the block was parsed (p.3). A key the device does not
+      understand is ignored, and an invalid value for a known key is ignored, both
+      still with ACK; the device then resends the key's existing value. Take state
+      only from the status block that follows, never from the request. NACK means
+      the block could not be parsed. Platform, server, quality level, video mode,
+      locale and audio source accept only values the device lists in its Available
+      keys, so a value outside them is acknowledged and not applied.
+
+  - models: [all]
+    severity: info
+    text: >
+      The device pushes blocks at any time: the full dump on connecting, concluded
+      by END PRELUDE (p.2), and the changed keys after any change made by any client,
+      the setup utility, tethering a smartphone or a streaming service disconnecting
+      (p.3). Only ACK and NACK are taken as command replies. A status request (get_*)
+      is answered with ACK and then the full block (p.4), which updates state through
+      telemetry, so the command itself returns only the acknowledgement.
+
+  - models: [all]
+    severity: info
+    text: >
+      STREAM STATE is pushed only when Status changes. Bitrate, Duration and Cache
+      Used must be polled by requesting the block (p.12); telemetry asks for it every
+      second. Duration is a DD:HH:MM:SS string, not a timecode.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Available servers and quality levels depend on the selected platform; set the
+      platform first, then read Available Servers and Available Quality Levels before
+      choosing them (p.8). set_stream_settings sends all five keys in one block, in
+      the document's order (p.9). Current URL is writable only while Customizable URL
+      is true (p.9).
+
+  - models: [all]
+    severity: warning
+    text: >
+      Changing network settings may drop the IP connection (p.7). Setting a static
+      address needs every static parameter in one block (p.7), which
+      set_network_static sends. Network interfaces are numbered from 0 on the wire
+      and in state, as the device names its blocks (NETWORK INTERFACE 0, 1). The
+      document shows two interfaces, Ethernet and a tethered smartphone's
+      USBEthernet (p.5-6); telemetry reads interfaces 0 and 1, and a device reporting
+      an Interface Count above 2 would need further rules.
+
+  - models: [all]
+    severity: critical
+    text: >
+      reboot stops the server and disconnects every client (p.14); factory_reset
+      returns every setting, including network settings, stream keys and loaded
+      Streaming XML files, to factory defaults (p.14). Neither asks for confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The Stream Key and SRT Password are sent and reported in clear text (p.8), so
+      they appear in state (stream.key, stream.password). Hosts that display or log
+      state should treat these two paths as secrets.
+
+  - models: [all]
+    severity: warning
+    text: >
+      add_stream_xml sends the header "STREAM XML <filename>:" followed by the XML
+      (p.10). A block ends at a blank line, so the XML must contain none (p.10), and
+      the format rejects line breaks in a parameter, so the XML must be given as a
+      single line. A one-line XML document is well formed, but the document only
+      shows multi-line examples and does not say whether the device accepts one
+      line; the following STREAM XML and STREAM SETTINGS (Available Custom
+      Platforms) blocks show whether it was loaded. Loading a file does not change
+      the Current platform (p.10). The device echoes the XML block back; that echo
+      is not read into state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Lists are comma separated, with "," and "\" inside a list item escaped with
+      "\" (p.2). State keeps each list as the device sends it, escapes included.
+      An empty value (e.g. "Files:" after removing every XML file, p.11) is stored
+      as an empty string. Lines from the device end in LF; this client sends LF,
+      which the device accepts alongside CR LF (p.2). The document does not name a
+      character encoding; UTF-8 is assumed, matching its locale names.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Protocol version 1.0 (Web Presenter HD, April 2021 manual) lacks the AUDIO
+      SETTINGS block, the Password, Current URL and Customizable URL stream keys and
+      the Cache Used key, and reports DNS servers as read-only keys of the NETWORK
+      block rather than of each interface. On such firmware set_stream_password,
+      set_stream_url, set_monitor_audio_source and the DNS part of
+      set_network_static are acknowledged and ignored. device.protocol_version
+      shows which version a unit speaks. Neither document states the firmware
+      release that introduced each version; their VERSION examples show Software
+      Release 2.0 (v1.0) and 3.5 (v1.2).
+
+  - models: [all]
+    severity: info
+    text: >
+      Clients should ignore blocks and keys they do not recognise (p.2); compatible
+      protocol changes raise only the minor version. SHUTDOWN is write-only and not
+      part of the dump (p.14). The document gives no length limits for the label,
+      stream key, password or URL; values holding CR or LF are rejected before
+      sending.
+
+  - models: [web-presenter-hd, web-presenter-4k]
+    severity: info
+    text: >
+      The protocol is documented for Blackmagic Web Presenter HD and 4K (May 2024
+      manual) and, at v1.0, for Web Presenter HD only (April 2021). The original
+      Blackmagic Web Presenter (2017) is not covered by either. ATEM Streaming
+      Bridge and Blackmagic Streaming Decoder 4K have no documented network control
+      protocol; they are configured with ATEM Setup or Blackmagic Streaming Setup.
