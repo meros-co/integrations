@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 
 use serde_json::{json, Map, Value};
 
+use super::vmix_functions::FUNCTIONS;
 use crate::catalog::Params;
 use crate::engine::template::percent_encode;
 use crate::module::{
@@ -146,7 +147,7 @@ fn text(params: &Params, name: &str) -> String {
 }
 
 /// `FUNCTION <name> <query>`, with URL-encoded values as the TCP API asks.
-fn function(name: &str, query: &[(&str, String)]) -> String {
+fn function_line(name: &str, query: &[(&str, String)]) -> String {
     let query: Vec<String> = query
         .iter()
         .map(|(k, v)| format!("{k}={}", percent_encode(v)))
@@ -158,67 +159,33 @@ fn function(name: &str, query: &[(&str, String)]) -> String {
     }
 }
 
+/// Parameter names as vMix spells them, in the order its examples give them.
+const PARAMETERS: [(&str, &str); 7] = [
+    ("input", "Input"),
+    ("selected_name", "SelectedName"),
+    ("selected_index", "SelectedIndex"),
+    ("value", "Value"),
+    ("duration", "Duration"),
+    ("mix", "Mix"),
+    ("channel", "Channel"),
+];
+
+/// The FUNCTION line for a command: the function from the generated table
+/// (`tools/generate_vmix.py`), or the transition named by `run_transition`,
+/// with the parameters given.
 fn function_for(name: &str, params: &Params) -> Option<String> {
-    let input = || ("Input", text(params, "input"));
-    let optional_input = || {
-        params
-            .get("input")
-            .map(|_| vec![input()])
-            .unwrap_or_default()
+    let function = if name == "run_transition" {
+        text(params, "name")
+    } else {
+        let at = FUNCTIONS.binary_search_by(|(cmd, _)| cmd.cmp(&name)).ok()?;
+        FUNCTIONS[at].1.to_string()
     };
-    let stream = || {
-        params
-            .get("stream")
-            .and_then(Value::as_i64)
-            .map(|n| vec![("Value", (n - 1).to_string())])
-            .unwrap_or_default()
-    };
-    Some(match name {
-        "cut" => function("Cut", &optional_input()),
-        "fade" => {
-            let mut q = vec![("Duration", text(params, "duration_ms"))];
-            q.extend(optional_input());
-            function("Fade", &q)
-        }
-        "transition" => function(&format!("Transition{}", text(params, "number")), &[]),
-        "cut_direct" => function("CutDirect", &[input()]),
-        "set_program" => function("ActiveInput", &[input()]),
-        "set_preview" => function("PreviewInput", &[input()]),
-        "quick_play" => function("QuickPlay", &[input()]),
-        "overlay_in" => function(
-            &format!("OverlayInput{}In", text(params, "overlay")),
-            &[input()],
-        ),
-        "overlay_out" => function(&format!("OverlayInput{}Out", text(params, "overlay")), &[]),
-        "overlays_off" => function("OverlayInputAllOff", &[]),
-        "fade_to_black" => function("FadeToBlack", &[]),
-        "start_recording" => function("StartRecording", &[]),
-        "stop_recording" => function("StopRecording", &[]),
-        "start_streaming" => function("StartStreaming", &stream()),
-        "stop_streaming" => function("StopStreaming", &stream()),
-        "start_external" => function("StartExternal", &[]),
-        "stop_external" => function("StopExternal", &[]),
-        "start_multicorder" => function("StartMultiCorder", &[]),
-        "stop_multicorder" => function("StopMultiCorder", &[]),
-        "set_input_mute" => {
-            let muted = params.get("muted").and_then(Value::as_bool).unwrap_or(true);
-            function(if muted { "AudioOff" } else { "AudioOn" }, &[input()])
-        }
-        "set_volume" => function("SetVolume", &[input(), ("Value", text(params, "volume"))]),
-        "set_text" => function(
-            "SetText",
-            &[
-                input(),
-                ("SelectedName", text(params, "field")),
-                ("Value", text(params, "text")),
-            ],
-        ),
-        "play" => function("Play", &[input()]),
-        "pause" => function("Pause", &[input()]),
-        "start_script" => function("ScriptStart", &[("Value", text(params, "name"))]),
-        "set_fader" => function("SetFader", &[("Value", text(params, "position"))]),
-        _ => return None,
-    })
+    let query: Vec<(&str, String)> = PARAMETERS
+        .iter()
+        .filter(|(key, _)| params.contains_key(*key))
+        .map(|(key, vmix)| (*vmix, text(params, key)))
+        .collect();
+    Some(function_line(&function, &query))
 }
 
 fn is_true(s: &str) -> bool {
@@ -739,7 +706,7 @@ mod tests {
             &mut cx,
             4,
             "set_text",
-            &params(json!({"input": "Lower third", "field": "Headline.Text", "text": "Hello & welcome"})),
+            &params(json!({"input": "Lower third", "selected_name": "Headline.Text", "value": "Hello & welcome"})),
         );
         assert_eq!(
             sent(&cx.take()),
@@ -770,34 +737,24 @@ mod tests {
         assert_eq!(line("cut", json!({})), "FUNCTION Cut");
         assert_eq!(line("cut", json!({"input": "3"})), "FUNCTION Cut Input=3");
         assert_eq!(
-            line("fade", json!({"duration_ms": 1000})),
+            line("fade", json!({"duration": 1000})),
             "FUNCTION Fade Duration=1000"
         );
         assert_eq!(
-            line("transition", json!({"number": 2})),
-            "FUNCTION Transition2"
-        );
-        assert_eq!(
-            line("overlay_in", json!({"overlay": 1, "input": "5"})),
+            line("overlay_input1_in", json!({"input": "5"})),
             "FUNCTION OverlayInput1In Input=5"
         );
+        // Names that do not convert back from snake_case come from the table.
         assert_eq!(
-            line("start_streaming", json!({"stream": 2})),
-            "FUNCTION StartStreaming Value=1"
-        );
-        assert_eq!(line("stop_streaming", json!({})), "FUNCTION StopStreaming");
-        assert_eq!(
-            line("set_input_mute", json!({"input": "1", "muted": true})),
-            "FUNCTION AudioOff Input=1"
+            line("ptz_move_up", json!({"input": "Cam 1", "value": "0.5"})),
+            "FUNCTION PTZMoveUp Input=Cam%201&Value=0.5"
         );
         assert_eq!(
-            line("set_volume", json!({"input": "1", "volume": 80})),
-            "FUNCTION SetVolume Input=1&Value=80"
+            line("run_transition", json!({"name": "Merge", "duration": 500})),
+            "FUNCTION Merge Duration=500"
         );
-        assert_eq!(
-            line("set_fader", json!({"position": 255})),
-            "FUNCTION SetFader Value=255"
-        );
+        assert!(FUNCTIONS.windows(2).all(|w| w[0].0 < w[1].0), "sorted");
+        assert_eq!(function_for("no_such_function", &params(json!({}))), None);
     }
 
     #[test]

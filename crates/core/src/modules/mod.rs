@@ -10,6 +10,7 @@ mod sennheiser_mcp;
 mod shure;
 mod tsl;
 mod vmix;
+mod vmix_functions;
 
 use std::sync::Arc;
 
