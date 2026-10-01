@@ -1,0 +1,410 @@
+spec: 1
+id: ross-xpression
+name: Ross XPression (RossTalk)
+vendor: Ross Video
+category: playback
+
+# Transcribed from Ross Video's XPression RossTalk command table. XPression is
+# Ross's real-time motion graphics system; RossTalk on it drives the sequencer
+# (take items), framebuffers and layers, cues and simulated GPIs.
+#
+# This is a separate command set from the switcher RossTalk dialects in
+# rosstalk.yaml: the same command words (UP, DOWN, FOCUS, NEXT, SEQI, SEQO,
+# GPI) mean different things here.
+#
+# Not included: XPression's other control interfaces (PBus, VDCP/AMP and the
+# Automation/CII Gateway, the DashBoard API, the MOS gateway, the XPression
+# Maps TCP Control API). They are separate protocols.
+source:
+  - title: "Carbonite Device DashBoard Setup (online help), RossTalk > XPression Commands (help build 2026013010, page build 20260528122140)"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device-db/Topics/Protocol/External/XPN/RT-XPN-Comm.html
+    note: >
+      Manufacturer document; the current edition. "Sending RossTalk Commands
+      to XPression" (port 7788; Edit > Hardware Setup > GPI Boards > Add,
+      Brand RossTalk, State Enabled, TCP port 7788), the CR/LF note, the case
+      sensitivity note, the framebuffer numbering note (framebuffer 1 is 0 on
+      the wire) and Table 1 "RossTalk Commands": CHANFOCUSSTORY, CLFB (two
+      forms), CLRA, CUE, DATALINQKEY, DOWN, FOCUSSTORY, FOCUS, GAMESTATE,
+      GPI, LAYEROFF, NEXT, READ, RESUME (two forms), ROUTEIPIN (with and
+      without the AUDIO clause), SEQI, SEQO, SWAP (with and without a
+      framebuffer), TAKE, TEMPLATEDATA, UNCUEALL, UNCUE, UP, UPNEXT.
+  - title: "Carbonite Device Setup (Legacy) (online help), RossTalk > XPression Commands (help build 2022012605)"
+    author: Ross Video Ltd.
+    url: https://help.rossvideo.com/carbonite-device/Topics/Protocol/RossTalk/XPN/RT-XPN-Comm.html
+    note: >
+      Manufacturer document, earlier edition. Identical setup text and the
+      same table without CHANFOCUSSTORY, DATALINQKEY, FOCUSSTORY, GAMESTATE,
+      ROUTEIPIN and TEMPLATEDATA. Used only to note what the current edition
+      added.
+  - title: "XPression User Guide, version 12.6 (3500DR-001-12.6, 16 January 2026)"
+    author: Ross Video Ltd.
+    url: https://documentation.rossvideo.com/files/Manuals/CG%20and%20Graphics/XPression/User%20Guides/XPression%20User%20Guide%20%283500DR-001-12.6%29.pdf
+    note: >
+      Manufacturer document. "Configuring Smart GPI / RossTalk" (pp.
+      189-190: Edit > Hardware Setup > GPI / Tally Boards > Add, Brand Smart
+      GPI / RossTalk; State Enabled; mode Serial RS232, TCP (optionally
+      Secure Listen) or UDP; incoming port; outgoing host and port for
+      RossTalk XPression sends), the RossTalk preferences panel (p. 32:
+      "Ignore TAKE / SEQI commands for items already online", "Apply
+      template data changes to items already on-air", on by default) and
+      the Layout and Sequence interface overviews (pp. 6-7: each output
+      framebuffer has an unlimited number of layers, positive above and
+      negative below).
+  - title: "XPression Software Releases (release notes, versions 9.5 to 12.5)"
+    author: Ross Video Ltd.
+    url: https://www.rossvideo.com/products/graphics-and-virtual/software-releases/
+    note: >
+      Manufacturer release notes. Version 10.0 added UNCUE and UNCUEALL;
+      11.0 added TEMPLATEDATA on published fields such as Visibility,
+      Position and Rotation, the preference letting TEMPLATEDATA update
+      on-air items, and a Tessera source name in RESUME; 11.5 added the
+      preference to ignore TAKE/SEQI for items already online and CUE of a
+      Take All sequence group; 12.5 logs outgoing RossTalk messages.
+  - title: "Bitfocus Companion module companion-module-rossvideo-xpression (MIT), src/actions.js"
+    author: Bitfocus AS and contributors (community)
+    url: https://github.com/bitfocus/companion-module-rossvideo-xpression
+    note: >
+      Community code, MIT licence, read for corroboration only. It sends
+      framebuffers unpadded and 0-based (operator number minus one), GPI
+      unpadded and SWAP with and without a framebuffer, as specified here.
+
+transport:
+  type: line-tcp
+  port: 7788
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: none
+
+models:
+  - id: xpression
+    name: Ross XPression (Studio, BlueBox, Tessera, Go and other editions)
+    supports: [focus_story_channel, clear_framebuffer, clear_layer, clear_all, cue, set_datalinq_key,
+               sequencer_down, focus_story, focus, game_state, gpi, layer_off, next, read,
+               resume_framebuffer, resume_layer, route_ip_input, route_ip_input_audio,
+               take_online, take_offline, swap, swap_all, take, set_template_data, uncue_all,
+               uncue, sequencer_up, up_next]
+    verification: none
+    notes: >
+      Ross documents one RossTalk command set for XPression and does not
+      distinguish editions. ROUTEIPIN needs a Matrox DSX IP board (see
+      quirks).
+
+commands:
+  focus_story_channel:
+    summary: Set the Remote Sequencer focus to a story of a rundown in a channel (CHANFOCUSSTORY channel:RoID:StoryID)
+    params:
+      channel:  { type: int, min: 1, max: 999, required: true }
+      rundown:  { type: string, pattern: '^[^:]+$', required: true }
+      story:    { type: string, pattern: '^[^:]+$', required: true }
+    send: "CHANFOCUSSTORY {channel}:{rundown}:{story}"
+    returns: none
+
+  clear_framebuffer:
+    summary: Clear every layer of a framebuffer, numbered from 1 (CLFB buffer, buffer 0-based on the wire)
+    params:
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+    send: "CLFB {framebuffer:-1}"
+    returns: none
+
+  clear_layer:
+    summary: Clear one layer of a framebuffer, numbered from 1 (CLFB buffer:layer, buffer 0-based on the wire)
+    params:
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+      layer:       { type: int, min: -9999, max: 9999, required: true }
+    send: "CLFB {framebuffer:-1}:{layer}"
+    returns: none
+
+  clear_all:
+    summary: Clear all framebuffers (CLRA)
+    send: "CLRA"
+    returns: none
+
+  cue:
+    summary: Prepare a take item to go to air next on a framebuffer layer without taking it, so a later SWAP takes it with no frame delay (CUE takeid:buffer:layer)
+    params:
+      take_id:     { type: int, min: 0, max: 99999, required: true }
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+      layer:       { type: int, min: -9999, max: 9999, required: true }
+    send: "CUE {take_id}:{framebuffer:-1}:{layer}"
+    returns: none
+
+  set_datalinq_key:
+    summary: Set a DataLinq key to a value for a take item (DATALINQKEY takeid:key:value)
+    params:
+      take_id: { type: int, min: 0, max: 99999, required: true }
+      key:     { type: string, pattern: '^[^:]+$', required: true }
+      value:   { type: string, pattern: '^[^:]*$', required: true }
+    send: "DATALINQKEY {take_id:04d}:{key}:{value}"
+    returns: none
+
+  sequencer_down:
+    summary: Move the sequencer selection to the item below it (DOWN)
+    send: "DOWN"
+    returns: none
+
+  focus_story:
+    summary: Set the Remote Sequencer focus to the first item of a story in a rundown (FOCUSSTORY RoID:StoryID)
+    params:
+      rundown: { type: string, pattern: '^[^:]+$', required: true }
+      story:   { type: string, pattern: '^[^:]+$', required: true }
+    send: "FOCUSSTORY {rundown}:{story}"
+    returns: none
+
+  focus:
+    summary: Set the sequencer focus to a take item (FOCUS takeid)
+    params:
+      take_id: { type: int, min: 0, max: 99999, required: true }
+    send: "FOCUS {take_id:04d}"
+    returns: none
+
+  game_state:
+    summary: Log an item in the As Run Log for each game state, such as first half and second half (GAMESTATE)
+    send: "GAMESTATE"
+    returns: none
+
+  gpi:
+    summary: Trigger simulated GPI input n, as if it were triggered externally (GPI gpi)
+    params:
+      number: { type: int, min: 1, max: 9999, required: true }
+    send: "GPI {number}"
+    returns: none
+
+  layer_off:
+    summary: Take the scene on a framebuffer layer off air with its defined out transition (LAYEROFF buffer:layer)
+    params:
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+      layer:       { type: int, min: -9999, max: 9999, required: true }
+    send: "LAYEROFF {framebuffer:-1}:{layer}"
+    returns: none
+
+  next:
+    summary: Take the current sequencer item to air and advance the selection to the next item (NEXT)
+    send: "NEXT"
+    returns: none
+
+  read:
+    summary: Take the current sequencer selection to air without advancing (READ)
+    send: "READ"
+    returns: none
+
+  resume_framebuffer:
+    summary: Resume all layers of a framebuffer (RESUME buffer)
+    params:
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+    send: "RESUME {framebuffer:-1}"
+    returns: none
+
+  resume_layer:
+    summary: Resume one layer of a framebuffer (RESUME buffer:layer)
+    params:
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+      layer:       { type: int, min: -9999, max: 9999, required: true }
+    send: "RESUME {framebuffer:-1}:{layer}"
+    returns: none
+
+  route_ip_input:
+    summary: Clean-switch a SMPTE 2110 IP input to a source address and port (ROUTEIPIN input:ip:port); Matrox DSX IP board only
+    params:
+      input:   { type: int, min: 1, max: 99, required: true }
+      address: { type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true }
+      port:    { type: int, min: 1, max: 65535, required: true }
+    send: "ROUTEIPIN {input}:{address}:{port}"
+    returns: none
+
+  route_ip_input_audio:
+    summary: Clean-switch a SMPTE 2110 IP input to video and audio source addresses (ROUTEIPIN input:ip:port:AUDIO:audioip:audioport); Matrox DSX IP board only
+    params:
+      input:         { type: int, min: 1, max: 99, required: true }
+      address:       { type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true }
+      port:          { type: int, min: 1, max: 65535, required: true }
+      audio_address: { type: string, pattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$', required: true }
+      audio_port:    { type: int, min: 1, max: 65535, required: true }
+    send: "ROUTEIPIN {input}:{address}:{port}:AUDIO:{audio_address}:{audio_port}"
+    returns: none
+
+  take_online:
+    summary: Take a take item to air on a layer of the output channel set in its template; the sequencer focus moves to it (SEQI takeid:layer)
+    params:
+      take_id: { type: int, min: 0, max: 99999, required: true }
+      layer:   { type: int, min: -9999, max: 9999, required: true }
+    send: "SEQI {take_id:04d}:{layer}"
+    returns: none
+
+  take_offline:
+    summary: Take a take item off air (SEQO takeid)
+    params:
+      take_id: { type: int, min: 0, max: 99999, required: true }
+    send: "SEQO {take_id:04d}"
+    returns: none
+
+  swap:
+    summary: Take every cued take item in one framebuffer to air (SWAP buffer)
+    params:
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+    send: "SWAP {framebuffer:-1}"
+    returns: none
+
+  swap_all:
+    summary: Take every cued take item in all framebuffers to air (SWAP)
+    send: "SWAP"
+    returns: none
+
+  take:
+    summary: Take a take item to air on a framebuffer layer; the sequencer focus does not move (TAKE takeid:buffer:layer)
+    params:
+      take_id:     { type: int, min: 0, max: 99999, required: true }
+      framebuffer: { type: int, min: 1, max: 9999, required: true }
+      layer:       { type: int, min: -9999, max: 9999, required: true }
+    send: "TAKE {take_id}:{framebuffer:-1}:{layer}"
+    returns: none
+
+  set_template_data:
+    summary: Set a property, such as Text, Visibility, Position or Rotation, of a named object in a take item (TEMPLATEDATA takeid:objectname:property:value)
+    params:
+      take_id:  { type: int, min: 0, max: 99999, required: true }
+      object:   { type: string, pattern: '^[^:]+$', required: true }
+      property: { type: string, pattern: '^[^:]+$', required: true }
+      value:    { type: string, pattern: '^[^:]*$', required: true }
+    send: "TEMPLATEDATA {take_id:04d}:{object}:{property}:{value}"
+    returns: none
+
+  uncue_all:
+    summary: Remove every cued item from the cued state (UNCUEALL)
+    send: "UNCUEALL"
+    returns: none
+
+  uncue:
+    summary: Remove one take item from the cued state (UNCUE takeid)
+    params:
+      take_id: { type: int, min: 0, max: 99999, required: true }
+    send: "UNCUE {take_id:04d}"
+    returns: none
+
+  sequencer_up:
+    summary: Move the sequencer selection to the item above it (UP)
+    send: "UP"
+    returns: none
+
+  up_next:
+    summary: Set the preview to a take item in the sequencer without moving the focus bar (UPNEXT takeid)
+    params:
+      take_id: { type: int, min: 0, max: 99999, required: true }
+    send: "UPNEXT {take_id:04d}"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      XPression sends no acknowledgements and Ross documents no reply or
+      query. Every command is unverified: a malformed command, an unknown
+      take ID and a successful take are indistinguishable to the sender.
+      Nothing XPression reports can be read back, so this spec has no state.
+
+  - models: [all]
+    severity: critical
+    text: >
+      Commands act on a live graphics output immediately. TAKE, SEQI, READ,
+      NEXT and SWAP put graphics on air; CLFB, CLRA, SEQO and LAYEROFF take
+      them off. CLFB and CLRA clear without the out transition; LAYEROFF
+      uses the scene's defined out transition.
+
+  - models: [all]
+    severity: warning
+    text: >
+      RossTalk is off until a RossTalk GPI board is added and enabled on the
+      XPression (Edit > Hardware Setup > GPI Boards > Add, Brand RossTalk,
+      State Enabled, TCP, TCP Port 7788; the 12.6 user guide names the tab
+      "GPI / Tally Boards" and the brand "Smart GPI / RossTalk"). The port is
+      whatever the operator enters there; 7788 is the one Ross's setup steps
+      use. All commands are case sensitive.
+
+  - models: [all]
+    severity: info
+    text: >
+      XPression also accepts the same commands over UDP and RS232, and over
+      TCP with "Secure Listen", which the user guide describes as making the
+      traffic "unreadable by other machines" (TLS). This spec covers plain
+      TCP only; a board set to Secure Listen will not accept it. The board's
+      outgoing host and port are for RossTalk that XPression itself sends
+      (from scenes and timelines), not replies to commands.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Framebuffers are numbered from 0 on the wire and from 1 in XPression
+      ("to select framebuffer 1 in XPression you must enter framebuffer 0 in
+      RossTalk"). The framebuffer parameters here are XPression's 1-based
+      numbers and are sent minus one. Ross's examples write the wire number
+      both padded ("CLFB 0000", "LAYEROFF 0000:2") and unpadded ("SWAP 0",
+      "TAKE 5:0:7"); it is sent unpadded.
+
+  - models: [all]
+    severity: info
+    text: >
+      Take IDs appear both padded to four digits ("FOCUS 0005", "SEQI
+      0005:7", "SEQO 0005", "DATALINQKEY 0002:...", "TEMPLATEDATA 0002:...")
+      and unpadded ("TAKE 5:0:7", "CUE 3:2:-5"), and Ross describes "SEQO
+      0005" as acting on "TakeID 5", so XPression reads the number either
+      way. Each command is sent in the form of its own example; UNCUE and
+      UPNEXT have no example and use the padded form. Ross does not state the
+      take ID range; 0-99999 is a wire bound.
+
+  - models: [all]
+    severity: info
+    text: >
+      Layers may be negative (Ross's example "CUE 3:2:-5" cues onto layer
+      -5): each output framebuffer has an unlimited number of layers, and
+      positive layers are drawn above negative ones. Ross does not state
+      layer, framebuffer, GPI or channel ranges; the ranges here are wire
+      bounds, and a command for one that does not exist is silently ignored.
+
+  - models: [all]
+    severity: info
+    text: >
+      UP, DOWN, FOCUS, READ, NEXT and UPNEXT act on the sequencer; SEQI moves
+      the sequencer focus to the item and TAKE does not. CUE prepares an item
+      without taking it; SWAP then takes cued items to air in one framebuffer,
+      or in all framebuffers when no framebuffer is given. Since 11.5, CUE can
+      cue a sequence group set to Take All.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Fields are separated by colons and Ross does not describe any escaping,
+      so strings here (DataLinq key and value, object and property names and
+      values, rundown and story IDs) may not contain a colon; a value such as
+      a time "12:30" cannot be sent. Ross's examples use a four-digit rundown
+      ID ("0001", "0003") and a story name ("Opening", "Halftime"); both are
+      sent as given.
+
+  - models: [all]
+    severity: info
+    text: >
+      TEMPLATEDATA sets published fields of a take item, including
+      Visibility, Position and Rotation since 11.0. It changes an item
+      already on air only while the preference "Apply template data changes
+      to items already on-air" is on (the default; Edit > Preferences >
+      RossTalk). Likewise "Ignore TAKE / SEQI commands for items already
+      online" (off unless set) makes TAKE and SEQI do nothing for an item
+      already online. GAMESTATE takes no argument in Ross's table; what game states
+      it logs is not described further.
+
+  - models: [all]
+    severity: info
+    text: >
+      Release notes for 11.0 say RESUME "can now contain a tessera source
+      name to resume all layers on that source", but Ross gives no syntax for
+      it, so it is not specified. CHANFOCUSSTORY and FOCUSSTORY act on the
+      Remote Sequencer (MOS rundowns), not the local sequencer.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ROUTEIPIN works only on a Matrox DSX IP board with the "Pair inputs to
+      allow remote clean switch" option enabled. Its audio clause
+      (":AUDIO:audioip:audioport") is optional and is the separate command
+      route_ip_input_audio.
