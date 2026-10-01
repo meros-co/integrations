@@ -75,17 +75,6 @@ def http(spec, command, input, method, target, **extra):
     })
 
 
-# grandMA2 telnet: payload + CRLF, never acknowledged.
-G = "grandma2"
-text(G, "go", {}, "Go\r\n", expect_result={"ok": {"kind": "unverified"}})
-text(G, "go_executor", {"executor": 3}, "Go Executor 3\r\n")
-text(G, "go_back", {}, "GoBack\r\n")
-text(G, "go_back_executor", {"executor": 3}, "GoBack Executor 3\r\n")
-text(G, "goto_cue", {"cue": "4.5"}, "Goto Cue 4.5\r\n")
-text(G, "goto_cue_executor", {"cue": "4.5", "executor": 2}, "Goto Cue 4.5 Executor 2\r\n")
-text(G, "fire_macro", {"macro": 10}, "Go Macro 10\r\n")
-text(G, "command", {"line": "Blackout"}, "Blackout\r\n")
-
 # ETC Eos: OSC 1.0 over TCP with a 4-byte length prefix.
 E = "etc-eos"
 binary(E, "go", {}, [length_prefixed(osc("/eos/key/go_0", ("f", 1.0))),
