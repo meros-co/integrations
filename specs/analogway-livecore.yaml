@@ -1,0 +1,639 @@
+spec: 1
+id: analogway-livecore
+name: Analog Way LiveCore series (TPP)
+vendor: Analog Way
+category: switcher
+
+# Analog Way's Third Party Protocol (TPP) for the LiveCore series (Ascender,
+# SmartMatriX Ultra, NeXtage and their 4K and PL versions). Every command is
+# ASCII ending in LF: index values, the value to write, and a register name of
+# up to five letters ("0,1SPCtk"); a read leaves the value out but keeps the
+# comma after each index ("0,GCava"). The device answers every valid command
+# with the register's current value, the register name first and CR LF last
+# ("SPCtk0,1"), and an invalid one with E10 to E13. Indexes are 0-based on the
+# wire; commands take screens, layers, inputs, memories and devices from 1 and
+# subtract one. Sources and monitoring sources are the documented enumeration
+# values, as on the wire.
+#
+# Every command checks that the answer starts with its own register name, or,
+# for the multi-register sequences (preset and monitoring recalls), that no
+# answer is an error (E1x).
+source:
+  - title: "LiveCore TPP Programmer's Guide for v04.02.23 (V1.00, March 3 2017)"
+    author: Analog Way
+    url: "https://dwn01.analogway.com/Site+Internet/Series/LiveCore/Common/Programmer's+guide/livecore_tpp_commands_for_v04_02_23.zip"
+    note: >
+      Manufacturer document, LiveCore_TPP_Programmers-guide_for-v04-02-23.pdf in the zip (46 pages), the
+      programmer's guide Analog Way lists for the LiveCore series. 2.3 (p.7): TCP, port 10600, five
+      connections; 2.4 (pp.8-10): command, read and answer structure, LF after a command, CR LF after an
+      answer, errors E10-E13; 2.6 (p.12): indexes and values; 2.8 (p.12): index 0 (master) in additive
+      configurations; 3.1 (pp.14-15): TPcon pushed on connecting, "?" answered DEV<value> with the device
+      table, 0,TPver, TPdie and 1TPdie/3TPdie read-back; 3.2 (pp.17-19): PMcat filter table, PMlse, PMmet
+      (memory - 1, 0-143), PMscf (screen - 1, 0-7), PMprf (0 program, 1 preview), 1PMloa and the PMloa0
+      answer, PMlot; 3.3 (pp.20-23): PSsse, PSmet, PSprf, PSloa, PSlot; 3.4 (p.23): <scrn>,<ProgPrev>,
+      <layr>,<src>SPPEi; 3.5 (p.24): SPPNi; 3.6 (pp.25-26): <scrn>,1SPCtk, SPCtk<scrn>,0 and GCava; 3.7
+      (pp.27-29): SPscl, SPtsl, SPslu; 3.8-3.10 (pp.30-34): MLupd, MLfen, MLfes and the monitoring source
+      table, MLces, MMloa; 3.11 (p.35): CMloa; 3.14 (p.36): PCreb, PCsht 1 and 2; 3.16-3.18 (pp.39-43):
+      GPiav, GPimo, GPits, GPist, GPoav, GPomo, GPofa, TAopr, TAopw.
+  - title: "LiveCore TPP variables for v04.02.23 (Analog Way TPP commands documentation, 2017-03-03)"
+    author: Analog Way
+    url: "https://dwn01.analogway.com/Site+Internet/Series/LiveCore/Common/Programmer's+guide/livecore_tpp_commands_for_v04_02_23.zip"
+    note: >
+      Manufacturer document, LiveCore_TPP_variables_for_v04-02-23.xls (and .pdf, 17 pages) in the same zip:
+      every register with its indexes, value range and default. Sheet 1 (registers): DEV, PCdgs, TPdie,
+      TPver, VEupd, TPcon, PCsht, PCreb, TEdal, FAalm, SPise, SPCtk, GCava, SPtsl, SPscl, SPslu, SPCtb
+      (0-65535), SPPNi, PMloa, PMlot, PMcat, PMlse, PMmet, PMscf, PMprf, PSose, PSloa, PSlot, PSmet, PSprf,
+      SPPEi, ISsva, INava, INfrz, INbla, MLfen, MLfes, MLces, MLupd, MMloa, CMloa, GPiav, GPist, GPimo,
+      GPits, GPoav, GPofa, GPomo, TAopr, TAopw. Sheet 2 (dimensions): DIM_SCREEN S1-S8, DIM_LAYER L1-L24,
+      DIM_INPUT IN_1-IN_24, DIM_GPI 1-2, DIM_GPO 1-10, DIM_MONITORING_ELEMENT 0-11, DIM_MON_MEM_SET 0-7,
+      DIM_CONFIDENCE_MEM_SET 0-15. Sheet 3 (enumerations): ENUM_DEV 97-119, ENUM_INPUTLAYER (0 none, 1-24
+      live inputs, 25-32 frames, 33-40 logos, 41 color), ENUM_MONITORING_ELEMENT_SOURCES (0-55),
+      ENUM_DEVICE_OPERATION_STATE, ENUM_TEMP_ALARM_LVL, ENUM_GPO_MODE.
+
+transport:
+  type: line-tcp
+  port: 10600
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  probe: "?"
+
+models:
+  - id: ascender-16
+    name: Analog Way Ascender 16 (ASC016)
+    supports: &all [take, take_all, set_take_list, set_take_list_on_master_load, set_tbar, recall_preset,
+                    recall_preset_and_take, recall_master_preset, recall_master_preset_and_take,
+                    set_master_preset_screen, set_layer_source, set_background, freeze_input, black_input,
+                    monitoring_fullscreen, monitoring_window_source, recall_monitoring_preset,
+                    recall_confidence_preset, set_gpi_mode, set_gpi_take_screen, set_gpo_mode, set_gpo,
+                    reboot, shutdown, shutdown_wake_on_lan, get_device_type, get_device_state, get_firmware,
+                    get_command_set_version, get_take_available, get_layer_source, get_background,
+                    get_tbar, get_input_frozen, get_tally_program, get_tally_preview, get_gpi, read_back,
+                    send_raw]
+    verification: none
+    notes: Reports DEV112.
+  - id: ascender-16-4k
+    name: Analog Way Ascender 16 - 4K (ASC016-4K)
+    supports: *all
+    verification: none
+    notes: Reports DEV113.
+  - id: ascender-32
+    name: Analog Way Ascender 32
+    supports: *all
+    verification: none
+    notes: Reports DEV99.
+  - id: ascender-32-4k
+    name: Analog Way Ascender 32 - 4K (ASC3204-4K)
+    supports: *all
+    verification: none
+    notes: Reports DEV107.
+  - id: ascender-32-4k-pl
+    name: Analog Way Ascender 32 - 4K - PL (ASC032-PL)
+    supports: *all
+    verification: none
+    notes: Reports DEV118.
+  - id: ascender-48
+    name: Analog Way Ascender 48
+    supports: *all
+    verification: none
+    notes: Reports DEV100.
+  - id: ascender-48-4k
+    name: Analog Way Ascender 48 - 4K (ASC4806-4K)
+    supports: *all
+    verification: none
+    notes: Reports DEV108.
+  - id: ascender-48-4k-pl
+    name: Analog Way Ascender 48 - 4K - PL (ASC048-PL)
+    supports: *all
+    verification: none
+    notes: Reports DEV114.
+  - id: smartmatrix-ultra
+    name: Analog Way SmartMatriX Ultra
+    supports: *all
+    verification: none
+    notes: Reports DEV98.
+  - id: smartmatrix-ultra-4k
+    name: Analog Way SmartMatriX Ultra - 4K (SMX12x4-4K)
+    supports: *all
+    verification: none
+    notes: Reports DEV106.
+  - id: nextage-16
+    name: Analog Way NeXtage 16
+    supports: *all
+    verification: none
+    notes: Reports DEV97.
+  - id: nextage-16-4k
+    name: Analog Way NeXtage 16 - 4K (NXT1604-4K)
+    supports: *all
+    verification: none
+    notes: Reports DEV105.
+  - id: nextage-08
+    name: Analog Way NeXtage 08 (NXT0802)
+    supports: *all
+    verification: none
+    notes: Reports DEV116.
+  - id: nextage-08-4k
+    name: Analog Way NeXtage 08 - 4K (NXT0802-4K)
+    supports: *all
+    verification: none
+    notes: Reports DEV117.
+
+commands:
+  # ── Transitions ───────────────────────────────────────────────────────────
+  take:
+    summary: "TAKE on one screen: preview to program with its transition (guide 3.6, SPCtk). The device answers 1 at once and 0 when the transition ends"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+    send: "{screen:-1},1SPCtk"
+    expect: { matches: "^SPCtk" }
+    returns: ack
+  take_all:
+    summary: "Global TAKE on the screens in the take list (guide 3.7, SPtsl)"
+    send: "1SPtsl"
+    expect: { matches: "^SPtsl" }
+    returns: ack
+  set_take_list:
+    summary: "Include a screen in, or exclude it from, the global TAKE list (guide 3.7, SPscl)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      included: { type: bool, default: true }
+    send: "{screen:-1},{included:bool01}SPscl"
+    expect: { matches: "^SPscl" }
+    returns: ack
+  set_take_list_on_master_load:
+    summary: "Fill the global TAKE list from each master preset recall (guide 3.7.4, SPslu)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "{enabled:bool01}SPslu"
+    expect: { matches: "^SPslu" }
+    returns: ack
+  set_tbar:
+    summary: "T-bar position of a screen, 0-65535 (variables, SP_TBAR SPCtb)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      position: { type: int, min: 0, max: 65535, required: true }
+    send: "{screen:-1},{position}SPCtb"
+    expect: { matches: "^SPCtb" }
+    returns: ack
+
+  # ── Presets ───────────────────────────────────────────────────────────────
+  recall_preset:
+    summary: "Recall a preset memory to a screen's preview (or program): filter, scale, memory, screen and destination, then the load (guide 3.2). filter adds the elements recalled: 1 sources, 2 positions and sizes, 4 transparencies, 8 cropping, 16 borders, 32 transitions, 64 effects, 128 timings, 256 speed, 512 flying curve, 1024 native background, 2048 cut and fill; 4095 is all"
+    params:
+      memory: { type: int, min: 1, max: 144, required: true }
+      screen: { type: int, min: 1, max: 8, required: true }
+      preview: { type: bool, default: true }
+      filter: { type: int, min: 0, max: 4095, default: 4095 }
+      scale: { type: bool, default: false }
+    send:
+      - "{filter}PMcat"
+      - "{scale:bool01}PMlse"
+      - "{memory:-1}PMmet"
+      - "{screen:-1}PMscf"
+      - "{preview:bool01}PMprf"
+      - "1PMloa"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  recall_preset_and_take:
+    summary: "As recall_preset, then TAKE the screen once loaded (guide 3.2.5, PMlot)"
+    params:
+      memory: { type: int, min: 1, max: 144, required: true }
+      screen: { type: int, min: 1, max: 8, required: true }
+      preview: { type: bool, default: true }
+      filter: { type: int, min: 0, max: 4095, default: 4095 }
+      scale: { type: bool, default: false }
+    send:
+      - "{filter}PMcat"
+      - "{scale:bool01}PMlse"
+      - "{memory:-1}PMmet"
+      - "{screen:-1}PMscf"
+      - "{preview:bool01}PMprf"
+      - "1PMlot"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  recall_master_preset:
+    summary: "Recall a master preset memory to the screens it holds, preview (or program): filter, scale, memory and destination, then the load (guide 3.3)"
+    params:
+      memory: { type: int, min: 1, max: 144, required: true }
+      preview: { type: bool, default: true }
+      filter: { type: int, min: 0, max: 4095, default: 4095 }
+      scale: { type: bool, default: false }
+    send:
+      - "{filter}PMcat"
+      - "{scale:bool01}PMlse"
+      - "{memory:-1}PSmet"
+      - "{preview:bool01}PSprf"
+      - "1PSloa"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  recall_master_preset_and_take:
+    summary: "As recall_master_preset, then a global TAKE of the loaded screens (guide 3.3.1.5, PSlot)"
+    params:
+      memory: { type: int, min: 1, max: 144, required: true }
+      preview: { type: bool, default: true }
+      filter: { type: int, min: 0, max: 4095, default: 4095 }
+      scale: { type: bool, default: false }
+    send:
+      - "{filter}PMcat"
+      - "{scale:bool01}PMlse"
+      - "{memory:-1}PSmet"
+      - "{preview:bool01}PSprf"
+      - "1PSlot"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  set_master_preset_screen:
+    summary: "Include or exclude a screen from master preset recalls (variables, PESMEM_OP_SCREEN_ENABLE PSose)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: "{screen:-1},{enabled:bool01}PSose"
+    expect: { matches: "^PSose" }
+    returns: ack
+
+  # ── Layers ────────────────────────────────────────────────────────────────
+  set_layer_source:
+    summary: "Source of a layer on a screen's preview (or program) (guide 3.4, SPPEi). source: 0 none, 1-12 live inputs of the master and 13-24 of the slave, 25-28 and 29-32 frames, 33-36 and 37-40 logos, 41 color"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      layer: { type: int, min: 1, max: 24, required: true }
+      source: { type: int, min: 0, max: 41, required: true }
+      preview: { type: bool, default: true }
+    send: "{screen:-1},{preview:bool01},{layer:-1},{source}SPPEi"
+    expect: { matches: "^SPPEi" }
+    returns: ack
+  set_background:
+    summary: "Native background set of a screen's preview (or program), 0 for none (guide 3.5, SPPNi)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      set: { type: int, min: 0, max: 8, required: true }
+      preview: { type: bool, default: true }
+    send: "{screen:-1},{preview:bool01},{set}SPPNi"
+    expect: { matches: "^SPPNi" }
+    returns: ack
+
+  # ── Inputs ────────────────────────────────────────────────────────────────
+  freeze_input:
+    summary: "Freeze or unfreeze a live input (variables, IN_FREEZE INfrz)"
+    params:
+      input: { type: int, min: 1, max: 24, required: true }
+      frozen: { type: bool, default: true }
+    send: "{input:-1},{frozen:bool01}INfrz"
+    expect: { matches: "^INfrz" }
+    returns: ack
+  black_input:
+    summary: "Black out a live input, or restore it (variables, IN_BLACK INbla)"
+    params:
+      input: { type: int, min: 1, max: 24, required: true }
+      black: { type: bool, default: true }
+    send: "{input:-1},{black:bool01}INbla"
+    expect: { matches: "^INbla" }
+    returns: ack
+
+  # ── Monitoring ────────────────────────────────────────────────────────────
+  monitoring_fullscreen:
+    summary: "Show one source full screen on a device's monitoring output (guide 3.8). source: 0-23 inputs, 24-31 frames, 32-39 logos, 40-47 screens 1-8 program, 48-55 preview"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1 }
+      source: { type: int, min: 0, max: 55, required: true }
+    send:
+      - "{device:-1},0MLupd"
+      - "{device:-1},1MLfen"
+      - "{device:-1},{source}MLfes"
+      - "{device:-1},1MLupd"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  monitoring_window_source:
+    summary: "Mosaic mode with a source in one monitoring window (guide 3.9); sources as monitoring_fullscreen"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1 }
+      window: { type: int, min: 1, max: 12, required: true }
+      source: { type: int, min: 0, max: 55, required: true }
+    send:
+      - "{device:-1},0MLupd"
+      - "{device:-1},0MLfen"
+      - "{device:-1},{window:-1},{source}MLces"
+      - "{device:-1},1MLupd"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  recall_monitoring_preset:
+    summary: "Recall a monitoring preset, 1-8 (guide 3.10)"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1 }
+      memory: { type: int, min: 1, max: 8, required: true }
+    send:
+      - "{device:-1},0MLupd"
+      - "{memory:-1},{device:-1},1MMloa"
+      - "{device:-1},1MLupd"
+    expect: { matches: "^([^E]|E[^1])" }
+    returns: ack
+  recall_confidence_preset:
+    summary: "Load a confidence monitor preset, 1-16, on a screen (guide 3.11, CMloa)"
+    params:
+      memory: { type: int, min: 1, max: 16, required: true }
+      screen: { type: int, min: 1, max: 8, required: true }
+    send: "{memory:-1},{screen:-1},1CMloa"
+    expect: { matches: "^CMloa" }
+    returns: ack
+
+  # ── GPIO ──────────────────────────────────────────────────────────────────
+  set_gpi_mode:
+    summary: "GPI mode: false normal, true TAKE on the screens chosen with set_gpi_take_screen (guide 3.16, GPimo)"
+    params:
+      gpi: { type: int, min: 1, max: 2, required: true }
+      take: { type: bool, required: true }
+    send: "{gpi:-1},{take:bool01}GPimo"
+    expect: { matches: "^GPimo" }
+    returns: ack
+  set_gpi_take_screen:
+    summary: "Whether a GPI in TAKE mode takes a screen (variables, GPIO_IN_TAKE_SCREEN GPits)"
+    params:
+      gpi: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: "{gpi:-1},{screen:-1},{enabled:bool01}GPits"
+    expect: { matches: "^GPits" }
+    returns: ack
+  set_gpo_mode:
+    summary: "GPO mode: 0 free, 1 tally before transition, 2 tally after transition (guide 3.17, GPomo)"
+    params:
+      gpo: { type: int, min: 1, max: 10, required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "{gpo:-1},{mode}GPomo"
+    expect: { matches: "^GPomo" }
+    returns: ack
+  set_gpo:
+    summary: "Activate or release a GPO in free mode (guide 3.17, GPofa)"
+    params:
+      gpo: { type: int, min: 1, max: 10, required: true }
+      active: { type: bool, default: true }
+    send: "{gpo:-1},{active:bool01}GPofa"
+    expect: { matches: "^GPofa" }
+    returns: ack
+
+  # ── System ────────────────────────────────────────────────────────────────
+  reboot:
+    summary: "Reboot the master (1) or slave (2) device (guide 3.14, PCreb)"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1 }
+    send: "{device:-1},1PCreb"
+    expect: { matches: "^PCreb" }
+    returns: ack
+  shutdown:
+    summary: "Shut the device down; it must be restarted by hand (guide 3.14, 1PCsht)"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1 }
+    send: "{device:-1},1PCsht"
+    expect: { matches: "^PCsht" }
+    returns: ack
+  shutdown_wake_on_lan:
+    summary: "Shut the device down with Wake-on-LAN enabled (guide 3.14, 2PCsht)"
+    params:
+      device: { type: int, min: 1, max: 2, default: 1 }
+    send: "{device:-1},2PCsht"
+    expect: { matches: "^PCsht" }
+    returns: ack
+
+  # ── Reads ─────────────────────────────────────────────────────────────────
+  get_device_type:
+    summary: "Device type number, 97-119 (guide 3.1, ?)"
+    send: "?"
+    expect: { matches: "^DEV(\\d+)$" }
+    returns: value
+  get_device_state:
+    summary: "Device state: 0 unknown, 1 initializing, 2 recall, 3 coupling, 4 factory reset, 5 updating, 255 ready (variables, PCdgs)"
+    send: "PCdgs"
+    expect: { matches: "^PCdgs(\\d+)$" }
+    returns: value
+  get_firmware:
+    summary: "Firmware version word: bit 31 beta, bits 24-30 major, 16-23 minor, 0-15 build (variables, VEupd)"
+    send: "0,VEupd"
+    expect: { matches: "^VEupd0,(\\d+)$" }
+    returns: value
+  get_command_set_version:
+    summary: "TPP command set version (guide 3.1, TPver)"
+    send: "0,TPver"
+    expect: { matches: "^TPver0,(\\d+)$" }
+    returns: value
+  get_take_available:
+    summary: "1 when TAKE and the T-bar are available on a screen (guide 3.6, GCava)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+    send: "{screen:-1},GCava"
+    expect: { matches: "^GCava\\d+,(\\d+)$" }
+    returns: value
+  get_layer_source:
+    summary: "Source of a layer on a screen's preview (or program), as for set_layer_source"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      layer: { type: int, min: 1, max: 24, required: true }
+      preview: { type: bool, default: true }
+    send: "{screen:-1},{preview:bool01},{layer:-1},SPPEi"
+    expect: { matches: "^SPPEi\\d+,\\d+,\\d+,(\\d+)$" }
+    returns: value
+  get_background:
+    summary: "Native background set of a screen's preview (or program)"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+      preview: { type: bool, default: true }
+    send: "{screen:-1},{preview:bool01},SPPNi"
+    expect: { matches: "^SPPNi\\d+,\\d+,(\\d+)$" }
+    returns: value
+  get_tbar:
+    summary: "T-bar position of a screen, 0-65535"
+    params:
+      screen: { type: int, min: 1, max: 8, required: true }
+    send: "{screen:-1},SPCtb"
+    expect: { matches: "^SPCtb\\d+,(\\d+)$" }
+    returns: value
+  get_input_frozen:
+    summary: "1 when a live input is frozen"
+    params:
+      input: { type: int, min: 1, max: 24, required: true }
+    send: "{input:-1},INfrz"
+    expect: { matches: "^INfrz\\d+,(\\d+)$" }
+    returns: value
+  get_tally_program:
+    summary: "1 when a source (layer source numbering, 1-41) is on a program screen (guide 3.18, TAopr)"
+    params:
+      source: { type: int, min: 1, max: 41, required: true }
+    send: "{source},TAopr"
+    expect: { matches: "^TAopr\\d+,(\\d+)$" }
+    returns: value
+  get_tally_preview:
+    summary: "1 when a source is on a preview screen (guide 3.18, TAopw)"
+    params:
+      source: { type: int, min: 1, max: 41, required: true }
+    send: "{source},TAopw"
+    expect: { matches: "^TAopw\\d+,(\\d+)$" }
+    returns: value
+  get_gpi:
+    summary: "1 when a GPI is active (guide 3.16, GPist)"
+    params:
+      gpi: { type: int, min: 1, max: 2, required: true }
+    send: "{gpi:-1},GPist"
+    expect: { matches: "^GPist\\d+,(\\d+)$" }
+    returns: value
+  read_back:
+    summary: "Ask the device to send every register (1) or those away from their defaults (3) (guide 3.1, TPdie); the values arrive as telemetry"
+    params:
+      mode: { type: int, min: 1, max: 3, default: 3 }
+    send: "{mode}TPdie"
+    expect: { matches: "^TPdie" }
+    returns: ack
+  send_raw:
+    summary: "Any TPP command from the variables document, as written (indexes, value, register name); returns the device's answer line"
+    params:
+      command: { type: string, max_length: 64, pattern: "^[!-~]+$", required: true }
+    send: "{command}"
+    expect: { matches: "^(([^E]|E[^1]).*)$" }
+    returns: value
+
+telemetry:
+  # Identity is asked once; then every register away from its default is read
+  # back (guide 3.1). The device answers each change with the register's
+  # value in the same form, and pushes TPcon on connecting.
+  poll:
+    send: ["?", "PCdgs", "0,VEupd", "0,TPver"]
+  subscribe:
+    send: ["3TPdie"]
+  updates:
+    - match: "^DEV(\\d+)$"
+      state: { "device.type": "{1}" }
+    - match: "^PCdgs(\\d+)$"
+      state: { "device.state": "{1}" }
+    - match: "^VEupd0,(\\d+)$"
+      state: { "device.firmware": "{1}" }
+    - match: "^TPver0,(\\d+)$"
+      state: { "device.command_set_version": "{1}" }
+    - match: "^TPcon0,(\\d+)$"
+      state: { "device.tpp_controllers": "{1}" }
+    - match: "^TEdal0,(\\d+)$"
+      state: { "device.temperature_alarm": "{1}" }
+    - match: "^FAalm0,(\\d+)$"
+      state: { "device.fan_alarm": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^SPise(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.enabled": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^SPCtk(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.taking": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GCava(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.take_available": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^SPscl(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.in_take_list": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^SPCtb(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.tbar": "{2}" }
+    - match: "^SPPEi(\\d+),0,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.program.layers.{2:+1}.source": "{3}" }
+    - match: "^SPPEi(\\d+),1,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.preview.layers.{2:+1}.source": "{3}" }
+    - match: "^SPPNi(\\d+),0,(\\d+)$"
+      state: { "screens.{1:+1}.program.background": "{2}" }
+    - match: "^SPPNi(\\d+),1,(\\d+)$"
+      state: { "screens.{1:+1}.preview.background": "{2}" }
+    - match: "^INava(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.available": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^INfrz(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.frozen": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^INbla(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.black": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^ISsva(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.signal": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^TAopr(\\d+),(\\d+)$"
+      state: { "tally.{1}.program": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^TAopw(\\d+),(\\d+)$"
+      state: { "tally.{1}.preview": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GPist(\\d+),(\\d+)$"
+      state: { "gpi.{1:+1}.active": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GPofa(\\d+),(\\d+)$"
+      state: { "gpo.{1:+1}.active": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^MLfen(\\d+),(\\d+)$"
+      state: { "monitoring.{1:+1}.fullscreen": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^MLfes(\\d+),(\\d+)$"
+      state: { "monitoring.{1:+1}.fullscreen_source": "{2}" }
+    - match: "^MLces(\\d+),(\\d+),(\\d+)$"
+      state: { "monitoring.{1:+1}.windows.{2:+1}.source": "{3}" }
+    - match: "^PMloa(\\d+)$"
+      state: { "presets.loading": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^PSloa(\\d+)$"
+      state: { "master_presets.loading": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^TPdie(\\d+)$"
+      state: { "device.reading_back": { value: "{1}", map: { "0": false, "1": true, "2": true, "3": true } } }
+
+state:
+  device.type: { type: int, description: "Device type: 97 NeXtage 16, 98 SmartMatriX Ultra, 99 Ascender 32, 100 Ascender 48, 105-108 their 4K versions, 112/113 Ascender 16 (4K), 114 Ascender 48 4K PL, 116/117 NeXtage 08 (4K), 118 Ascender 32 4K PL; 102-104, 109-111, 115, 119 output expanders" }
+  device.state: { type: int, description: "Global state: 0 unknown, 1 initializing, 2 recall, 3 coupling, 4 factory reset, 5 updating, 255 ready" }
+  device.firmware: { type: int, description: "Firmware version word: bit 31 beta, bits 24-30 major, 16-23 minor, 0-15 build" }
+  device.command_set_version: { type: int, description: "TPP command set version" }
+  device.tpp_controllers: { type: int, description: "TPP controllers connected (pushed on connecting)" }
+  device.temperature_alarm: { type: int, description: "0 none, 1 preventive, 2 standby forced" }
+  device.fan_alarm: { type: bool, description: "A fan alarm is raised" }
+  device.reading_back: { type: bool, description: "A read-back (TPdie) is in progress" }
+  screens.*.enabled: { type: bool, description: "Screen enabled and able to manage presets" }
+  screens.*.taking: { type: bool, description: "A TAKE is in progress on the screen" }
+  screens.*.take_available: { type: bool, description: "TAKE and T-bar available" }
+  screens.*.in_take_list: { type: bool, description: "Screen included in the global TAKE" }
+  screens.*.tbar: { type: int, description: "T-bar position, 0-65535" }
+  screens.*.program.layers.*.source: { type: int, description: "Layer source on program: 0 none, 1-24 inputs, 25-32 frames, 33-40 logos, 41 color" }
+  screens.*.preview.layers.*.source: { type: int, description: "Layer source on preview" }
+  screens.*.program.background: { type: int, description: "Native background set on program, 0 none" }
+  screens.*.preview.background: { type: int, description: "Native background set on preview, 0 none" }
+  inputs.*.available: { type: bool, description: "Input present on the device" }
+  inputs.*.frozen: { type: bool, description: "Input frozen" }
+  inputs.*.black: { type: bool, description: "Input blacked out" }
+  inputs.*.plugs.*.signal: { type: bool, description: "Valid signal detected on a plug (0 HD15, 1 DVI-A, 2 DVI, 3 SDI, 4 HDMI, 5 DisplayPort)" }
+  tally.*.program: { type: bool, description: "Source (layer source numbering) on a program screen" }
+  tally.*.preview: { type: bool, description: "Source on a preview screen" }
+  gpi.*.active: { type: bool, description: "GPI active" }
+  gpo.*.active: { type: bool, description: "GPO active (free mode) or tally on" }
+  monitoring.*.fullscreen: { type: bool, description: "Monitoring in full screen rather than mosaic" }
+  monitoring.*.fullscreen_source: { type: int, description: "Full screen monitoring source (0-55)" }
+  monitoring.*.windows.*.source: { type: int, description: "Source of a mosaic monitoring window" }
+  presets.loading: { type: bool, description: "A preset memory load is in progress" }
+  master_presets.loading: { type: bool, description: "A master preset load is in progress" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Recalls are register sequences (filter, scale, memory, screen, destination, then the load). The
+      registers keep their values and are shared by every connected controller, so two controllers
+      recalling at once can mix their parameters (guide 2.7). Each message waits for its answer before the
+      next is sent.
+  - models: [all]
+    severity: warning
+    text: >
+      The device pushes register changes in the same form as its answers (the tally section, 3.18, says the
+      same commands notify or are polled). A push arriving while a command waits for its answer is taken as
+      that answer: single-register commands then fail because the answer does not start with their
+      register, and the change is still applied to the state.
+  - models: [all]
+    severity: info
+    text: >
+      An invalid command is answered with the register's previous value and then an error E10-E13 (guide
+      2.4.5). A value outside the range the device accepts can therefore be acknowledged by the first line,
+      with the error following as a separate message; ranges are checked here before sending.
+  - models: [all]
+    severity: info
+    text: >
+      Ambiguities: the guide writes master preset screen enabling as <MasterMem>,<Screen>,<value>PSsse
+      (3.3.1.3), but the variables document lists PSsse as read-only and PSose (screen, value) as the
+      enable; PSose is used. The guide gives GPits as <gpi>,<scn>GPits without a value (3.16.2); the
+      variables document's form with a value is used. The guide's layer description gives layers A-D (0-3)
+      while the variables document allows L1-L24; 1-24 is accepted. The guide's 3.3 "Example 2" repeats
+      4095 where it means 4094.
+  - models: [all]
+    severity: info
+    text: >
+      In an additive (master and slave) configuration, commands address the master (index 0) except the
+      monitoring, reboot and shutdown commands, which take the device (2.8, ENUM_DEVICE).
+  - models: [all]
+    severity: info
+    text: >
+      Labels are sent letter by letter as ASCII codes (LBScr, LBInp and similar, one register per
+      character) and are not decoded into the state; send_raw reads them.
+  - models: [all]
+    severity: info
+    text: >
+      The guide documents snapshots over HTTP (3.12) and Wake-on-LAN (3.15), which are not TPP commands and
+      are not covered here.

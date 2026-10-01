@@ -1,0 +1,263 @@
+spec: 1
+id: analogway-picturall
+name: Analog Way Picturall media servers
+vendor: Analog Way
+category: playback
+
+# Picturall servers take text commands on a telnet-like TCP connection to
+# port 11000, one per line, executed when the line feed arrives. The server
+# answers in human-readable text with no documented acknowledgement, so
+# commands are sent and reported unverified. On connecting, the client waits
+# for the server's start-up, turns off the human-readable log and asks for the
+# server's messages: control status messages, MSG(target, source, 13, ...),
+# are then sent to every client whenever a parameter changes, and are what the
+# telemetry rules read.
+source:
+  - title: "Picturall Series Media Servers (V3.5) User Manual, Appendix D: Picturall Server communication protocol specifications (05/2026)"
+    author: Analog Way
+    url: "https://dwn01.analogway.com/Site+Internet/Series/Picturall++Mark+II/Common/User+Manual/user-manual-picturall-media-server-357.pdf"
+    note: >
+      Manufacturer document, references MST02, MSTC02, MSQ04, MSQC04 and MSP16 (R1, R2 and MkII). Appendix D,
+      pp.140-147: D.a multicast discovery (224.0.0.180 port 11009, "HELLO"); D.b TCP port 11000 and
+      wait_startup on connecting; D.c objects, controls and parameters (sourcen, layern, audion; ctrl_info
+      source1 listing play_state, timecode, media_length, slot, collection, media_end_action,
+      play_state_req, seek 0-1, fps); D.d media modes (table 12: -1 error, 0 play loop default, 1 play
+      next, 2 play stop, 3 play pause, 4 play loop, 5 pause, 6 stop) and draw modes; D.e messages
+      MSG(target, source, type, content), types 13 control status, 14 control info, 15 object list, 20
+      overflow (then disconnect), 24 object added, 33/38 system results, and the control status example
+      with object name="source1" and info media_file, play_state, timecode, media_length; D.f ctrl_status,
+      ctrl_info, enum_objects, loglevel all|none, receiving all|none, set object control
+      [time=<t>] param=value[,...] with the examples, wait_startup, fullscreen layer display...; D.g
+      system and system_bg. Appendix E (pp.148-152): lua, runcue and the Lua API.
+  - title: "Picturall Mark II media servers, TCP/IP quick start guide v1.0 (June 2021)"
+    author: Analog Way
+    url: "https://dwn01.analogway.com/Site+Internet/Series/Picturall++Mark+II/Common/Programmer's+Guide/picturall_markii_series_tcpip_quick_start_guide.pdf"
+    note: >
+      Manufacturer document, 5 pages, listed as the Picturall programmer's guide. p.2: port 11000, command
+      executed on line feed, Commander's command log; p.3: "cue x" runs a cue; p.4: "set stack2 select
+      cue_stack=1,major=0,minor=0" puts cue stack 1 in playback 2 (playback 2 is named stack2), with
+      major/minor selecting the cue position, "set stack2 control command=1" presses the playback's go
+      button, power on by Wake-on-LAN and "poweroff".
+
+transport:
+  type: line-tcp
+  port: 11000
+  framing: terminated
+  terminator: lf
+  encoding: utf-8
+  timeout_ms: 3000
+  reply: none
+
+on_connect:
+  - "wait_startup"
+  - "loglevel none"
+  - "receiving all"
+
+models:
+  - id: picturall-pro-mkii
+    name: Analog Way Picturall Pro Mark II (MSP16-MkII)
+    supports: &all [run_cue, playback_select, playback_go, layer_media, layer_play_mode, layer_seek,
+                    layer_intensity, layer_intensity_fade, layer_position, layer_fullscreen, layer_status,
+                    status_all, list_objects, poweroff, send_raw]
+    verification: none
+  - id: picturall-quad-mkii
+    name: Analog Way Picturall Quad Mark II (MSQ04-MkII)
+    supports: *all
+    verification: none
+  - id: picturall-quad-compact-mkii
+    name: Analog Way Picturall Quad Compact Mark II (MSQC04-MkII)
+    supports: *all
+    verification: none
+  - id: picturall-twin-compact-mkii
+    name: Analog Way Picturall Twin Compact Mark II (MSTC02-MkII)
+    supports: *all
+    verification: none
+  - id: picturall-pro
+    name: Analog Way Picturall Pro (MSP16-R1/R2)
+    supports: *all
+    verification: none
+  - id: picturall-quad
+    name: Analog Way Picturall Quad (MSQ04-R1/R2)
+    supports: *all
+    verification: none
+  - id: picturall-quad-compact
+    name: Analog Way Picturall Quad Compact (MSQC04-R1/R2)
+    supports: *all
+    verification: none
+  - id: picturall-twin
+    name: Analog Way Picturall Twin (MST02-R1/R2)
+    supports: *all
+    verification: none
+  - id: picturall-twin-compact
+    name: Analog Way Picturall Twin Compact (MSTC02-R1/R2)
+    supports: *all
+    verification: none
+
+commands:
+  run_cue:
+    summary: "Run a cue by number (quick start guide p.3, cue x)"
+    params:
+      cue: { type: int, min: 0, required: true }
+    send: "cue {cue}"
+    returns: none
+  playback_select:
+    summary: "Put a cue stack in a playback, at a cue position major.minor; a position other than 0.0 also runs that cue (quick start guide p.4). The playback is named stack<n> on the command line"
+    params:
+      playback: { type: int, min: 1, required: true }
+      cue_stack: { type: int, min: 0, required: true }
+      major: { type: int, min: 0, default: 0 }
+      minor: { type: int, min: 0, default: 0 }
+    send: "set stack{playback} select cue_stack={cue_stack},major={major},minor={minor}"
+    returns: none
+  playback_go:
+    summary: "Press a playback's go button (quick start guide p.4, command=1)"
+    params:
+      playback: { type: int, min: 1, required: true }
+    send: "set stack{playback} control command=1"
+    returns: none
+  layer_media:
+    summary: "Select the media a layer plays: slot in a media library (collection) (manual D.f.f example)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      slot: { type: int, min: 0, max: 255, required: true }
+      collection: { type: int, min: 0, max: 255, default: 0 }
+    send: "set source{layer} selection slot={slot},collection={collection}"
+    returns: none
+  layer_play_mode:
+    summary: "Requested play mode of a layer: 0 play loop (default), 1 play next, 2 play stop, 3 play pause, 4 play loop, 5 pause, 6 stop (manual D.d.a, play_state_req)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      mode: { type: int, min: 0, max: 6, required: true }
+    send: "set source{layer} control play_state_req={mode}"
+    returns: none
+  layer_seek:
+    summary: "Seek a layer's media, 0 to 1 of its length (manual D.c, seek)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      position: { type: float, min: 0, max: 1, required: true }
+    send: "set source{layer} control seek={position:.4f}"
+    returns: none
+  layer_intensity:
+    summary: "Intensity of a layer, 0 to 1 (manual D.f.f, composition intensity)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      intensity: { type: float, min: 0, max: 1, required: true }
+    send: "set layer{layer} composition intensity={intensity:.3f}"
+    returns: none
+  layer_intensity_fade:
+    summary: "Fade a layer's intensity over a time in seconds (manual D.f.f, time=)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      intensity: { type: float, min: 0, max: 1, required: true }
+      time: { type: float, min: 0, required: true }
+    send: "set layer{layer} composition time={time:.2f} intensity={intensity:.3f}"
+    returns: none
+  layer_position:
+    summary: "Position of a layer, x and y in the composition's units (manual D.f.f, composition x and y)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      x: { type: float, required: true }
+      y: { type: float, required: true }
+    send: "set layer{layer} composition x={x:.4f},y={y:.4f}"
+    returns: none
+  layer_fullscreen:
+    summary: "Fit a layer to a display (manual D.f.h, fullscreen layer display)"
+    params:
+      layer: { type: int, min: 1, required: true }
+      display: { type: int, min: 1, required: true }
+    send: "fullscreen layer{layer} {display}"
+    returns: none
+  layer_status:
+    summary: "Ask for a layer's source status; the answer arrives as a control status message (manual D.f.a)"
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: "ctrl_status source{layer}"
+    returns: none
+  status_all:
+    summary: "Ask for the status of every object; the answers arrive as control status messages (manual D.f.a)"
+    send: "ctrl_status"
+    returns: none
+  list_objects:
+    summary: "Ask for the list of objects and their IDs (manual D.f.c, enum_objects)"
+    send: "enum_objects"
+    returns: none
+  poweroff:
+    summary: "Power the server off; it is started again by Wake-on-LAN (quick start guide p.4)"
+    send: "poweroff"
+    returns: none
+  send_raw:
+    summary: "Any server command line, e.g. a set command copied from Picturall Commander's command log (quick start guide p.2)"
+    params:
+      command: { type: string, max_length: 1024, required: true }
+    send: "{command}"
+    returns: none
+
+telemetry:
+  # Every parameter is reported once; afterwards the server sends a control
+  # status message to every client whenever a parameter changes (D.e.c).
+  poll:
+    send: ["ctrl_status"]
+  updates:
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bmedia_file="([^"]*)"'
+      state: { "layers.{1}.media_file": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bplay_state=(-?\d+)'
+      state: { "layers.{1}.play_state": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\btimecode=(\d+)'
+      state: { "layers.{1}.timecode_ns": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bmedia_length=(\d+)'
+      state: { "layers.{1}.media_length_ns": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bslot=(\d+)'
+      state: { "layers.{1}.slot": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="source(\d+)".*\bcollection=(\d+)'
+      state: { "layers.{1}.collection": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *13, *object name="layer(\d+)".*\bintensity="?(-?[0-9.]+)'
+      state: { "layers.{1}.intensity": "{2}" }
+    - match: '^MSG\(\d+, *\d+, *24, *([^)]+)\)'
+      state: { "server.last_object_added": "{1}" }
+    - match: '^MSG\(\d+, *\d+, *20\b'
+      state: { "server.overflow": { value: "20", map: { "20": true } } }
+
+state:
+  layers.*.media_file: { type: string, description: "File the layer's source plays" }
+  layers.*.play_state: { type: int, description: "Actual play state: -1 error, 0 play loop, 1 play next, 2 play stop, 3 play pause, 4 play loop, 5 pause, 6 stop" }
+  layers.*.timecode_ns: { type: int, unit: ns, description: "Timecode of the media playing" }
+  layers.*.media_length_ns: { type: int, unit: ns, description: "Length of the media" }
+  layers.*.slot: { type: int, description: "Media slot playing" }
+  layers.*.collection: { type: int, description: "Media library playing" }
+  layers.*.intensity: { type: float, description: "Layer intensity, 0 to 1" }
+  server.last_object_added: { type: string, description: "Name of the last object added to the show (message 24)" }
+  server.overflow: { type: bool, description: "The server reported a message queue overflow and disconnects the client (message 20)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The server has no documented acknowledgement: its answers are human-readable text, so every command
+      is reported unverified. Failures show only as missing state changes.
+  - models: [all]
+    severity: warning
+    text: >
+      Control status messages list parameters as name=value pairs separated by commas and by the string
+      "\n" (D.e.c). The rules read them from one line; if a server sends real line breaks between controls,
+      only the parameters on the line with object name are read.
+  - models: [all]
+    severity: info
+    text: >
+      The manual's set examples write values quoted (x="0.3") and unquoted (intensity=0.0); unquoted values
+      are sent, as in the timed examples. Layer numbers are those of the show's objects (sourcen, layern).
+  - models: [all]
+    severity: info
+    text: >
+      Playback go is the only playback command documented (command=1); others, and the meaning of
+      media_end_action, are not, and are reachable through send_raw (Picturall Commander's command log
+      shows the lines it sends).
+  - models: [all]
+    severity: info
+    text: >
+      If the client cannot keep up, the server sends message 20 and disconnects (D.e.b); the core
+      reconnects.
+  - models: [all]
+    severity: info
+    text: >
+      The commands system, system_bg (Linux shell) and lua run code on the server and are not offered as
+      commands; send_raw can still send them.

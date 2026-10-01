@@ -1,0 +1,831 @@
+# Analog Way Alta 4K (AWJ): native module crates/core/src/modules/analogway.rs.
+# Commands are AWJ get/replace messages on TCP 10606; see the module and the
+# guides cited below for the paths each one writes.
+spec: 1
+id: analogway-alta4k
+name: Analog Way Alta 4K (AWJ)
+vendor: Analog Way
+category: switcher
+implementation: native
+reason: >-
+  AWJ is JSON over TCP with 0x04-terminated messages: answers are matched to reads by path, errors carry no path,
+  changes are pushed only after a Subscriptions write repeated on every connection, and writes to a screen's program
+  or preview go to the DOWN or UP bank depending on the T-bar position, which has to be read from the device first
+  (guide 3.8). The spec format has no session state or reply-dependent sequencing to express this.
+source:
+- title: Alta 4K AWJ Protocol Programmer's Guide, for firmware version v1.0.08 or higher (version 1.2, September
+    2023)
+  author: Analog Way
+  url: https://dwn01.analogway.com/Site+Internet/Series/Alta+4k/Common/AWJ+Protocol/alta_4k_awj_programmers_guide_v1.2.pdf
+  note: >-
+    Manufacturer document, 49 pages. Line for line the Midra 4K guide v3.2 with Alta values: device types ZEN100
+    and ZEN200 (2.1), inputs INPUT_1 to INPUT_13 (Zenith 100) or 16 (Zenith 200) and screens PROGRAM_1 to 3 or 4
+    (3.14), audio inputs IN1 to IN13/IN16 (5.1.4.2), widgets 1 to 27 (5.2.4.2), screens 1 to 3/4 (5.3.2.2). Sections
+    and pages as cited in the commands: 1 (pp.4-6) protocol, 2 (pp.7-8) system, 3 (pp.9-20) screens, 4 (pp.21-23)
+    multiviewer, 5 (pp.24-41) audio, 6 (pp.42-46) sources, 7 (p.47) thumbnails.
+- title: Alta 4K REST API Programmer's Guide, for version v1.00 (version 1.00, December 2022)
+  author: Analog Way
+  url: https://dwn01.analogway.com/Site+Internet/Series/Alta+4k/Common/Rest+API+Programmer's+Guide/alta4k_rest_api_programmers_guide_v1_0.pdf
+  note: >-
+    Manufacturer document, 59 pages. Used only for ranges: screens 1-4, auxiliary screens 1-4, layers 1-8, screen
+    presets 1-200, master presets 1-50, multiviewer presets 1-20, widgets 1-27, inputs 1-16, background sets 1-8,
+    foreground and background images 1-4, Dante groups 1-4, line outs 1-2.
+settings:
+  extra_subscriptions:
+    type: string
+    max_length: 4096
+    default: ''
+  read_on_connect:
+    type: bool
+    default: true
+models:
+- id: zenith-100
+  name: Analog Way Zenith 100
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_background
+  - set_foreground
+  - set_aux_source
+  - set_foreground_image
+  - set_background_image
+  - freeze_screen
+  - freeze_layer
+  - freeze_input
+  - enable_quick_preset
+  - update
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - set_output_audio_mode
+  - set_output_audio_source
+  - set_screen_audio_mode
+  - set_screen_audio_source
+  - set_screen_audio_follow_layer
+  - set_screen_audio_layer_source
+  - set_aux_audio_mode
+  - set_aux_audio_source
+  - set_aux_audio_layer_source
+  - mute_output_audio
+  - mute_screen_audio
+  - mute_aux_audio
+  - mute_input_audio
+  - set_dante_audio_mode
+  - set_dante_audio_source
+  - set_dante_follow_screen
+  - set_line_out_mode
+  - set_line_out_source
+  - set_line_out_pair
+  - set_line_out_follow_screen
+  - set_multiviewer_output_audio_mode
+  - set_multiviewer_output_audio_source
+  - set_multiviewer_audio_mode
+  - set_multiviewer_audio_source
+  - set_multiviewer_audio_follow_widget
+  - reboot
+  - standby
+  - switch_off
+  - wake_up
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type ZEN100.
+- id: zenith-200
+  name: Analog Way Zenith 200
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_background
+  - set_foreground
+  - set_aux_source
+  - set_foreground_image
+  - set_background_image
+  - freeze_screen
+  - freeze_layer
+  - freeze_input
+  - enable_quick_preset
+  - update
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - set_output_audio_mode
+  - set_output_audio_source
+  - set_screen_audio_mode
+  - set_screen_audio_source
+  - set_screen_audio_follow_layer
+  - set_screen_audio_layer_source
+  - set_aux_audio_mode
+  - set_aux_audio_source
+  - set_aux_audio_layer_source
+  - mute_output_audio
+  - mute_screen_audio
+  - mute_aux_audio
+  - mute_input_audio
+  - set_dante_audio_mode
+  - set_dante_audio_source
+  - set_dante_follow_screen
+  - set_line_out_mode
+  - set_line_out_source
+  - set_line_out_pair
+  - set_line_out_follow_screen
+  - set_multiviewer_output_audio_mode
+  - set_multiviewer_output_audio_source
+  - set_multiviewer_audio_mode
+  - set_multiviewer_audio_source
+  - set_multiviewer_audio_follow_widget
+  - reboot
+  - standby
+  - switch_off
+  - wake_up
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type ZEN200.
+commands:
+  take:
+    summary: TAKE on a screen (guide 3.2, transition xTake)
+    params:
+      screen: &id001
+        type: int
+        min: 1
+        max: 4
+        required: true
+    returns: none
+  take_aux:
+    summary: TAKE on an auxiliary screen (guide 3.2)
+    params:
+      aux: &id002
+        type: int
+        min: 1
+        max: 4
+        required: true
+    returns: none
+  recall_screen_preset:
+    summary: Recall a screen preset to a screen's program or preview (3.3)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 200
+        required: true
+      screen: *id001
+      destination: &id003
+        type: enum
+        values:
+        - program
+        - preview
+        default: preview
+    returns: none
+  recall_aux_preset:
+    summary: Recall an auxiliary preset to an auxiliary screen (3.4)
+    params:
+      preset:
+        type: int
+        min: 1
+        required: true
+      aux: *id002
+      destination: *id003
+    returns: none
+  recall_master_preset:
+    summary: Recall a master preset to program or preview (3.5)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 50
+        required: true
+      destination: *id003
+    returns: none
+  recall_multiviewer_preset:
+    summary: Recall a multiviewer preset (4.2)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 20
+        required: true
+    returns: none
+  set_layer_source:
+    summary: Set the source of a live layer on a screen's program or preview (INPUT_n, NONE), then the global update
+      (3.8). The DOWN/UP bank is chosen from the screen's T-bar position, read first when not known
+    params:
+      screen: *id001
+      layer: &id005
+        type: int
+        min: 1
+        max: 8
+        required: true
+      source: &id004
+        type: string
+        pattern: ^[A-Z0-9_]+$
+        required: true
+      destination: *id003
+    returns: none
+  set_background:
+    summary: Set a screen's background set (0 for NONE) on program or preview, then the update (3.10)
+    params:
+      screen: *id001
+      set:
+        type: int
+        min: 0
+        max: 8
+        required: true
+      destination: *id003
+    returns: none
+  set_foreground:
+    summary: Set a screen's foreground image (0 for NONE) on program or preview, then the update (3.12)
+    params:
+      screen: *id001
+      frame:
+        type: int
+        min: 0
+        max: 4
+        required: true
+      destination: *id003
+    returns: none
+  set_aux_source:
+    summary: 'Set an auxiliary screen''s source on program or preview: NONE, INPUT_n or PROGRAM_n (3.15)'
+    params:
+      aux: *id002
+      source: *id004
+      destination: *id003
+    returns: none
+  set_foreground_image:
+    summary: Load an image library slot into a screen's foreground image (6.3, 6.5)
+    params:
+      screen: *id001
+      image:
+        type: int
+        min: 1
+        max: 4
+        required: true
+      library_slot:
+        type: int
+        min: 1
+        required: true
+    returns: none
+  set_background_image:
+    summary: Load an image library slot into a screen's background image (6.3, 6.5)
+    params:
+      screen: *id001
+      image:
+        type: int
+        min: 1
+        max: 4
+        required: true
+      library_slot:
+        type: int
+        min: 1
+        required: true
+    returns: none
+  freeze_screen:
+    summary: Freeze or unfreeze a screen (3.19)
+    params:
+      screen: *id001
+      frozen:
+        type: bool
+        required: true
+    returns: none
+  freeze_layer:
+    summary: Freeze or unfreeze a live layer of a screen (3.20)
+    params:
+      screen: *id001
+      layer: *id005
+      frozen:
+        type: bool
+        required: true
+    returns: none
+  freeze_input:
+    summary: Freeze or unfreeze an input (6.7)
+    params:
+      input:
+        type: int
+        min: 1
+        max: 16
+        required: true
+      frozen:
+        type: bool
+        required: true
+    returns: none
+  enable_quick_preset:
+    summary: Enable or disable the configured Quick Preset (3.18)
+    params:
+      enabled:
+        type: bool
+        required: true
+    returns: none
+  update:
+    summary: Send the global update that applies pending layer changes (3.8, xUpdate)
+    returns: none
+  set_multiviewer_widget_source:
+    summary: 'Set the source of a multiviewer widget (4.5): NONE, INPUT_n, SCREEN_PRGM_n, SCREEN_PRW_n, TIMER_n
+      (4.1)'
+    params:
+      widget: &id006
+        type: int
+        min: 1
+        max: 27
+        required: true
+      source: *id004
+    returns: none
+  set_multiviewer_vu_meter:
+    summary: Show the VU meter on a multiviewer widget (5.2.7)
+    params:
+      widget: *id006
+    returns: none
+  set_output_audio_mode:
+    summary: 'Output audio mode: NONE, DIRECT_ROUTING or AUTO (5.1.4)'
+    params:
+      output:
+        type: int
+        min: 1
+        required: true
+      mode:
+        type: enum
+        values:
+        - NONE
+        - DIRECT_ROUTING
+        - AUTO
+        required: true
+    returns: none
+  set_output_audio_source:
+    summary: 'Direct-routing audio source of an output: NONE, INn, IN_DANTE_CHx_y, IN_ANALOG_n, CUSTOM_n (5.1.4.2)'
+    params:
+      output:
+        type: int
+        min: 1
+        required: true
+      source: &id007
+        type: string
+        pattern: ^(NONE|IN[0-9]+|IN_DANTE_CH[0-9]+_[0-9]+|IN_ANALOG_[0-9]+|CUSTOM_[0-9]+)$
+        required: true
+    returns: none
+  set_screen_audio_mode:
+    summary: Screen audio mode (5.1.5)
+    params:
+      screen: *id001
+      mode:
+        type: enum
+        values:
+        - DIRECT_ROUTING
+        - FOLLOW_LIVE_LAYER_CONTENT
+        - FOLLOW_AUDIO_LAYER
+        required: true
+    returns: none
+  set_screen_audio_source:
+    summary: Direct-routing audio source of a screen (5.1.5.1)
+    params:
+      screen: *id001
+      source: *id007
+    returns: none
+  set_screen_audio_follow_layer:
+    summary: Layer whose content a screen's audio follows (5.1.5.2)
+    params:
+      screen: *id001
+      layer: *id005
+    returns: none
+  set_screen_audio_layer_source:
+    summary: Audio-layer source of a screen's program or preview (5.1.5.3)
+    params:
+      screen: *id001
+      source: *id007
+      destination: *id003
+    returns: none
+  set_aux_audio_mode:
+    summary: Auxiliary screen audio mode (5.1.6)
+    params:
+      aux: *id002
+      mode:
+        type: enum
+        values:
+        - DIRECT_ROUTING
+        - FOLLOW_CONTENT
+        - FOLLOW_AUDIO_LAYER
+        required: true
+    returns: none
+  set_aux_audio_source:
+    summary: Direct-routing audio source of an auxiliary screen (5.1.6.1)
+    params:
+      aux: *id002
+      source: *id007
+    returns: none
+  set_aux_audio_layer_source:
+    summary: Audio-layer source of an auxiliary screen's program or preview (5.1.6.3)
+    params:
+      aux: *id002
+      source: *id007
+      destination: *id003
+    returns: none
+  mute_output_audio:
+    summary: Mute or unmute an output's audio (5.1.10, VIDEO_OUT_n)
+    params:
+      output:
+        type: int
+        min: 1
+        required: true
+      muted:
+        type: bool
+        required: true
+    returns: none
+  mute_screen_audio:
+    summary: Mute or unmute a screen's audio (5.1.11)
+    params:
+      screen: *id001
+      muted:
+        type: bool
+        required: true
+    returns: none
+  mute_aux_audio:
+    summary: Mute or unmute an auxiliary screen's audio (5.1.12)
+    params:
+      aux: *id002
+      muted:
+        type: bool
+        required: true
+    returns: none
+  mute_input_audio:
+    summary: Mute or unmute one audio channel of an input plug, named as in the guide (e.g. IN9_DP_EMBEDDED, 5.1.13)
+    params:
+      input:
+        type: string
+        pattern: ^[A-Z0-9_]+$
+        required: true
+      channel:
+        type: int
+        min: 1
+        required: true
+      muted:
+        type: bool
+        required: true
+    returns: none
+  set_dante_audio_mode:
+    summary: Dante output group audio mode (5.3)
+    params:
+      group:
+        type: int
+        min: 1
+        max: 4
+        required: true
+      mode:
+        type: enum
+        values:
+        - DIRECT_ROUTING
+        - FOLLOW_SCREEN
+        required: true
+    returns: none
+  set_dante_audio_source:
+    summary: Direct-routing source of a Dante output group (5.3.2.1)
+    params:
+      group:
+        type: int
+        min: 1
+        max: 4
+        required: true
+      source: *id007
+    returns: none
+  set_dante_follow_screen:
+    summary: Screen a Dante output group follows (5.3.2.2)
+    params:
+      group:
+        type: int
+        min: 1
+        max: 4
+        required: true
+      screen: *id001
+    returns: none
+  set_line_out_mode:
+    summary: Line out audio mode (5.4)
+    params:
+      line_out:
+        type: int
+        min: 1
+        max: 2
+        required: true
+      mode:
+        type: enum
+        values:
+        - DIRECT_ROUTING
+        - FOLLOW_SCREEN
+        required: true
+    returns: none
+  set_line_out_source:
+    summary: Direct-routing source of a line out (5.4.2.1)
+    params:
+      line_out:
+        type: int
+        min: 1
+        max: 2
+        required: true
+      source: *id007
+    returns: none
+  set_line_out_pair:
+    summary: Channel pair of the source sent to a line out (5.4.2)
+    params:
+      line_out:
+        type: int
+        min: 1
+        max: 2
+        required: true
+      pair:
+        type: enum
+        values:
+        - CHANNEL_1_2
+        - CHANNEL_3_4
+        - CHANNEL_5_6
+        - CHANNEL_7_8
+        required: true
+    returns: none
+  set_line_out_follow_screen:
+    summary: Screen a line out follows (5.4.2.2)
+    params:
+      line_out:
+        type: int
+        min: 1
+        max: 2
+        required: true
+      screen: *id001
+    returns: none
+  set_multiviewer_output_audio_mode:
+    summary: Multiviewer output audio mode (5.2.3)
+    params:
+      mode:
+        type: enum
+        values:
+        - NONE
+        - DIRECT_ROUTING
+        - AUTO
+        required: true
+    returns: none
+  set_multiviewer_output_audio_source:
+    summary: Direct-routing source of the multiviewer output (5.2.3.2)
+    params:
+      source: *id007
+    returns: none
+  set_multiviewer_audio_mode:
+    summary: Multiviewer screen audio mode (5.2.4)
+    params:
+      mode:
+        type: enum
+        values:
+        - DIRECT_ROUTING
+        - FOLLOW_WIDGET
+        required: true
+    returns: none
+  set_multiviewer_audio_source:
+    summary: Direct-routing source of the multiviewer screen (5.2.4.1)
+    params:
+      source: *id007
+    returns: none
+  set_multiviewer_audio_follow_widget:
+    summary: Widget whose audio the multiviewer follows (5.2.4.2)
+    params:
+      widget: *id006
+    returns: none
+  reboot:
+    summary: Soft reboot (2.4, xReboot)
+    returns: none
+  standby:
+    summary: Put the unit in standby (2.5)
+    returns: none
+  switch_off:
+    summary: Switch the unit off; it must be restarted by hand (2.6)
+    returns: none
+  wake_up:
+    summary: Resume from standby (2.7)
+    returns: none
+  awj_get:
+    summary: Read any property or object of the AWJ object model by its path; returns its value (guides 1.2). The
+      answer is also applied to the state
+    params:
+      path:
+        type: string
+        max_length: 512
+        pattern: ^\S.*$
+        required: true
+    returns: value
+  awj_replace:
+    summary: 'Write any property of the AWJ object model: the path and the new value as JSON (guides 1.2, op replace).
+      Not acknowledged by the device'
+    params:
+      path:
+        type: string
+        max_length: 512
+        pattern: ^\S.*$
+        required: true
+      value:
+        type: json
+        required: true
+    returns: none
+  subscribe:
+    summary: Add path prefixes to this connection's subscription list (guides 1.4); kept and sent again on every
+      reconnection. A JSON array of strings
+    params:
+      paths:
+        type: json
+        required: true
+    returns: none
+quirks:
+- models:
+  - all
+  severity: critical
+  text: >-
+    Layer, background, foreground, auxiliary source and audio-layer settings live in two banks, DOWN and UP; AT_DOWN
+    puts DOWN on program, AT_UP puts UP there (guide 3.8). Commands taking 'destination' are resolved against the
+    T-bar position, read first when not known; any other position fails the command. State reports program/preview
+    and banks.DOWN / banks.UP.
+- models:
+  - all
+  severity: warning
+  text: >-
+    Writes are not acknowledged, so they complete as unverified; subscribed notifications show the result. Errors
+    carry no path and are matched to the oldest message not yet answered: a read fails with it, a write is logged
+    as refused (guide 1.3).
+- models:
+  - all
+  severity: warning
+  text: >-
+    The guide gives the T-bar read for screens only; for auxiliary screens the module reads DeviceObject/transition/$auxiliaryScreen/@items/<n>/status/@props/transition
+    by analogy with the documented auxiliary xTake. This is an inference.
+- models:
+  - all
+  severity: warning
+  text: >-
+    Ambiguities in the guide, resolved as follows: auxiliary preset recall uses '$auxillaryScreen' as printed (3.4);
+    audio modes are written with underscores (FOLLOW_AUDIO_LAYER, FOLLOW_WIDGET) as in the examples, where the tables
+    print spaces; Dante and line out 'follow screen' writes use followScreen/@props/source as in the write examples,
+    while the reads show followScreen/@props/screen; the line out follow example's 'audio/dante/$lineOut' path is
+    taken as a typing error for 'audio/$lineOut'; 6.3 and 6.5 have their foreground and background titles swapped,
+    and the paths ($topFrame, $backFrame) are followed; the background status read in 3.9 prints 'presetList' where
+    its answer and every other path have '$preset'.
+- models:
+  - all
+  severity: info
+  text: >-
+    Multiviewer widgets are numbered from 1 on this family (4.3-4.5), unlike LivePremier.
+- models:
+  - all
+  severity: info
+  text: >-
+    The module subscribes to transitions, screens, auxiliary screens, presets, inputs and the multiviewer on every
+    connection (plus extra_subscriptions) and, with read_on_connect, reads those objects once.
+- models:
+  - all
+  severity: info
+  text: >-
+    Not documented over AWJ, so not offered: cut, auto transition with a rate, transition settings, test patterns.
+    awj_replace reaches any other property.
+state:
+  device.type:
+    type: string
+    description: Device type (2.1)
+  device.serial:
+    type: string
+    description: Serial number (2.2)
+  device.firmware:
+    type: string
+    description: Firmware version (2.3)
+  screens.*.label:
+    type: string
+    description: Screen label (3.1)
+  screens.*.transition:
+    type: string
+    description: 'T-bar position: AT_DOWN or AT_UP (3.8)'
+  screens.*.frozen:
+    type: bool
+    description: Screen frozen (3.19)
+  screens.*.layer_frozen.*:
+    type: bool
+    description: Live layer frozen (3.20)
+  screens.*.program.layers.*.source:
+    type: string
+    description: Source of a live layer on program (INPUT_n or NONE) (3.7)
+  screens.*.preview.layers.*.source:
+    type: string
+    description: Source of a live layer on preview
+  screens.*.program.layers.*.state:
+    type: string
+    description: 'Layer status on program: OFF, OPEN, CLOSE, CROSS, FLYING, FLYING_DEPTH'
+  screens.*.preview.layers.*.state:
+    type: string
+    description: Layer status on preview
+  screens.*.program.background:
+    type: string
+    description: Background set on program (3.9)
+  screens.*.preview.background:
+    type: string
+    description: Background set on preview
+  screens.*.program.background_state:
+    type: string
+    description: Background layer status on program
+  screens.*.preview.background_state:
+    type: string
+    description: Background layer status on preview
+  screens.*.program.foreground:
+    type: string
+    description: Foreground image on program (3.11)
+  screens.*.preview.foreground:
+    type: string
+    description: Foreground image on preview
+  screens.*.program.foreground_state:
+    type: string
+    description: Foreground layer status on program
+  screens.*.preview.foreground_state:
+    type: string
+    description: Foreground layer status on preview
+  screens.*.program.preset:
+    type: int
+    description: Last preset loaded to program (3.16)
+  screens.*.preview.preset:
+    type: int
+    description: Last preset loaded to preview
+  screens.*.program.audio_source:
+    type: string
+    description: Audio source on program (5.1.8)
+  screens.*.preview.audio_source:
+    type: string
+    description: Audio source on preview
+  screens.*.banks:
+    type: object
+    description: The same values per raw bank, DOWN and UP
+  auxiliaries.*.label:
+    type: string
+    description: Auxiliary screen label (3.13)
+  auxiliaries.*.transition:
+    type: string
+    description: Auxiliary T-bar position
+  auxiliaries.*.program.source:
+    type: string
+    description: 'Auxiliary source on program: NONE, INPUT_n, PROGRAM_n (3.14)'
+  auxiliaries.*.preview.source:
+    type: string
+    description: Auxiliary source on preview
+  auxiliaries.*.program.preset:
+    type: int
+    description: Last preset loaded to the auxiliary's program
+  auxiliaries.*.preview.preset:
+    type: int
+    description: Last preset loaded to the auxiliary's preview
+  auxiliaries.*.program.audio_source:
+    type: string
+    description: Auxiliary audio source on program (5.1.9)
+  auxiliaries.*.preview.audio_source:
+    type: string
+    description: Auxiliary audio source on preview
+  auxiliaries.*.banks:
+    type: object
+    description: Auxiliary values per raw bank
+  master_preset.program:
+    type: int
+    description: Last master preset recalled to program (3.17)
+  master_preset.preview:
+    type: int
+    description: Last master preset recalled to preview
+  presets.*.label:
+    type: string
+    description: Screen preset label (3.6)
+  master_presets.*.label:
+    type: string
+    description: Master preset label
+  aux_presets.*.label:
+    type: string
+    description: Auxiliary preset label
+  inputs.*.frozen:
+    type: bool
+    description: Input frozen (6.7)
+  inputs.*.plugs.*.label:
+    type: string
+    description: Input plug label (6.1)
+  inputs.*.plugs.*.type:
+    type: string
+    description: Input plug type, e.g. HDMI
+  inputs.*.plugs.*.available:
+    type: bool
+    description: Input plug available
+  inputs.*.plugs.*.valid:
+    type: bool
+    description: Input plug signal valid
+  multiviewer.label:
+    type: string
+    description: Multiviewer label (4.1)
+  multiviewer.widgets.*.source:
+    type: string
+    description: Source of a multiviewer widget (4.3)
+  multiviewer.widgets.*.enabled:
+    type: bool
+    description: Multiviewer widget enabled (4.4)
+  last_error:
+    type: object
+    description: The last error object the device sent (1.3)
+  awj:
+    type: object
+    description: Every property the device reported, keyed by its full AWJ path

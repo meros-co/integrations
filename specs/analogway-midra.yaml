@@ -1,0 +1,509 @@
+spec: 1
+id: analogway-midra
+name: Analog Way Midra series (TPP)
+vendor: Analog Way
+category: switcher
+
+# Analog Way's Third Party Protocol (TPP) for the Midra series that came before
+# Midra 4K: Eikos², Saphyr, Pulse², SmartMatriX², QuickMatriX and QuickVu, and
+# their HDBaseT (-H) versions. The command form is LiveCore's: index values,
+# the value to write and a register name ("0,1GCtak"); a read omits the value
+# and keeps the comma after each index. Answers start with the register name
+# and end in CR LF ("GCtak0,1"); errors are E10 to E12. Indexes are 0-based on
+# the wire; commands take screens, inputs, outputs and memories from 1. Layers
+# and sources are the documented enumeration values: layer 0 frame, 1-4 PIP,
+# 5-6 logos, 7 audio; source 0 none, 1-10 input (or frame) 1-10, 11 color.
+source:
+  - title: "Midra TPP Programmer's Guide for v02.00.15 (V1.00, November 3 2017)"
+    author: Analog Way
+    url: "https://dwn01.analogway.com/Site+Internet/Series/Midra/Common/Programmer's+guide/midra_tpp_commands_for_v02-00-15.zip"
+    note: >
+      Manufacturer document, Midra_TPP_Programmers-guide_for_v02-00-15.pdf in the zip (28 pages), listed by
+      Analog Way as the Midra series programmer's guide. 2.2-2.3 (p.6): Ethernet or RS-232, TCP or UDP, TPP
+      port 10500, one TCP connection at a time; 2.4 (pp.7-9): command and answer structure, CR LF after an
+      answer, errors E10-E12; 2.7 (p.12): one TCP controller; 3.1 (pp.14-15): "*" READY, "?" answered
+      DEV<value> with the device table, VEvar, # and 1#/3# read-back; 3.2 (p.17): <val>SYpig answered with
+      the inverted value; 3.3 (p.18): <scrn>,<ProgPrev>,<layer>,<src>PRinp then PUscu, layer and source
+      tables; 3.4 (p.19): <scrn>,1GCtak after TAKEAVA; 3.5 (p.20): 1,GCtal; 3.6 (pp.21-22):
+      <scrnF>,<mem>,<scrnT>,<progPrev>,<fltr>,1GClrq and the filter table; 3.8-3.9 (p.25): CTqfa, CTqfl.
+  - title: "Midra TPP commands for v02.00.15 (Analog Way TPP commands documentation, rev 1.00, 2017-11-03)"
+    author: Analog Way
+    url: "https://dwn01.analogway.com/Site+Internet/Series/Midra/Common/Programmer's+guide/midra_tpp_commands_for_v02-00-15.zip"
+    note: >
+      Manufacturer document, Midra_TPP_commands_for_v02-00-15.xls (and .pdf, 13 pages) in the same zip.
+      Registers: DEV, READY (*), DIESE (#), SYpig, VEvar, VEupd, DIdsn, SGswm, SBsta, SBreq, GClrq, GCtav,
+      GCtak, GCtal, GCtio, GCtba (0-10000), PUscu, GCsba, GCrpr, GCfsc, GCfra, CTqfa, CTqfl, CTaqf, SCmly,
+      PRinp, GCfrl, GCply, ISsva, INava, INfrz, INasi, AUile, AUomv, AUimu, AUomu, AUodi, INplg. Dimensions:
+      DIM_SCREEN S1-S2, DIM_PRESET CURRENT/NEXT/PREVIOUS, DIM_PRESET_MEM 1-8, DIM_INPUT 1-10, DIM_OUTPUT 1-2,
+      DIM_AUDIO_INPUT 1_ANALOG (1) to 4_HDBASET (24). Enumerations: ENUM_DEV 257-262 and 282-285,
+      ENUM_LAYER, ENUM_INPUTLAYER, ENUM_LOAD_FILTER, ENUM_SWITCHER_MODE, ENUM_IN_PLUG, ENUM_AUDIO_INPUT.
+
+transport:
+  type: line-tcp
+  port: 10500
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  probe: "*"
+
+models:
+  - id: eikos2
+    name: Analog Way Eikos² (EKS550)
+    supports: &all [take, take_all, set_tbar, recall_preset, set_layer_source, update_screen, step_back,
+                    reload_program, freeze_screen, freeze_all, freeze_layer, freeze_input, quick_frame,
+                    quick_frame_all, auto_quick_frame, standby, set_switcher_mode, set_input_plug,
+                    autoset_input, set_audio_input_level, set_audio_output_volume, mute_audio_input,
+                    mute_audio_output, set_audio_output_input, ping, get_ready, get_device_type, get_firmware,
+                    get_command_set_version, get_take_available, get_layer_source, get_tbar, read_back, send_raw]
+    verification: none
+    notes: Reports DEV257.
+  - id: saphyr
+    name: Analog Way Saphyr (SPX450)
+    supports: *all
+    verification: none
+    notes: Reports DEV258.
+  - id: pulse2
+    name: Analog Way Pulse² (PLS350)
+    supports: *all
+    verification: none
+    notes: Reports DEV259.
+  - id: smartmatrix2
+    name: Analog Way SmartMatriX² (SMX250)
+    supports: *all
+    verification: none
+    notes: Reports DEV260.
+  - id: quickmatrix
+    name: Analog Way QuickMatriX (QMX150)
+    supports: *all
+    verification: none
+    notes: Reports DEV261.
+  - id: quickvu
+    name: Analog Way QuickVu (QVU150)
+    supports: *all
+    verification: none
+    notes: Reports DEV262.
+  - id: saphyr-h
+    name: Analog Way Saphyr-H (SPX450-H)
+    supports: *all
+    verification: none
+    notes: Reports DEV282.
+  - id: pulse2-h
+    name: Analog Way Pulse²-H (PLS350-H)
+    supports: *all
+    verification: none
+    notes: Reports DEV283.
+  - id: smartmatrix2-h
+    name: Analog Way SmartMatriX²-H (SMX250-H)
+    supports: *all
+    verification: none
+    notes: Reports DEV284.
+  - id: quickmatrix-h
+    name: Analog Way QuickMatriX-H (QMX150-H)
+    supports: *all
+    verification: none
+    notes: Reports DEV285.
+
+commands:
+  # ── Transitions ───────────────────────────────────────────────────────────
+  take:
+    summary: "TAKE on one screen (guide 3.4, GCtak); answered 1 at once and 0 when the transition ends. The device needs TAKEAVA (get_take_available) to be 1"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+    send: "{screen:-1},1GCtak"
+    expect: { matches: "^GCtak" }
+    returns: ack
+  take_all:
+    summary: "TAKE on every screen in matrix mode (guide 3.5 and variables, TAKE_ALL GCtal)"
+    send: "1GCtal"
+    expect: { matches: "^GCtal" }
+    returns: ack
+  set_tbar:
+    summary: "T-bar position of a screen, 0-10000 in hundredths of a percent (variables, GCtba)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+      position: { type: int, min: 0, max: 10000, required: true }
+    send: "{screen:-1},{position}GCtba"
+    expect: { matches: "^GCtba" }
+    returns: ack
+
+  # ── Presets and layers ────────────────────────────────────────────────────
+  recall_preset:
+    summary: "Load master memory 1-8, as stored from screen from_screen, to a screen's preview (or program) (guide 3.6, GClrq). filter adds the elements NOT recalled: 1 auto-scale, 2 source, 4 position and size, 8 transparency, 16 cropping, 32 border, 64 transition, 128 timing, 256 effects, 512 audio layer; 0 recalls everything"
+    params:
+      memory: { type: int, min: 1, max: 8, required: true }
+      screen: { type: int, min: 1, max: 2, required: true }
+      from_screen: { type: int, min: 1, max: 2, default: 1 }
+      preview: { type: bool, default: true }
+      filter: { type: int, min: 0, max: 1023, default: 0 }
+    send: "{from_screen:-1},{memory:-1},{screen:-1},{preview:bool01},{filter},1GClrq"
+    expect: { matches: "^GClrq" }
+    returns: ack
+  set_layer_source:
+    summary: "Source of a layer on a screen's preview (or program), then the screen update that applies it (guide 3.3, PRinp and PUscu). layer: 0 frame, 1-4 PIP, 5-6 logos, 7 audio; source: 0 none, 1-10 input or frame, 11 color"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+      layer: { type: int, min: 0, max: 7, required: true }
+      source: { type: int, min: 0, max: 11, required: true }
+      preview: { type: bool, default: true }
+    send:
+      - "{screen:-1},{preview:bool01},{layer},{source}PRinp"
+      - "{screen:-1},1PUscu"
+    expect: { matches: "^(PRinp|PUscu)" }
+    returns: ack
+  update_screen:
+    summary: "Apply pending preset changes to a screen (variables, PU_SCREEN_UPDATE PUscu)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+    send: "{screen:-1},1PUscu"
+    expect: { matches: "^PUscu" }
+    returns: ack
+  step_back:
+    summary: "Load the preset before the last TAKE to preview (variables, STEPBACK GCsba)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+    send: "{screen:-1},1GCsba"
+    expect: { matches: "^GCsba" }
+    returns: ack
+  reload_program:
+    summary: "Copy program to preview (variables, RELOAD_PROGRAM GCrpr)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+    send: "{screen:-1},1GCrpr"
+    expect: { matches: "^GCrpr" }
+    returns: ack
+
+  # ── Freeze and Quick Frame ────────────────────────────────────────────────
+  freeze_screen:
+    summary: "Freeze all layers of a screen (variables, FREEZE_SCREEN GCfsc)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+      frozen: { type: bool, default: true }
+    send: "{screen:-1},{frozen:bool01}GCfsc"
+    expect: { matches: "^GCfsc" }
+    returns: ack
+  freeze_all:
+    summary: "Freeze all layers of all screens (variables, FREEZE_ALL GCfra)"
+    params:
+      frozen: { type: bool, default: true }
+    send: "{frozen:bool01}GCfra"
+    expect: { matches: "^GCfra" }
+    returns: ack
+  freeze_layer:
+    summary: "Freeze one layer of a screen (variables, FREEZE_LAYER GCfrl); layer as set_layer_source"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+      layer: { type: int, min: 0, max: 7, required: true }
+      frozen: { type: bool, default: true }
+    send: "{screen:-1},{layer},{frozen:bool01}GCfrl"
+    expect: { matches: "^GCfrl" }
+    returns: ack
+  freeze_input:
+    summary: "Freeze an input (variables, IN_FREEZE INfrz)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true }
+      frozen: { type: bool, default: true }
+    send: "{input:-1},{frozen:bool01}INfrz"
+    expect: { matches: "^INfrz" }
+    returns: ack
+  quick_frame:
+    summary: "Show or hide the Quick Frame on one screen (guide 3.8, CTqfa)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+      enabled: { type: bool, default: true }
+    send: "{screen:-1},{enabled:bool01}CTqfa"
+    expect: { matches: "^CTqfa" }
+    returns: ack
+  quick_frame_all:
+    summary: "Show or hide the Quick Frames on both screens (guide 3.9, CTqfl)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "{enabled:bool01}CTqfl"
+    expect: { matches: "^CTqfl" }
+    returns: ack
+  auto_quick_frame:
+    summary: "Show the Quick Frame automatically when a displayed source is lost (variables, CTaqf)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "{enabled:bool01}CTaqf"
+    expect: { matches: "^CTaqf" }
+    returns: ack
+
+  # ── Device ────────────────────────────────────────────────────────────────
+  standby:
+    summary: "Put the device in standby, or wake it (variables, STDBY_REQUEST SBreq)"
+    params:
+      standby: { type: bool, default: true }
+    send: "{standby:bool01}SBreq"
+    expect: { matches: "^SBreq" }
+    returns: ack
+  set_switcher_mode:
+    summary: "Switcher mode: 0 mixer, 1 matrix, 2 quadravision (variables, SGswm)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "{mode}SGswm"
+    expect: { matches: "^SGswm" }
+    returns: ack
+  set_input_plug:
+    summary: "Active plug of an input: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT (variables, IN_PLUG INplg)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true }
+      plug: { type: int, min: 0, max: 4, required: true }
+    send: "{input:-1},{plug}INplg"
+    expect: { matches: "^INplg" }
+    returns: ack
+  autoset_input:
+    summary: "Request the auto settings of all plugs of an input (variables, INasi)"
+    params:
+      input: { type: int, min: 1, max: 10, required: true }
+    send: "{input:-1},1INasi"
+    expect: { matches: "^INasi" }
+    returns: ack
+
+  # ── Audio ─────────────────────────────────────────────────────────────────
+  set_audio_input_level:
+    summary: "Level of an audio input, 0-255: 16 -50 dB, 64 -20 dB, 128 -6 dB, 192 0 dB, 255 +6 dB. audio_input is the documented number: 1-4 analog, 5-8 DVI 1-4, 9-12 HDMI 3-6, 13-16 SDI 7-10, 17-18 SPDIF, 19-20 HDMI 1-2, 21-24 HDBaseT (variables, AUile)"
+    params:
+      audio_input: { type: int, min: 1, max: 24, required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "{audio_input},{level}AUile"
+    expect: { matches: "^AUile" }
+    returns: ack
+  set_audio_output_volume:
+    summary: "Master volume of an audio output, 0-192 (192 is 0 dB) (variables, AUomv)"
+    params:
+      output: { type: int, min: 1, max: 2, required: true }
+      volume: { type: int, min: 0, max: 192, required: true }
+    send: "{output:-1},{volume}AUomv"
+    expect: { matches: "^AUomv" }
+    returns: ack
+  mute_audio_input:
+    summary: "Mute an audio input, numbered as set_audio_input_level (variables, AUimu)"
+    params:
+      audio_input: { type: int, min: 1, max: 24, required: true }
+      muted: { type: bool, default: true }
+    send: "{audio_input},{muted:bool01}AUimu"
+    expect: { matches: "^AUimu" }
+    returns: ack
+  mute_audio_output:
+    summary: "Mute an audio output (variables, AUomu)"
+    params:
+      output: { type: int, min: 1, max: 2, required: true }
+      muted: { type: bool, default: true }
+    send: "{output:-1},{muted:bool01}AUomu"
+    expect: { matches: "^AUomu" }
+    returns: ack
+  set_audio_output_input:
+    summary: "Video input whose audio an output plays in de-embedded audio mode, 0 none (variables, AUodi)"
+    params:
+      output: { type: int, min: 1, max: 2, required: true }
+      input: { type: int, min: 0, max: 10, required: true }
+    send: "{output:-1},{input}AUodi"
+    expect: { matches: "^AUodi" }
+    returns: ack
+
+  # ── Reads ─────────────────────────────────────────────────────────────────
+  ping:
+    summary: "Keep-alive: the device answers the 32-bit inverse of the value (guide 3.2, SYpig)"
+    params:
+      value: { type: int, min: 0, max: 4294967295, default: 0 }
+    send: "{value}SYpig"
+    expect: { matches: "^SYpig(\\d+)$" }
+    returns: value
+  get_ready:
+    summary: "1 once the device is ready after power up (guide 3.1, *)"
+    send: "*"
+    expect: { matches: "^\\*(\\d+)$" }
+    returns: value
+  get_device_type:
+    summary: "Device type number, 257-262 and 282-285 (guide 3.1, ?)"
+    send: "?"
+    expect: { matches: "^DEV(\\d+)$" }
+    returns: value
+  get_firmware:
+    summary: "Firmware version word: bit 31 beta, bits 24-30 major, 16-23 minor, 0-15 build (variables, VEupd)"
+    send: "VEupd"
+    expect: { matches: "^VEupd(\\d+)$" }
+    returns: value
+  get_command_set_version:
+    summary: "TPP command set version (guide 3.1, VEvar)"
+    send: "VEvar"
+    expect: { matches: "^VEvar(\\d+)$" }
+    returns: value
+  get_take_available:
+    summary: "1 when TAKE can be used on a screen (guide 3.4, TAKEAVA GCtav)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+    send: "{screen:-1},GCtav"
+    expect: { matches: "^GCtav\\d+,(\\d+)$" }
+    returns: value
+  get_layer_source:
+    summary: "Source of a layer on a screen's preview (or program)"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+      layer: { type: int, min: 0, max: 7, required: true }
+      preview: { type: bool, default: true }
+    send: "{screen:-1},{preview:bool01},{layer},PRinp"
+    expect: { matches: "^PRinp\\d+,\\d+,\\d+,(\\d+)$" }
+    returns: value
+  get_tbar:
+    summary: "T-bar position of a screen, 0-10000"
+    params:
+      screen: { type: int, min: 1, max: 2, required: true }
+    send: "{screen:-1},GCtba"
+    expect: { matches: "^GCtba\\d+,(\\d+)$" }
+    returns: value
+  read_back:
+    summary: "Ask the device to send every register (1), those away from their defaults (2), or the compatible set (3) (guide 3.1, #)"
+    params:
+      mode: { type: int, min: 1, max: 3, default: 3 }
+    send: "{mode}#"
+    expect: { matches: "^#" }
+    returns: ack
+  send_raw:
+    summary: "Any TPP command from the commands document, as written; returns the device's answer line"
+    params:
+      command: { type: string, max_length: 64, pattern: "^[!-~]+$", required: true }
+    send: "{command}"
+    expect: { matches: "^(([^E]|E[^1]).*)$" }
+    returns: value
+
+telemetry:
+  # The guide's connection sequence (3.1): READY, the device type, the command
+  # set version, then a read-back of every register away from its default.
+  poll:
+    send: ["*", "?", "VEvar", "VEupd"]
+  subscribe:
+    send: ["3#"]
+  updates:
+    - match: "^\\*(\\d+)$"
+      state: { "device.ready": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^DEV(\\d+)$"
+      state: { "device.type": "{1}" }
+    - match: "^VEvar(\\d+)$"
+      state: { "device.command_set_version": "{1}" }
+    - match: "^VEupd(\\d+)$"
+      state: { "device.firmware": "{1}" }
+    - match: "^DIdsn(\\d+)$"
+      state: { "device.serial_number": "{1}" }
+    - match: "^SGswm(\\d+)$"
+      state: { "device.switcher_mode": "{1}" }
+    - match: "^SBsta(\\d+)$"
+      state: { "device.standby": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^GCtav(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.take_available": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GCtak(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.taking": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GCtio(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.take_kind": "{2}" }
+    - match: "^GCtba(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.tbar": "{2}" }
+    - match: "^SCmly(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.max_layers": "{2}" }
+    - match: "^GCfsc(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.frozen": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^GCfrl(\\d+),(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.layer_frozen.{2}": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^CTqfa(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.quick_frame": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^PRinp(\\d+),0,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.program.layers.{2}.source": "{3}" }
+    - match: "^PRinp(\\d+),1,(\\d+),(\\d+)$"
+      state: { "screens.{1:+1}.preview.layers.{2}.source": "{3}" }
+    - match: "^GCfra(\\d+)$"
+      state: { "freeze_all": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^CTqfl(\\d+)$"
+      state: { "quick_frame_all": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^CTaqf(\\d+)$"
+      state: { "auto_quick_frame": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^GCply(\\d+)$"
+      state: { "previewed_layer": "{1}" }
+    - match: "^INava(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.available": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^INfrz(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.frozen": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^INplg(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plug": "{2}" }
+    - match: "^ISsva(\\d+),(\\d+),(\\d+)$"
+      state: { "inputs.{1:+1}.plugs.{2}.signal": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: "^AUile(\\d+),(\\d+)$"
+      state: { "audio.inputs.{1}.level": "{2}" }
+    - match: "^AUimu(\\d+),(\\d+)$"
+      state: { "audio.inputs.{1}.muted": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^AUomv(\\d+),(\\d+)$"
+      state: { "audio.outputs.{1:+1}.volume": "{2}" }
+    - match: "^AUomu(\\d+),(\\d+)$"
+      state: { "audio.outputs.{1:+1}.muted": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^AUodi(\\d+),(\\d+)$"
+      state: { "audio.outputs.{1:+1}.input": "{2}" }
+
+state:
+  device.ready: { type: bool, description: "Ready after power up (READY)" }
+  device.type: { type: int, description: "Device type: 257 Eikos², 258 Saphyr, 259 Pulse², 260 SmartMatriX², 261 QuickMatriX, 262 QuickVu, 282-285 the -H versions" }
+  device.command_set_version: { type: int, description: "TPP command set version" }
+  device.firmware: { type: int, description: "Firmware version word: bit 31 beta, bits 24-30 major, 16-23 minor, 0-15 build" }
+  device.serial_number: { type: int, description: "Serial number, the digits of e.g. DR0100" }
+  device.switcher_mode: { type: int, description: "0 mixer, 1 matrix, 2 quadravision" }
+  device.standby: { type: bool, description: "In standby" }
+  screens.*.take_available: { type: bool, description: "TAKE can be used (TAKEAVA)" }
+  screens.*.taking: { type: bool, description: "A TAKE is in progress" }
+  screens.*.take_kind: { type: int, description: "Next TAKE: 0 one shot, 1 two shots, 2 sequenced" }
+  screens.*.tbar: { type: int, description: "T-bar position, 0-10000" }
+  screens.*.max_layers: { type: int, description: "Live layers available on the screen" }
+  screens.*.frozen: { type: bool, description: "All layers of the screen frozen" }
+  screens.*.layer_frozen.*: { type: bool, description: "A layer (0 frame, 1-4 PIP, 5-6 logos, 7 audio) frozen" }
+  screens.*.quick_frame: { type: bool, description: "Quick Frame shown" }
+  screens.*.program.layers.*.source: { type: int, description: "Source of a layer on program: 0 none, 1-10 input or frame, 11 color" }
+  screens.*.preview.layers.*.source: { type: int, description: "Source of a layer on preview" }
+  freeze_all: { type: bool, description: "All screens frozen" }
+  quick_frame_all: { type: bool, description: "Quick Frames shown on all screens" }
+  auto_quick_frame: { type: bool, description: "Quick Frame shown automatically on signal loss" }
+  previewed_layer: { type: int, description: "Layer currently previewed (0-6)" }
+  inputs.*.available: { type: bool, description: "Input present on the device" }
+  inputs.*.frozen: { type: bool, description: "Input frozen" }
+  inputs.*.plug: { type: int, description: "Active plug: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT" }
+  inputs.*.plugs.*.signal: { type: bool, description: "Valid signal detected on a plug" }
+  audio.inputs.*.level: { type: int, description: "Audio input level, 0-255 (192 is 0 dB), by the documented audio input number" }
+  audio.inputs.*.muted: { type: bool, description: "Audio input muted" }
+  audio.outputs.*.volume: { type: int, description: "Audio output master volume, 0-192" }
+  audio.outputs.*.muted: { type: bool, description: "Audio output muted" }
+  audio.outputs.*.input: { type: int, description: "Video input whose audio is de-embedded, 0 none" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Only one TCP controller can be connected at a time (guide 2.3 and 2.7); while the core holds the
+      connection, the RCS² software and other controllers cannot connect over TCP. UDP, which the guide
+      offers for several controllers, is not used.
+  - models: [all]
+    severity: warning
+    text: >
+      TAKE, TAKE ALL, step back and reload need TAKEAVA to be 1 first (guide 3.4, 3.5; variables). The
+      device answers a TAKE sent while it is not available like any other; read get_take_available first
+      when it matters.
+  - models: [all]
+    severity: warning
+    text: >
+      The device pushes register changes in the same form as its answers. A push arriving while a command
+      waits for its answer is taken as that answer, and a command whose answer does not start with its
+      register then fails, though the change is still applied to the state.
+  - models: [all]
+    severity: info
+    text: >
+      Ambiguities: the guide gives TAKE ALL as "1,GCtalLF" (3.5), a form with one index, while the commands
+      document gives TAKE_ALL no index; the document's "1GCtal" is used. The guide shows commands ended with
+      LF in some examples and CR LF in others ("1#CRLF") and says a command ends with its last letter; LF is
+      sent.
+  - models: [all]
+    severity: info
+    text: >
+      An invalid command is answered with the previous value and then an error E10-E12 (guide 2.4.5), so
+      the first line can acknowledge a command the device rejected; values are range-checked before
+      sending.
+  - models: [all]
+    severity: info
+    text: >
+      Master memories 1-8 are the only presets a controller can recall; the 56 RCS² memories live on the
+      computer running RCS² (guide 3.6.2).

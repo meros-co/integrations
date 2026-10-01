@@ -1,0 +1,1070 @@
+# Analog Way LivePremier / Aquilon (AWJ): native module crates/core/src/modules/analogway.rs.
+# Commands are AWJ get/replace messages on TCP 10606; see the module and the
+# guides cited below for the paths each one writes.
+spec: 1
+id: analogway-livepremier
+name: Analog Way LivePremier / Aquilon (AWJ)
+vendor: Analog Way
+category: switcher
+implementation: native
+reason: >-
+  AWJ is JSON over TCP with 0x04-terminated messages and nothing in the spec format can express its session: answers
+  are matched to reads by path, errors carry no path, changes are pushed only after a Subscriptions write that must
+  be repeated on every connection, and writes to a screen's program or preview go to bank A or B depending on the
+  T-bar position, which has to be read from the device before the write (guide 3.8).
+source:
+- title: Aquilon AWJ Protocol Programmer's Guide, for firmware version v6.2 or higher (document version 6.2, June
+    2026)
+  author: Analog Way
+  url: https://dwn01.analogway.com/Site+Internet/Series/Aquilon/Common/AWJ+Protocol/AW_Aquilon_AWJ_ProgrammersGuide_V6.2.pdf
+  note: >-
+    Manufacturer document, 34 pages (PDF created 2026-09-21). 1.1-1.4 (pp.3-5): TCP 10606, five clients, JSON objects
+    ended by 0x04, get/replace, the error object and codes E09-E13, Subscriptions; 2.1-2.5 (pp.6-7): device type
+    values NLC_RSALPHA..NLC_CMAX, serial, firmware, reboot and shutdown on DeviceObject/system/shutdown/cmd; 3.1-3.13
+    (pp.8-17): screen and auxiliary labels, xTake, preset and master preset recall, layer capability, layer freeze
+    lists (firmware 4.4+), layer sources, the A/B bank and T-bar table, xUpdate, backgrounds, last loaded presets,
+    keying; 4.1-4.6 (pp.18-20): multiviewer; 5 (pp.21-23): audio; 6.1-6.11 (pp.24-30): inputs, stills, backgrounds
+    and backups; 7 (p.31): thumbnails; 8 (pp.32-33): Wake-on-LAN.
+- title: LivePremier AWJ Protocol Programmer's Guide, for firmware version v4.0 or higher (document version 4.0,
+    January 2024)
+  author: Analog Way
+  url: https://s3.eu-west-3.amazonaws.com/aw.store01/Site+Internet/Series/LivePremier/Common/AWJ+Protocol/LivePremier_awj_programmers_guide_v4.0.pdf
+  note: >-
+    Manufacturer document, 31 pages, the edition before the Aquilon rename. Same protocol; differs from v6.2 in
+    the reboot/shutdown path (DeviceObject/system/$device/@items/1/shutdown/cmd, 2.4-2.5), the screen preconfig
+    path (@items/1 rather than @items/S1, 3.1 and 3.5) and in lacking keying, layer freeze, VU meter and backup
+    sections. Section 1.4 lists the 4.0 changes: the device selection added for Link, screens and auxiliaries split
+    into two lists.
+- title: Aquilon REST API Programmer's Guide, for version v4.0 or higher (PDF dated 2026-09-21, file v6.0)
+  author: Analog Way
+  url: https://dwn01.analogway.com/Site+Internet/Series/Aquilon/Common/Rest+API+Programmer's+Guide/AW_Aquilon_AWJ_REST_API_programmers_guide_v6.0.pdf
+  note: >-
+    Manufacturer document, 76 pages. Used only for the ranges the AWJ guide leaves out: screens 1-24, auxiliary
+    screens 1-96, screen layers 1-128, auxiliary layers 1-8, preset memories 1-1000, master presets 1-500, multiviewers
+    1-8 with widgets 1-64 and presets 1-50, inputs 1-256, background sets 1-8 (sections 3-7, pp.11-69). The REST
+    API itself is not used: it has no push, and its cookie login (section 10) is a handshake the spec format cannot
+    express.
+settings:
+  extra_subscriptions:
+    type: string
+    max_length: 4096
+    default: ''
+  read_on_connect:
+    type: bool
+    default: true
+models:
+- id: aquilon-rs-alpha
+  name: Analog Way Aquilon RS alpha
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RSALPHA.
+- id: aquilon-rs1
+  name: Analog Way Aquilon RS1
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RS1.
+- id: aquilon-rs2
+  name: Analog Way Aquilon RS2
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RS2.
+- id: aquilon-rs3
+  name: Analog Way Aquilon RS3
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RS3.
+- id: aquilon-rs4
+  name: Analog Way Aquilon RS4
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RS4.
+- id: aquilon-rs5
+  name: Analog Way Aquilon RS5
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RS5.
+- id: aquilon-rs6
+  name: Analog Way Aquilon RS6
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_RS6.
+- id: aquilon-cmini
+  name: Analog Way Aquilon Cmini
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_CMINI.
+- id: aquilon-c
+  name: Analog Way Aquilon C
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_C.
+- id: aquilon-c-plus
+  name: Analog Way Aquilon C+
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_CPLUS.
+- id: aquilon-cmax
+  name: Analog Way Aquilon Cmax
+  supports:
+  - take
+  - take_aux
+  - recall_screen_preset
+  - recall_aux_preset
+  - recall_master_preset
+  - recall_multiviewer_preset
+  - set_layer_source
+  - set_aux_layer_source
+  - set_background
+  - set_aux_background
+  - set_layer_keying
+  - enable_layer_keying
+  - freeze_layer
+  - freeze_input
+  - update
+  - mute_input_audio
+  - mute_dante_input_audio
+  - mute_output_audio
+  - set_output_audio_source
+  - set_multiviewer_widget_source
+  - set_multiviewer_vu_meter
+  - trigger_input_backup
+  - set_input_backup_auto
+  - trigger_background_backup
+  - set_background_backup_auto
+  - trigger_group_backup
+  - set_group_backup_auto
+  - reboot
+  - shutdown
+  - awj_get
+  - awj_replace
+  - subscribe
+  verification: none
+  notes: Reports device type NLC_CMAX.
+commands:
+  take:
+    summary: 'TAKE: transition a screen''s preview to program (Aquilon guide 3.2, xTake)'
+    params:
+      screen: &id001
+        type: int
+        min: 1
+        max: 24
+        required: true
+    returns: none
+  take_aux:
+    summary: 'TAKE on an auxiliary screen (Aquilon guide 3.2: the same xTake on the A item of $screenAuxGroup)'
+    params:
+      aux: &id002
+        type: int
+        min: 1
+        max: 96
+        required: true
+    returns: none
+  recall_screen_preset:
+    summary: Recall a screen preset memory to a screen's program or preview (3.3)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 1000
+        required: true
+      screen: *id001
+      destination: &id003
+        type: enum
+        values:
+        - program
+        - preview
+        default: preview
+    returns: none
+  recall_aux_preset:
+    summary: Recall a screen preset memory to an auxiliary screen's program or preview (3.3)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 1000
+        required: true
+      aux: *id002
+      destination: *id003
+    returns: none
+  recall_master_preset:
+    summary: Recall a master preset to program or preview (3.4)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 500
+        required: true
+      destination: *id003
+    returns: none
+  recall_multiviewer_preset:
+    summary: Recall a multiviewer preset on a multiviewer output (4.2)
+    params:
+      preset:
+        type: int
+        min: 1
+        max: 50
+        required: true
+      multiviewer:
+        type: int
+        min: 1
+        max: 8
+        required: true
+    returns: none
+  set_layer_source:
+    summary: 'Set the source of a live layer on a screen''s program or preview, then send the global update (3.8).
+      The A/B bank is chosen from the screen''s T-bar position, read first when not known. Sources: NONE, COLOR,
+      LIVE_n, STILL_n, SCREEN_n, NATIVE_n (3.6)'
+    params:
+      screen: *id001
+      layer:
+        type: int
+        min: 1
+        max: 128
+        required: true
+      source: &id004
+        type: string
+        pattern: ^(NONE|COLOR|LIVE_[0-9]+|STILL_[0-9]+|SCREEN_[0-9]+|NATIVE_[0-9]+)$
+        required: true
+      destination: *id003
+    returns: none
+  set_aux_layer_source:
+    summary: Set the source of a layer on an auxiliary screen's program or preview, then the global update (3.8)
+    params:
+      aux: *id002
+      layer:
+        type: int
+        min: 1
+        max: 8
+        required: true
+      source: *id004
+      destination: *id003
+    returns: none
+  set_background:
+    summary: Set a screen's background layer to background set n (NATIVE_n), or none with 0, on program or preview,
+      then the global update (3.10)
+    params:
+      screen: *id001
+      set:
+        type: int
+        min: 0
+        max: 8
+        required: true
+      destination: *id003
+    returns: none
+  set_aux_background:
+    summary: Set an auxiliary screen's background set (NATIVE_n, 0 for none) (3.10)
+    params:
+      aux: *id002
+      set:
+        type: int
+        min: 0
+        max: 8
+        required: true
+      destination: *id003
+    returns: none
+  set_layer_keying:
+    summary: Select keying preset SLOT_n (0 for NONE) on a screen layer, program or preview (3.13)
+    params:
+      screen: *id001
+      layer:
+        type: int
+        min: 1
+        max: 128
+        required: true
+      slot:
+        type: int
+        min: 0
+        required: true
+      destination: *id003
+    returns: none
+  enable_layer_keying:
+    summary: Turn keying on or off on a screen layer, program or preview (3.13)
+    params:
+      screen: *id001
+      layer:
+        type: int
+        min: 1
+        max: 128
+        required: true
+      enabled:
+        type: bool
+        required: true
+      destination: *id003
+    returns: none
+  freeze_layer:
+    summary: 'Freeze a live layer on program, preview, both or neither: the frozen banks are written as the layer''s
+      freeze list (Aquilon guide 3.5, firmware 4.4 or later)'
+    params:
+      screen: *id001
+      layer:
+        type: int
+        min: 1
+        max: 128
+        required: true
+      program:
+        type: bool
+        required: true
+      preview:
+        type: bool
+        required: true
+    returns: none
+  freeze_input:
+    summary: Freeze or unfreeze a live input (its control freeze property, guide 6.1)
+    params:
+      input:
+        type: int
+        min: 1
+        max: 256
+        required: true
+      frozen:
+        type: bool
+        required: true
+    returns: none
+  update:
+    summary: Send the global update that applies pending layer changes (3.8, xUpdate)
+    returns: none
+  mute_input_audio:
+    summary: Mute or unmute one audio channel of a video input (5.1.2)
+    params:
+      input:
+        type: int
+        min: 1
+        required: true
+      channel:
+        type: int
+        min: 1
+        required: true
+      muted:
+        type: bool
+        required: true
+    returns: none
+  mute_dante_input_audio:
+    summary: Mute or unmute one channel of a Dante input group (5.1, DANTE_xx_CHANNEL_x)
+    params:
+      group:
+        type: int
+        min: 1
+        required: true
+      channel:
+        type: int
+        min: 1
+        required: true
+      muted:
+        type: bool
+        required: true
+    returns: none
+  mute_output_audio:
+    summary: Mute or unmute one audio channel of an output, Dante output group or multiviewer (5.2.2; OUTPUT_x,
+      DANTE_x, MVW_x)
+    params:
+      output_type:
+        type: enum
+        values:
+        - OUTPUT
+        - DANTE
+        - MVW
+        required: true
+      output:
+        type: int
+        min: 1
+        required: true
+      channel:
+        type: int
+        min: 1
+        required: true
+      muted:
+        type: bool
+        required: true
+    returns: none
+  set_output_audio_source:
+    summary: Route an audio source channel (INPUT_xx_CHANNEL_x, DANTE_xx_CHANNEL_x or NONE) to one channel of an
+      output, Dante output group or multiviewer (5.2.4)
+    params:
+      output_type:
+        type: enum
+        values:
+        - OUTPUT
+        - DANTE
+        - MVW
+        required: true
+      output:
+        type: int
+        min: 1
+        required: true
+      channel:
+        type: int
+        min: 1
+        required: true
+      source:
+        type: string
+        pattern: ^(NONE|(INPUT|DANTE)_[0-9]+_CHANNEL_[0-9]+)$
+        required: true
+    returns: none
+  set_multiviewer_widget_source:
+    summary: 'Set the source of a multiviewer widget, numbered from 1 (sent as n-1, guide 4.3/4.5). Sources: NONE,
+      PROGRAM_Sx, PREVIEW_Sx, A_x, IN_x, TIMER_x, STILL_x'
+    params:
+      multiviewer:
+        type: int
+        min: 1
+        max: 8
+        required: true
+      widget:
+        type: int
+        min: 1
+        max: 64
+        required: true
+      source:
+        type: string
+        pattern: ^(NONE|PROGRAM_S[0-9]+|PREVIEW_S[0-9]+|A_[0-9]+|IN_[0-9]+|TIMER_[0-9]+|STILL_[0-9]+)$
+        required: true
+    returns: none
+  set_multiviewer_vu_meter:
+    summary: 'Show the VU meter on a multiviewer widget: a widget number or None (Aquilon guide 4.6)'
+    params:
+      multiviewer:
+        type: int
+        min: 1
+        max: 8
+        required: true
+      widget:
+        type: string
+        pattern: ^(None|[0-9]+)$
+        required: true
+    returns: none
+  trigger_input_backup:
+    summary: 'Select an input''s backup source manually: NONE, 1 or 2 (Aquilon guide 6.5)'
+    params:
+      input:
+        type: int
+        min: 1
+        max: 256
+        required: true
+      slot:
+        type: enum
+        values:
+        - NONE
+        - '1'
+        - '2'
+        required: true
+    returns: none
+  set_input_backup_auto:
+    summary: Turn an input's automatic backup on or off (6.6)
+    params:
+      input:
+        type: int
+        min: 1
+        max: 256
+        required: true
+      enabled:
+        type: bool
+        required: true
+    returns: none
+  trigger_background_backup:
+    summary: 'Select a background set''s backup manually: NONE, 1 or 2 (6.8)'
+    params:
+      screen: *id001
+      set:
+        type: int
+        min: 1
+        max: 8
+        required: true
+      slot:
+        type: enum
+        values:
+        - NONE
+        - '1'
+        - '2'
+        required: true
+    returns: none
+  set_background_backup_auto:
+    summary: Turn a background set's automatic backup on or off (6.9)
+    params:
+      screen: *id001
+      set:
+        type: int
+        min: 1
+        max: 8
+        required: true
+      enabled:
+        type: bool
+        required: true
+    returns: none
+  trigger_group_backup:
+    summary: 'Select a backup group''s backup manually: NONE, 1 or 2 (6.10)'
+    params:
+      group:
+        type: int
+        min: 1
+        required: true
+      slot:
+        type: enum
+        values:
+        - NONE
+        - '1'
+        - '2'
+        required: true
+    returns: none
+  set_group_backup_auto:
+    summary: Turn a backup group's automatic backup on or off (6.11)
+    params:
+      group:
+        type: int
+        min: 1
+        required: true
+      enabled:
+        type: bool
+        required: true
+    returns: none
+  reboot:
+    summary: Soft reboot (Aquilon guide 2.4, xRequest REBOOT)
+    returns: none
+  shutdown:
+    summary: Power the unit down; it must be restarted by hand or by Wake-on-LAN (2.5, SHUTDOWN)
+    returns: none
+  awj_get:
+    summary: Read any property or object of the AWJ object model by its path; returns its value (guides 1.2). The
+      answer is also applied to the state
+    params:
+      path:
+        type: string
+        max_length: 512
+        pattern: ^\S.*$
+        required: true
+    returns: value
+  awj_replace:
+    summary: 'Write any property of the AWJ object model: the path and the new value as JSON (guides 1.2, op replace).
+      Not acknowledged by the device'
+    params:
+      path:
+        type: string
+        max_length: 512
+        pattern: ^\S.*$
+        required: true
+      value:
+        type: json
+        required: true
+    returns: none
+  subscribe:
+    summary: Add path prefixes to this connection's subscription list (guides 1.4); kept and sent again on every
+      reconnection. A JSON array of strings
+    params:
+      paths:
+        type: json
+        required: true
+    returns: none
+quirks:
+- models:
+  - all
+  severity: critical
+  text: >-
+    Layer, background and keying settings live in two banks, A and B, and which is on program depends on the T-bar:
+    AT_DOWN puts A on program, AT_UP puts B there (guide 3.8). Commands taking 'destination' are resolved against
+    the screen's transition status, read before the first such command when the module does not know it yet; a position
+    other than AT_DOWN or AT_UP fails the command rather than guessing. State reports each screen's content as program/preview
+    and under banks.A / banks.B.
+- models:
+  - all
+  severity: warning
+  text: >-
+    Writes are not acknowledged ('The device will not return a string'), so every write completes as unverified.
+    The subscribed change notifications show whether it took effect.
+- models:
+  - all
+  severity: warning
+  text: >-
+    The error object carries no path (guide 1.3). The device handles messages in order, so an error is matched to
+    the oldest message not yet answered: a read fails with it, a write is logged as refused. A write the device
+    accepted is never answered, so an error after one is logged against it and the read behind it times out; errors
+    are also kept as last_error.
+- models:
+  - all
+  severity: warning
+  text: >-
+    The guides give the T-bar status read for screens only (3.8). For auxiliary screens the module reads DeviceObject/$screenAuxGroup/@items/A<n>/status/@props/transition,
+    by analogy with the documented xTake path for auxiliaries; this is an inference.
+- models:
+  - all
+  severity: warning
+  text: >-
+    Writing an input's freeze property is not shown in the guide, which documents reading it (6.1); freeze_input
+    writes that property as the protocol allows for any property (1.1).
+- models:
+  - all
+  severity: info
+  text: >-
+    Reboot and shutdown use DeviceObject/system/shutdown/cmd (Aquilon guide 6.2). The v4.0 guide shows DeviceObject/system/$device/@items/1/shutdown/cmd;
+    on firmware where the short path is refused, use awj_replace with the long one.
+- models:
+  - all
+  severity: info
+  text: >-
+    Multiviewer widgets are numbered from 0 on the wire (guide 4.3); commands take them from 1, and state reports
+    them from 1.
+- models:
+  - all
+  severity: info
+  text: >-
+    Linked systems: paths use device 1, as the guide says for a single unit (1.4).
+- models:
+  - all
+  severity: info
+  text: >-
+    The guide's sample answers contain typing errors (a space before DeviceObject in 3.5 and 3.8, '$screen' for
+    an auxiliary in 3.11, 'DeviceObject/ masterPresetBank' in 3.4); paths are trimmed and the documented paths are
+    sent without the stray spaces.
+- models:
+  - all
+  severity: info
+  text: >-
+    Nothing is pushed without a subscription (1.4). The module subscribes to screens, auxiliaries, transitions,
+    preset status and labels, inputs and multiviewers on every connection, plus extra_subscriptions; 'subscribe'
+    adds more. With read_on_connect the same objects are read once; an object read is taken to mirror the paths
+    beneath it, which the guide does not show.
+- models:
+  - all
+  severity: info
+  text: >-
+    Not documented over AWJ, so not offered: cut, auto transition with a rate, global take of several screens, transition
+    type and duration, test patterns. awj_replace reaches any other property of the object model.
+state:
+  device.type:
+    type: string
+    description: Device type, e.g. NLC_RS4 (guide 2.1)
+  device.serial:
+    type: string
+    description: Serial number (2.2)
+  device.firmware:
+    type: string
+    description: Firmware version, e.g. 2.2.80 (2.3)
+  screens.*.label:
+    type: string
+    description: Screen label
+  screens.*.transition:
+    type: string
+    description: 'T-bar position: AT_DOWN or AT_UP (3.8)'
+  screens.*.program.layers.*.source:
+    type: string
+    description: 'Source of a layer on program: LIVE_n, STILL_n, SCREEN_n, NATIVE_n, COLOR or NONE'
+  screens.*.preview.layers.*.source:
+    type: string
+    description: Source of a layer on preview
+  screens.*.program.layers.*.keying_source:
+    type: string
+    description: Keying preset of a layer on program (SLOT_n)
+  screens.*.preview.layers.*.keying_source:
+    type: string
+    description: Keying preset of a layer on preview
+  screens.*.program.layers.*.keying_enabled:
+    type: bool
+    description: Keying on for a layer on program
+  screens.*.preview.layers.*.keying_enabled:
+    type: bool
+    description: Keying on for a layer on preview
+  screens.*.program.background:
+    type: string
+    description: Background set on program (NATIVE_n or NONE)
+  screens.*.preview.background:
+    type: string
+    description: Background set on preview
+  screens.*.program.preset:
+    type: int
+    description: Last preset loaded to program (3.11)
+  screens.*.preview.preset:
+    type: int
+    description: Last preset loaded to preview
+  screens.*.banks:
+    type: object
+    description: The same values per raw bank, A and B
+  screens.*.layer_freeze.*:
+    type: array
+    description: 'Banks in which a layer is frozen: [], ["UP"], ["DOWN"] or both (3.5)'
+  auxiliaries.*.label:
+    type: string
+    description: Auxiliary screen label
+  auxiliaries.*.transition:
+    type: string
+    description: Auxiliary T-bar position
+  auxiliaries.*.program.layers.*.source:
+    type: string
+    description: Source of an auxiliary layer on program
+  auxiliaries.*.preview.layers.*.source:
+    type: string
+    description: Source of an auxiliary layer on preview
+  auxiliaries.*.program.background:
+    type: string
+    description: Auxiliary background set on program
+  auxiliaries.*.preview.background:
+    type: string
+    description: Auxiliary background set on preview
+  auxiliaries.*.program.preset:
+    type: int
+    description: Last preset loaded to the auxiliary's program
+  auxiliaries.*.preview.preset:
+    type: int
+    description: Last preset loaded to the auxiliary's preview
+  auxiliaries.*.banks:
+    type: object
+    description: Auxiliary values per raw bank
+  master_preset.program:
+    type: int
+    description: Last master preset recalled to program (3.12)
+  master_preset.preview:
+    type: int
+    description: Last master preset recalled to preview
+  presets.*.label:
+    type: string
+    description: Screen preset label (3.7)
+  master_presets.*.label:
+    type: string
+    description: Master preset label
+  inputs.*.label:
+    type: string
+    description: Input label (6.1)
+  inputs.*.frozen:
+    type: bool
+    description: Input frozen
+  inputs.*.available:
+    type: bool
+    description: Input available
+  inputs.*.enabled:
+    type: bool
+    description: Input enabled
+  inputs.*.capability:
+    type: string
+    description: 'Input capacity: OFF, DUAL, 4K or 5K'
+  multiviewers.*.label:
+    type: string
+    description: Multiviewer output label (4.1)
+  multiviewers.*.enabled:
+    type: bool
+    description: Multiviewer output enabled
+  multiviewers.*.widgets.*.source:
+    type: string
+    description: Source of a multiviewer widget, numbered from 1 (4.3)
+  last_error:
+    type: object
+    description: 'The last error object the device sent: code and message (1.3)'
+  awj:
+    type: object
+    description: Every property the device reported, keyed by its full AWJ path
