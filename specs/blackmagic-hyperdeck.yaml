@@ -40,6 +40,20 @@ transport:
   reply_match: "^[12][0-9][0-9] "
   probe: "ping"
 
+settings:
+  # Only for decks set up for secure access; left empty, nothing is sent.
+  username: { type: string, max_length: 255 }
+  password: { type: string, max_length: 255, secret: true, default: "" }
+
+on_connect:
+  # Multiline-only "authenticate:" (p.8): username and password, each case
+  # sensitive, then a blank line. A wrong credential answers "121
+  # authentication failed" (p.11), which is terminal.
+  - when_set: username
+    send: "authenticate:\r\nusername: {settings.username}\r\npassword: {settings.password}\r\n"
+    await_reply: true
+    refused: "^121 "
+
 models:
   - id: hyperdeck-1-8
     name: HyperDeck Studio with SSD slots (protocol 1.8)
@@ -2210,9 +2224,13 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      NAS credentials go over port 9993 in plain text. The document recommends
-      the protocol's secure mode for them and lists an authenticate command
-      (codes 121 and 122) but does not document how secure mode is reached.
+      When the username setting is filled in, the multiline "authenticate:"
+      command is sent first on connecting and its reply awaited before any
+      other command; "121 authentication failed" is a terminal refusal of the
+      credential, and "122 authentication required" answers commands sent
+      without it. The document recommends the protocol's secure mode for
+      passwords but does not say how secure mode is reached, so on port 9993
+      this credential, like NAS credentials, travels in plain text.
 
   - models: [all]
     severity: info
