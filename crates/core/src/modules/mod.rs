@@ -3,6 +3,7 @@
 
 mod atem;
 mod obs;
+mod panasonic_notify;
 mod sennheiser_d6000;
 mod sennheiser_ewdx;
 mod sennheiser_mcp;
@@ -22,8 +23,15 @@ pub(crate) fn construct(
     context: OpenContext,
 ) -> Result<Box<dyn Module>, String> {
     if spec.implementation == Implementation::Spec {
-        return SpecEngine::new(Arc::new(spec.clone()), context)
-            .map(|e| Box::new(e) as Box<dyn Module>);
+        let extension = spec.extension.as_deref();
+        let engine = SpecEngine::new(Arc::new(spec.clone()), context.clone())?;
+        return match extension {
+            None => Ok(Box::new(engine)),
+            Some("panasonic-update-notification") => Ok(Box::new(
+                panasonic_notify::PanasonicNotify::new(engine, &context),
+            )),
+            Some(other) => Err(format!("no native extension '{other}'")),
+        };
     }
     match spec.id.as_str() {
         "sennheiser-ew-g3-g4" => Ok(Box::new(sennheiser_mcp::Mcp::new(context))),

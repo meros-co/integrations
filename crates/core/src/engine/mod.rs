@@ -781,10 +781,21 @@ impl SpecEngine {
         }
     }
 
-    fn inbound_text(&mut self, cx: &mut Cx, message: String) {
-        if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Text(&message)) {
+    /// Offer a text message to the telemetry rules: a line or block from the
+    /// device, a text HTTP reply, or a notification a native extension
+    /// received on the spec's behalf.
+    pub(crate) fn apply_text(&self, cx: &mut Cx, text: &str) {
+        let text = text.trim();
+        if text.is_empty() {
+            return;
+        }
+        if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Text(text)) {
             cx.state(patch);
         }
+    }
+
+    fn inbound_text(&mut self, cx: &mut Cx, message: String) {
+        self.apply_text(cx, &message);
         let waiting = matches!(
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Text)
@@ -942,6 +953,11 @@ impl Module for SpecEngine {
                 };
                 if let Some(patch) = self.telemetry.apply(&inbound) {
                     cx.state(patch);
+                }
+                // A text reply ("p1" from a Panasonic camera) is also offered to
+                // the rules for text messages.
+                if let Ok(text) = std::str::from_utf8(&response.body) {
+                    self.apply_text(cx, text);
                 }
             }
         }

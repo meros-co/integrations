@@ -24,6 +24,10 @@ pub struct DeviceSpec {
     pub implementation: Implementation,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// A native addition to a spec-driven device, for what the format cannot
+    /// express (a notification channel), named so it is never hidden.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension: Option<String>,
     pub source: Vec<Source>,
     #[serde(default)]
     pub settings: BTreeMap<String, ParamSpec>,

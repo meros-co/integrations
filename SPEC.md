@@ -614,3 +614,20 @@ commands:
 A native spec's commands have no `send`, `expect` or `transport`; the module
 defines those. `reason` says why the protocol cannot be expressed as data.
 Vectors apply to native modules exactly as to spec-driven ones.
+
+### Native extensions
+
+A spec-driven device can name one native `extension` for a single thing the
+format cannot express, while its commands, queries and telemetry rules stay in
+the spec:
+
+```yaml
+extension: panasonic-update-notification
+```
+
+The extension is a small Rust module that wraps the spec engine. The set is
+closed and each is named in the spec, so it is never hidden:
+
+| Extension | Adds |
+|---|---|
+| `panasonic-update-notification` | Panasonic AW-series cameras' update notifications: registers a local TCP port with the camera (`/cgi-bin/event?connect=start`), receives the changed settings it pushes there, and passes each one, a response text such as `p1`, to the spec's telemetry rules. Registers again when the camera's 60-second version notices stop, and unregisters on closing |

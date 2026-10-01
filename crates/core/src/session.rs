@@ -563,6 +563,11 @@ impl Session {
                         let _ = c.writer.send(crate::ws::Outgoing::Text(text));
                     }
                 }
+                // Sent, with nobody waiting for the reply.
+                Action::Http { id, request } => {
+                    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+                    self.services.http.spawn_request(id, &request, tx);
+                }
                 _ => {}
             }
         }
