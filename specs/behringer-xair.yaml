@@ -1,0 +1,3734 @@
+spec: 1
+id: behringer-xair
+name: Behringer X AIR / Midas M AIR
+vendor: Behringer
+category: mixer
+
+source:
+  - title: "X AIR Mixer Series Remote Control Protocol (firmware 1.11 or higher), 'X AIR Mixer OSC Document (fw 1.11)', 4 pages, 29 Aug 2016"
+    author: MUSIC Group (Music Tribe)
+    url: https://cdn.mediavalet.com/aunsw/musictribe/hmivS7F05kKSJlWDYPGLpA/agTKkSIWS0y1bJl97YZEjg/Original/X%20AIR%20Remote%20Control%20Protocol.pdf
+    note: >
+      Manufacturer document, the only one Behringer publishes for X AIR OSC.
+      UDP 10024 with replies to the requester's IP and port, /info, /xinfo,
+      /status, /xremote (at most eight clients, 10 s timeout), get by sending an
+      address without arguments, set with one argument (p.1); the /info and
+      /status replies, echo of a parameter on get, set or subscription, type
+      rules: big-endian, 4-byte padded, floats 0.0-1.0, booleans as ints (p.2);
+      meter banks /meters/0-9 (p.3-4); snapshot operations and the 59-character
+      recall scope (p.4). It names a companion Parameters.txt holding every OSC
+      path and range; that file is not published by Behringer and no copy was
+      obtained, so the address tree comes from the community list below.
+  - title: "X-Air / M-Air OSC Commands (Behringer World Wiki, page x-air_osc, last modified 2024-02-29)"
+    author: Paul Vannatto (community)
+    url: https://behringer.world/wiki/doku.php?id=x-air_osc
+    note: >
+      Community document, not a manufacturer specification: it says the X-Air
+      OSC commands "were not officially documented, other than a brief text
+      file", and its table is derived from the Sysex OSC Generator X-Air command
+      list. It is the source of every parameter address and range in this spec
+      (sections Action, Snapshots, Status, Buses 1-6, Channels 01-16,
+      Configuration, DCA 1-4, FX 1-4, FX Sends 1-4, Preamps 1-16, Main LR,
+      Routing, FX Returns 1-4), including its note that FX1-4 are mix buses 7-10
+      for channel sends. It has evident copy errors, listed in the quirks.
+  - title: "Product Manual X AIR XR18/X18/XR16/XR12 (M_BE_0605-AAA)"
+    author: Behringer (Music Tribe)
+    url: https://mediadl.musictribe.com/media/PLM/data/docs/X-AIR/M_BE_0605-AAA_X-AIR_EN.pdf
+    note: >
+      Model facts only. System overview and XR12 channels 13-16 fed from any
+      input (p.13); 4-band input EQ (p.18, p.21); 6-band bus and main EQ with
+      PEQ/GEQ/TEQ (p.19, p.22); 4 mute groups (p.20, p.25); DCA 1-4 (p.25);
+      snapshots (p.23, p.29); automix X/Y (p.22, p.30); link preferences and
+      DCA mute preference (p.24, p.28); MIDI implementation, snapshots 1-64 by
+      program change, OSC over SysEx (p.31); specifications: every model 16
+      input channels plus a stereo aux/USB return, 4 FX returns, 6 aux buses
+      and main LR; XR18/X18 18x18 USB interface and ULTRANET, XR16/XR12 USB
+      stick stereo recorder (p.32-34); headamp gain -12 to +60 dB in 0.5 dB
+      steps (block diagram, p.43).
+  - title: "User Manual M AIR MR18/MR12 (M_MI_0605-AAF)"
+    author: Midas (Music Tribe)
+    url: https://cdn.mediavalet.com/aunsw/musictribe/prxekByihEKC5A73jgAr7Q/8SxI9diW9kqQ21hjVM_hmw/Original/M_MI_0605-AAF_MR18-MR12_EN.pdf
+    note: >
+      MR18 specifications (p.32) match the XR18, MR12 (p.33) the XR12: 16
+      processing channels plus a stereo USB return, 4 FX returns, 6 aux buses;
+      the same MIDI chart (p.31) and HA gain -12 to +60 dB (p.43).
+  - title: "Unofficial X32/M32 OSC Remote Protocol, version 4.02-01 (Jan 12, 2020)"
+    author: Patrick-Gilles Maillot (community)
+    url: https://tostibroeders.nl/wp-content/uploads/2020/02/X32-OSC.pdf
+    note: >
+      Cross-reference only, for conventions the X AIR documents leave implicit
+      and that the X32 family shares: mix/on 1 = passing audio, 0 = muted
+      (p.27), the four-segment fader taper (p.128), sets not echoed to the
+      sender (p.10). See specs/behringer-x32.yaml.
+  - title: Bitfocus Companion, companion-module-behringer-xair
+    url: https://github.com/bitfocus/companion-module-behringer-xair
+    note: >
+      MIT-licensed; cross-check only. Corroborates UDP 10024, /xinfo, /xremote,
+      /-snap/NN/name and /-snap/index, /headamp/NN with two digits from 01,
+      /rtn/aux, /rtn/N, /fxsend/N, /lr, mute on mix/on and the /config/solo
+      parameters.
+
+transport:
+  type: osc-udp
+  port: 10024
+  timeout_ms: 500
+  reply: to-source
+  probe: /info
+
+models:
+  - id: xr18
+    name: Behringer XR18
+    channels: 16
+    dcas: 4
+    supports: [set_channel_fader, mute_channel, get_channel_fader, get_channel_on,
+               get_channel_name, set_channel_name, set_channel_color, set_aux_fader, mute_aux,
+               get_aux_fader, get_aux_on, get_aux_name, set_aux_name, set_aux_color,
+               set_fx_return_fader, mute_fx_return, get_fx_return_fader, get_fx_return_on,
+               get_fx_return_name, set_fx_return_name, set_fx_return_color, set_bus_fader,
+               mute_bus, get_bus_fader, get_bus_on, get_bus_name, set_bus_name, set_bus_color,
+               set_fx_send_fader, mute_fx_send, get_fx_send_fader, get_fx_send_on,
+               get_fx_send_name, set_fx_send_name, set_fx_send_color, set_main_fader,
+               mute_main, get_main_fader, get_main_on, get_main_name, set_main_name,
+               set_main_color, set_channel_pan, set_aux_pan, set_fx_return_pan, set_bus_pan,
+               set_main_pan, set_channel_send_level, get_channel_send_level,
+               set_channel_send_pan, set_channel_send_tap, set_channel_send_group_on,
+               set_aux_send_level, get_aux_send_level, set_aux_send_pan, set_aux_send_tap,
+               set_aux_send_group_on, set_fx_return_send_level, get_fx_return_send_level,
+               set_fx_return_send_pan, set_fx_return_send_tap, set_fx_return_send_group_on,
+               assign_channel_to_main, assign_aux_to_main, assign_fx_return_to_main,
+               assign_bus_to_main, set_channel_dca_groups, set_channel_mute_groups,
+               set_bus_dca_groups, set_bus_mute_groups, set_fx_send_dca_groups,
+               set_fx_send_mute_groups, set_channel_eq_on, set_aux_eq_on, set_bus_eq_on,
+               set_main_eq_on, set_bus_eq_mode, set_main_eq_mode, set_channel_eq_band_type,
+               set_channel_eq_band_frequency, set_channel_eq_band_gain, set_channel_eq_band_q,
+               set_aux_eq_band_type, set_aux_eq_band_frequency, set_aux_eq_band_gain,
+               set_aux_eq_band_q, set_fx_return_eq_band_type, set_fx_return_eq_band_frequency,
+               set_fx_return_eq_band_gain, set_fx_return_eq_band_q, set_bus_eq_band_type,
+               set_bus_eq_band_frequency, set_bus_eq_band_gain, set_bus_eq_band_q,
+               set_main_eq_band_type, set_main_eq_band_frequency, set_main_eq_band_gain,
+               set_main_eq_band_q, set_channel_dyn_on, set_channel_dyn_mode,
+               set_channel_dyn_detector, set_channel_dyn_envelope, set_channel_dyn_threshold,
+               set_channel_dyn_ratio, set_channel_dyn_knee, set_channel_dyn_makeup_gain,
+               set_channel_dyn_attack, set_channel_dyn_hold, set_channel_dyn_release,
+               set_channel_dyn_mix, set_channel_dyn_key_source, set_channel_dyn_auto,
+               set_channel_dyn_filter_on, set_channel_dyn_filter_type,
+               set_channel_dyn_filter_frequency, set_bus_dyn_on, set_bus_dyn_mode,
+               set_bus_dyn_detector, set_bus_dyn_envelope, set_bus_dyn_threshold,
+               set_bus_dyn_ratio, set_bus_dyn_knee, set_bus_dyn_makeup_gain,
+               set_bus_dyn_attack, set_bus_dyn_hold, set_bus_dyn_release, set_bus_dyn_mix,
+               set_bus_dyn_key_source, set_bus_dyn_auto, set_bus_dyn_filter_on,
+               set_bus_dyn_filter_type, set_bus_dyn_filter_frequency, set_main_dyn_on,
+               set_main_dyn_mode, set_main_dyn_detector, set_main_dyn_envelope,
+               set_main_dyn_threshold, set_main_dyn_ratio, set_main_dyn_knee,
+               set_main_dyn_makeup_gain, set_main_dyn_attack, set_main_dyn_hold,
+               set_main_dyn_release, set_main_dyn_mix, set_main_dyn_key_source,
+               set_main_dyn_auto, set_main_dyn_filter_on, set_main_dyn_filter_type,
+               set_main_dyn_filter_frequency, set_channel_gate_on, set_channel_gate_mode,
+               set_channel_gate_threshold, set_channel_gate_range, set_channel_gate_attack,
+               set_channel_gate_hold, set_channel_gate_release, set_channel_gate_key_source,
+               set_channel_gate_filter_on, set_channel_gate_filter_type,
+               set_channel_gate_filter_frequency, set_channel_insert_on,
+               set_channel_insert_select, set_bus_insert_on, set_bus_insert_select,
+               set_channel_usb_trim, set_channel_usb_return, set_aux_usb_trim,
+               set_aux_usb_return, set_fx_return_usb_trim, set_fx_return_usb_return,
+               set_aux_usb_source, set_fx_return_usb_source, set_channel_invert,
+               set_channel_low_cut, set_channel_low_cut_frequency, set_channel_source,
+               set_channel_usb_source, set_channel_automix_group, set_channel_automix_weight,
+               set_dca_fader, mute_dca, get_dca_fader, get_dca_on, get_dca_name, set_dca_name,
+               set_dca_color, solo_channel, clear_solo, get_solo_active, mute_group,
+               get_mute_group, set_monitor_level, set_monitor_source, set_monitor_source_trim,
+               set_monitor_channel_mode, set_monitor_bus_mode, set_monitor_dim,
+               set_monitor_dim_gain, set_monitor_pfl_dim, set_monitor_mono, mute_monitor,
+               set_channel_link, set_bus_link, set_link_preference, set_automix_enable,
+               set_automix_lock, set_headamp_gain, set_headamp_phantom, get_headamp_gain,
+               get_headamp_phantom, set_fx_type, get_fx_type, set_fx_insert, get_fx_parameter,
+               set_aux_out_source, set_aux_out_tap, set_main_out_source, set_phones_source,
+               set_ultranet_source, set_ultranet_tap, set_usb_out_source, set_usb_out_tap,
+               load_snapshot, save_snapshot, delete_snapshot, set_snapshot_save_name,
+               get_snapshot_index, get_snapshot_name, get_snapshot_slot_name,
+               set_snapshot_slot_name, get_snapshot_scope, set_snapshot_scope, save_state,
+               get_mixer_name, get_console_model, get_firmware_version, get_console_name,
+               get_status]
+    verification: none
+    notes: >
+      Rack. 16 MIDAS mic preamps, stereo aux line in 17-18 (TRS), 6 aux outputs, ULTRANET, 18x18 USB audio interface (manual p.32-33). /info reports XR18.
+  - id: x18
+    name: Behringer X18
+    channels: 16
+    dcas: 4
+    supports: [set_channel_fader, mute_channel, get_channel_fader, get_channel_on,
+               get_channel_name, set_channel_name, set_channel_color, set_aux_fader, mute_aux,
+               get_aux_fader, get_aux_on, get_aux_name, set_aux_name, set_aux_color,
+               set_fx_return_fader, mute_fx_return, get_fx_return_fader, get_fx_return_on,
+               get_fx_return_name, set_fx_return_name, set_fx_return_color, set_bus_fader,
+               mute_bus, get_bus_fader, get_bus_on, get_bus_name, set_bus_name, set_bus_color,
+               set_fx_send_fader, mute_fx_send, get_fx_send_fader, get_fx_send_on,
+               get_fx_send_name, set_fx_send_name, set_fx_send_color, set_main_fader,
+               mute_main, get_main_fader, get_main_on, get_main_name, set_main_name,
+               set_main_color, set_channel_pan, set_aux_pan, set_fx_return_pan, set_bus_pan,
+               set_main_pan, set_channel_send_level, get_channel_send_level,
+               set_channel_send_pan, set_channel_send_tap, set_channel_send_group_on,
+               set_aux_send_level, get_aux_send_level, set_aux_send_pan, set_aux_send_tap,
+               set_aux_send_group_on, set_fx_return_send_level, get_fx_return_send_level,
+               set_fx_return_send_pan, set_fx_return_send_tap, set_fx_return_send_group_on,
+               assign_channel_to_main, assign_aux_to_main, assign_fx_return_to_main,
+               assign_bus_to_main, set_channel_dca_groups, set_channel_mute_groups,
+               set_bus_dca_groups, set_bus_mute_groups, set_fx_send_dca_groups,
+               set_fx_send_mute_groups, set_channel_eq_on, set_aux_eq_on, set_bus_eq_on,
+               set_main_eq_on, set_bus_eq_mode, set_main_eq_mode, set_channel_eq_band_type,
+               set_channel_eq_band_frequency, set_channel_eq_band_gain, set_channel_eq_band_q,
+               set_aux_eq_band_type, set_aux_eq_band_frequency, set_aux_eq_band_gain,
+               set_aux_eq_band_q, set_fx_return_eq_band_type, set_fx_return_eq_band_frequency,
+               set_fx_return_eq_band_gain, set_fx_return_eq_band_q, set_bus_eq_band_type,
+               set_bus_eq_band_frequency, set_bus_eq_band_gain, set_bus_eq_band_q,
+               set_main_eq_band_type, set_main_eq_band_frequency, set_main_eq_band_gain,
+               set_main_eq_band_q, set_channel_dyn_on, set_channel_dyn_mode,
+               set_channel_dyn_detector, set_channel_dyn_envelope, set_channel_dyn_threshold,
+               set_channel_dyn_ratio, set_channel_dyn_knee, set_channel_dyn_makeup_gain,
+               set_channel_dyn_attack, set_channel_dyn_hold, set_channel_dyn_release,
+               set_channel_dyn_mix, set_channel_dyn_key_source, set_channel_dyn_auto,
+               set_channel_dyn_filter_on, set_channel_dyn_filter_type,
+               set_channel_dyn_filter_frequency, set_bus_dyn_on, set_bus_dyn_mode,
+               set_bus_dyn_detector, set_bus_dyn_envelope, set_bus_dyn_threshold,
+               set_bus_dyn_ratio, set_bus_dyn_knee, set_bus_dyn_makeup_gain,
+               set_bus_dyn_attack, set_bus_dyn_hold, set_bus_dyn_release, set_bus_dyn_mix,
+               set_bus_dyn_key_source, set_bus_dyn_auto, set_bus_dyn_filter_on,
+               set_bus_dyn_filter_type, set_bus_dyn_filter_frequency, set_main_dyn_on,
+               set_main_dyn_mode, set_main_dyn_detector, set_main_dyn_envelope,
+               set_main_dyn_threshold, set_main_dyn_ratio, set_main_dyn_knee,
+               set_main_dyn_makeup_gain, set_main_dyn_attack, set_main_dyn_hold,
+               set_main_dyn_release, set_main_dyn_mix, set_main_dyn_key_source,
+               set_main_dyn_auto, set_main_dyn_filter_on, set_main_dyn_filter_type,
+               set_main_dyn_filter_frequency, set_channel_gate_on, set_channel_gate_mode,
+               set_channel_gate_threshold, set_channel_gate_range, set_channel_gate_attack,
+               set_channel_gate_hold, set_channel_gate_release, set_channel_gate_key_source,
+               set_channel_gate_filter_on, set_channel_gate_filter_type,
+               set_channel_gate_filter_frequency, set_channel_insert_on,
+               set_channel_insert_select, set_bus_insert_on, set_bus_insert_select,
+               set_channel_usb_trim, set_channel_usb_return, set_aux_usb_trim,
+               set_aux_usb_return, set_fx_return_usb_trim, set_fx_return_usb_return,
+               set_aux_usb_source, set_fx_return_usb_source, set_channel_invert,
+               set_channel_low_cut, set_channel_low_cut_frequency, set_channel_source,
+               set_channel_usb_source, set_channel_automix_group, set_channel_automix_weight,
+               set_dca_fader, mute_dca, get_dca_fader, get_dca_on, get_dca_name, set_dca_name,
+               set_dca_color, solo_channel, clear_solo, get_solo_active, mute_group,
+               get_mute_group, set_monitor_level, set_monitor_source, set_monitor_source_trim,
+               set_monitor_channel_mode, set_monitor_bus_mode, set_monitor_dim,
+               set_monitor_dim_gain, set_monitor_pfl_dim, set_monitor_mono, mute_monitor,
+               set_channel_link, set_bus_link, set_link_preference, set_automix_enable,
+               set_automix_lock, set_headamp_gain, set_headamp_phantom, get_headamp_gain,
+               get_headamp_phantom, set_fx_type, get_fx_type, set_fx_insert, get_fx_parameter,
+               set_aux_out_source, set_aux_out_tap, set_main_out_source, set_phones_source,
+               set_ultranet_source, set_ultranet_tap, set_usb_out_source, set_usb_out_tap,
+               load_snapshot, save_snapshot, delete_snapshot, set_snapshot_save_name,
+               get_snapshot_index, get_snapshot_name, get_snapshot_slot_name,
+               set_snapshot_slot_name, get_snapshot_scope, set_snapshot_scope, save_state,
+               get_mixer_name, get_console_model, get_firmware_version, get_console_name,
+               get_status]
+    verification: none
+    notes: >
+      Desk version of the XR18: the same processing and I/O, aux line in on RCA, extra RCA monitor outputs (manual p.32-33). /info reports X18.
+  - id: xr16
+    name: Behringer XR16
+    channels: 16
+    dcas: 4
+    supports: [set_channel_fader, mute_channel, get_channel_fader, get_channel_on,
+               get_channel_name, set_channel_name, set_channel_color, set_aux_fader, mute_aux,
+               get_aux_fader, get_aux_on, get_aux_name, set_aux_name, set_aux_color,
+               set_fx_return_fader, mute_fx_return, get_fx_return_fader, get_fx_return_on,
+               get_fx_return_name, set_fx_return_name, set_fx_return_color, set_bus_fader,
+               mute_bus, get_bus_fader, get_bus_on, get_bus_name, set_bus_name, set_bus_color,
+               set_fx_send_fader, mute_fx_send, get_fx_send_fader, get_fx_send_on,
+               get_fx_send_name, set_fx_send_name, set_fx_send_color, set_main_fader,
+               mute_main, get_main_fader, get_main_on, get_main_name, set_main_name,
+               set_main_color, set_channel_pan, set_aux_pan, set_fx_return_pan, set_bus_pan,
+               set_main_pan, set_channel_send_level, get_channel_send_level,
+               set_channel_send_pan, set_channel_send_tap, set_channel_send_group_on,
+               set_aux_send_level, get_aux_send_level, set_aux_send_pan, set_aux_send_tap,
+               set_aux_send_group_on, set_fx_return_send_level, get_fx_return_send_level,
+               set_fx_return_send_pan, set_fx_return_send_tap, set_fx_return_send_group_on,
+               assign_channel_to_main, assign_aux_to_main, assign_fx_return_to_main,
+               assign_bus_to_main, set_channel_dca_groups, set_channel_mute_groups,
+               set_bus_dca_groups, set_bus_mute_groups, set_fx_send_dca_groups,
+               set_fx_send_mute_groups, set_channel_eq_on, set_aux_eq_on, set_bus_eq_on,
+               set_main_eq_on, set_bus_eq_mode, set_main_eq_mode, set_channel_eq_band_type,
+               set_channel_eq_band_frequency, set_channel_eq_band_gain, set_channel_eq_band_q,
+               set_aux_eq_band_type, set_aux_eq_band_frequency, set_aux_eq_band_gain,
+               set_aux_eq_band_q, set_fx_return_eq_band_type, set_fx_return_eq_band_frequency,
+               set_fx_return_eq_band_gain, set_fx_return_eq_band_q, set_bus_eq_band_type,
+               set_bus_eq_band_frequency, set_bus_eq_band_gain, set_bus_eq_band_q,
+               set_main_eq_band_type, set_main_eq_band_frequency, set_main_eq_band_gain,
+               set_main_eq_band_q, set_channel_dyn_on, set_channel_dyn_mode,
+               set_channel_dyn_detector, set_channel_dyn_envelope, set_channel_dyn_threshold,
+               set_channel_dyn_ratio, set_channel_dyn_knee, set_channel_dyn_makeup_gain,
+               set_channel_dyn_attack, set_channel_dyn_hold, set_channel_dyn_release,
+               set_channel_dyn_mix, set_channel_dyn_key_source, set_channel_dyn_auto,
+               set_channel_dyn_filter_on, set_channel_dyn_filter_type,
+               set_channel_dyn_filter_frequency, set_bus_dyn_on, set_bus_dyn_mode,
+               set_bus_dyn_detector, set_bus_dyn_envelope, set_bus_dyn_threshold,
+               set_bus_dyn_ratio, set_bus_dyn_knee, set_bus_dyn_makeup_gain,
+               set_bus_dyn_attack, set_bus_dyn_hold, set_bus_dyn_release, set_bus_dyn_mix,
+               set_bus_dyn_key_source, set_bus_dyn_auto, set_bus_dyn_filter_on,
+               set_bus_dyn_filter_type, set_bus_dyn_filter_frequency, set_main_dyn_on,
+               set_main_dyn_mode, set_main_dyn_detector, set_main_dyn_envelope,
+               set_main_dyn_threshold, set_main_dyn_ratio, set_main_dyn_knee,
+               set_main_dyn_makeup_gain, set_main_dyn_attack, set_main_dyn_hold,
+               set_main_dyn_release, set_main_dyn_mix, set_main_dyn_key_source,
+               set_main_dyn_auto, set_main_dyn_filter_on, set_main_dyn_filter_type,
+               set_main_dyn_filter_frequency, set_channel_gate_on, set_channel_gate_mode,
+               set_channel_gate_threshold, set_channel_gate_range, set_channel_gate_attack,
+               set_channel_gate_hold, set_channel_gate_release, set_channel_gate_key_source,
+               set_channel_gate_filter_on, set_channel_gate_filter_type,
+               set_channel_gate_filter_frequency, set_channel_insert_on,
+               set_channel_insert_select, set_bus_insert_on, set_bus_insert_select,
+               set_channel_usb_trim, set_channel_usb_return, set_aux_usb_trim,
+               set_aux_usb_return, set_fx_return_usb_trim, set_fx_return_usb_return,
+               set_aux_usb_source, set_fx_return_usb_source, set_channel_invert,
+               set_channel_low_cut, set_channel_low_cut_frequency, set_channel_source,
+               set_channel_usb_source, set_channel_automix_group, set_channel_automix_weight,
+               set_dca_fader, mute_dca, get_dca_fader, get_dca_on, get_dca_name, set_dca_name,
+               set_dca_color, solo_channel, clear_solo, get_solo_active, mute_group,
+               get_mute_group, set_monitor_level, set_monitor_source, set_monitor_source_trim,
+               set_monitor_channel_mode, set_monitor_bus_mode, set_monitor_dim,
+               set_monitor_dim_gain, set_monitor_pfl_dim, set_monitor_mono, mute_monitor,
+               set_channel_link, set_bus_link, set_link_preference, set_automix_enable,
+               set_automix_lock, set_headamp_gain, set_headamp_phantom, get_headamp_gain,
+               get_headamp_phantom, set_fx_type, get_fx_type, set_fx_insert, get_fx_parameter,
+               set_aux_out_source, set_aux_out_tap, set_main_out_source, set_phones_source,
+               load_snapshot, save_snapshot, delete_snapshot, set_snapshot_save_name,
+               get_snapshot_index, get_snapshot_name, get_snapshot_slot_name,
+               set_snapshot_slot_name, get_snapshot_scope, set_snapshot_scope,
+               set_recorder_state, get_recorder_state, get_usb_mounted, save_state,
+               get_mixer_name, get_console_model, get_firmware_version, get_console_name,
+               get_status]
+    verification: none
+    notes: >
+      8 MIDAS mic preamps (channels 1-8), 8 line inputs (9-16), 4 aux outputs, USB stick stereo recorder in place of the USB interface, no ULTRANET (manual p.13, p.34). /info reports XR16.
+  - id: xr12
+    name: Behringer XR12
+    channels: 16
+    dcas: 4
+    supports: [set_channel_fader, mute_channel, get_channel_fader, get_channel_on,
+               get_channel_name, set_channel_name, set_channel_color, set_aux_fader, mute_aux,
+               get_aux_fader, get_aux_on, get_aux_name, set_aux_name, set_aux_color,
+               set_fx_return_fader, mute_fx_return, get_fx_return_fader, get_fx_return_on,
+               get_fx_return_name, set_fx_return_name, set_fx_return_color, set_bus_fader,
+               mute_bus, get_bus_fader, get_bus_on, get_bus_name, set_bus_name, set_bus_color,
+               set_fx_send_fader, mute_fx_send, get_fx_send_fader, get_fx_send_on,
+               get_fx_send_name, set_fx_send_name, set_fx_send_color, set_main_fader,
+               mute_main, get_main_fader, get_main_on, get_main_name, set_main_name,
+               set_main_color, set_channel_pan, set_aux_pan, set_fx_return_pan, set_bus_pan,
+               set_main_pan, set_channel_send_level, get_channel_send_level,
+               set_channel_send_pan, set_channel_send_tap, set_channel_send_group_on,
+               set_aux_send_level, get_aux_send_level, set_aux_send_pan, set_aux_send_tap,
+               set_aux_send_group_on, set_fx_return_send_level, get_fx_return_send_level,
+               set_fx_return_send_pan, set_fx_return_send_tap, set_fx_return_send_group_on,
+               assign_channel_to_main, assign_aux_to_main, assign_fx_return_to_main,
+               assign_bus_to_main, set_channel_dca_groups, set_channel_mute_groups,
+               set_bus_dca_groups, set_bus_mute_groups, set_fx_send_dca_groups,
+               set_fx_send_mute_groups, set_channel_eq_on, set_aux_eq_on, set_bus_eq_on,
+               set_main_eq_on, set_bus_eq_mode, set_main_eq_mode, set_channel_eq_band_type,
+               set_channel_eq_band_frequency, set_channel_eq_band_gain, set_channel_eq_band_q,
+               set_aux_eq_band_type, set_aux_eq_band_frequency, set_aux_eq_band_gain,
+               set_aux_eq_band_q, set_fx_return_eq_band_type, set_fx_return_eq_band_frequency,
+               set_fx_return_eq_band_gain, set_fx_return_eq_band_q, set_bus_eq_band_type,
+               set_bus_eq_band_frequency, set_bus_eq_band_gain, set_bus_eq_band_q,
+               set_main_eq_band_type, set_main_eq_band_frequency, set_main_eq_band_gain,
+               set_main_eq_band_q, set_channel_dyn_on, set_channel_dyn_mode,
+               set_channel_dyn_detector, set_channel_dyn_envelope, set_channel_dyn_threshold,
+               set_channel_dyn_ratio, set_channel_dyn_knee, set_channel_dyn_makeup_gain,
+               set_channel_dyn_attack, set_channel_dyn_hold, set_channel_dyn_release,
+               set_channel_dyn_mix, set_channel_dyn_key_source, set_channel_dyn_auto,
+               set_channel_dyn_filter_on, set_channel_dyn_filter_type,
+               set_channel_dyn_filter_frequency, set_bus_dyn_on, set_bus_dyn_mode,
+               set_bus_dyn_detector, set_bus_dyn_envelope, set_bus_dyn_threshold,
+               set_bus_dyn_ratio, set_bus_dyn_knee, set_bus_dyn_makeup_gain,
+               set_bus_dyn_attack, set_bus_dyn_hold, set_bus_dyn_release, set_bus_dyn_mix,
+               set_bus_dyn_key_source, set_bus_dyn_auto, set_bus_dyn_filter_on,
+               set_bus_dyn_filter_type, set_bus_dyn_filter_frequency, set_main_dyn_on,
+               set_main_dyn_mode, set_main_dyn_detector, set_main_dyn_envelope,
+               set_main_dyn_threshold, set_main_dyn_ratio, set_main_dyn_knee,
+               set_main_dyn_makeup_gain, set_main_dyn_attack, set_main_dyn_hold,
+               set_main_dyn_release, set_main_dyn_mix, set_main_dyn_key_source,
+               set_main_dyn_auto, set_main_dyn_filter_on, set_main_dyn_filter_type,
+               set_main_dyn_filter_frequency, set_channel_gate_on, set_channel_gate_mode,
+               set_channel_gate_threshold, set_channel_gate_range, set_channel_gate_attack,
+               set_channel_gate_hold, set_channel_gate_release, set_channel_gate_key_source,
+               set_channel_gate_filter_on, set_channel_gate_filter_type,
+               set_channel_gate_filter_frequency, set_channel_insert_on,
+               set_channel_insert_select, set_bus_insert_on, set_bus_insert_select,
+               set_channel_usb_trim, set_channel_usb_return, set_aux_usb_trim,
+               set_aux_usb_return, set_fx_return_usb_trim, set_fx_return_usb_return,
+               set_aux_usb_source, set_fx_return_usb_source, set_channel_invert,
+               set_channel_low_cut, set_channel_low_cut_frequency, set_channel_source,
+               set_channel_usb_source, set_channel_automix_group, set_channel_automix_weight,
+               set_dca_fader, mute_dca, get_dca_fader, get_dca_on, get_dca_name, set_dca_name,
+               set_dca_color, solo_channel, clear_solo, get_solo_active, mute_group,
+               get_mute_group, set_monitor_level, set_monitor_source, set_monitor_source_trim,
+               set_monitor_channel_mode, set_monitor_bus_mode, set_monitor_dim,
+               set_monitor_dim_gain, set_monitor_pfl_dim, set_monitor_mono, mute_monitor,
+               set_channel_link, set_bus_link, set_link_preference, set_automix_enable,
+               set_automix_lock, set_headamp_gain, set_headamp_phantom, get_headamp_gain,
+               get_headamp_phantom, set_fx_type, get_fx_type, set_fx_insert, get_fx_parameter,
+               set_aux_out_source, set_aux_out_tap, set_main_out_source, set_phones_source,
+               load_snapshot, save_snapshot, delete_snapshot, set_snapshot_save_name,
+               get_snapshot_index, get_snapshot_name, get_snapshot_slot_name,
+               set_snapshot_slot_name, get_snapshot_scope, set_snapshot_scope,
+               set_recorder_state, get_recorder_state, get_usb_mounted, save_state,
+               get_mixer_name, get_console_model, get_firmware_version, get_console_name,
+               get_status]
+    verification: none
+    notes: >
+      4 MIDAS mic preamps (channels 1-4), 8 line inputs (5-12); processing channels 13-16 are fed from any input 1-12. 2 aux outputs, USB stick stereo recorder, no ULTRANET (manual p.13, p.34). /info reports XR12.
+  - id: mr18
+    name: Midas MR18
+    channels: 16
+    dcas: 4
+    supports: [set_channel_fader, mute_channel, get_channel_fader, get_channel_on,
+               get_channel_name, set_channel_name, set_channel_color, set_aux_fader, mute_aux,
+               get_aux_fader, get_aux_on, get_aux_name, set_aux_name, set_aux_color,
+               set_fx_return_fader, mute_fx_return, get_fx_return_fader, get_fx_return_on,
+               get_fx_return_name, set_fx_return_name, set_fx_return_color, set_bus_fader,
+               mute_bus, get_bus_fader, get_bus_on, get_bus_name, set_bus_name, set_bus_color,
+               set_fx_send_fader, mute_fx_send, get_fx_send_fader, get_fx_send_on,
+               get_fx_send_name, set_fx_send_name, set_fx_send_color, set_main_fader,
+               mute_main, get_main_fader, get_main_on, get_main_name, set_main_name,
+               set_main_color, set_channel_pan, set_aux_pan, set_fx_return_pan, set_bus_pan,
+               set_main_pan, set_channel_send_level, get_channel_send_level,
+               set_channel_send_pan, set_channel_send_tap, set_channel_send_group_on,
+               set_aux_send_level, get_aux_send_level, set_aux_send_pan, set_aux_send_tap,
+               set_aux_send_group_on, set_fx_return_send_level, get_fx_return_send_level,
+               set_fx_return_send_pan, set_fx_return_send_tap, set_fx_return_send_group_on,
+               assign_channel_to_main, assign_aux_to_main, assign_fx_return_to_main,
+               assign_bus_to_main, set_channel_dca_groups, set_channel_mute_groups,
+               set_bus_dca_groups, set_bus_mute_groups, set_fx_send_dca_groups,
+               set_fx_send_mute_groups, set_channel_eq_on, set_aux_eq_on, set_bus_eq_on,
+               set_main_eq_on, set_bus_eq_mode, set_main_eq_mode, set_channel_eq_band_type,
+               set_channel_eq_band_frequency, set_channel_eq_band_gain, set_channel_eq_band_q,
+               set_aux_eq_band_type, set_aux_eq_band_frequency, set_aux_eq_band_gain,
+               set_aux_eq_band_q, set_fx_return_eq_band_type, set_fx_return_eq_band_frequency,
+               set_fx_return_eq_band_gain, set_fx_return_eq_band_q, set_bus_eq_band_type,
+               set_bus_eq_band_frequency, set_bus_eq_band_gain, set_bus_eq_band_q,
+               set_main_eq_band_type, set_main_eq_band_frequency, set_main_eq_band_gain,
+               set_main_eq_band_q, set_channel_dyn_on, set_channel_dyn_mode,
+               set_channel_dyn_detector, set_channel_dyn_envelope, set_channel_dyn_threshold,
+               set_channel_dyn_ratio, set_channel_dyn_knee, set_channel_dyn_makeup_gain,
+               set_channel_dyn_attack, set_channel_dyn_hold, set_channel_dyn_release,
+               set_channel_dyn_mix, set_channel_dyn_key_source, set_channel_dyn_auto,
+               set_channel_dyn_filter_on, set_channel_dyn_filter_type,
+               set_channel_dyn_filter_frequency, set_bus_dyn_on, set_bus_dyn_mode,
+               set_bus_dyn_detector, set_bus_dyn_envelope, set_bus_dyn_threshold,
+               set_bus_dyn_ratio, set_bus_dyn_knee, set_bus_dyn_makeup_gain,
+               set_bus_dyn_attack, set_bus_dyn_hold, set_bus_dyn_release, set_bus_dyn_mix,
+               set_bus_dyn_key_source, set_bus_dyn_auto, set_bus_dyn_filter_on,
+               set_bus_dyn_filter_type, set_bus_dyn_filter_frequency, set_main_dyn_on,
+               set_main_dyn_mode, set_main_dyn_detector, set_main_dyn_envelope,
+               set_main_dyn_threshold, set_main_dyn_ratio, set_main_dyn_knee,
+               set_main_dyn_makeup_gain, set_main_dyn_attack, set_main_dyn_hold,
+               set_main_dyn_release, set_main_dyn_mix, set_main_dyn_key_source,
+               set_main_dyn_auto, set_main_dyn_filter_on, set_main_dyn_filter_type,
+               set_main_dyn_filter_frequency, set_channel_gate_on, set_channel_gate_mode,
+               set_channel_gate_threshold, set_channel_gate_range, set_channel_gate_attack,
+               set_channel_gate_hold, set_channel_gate_release, set_channel_gate_key_source,
+               set_channel_gate_filter_on, set_channel_gate_filter_type,
+               set_channel_gate_filter_frequency, set_channel_insert_on,
+               set_channel_insert_select, set_bus_insert_on, set_bus_insert_select,
+               set_channel_usb_trim, set_channel_usb_return, set_aux_usb_trim,
+               set_aux_usb_return, set_fx_return_usb_trim, set_fx_return_usb_return,
+               set_aux_usb_source, set_fx_return_usb_source, set_channel_invert,
+               set_channel_low_cut, set_channel_low_cut_frequency, set_channel_source,
+               set_channel_usb_source, set_channel_automix_group, set_channel_automix_weight,
+               set_dca_fader, mute_dca, get_dca_fader, get_dca_on, get_dca_name, set_dca_name,
+               set_dca_color, solo_channel, clear_solo, get_solo_active, mute_group,
+               get_mute_group, set_monitor_level, set_monitor_source, set_monitor_source_trim,
+               set_monitor_channel_mode, set_monitor_bus_mode, set_monitor_dim,
+               set_monitor_dim_gain, set_monitor_pfl_dim, set_monitor_mono, mute_monitor,
+               set_channel_link, set_bus_link, set_link_preference, set_automix_enable,
+               set_automix_lock, set_headamp_gain, set_headamp_phantom, get_headamp_gain,
+               get_headamp_phantom, set_fx_type, get_fx_type, set_fx_insert, get_fx_parameter,
+               set_aux_out_source, set_aux_out_tap, set_main_out_source, set_phones_source,
+               set_ultranet_source, set_ultranet_tap, set_usb_out_source, set_usb_out_tap,
+               load_snapshot, save_snapshot, delete_snapshot, set_snapshot_save_name,
+               get_snapshot_index, get_snapshot_name, get_snapshot_slot_name,
+               set_snapshot_slot_name, get_snapshot_scope, set_snapshot_scope, save_state,
+               get_mixer_name, get_console_model, get_firmware_version, get_console_name,
+               get_status]
+    verification: none
+    notes: >
+      Midas counterpart of the XR18: 16 MIDAS PRO preamps, 6 aux outputs, ULTRANET, 18x18 USB interface (MR manual p.32). /info reports MR18.
+  - id: mr12
+    name: Midas MR12
+    channels: 16
+    dcas: 4
+    supports: [set_channel_fader, mute_channel, get_channel_fader, get_channel_on,
+               get_channel_name, set_channel_name, set_channel_color, set_aux_fader, mute_aux,
+               get_aux_fader, get_aux_on, get_aux_name, set_aux_name, set_aux_color,
+               set_fx_return_fader, mute_fx_return, get_fx_return_fader, get_fx_return_on,
+               get_fx_return_name, set_fx_return_name, set_fx_return_color, set_bus_fader,
+               mute_bus, get_bus_fader, get_bus_on, get_bus_name, set_bus_name, set_bus_color,
+               set_fx_send_fader, mute_fx_send, get_fx_send_fader, get_fx_send_on,
+               get_fx_send_name, set_fx_send_name, set_fx_send_color, set_main_fader,
+               mute_main, get_main_fader, get_main_on, get_main_name, set_main_name,
+               set_main_color, set_channel_pan, set_aux_pan, set_fx_return_pan, set_bus_pan,
+               set_main_pan, set_channel_send_level, get_channel_send_level,
+               set_channel_send_pan, set_channel_send_tap, set_channel_send_group_on,
+               set_aux_send_level, get_aux_send_level, set_aux_send_pan, set_aux_send_tap,
+               set_aux_send_group_on, set_fx_return_send_level, get_fx_return_send_level,
+               set_fx_return_send_pan, set_fx_return_send_tap, set_fx_return_send_group_on,
+               assign_channel_to_main, assign_aux_to_main, assign_fx_return_to_main,
+               assign_bus_to_main, set_channel_dca_groups, set_channel_mute_groups,
+               set_bus_dca_groups, set_bus_mute_groups, set_fx_send_dca_groups,
+               set_fx_send_mute_groups, set_channel_eq_on, set_aux_eq_on, set_bus_eq_on,
+               set_main_eq_on, set_bus_eq_mode, set_main_eq_mode, set_channel_eq_band_type,
+               set_channel_eq_band_frequency, set_channel_eq_band_gain, set_channel_eq_band_q,
+               set_aux_eq_band_type, set_aux_eq_band_frequency, set_aux_eq_band_gain,
+               set_aux_eq_band_q, set_fx_return_eq_band_type, set_fx_return_eq_band_frequency,
+               set_fx_return_eq_band_gain, set_fx_return_eq_band_q, set_bus_eq_band_type,
+               set_bus_eq_band_frequency, set_bus_eq_band_gain, set_bus_eq_band_q,
+               set_main_eq_band_type, set_main_eq_band_frequency, set_main_eq_band_gain,
+               set_main_eq_band_q, set_channel_dyn_on, set_channel_dyn_mode,
+               set_channel_dyn_detector, set_channel_dyn_envelope, set_channel_dyn_threshold,
+               set_channel_dyn_ratio, set_channel_dyn_knee, set_channel_dyn_makeup_gain,
+               set_channel_dyn_attack, set_channel_dyn_hold, set_channel_dyn_release,
+               set_channel_dyn_mix, set_channel_dyn_key_source, set_channel_dyn_auto,
+               set_channel_dyn_filter_on, set_channel_dyn_filter_type,
+               set_channel_dyn_filter_frequency, set_bus_dyn_on, set_bus_dyn_mode,
+               set_bus_dyn_detector, set_bus_dyn_envelope, set_bus_dyn_threshold,
+               set_bus_dyn_ratio, set_bus_dyn_knee, set_bus_dyn_makeup_gain,
+               set_bus_dyn_attack, set_bus_dyn_hold, set_bus_dyn_release, set_bus_dyn_mix,
+               set_bus_dyn_key_source, set_bus_dyn_auto, set_bus_dyn_filter_on,
+               set_bus_dyn_filter_type, set_bus_dyn_filter_frequency, set_main_dyn_on,
+               set_main_dyn_mode, set_main_dyn_detector, set_main_dyn_envelope,
+               set_main_dyn_threshold, set_main_dyn_ratio, set_main_dyn_knee,
+               set_main_dyn_makeup_gain, set_main_dyn_attack, set_main_dyn_hold,
+               set_main_dyn_release, set_main_dyn_mix, set_main_dyn_key_source,
+               set_main_dyn_auto, set_main_dyn_filter_on, set_main_dyn_filter_type,
+               set_main_dyn_filter_frequency, set_channel_gate_on, set_channel_gate_mode,
+               set_channel_gate_threshold, set_channel_gate_range, set_channel_gate_attack,
+               set_channel_gate_hold, set_channel_gate_release, set_channel_gate_key_source,
+               set_channel_gate_filter_on, set_channel_gate_filter_type,
+               set_channel_gate_filter_frequency, set_channel_insert_on,
+               set_channel_insert_select, set_bus_insert_on, set_bus_insert_select,
+               set_channel_usb_trim, set_channel_usb_return, set_aux_usb_trim,
+               set_aux_usb_return, set_fx_return_usb_trim, set_fx_return_usb_return,
+               set_aux_usb_source, set_fx_return_usb_source, set_channel_invert,
+               set_channel_low_cut, set_channel_low_cut_frequency, set_channel_source,
+               set_channel_usb_source, set_channel_automix_group, set_channel_automix_weight,
+               set_dca_fader, mute_dca, get_dca_fader, get_dca_on, get_dca_name, set_dca_name,
+               set_dca_color, solo_channel, clear_solo, get_solo_active, mute_group,
+               get_mute_group, set_monitor_level, set_monitor_source, set_monitor_source_trim,
+               set_monitor_channel_mode, set_monitor_bus_mode, set_monitor_dim,
+               set_monitor_dim_gain, set_monitor_pfl_dim, set_monitor_mono, mute_monitor,
+               set_channel_link, set_bus_link, set_link_preference, set_automix_enable,
+               set_automix_lock, set_headamp_gain, set_headamp_phantom, get_headamp_gain,
+               get_headamp_phantom, set_fx_type, get_fx_type, set_fx_insert, get_fx_parameter,
+               set_aux_out_source, set_aux_out_tap, set_main_out_source, set_phones_source,
+               load_snapshot, save_snapshot, delete_snapshot, set_snapshot_save_name,
+               get_snapshot_index, get_snapshot_name, get_snapshot_slot_name,
+               set_snapshot_slot_name, get_snapshot_scope, set_snapshot_scope,
+               set_recorder_state, get_recorder_state, get_usb_mounted, save_state,
+               get_mixer_name, get_console_model, get_firmware_version, get_console_name,
+               get_status]
+    verification: none
+    notes: >
+      Midas counterpart of the XR12: 4 MIDAS PRO preamps, 8 line inputs, 2 aux outputs, USB stick stereo recorder (MR manual p.33). /info reports MR12.
+
+commands:
+  set_channel_fader:
+    summary: "Set an input channel's fader position (0-1, 0.75 = 0 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      level:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_channel:
+    summary: "Mute or unmute an input channel"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      muted:   { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_channel_fader:
+    summary: "Read an input channel's fader position (0-1)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/ch/{channel:02d}/mix/fader" }
+    expect: { address: "/ch/{channel:02d}/mix/fader", arg: 0 }
+    returns: value
+
+  get_channel_on:
+    summary: "Read an input channel's mix/on flag: 1 passes audio, 0 is muted"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/ch/{channel:02d}/mix/on" }
+    expect: { address: "/ch/{channel:02d}/mix/on", arg: 0 }
+    returns: value
+
+  get_channel_name:
+    summary: "Read an input channel's scribble-strip name"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/ch/{channel:02d}/config/name" }
+    expect: { address: "/ch/{channel:02d}/config/name", arg: 0 }
+    returns: value
+
+  set_channel_name:
+    summary: "Set an input channel's scribble-strip name"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      name:    { type: string, required: true }
+    send:
+      address: /ch/{channel:02d}/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_channel_color:
+    summary: "Set an input channel's scribble-strip colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      color:   { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /ch/{channel:02d}/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  set_aux_fader:
+    summary: "Set the aux (USB) return's fader position (0-1, 0.75 = 0 dB)"
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_aux:
+    summary: "Mute or unmute the aux (USB) return"
+    params:
+      muted: { type: bool, default: true }
+    send:
+      address: /rtn/aux/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_aux_fader:
+    summary: "Read the aux (USB) return's fader position (0-1)"
+    send: { address: "/rtn/aux/mix/fader" }
+    expect: { address: "/rtn/aux/mix/fader", arg: 0 }
+    returns: value
+
+  get_aux_on:
+    summary: "Read the aux (USB) return's mix/on flag: 1 passes audio, 0 is muted"
+    send: { address: "/rtn/aux/mix/on" }
+    expect: { address: "/rtn/aux/mix/on", arg: 0 }
+    returns: value
+
+  get_aux_name:
+    summary: "Read the aux (USB) return's scribble-strip name"
+    send: { address: "/rtn/aux/config/name" }
+    expect: { address: "/rtn/aux/config/name", arg: 0 }
+    returns: value
+
+  set_aux_name:
+    summary: "Set the aux (USB) return's scribble-strip name"
+    params:
+      name: { type: string, required: true }
+    send:
+      address: /rtn/aux/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_aux_color:
+    summary: "Set the aux (USB) return's scribble-strip colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      color: { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /rtn/aux/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  set_fx_return_fader:
+    summary: "Set an FX return's fader position (0-1, 0.75 = 0 dB)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      level:     { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_fx_return:
+    summary: "Mute or unmute an FX return"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      muted:     { type: bool, default: true }
+    send:
+      address: /rtn/{fx_return}/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_fx_return_fader:
+    summary: "Read an FX return's fader position (0-1)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/rtn/{fx_return}/mix/fader" }
+    expect: { address: "/rtn/{fx_return}/mix/fader", arg: 0 }
+    returns: value
+
+  get_fx_return_on:
+    summary: "Read an FX return's mix/on flag: 1 passes audio, 0 is muted"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/rtn/{fx_return}/mix/on" }
+    expect: { address: "/rtn/{fx_return}/mix/on", arg: 0 }
+    returns: value
+
+  get_fx_return_name:
+    summary: "Read an FX return's scribble-strip name"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/rtn/{fx_return}/config/name" }
+    expect: { address: "/rtn/{fx_return}/config/name", arg: 0 }
+    returns: value
+
+  set_fx_return_name:
+    summary: "Set an FX return's scribble-strip name"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      name:      { type: string, required: true }
+    send:
+      address: /rtn/{fx_return}/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_fx_return_color:
+    summary: "Set an FX return's scribble-strip colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      color:     { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /rtn/{fx_return}/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  set_bus_fader:
+    summary: "Set a mix (aux) bus's fader position (0-1, 0.75 = 0 dB)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_bus:
+    summary: "Mute or unmute a mix (aux) bus"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_bus_fader:
+    summary: "Read a mix (aux) bus's fader position (0-1)"
+    params:
+      bus: { type: int, min: 1, max: 6, required: true }
+    send: { address: "/bus/{bus}/mix/fader" }
+    expect: { address: "/bus/{bus}/mix/fader", arg: 0 }
+    returns: value
+
+  get_bus_on:
+    summary: "Read a mix (aux) bus's mix/on flag: 1 passes audio, 0 is muted"
+    params:
+      bus: { type: int, min: 1, max: 6, required: true }
+    send: { address: "/bus/{bus}/mix/on" }
+    expect: { address: "/bus/{bus}/mix/on", arg: 0 }
+    returns: value
+
+  get_bus_name:
+    summary: "Read a mix (aux) bus's scribble-strip name"
+    params:
+      bus: { type: int, min: 1, max: 6, required: true }
+    send: { address: "/bus/{bus}/config/name" }
+    expect: { address: "/bus/{bus}/config/name", arg: 0 }
+    returns: value
+
+  set_bus_name:
+    summary: "Set a mix (aux) bus's scribble-strip name"
+    params:
+      bus:  { type: int, min: 1, max: 6, required: true }
+      name: { type: string, required: true }
+    send:
+      address: /bus/{bus}/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_bus_color:
+    summary: "Set a mix (aux) bus's scribble-strip colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      color: { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /bus/{bus}/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  set_fx_send_fader:
+    summary: "Set an FX send bus's fader position (0-1, 0.75 = 0 dB)"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+      level:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /fxsend/{fx_send}/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_fx_send:
+    summary: "Mute or unmute an FX send bus"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+      muted:   { type: bool, default: true }
+    send:
+      address: /fxsend/{fx_send}/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_fx_send_fader:
+    summary: "Read an FX send bus's fader position (0-1)"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/fxsend/{fx_send}/mix/fader" }
+    expect: { address: "/fxsend/{fx_send}/mix/fader", arg: 0 }
+    returns: value
+
+  get_fx_send_on:
+    summary: "Read an FX send bus's mix/on flag: 1 passes audio, 0 is muted"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/fxsend/{fx_send}/mix/on" }
+    expect: { address: "/fxsend/{fx_send}/mix/on", arg: 0 }
+    returns: value
+
+  get_fx_send_name:
+    summary: "Read an FX send bus's scribble-strip name"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/fxsend/{fx_send}/config/name" }
+    expect: { address: "/fxsend/{fx_send}/config/name", arg: 0 }
+    returns: value
+
+  set_fx_send_name:
+    summary: "Set an FX send bus's scribble-strip name"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+      name:    { type: string, required: true }
+    send:
+      address: /fxsend/{fx_send}/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_fx_send_color:
+    summary: "Set an FX send bus's scribble-strip colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+      color:   { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /fxsend/{fx_send}/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  set_main_fader:
+    summary: "Set the main LR bus's fader position (0-1, 0.75 = 0 dB)"
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/mix/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_main:
+    summary: "Mute or unmute the main LR bus"
+    params:
+      muted: { type: bool, default: true }
+    send:
+      address: /lr/mix/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_main_fader:
+    summary: "Read the main LR bus's fader position (0-1)"
+    send: { address: "/lr/mix/fader" }
+    expect: { address: "/lr/mix/fader", arg: 0 }
+    returns: value
+
+  get_main_on:
+    summary: "Read the main LR bus's mix/on flag: 1 passes audio, 0 is muted"
+    send: { address: "/lr/mix/on" }
+    expect: { address: "/lr/mix/on", arg: 0 }
+    returns: value
+
+  get_main_name:
+    summary: "Read the main LR bus's scribble-strip name"
+    send: { address: "/lr/config/name" }
+    expect: { address: "/lr/config/name", arg: 0 }
+    returns: value
+
+  set_main_name:
+    summary: "Set the main LR bus's scribble-strip name"
+    params:
+      name: { type: string, required: true }
+    send:
+      address: /lr/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_main_color:
+    summary: "Set the main LR bus's scribble-strip colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      color: { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /lr/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  set_channel_pan:
+    summary: "Set an input channel's pan or balance (0-1 over -100 to +100: 0 full left, 0.5 centre, 1 full right)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      pan:     { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/mix/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_aux_pan:
+    summary: "Set the aux (USB) return's pan or balance (0-1 over -100 to +100: 0 full left, 0.5 centre, 1 full right)"
+    params:
+      pan: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/mix/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_fx_return_pan:
+    summary: "Set an FX return's pan or balance (0-1 over -100 to +100: 0 full left, 0.5 centre, 1 full right)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      pan:       { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/mix/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_bus_pan:
+    summary: "Set a mix (aux) bus's pan or balance (0-1 over -100 to +100: 0 full left, 0.5 centre, 1 full right)"
+    params:
+      bus: { type: int, min: 1, max: 6, required: true }
+      pan: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/mix/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_main_pan:
+    summary: "Set the main LR bus's pan or balance (0-1 over -100 to +100: 0 full left, 0.5 centre, 1 full right)"
+    params:
+      pan: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/mix/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_channel_send_level:
+    summary: "Set an input channel's send level (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1, 0.75 = 0 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      bus:     { type: int, min: 1, max: 10, required: true }
+      level:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/mix/{bus:02d}/level
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  get_channel_send_level:
+    summary: "Read an input channel's send level (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      bus:     { type: int, min: 1, max: 10, required: true }
+    send: { address: "/ch/{channel:02d}/mix/{bus:02d}/level" }
+    expect: { address: "/ch/{channel:02d}/mix/{bus:02d}/level", arg: 0 }
+    returns: value
+
+  set_channel_send_pan:
+    summary: "Set an input channel's send pan (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1 over -100 to +100, 0.5 centre)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      bus:     { type: int, min: 1, max: 10, required: true }
+      pan:     { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/mix/{bus:02d}/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_channel_send_tap:
+    summary: "Set an input channel's send tap point (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4): 0 IN, 1 PREEQ, 2 POSTEQ, 3 PRE, 4 POST, 5 GRP"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      bus:     { type: int, min: 1, max: 10, required: true }
+      tap:     { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /ch/{channel:02d}/mix/{bus:02d}/tap
+      args: [ { value: "{tap}", type: int } ]
+    returns: none
+
+  set_channel_send_group_on:
+    summary: "Switch an input channel's send 'group' flag (mix/NN/grpon) for a bus (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4); the community list describes it only as 'mixbus sends group Off/On'"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      bus:     { type: int, min: 1, max: 10, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/mix/{bus:02d}/grpon
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_aux_send_level:
+    summary: "Set the aux (USB) return's send level (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1, 0.75 = 0 dB)"
+    params:
+      bus:   { type: int, min: 1, max: 10, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/mix/{bus:02d}/level
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  get_aux_send_level:
+    summary: "Read the aux (USB) return's send level (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1)"
+    params:
+      bus: { type: int, min: 1, max: 10, required: true }
+    send: { address: "/rtn/aux/mix/{bus:02d}/level" }
+    expect: { address: "/rtn/aux/mix/{bus:02d}/level", arg: 0 }
+    returns: value
+
+  set_aux_send_pan:
+    summary: "Set the aux (USB) return's send pan (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1 over -100 to +100, 0.5 centre)"
+    params:
+      bus: { type: int, min: 1, max: 10, required: true }
+      pan: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/mix/{bus:02d}/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_aux_send_tap:
+    summary: "Set the aux (USB) return's send tap point (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4): 0 IN, 1 PREEQ, 2 POSTEQ, 3 PRE, 4 POST, 5 GRP"
+    params:
+      bus: { type: int, min: 1, max: 10, required: true }
+      tap: { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /rtn/aux/mix/{bus:02d}/tap
+      args: [ { value: "{tap}", type: int } ]
+    returns: none
+
+  set_aux_send_group_on:
+    summary: "Switch the aux (USB) return's send 'group' flag (mix/NN/grpon) for a bus (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4); the community list describes it only as 'mixbus sends group Off/On'"
+    params:
+      bus:     { type: int, min: 1, max: 10, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /rtn/aux/mix/{bus:02d}/grpon
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_fx_return_send_level:
+    summary: "Set an FX return's send level (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1, 0.75 = 0 dB)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      bus:       { type: int, min: 1, max: 10, required: true }
+      level:     { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/mix/{bus:02d}/level
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  get_fx_return_send_level:
+    summary: "Read an FX return's send level (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      bus:       { type: int, min: 1, max: 10, required: true }
+    send: { address: "/rtn/{fx_return}/mix/{bus:02d}/level" }
+    expect: { address: "/rtn/{fx_return}/mix/{bus:02d}/level", arg: 0 }
+    returns: value
+
+  set_fx_return_send_pan:
+    summary: "Set an FX return's send pan (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4; 0-1 over -100 to +100, 0.5 centre)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      bus:       { type: int, min: 1, max: 10, required: true }
+      pan:       { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/mix/{bus:02d}/pan
+      args: [ { value: "{pan}", type: float } ]
+    returns: none
+
+  set_fx_return_send_tap:
+    summary: "Set an FX return's send tap point (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4): 0 IN, 1 PREEQ, 2 POSTEQ, 3 PRE, 4 POST, 5 GRP"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      bus:       { type: int, min: 1, max: 10, required: true }
+      tap:       { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /rtn/{fx_return}/mix/{bus:02d}/tap
+      args: [ { value: "{tap}", type: int } ]
+    returns: none
+
+  set_fx_return_send_group_on:
+    summary: "Switch an FX return's send 'group' flag (mix/NN/grpon) for a bus (bus 1-6 is mix bus 1-6, 7-10 is FX send 1-4); the community list describes it only as 'mixbus sends group Off/On'"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      bus:       { type: int, min: 1, max: 10, required: true }
+      enabled:   { type: bool, default: true }
+    send:
+      address: /rtn/{fx_return}/mix/{bus:02d}/grpon
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  assign_channel_to_main:
+    summary: "Assign an input channel to the main LR bus, or remove it (mix/lr)"
+    params:
+      channel:  { type: int, min: 1, max: 16, required: true }
+      assigned: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/mix/lr
+      args: [ { value: "{assigned:bool01}", type: int } ]
+    returns: none
+
+  assign_aux_to_main:
+    summary: "Assign the aux (USB) return to the main LR bus, or remove it (mix/lr)"
+    params:
+      assigned: { type: bool, default: true }
+    send:
+      address: /rtn/aux/mix/lr
+      args: [ { value: "{assigned:bool01}", type: int } ]
+    returns: none
+
+  assign_fx_return_to_main:
+    summary: "Assign an FX return to the main LR bus, or remove it (mix/lr)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      assigned:  { type: bool, default: true }
+    send:
+      address: /rtn/{fx_return}/mix/lr
+      args: [ { value: "{assigned:bool01}", type: int } ]
+    returns: none
+
+  assign_bus_to_main:
+    summary: "Assign a mix (aux) bus to the main LR bus, or remove it (mix/lr)"
+    params:
+      bus:      { type: int, min: 1, max: 6, required: true }
+      assigned: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/mix/lr
+      args: [ { value: "{assigned:bool01}", type: int } ]
+    returns: none
+
+  set_channel_dca_groups:
+    summary: "Set which DCA groups an input channel belongs to (bitmap: bit 0 DCA 1 ... bit 3 DCA 4)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      groups:  { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /ch/{channel:02d}/grp/dca
+      args: [ { value: "{groups}", type: int } ]
+    returns: none
+
+  set_channel_mute_groups:
+    summary: "Set which mute groups an input channel belongs to (bitmap: bit 0 group 1 ... bit 3 group 4)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      groups:  { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /ch/{channel:02d}/grp/mute
+      args: [ { value: "{groups}", type: int } ]
+    returns: none
+
+  set_bus_dca_groups:
+    summary: "Set which DCA groups a mix (aux) bus belongs to (bitmap: bit 0 DCA 1 ... bit 3 DCA 4)"
+    params:
+      bus:    { type: int, min: 1, max: 6, required: true }
+      groups: { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /bus/{bus}/grp/dca
+      args: [ { value: "{groups}", type: int } ]
+    returns: none
+
+  set_bus_mute_groups:
+    summary: "Set which mute groups a mix (aux) bus belongs to (bitmap: bit 0 group 1 ... bit 3 group 4)"
+    params:
+      bus:    { type: int, min: 1, max: 6, required: true }
+      groups: { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /bus/{bus}/grp/mute
+      args: [ { value: "{groups}", type: int } ]
+    returns: none
+
+  set_fx_send_dca_groups:
+    summary: "Set which DCA groups an FX send bus belongs to (bitmap: bit 0 DCA 1 ... bit 3 DCA 4)"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+      groups:  { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /fxsend/{fx_send}/grp/dca
+      args: [ { value: "{groups}", type: int } ]
+    returns: none
+
+  set_fx_send_mute_groups:
+    summary: "Set which mute groups an FX send bus belongs to (bitmap: bit 0 group 1 ... bit 3 group 4)"
+    params:
+      fx_send: { type: int, min: 1, max: 4, required: true }
+      groups:  { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /fxsend/{fx_send}/grp/mute
+      args: [ { value: "{groups}", type: int } ]
+    returns: none
+
+  set_channel_eq_on:
+    summary: "Switch an input channel's EQ on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/eq/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_aux_eq_on:
+    summary: "Switch the aux (USB) return's EQ on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /rtn/aux/eq/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_bus_eq_on:
+    summary: "Switch a mix (aux) bus's EQ on or off"
+    params:
+      bus:     { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/eq/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_main_eq_on:
+    summary: "Switch the main LR bus's EQ on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /lr/eq/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_bus_eq_mode:
+    summary: "Set a mix (aux) bus's EQ mode: 0 PEQ (6-band parametric), 1 GEQ, 2 TEQ"
+    params:
+      bus:  { type: int, min: 1, max: 6, required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send:
+      address: /bus/{bus}/eq/mode
+      args: [ { value: "{mode}", type: int } ]
+    returns: none
+
+  set_main_eq_mode:
+    summary: "Set the main LR bus's EQ mode: 0 PEQ (6-band parametric), 1 GEQ, 2 TEQ"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send:
+      address: /lr/eq/mode
+      args: [ { value: "{mode}", type: int } ]
+    returns: none
+
+  set_channel_eq_band_type:
+    summary: "Set an input channel's EQ band type, band 1-4: 0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      type:    { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /ch/{channel:02d}/eq/{band}/type
+      args: [ { value: "{type}", type: int } ]
+    returns: none
+
+  set_channel_eq_band_frequency:
+    summary: "Set an input channel's EQ band frequency, band 1-4 (0-1 over 20 Hz to 20 kHz, logarithmic)"
+    params:
+      channel:   { type: int, min: 1, max: 16, required: true }
+      band:      { type: int, min: 1, max: 4, required: true }
+      frequency: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/eq/{band}/f
+      args: [ { value: "{frequency}", type: float } ]
+    returns: none
+
+  set_channel_eq_band_gain:
+    summary: "Set an input channel's EQ band gain, band 1-4 (0-1 over -15 to +15 dB, 0.5 = 0 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      gain:    { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/eq/{band}/g
+      args: [ { value: "{gain}", type: float } ]
+    returns: none
+
+  set_channel_eq_band_q:
+    summary: "Set an input channel's EQ band Q, band 1-4 (0-1; the community list gives 10 to 0.3)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      q:       { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/eq/{band}/q
+      args: [ { value: "{q}", type: float } ]
+    returns: none
+
+  set_aux_eq_band_type:
+    summary: "Set the aux (USB) return's EQ band type, band 1-4: 0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut"
+    params:
+      band: { type: int, min: 1, max: 4, required: true }
+      type: { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /rtn/aux/eq/{band}/type
+      args: [ { value: "{type}", type: int } ]
+    returns: none
+
+  set_aux_eq_band_frequency:
+    summary: "Set the aux (USB) return's EQ band frequency, band 1-4 (0-1 over 20 Hz to 20 kHz, logarithmic)"
+    params:
+      band:      { type: int, min: 1, max: 4, required: true }
+      frequency: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/eq/{band}/f
+      args: [ { value: "{frequency}", type: float } ]
+    returns: none
+
+  set_aux_eq_band_gain:
+    summary: "Set the aux (USB) return's EQ band gain, band 1-4 (0-1 over -15 to +15 dB, 0.5 = 0 dB)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true }
+      gain: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/eq/{band}/g
+      args: [ { value: "{gain}", type: float } ]
+    returns: none
+
+  set_aux_eq_band_q:
+    summary: "Set the aux (USB) return's EQ band Q, band 1-4 (0-1; the community list gives 10 to 0.3)"
+    params:
+      band: { type: int, min: 1, max: 4, required: true }
+      q:    { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/eq/{band}/q
+      args: [ { value: "{q}", type: float } ]
+    returns: none
+
+  set_fx_return_eq_band_type:
+    summary: "Set an FX return's EQ band type, band 1-4: 0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      band:      { type: int, min: 1, max: 4, required: true }
+      type:      { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /rtn/{fx_return}/eq/{band}/type
+      args: [ { value: "{type}", type: int } ]
+    returns: none
+
+  set_fx_return_eq_band_frequency:
+    summary: "Set an FX return's EQ band frequency, band 1-4 (0-1 over 20 Hz to 20 kHz, logarithmic)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      band:      { type: int, min: 1, max: 4, required: true }
+      frequency: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/eq/{band}/f
+      args: [ { value: "{frequency}", type: float } ]
+    returns: none
+
+  set_fx_return_eq_band_gain:
+    summary: "Set an FX return's EQ band gain, band 1-4 (0-1 over -15 to +15 dB, 0.5 = 0 dB)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      band:      { type: int, min: 1, max: 4, required: true }
+      gain:      { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/eq/{band}/g
+      args: [ { value: "{gain}", type: float } ]
+    returns: none
+
+  set_fx_return_eq_band_q:
+    summary: "Set an FX return's EQ band Q, band 1-4 (0-1; the community list gives 10 to 0.3)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      band:      { type: int, min: 1, max: 4, required: true }
+      q:         { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/eq/{band}/q
+      args: [ { value: "{q}", type: float } ]
+    returns: none
+
+  set_bus_eq_band_type:
+    summary: "Set a mix (aux) bus's EQ band type, band 1-6: 0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut"
+    params:
+      bus:  { type: int, min: 1, max: 6, required: true }
+      band: { type: int, min: 1, max: 6, required: true }
+      type: { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /bus/{bus}/eq/{band}/type
+      args: [ { value: "{type}", type: int } ]
+    returns: none
+
+  set_bus_eq_band_frequency:
+    summary: "Set a mix (aux) bus's EQ band frequency, band 1-6 (0-1 over 20 Hz to 20 kHz, logarithmic)"
+    params:
+      bus:       { type: int, min: 1, max: 6, required: true }
+      band:      { type: int, min: 1, max: 6, required: true }
+      frequency: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/eq/{band}/f
+      args: [ { value: "{frequency}", type: float } ]
+    returns: none
+
+  set_bus_eq_band_gain:
+    summary: "Set a mix (aux) bus's EQ band gain, band 1-6 (0-1 over -15 to +15 dB, 0.5 = 0 dB)"
+    params:
+      bus:  { type: int, min: 1, max: 6, required: true }
+      band: { type: int, min: 1, max: 6, required: true }
+      gain: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/eq/{band}/g
+      args: [ { value: "{gain}", type: float } ]
+    returns: none
+
+  set_bus_eq_band_q:
+    summary: "Set a mix (aux) bus's EQ band Q, band 1-6 (0-1; the community list gives 10 to 0.3)"
+    params:
+      bus:  { type: int, min: 1, max: 6, required: true }
+      band: { type: int, min: 1, max: 6, required: true }
+      q:    { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/eq/{band}/q
+      args: [ { value: "{q}", type: float } ]
+    returns: none
+
+  set_main_eq_band_type:
+    summary: "Set the main LR bus's EQ band type, band 1-6: 0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut"
+    params:
+      band: { type: int, min: 1, max: 6, required: true }
+      type: { type: int, min: 0, max: 5, required: true }
+    send:
+      address: /lr/eq/{band}/type
+      args: [ { value: "{type}", type: int } ]
+    returns: none
+
+  set_main_eq_band_frequency:
+    summary: "Set the main LR bus's EQ band frequency, band 1-6 (0-1 over 20 Hz to 20 kHz, logarithmic)"
+    params:
+      band:      { type: int, min: 1, max: 6, required: true }
+      frequency: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/eq/{band}/f
+      args: [ { value: "{frequency}", type: float } ]
+    returns: none
+
+  set_main_eq_band_gain:
+    summary: "Set the main LR bus's EQ band gain, band 1-6 (0-1 over -15 to +15 dB, 0.5 = 0 dB)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true }
+      gain: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/eq/{band}/g
+      args: [ { value: "{gain}", type: float } ]
+    returns: none
+
+  set_main_eq_band_q:
+    summary: "Set the main LR bus's EQ band Q, band 1-6 (0-1; the community list gives 10 to 0.3)"
+    params:
+      band: { type: int, min: 1, max: 6, required: true }
+      q:    { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/eq/{band}/q
+      args: [ { value: "{q}", type: float } ]
+    returns: none
+
+  set_channel_dyn_on:
+    summary: "Switch an input channel's compressor on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/dyn/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_dyn_mode:
+    summary: "Set an input channel's compressor mode: 0 COMP, 1 EXP"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/mode
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_dyn_detector:
+    summary: "Set an input channel's compressor detector: 0 PEAK, 1 RMS"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/det
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_dyn_envelope:
+    summary: "Set an input channel's compressor envelope: 0 LIN, 1 LOG"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/env
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_dyn_threshold:
+    summary: "Set an input channel's compressor threshold (0-1 over -60 to 0 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/thr
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_ratio:
+    summary: "Set an input channel's compressor ratio: 0 1.1, 1 1.3, 2 1.5, 3 2.0, 4 2.5, 5 3.0, 6 4.0, 7 5.0, 8 7.0, 9 10, 10 20, 11 100"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 11, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/ratio
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_dyn_knee:
+    summary: "Set an input channel's compressor knee (0-1 over 0 to 5)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/knee
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_makeup_gain:
+    summary: "Set an input channel's compressor makeup gain (0-1 over 0 to 24 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/mgain
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_attack:
+    summary: "Set an input channel's compressor attack (0-1 over 0 to 120 ms)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/attack
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_hold:
+    summary: "Set an input channel's compressor hold (0-1 over 0.02 to 2000 ms)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/hold
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_release:
+    summary: "Set an input channel's compressor release (0-1 over 5 to 4000 ms)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/release
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_mix:
+    summary: "Set an input channel's compressor wet/dry mix (0-1 over 0 to 100 %)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/mix
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_dyn_key_source:
+    summary: "Set an input channel's compressor key source: 0 SELF, 1-16 Ch01-Ch16, 17-22 Bus1-Bus6"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 22, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/keysrc
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_dyn_auto:
+    summary: "Switch an input channel's compressor auto time on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/dyn/auto
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_dyn_filter_on:
+    summary: "Switch an input channel's compressor side-chain filter on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/dyn/filter/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_dyn_filter_type:
+    summary: "Set an input channel's compressor side-chain filter type: 0 LC6, 1 LC12, 2 HC6, 3 HC12, 4 1.0, 5 2.0, 6 3.0, 7 5.0, 8 10.0"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/filter/type
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_dyn_filter_frequency:
+    summary: "Set an input channel's compressor side-chain filter frequency (0-1 over 20 Hz to 20 kHz)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/dyn/filter/f
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_on:
+    summary: "Switch a mix (aux) bus's compressor on or off"
+    params:
+      bus:     { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/dyn/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_bus_dyn_mode:
+    summary: "Set a mix (aux) bus's compressor mode: 0 COMP, 1 EXP"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /bus/{bus}/dyn/mode
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_bus_dyn_detector:
+    summary: "Set a mix (aux) bus's compressor detector: 0 PEAK, 1 RMS"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /bus/{bus}/dyn/det
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_bus_dyn_envelope:
+    summary: "Set a mix (aux) bus's compressor envelope: 0 LIN, 1 LOG"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /bus/{bus}/dyn/env
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_bus_dyn_threshold:
+    summary: "Set a mix (aux) bus's compressor threshold (0-1 over -60 to 0 dB)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/thr
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_ratio:
+    summary: "Set a mix (aux) bus's compressor ratio: 0 1.1, 1 1.3, 2 1.5, 3 2.0, 4 2.5, 5 3.0, 6 4.0, 7 5.0, 8 7.0, 9 10, 10 20, 11 100"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: int, min: 0, max: 11, required: true }
+    send:
+      address: /bus/{bus}/dyn/ratio
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_bus_dyn_knee:
+    summary: "Set a mix (aux) bus's compressor knee (0-1 over 0 to 5)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/knee
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_makeup_gain:
+    summary: "Set a mix (aux) bus's compressor makeup gain (0-1 over 0 to 24 dB)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/mgain
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_attack:
+    summary: "Set a mix (aux) bus's compressor attack (0-1 over 0 to 120 ms)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/attack
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_hold:
+    summary: "Set a mix (aux) bus's compressor hold (0-1 over 0.02 to 2000 ms)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/hold
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_release:
+    summary: "Set a mix (aux) bus's compressor release (0-1 over 5 to 4000 ms)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/release
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_mix:
+    summary: "Set a mix (aux) bus's compressor wet/dry mix (0-1 over 0 to 100 %)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/mix
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_bus_dyn_key_source:
+    summary: "Set a mix (aux) bus's compressor key source: 0 SELF, 1-16 Ch01-Ch16, 17-22 Bus1-Bus6"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: int, min: 0, max: 22, required: true }
+    send:
+      address: /bus/{bus}/dyn/keysrc
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_bus_dyn_auto:
+    summary: "Switch a mix (aux) bus's compressor auto time on or off"
+    params:
+      bus:     { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/dyn/auto
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_bus_dyn_filter_on:
+    summary: "Switch a mix (aux) bus's compressor side-chain filter on or off"
+    params:
+      bus:     { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/dyn/filter/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_bus_dyn_filter_type:
+    summary: "Set a mix (aux) bus's compressor side-chain filter type: 0 LC6, 1 LC12, 2 HC6, 3 HC12, 4 1.0, 5 2.0, 6 3.0, 7 5.0, 8 10.0"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /bus/{bus}/dyn/filter/type
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_bus_dyn_filter_frequency:
+    summary: "Set a mix (aux) bus's compressor side-chain filter frequency (0-1 over 20 Hz to 20 kHz)"
+    params:
+      bus:   { type: int, min: 1, max: 6, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /bus/{bus}/dyn/filter/f
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_on:
+    summary: "Switch the main LR bus's compressor on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /lr/dyn/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_main_dyn_mode:
+    summary: "Set the main LR bus's compressor mode: 0 COMP, 1 EXP"
+    params:
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /lr/dyn/mode
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_main_dyn_detector:
+    summary: "Set the main LR bus's compressor detector: 0 PEAK, 1 RMS"
+    params:
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /lr/dyn/det
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_main_dyn_envelope:
+    summary: "Set the main LR bus's compressor envelope: 0 LIN, 1 LOG"
+    params:
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /lr/dyn/env
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_main_dyn_threshold:
+    summary: "Set the main LR bus's compressor threshold (0-1 over -60 to 0 dB)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/thr
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_ratio:
+    summary: "Set the main LR bus's compressor ratio: 0 1.1, 1 1.3, 2 1.5, 3 2.0, 4 2.5, 5 3.0, 6 4.0, 7 5.0, 8 7.0, 9 10, 10 20, 11 100"
+    params:
+      value: { type: int, min: 0, max: 11, required: true }
+    send:
+      address: /lr/dyn/ratio
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_main_dyn_knee:
+    summary: "Set the main LR bus's compressor knee (0-1 over 0 to 5)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/knee
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_makeup_gain:
+    summary: "Set the main LR bus's compressor makeup gain (0-1 over 0 to 24 dB)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/mgain
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_attack:
+    summary: "Set the main LR bus's compressor attack (0-1 over 0 to 120 ms)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/attack
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_hold:
+    summary: "Set the main LR bus's compressor hold (0-1 over 0.02 to 2000 ms)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/hold
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_release:
+    summary: "Set the main LR bus's compressor release (0-1 over 5 to 4000 ms)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/release
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_mix:
+    summary: "Set the main LR bus's compressor wet/dry mix (0-1 over 0 to 100 %)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/mix
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_main_dyn_key_source:
+    summary: "Set the main LR bus's compressor key source: 0 SELF, 1-16 Ch01-Ch16, 17-22 Bus1-Bus6"
+    params:
+      value: { type: int, min: 0, max: 22, required: true }
+    send:
+      address: /lr/dyn/keysrc
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_main_dyn_auto:
+    summary: "Switch the main LR bus's compressor auto time on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /lr/dyn/auto
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_main_dyn_filter_on:
+    summary: "Switch the main LR bus's compressor side-chain filter on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /lr/dyn/filter/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_main_dyn_filter_type:
+    summary: "Set the main LR bus's compressor side-chain filter type: 0 LC6, 1 LC12, 2 HC6, 3 HC12, 4 1.0, 5 2.0, 6 3.0, 7 5.0, 8 10.0"
+    params:
+      value: { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /lr/dyn/filter/type
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_main_dyn_filter_frequency:
+    summary: "Set the main LR bus's compressor side-chain filter frequency (0-1 over 20 Hz to 20 kHz)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /lr/dyn/filter/f
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_gate_on:
+    summary: "Switch an input channel's gate on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/gate/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_gate_mode:
+    summary: "Set an input channel's gate mode, 0-4 (the community list names GATE, EXP2, EXP3, EXP4, DUCK; see the gate mode quirk)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 4, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/mode
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_gate_threshold:
+    summary: "Set an input channel's gate threshold (0-1 over -80 to 0 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/thr
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_gate_range:
+    summary: "Set an input channel's gate range (0-1 over 3 to 60 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/range
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_gate_attack:
+    summary: "Set an input channel's gate attack (0-1 over 0 to 120 ms)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/attack
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_gate_hold:
+    summary: "Set an input channel's gate hold (0-1 over 0.02 to 2000 ms)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/hold
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_gate_release:
+    summary: "Set an input channel's gate release (0-1 over 5 to 4000 ms)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/release
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_gate_key_source:
+    summary: "Set an input channel's gate key source: 0 SELF, 1-16 Ch01-Ch16, 17-22 Bus1-Bus6"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 22, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/keysrc
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_gate_filter_on:
+    summary: "Switch an input channel's gate side-chain filter on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/gate/filter/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_gate_filter_type:
+    summary: "Set an input channel's gate side-chain filter type: 0 LC6, 1 LC12, 2 HC6, 3 HC12, 4 1.0, 5 2.0, 6 3.0, 7 5.0, 8 10.0"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/filter/type
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_channel_gate_filter_frequency:
+    summary: "Set an input channel's gate side-chain filter frequency (0-1 over 20 Hz to 20 kHz)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      value:   { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/gate/filter/f
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_channel_insert_on:
+    summary: "Switch an input channel's insert on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/insert/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_insert_select:
+    summary: "Choose the FX slot inserted on an input channel: 0 OFF, 1 Fx1A, 2 Fx1B, 3 Fx2A, 4 Fx2B, 5 Fx3A, 6 Fx3B, 7 Fx4A, 8 Fx4B"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      insert:  { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /ch/{channel:02d}/insert/fxslot
+      args: [ { value: "{insert}", type: int } ]
+    returns: none
+
+  set_bus_insert_on:
+    summary: "Switch a mix (aux) bus's insert on or off"
+    params:
+      bus:     { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /bus/{bus}/insert/on
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_bus_insert_select:
+    summary: "Choose the FX slot inserted on a mix (aux) bus: 0 OFF, 1 Fx1A, 2 Fx1B, 3 Fx2A, 4 Fx2B, 5 Fx3A, 6 Fx3B, 7 Fx4A, 8 Fx4B"
+    params:
+      bus:    { type: int, min: 1, max: 6, required: true }
+      insert: { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /bus/{bus}/insert/fxslot
+      args: [ { value: "{insert}", type: int } ]
+    returns: none
+
+  set_channel_usb_trim:
+    summary: "Set an input channel's USB return trim (preamp/rtntrim, 0-1 over -18 to +18 dB, 0.5 = 0 dB)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      trim:    { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/preamp/rtntrim
+      args: [ { value: "{trim}", type: float } ]
+    returns: none
+
+  set_channel_usb_return:
+    summary: "Switch an input channel between its analog source (off) and its USB return (on) (preamp/rtnsw)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/preamp/rtnsw
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_aux_usb_trim:
+    summary: "Set the aux (USB) return's USB return trim (preamp/rtntrim, 0-1 over -18 to +18 dB, 0.5 = 0 dB)"
+    params:
+      trim: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/aux/preamp/rtntrim
+      args: [ { value: "{trim}", type: float } ]
+    returns: none
+
+  set_aux_usb_return:
+    summary: "Switch the aux (USB) return between its analog source (off) and its USB return (on) (preamp/rtnsw)"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /rtn/aux/preamp/rtnsw
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_fx_return_usb_trim:
+    summary: "Set an FX return's USB return trim (preamp/rtntrim, 0-1 over -18 to +18 dB, 0.5 = 0 dB)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      trim:      { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /rtn/{fx_return}/preamp/rtntrim
+      args: [ { value: "{trim}", type: float } ]
+    returns: none
+
+  set_fx_return_usb_return:
+    summary: "Switch an FX return between its analog source (off) and its USB return (on) (preamp/rtnsw)"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      enabled:   { type: bool, default: true }
+    send:
+      address: /rtn/{fx_return}/preamp/rtnsw
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_aux_usb_source:
+    summary: "Set the aux (USB) return's USB return source: 0 U0102, 1 U0304, ... 8 U1718"
+    params:
+      source: { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /rtn/aux/config/rtnsrc
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_fx_return_usb_source:
+    summary: "Set an FX return's USB return source: 0 U0102, 1 U0304, ... 8 U1718"
+    params:
+      fx_return: { type: int, min: 1, max: 4, required: true }
+      source:    { type: int, min: 0, max: 8, required: true }
+    send:
+      address: /rtn/{fx_return}/config/rtnsrc
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_channel_invert:
+    summary: "Switch an input channel's polarity invert on or off"
+    params:
+      channel:  { type: int, min: 1, max: 16, required: true }
+      inverted: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/preamp/invert
+      args: [ { value: "{inverted:bool01}", type: int } ]
+    returns: none
+
+  set_channel_low_cut:
+    summary: "Switch an input channel's low cut (high-pass filter) on or off"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /ch/{channel:02d}/preamp/hpon
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_channel_low_cut_frequency:
+    summary: "Set an input channel's low-cut frequency (0-1; the community list gives 20 to 200 Hz)"
+    params:
+      channel:   { type: int, min: 1, max: 16, required: true }
+      frequency: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/preamp/hpf
+      args: [ { value: "{frequency}", type: float } ]
+    returns: none
+
+  set_channel_source:
+    summary: "Set an input channel's input source, 0-15 (see the channel source quirk)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      source:  { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /ch/{channel:02d}/config/insrc
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_channel_usb_source:
+    summary: "Set an input channel's USB return source: 0-17 is U01-U18"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      source:  { type: int, min: 0, max: 17, required: true }
+    send:
+      address: /ch/{channel:02d}/config/rtnsrc
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_channel_automix_group:
+    summary: "Assign an input channel to an automix group: 0 OFF, 1 X, 2 Y"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      group:   { type: int, min: 0, max: 2, required: true }
+    send:
+      address: /ch/{channel:02d}/automix/group
+      args: [ { value: "{group}", type: int } ]
+    returns: none
+
+  set_channel_automix_weight:
+    summary: "Set an input channel's automix weight (0-1; the community list gives -24 to +24, the python reference -12 to +12)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      weight:  { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /ch/{channel:02d}/automix/weight
+      args: [ { value: "{weight}", type: float } ]
+    returns: none
+
+  set_dca_fader:
+    summary: "Set a DCA fader position (0-1, 0.75 = 0 dB)"
+    params:
+      dca:   { type: int, min: 1, max: 4, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /dca/{dca}/fader
+      args: [ { value: "{level}", type: float } ]
+    returns: none
+
+  mute_dca:
+    summary: "Mute or unmute a DCA"
+    params:
+      dca:   { type: int, min: 1, max: 4, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /dca/{dca}/on
+      args: [ { value: "{muted:bool10}", type: int } ]
+    returns: none
+
+  get_dca_fader:
+    summary: "Read a DCA's fader position (0-1)"
+    params:
+      dca: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/dca/{dca}/fader" }
+    expect: { address: "/dca/{dca}/fader", arg: 0 }
+    returns: value
+
+  get_dca_on:
+    summary: "Read a DCA's on flag: 1 passes audio, 0 is muted"
+    params:
+      dca: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/dca/{dca}/on" }
+    expect: { address: "/dca/{dca}/on", arg: 0 }
+    returns: value
+
+  get_dca_name:
+    summary: "Read a DCA's name"
+    params:
+      dca: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/dca/{dca}/config/name" }
+    expect: { address: "/dca/{dca}/config/name", arg: 0 }
+    returns: value
+
+  set_dca_name:
+    summary: "Set a DCA's name"
+    params:
+      dca:  { type: int, min: 1, max: 4, required: true }
+      name: { type: string, required: true }
+    send:
+      address: /dca/{dca}/config/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  set_dca_color:
+    summary: "Set a DCA's colour (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))"
+    params:
+      dca:   { type: int, min: 1, max: 4, required: true }
+      color: { type: int, min: 0, max: 15, required: true }
+    send:
+      address: /dca/{dca}/config/color
+      args: [ { value: "{color}", type: int } ]
+    returns: none
+
+  solo_channel:
+    summary: "Switch an input channel's solo on or off (/-stat/solosw/01-16)"
+    params:
+      channel: { type: int, min: 1, max: 16, required: true }
+      soloed:  { type: bool, default: true }
+    send:
+      address: /-stat/solosw/{channel:02d}
+      args: [ { value: "{soloed:bool01}", type: int } ]
+    returns: none
+
+  clear_solo:
+    summary: "Clear every solo, as the Solo Clear button does"
+    send:
+      address: /-action/clearsolo
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  get_solo_active:
+    summary: "Read whether any solo is on (1) or none (0)"
+    send: { address: "/-stat/solo" }
+    expect: { address: "/-stat/solo", arg: 0 }
+    returns: value
+
+  mute_group:
+    summary: "Engage or release a mute group (1-4)"
+    params:
+      group: { type: int, min: 1, max: 4, required: true }
+      muted: { type: bool, default: true }
+    send:
+      address: /config/mute/{group}
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  get_mute_group:
+    summary: "Read whether a mute group is engaged (1) or released (0)"
+    params:
+      group: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/config/mute/{group}" }
+    expect: { address: "/config/mute/{group}", arg: 0 }
+    returns: value
+
+  set_monitor_level:
+    summary: "Set the headphone/monitor (solo bus) level (0-1, fader taper, 0.75 = 0 dB)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /config/solo/level
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_monitor_source:
+    summary: "Set the headphone/monitor source: 0 OFF, 1 LR, 2 LRPFL, 3 LRAFL, 4 AUX, 5 U1718, 6-11 Bus1-6, 12 Bus12, 13 Bus34, 14 Bus56"
+    params:
+      value: { type: int, min: 0, max: 14, required: true }
+    send:
+      address: /config/solo/source
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_monitor_source_trim:
+    summary: "Set the headphone/monitor source trim (0-1 over -18 to +12 dB)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /config/solo/sourcetrim
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_monitor_channel_mode:
+    summary: "Set channel solo tap: 0 PFL, 1 AFL"
+    params:
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /config/solo/chmode
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_monitor_bus_mode:
+    summary: "Set bus solo tap: 0 PFL, 1 AFL"
+    params:
+      value: { type: int, min: 0, max: 1, required: true }
+    send:
+      address: /config/solo/busmode
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_monitor_dim:
+    summary: "Switch the headphone/monitor dim on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /config/solo/dim
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_monitor_dim_gain:
+    summary: "Set the headphone/monitor dim gain (0-1 over -40 to 0 dB)"
+    params:
+      value: { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /config/solo/dimatt
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_monitor_pfl_dim:
+    summary: "Switch PFL dim of the headphone/monitor on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /config/solo/dimpfl
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_monitor_mono:
+    summary: "Switch the headphone/monitor mono on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      address: /config/solo/mono
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  mute_monitor:
+    summary: "Mute or unmute the headphone/monitor output"
+    params:
+      muted: { type: bool, default: true }
+    send:
+      address: /config/solo/mute
+      args: [ { value: "{muted:bool01}", type: int } ]
+    returns: none
+
+  set_channel_link:
+    summary: "Stereo-link an odd/even pair of input channels (1-2 ... 15-16), or unlink it"
+    params:
+      pair:   { type: enum, values: ["1-2", "3-4", "5-6", "7-8", "9-10", "11-12", "13-14", "15-16"], required: true }
+      linked: { type: bool, default: true }
+    send:
+      address: /config/chlink/{pair}
+      args: [ { value: "{linked:bool01}", type: int } ]
+    returns: none
+
+  set_bus_link:
+    summary: "Stereo-link an odd/even pair of mix buses (1-2, 3-4, 5-6), or unlink it"
+    params:
+      pair:   { type: enum, values: ["1-2", "3-4", "5-6"], required: true }
+      linked: { type: bool, default: true }
+    send:
+      address: /config/buslink/{pair}
+      args: [ { value: "{linked:bool01}", type: int } ]
+    returns: none
+
+  set_link_preference:
+    summary: "Choose which elements follow a stereo link: preamp, eq, dyn, or fdrmute (fader, mute and sends)"
+    params:
+      element: { type: enum, values: [preamp, eq, dyn, fdrmute], required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /config/linkcfg/{element}
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_automix_enable:
+    summary: "Switch automix group X or Y on or off"
+    params:
+      group:   { type: enum, values: [X, Y], required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /config/amixenable/{group}
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  set_automix_lock:
+    summary: "Switch automix group X or Y's lock on or off"
+    params:
+      group:  { type: enum, values: [X, Y], required: true }
+      locked: { type: bool, default: true }
+    send:
+      address: /config/amixlock/{group}
+      args: [ { value: "{locked:bool01}", type: int } ]
+    returns: none
+
+  set_headamp_gain:
+    summary: "Set a mic preamp's gain (0-1 over -12 to +60 dB in 0.5 dB steps). Headamp 1-16 (see the headamp quirk)"
+    params:
+      headamp: { type: int, min: 1, max: 16, required: true }
+      gain:    { type: float, min: 0.0, max: 1.0, required: true }
+    send:
+      address: /headamp/{headamp:02d}/gain
+      args: [ { value: "{gain}", type: float } ]
+    returns: none
+
+  set_headamp_phantom:
+    summary: "Switch a mic preamp's +48 V phantom power on or off. Headamp 1-16"
+    params:
+      headamp: { type: int, min: 1, max: 16, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /headamp/{headamp:02d}/phantom
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  get_headamp_gain:
+    summary: "Read a mic preamp's gain (0-1)"
+    params:
+      headamp: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/headamp/{headamp:02d}/gain" }
+    expect: { address: "/headamp/{headamp:02d}/gain", arg: 0 }
+    returns: value
+
+  get_headamp_phantom:
+    summary: "Read a mic preamp's phantom power: 1 on, 0 off"
+    params:
+      headamp: { type: int, min: 1, max: 16, required: true }
+    send: { address: "/headamp/{headamp:02d}/phantom" }
+    expect: { address: "/headamp/{headamp:02d}/phantom", arg: 0 }
+    returns: value
+
+  set_fx_type:
+    summary: "Set an effects slot's effect type, 0-60 (the product manual's effect list)"
+    params:
+      slot: { type: int, min: 1, max: 4, required: true }
+      type: { type: int, min: 0, max: 60, required: true }
+    send:
+      address: /fx/{slot}/type
+      args: [ { value: "{type}", type: int } ]
+    returns: none
+
+  get_fx_type:
+    summary: "Read an effects slot's effect type"
+    params:
+      slot: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/fx/{slot}/type" }
+    expect: { address: "/fx/{slot}/type", arg: 0 }
+    returns: value
+
+  set_fx_insert:
+    summary: "Switch an effects slot's insert flag (/fx/N/insert) on or off"
+    params:
+      slot:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      address: /fx/{slot}/insert
+      args: [ { value: "{enabled:bool01}", type: int } ]
+    returns: none
+
+  get_fx_parameter:
+    summary: "Read one of an effects slot's parameters, 01-64; the meaning depends on the effect type"
+    params:
+      slot:      { type: int, min: 1, max: 4, required: true }
+      parameter: { type: int, min: 1, max: 64, required: true }
+    send: { address: "/fx/{slot}/par/{parameter:02d}" }
+    expect: { address: "/fx/{slot}/par/{parameter:02d}", arg: 0 }
+    returns: value
+
+  set_aux_out_source:
+    summary: "Set an aux output's source: 0-15 Ch01-16, 16-17 AuxL-R, 18-25 Fx1L-Fx4R, 26-31 Bus1-6, 32-35 Send1-4, 36-37 L/R, 38-55 U1-18"
+    params:
+      output: { type: int, min: 1, max: 6, required: true }
+      source: { type: int, min: 0, max: 55, required: true }
+    send:
+      address: /routing/aux/{output:02d}/src
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_aux_out_tap:
+    summary: "Set an aux output's tap: 0 AIN, 1 AIN+M, 2 IN, 3 IN+M, 4 PREEQ, 5 PREEQ+M, 6 POSTEQ, 7 POSTEQ+M, 8 PRE, 9 PRE+M, 10 POST"
+    params:
+      output: { type: int, min: 1, max: 6, required: true }
+      tap:    { type: int, min: 0, max: 10, required: true }
+    send:
+      address: /routing/aux/{output:02d}/pos
+      args: [ { value: "{tap}", type: int } ]
+    returns: none
+
+  set_main_out_source:
+    summary: "Set the main output's source: 0 LR, 1 MON, 2-10 U0102-U1718"
+    params:
+      source: { type: int, min: 0, max: 10, required: true }
+    send:
+      address: /routing/main/01/src
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_phones_source:
+    summary: "Set the phones output's source: 0 LR, 1 MON, 2-10 U0102-U1718"
+    params:
+      source: { type: int, min: 0, max: 10, required: true }
+    send:
+      address: /routing/main/02/src
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_ultranet_source:
+    summary: "Set an ULTRANET (P16) output's source: 0-15 Ch01-16, 16-17 AuxL-R, 18-25 Fx1L-Fx4R, 26-31 Bus1-6, 32-35 Send1-4, 36-37 L/R, 38-55 U1-18"
+    params:
+      output: { type: int, min: 1, max: 16, required: true }
+      source: { type: int, min: 0, max: 55, required: true }
+    send:
+      address: /routing/p16/{output:02d}/src
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_ultranet_tap:
+    summary: "Set an ULTRANET (P16) output's tap: 0 AIN, 1 AIN+M, 2 IN, 3 IN+M, 4 PREEQ, 5 PREEQ+M, 6 POSTEQ, 7 POSTEQ+M, 8 PRE, 9 PRE+M, 10 POST"
+    params:
+      output: { type: int, min: 1, max: 16, required: true }
+      tap:    { type: int, min: 0, max: 10, required: true }
+    send:
+      address: /routing/p16/{output:02d}/pos
+      args: [ { value: "{tap}", type: int } ]
+    returns: none
+
+  set_usb_out_source:
+    summary: "Set a USB send's source: 0-15 Ch01-16, 16-17 AuxL-R, 18-25 Fx1L-Fx4R, 26-31 Bus1-6, 32-35 Send1-4, 36-37 L/R"
+    params:
+      output: { type: int, min: 1, max: 18, required: true }
+      source: { type: int, min: 0, max: 37, required: true }
+    send:
+      address: /routing/usb/{output:02d}/src
+      args: [ { value: "{source}", type: int } ]
+    returns: none
+
+  set_usb_out_tap:
+    summary: "Set a USB send's tap: 0 AIN, 1 AIN+M, 2 IN, 3 IN+M, 4 PREEQ, 5 PREEQ+M, 6 POSTEQ, 7 POSTEQ+M, 8 PRE, 9 PRE+M, 10 POST"
+    params:
+      output: { type: int, min: 1, max: 18, required: true }
+      tap:    { type: int, min: 0, max: 10, required: true }
+    send:
+      address: /routing/usb/{output:02d}/pos
+      args: [ { value: "{tap}", type: int } ]
+    returns: none
+
+  load_snapshot:
+    summary: "Load (recall) the snapshot stored in slot 1-64 (/-snap/load). See the snapshot quirk"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+    send:
+      address: /-snap/load
+      args: [ { value: "{snapshot}", type: int } ]
+    returns: none
+
+  save_snapshot:
+    summary: "Save the current mix to snapshot slot 1-64 (/-snap/save), using the name set with set_snapshot_save_name"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+    send:
+      address: /-snap/save
+      args: [ { value: "{snapshot}", type: int } ]
+    returns: none
+
+  delete_snapshot:
+    summary: "Delete the snapshot in slot 1-64 (/-snap/delete)"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+    send:
+      address: /-snap/delete
+      args: [ { value: "{snapshot}", type: int } ]
+    returns: none
+
+  set_snapshot_save_name:
+    summary: "Set the name the next save_snapshot stores (/-snap/name, 31 characters at most)"
+    params:
+      name: { type: string, max_length: 31, required: true }
+    send:
+      address: /-snap/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  get_snapshot_index:
+    summary: "Read the number of the snapshot most recently loaded or saved (1-64)"
+    send: { address: "/-snap/index" }
+    expect: { address: "/-snap/index", arg: 0 }
+    returns: value
+
+  get_snapshot_name:
+    summary: "Read the name of the snapshot most recently loaded"
+    send: { address: "/-snap/name" }
+    expect: { address: "/-snap/name", arg: 0 }
+    returns: value
+
+  get_snapshot_slot_name:
+    summary: "Read the name stored in snapshot slot 1-64"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+    send: { address: "/-snap/{snapshot:02d}/name" }
+    expect: { address: "/-snap/{snapshot:02d}/name", arg: 0 }
+    returns: value
+
+  set_snapshot_slot_name:
+    summary: "Rename the snapshot in slot 1-64 at once, without a save (31 characters at most)"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+      name:     { type: string, max_length: 31, required: true }
+    send:
+      address: /-snap/{snapshot:02d}/name
+      args: [ { value: "{name}", type: string } ]
+    returns: none
+
+  get_snapshot_scope:
+    summary: "Read the recall scope of snapshot slot 1-64: 59 characters, '+' recalled, '-' not"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+    send: { address: "/-snap/{snapshot:02d}/scope" }
+    expect: { address: "/-snap/{snapshot:02d}/scope", arg: 0 }
+    returns: value
+
+  set_snapshot_scope:
+    summary: "Set the recall scope of snapshot slot 1-64: 59 characters in the document's order, '+' recalled, '-' not"
+    params:
+      snapshot: { type: int, min: 1, max: 64, required: true }
+      scope:    { type: string, pattern: "^[+-]{59}$", required: true }
+    send:
+      address: /-snap/{snapshot:02d}/scope
+      args: [ { value: "{scope}", type: string } ]
+    returns: none
+
+  set_recorder_state:
+    summary: "Drive the USB stick recorder: 0 STOP, 1 PLAY PAUSE, 2 PLAY, 3 RECORD PAUSE, 4 RECORD, 5 FF, 6 REW"
+    params:
+      state: { type: int, min: 0, max: 6, required: true }
+    send:
+      address: /-stat/tape/state
+      args: [ { value: "{state}", type: int } ]
+    returns: none
+
+  get_recorder_state:
+    summary: "Read the USB recorder state (0 STOP, 1 PPAUSE, 2 PLAY, 3 RPAUSE, 4 REC, 5 FF, 6 REW)"
+    send: { address: "/-stat/tape/state" }
+    expect: { address: "/-stat/tape/state", arg: 0 }
+    returns: value
+
+  get_usb_mounted:
+    summary: "Read whether a USB stick is mounted (1) or not (0)"
+    send: { address: "/-stat/usbmounted" }
+    expect: { address: "/-stat/usbmounted", arg: 0 }
+    returns: value
+
+  save_state:
+    summary: "Save the mixer's current state (/-action/savestate)"
+    send:
+      address: /-action/savestate
+      args: [ { value: "1", type: int } ]
+    returns: none
+
+  get_mixer_name:
+    summary: "Read the mixer's name (/-prefs/name)"
+    send: { address: "/-prefs/name" }
+    expect: { address: "/-prefs/name", arg: 0 }
+    returns: value
+
+  get_console_model:
+    summary: "Read the mixer model from /info (the device_model string)"
+    send: { address: "/info" }
+    expect: { address: "/info", arg: 2 }
+    returns: value
+
+  get_firmware_version:
+    summary: "Read the mixer firmware from /info (the device_version string)"
+    send: { address: "/info" }
+    expect: { address: "/info", arg: 3 }
+    returns: value
+
+  get_console_name:
+    summary: "Read the mixer name from /info (the device_name string)"
+    send: { address: "/info" }
+    expect: { address: "/info", arg: 1 }
+    returns: value
+
+  get_status:
+    summary: "Read /status: 'active' or 'standby', whether the mixer can currently fulfil subscriptions"
+    send: { address: "/status" }
+    expect: { address: "/status", arg: 0 }
+    returns: value
+
+telemetry:
+  # /xremote asks the mixer to send every parameter change to this client for
+  # 10 seconds, to at most eight clients (protocol document p.1); renewed every 9.
+  subscribe:
+    send: ["/xremote"]
+    every_ms: 9000
+  # The current values, asked once on connecting, one at a time: /xremote only
+  # reports changes. The list is explicit because the format has no loops:
+  # mute, fader and name of every strip, DCAs, mute groups, solo, the 16
+  # headamps, the current snapshot and the headphone/monitor level and source.
+  poll:
+    send:
+      - "/ch/01/mix/on"
+      - "/ch/01/mix/fader"
+      - "/ch/01/config/name"
+      - "/ch/02/mix/on"
+      - "/ch/02/mix/fader"
+      - "/ch/02/config/name"
+      - "/ch/03/mix/on"
+      - "/ch/03/mix/fader"
+      - "/ch/03/config/name"
+      - "/ch/04/mix/on"
+      - "/ch/04/mix/fader"
+      - "/ch/04/config/name"
+      - "/ch/05/mix/on"
+      - "/ch/05/mix/fader"
+      - "/ch/05/config/name"
+      - "/ch/06/mix/on"
+      - "/ch/06/mix/fader"
+      - "/ch/06/config/name"
+      - "/ch/07/mix/on"
+      - "/ch/07/mix/fader"
+      - "/ch/07/config/name"
+      - "/ch/08/mix/on"
+      - "/ch/08/mix/fader"
+      - "/ch/08/config/name"
+      - "/ch/09/mix/on"
+      - "/ch/09/mix/fader"
+      - "/ch/09/config/name"
+      - "/ch/10/mix/on"
+      - "/ch/10/mix/fader"
+      - "/ch/10/config/name"
+      - "/ch/11/mix/on"
+      - "/ch/11/mix/fader"
+      - "/ch/11/config/name"
+      - "/ch/12/mix/on"
+      - "/ch/12/mix/fader"
+      - "/ch/12/config/name"
+      - "/ch/13/mix/on"
+      - "/ch/13/mix/fader"
+      - "/ch/13/config/name"
+      - "/ch/14/mix/on"
+      - "/ch/14/mix/fader"
+      - "/ch/14/config/name"
+      - "/ch/15/mix/on"
+      - "/ch/15/mix/fader"
+      - "/ch/15/config/name"
+      - "/ch/16/mix/on"
+      - "/ch/16/mix/fader"
+      - "/ch/16/config/name"
+      - "/rtn/aux/mix/on"
+      - "/rtn/aux/mix/fader"
+      - "/rtn/aux/config/name"
+      - "/rtn/1/mix/on"
+      - "/rtn/1/mix/fader"
+      - "/rtn/1/config/name"
+      - "/rtn/2/mix/on"
+      - "/rtn/2/mix/fader"
+      - "/rtn/2/config/name"
+      - "/rtn/3/mix/on"
+      - "/rtn/3/mix/fader"
+      - "/rtn/3/config/name"
+      - "/rtn/4/mix/on"
+      - "/rtn/4/mix/fader"
+      - "/rtn/4/config/name"
+      - "/bus/1/mix/on"
+      - "/bus/1/mix/fader"
+      - "/bus/1/config/name"
+      - "/bus/2/mix/on"
+      - "/bus/2/mix/fader"
+      - "/bus/2/config/name"
+      - "/bus/3/mix/on"
+      - "/bus/3/mix/fader"
+      - "/bus/3/config/name"
+      - "/bus/4/mix/on"
+      - "/bus/4/mix/fader"
+      - "/bus/4/config/name"
+      - "/bus/5/mix/on"
+      - "/bus/5/mix/fader"
+      - "/bus/5/config/name"
+      - "/bus/6/mix/on"
+      - "/bus/6/mix/fader"
+      - "/bus/6/config/name"
+      - "/fxsend/1/mix/on"
+      - "/fxsend/1/mix/fader"
+      - "/fxsend/1/config/name"
+      - "/fxsend/2/mix/on"
+      - "/fxsend/2/mix/fader"
+      - "/fxsend/2/config/name"
+      - "/fxsend/3/mix/on"
+      - "/fxsend/3/mix/fader"
+      - "/fxsend/3/config/name"
+      - "/fxsend/4/mix/on"
+      - "/fxsend/4/mix/fader"
+      - "/fxsend/4/config/name"
+      - "/lr/mix/on"
+      - "/lr/mix/fader"
+      - "/lr/config/name"
+      - "/dca/1/on"
+      - "/dca/1/fader"
+      - "/dca/1/config/name"
+      - "/dca/2/on"
+      - "/dca/2/fader"
+      - "/dca/2/config/name"
+      - "/dca/3/on"
+      - "/dca/3/fader"
+      - "/dca/3/config/name"
+      - "/dca/4/on"
+      - "/dca/4/fader"
+      - "/dca/4/config/name"
+      - "/config/mute/1"
+      - "/config/mute/2"
+      - "/config/mute/3"
+      - "/config/mute/4"
+      - "/-stat/solo"
+      - "/headamp/01/gain"
+      - "/headamp/01/phantom"
+      - "/headamp/02/gain"
+      - "/headamp/02/phantom"
+      - "/headamp/03/gain"
+      - "/headamp/03/phantom"
+      - "/headamp/04/gain"
+      - "/headamp/04/phantom"
+      - "/headamp/05/gain"
+      - "/headamp/05/phantom"
+      - "/headamp/06/gain"
+      - "/headamp/06/phantom"
+      - "/headamp/07/gain"
+      - "/headamp/07/phantom"
+      - "/headamp/08/gain"
+      - "/headamp/08/phantom"
+      - "/headamp/09/gain"
+      - "/headamp/09/phantom"
+      - "/headamp/10/gain"
+      - "/headamp/10/phantom"
+      - "/headamp/11/gain"
+      - "/headamp/11/phantom"
+      - "/headamp/12/gain"
+      - "/headamp/12/phantom"
+      - "/headamp/13/gain"
+      - "/headamp/13/phantom"
+      - "/headamp/14/gain"
+      - "/headamp/14/phantom"
+      - "/headamp/15/gain"
+      - "/headamp/15/phantom"
+      - "/headamp/16/gain"
+      - "/headamp/16/phantom"
+      - "/-snap/index"
+      - "/-snap/name"
+      - "/config/solo/level"
+      - "/config/solo/source"
+  updates:
+    - address: "^/ch/(\\d\\d)/mix/on$"
+      state: { "channels.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/ch/(\\d\\d)/mix/fader$"
+      state: { "channels.{1}.fader": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/config/name$"
+      state: { "channels.{1}.name": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/config/color$"
+      state: { "channels.{1}.color": "{arg0}" }
+    - address: "^/rtn/aux/mix/on$"
+      state: { "aux.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/rtn/aux/mix/fader$"
+      state: { "aux.fader": "{arg0}" }
+    - address: "^/rtn/aux/config/name$"
+      state: { "aux.name": "{arg0}" }
+    - address: "^/rtn/aux/config/color$"
+      state: { "aux.color": "{arg0}" }
+    - address: "^/rtn/([1-4])/mix/on$"
+      state: { "fx_returns.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/rtn/([1-4])/mix/fader$"
+      state: { "fx_returns.{1}.fader": "{arg0}" }
+    - address: "^/rtn/([1-4])/config/name$"
+      state: { "fx_returns.{1}.name": "{arg0}" }
+    - address: "^/rtn/([1-4])/config/color$"
+      state: { "fx_returns.{1}.color": "{arg0}" }
+    - address: "^/bus/([1-6])/mix/on$"
+      state: { "buses.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/bus/([1-6])/mix/fader$"
+      state: { "buses.{1}.fader": "{arg0}" }
+    - address: "^/bus/([1-6])/config/name$"
+      state: { "buses.{1}.name": "{arg0}" }
+    - address: "^/bus/([1-6])/config/color$"
+      state: { "buses.{1}.color": "{arg0}" }
+    - address: "^/fxsend/([1-4])/mix/on$"
+      state: { "fx_sends.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/fxsend/([1-4])/mix/fader$"
+      state: { "fx_sends.{1}.fader": "{arg0}" }
+    - address: "^/fxsend/([1-4])/config/name$"
+      state: { "fx_sends.{1}.name": "{arg0}" }
+    - address: "^/fxsend/([1-4])/config/color$"
+      state: { "fx_sends.{1}.color": "{arg0}" }
+    - address: "^/lr/mix/on$"
+      state: { "main.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/lr/mix/fader$"
+      state: { "main.fader": "{arg0}" }
+    - address: "^/lr/config/name$"
+      state: { "main.name": "{arg0}" }
+    - address: "^/lr/config/color$"
+      state: { "main.color": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/mix/pan$"
+      state: { "channels.{1}.pan": "{arg0}" }
+    - address: "^/rtn/aux/mix/pan$"
+      state: { "aux.pan": "{arg0}" }
+    - address: "^/rtn/([1-4])/mix/pan$"
+      state: { "fx_returns.{1}.pan": "{arg0}" }
+    - address: "^/bus/([1-6])/mix/pan$"
+      state: { "buses.{1}.pan": "{arg0}" }
+    - address: "^/lr/mix/pan$"
+      state: { "main.pan": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/mix/(\\d\\d)/level$"
+      state: { "channels.{1}.sends.{2}.level": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/mix/(\\d\\d)/pan$"
+      state: { "channels.{1}.sends.{2}.pan": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/mix/(\\d\\d)/tap$"
+      state: { "channels.{1}.sends.{2}.tap": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/mix/(\\d\\d)/grpon$"
+      state: { "channels.{1}.sends.{2}.group_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/aux/mix/(\\d\\d)/level$"
+      state: { "aux.sends.{1}.level": "{arg0}" }
+    - address: "^/rtn/aux/mix/(\\d\\d)/pan$"
+      state: { "aux.sends.{1}.pan": "{arg0}" }
+    - address: "^/rtn/aux/mix/(\\d\\d)/tap$"
+      state: { "aux.sends.{1}.tap": "{arg0}" }
+    - address: "^/rtn/aux/mix/(\\d\\d)/grpon$"
+      state: { "aux.sends.{1}.group_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/([1-4])/mix/(\\d\\d)/level$"
+      state: { "fx_returns.{1}.sends.{2}.level": "{arg0}" }
+    - address: "^/rtn/([1-4])/mix/(\\d\\d)/pan$"
+      state: { "fx_returns.{1}.sends.{2}.pan": "{arg0}" }
+    - address: "^/rtn/([1-4])/mix/(\\d\\d)/tap$"
+      state: { "fx_returns.{1}.sends.{2}.tap": "{arg0}" }
+    - address: "^/rtn/([1-4])/mix/(\\d\\d)/grpon$"
+      state: { "fx_returns.{1}.sends.{2}.group_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/mix/lr$"
+      state: { "channels.{1}.main_assign": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/aux/mix/lr$"
+      state: { "aux.main_assign": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/([1-4])/mix/lr$"
+      state: { "fx_returns.{1}.main_assign": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/mix/lr$"
+      state: { "buses.{1}.main_assign": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/grp/dca$"
+      state: { "channels.{1}.dca_groups": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/grp/mute$"
+      state: { "channels.{1}.mute_groups": "{arg0}" }
+    - address: "^/bus/([1-6])/grp/dca$"
+      state: { "buses.{1}.dca_groups": "{arg0}" }
+    - address: "^/bus/([1-6])/grp/mute$"
+      state: { "buses.{1}.mute_groups": "{arg0}" }
+    - address: "^/fxsend/([1-4])/grp/dca$"
+      state: { "fx_sends.{1}.dca_groups": "{arg0}" }
+    - address: "^/fxsend/([1-4])/grp/mute$"
+      state: { "fx_sends.{1}.mute_groups": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/eq/on$"
+      state: { "channels.{1}.eq_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/aux/eq/on$"
+      state: { "aux.eq_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/eq/on$"
+      state: { "buses.{1}.eq_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/lr/eq/on$"
+      state: { "main.eq_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/eq/mode$"
+      state: { "buses.{1}.eq_mode": "{arg0}" }
+    - address: "^/lr/eq/mode$"
+      state: { "main.eq_mode": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/eq/([1-6])/type$"
+      state: { "channels.{1}.eq.bands.{2}.type": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/eq/([1-6])/f$"
+      state: { "channels.{1}.eq.bands.{2}.frequency": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/eq/([1-6])/g$"
+      state: { "channels.{1}.eq.bands.{2}.gain": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/eq/([1-6])/q$"
+      state: { "channels.{1}.eq.bands.{2}.q": "{arg0}" }
+    - address: "^/rtn/aux/eq/([1-6])/type$"
+      state: { "aux.eq.bands.{1}.type": "{arg0}" }
+    - address: "^/rtn/aux/eq/([1-6])/f$"
+      state: { "aux.eq.bands.{1}.frequency": "{arg0}" }
+    - address: "^/rtn/aux/eq/([1-6])/g$"
+      state: { "aux.eq.bands.{1}.gain": "{arg0}" }
+    - address: "^/rtn/aux/eq/([1-6])/q$"
+      state: { "aux.eq.bands.{1}.q": "{arg0}" }
+    - address: "^/rtn/([1-4])/eq/([1-6])/type$"
+      state: { "fx_returns.{1}.eq.bands.{2}.type": "{arg0}" }
+    - address: "^/rtn/([1-4])/eq/([1-6])/f$"
+      state: { "fx_returns.{1}.eq.bands.{2}.frequency": "{arg0}" }
+    - address: "^/rtn/([1-4])/eq/([1-6])/g$"
+      state: { "fx_returns.{1}.eq.bands.{2}.gain": "{arg0}" }
+    - address: "^/rtn/([1-4])/eq/([1-6])/q$"
+      state: { "fx_returns.{1}.eq.bands.{2}.q": "{arg0}" }
+    - address: "^/bus/([1-6])/eq/([1-6])/type$"
+      state: { "buses.{1}.eq.bands.{2}.type": "{arg0}" }
+    - address: "^/bus/([1-6])/eq/([1-6])/f$"
+      state: { "buses.{1}.eq.bands.{2}.frequency": "{arg0}" }
+    - address: "^/bus/([1-6])/eq/([1-6])/g$"
+      state: { "buses.{1}.eq.bands.{2}.gain": "{arg0}" }
+    - address: "^/bus/([1-6])/eq/([1-6])/q$"
+      state: { "buses.{1}.eq.bands.{2}.q": "{arg0}" }
+    - address: "^/lr/eq/([1-6])/type$"
+      state: { "main.eq.bands.{1}.type": "{arg0}" }
+    - address: "^/lr/eq/([1-6])/f$"
+      state: { "main.eq.bands.{1}.frequency": "{arg0}" }
+    - address: "^/lr/eq/([1-6])/g$"
+      state: { "main.eq.bands.{1}.gain": "{arg0}" }
+    - address: "^/lr/eq/([1-6])/q$"
+      state: { "main.eq.bands.{1}.q": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/on$"
+      state: { "channels.{1}.dyn_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/dyn/mode$"
+      state: { "channels.{1}.dyn.mode": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/det$"
+      state: { "channels.{1}.dyn.detector": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/env$"
+      state: { "channels.{1}.dyn.envelope": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/thr$"
+      state: { "channels.{1}.dyn.threshold": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/ratio$"
+      state: { "channels.{1}.dyn.ratio": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/knee$"
+      state: { "channels.{1}.dyn.knee": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/mgain$"
+      state: { "channels.{1}.dyn.makeup_gain": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/attack$"
+      state: { "channels.{1}.dyn.attack": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/hold$"
+      state: { "channels.{1}.dyn.hold": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/release$"
+      state: { "channels.{1}.dyn.release": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/mix$"
+      state: { "channels.{1}.dyn.mix": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/keysrc$"
+      state: { "channels.{1}.dyn.key_source": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/auto$"
+      state: { "channels.{1}.dyn.auto": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/dyn/filter/on$"
+      state: { "channels.{1}.dyn.filter_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/dyn/filter/type$"
+      state: { "channels.{1}.dyn.filter_type": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/dyn/filter/f$"
+      state: { "channels.{1}.dyn.filter_frequency": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/on$"
+      state: { "buses.{1}.dyn_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/dyn/mode$"
+      state: { "buses.{1}.dyn.mode": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/det$"
+      state: { "buses.{1}.dyn.detector": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/env$"
+      state: { "buses.{1}.dyn.envelope": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/thr$"
+      state: { "buses.{1}.dyn.threshold": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/ratio$"
+      state: { "buses.{1}.dyn.ratio": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/knee$"
+      state: { "buses.{1}.dyn.knee": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/mgain$"
+      state: { "buses.{1}.dyn.makeup_gain": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/attack$"
+      state: { "buses.{1}.dyn.attack": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/hold$"
+      state: { "buses.{1}.dyn.hold": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/release$"
+      state: { "buses.{1}.dyn.release": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/mix$"
+      state: { "buses.{1}.dyn.mix": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/keysrc$"
+      state: { "buses.{1}.dyn.key_source": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/auto$"
+      state: { "buses.{1}.dyn.auto": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/dyn/filter/on$"
+      state: { "buses.{1}.dyn.filter_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/dyn/filter/type$"
+      state: { "buses.{1}.dyn.filter_type": "{arg0}" }
+    - address: "^/bus/([1-6])/dyn/filter/f$"
+      state: { "buses.{1}.dyn.filter_frequency": "{arg0}" }
+    - address: "^/lr/dyn/on$"
+      state: { "main.dyn_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/lr/dyn/mode$"
+      state: { "main.dyn.mode": "{arg0}" }
+    - address: "^/lr/dyn/det$"
+      state: { "main.dyn.detector": "{arg0}" }
+    - address: "^/lr/dyn/env$"
+      state: { "main.dyn.envelope": "{arg0}" }
+    - address: "^/lr/dyn/thr$"
+      state: { "main.dyn.threshold": "{arg0}" }
+    - address: "^/lr/dyn/ratio$"
+      state: { "main.dyn.ratio": "{arg0}" }
+    - address: "^/lr/dyn/knee$"
+      state: { "main.dyn.knee": "{arg0}" }
+    - address: "^/lr/dyn/mgain$"
+      state: { "main.dyn.makeup_gain": "{arg0}" }
+    - address: "^/lr/dyn/attack$"
+      state: { "main.dyn.attack": "{arg0}" }
+    - address: "^/lr/dyn/hold$"
+      state: { "main.dyn.hold": "{arg0}" }
+    - address: "^/lr/dyn/release$"
+      state: { "main.dyn.release": "{arg0}" }
+    - address: "^/lr/dyn/mix$"
+      state: { "main.dyn.mix": "{arg0}" }
+    - address: "^/lr/dyn/keysrc$"
+      state: { "main.dyn.key_source": "{arg0}" }
+    - address: "^/lr/dyn/auto$"
+      state: { "main.dyn.auto": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/lr/dyn/filter/on$"
+      state: { "main.dyn.filter_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/lr/dyn/filter/type$"
+      state: { "main.dyn.filter_type": "{arg0}" }
+    - address: "^/lr/dyn/filter/f$"
+      state: { "main.dyn.filter_frequency": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/on$"
+      state: { "channels.{1}.gate_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/gate/mode$"
+      state: { "channels.{1}.gate.mode": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/thr$"
+      state: { "channels.{1}.gate.threshold": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/range$"
+      state: { "channels.{1}.gate.range": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/attack$"
+      state: { "channels.{1}.gate.attack": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/hold$"
+      state: { "channels.{1}.gate.hold": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/release$"
+      state: { "channels.{1}.gate.release": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/keysrc$"
+      state: { "channels.{1}.gate.key_source": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/filter/on$"
+      state: { "channels.{1}.gate.filter_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/gate/filter/type$"
+      state: { "channels.{1}.gate.filter_type": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/gate/filter/f$"
+      state: { "channels.{1}.gate.filter_frequency": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/insert/on$"
+      state: { "channels.{1}.insert_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/insert/fxslot$"
+      state: { "channels.{1}.insert_select": "{arg0}" }
+    - address: "^/bus/([1-6])/insert/on$"
+      state: { "buses.{1}.insert_on": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/bus/([1-6])/insert/fxslot$"
+      state: { "buses.{1}.insert_select": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/preamp/rtntrim$"
+      state: { "channels.{1}.usb_trim": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/preamp/rtnsw$"
+      state: { "channels.{1}.usb_return": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/aux/preamp/rtntrim$"
+      state: { "aux.usb_trim": "{arg0}" }
+    - address: "^/rtn/aux/preamp/rtnsw$"
+      state: { "aux.usb_return": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/([1-4])/preamp/rtntrim$"
+      state: { "fx_returns.{1}.usb_trim": "{arg0}" }
+    - address: "^/rtn/([1-4])/preamp/rtnsw$"
+      state: { "fx_returns.{1}.usb_return": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/rtn/aux/config/rtnsrc$"
+      state: { "aux.usb_source": "{arg0}" }
+    - address: "^/rtn/([1-4])/config/rtnsrc$"
+      state: { "fx_returns.{1}.usb_source": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/preamp/invert$"
+      state: { "channels.{1}.invert": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/preamp/hpon$"
+      state: { "channels.{1}.low_cut": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/ch/(\\d\\d)/preamp/hpf$"
+      state: { "channels.{1}.low_cut_frequency": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/config/insrc$"
+      state: { "channels.{1}.source": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/config/rtnsrc$"
+      state: { "channels.{1}.usb_source": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/automix/group$"
+      state: { "channels.{1}.automix_group": "{arg0}" }
+    - address: "^/ch/(\\d\\d)/automix/weight$"
+      state: { "channels.{1}.automix_weight": "{arg0}" }
+    - address: "^/dca/([1-4])/on$"
+      state: { "dcas.{1}.mute": { value: "{arg0}", map: { "0": true, "1": false } } }
+    - address: "^/dca/([1-4])/fader$"
+      state: { "dcas.{1}.fader": "{arg0}" }
+    - address: "^/dca/([1-4])/config/name$"
+      state: { "dcas.{1}.name": "{arg0}" }
+    - address: "^/dca/([1-4])/config/color$"
+      state: { "dcas.{1}.color": "{arg0}" }
+    - address: "^/-stat/solosw/(0[1-9]|1[0-6])$"
+      state: { "channels.{1}.solo": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/-stat/solo$"
+      state: { "solo_active": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/mute/([1-4])$"
+      state: { "mute_groups.{1}.muted": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/solo/level$"
+      state: { "monitor.level": "{arg0}" }
+    - address: "^/config/solo/source$"
+      state: { "monitor.source": "{arg0}" }
+    - address: "^/config/solo/sourcetrim$"
+      state: { "monitor.source_trim": "{arg0}" }
+    - address: "^/config/solo/chmode$"
+      state: { "monitor.channel_mode": "{arg0}" }
+    - address: "^/config/solo/busmode$"
+      state: { "monitor.bus_mode": "{arg0}" }
+    - address: "^/config/solo/dim$"
+      state: { "monitor.dim": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/solo/dimatt$"
+      state: { "monitor.dim_gain": "{arg0}" }
+    - address: "^/config/solo/dimpfl$"
+      state: { "monitor.pfl_dim": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/solo/mono$"
+      state: { "monitor.mono": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/solo/mute$"
+      state: { "monitor.mute": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/chlink/(\\d+-\\d+)$"
+      state: { "channel_links.{1}": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/buslink/(\\d-\\d)$"
+      state: { "bus_links.{1}": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/linkcfg/(preamp|eq|dyn|fdrmute)$"
+      state: { "link_preferences.{1}": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/amixenable/(X|Y)$"
+      state: { "automix.{1}.enabled": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/config/amixlock/(X|Y)$"
+      state: { "automix.{1}.locked": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/headamp/(\\d\\d)/gain$"
+      state: { "headamps.{1}.gain": "{arg0}" }
+    - address: "^/headamp/(\\d\\d)/phantom$"
+      state: { "headamps.{1}.phantom": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/fx/([1-4])/type$"
+      state: { "fx.{1}.type": "{arg0}" }
+    - address: "^/fx/([1-4])/insert$"
+      state: { "fx.{1}.insert": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/fx/([1-4])/par/(\\d\\d)$"
+      state: { "fx.{1}.parameters.{2}": "{arg0}" }
+    - address: "^/routing/aux/(\\d\\d)/src$"
+      state: { "routing.aux.{1}.source": "{arg0}" }
+    - address: "^/routing/aux/(\\d\\d)/pos$"
+      state: { "routing.aux.{1}.tap": "{arg0}" }
+    - address: "^/routing/main/01/src$"
+      state: { "routing.main_source": "{arg0}" }
+    - address: "^/routing/main/02/src$"
+      state: { "routing.phones_source": "{arg0}" }
+    - address: "^/routing/p16/(\\d\\d)/src$"
+      state: { "routing.ultranet.{1}.source": "{arg0}" }
+    - address: "^/routing/p16/(\\d\\d)/pos$"
+      state: { "routing.ultranet.{1}.tap": "{arg0}" }
+    - address: "^/routing/usb/(\\d\\d)/src$"
+      state: { "routing.usb.{1}.source": "{arg0}" }
+    - address: "^/routing/usb/(\\d\\d)/pos$"
+      state: { "routing.usb.{1}.tap": "{arg0}" }
+    - address: "^/-snap/index$"
+      state: { "snapshot.index": "{arg0}" }
+    - address: "^/-snap/name$"
+      state: { "snapshot.name": "{arg0}" }
+    - address: "^/-snap/(\\d\\d)/name$"
+      state: { "snapshots.{1}.name": "{arg0}" }
+    - address: "^/-snap/(\\d\\d)/scope$"
+      state: { "snapshots.{1}.scope": "{arg0}" }
+    - address: "^/-stat/tape/state$"
+      state: { "recorder.state": "{arg0}" }
+    - address: "^/-stat/tape/etime$"
+      state: { "recorder.elapsed": "{arg0}" }
+    - address: "^/-stat/tape/rtime$"
+      state: { "recorder.remaining": "{arg0}" }
+    - address: "^/-stat/tape/file$"
+      state: { "recorder.file": "{arg0}" }
+    - address: "^/-stat/usbmounted$"
+      state: { "recorder.usb_mounted": { value: "{arg0}", map: { "0": false, "1": true } } }
+    - address: "^/-prefs/name$"
+      state: { "console.name": "{arg0}" }
+
+state:
+  channels.*.mute:                   { type: bool, description: "Input channel muted (mix/on inverted)" }
+  channels.*.fader:                  { type: float, description: "Input channel fader position 0-1 (0.75 = 0 dB), not dB" }
+  channels.*.name:                   { type: string, description: "Input channel scribble-strip name" }
+  channels.*.color:                  { type: int, description: "Input channel scribble-strip colour 0-15 (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))" }
+  aux.mute:                          { type: bool, description: "Aux/USB return muted (mix/on inverted)" }
+  aux.fader:                         { type: float, description: "Aux/USB return fader position 0-1 (0.75 = 0 dB), not dB" }
+  aux.name:                          { type: string, description: "Aux/USB return scribble-strip name" }
+  aux.color:                         { type: int, description: "Aux/USB return scribble-strip colour 0-15 (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))" }
+  fx_returns.*.mute:                 { type: bool, description: "FX return muted (mix/on inverted)" }
+  fx_returns.*.fader:                { type: float, description: "FX return fader position 0-1 (0.75 = 0 dB), not dB" }
+  fx_returns.*.name:                 { type: string, description: "FX return scribble-strip name" }
+  fx_returns.*.color:                { type: int, description: "FX return scribble-strip colour 0-15 (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))" }
+  buses.*.mute:                      { type: bool, description: "Mix bus muted (mix/on inverted)" }
+  buses.*.fader:                     { type: float, description: "Mix bus fader position 0-1 (0.75 = 0 dB), not dB" }
+  buses.*.name:                      { type: string, description: "Mix bus scribble-strip name" }
+  buses.*.color:                     { type: int, description: "Mix bus scribble-strip colour 0-15 (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))" }
+  fx_sends.*.mute:                   { type: bool, description: "FX send bus muted (mix/on inverted)" }
+  fx_sends.*.fader:                  { type: float, description: "FX send bus fader position 0-1 (0.75 = 0 dB), not dB" }
+  fx_sends.*.name:                   { type: string, description: "FX send bus scribble-strip name" }
+  fx_sends.*.color:                  { type: int, description: "FX send bus scribble-strip colour 0-15 (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))" }
+  main.mute:                         { type: bool, description: "Main LR bus muted (mix/on inverted)" }
+  main.fader:                        { type: float, description: "Main LR bus fader position 0-1 (0.75 = 0 dB), not dB" }
+  main.name:                         { type: string, description: "Main LR bus scribble-strip name" }
+  main.color:                        { type: int, description: "Main LR bus scribble-strip colour 0-15 (0 OFF, 1 RD, 2 GN, 3 YE, 4 BL, 5 MG, 6 CY, 7 WH, 8-15 the same inverted (OFFi...WHi))" }
+  channels.*.pan:                    { type: float, description: "Input channel pan 0-1 (0.5 centre)" }
+  aux.pan:                           { type: float, description: "Aux/USB return pan 0-1 (0.5 centre)" }
+  fx_returns.*.pan:                  { type: float, description: "FX return pan 0-1 (0.5 centre)" }
+  buses.*.pan:                       { type: float, description: "Mix bus pan 0-1 (0.5 centre)" }
+  main.pan:                          { type: float, description: "Main LR bus pan 0-1 (0.5 centre)" }
+  channels.*.sends.*.level:          { type: float, description: "Input channel send level to bus N (1-6 mix buses, 7-10 FX sends), 0-1" }
+  channels.*.sends.*.pan:            { type: float, description: "Input channel send pan to bus N, 0-1" }
+  channels.*.sends.*.tap:            { type: int, description: "Input channel send tap to bus N (0 IN, 1 PREEQ, 2 POSTEQ, 3 PRE, 4 POST, 5 GRP)" }
+  channels.*.sends.*.group_on:       { type: bool, description: "Input channel send group flag to bus N" }
+  aux.sends.*.level:                 { type: float, description: "Aux/USB return send level to bus N (1-6 mix buses, 7-10 FX sends), 0-1" }
+  aux.sends.*.pan:                   { type: float, description: "Aux/USB return send pan to bus N, 0-1" }
+  aux.sends.*.tap:                   { type: int, description: "Aux/USB return send tap to bus N (0 IN, 1 PREEQ, 2 POSTEQ, 3 PRE, 4 POST, 5 GRP)" }
+  aux.sends.*.group_on:              { type: bool, description: "Aux/USB return send group flag to bus N" }
+  fx_returns.*.sends.*.level:        { type: float, description: "FX return send level to bus N (1-6 mix buses, 7-10 FX sends), 0-1" }
+  fx_returns.*.sends.*.pan:          { type: float, description: "FX return send pan to bus N, 0-1" }
+  fx_returns.*.sends.*.tap:          { type: int, description: "FX return send tap to bus N (0 IN, 1 PREEQ, 2 POSTEQ, 3 PRE, 4 POST, 5 GRP)" }
+  fx_returns.*.sends.*.group_on:     { type: bool, description: "FX return send group flag to bus N" }
+  channels.*.main_assign:            { type: bool, description: "Input channel assigned to the main LR bus" }
+  aux.main_assign:                   { type: bool, description: "Aux/USB return assigned to the main LR bus" }
+  fx_returns.*.main_assign:          { type: bool, description: "FX return assigned to the main LR bus" }
+  buses.*.main_assign:               { type: bool, description: "Mix bus assigned to the main LR bus" }
+  channels.*.dca_groups:             { type: int, description: "Input channel DCA membership bitmap, bit 0 = DCA 1" }
+  channels.*.mute_groups:            { type: int, description: "Input channel mute-group membership bitmap, bit 0 = group 1" }
+  buses.*.dca_groups:                { type: int, description: "Mix bus DCA membership bitmap, bit 0 = DCA 1" }
+  buses.*.mute_groups:               { type: int, description: "Mix bus mute-group membership bitmap, bit 0 = group 1" }
+  fx_sends.*.dca_groups:             { type: int, description: "FX send bus DCA membership bitmap, bit 0 = DCA 1" }
+  fx_sends.*.mute_groups:            { type: int, description: "FX send bus mute-group membership bitmap, bit 0 = group 1" }
+  channels.*.eq_on:                  { type: bool, description: "Input channel EQ on" }
+  aux.eq_on:                         { type: bool, description: "Aux/USB return EQ on" }
+  buses.*.eq_on:                     { type: bool, description: "Mix bus EQ on" }
+  main.eq_on:                        { type: bool, description: "Main LR bus EQ on" }
+  buses.*.eq_mode:                   { type: int, description: "Mix bus EQ mode (0 PEQ, 1 GEQ, 2 TEQ)" }
+  main.eq_mode:                      { type: int, description: "Main LR bus EQ mode (0 PEQ, 1 GEQ, 2 TEQ)" }
+  channels.*.eq.bands.*.type:        { type: int, description: "Input channel EQ band N type, wire value (0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut)" }
+  channels.*.eq.bands.*.frequency:   { type: float, description: "Input channel EQ band N frequency, wire value 0-1" }
+  channels.*.eq.bands.*.gain:        { type: float, description: "Input channel EQ band N gain, wire value 0-1" }
+  channels.*.eq.bands.*.q:           { type: float, description: "Input channel EQ band N Q, wire value 0-1" }
+  aux.eq.bands.*.type:               { type: int, description: "Aux/USB return EQ band N type, wire value (0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut)" }
+  aux.eq.bands.*.frequency:          { type: float, description: "Aux/USB return EQ band N frequency, wire value 0-1" }
+  aux.eq.bands.*.gain:               { type: float, description: "Aux/USB return EQ band N gain, wire value 0-1" }
+  aux.eq.bands.*.q:                  { type: float, description: "Aux/USB return EQ band N Q, wire value 0-1" }
+  fx_returns.*.eq.bands.*.type:      { type: int, description: "FX return EQ band N type, wire value (0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut)" }
+  fx_returns.*.eq.bands.*.frequency: { type: float, description: "FX return EQ band N frequency, wire value 0-1" }
+  fx_returns.*.eq.bands.*.gain:      { type: float, description: "FX return EQ band N gain, wire value 0-1" }
+  fx_returns.*.eq.bands.*.q:         { type: float, description: "FX return EQ band N Q, wire value 0-1" }
+  buses.*.eq.bands.*.type:           { type: int, description: "Mix bus EQ band N type, wire value (0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut)" }
+  buses.*.eq.bands.*.frequency:      { type: float, description: "Mix bus EQ band N frequency, wire value 0-1" }
+  buses.*.eq.bands.*.gain:           { type: float, description: "Mix bus EQ band N gain, wire value 0-1" }
+  buses.*.eq.bands.*.q:              { type: float, description: "Mix bus EQ band N Q, wire value 0-1" }
+  main.eq.bands.*.type:              { type: int, description: "Main LR bus EQ band N type, wire value (0 LCut, 1 LShv, 2 PEQ, 3 VEQ, 4 HShv, 5 HCut)" }
+  main.eq.bands.*.frequency:         { type: float, description: "Main LR bus EQ band N frequency, wire value 0-1" }
+  main.eq.bands.*.gain:              { type: float, description: "Main LR bus EQ band N gain, wire value 0-1" }
+  main.eq.bands.*.q:                 { type: float, description: "Main LR bus EQ band N Q, wire value 0-1" }
+  channels.*.dyn_on:                 { type: bool, description: "Input channel compressor on switched on" }
+  channels.*.dyn.mode:               { type: int, description: "Input channel compressor mode (wire index)" }
+  channels.*.dyn.detector:           { type: int, description: "Input channel compressor detector (wire index)" }
+  channels.*.dyn.envelope:           { type: int, description: "Input channel compressor envelope (wire index)" }
+  channels.*.dyn.threshold:          { type: float, description: "Input channel compressor threshold, wire value 0-1" }
+  channels.*.dyn.ratio:              { type: int, description: "Input channel compressor ratio (wire index)" }
+  channels.*.dyn.knee:               { type: float, description: "Input channel compressor knee, wire value 0-1" }
+  channels.*.dyn.makeup_gain:        { type: float, description: "Input channel compressor makeup gain, wire value 0-1" }
+  channels.*.dyn.attack:             { type: float, description: "Input channel compressor attack, wire value 0-1" }
+  channels.*.dyn.hold:               { type: float, description: "Input channel compressor hold, wire value 0-1" }
+  channels.*.dyn.release:            { type: float, description: "Input channel compressor release, wire value 0-1" }
+  channels.*.dyn.mix:                { type: float, description: "Input channel compressor mix, wire value 0-1" }
+  channels.*.dyn.key_source:         { type: int, description: "Input channel compressor key source (wire index)" }
+  channels.*.dyn.auto:               { type: bool, description: "Input channel compressor auto switched on" }
+  channels.*.dyn.filter_on:          { type: bool, description: "Input channel compressor filter on switched on" }
+  channels.*.dyn.filter_type:        { type: int, description: "Input channel compressor filter type (wire index)" }
+  channels.*.dyn.filter_frequency:   { type: float, description: "Input channel compressor filter frequency, wire value 0-1" }
+  buses.*.dyn_on:                    { type: bool, description: "Mix bus compressor on switched on" }
+  buses.*.dyn.mode:                  { type: int, description: "Mix bus compressor mode (wire index)" }
+  buses.*.dyn.detector:              { type: int, description: "Mix bus compressor detector (wire index)" }
+  buses.*.dyn.envelope:              { type: int, description: "Mix bus compressor envelope (wire index)" }
+  buses.*.dyn.threshold:             { type: float, description: "Mix bus compressor threshold, wire value 0-1" }
+  buses.*.dyn.ratio:                 { type: int, description: "Mix bus compressor ratio (wire index)" }
+  buses.*.dyn.knee:                  { type: float, description: "Mix bus compressor knee, wire value 0-1" }
+  buses.*.dyn.makeup_gain:           { type: float, description: "Mix bus compressor makeup gain, wire value 0-1" }
+  buses.*.dyn.attack:                { type: float, description: "Mix bus compressor attack, wire value 0-1" }
+  buses.*.dyn.hold:                  { type: float, description: "Mix bus compressor hold, wire value 0-1" }
+  buses.*.dyn.release:               { type: float, description: "Mix bus compressor release, wire value 0-1" }
+  buses.*.dyn.mix:                   { type: float, description: "Mix bus compressor mix, wire value 0-1" }
+  buses.*.dyn.key_source:            { type: int, description: "Mix bus compressor key source (wire index)" }
+  buses.*.dyn.auto:                  { type: bool, description: "Mix bus compressor auto switched on" }
+  buses.*.dyn.filter_on:             { type: bool, description: "Mix bus compressor filter on switched on" }
+  buses.*.dyn.filter_type:           { type: int, description: "Mix bus compressor filter type (wire index)" }
+  buses.*.dyn.filter_frequency:      { type: float, description: "Mix bus compressor filter frequency, wire value 0-1" }
+  main.dyn_on:                       { type: bool, description: "Main LR bus compressor on switched on" }
+  main.dyn.mode:                     { type: int, description: "Main LR bus compressor mode (wire index)" }
+  main.dyn.detector:                 { type: int, description: "Main LR bus compressor detector (wire index)" }
+  main.dyn.envelope:                 { type: int, description: "Main LR bus compressor envelope (wire index)" }
+  main.dyn.threshold:                { type: float, description: "Main LR bus compressor threshold, wire value 0-1" }
+  main.dyn.ratio:                    { type: int, description: "Main LR bus compressor ratio (wire index)" }
+  main.dyn.knee:                     { type: float, description: "Main LR bus compressor knee, wire value 0-1" }
+  main.dyn.makeup_gain:              { type: float, description: "Main LR bus compressor makeup gain, wire value 0-1" }
+  main.dyn.attack:                   { type: float, description: "Main LR bus compressor attack, wire value 0-1" }
+  main.dyn.hold:                     { type: float, description: "Main LR bus compressor hold, wire value 0-1" }
+  main.dyn.release:                  { type: float, description: "Main LR bus compressor release, wire value 0-1" }
+  main.dyn.mix:                      { type: float, description: "Main LR bus compressor mix, wire value 0-1" }
+  main.dyn.key_source:               { type: int, description: "Main LR bus compressor key source (wire index)" }
+  main.dyn.auto:                     { type: bool, description: "Main LR bus compressor auto switched on" }
+  main.dyn.filter_on:                { type: bool, description: "Main LR bus compressor filter on switched on" }
+  main.dyn.filter_type:              { type: int, description: "Main LR bus compressor filter type (wire index)" }
+  main.dyn.filter_frequency:         { type: float, description: "Main LR bus compressor filter frequency, wire value 0-1" }
+  channels.*.gate_on:                { type: bool, description: "Input channel gate on switched on" }
+  channels.*.gate.mode:              { type: int, description: "Input channel gate mode (wire index)" }
+  channels.*.gate.threshold:         { type: float, description: "Input channel gate threshold, wire value 0-1" }
+  channels.*.gate.range:             { type: float, description: "Input channel gate range, wire value 0-1" }
+  channels.*.gate.attack:            { type: float, description: "Input channel gate attack, wire value 0-1" }
+  channels.*.gate.hold:              { type: float, description: "Input channel gate hold, wire value 0-1" }
+  channels.*.gate.release:           { type: float, description: "Input channel gate release, wire value 0-1" }
+  channels.*.gate.key_source:        { type: int, description: "Input channel gate key source (wire index)" }
+  channels.*.gate.filter_on:         { type: bool, description: "Input channel gate filter on switched on" }
+  channels.*.gate.filter_type:       { type: int, description: "Input channel gate filter type (wire index)" }
+  channels.*.gate.filter_frequency:  { type: float, description: "Input channel gate filter frequency, wire value 0-1" }
+  channels.*.insert_on:              { type: bool, description: "Input channel insert on" }
+  channels.*.insert_select:          { type: int, description: "Input channel insert FX slot 0-8 (0 OFF, 1 Fx1A, 2 Fx1B, 3 Fx2A, 4 Fx2B, 5 Fx3A, 6 Fx3B, 7 Fx4A, 8 Fx4B)" }
+  buses.*.insert_on:                 { type: bool, description: "Mix bus insert on" }
+  buses.*.insert_select:             { type: int, description: "Mix bus insert FX slot 0-8 (0 OFF, 1 Fx1A, 2 Fx1B, 3 Fx2A, 4 Fx2B, 5 Fx3A, 6 Fx3B, 7 Fx4A, 8 Fx4B)" }
+  channels.*.usb_trim:               { type: float, description: "Input channel USB return trim 0-1 (-18 to +18 dB)" }
+  channels.*.usb_return:             { type: bool, description: "Input channel fed from its USB return" }
+  aux.usb_trim:                      { type: float, description: "Aux/USB return USB return trim 0-1 (-18 to +18 dB)" }
+  aux.usb_return:                    { type: bool, description: "Aux/USB return fed from its USB return" }
+  fx_returns.*.usb_trim:             { type: float, description: "FX return USB return trim 0-1 (-18 to +18 dB)" }
+  fx_returns.*.usb_return:           { type: bool, description: "FX return fed from its USB return" }
+  aux.usb_source:                    { type: int, description: "Aux/USB return USB return source 0-8 (U0102 ... U1718)" }
+  fx_returns.*.usb_source:           { type: int, description: "FX return USB return source 0-8 (U0102 ... U1718)" }
+  channels.*.invert:                 { type: bool, description: "Input channel polarity inverted" }
+  channels.*.low_cut:                { type: bool, description: "Input channel low cut on" }
+  channels.*.low_cut_frequency:      { type: float, description: "Input channel low-cut frequency, wire value 0-1" }
+  channels.*.source:                 { type: int, description: "Input channel source index 0-15" }
+  channels.*.usb_source:             { type: int, description: "Input channel USB return source 0-17 (U01-U18)" }
+  channels.*.automix_group:          { type: int, description: "Input channel automix group (0 OFF, 1 X, 2 Y)" }
+  channels.*.automix_weight:         { type: float, description: "Input channel automix weight, wire value 0-1" }
+  dcas.*.mute:                       { type: bool, description: "DCA muted (on inverted)" }
+  dcas.*.fader:                      { type: float, description: "DCA fader position 0-1 (0.75 = 0 dB)" }
+  dcas.*.name:                       { type: string, description: "DCA name" }
+  dcas.*.color:                      { type: int, description: "DCA colour 0-15" }
+  channels.*.solo:                   { type: bool, description: "Input channel solo switched on" }
+  solo_active:                       { type: bool, description: "At least one solo is on" }
+  mute_groups.*.muted:               { type: bool, description: "Mute group engaged" }
+  monitor.level:                     { type: float, description: "Headphone/monitor level, wire value 0-1" }
+  monitor.source:                    { type: int, description: "Headphone/monitor source (wire index)" }
+  monitor.source_trim:               { type: float, description: "Headphone/monitor sourcetrim, wire value 0-1" }
+  monitor.channel_mode:              { type: int, description: "Headphone/monitor chmode (wire index)" }
+  monitor.bus_mode:                  { type: int, description: "Headphone/monitor busmode (wire index)" }
+  monitor.dim:                       { type: bool, description: "Headphone/monitor dim on" }
+  monitor.dim_gain:                  { type: float, description: "Headphone/monitor dimatt, wire value 0-1" }
+  monitor.pfl_dim:                   { type: bool, description: "Headphone/monitor dimpfl on" }
+  monitor.mono:                      { type: bool, description: "Headphone/monitor mono on" }
+  monitor.mute:                      { type: bool, description: "Headphone/monitor mute on" }
+  channel_links.*:                   { type: bool, description: "Input channel pair stereo-linked, keyed 1-2 ... 15-16" }
+  bus_links.*:                       { type: bool, description: "Mix bus pair stereo-linked, keyed 1-2, 3-4, 5-6" }
+  link_preferences.*:                { type: bool, description: "Stereo link includes this element" }
+  automix.*.enabled:                 { type: bool, description: "Automix group enabled, keyed X / Y" }
+  automix.*.locked:                  { type: bool, description: "Automix group locked, keyed X / Y" }
+  headamps.*.gain:                   { type: float, description: "Preamp gain 0-1 (-12 to +60 dB on the mic preamps), numbered as on the wire from 1" }
+  headamps.*.phantom:                { type: bool, description: "Preamp +48 V phantom power on" }
+  fx.*.type:                         { type: int, description: "Effects slot type number" }
+  fx.*.insert:                       { type: bool, description: "Effects slot insert flag" }
+  fx.*.parameters.*:                 { type: float, description: "Effects slot parameter N, as the console sends it" }
+  routing.aux.*.source:              { type: int, description: "Aux output source index" }
+  routing.aux.*.tap:                 { type: int, description: "Aux output tap index" }
+  routing.main_source:               { type: int, description: "Main output source (0 LR, 1 MON, 2-10 USB pairs)" }
+  routing.phones_source:             { type: int, description: "Phones output source (0 LR, 1 MON, 2-10 USB pairs)" }
+  routing.ultranet.*.source:         { type: int, description: "ULTRANET output source index" }
+  routing.ultranet.*.tap:            { type: int, description: "ULTRANET output tap index" }
+  routing.usb.*.source:              { type: int, description: "USB send source index" }
+  routing.usb.*.tap:                 { type: int, description: "USB send tap index" }
+  snapshot.index:                    { type: int, description: "Snapshot most recently loaded or saved, 1-64" }
+  snapshot.name:                     { type: string, description: "Name of the snapshot most recently loaded, or the name for the next save" }
+  snapshots.*.name:                  { type: string, description: "Name stored in snapshot slot N" }
+  snapshots.*.scope:                 { type: string, description: "Recall scope of snapshot slot N, 59 '+'/'-' characters" }
+  recorder.state:                    { type: int, description: "USB recorder state (0 STOP, 1 PPAUSE, 2 PLAY, 3 RPAUSE, 4 REC, 5 FF, 6 REW)" }
+  recorder.elapsed:                  { type: int, description: "USB recorder elapsed time, seconds" }
+  recorder.remaining:                { type: int, description: "USB recorder remaining time in seconds; -(dropouts + 1) while recording" }
+  recorder.file:                     { type: string, description: "USB recorder file name" }
+  recorder.usb_mounted:              { type: bool, description: "USB stick mounted" }
+  console.name:                      { type: string, description: "Mixer name" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      mix/on is inverted: 0 is muted, 1 is passing audio. The community list
+      labels it "OFF, ON" and "mute" without saying which way round; the sense
+      here is the X32 family's (Maillot p.27), which the X AIR shares and the
+      Companion module corroborates. The mute_* commands use the bool10
+      directive; the get_*_on queries return the raw flag (1 = not muted). DCA
+      on works the same way. Mute groups are not inverted: /config/mute/N 1
+      engages the group.
+
+  - models: [all]
+    severity: critical
+    text: >
+      load_snapshot acts at once on the live mix: every parameter in the slot's
+      recall scope is overwritten (product manual p.23, p.29), including
+      headamp gain and phantom when the scope includes them. The scope is a
+      per-slot setting, so the same load does different things on differently
+      configured mixers. /-snap/load has no documented reply and reports
+      unverified; read get_snapshot_index afterwards. The manufacturer document
+      (p.4) writes the snapshot node as "/snap/"; the community list and the
+      Companion module use "/-snap/", which this spec follows. save_snapshot
+      overwrites the slot and delete_snapshot empties it without confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The manufacturer document says the mixer echoes a parameter "in response
+      to a get, set or fulfilment of single parameter subscription" (p.2). On
+      the X32 a set is not echoed to the client that sent it (Maillot p.10).
+      Which holds for the X AIR is not confirmed, so sets report unverified
+      rather than wait for an echo that may never come. Any echo that does
+      arrive still updates state through the telemetry rules. Read a value back
+      with its get command to confirm it.
+
+  - models: [all]
+    severity: warning
+    text: >
+      /xremote sends changes to at most eight active clients and lapses after
+      10 seconds unless renewed (protocol document p.1). In Access Point mode
+      the mixer accepts at most four Wi-Fi clients (product manual p.13,
+      p.33). UDP replies can be lost silently over Wi-Fi; a lost poll reply
+      leaves that value unset until it next changes.
+
+  - models: [all]
+    severity: info
+    text: >
+      Address differences from the X32 (specs/behringer-x32.yaml): UDP 10024,
+      not 10023. The main bus is /lr, not /main/st; there is no mono/centre bus
+      and no matrix. The stereo aux (or USB) return is a single strip /rtn/aux,
+      not /auxin/01-08. FX returns are /rtn/1-4, not /fxrtn/01-08. FX sends
+      /fxsend/1-4 are strips of their own with no X32 equivalent, and a strip's
+      sends 07-10 feed them. Buses are /bus/1-6 without zero padding. Main
+      assignment is mix/lr, not mix/st. The insert selector is insert/fxslot
+      (0-8), not insert/sel. Trim is preamp/rtntrim and applies to the USB
+      return. Headamps are /headamp/01-16, two digits and numbered from 1 on
+      the wire, not /headamp/000-127. DCAs and mute groups are 1-4, and their
+      membership bitmaps 0-15. Strips have no icon. Scenes, snippets and cues
+      are replaced by 64 snapshots under /-snap. There is no talkback,
+      oscillator, user-control or undo section; there are send pan, tap and
+      group flags, automix, a headphone/monitor section under /config/solo,
+      output routing under /routing, and a USB recorder on some models.
+
+  - models: [all]
+    severity: info
+    text: >
+      Every float on the wire is 0.0-1.0 (protocol document p.2), mapped by the
+      mixer onto the parameter's range. Faders and send levels use the X32
+      family's four-segment taper, 0.75 = 0 dB and 1.0 = +10 dB (Maillot
+      p.128); the format has no piecewise conversion, so commands and state
+      carry the position. Ranges quoted in summaries are the community list's.
+      Integers are signed 32-bit and booleans are ints (p.2).
+
+  - models: [all]
+    severity: info
+    text: >
+      Headamp numbering is the community list's "Preamps 1-16". The XR18,
+      X18 and MR18 have 16 mic preamps, the XR16 8 (channels 1-8) and the
+      XR12 and MR12 4 (channels 1-4) (product manual p.13, p.32-34). How the
+      line inputs and the stereo aux input are addressed is not documented, so
+      they are not covered, and a headamp number above the model's preamp
+      count addresses nothing documented. The community list gives the gain
+      range as -12 to +20 dB; the manuals' block diagrams give the mic preamp
+      as -12 to +60 dB in 0.5 dB steps (p.43), which the summaries follow.
+
+  - models: [xr16, xr12, mr12]
+    severity: info
+    text: >
+      All models process 16 input channels and 6 aux buses (product manual
+      p.32-34). The XR12 and MR12 have 12 inputs: processing channels 13-16
+      take their signal from any input 1-12 (p.13). The XR16 has 4 aux outputs
+      and the XR12/MR12 2, so buses 5-6 (XR16) or 3-6 (XR12) are pre-defined
+      as subgroups (p.13), and set_aux_out_source/tap for an output the model
+      lacks addresses nothing physical. The USB return strip /rtn/aux carries
+      the recorder's stereo playback on these models (MIDI chart, p.31).
+
+  - models: [xr18, x18, mr18]
+    severity: info
+    text: >
+      The XR18, X18 and MR18 have the 18x18 USB audio interface and ULTRANET
+      but no USB stick recorder (product manual p.32-33), so the recorder
+      commands are not offered; /-action/setclock is ignored on them per the
+      community list. /rtn/aux is the stereo aux line input 17-18.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The channel input source /ch/NN/config/insrc is listed as an int 0-15
+      with the labels "OFF, IN01-16", which is seventeen values. set_channel_source
+      accepts the stated range 0-15; which value is OFF, if any, is not
+      established.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Gate mode is 0-4. The community list names the values GATE, EXP2, EXP3,
+      EXP4, DUCK; the X32 document orders the same set EXP2, EXP3, EXP4, GATE,
+      DUCK. The order on the X AIR is not established, so the command takes the
+      number only.
+
+  - models: [all]
+    severity: info
+    text: >
+      Copy errors in the community list, resolved here as follows. The bus pan
+      range reads "-oo - +10" and bus insert/on "-15.0 - +15.0" (treated as
+      pan and a switch). The bus compressor filter type is listed twice, 0-8
+      and 0-5 (0-8 is used, as for channels and main). Bus DCA and mute-group
+      membership is printed as /bus/grp/dca without the bus number (the
+      numbered form /bus/N/grp is used). The bus EQ Q reads "10.0 - 9.3". USB
+      routing reads [1..36]; the XR18 has 18 USB sends (manual p.33), so 1-18
+      is used. Automix weight reads -24 to +24 dB.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not covered because the sources disagree or are silent: the main LR
+      insert (the community list prints it as /lr/dyn/insert/..., under the
+      compressor), FX return EQ on/off (listed for the aux return only), the
+      31-band GEQ (the community list indexes it /geq/0, other references by
+      frequency), and setting FX parameters (the community list types
+      /fx/N/par/NN as int, the X32 family uses floats; get_fx_parameter reads
+      whatever the mixer holds, and the 64-parameter range is the X32's).
+      Names other than snapshot names (31 characters, p.4) have no documented
+      length limit.
+
+  - models: [all]
+    severity: info
+    text: >
+      DCA mute mutes its channels only when "DCA Groups in the Mute System" is
+      enabled in the mixer's preferences (/-prefs/dcamute; product manual p.24,
+      p.28). Otherwise a DCA controls level only.
+
+  - models: [all]
+    severity: info
+    text: >
+      /info answers with four strings: server version, device name, device
+      model and device version (protocol document p.2), so it serves as the
+      liveness probe and as the source of get_console_model and
+      get_firmware_version. /xinfo answers with the IP address in place of the
+      server version; the document's wording leaves the order unclear, so it
+      is not used.
