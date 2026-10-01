@@ -675,7 +675,8 @@ mod tests {
             &state(json!({"cues.*.name": {"type": "string", "description": "x"}})),
         )
         .unwrap();
-        let reply = r#"{"workspace_id":"w","address":"/cue_id/A1/name","status":"ok","data":"Intro"}"#;
+        let reply =
+            r#"{"workspace_id":"w","address":"/cue_id/A1/name","status":"ok","data":"Intro"}"#;
         let p = t
             .apply(&Inbound::Osc {
                 address: "/reply/cue_id/A1/name",
