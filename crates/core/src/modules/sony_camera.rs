@@ -3125,6 +3125,8 @@ impl Module for SonyCamera {
             return;
         };
         match input {
+            // Not a download's report.
+            FileInput::Read { .. } => self.download = Some(d),
             FileInput::Closed { bytes } => {
                 let result = match d.error {
                     Some(e) => Err(refused("download_failed", e)),

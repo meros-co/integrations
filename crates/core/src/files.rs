@@ -89,6 +89,38 @@ pub(crate) fn open(
     Writer { generation, ops }
 }
 
+/// Read `path` whole on a thread and report it as `Read`, or `Failed` when it
+/// is missing, unreadable or larger than `max_bytes`.
+pub(crate) fn read(
+    file: Key,
+    generation: u64,
+    path: PathBuf,
+    max_bytes: u64,
+    inbound: mpsc::Sender<Inbound>,
+) {
+    std::thread::spawn(move || {
+        let failed = |e: String| FileInput::Failed {
+            message: format!("{}: {e}", path.display()),
+        };
+        let input = match std::fs::metadata(&path) {
+            Err(e) => failed(e.to_string()),
+            Ok(m) if !m.is_file() => failed("not a file".into()),
+            Ok(m) if m.len() > max_bytes => {
+                failed(format!("{} bytes, more than {max_bytes}", m.len()))
+            }
+            Ok(_) => match std::fs::read(&path) {
+                Ok(data) => FileInput::Read { data },
+                Err(e) => failed(e.to_string()),
+            },
+        };
+        let _ = inbound.blocking_send(Inbound::File {
+            file,
+            generation,
+            input,
+        });
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,6 +144,32 @@ mod tests {
             _ => panic!("expected the file to close"),
         }
         assert_eq!(std::fs::read(&path).unwrap(), b"abcdef");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn files_are_read_whole_up_to_a_limit() {
+        let dir = std::env::temp_dir().join(format!("meros-read-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("look.cube");
+        std::fs::write(&path, b"LUT_3D_SIZE 2").unwrap();
+        let (tx, mut rx) = mpsc::channel(8);
+        read("lut", 1, path.clone(), 1024, tx.clone());
+        match rx.recv().await {
+            Some(Inbound::File {
+                input: FileInput::Read { data },
+                ..
+            }) => assert_eq!(data, b"LUT_3D_SIZE 2"),
+            _ => panic!("expected the file"),
+        }
+        read("lut", 2, path, 4, tx);
+        assert!(matches!(
+            rx.recv().await,
+            Some(Inbound::File {
+                input: FileInput::Failed { .. },
+                ..
+            })
+        ));
         let _ = std::fs::remove_dir_all(&dir);
     }
 

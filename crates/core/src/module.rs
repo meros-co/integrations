@@ -154,9 +154,11 @@ pub enum SseInput {
 pub enum FileInput {
     /// Every chunk was written and the file closed.
     Closed { bytes: u64 },
-    /// The file could not be created or written. Reported once; later writes
-    /// are dropped.
+    /// The file could not be created, written or read. Reported once; later
+    /// writes are dropped.
     Failed { message: String },
+    /// A file asked for with `file_read`, whole.
+    Read { data: Vec<u8> },
 }
 
 /// What happens on a TCP connection.
@@ -277,6 +279,14 @@ pub enum Action {
     /// Close the file; reported as `FileInput::Closed` once written.
     FileClose {
         file: Key,
+    },
+    /// Read a whole file on the host, for an upload (a LUT, a scene file).
+    /// Reported as `FileInput::Read`, or `Failed` for a missing or unreadable
+    /// file or one larger than `max_bytes`.
+    FileRead {
+        file: Key,
+        path: String,
+        max_bytes: u64,
     },
     TcpClose {
         socket: Key,
@@ -400,6 +410,15 @@ impl Cx {
 
     pub fn file_close(&mut self, file: Key) {
         self.push(Action::FileClose { file });
+    }
+
+    /// Read a whole file on the host; see [`Action::FileRead`].
+    pub fn file_read(&mut self, file: Key, path: impl Into<String>, max_bytes: u64) {
+        self.push(Action::FileRead {
+            file,
+            path: path.into(),
+            max_bytes,
+        });
     }
 
     /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].

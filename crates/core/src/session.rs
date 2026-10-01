@@ -140,6 +140,8 @@ pub(crate) struct Session {
     ssh: crate::ssh::Sessions,
     /// Files being written, by key.
     files: HashMap<Key, crate::files::Writer>,
+    /// Files being read, by key, with the generation of the read.
+    reads: HashMap<Key, u64>,
     ws: HashMap<Key, crate::ws::Connection>,
     /// TCP ports this session listens on, by key.
     listening: HashMap<Key, u16>,
@@ -173,6 +175,7 @@ impl Session {
             tcp: HashMap::new(),
             ssh: crate::ssh::Sessions::default(),
             files: HashMap::new(),
+            reads: HashMap::new(),
             ws: HashMap::new(),
             listening: HashMap::new(),
             next_generation: 1,
@@ -256,10 +259,13 @@ impl Session {
                             self.module.tcp(&mut cx, socket, input);
                         }
                         Inbound::File { file, generation, input } => {
-                            if self.files.get(file).map(|w| w.generation) != Some(generation) {
+                            if self.reads.get(file) == Some(&generation) {
+                                self.reads.remove(file);
+                            } else if self.files.get(file).map(|w| w.generation) == Some(generation) {
+                                self.files.remove(file);
+                            } else {
                                 continue;
                             }
-                            self.files.remove(file);
                             self.module.file(&mut cx, file, input);
                         }
                         Inbound::Accepted { socket, stream } => {
@@ -392,6 +398,22 @@ impl Session {
                     if let Some(w) = self.files.get(file) {
                         w.close();
                     }
+                }
+                Action::FileRead {
+                    file,
+                    path,
+                    max_bytes,
+                } => {
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    self.reads.insert(file, generation);
+                    crate::files::read(
+                        file,
+                        generation,
+                        path.into(),
+                        max_bytes,
+                        self.inbound_tx.clone(),
+                    );
                 }
                 Action::TcpListen { socket, port } => {
                     let result = self.services.shared_tcp.register(
