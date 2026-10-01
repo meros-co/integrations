@@ -1,0 +1,1411 @@
+spec: 1
+id: barco-eventmaster
+name: Barco Event Master (JSON-RPC API)
+vendor: Barco
+category: switcher
+
+# Every command is one JSON-RPC 2.0 method, sent as an HTTP POST to port 9999
+# with a body {"params":{...},"method":"...","id":"1234","jsonrpc":"2.0"}.
+# The processor answers 200 with {"jsonrpc":"2.0","id":"1234","result":
+# {"success":0,"response":...}}; success other than 0 is an error, so every
+# command checks $.result.success. Methods whose params are optional are split
+# into one command per documented form (activate_preset, _by_serial, _by_name,
+# _as_operator, _as_super_operator), and the methods whose params are nested
+# structures also have a _custom (or plain-named) form taking the documented
+# params object as JSON.
+
+source:
+  - title: Event Master series Remote control protocol, Reference guide (R5919184/00)
+    author: Barco
+    url: https://www.barco.com/en/support/docs/R5919184
+    note: >
+      Manufacturer document, revision 00, dated 2025-05-08 on its last page.
+      Chapter 1 is the ASCII (telnet 9878) interface, chapter 2 the JSON RPC
+      interface: section 2.1 (port 9999, master unit, case-sensitive requests)
+      and section 2.2, pages 10-22, every method from allTrans to unsubscribe
+      with its params and the reply's response and success fields. Barco's
+      support site lists revision 02 (2026-02-12) as current; it sits behind a
+      bot challenge and could not be retrieved, so revision 00 was read from
+      the copy attached to bitfocus/companion-module-requests issue 1912
+      (https://github.com/user-attachments/files/21056211/R5919184_00_ReferenceGuide.pdf).
+      Cited as R5919184/00.
+  - title: Event Master Devices User's Guide (R5905948/12), appendix B.2 "Event Master series processor JSON RPC remote control"
+    author: Barco
+    url: https://www.manualslib.com/manual/1822386/Barco-Event-Master-E2-Series.html?page=555
+    note: >
+      Manufacturer document, revision 12, read on ManualsLib pages 553-568;
+      revision 10 (software 6.0) read as PDF for comparison. Same method set and
+      wording as R5919184/00, which superseded it. Cited as R5905948/12 B.2. The
+      current revision (15, 2026-06-23 per Barco's listing) could not be
+      retrieved for the same reason as above.
+  - title: JSON RPC with Event Master processors (Word document, "Doc 8.2")
+    author: Barco
+    url: https://github.com/bitfocus/companion-module-barco-eventmaster/blob/master/docs/JSON_RPC_with_EM_processors_Doc_8_2.docx
+    note: >
+      Manufacturer document (Barco author metadata, last modified 2021-02-17),
+      distributed in the MIT-licensed Bitfocus Companion module repository; not
+      published on Barco's site in this form. Adds to R5919184/00 for E2, S3-4K
+      and EX: allTrans transTime, the multi-operator operatorId and password
+      params, savePreset serialNo and saveFromProgram, listSuperDestContent,
+      listSuperAuxContent, changeSuperDestContent, changeSuperAuxContent,
+      3dControlOutput, armUnarmDestination, fillHV, clearLayers, recallUserKey,
+      listUserKeys, listSourceMainBackup, activateSourceMainBackup,
+      resetSourceMainBackup, listInputs, listOutputs, mvrLayoutChange,
+      listOperators and configureOperator, and the full reply envelope in its
+      listContent example. Cited as Doc 8.2.
+  - title: JSON RPC for Encore3 Processors v10.0
+    author: Barco
+    url: https://github.com/bitfocus/companion-module-barco-eventmaster/blob/master/docs/Barco%20JSON%20RPC%20with%20Encore3%20processors%20v10.0-Final.pdf
+    note: >
+      Manufacturer document (PDF created 2025-08-05, Barco metadata; its title
+      metadata reads "WORK IN PROGRESS: PRELIMINARY AND EXPECTED TO CHANGE UNTIL
+      FINAL RELEASE"), distributed in the same Companion repository. Pages 1-2:
+      HTTP POST with Content-Type application/json to port 9999, a secure port
+      9997 announced for a future release, and the result/error/id reply
+      members. Pages 3-20: the Encore3 method set, including the reply envelope
+      {"jsonrpc","id","result":{"success","response"}} in getFrameSettings,
+      FrameType 8 for Encore3, the 0-3 reset codes with saveOptions, DestOutMap
+      on listContent, changeContent, fillHV, clearLayers and recallUserKey, and
+      listMvrPreset, activateMvrPreset and the three-argument mvrLayoutChange.
+      Cited as Encore3 v10.0.
+  - title: Encore3 User guide (R5917615/01), section 6.5.1 "Use JSON"
+    author: Barco
+    url: https://www.manualslib.com/manual/4552519/Barco-Encore3.html?page=93
+    note: >
+      Manufacturer document (software Event Master Toolset 10.1). Used for the
+      statement that API calls can be blocked by the Encore3's security
+      settings, and that the Encore3's commands are those of the Event Master
+      remote control protocol reference guide.
+
+transport:
+  type: http
+  port: 9999
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: POST, path: /, body: '{"params":{},"method":"powerStatus","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+
+settings:
+  super_operator_password: { type: string, secret: true, default: "" }
+
+models:
+  - id: e2
+    name: Barco Event Master E2 (E2, E2 Gen 2, E2 Jr)
+    supports: [get_frame_settings, get_power_status, reset_frame, all_trans,
+               all_trans_time, all_trans_as_operator, all_trans_as_super_operator, cut,
+               cut_as_operator, cut_as_super_operator, list_presets, list_destinations_for_preset,
+               save_preset, save_preset_numbered, save_preset_as_operator, save_preset_as_super_operator,
+               save_preset_custom, rename_preset, rename_preset_by_serial, rename_preset_by_name,
+               delete_preset, delete_preset_by_serial, delete_preset_by_name, delete_preset_as_operator,
+               delete_preset_as_super_operator, activate_preset, activate_preset_by_serial, activate_preset_by_name,
+               activate_preset_as_operator, activate_preset_as_super_operator, recall_next_preset, list_destinations,
+               list_content, change_content, change_layer_source, set_layer_mask,
+               set_screen_test_pattern, list_aux_content, change_aux_content, change_aux_content_named,
+               set_aux_test_pattern, freeze_input, freeze_background, freeze_screen,
+               freeze_aux, arm_destinations, activate_dest_group, activate_dest_group_by_serial,
+               activate_dest_group_by_name, fill_hv, fill_hv_custom, clear_layer,
+               clear_layers_custom, list_sources, list_sources_by_type, list_inputs,
+               get_input, list_outputs, get_output, list_source_main_backup,
+               list_source_main_backup_by_kind, activate_source_main_backup, reset_source_main_backup, control_3d_input,
+               control_3d_input_reset, control_3d_output, control_3d_output_reset, list_stills,
+               take_still, take_still_from_background, delete_still, list_cues,
+               activate_cue, activate_cue_by_name, activate_cue_by_serial, cue_transport,
+               list_user_keys, recall_user_key, recall_user_key_by_name, recall_user_key_custom,
+               list_super_dest_content, list_super_aux_content, set_super_layer_window, change_super_dest_content,
+               change_super_aux_content, list_operators, enable_operator, rename_operator,
+               set_operator_preset_range, configure_operator, change_mvr_layout, subscribe,
+               unsubscribe]
+    verification: none
+    notes: >
+      getFrameSettings reports FrameType 0 (E2) or 5 (E2-Gen2).
+  - id: s3-4k
+    name: Barco Event Master S3-4K (S3-4K, S3-4K Jr)
+    supports: [get_frame_settings, get_power_status, reset_frame, all_trans,
+               all_trans_time, all_trans_as_operator, all_trans_as_super_operator, cut,
+               cut_as_operator, cut_as_super_operator, list_presets, list_destinations_for_preset,
+               save_preset, save_preset_numbered, save_preset_as_operator, save_preset_as_super_operator,
+               save_preset_custom, rename_preset, rename_preset_by_serial, rename_preset_by_name,
+               delete_preset, delete_preset_by_serial, delete_preset_by_name, delete_preset_as_operator,
+               delete_preset_as_super_operator, activate_preset, activate_preset_by_serial, activate_preset_by_name,
+               activate_preset_as_operator, activate_preset_as_super_operator, recall_next_preset, list_destinations,
+               list_content, change_content, change_layer_source, set_layer_mask,
+               set_screen_test_pattern, list_aux_content, change_aux_content, change_aux_content_named,
+               set_aux_test_pattern, freeze_input, freeze_background, freeze_screen,
+               freeze_aux, arm_destinations, activate_dest_group, activate_dest_group_by_serial,
+               activate_dest_group_by_name, fill_hv, fill_hv_custom, clear_layer,
+               clear_layers_custom, list_sources, list_sources_by_type, list_inputs,
+               get_input, list_outputs, get_output, list_source_main_backup,
+               list_source_main_backup_by_kind, activate_source_main_backup, reset_source_main_backup, control_3d_input,
+               control_3d_input_reset, control_3d_output, control_3d_output_reset, list_stills,
+               take_still, take_still_from_background, delete_still, list_cues,
+               activate_cue, activate_cue_by_name, activate_cue_by_serial, cue_transport,
+               list_user_keys, recall_user_key, recall_user_key_by_name, recall_user_key_custom,
+               list_super_dest_content, list_super_aux_content, set_super_layer_window, change_super_dest_content,
+               change_super_aux_content, list_operators, enable_operator, rename_operator,
+               set_operator_preset_range, configure_operator, change_mvr_layout, subscribe,
+               unsubscribe]
+    verification: none
+    notes: >
+      getFrameSettings reports FrameType 1, FrameTypeName S3.
+  - id: ex
+    name: Barco Event Master EX
+    supports: [get_frame_settings, get_power_status, reset_frame, all_trans,
+               all_trans_time, all_trans_as_operator, all_trans_as_super_operator, cut,
+               cut_as_operator, cut_as_super_operator, list_presets, list_destinations_for_preset,
+               save_preset, save_preset_numbered, save_preset_as_operator, save_preset_as_super_operator,
+               save_preset_custom, rename_preset, rename_preset_by_serial, rename_preset_by_name,
+               delete_preset, delete_preset_by_serial, delete_preset_by_name, delete_preset_as_operator,
+               delete_preset_as_super_operator, activate_preset, activate_preset_by_serial, activate_preset_by_name,
+               activate_preset_as_operator, activate_preset_as_super_operator, recall_next_preset, list_destinations,
+               list_content, change_content, change_layer_source, set_layer_mask,
+               set_screen_test_pattern, list_aux_content, change_aux_content, change_aux_content_named,
+               set_aux_test_pattern, freeze_input, freeze_background, freeze_screen,
+               freeze_aux, arm_destinations, activate_dest_group, activate_dest_group_by_serial,
+               activate_dest_group_by_name, fill_hv, fill_hv_custom, clear_layer,
+               clear_layers_custom, list_sources, list_sources_by_type, list_inputs,
+               get_input, list_outputs, get_output, list_source_main_backup,
+               list_source_main_backup_by_kind, activate_source_main_backup, reset_source_main_backup, control_3d_input,
+               control_3d_input_reset, control_3d_output, control_3d_output_reset, list_stills,
+               take_still, take_still_from_background, delete_still, list_cues,
+               activate_cue, activate_cue_by_name, activate_cue_by_serial, cue_transport,
+               list_user_keys, recall_user_key, recall_user_key_by_name, recall_user_key_custom,
+               list_super_dest_content, list_super_aux_content, set_super_layer_window, change_super_dest_content,
+               change_super_aux_content, list_operators, enable_operator, rename_operator,
+               set_operator_preset_range, configure_operator, change_mvr_layout, subscribe,
+               unsubscribe]
+    verification: none
+    notes: >
+      getFrameSettings reports FrameType 2.
+  - id: encore3
+    name: Barco Encore3 (E3)
+    supports: [get_frame_settings, get_power_status, reset_frame_encore3, factory_reset_keep,
+               all_trans, all_trans_time, all_trans_as_operator, all_trans_as_super_operator,
+               cut, cut_as_operator, cut_as_super_operator, list_presets,
+               list_destinations_for_preset, save_preset, save_preset_numbered, save_preset_as_operator,
+               save_preset_as_super_operator, save_preset_custom, rename_preset, rename_preset_by_serial,
+               rename_preset_by_name, delete_preset, delete_preset_by_serial, delete_preset_by_name,
+               delete_preset_as_operator, delete_preset_as_super_operator, activate_preset, activate_preset_by_serial,
+               activate_preset_by_name, activate_preset_as_operator, activate_preset_as_super_operator, recall_next_preset,
+               list_destinations, list_content, list_output_content, change_content,
+               change_layer_source, change_output_layer_source, set_layer_mask, set_screen_test_pattern,
+               set_output_test_pattern, list_aux_content, change_aux_content, change_aux_content_named,
+               set_aux_test_pattern, freeze_input, freeze_screen, freeze_aux,
+               arm_destinations, activate_dest_group, activate_dest_group_by_name, fill_hv,
+               fill_hv_output, fill_hv_custom, clear_layer, clear_output_layer,
+               clear_layers_custom, list_sources, list_inputs, get_input,
+               list_outputs, get_output, list_source_main_backup, list_source_main_backup_for_input,
+               activate_source_main_backup, reset_source_main_backup, list_stills, take_still,
+               delete_still, list_cues, activate_cue, cue_transport,
+               list_user_keys, recall_user_key, recall_user_key_by_name, recall_user_key_custom,
+               list_operators, enable_operator, rename_operator, set_operator_preset_range,
+               configure_operator, change_mvr_layout_encore3, list_mvr_presets, activate_mvr_preset]
+    verification: none
+    notes: >
+      Third-generation Event Master processor, sold as Encore3 and often called E3. getFrameSettings reports FrameType 8. Commands are those of Barco's Encore3 JSON document (v10.0), which differs from the E2/S3/EX documents in several places; see the quirks.
+
+commands:
+  # ── System ────────────────────────────────────────────────────────────────
+  get_frame_settings:
+    summary: "System and frame information: name, software version, frame type, network settings, cards (R5919184/00 getFrameSettings)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"getFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  get_power_status:
+    summary: "Power supply status of each frame, 0 not present to 3 OK (R5919184/00 powerStatus)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"powerStatus","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  reset_frame:
+    summary: "Reset: 0 soft reset, 1 factory reset, 2 factory reset keeping IP, 3 keeping IP and EDID, 4 keeping VPID, 5 power down (R5919184/00 resetFrameSettings)"
+    params:
+      reset: { type: int, min: 0, max: 5, required: true }
+    send: { method: POST, path: /, body: '{"params":{"reset":{reset}},"method":"resetFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  reset_frame_encore3:
+    summary: "Reset: 0 soft reset, 1 factory reset, 2 factory reset and keep all, 3 power down (Encore3 v10.0 resetFrameSettings)"
+    params:
+      reset: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /, body: '{"params":{"reset":{reset}},"method":"resetFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  factory_reset_keep:
+    summary: "Factory reset and keep: 0 all, 1 IP settings, 2 input EDIDs, 3 unit ID, 4 system native rate (Encore3 v10.0 resetFrameSettings reset 2 with saveOptions)"
+    params:
+      keep: { type: int, min: 0, max: 4, required: true }
+    send: { method: POST, path: /, body: '{"params":{"reset":2,"saveOptions":{keep}},"method":"resetFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Transitions ───────────────────────────────────────────────────────────
+  all_trans:
+    summary: "Transition every armed destination from preview to program at its own rate (R5919184/00 allTrans)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"allTrans","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  all_trans_time:
+    summary: "Transition every armed destination with this transition time in frames (Doc 8.2, Encore3 v10.0 allTrans transTime)"
+    params:
+      frames: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"transTime":{frames}},"method":"allTrans","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  all_trans_as_operator:
+    summary: "allTrans on the destinations of one operator, 0 to 2, in multi-operator mode (Doc 8.2, Encore3 v10.0 allTrans operatorId)"
+    params:
+      operator: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: /, body: '{"params":{"operatorId":{operator}},"method":"allTrans","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  all_trans_as_super_operator:
+    summary: "allTrans as the super operator, with the super operator password setting (Doc 8.2, Encore3 v10.0 allTrans password)"
+    send: { method: POST, path: /, body: '{"params":{"password":{settings.super_operator_password:json}},"method":"allTrans","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  cut:
+    summary: "Cut every armed destination from preview to program (R5919184/00 cut)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"cut","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  cut_as_operator:
+    summary: "Cut on the destinations of one operator, 0 to 2, in multi-operator mode (Doc 8.2, Encore3 v10.0 cut operatorId)"
+    params:
+      operator: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: /, body: '{"params":{"operatorId":{operator}},"method":"cut","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  cut_as_super_operator:
+    summary: "Cut as the super operator, with the super operator password setting (Doc 8.2, Encore3 v10.0 cut password)"
+    send: { method: POST, path: /, body: '{"params":{"password":{settings.super_operator_password:json}},"method":"cut","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Presets ───────────────────────────────────────────────────────────────
+  list_presets:
+    summary: "Presets, all or those containing a destination: -2 excludes that destination type, -1 any, 0-999 that destination (R5919184/00 listPresets)"
+    params:
+      screen: { type: int, min: -2, max: 999, default: -1 }
+      aux: { type: int, min: -2, max: 999, default: -1 }
+    send: { method: POST, path: /, body: '{"params":{"ScreenDest":{screen},"AuxDest":{aux}},"method":"listPresets","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_destinations_for_preset:
+    summary: "The destinations a preset holds, -1 for every preset (R5919184/00 listDestinationsForPreset)"
+    params:
+      preset: { type: int, min: -1, max: 999, default: -1 }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"listDestinationsForPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  save_preset:
+    summary: "Save the selected destinations' previews as a new preset with this name (R5919184/00 savePreset)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  save_preset_numbered:
+    summary: "Save a preset at this serial number (overwriting it), from preview or program (Doc 8.2, Encore3 v10.0 savePreset serialNo, saveFromProgram)"
+    params:
+      name: { type: string, required: true }
+      serial: { type: float, min: 0, required: true }
+      from_program: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"serialNo":{serial:.2f},"saveFromProgram":{from_program:bool01}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  save_preset_as_operator:
+    summary: "Save a preset as operator 0 to 2 in multi-operator mode (Doc 8.2, Encore3 v10.0 savePreset operatorId)"
+    params:
+      name: { type: string, required: true }
+      operator: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"operatorId":{operator}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  save_preset_as_super_operator:
+    summary: "Save a preset as the super operator (Doc 8.2, Encore3 v10.0 savePreset password)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"password":{settings.super_operator_password:json}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  save_preset_custom:
+    summary: "savePreset with a params object of the documented savePreset schema: presetName, ScreenDestination and AuxDestination arrays of {\"id\": n}, serialNo, saveFromProgram, operatorId or password (R5919184/00 savePreset)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  rename_preset:
+    summary: "Rename the preset with this id (R5919184/00 renamePreset id)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+      new_name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset},"newPresetName":{new_name:json}},"method":"renamePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  rename_preset_by_serial:
+    summary: "Rename the preset with this serial number (R5919184/00 renamePreset presetSno)"
+    params:
+      serial: { type: float, min: 0, required: true }
+      new_name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetSno":{serial:.2f},"newPresetName":{new_name:json}},"method":"renamePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  rename_preset_by_name:
+    summary: "Rename the preset with this name (R5919184/00 renamePreset presetName)"
+    params:
+      name: { type: string, required: true }
+      new_name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"newPresetName":{new_name:json}},"method":"renamePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  delete_preset:
+    summary: "Delete the preset with this id (R5919184/00 deletePreset id)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  delete_preset_by_serial:
+    summary: "Delete the preset with this serial number (R5919184/00 deletePreset presetSno)"
+    params:
+      serial: { type: float, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetSno":{serial:.2f}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  delete_preset_by_name:
+    summary: "Delete the preset with this name (R5919184/00 deletePreset presetName)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  delete_preset_as_operator:
+    summary: "Delete a preset as operator 0 to 2 (Doc 8.2, Encore3 v10.0 deletePreset operatorId)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+      operator: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset},"operatorId":{operator}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  delete_preset_as_super_operator:
+    summary: "Delete a preset as the super operator (Doc 8.2, Encore3 v10.0 deletePreset password)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset},"password":{settings.super_operator_password:json}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_preset:
+    summary: "Recall the preset with this id to preview, or to program (R5919184/00 activatePreset id, type)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+      program: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset},"type":{program:bool01}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_preset_by_serial:
+    summary: "Recall the preset with this serial number to preview, or to program (R5919184/00 activatePreset presetSno, type)"
+    params:
+      serial: { type: float, min: 0, required: true }
+      program: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"presetSno":{serial:.2f},"type":{program:bool01}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_preset_by_name:
+    summary: "Recall the preset with this name to preview (R5919184/00 activatePreset presetName)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"presetName":{name:json}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_preset_as_operator:
+    summary: "Recall a preset as operator 0 to 2 (Doc 8.2, Encore3 v10.0 activatePreset operatorId)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+      operator: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset},"operatorId":{operator}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_preset_as_super_operator:
+    summary: "Recall a preset as the super operator (Doc 8.2, Encore3 v10.0 activatePreset password)"
+    params:
+      preset: { type: int, min: 0, max: 999, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset},"password":{settings.super_operator_password:json}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  recall_next_preset:
+    summary: "Recall the preset after the last one recalled (R5919184/00 recallNextPreset)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"recallNextPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Destinations and content ──────────────────────────────────────────────
+  list_destinations:
+    summary: "Destinations: 0 all, 1 screen destinations, 2 aux destinations (R5919184/00 listDestinations)"
+    params:
+      type: { type: int, min: 0, max: 2, default: 0 }
+    send: { method: POST, path: /, body: '{"params":{"type":{type}},"method":"listDestinations","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_content:
+    summary: "Backgrounds, layers and transition of a screen destination (R5919184/00 listContent)"
+    params:
+      screen: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen}},"method":"listContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_output_content:
+    summary: "Backgrounds and the layers of one output of a screen destination (Encore3 v10.0 listContent DestOutMap)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen},"DestOutMap":{output}},"method":"listContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  change_content:
+    summary: "changeContent with a params object of the documented changeContent schema: id, DestOutMap (Encore3), TestPattern, BGLyr, Layers with id, LastSrcIdx, Window, Source, Mask, PvwMode, PgmMode (R5919184/00 changeContent)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  change_layer_source:
+    summary: "Put a source in a layer of a screen destination at this window, in preview and/or program (R5919184/00 changeContent Layers)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+      source: { type: int, min: 0, required: true }
+      h_pos: { type: int, required: true }
+      v_pos: { type: int, required: true }
+      h_size: { type: int, min: 0, required: true }
+      v_size: { type: int, min: 0, required: true }
+      preview: { type: bool, default: true }
+      program: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen},"Layers":[{"id":{layer},"LastSrcIdx":{source},"Window":{"HPos":{h_pos},"VPos":{v_pos},"HSize":{h_size},"VSize":{v_size}},"PvwMode":{preview:bool01},"PgmMode":{program:bool01}}]},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  change_output_layer_source:
+    summary: "As change_layer_source, for a layer of one output of the screen destination (Encore3 v10.0 changeContent DestOutMap, Layers)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+      source: { type: int, min: 0, required: true }
+      h_pos: { type: int, required: true }
+      v_pos: { type: int, required: true }
+      h_size: { type: int, min: 0, required: true }
+      v_size: { type: int, min: 0, required: true }
+      preview: { type: bool, default: true }
+      program: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen},"DestOutMap":{output},"Layers":[{"id":{layer},"LastSrcIdx":{source},"Window":{"HPos":{h_pos},"VPos":{v_pos},"HSize":{h_size},"VSize":{v_size}},"PvwMode":{preview:bool01},"PgmMode":{program:bool01}}]},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  set_layer_mask:
+    summary: "Mask a layer's edges, in percent, in preview and/or program (R5919184/00 changeContent Layers Mask, sent apart from Window as Encore3 v10.0 requires)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+      left: { type: float, min: 0, max: 100, required: true }
+      right: { type: float, min: 0, max: 100, required: true }
+      top: { type: float, min: 0, max: 100, required: true }
+      bottom: { type: float, min: 0, max: 100, required: true }
+      preview: { type: bool, default: true }
+      program: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen},"Layers":[{"id":{layer},"Mask":{"Left":{left:.2f},"Right":{right:.2f},"Top":{top:.2f},"Bottom":{bottom:.2f}},"PvwMode":{preview:bool01},"PgmMode":{program:bool01}}]},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  set_screen_test_pattern:
+    summary: "Test pattern on a screen destination, 0 off (R5919184/00 changeContent TestPattern)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      pattern: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen},"TestPattern":{pattern}},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  set_output_test_pattern:
+    summary: "Test pattern on one output of a screen destination, 0 off (Encore3 v10.0 changeContent DestOutMap, TestPattern)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true }
+      pattern: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{screen},"DestOutMap":{output},"TestPattern":{pattern}},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  list_aux_content:
+    summary: "Name and preview and program sources of an aux destination (R5919184/00 listAuxContent)"
+    params:
+      aux: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{aux}},"method":"listAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  change_aux_content:
+    summary: "Set the preview and program sources of an aux destination (R5919184/00 changeAuxContent)"
+    params:
+      aux: { type: int, min: 0, required: true }
+      preview_source: { type: int, min: 0, required: true }
+      program_source: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{aux},"PvwLastSrcIndex":{preview_source},"PgmLastSrcIndex":{program_source}},"method":"changeAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  change_aux_content_named:
+    summary: "Set the name and the preview and program sources of an aux destination (R5919184/00 changeAuxContent Name)"
+    params:
+      aux: { type: int, min: 0, required: true }
+      name: { type: string, required: true }
+      preview_source: { type: int, min: 0, required: true }
+      program_source: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{aux},"Name":{name:json},"PvwLastSrcIndex":{preview_source},"PgmLastSrcIndex":{program_source}},"method":"changeAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  set_aux_test_pattern:
+    summary: "Test pattern on an aux destination, 0 off (R5919184/00 changeAuxContent TestPattern)"
+    params:
+      aux: { type: int, min: 0, required: true }
+      pattern: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{aux},"TestPattern":{pattern}},"method":"changeAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  freeze_input:
+    summary: "Freeze or unfreeze an input source (R5919184/00 freezeDestSource type 0)"
+    params:
+      source: { type: int, min: 0, required: true }
+      frozen: { type: bool, default: true }
+    send: { method: POST, path: /, body: '{"params":{"type":0,"id":{source},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  freeze_background:
+    summary: "Freeze or unfreeze a background source (R5919184/00 freezeDestSource type 1)"
+    params:
+      source: { type: int, min: 0, required: true }
+      frozen: { type: bool, default: true }
+    send: { method: POST, path: /, body: '{"params":{"type":1,"id":{source},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  freeze_screen:
+    summary: "Freeze or unfreeze a screen destination (R5919184/00 freezeDestSource type 2)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      frozen: { type: bool, default: true }
+    send: { method: POST, path: /, body: '{"params":{"type":2,"id":{screen},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  freeze_aux:
+    summary: "Freeze or unfreeze an aux destination (R5919184/00 freezeDestSource type 3)"
+    params:
+      aux: { type: int, min: 0, required: true }
+      frozen: { type: bool, default: true }
+    send: { method: POST, path: /, body: '{"params":{"type":3,"id":{aux},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  arm_destinations:
+    summary: "Arm or unarm destinations for transitions and preset saving; screens and auxes are arrays of {\"id\": n} (Doc 8.2, Encore3 v10.0 armUnarmDestination)"
+    params:
+      armed: { type: bool, default: true }
+      screens: { type: json, required: true }
+      auxes: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{"arm":{armed:bool01},"ScreenDestination":{screens},"AuxDestination":{auxes}},"method":"armUnarmDestination","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_dest_group:
+    summary: "Recall the destination group with this id (R5919184/00 activateDestGroup id)"
+    params:
+      group: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{group}},"method":"activateDestGroup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_dest_group_by_serial:
+    summary: "Recall the destination group with this serial number (R5919184/00 activateDestGroup destGrpSno)"
+    params:
+      serial: { type: float, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"destGrpSno":{serial:.2f}},"method":"activateDestGroup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_dest_group_by_name:
+    summary: "Recall the destination group with this name (R5919184/00 activateDestGroup, key as in its example)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"destGrpName":{name:json}},"method":"activateDestGroup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Layers ────────────────────────────────────────────────────────────────
+  fill_hv:
+    summary: "Fit a layer of a screen destination to the screen's width and height (Doc 8.2, Encore3 v10.0 fillHV)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"Layers":[{"id":{layer}}]},"method":"fillHV","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  fill_hv_output:
+    summary: "Fit an output layer of a screen destination to the screen (Encore3 v10.0 fillHV DestOutMap)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"DestOutMap":{output},"Layers":[{"id":{layer}}]},"method":"fillHV","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  fill_hv_custom:
+    summary: "fillHV with a params object of the documented schema: screenId, DestOutMap (Encore3), Layers array of {\"id\": n} (Doc 8.2, Encore3 v10.0 fillHV)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"fillHV","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  clear_layer:
+    summary: "Clear a layer from a screen destination (Doc 8.2, Encore3 v10.0 clearLayers)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"Layers":[{"id":{layer}}]},"method":"clearLayers","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  clear_output_layer:
+    summary: "Clear an output layer from a screen destination (Encore3 v10.0 clearLayers DestOutMap)"
+    params:
+      screen: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"DestOutMap":{output},"Layers":[{"id":{layer}}]},"method":"clearLayers","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  clear_layers_custom:
+    summary: "clearLayers with a params object of the documented schema: screenId, DestOutMap (Encore3), Layers array of {\"id\": n} (Doc 8.2, Encore3 v10.0 clearLayers)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"clearLayers","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Sources, inputs and outputs ───────────────────────────────────────────
+  list_sources:
+    summary: "Sources with size, type, freeze and video status (R5919184/00 listSources)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listSources","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_sources_by_type:
+    summary: "Sources: 0 all input sources, 1 background sources only (R5919184/00 listSources type)"
+    params:
+      type: { type: int, min: 0, max: 1, required: true }
+    send: { method: POST, path: /, body: '{"params":{"type":{type}},"method":"listSources","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_inputs:
+    summary: "Every configured input with sync and video status, format and colour (Doc 8.2, Encore3 v10.0 listInputs)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listInputs","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  get_input:
+    summary: "One configured input, by input configuration index (Doc 8.2, Encore3 v10.0 listInputs inputId)"
+    params:
+      input: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"inputId":{input}},"method":"listInputs","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_outputs:
+    summary: "Every configured output with format and colour (Doc 8.2, Encore3 v10.0 listOutputs)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listOutputs","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  get_output:
+    summary: "One configured output, by output configuration index (Doc 8.2, Encore3 v10.0 listOutputs outputCfgId)"
+    params:
+      output: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"outputCfgId":{output}},"method":"listOutputs","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_source_main_backup:
+    summary: "Inputs with at least one backup configured (Doc 8.2, Encore3 v10.0 listSourceMainBackup)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_source_main_backup_by_kind:
+    summary: "Inputs (0) or backgrounds (1) with a backup configured (Doc 8.2 listSourceMainBackup inputType)"
+    params:
+      kind: { type: int, min: 0, max: 1, required: true }
+    send: { method: POST, path: /, body: '{"params":{"inputType":{kind}},"method":"listSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_source_main_backup_for_input:
+    summary: "The backups of one input, 0-99 (Encore3 v10.0 listSourceMainBackup inputType)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /, body: '{"params":{"inputType":{input}},"method":"listSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  activate_source_main_backup:
+    summary: "activateSourceMainBackup with a params object of the documented schema: inputId, Backup1-3 of {SrcType, SourceId}, BackUpState (Doc 8.2, Encore3 v10.0 activateSourceMainBackup)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"activateSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  reset_source_main_backup:
+    summary: "Return an input from its backup to its primary source (Doc 8.2, Encore3 v10.0 resetSourceMainBackup)"
+    params:
+      input: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{input}},"method":"resetSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  control_3d_input:
+    summary: "3D on an input configuration: off or sequential, sync source mini-DIN 1-4, sync invert (R5919184/00 3dControl)"
+    params:
+      input: { type: int, min: 0, required: true }
+      sequential: { type: bool, required: true }
+      sync_source: { type: int, min: 1, max: 4, default: 1 }
+      invert: { type: bool, default: false }
+    send: { method: POST, path: /, body: '{"params":{"id":{input},"type":{sequential:bool01},"syncSource":{sync_source},"syncInvert":{invert:bool01}},"method":"3dControl","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  control_3d_input_reset:
+    summary: "Reset an input configuration's 3D controls (R5919184/00 3dControl with id only)"
+    params:
+      input: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{input}},"method":"3dControl","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  control_3d_output:
+    summary: "3D on an output configuration: off or sequential (Doc 8.2 3dControlOutput)"
+    params:
+      output: { type: int, min: 0, required: true }
+      sequential: { type: bool, required: true }
+    send: { method: POST, path: /, body: '{"params":{"outputId":{output},"3Dtype":{sequential:bool01}},"method":"3dControlOutput","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  control_3d_output_reset:
+    summary: "Reset an output configuration's 3D controls (Doc 8.2 3dControlOutput with outputId only)"
+    params:
+      output: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"outputId":{output}},"method":"3dControlOutput","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Stills ────────────────────────────────────────────────────────────────
+  list_stills:
+    summary: "Still stores with size, state and file size (R5919184/00 listStill)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  take_still:
+    summary: "Capture a still from an input source into still file id (file 5 is StillStore6) (R5919184/00 takeStill type 0)"
+    params:
+      source: { type: int, min: 0, required: true }
+      file: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"type":0,"id":{source},"file":{file}},"method":"takeStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  take_still_from_background:
+    summary: "Capture a still from a background source into still file id (R5919184/00 takeStill type 1)"
+    params:
+      source: { type: int, min: 0, required: true }
+      file: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"type":1,"id":{source},"file":{file}},"method":"takeStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  delete_still:
+    summary: "Delete a still (R5919184/00 deleteStill)"
+    params:
+      still: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{still}},"method":"deleteStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Cues ──────────────────────────────────────────────────────────────────
+  list_cues:
+    summary: "Every cue (R5919184/00 listCues)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listCues","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  activate_cue:
+    summary: "Play (0), pause (1) or stop (2) the cue with this id (R5919184/00 activateCue id, type)"
+    params:
+      cue: { type: int, min: 0, required: true }
+      action: { type: int, min: 0, max: 2, default: 0 }
+    send: { method: POST, path: /, body: '{"params":{"id":{cue},"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_cue_by_name:
+    summary: "Play (0), pause (1) or stop (2) the cue with this name (R5919184/00 activateCue cueName)"
+    params:
+      name: { type: string, required: true }
+      action: { type: int, min: 0, max: 2, default: 0 }
+    send: { method: POST, path: /, body: '{"params":{"cueName":{name:json},"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  activate_cue_by_serial:
+    summary: "Play (0), pause (1) or stop (2) the cue with this serial number (R5919184/00 activateCue cueSerialNo)"
+    params:
+      serial: { type: float, min: 0, required: true }
+      action: { type: int, min: 0, max: 2, default: 0 }
+    send: { method: POST, path: /, body: '{"params":{"cueSerialNo":{serial:.2f},"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  cue_transport:
+    summary: "Pause (1) or stop (2) with no cue named, as in the document's examples (R5919184/00 activateCue type only)"
+    params:
+      action: { type: int, min: 1, max: 2, required: true }
+    send: { method: POST, path: /, body: '{"params":{"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── User keys ─────────────────────────────────────────────────────────────
+  list_user_keys:
+    summary: "Every user key (Doc 8.2, Encore3 v10.0 listUserKeys)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listUserKeys","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  recall_user_key:
+    summary: "Apply the user key with this id to a layer of a screen destination (Doc 8.2, Encore3 v10.0 recallUserKey id)"
+    params:
+      key: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{key},"ScreenDestination":[{screen}],"Layer":[{layer}]},"method":"recallUserKey","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  recall_user_key_by_name:
+    summary: "Apply the user key with this name to a layer of a screen destination (Doc 8.2, Encore3 v10.0 recallUserKey userkeyName)"
+    params:
+      name: { type: string, required: true }
+      screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"userkeyName":{name:json},"ScreenDestination":[{screen}],"Layer":[{layer}]},"method":"recallUserKey","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  recall_user_key_custom:
+    summary: "recallUserKey with a params object of the documented schema: id or userkeyName, ScreenDestination, DestOutMap (Encore3) and Layer index arrays (Doc 8.2, Encore3 v10.0 recallUserKey)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"recallUserKey","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Super destinations ────────────────────────────────────────────────────
+  list_super_dest_content:
+    summary: "Size, member screens and super layers of a super screen destination (Doc 8.2 listSuperDestContent)"
+    params:
+      super_screen: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{super_screen}},"method":"listSuperDestContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  list_super_aux_content:
+    summary: "Size and member aux destinations of a super aux (Doc 8.2 listSuperAuxContent)"
+    params:
+      super_aux: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{super_aux}},"method":"listSuperAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  set_super_layer_window:
+    summary: "Position and size a super layer across every screen of a super destination (Doc 8.2 changeSuperDestContent GlobalLayers)"
+    params:
+      super_screen: { type: int, min: 0, required: true }
+      layer: { type: int, min: 0, required: true }
+      h_pos: { type: int, required: true }
+      v_pos: { type: int, required: true }
+      h_size: { type: int, min: 0, required: true }
+      v_size: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{super_screen},"GlobalLayers":[{"id":{layer},"Window":{"HPos":{h_pos},"VPos":{v_pos},"HSize":{h_size},"VSize":{v_size}}}]},"method":"changeSuperDestContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  change_super_dest_content:
+    summary: "changeSuperDestContent with a params object of the documented schema: id, GlobalLayers of {id, Window} (Doc 8.2 changeSuperDestContent)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"changeSuperDestContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  change_super_aux_content:
+    summary: "changeSuperAuxContent with a params object of the documented schema: id, Destinations of {id, Name, PvwLastSrcIndex, PgmLastSrcIndex} (Doc 8.2 changeSuperAuxContent)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"changeSuperAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Operators ─────────────────────────────────────────────────────────────
+  list_operators:
+    summary: "Multi-operator profiles with preset range and destinations (Doc 8.2, Encore3 v10.0 listOperators)"
+    send: { method: POST, path: /, body: '{"params":{},"method":"listOperators","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  enable_operator:
+    summary: "Enable or disable operator 0 to 2 (Doc 8.2, Encore3 v10.0 configureOperator enable)"
+    params:
+      operator: { type: int, min: 0, max: 2, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: POST, path: /, body: '{"params":{"operatorId":{operator},"enable":{enabled:bool01}},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  rename_operator:
+    summary: "Name operator 0 to 2 (Doc 8.2, Encore3 v10.0 configureOperator name)"
+    params:
+      operator: { type: int, min: 0, max: 2, required: true }
+      name: { type: string, required: true }
+    send: { method: POST, path: /, body: '{"params":{"operatorId":{operator},"name":{name:json}},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  set_operator_preset_range:
+    summary: "The preset serial number range of operator 0 to 2 (Doc 8.2, Encore3 v10.0 configureOperator startRange, endRange)"
+    params:
+      operator: { type: int, min: 0, max: 2, required: true }
+      start: { type: int, min: 0, required: true }
+      end: { type: int, min: 0, required: true }
+    send: { method: POST, path: /, body: '{"params":{"operatorId":{operator},"startRange":{start},"endRange":{end}},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  configure_operator:
+    summary: "configureOperator with a params object of the documented schema: operatorId, name, startRange, endRange, enable, add and remove of {destType, destIndex} (Doc 8.2, Encore3 v10.0 configureOperator)"
+    params:
+      params: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{params},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Multiviewer ───────────────────────────────────────────────────────────
+  change_mvr_layout:
+    summary: "Multiviewer layout 0-3 on a frame unit (Doc 8.2 mvrLayoutChange)"
+    params:
+      unit: { type: int, min: 0, required: true }
+      layout: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /, body: '{"params":{"frameUnitId":{unit},"mvrLayoutId":{layout}},"method":"mvrLayoutChange","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  change_mvr_layout_encore3:
+    summary: "Layout 0-9 of multiviewer 0 or 1 on a frame unit (Encore3 v10.0 mvrLayoutChange)"
+    params:
+      unit: { type: int, min: 0, required: true }
+      mvr: { type: int, min: 0, max: 1, required: true }
+      layout: { type: int, min: 0, max: 9, required: true }
+    send: { method: POST, path: /, body: '{"params":{"frameUnitId":{unit},"mvrId":{mvr},"mvrLayoutId":{layout}},"method":"mvrLayoutChange","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  list_mvr_presets:
+    summary: "MVR presets and their layouts, -1 for all (Encore3 v10.0 listMvrPreset)"
+    params:
+      preset: { type: int, min: -1, max: 9, default: -1 }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"listMvrPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  activate_mvr_preset:
+    summary: "Recall an MVR preset, 0-9 (Encore3 v10.0 activateMvrPreset)"
+    params:
+      preset: { type: int, min: 0, max: 9, required: true }
+    send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"activateMvrPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 } }
+    returns: ack
+
+  # ── Notifications ─────────────────────────────────────────────────────────
+  subscribe:
+    summary: "Ask the processor to POST change notifications to hostname:port; notifications is an array of ScreenDestChanged, AUXDestChanged, FrameChanged, NativeRateChanged, InputCfgChanged, SourceChanged, BGSourceChanged, PresetChanged, StillChanged, OutputCfgChanged, CueChanged (R5919184/00 subscribe)"
+    params:
+      hostname: { type: string, required: true }
+      port: { type: int, min: 1, max: 65535, required: true }
+      notifications: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{"hostname":{hostname:json},"port":"{port}","notification":{notifications}},"method":"subscribe","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+  unsubscribe:
+    summary: "Remove a notification subscription for hostname:port (R5919184/00 unsubscribe)"
+    params:
+      hostname: { type: string, required: true }
+      port: { type: int, min: 1, max: 65535, required: true }
+      notifications: { type: json, required: true }
+    send: { method: POST, path: /, body: '{"params":{"hostname":{hostname:json},"port":"{port}","notification":{notifications}},"method":"unsubscribe","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
+    returns: value
+
+telemetry:
+  # The processor pushes changes only as HTTP POSTs to a listener the client
+  # runs (subscribe), which the core does not provide, so the system, the
+  # destination list and the source list are asked for every 10 seconds.
+  # Every method shares the one URL, so a rule can only recognise a reply by
+  # its shape: each rule below reads fields that only one method's reply holds.
+  poll:
+    send:
+      - { method: POST, path: /, body: '{"params":{},"method":"getFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+      - { method: POST, path: /, body: '{"params":{},"method":"listDestinations","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+      - { method: POST, path: /, body: '{"params":{},"method":"listSources","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
+    every_ms: 10000
+  updates:
+    # getFrameSettings: the frame (System.FrameCollection.Frame).
+    - path: "^/$"
+      json:
+        name: "$.result.response.System.FrameCollection.Frame.Name"
+        version: "$.result.response.System.FrameCollection.Frame.Version"
+        os_version: "$.result.response.System.FrameCollection.Frame.OSVersion"
+        frame_type: "$.result.response.System.FrameCollection.Frame.FrameType"
+        frame_type_name: "$.result.response.System.FrameCollection.Frame.FrameTypeName"
+        ip: "$.result.response.System.FrameCollection.Frame.Enet.IP"
+        mac: "$.result.response.System.FrameCollection.Frame.Enet.MacAddress"
+        over_temp: "$.result.response.System.FrameCollection.Frame.SysCard.OverTemp"
+        fan_warn: "$.result.response.System.FrameCollection.Frame.SysCard.FanWarn"
+      state:
+        frame.name: "{name}"
+        frame.version: "{version}"
+        frame.os_version: "{os_version}"
+        frame.type: "{frame_type}"
+        frame.type_name: "{frame_type_name}"
+        frame.ip: "{ip}"
+        frame.mac: "{mac}"
+        frame.over_temp: { value: "{over_temp}", map: { "0": false, "1": true } }
+        frame.fan_warning: { value: "{fan_warn}", map: { "0": false, "1": true } }
+
+    # getFrameSettings: the cards in the frame's slots, keyed by CardID.
+    - path: "^/$"
+      json_each: "$.result.response.System.FrameCollection.Frame.Slot"
+      json: { card: "$.Card.CardID", status: "$.Card.CardStatusLabel", type: "$.Card.CardTypeLabel" }
+      state:
+        "cards.{card}.status": "{status}"
+        "cards.{card}.type": "{type}"
+
+    # listDestinations: screen destinations.
+    - path: "^/$"
+      json_each: "$.result.response.ScreenDestination"
+      json: { id: "$.id", name: "$.Name", width: "$.HSize", height: "$.VSize" }
+      state:
+        "screens.{id}.name": "{name}"
+        "screens.{id}.width": "{width}"
+        "screens.{id}.height": "{height}"
+
+    # listDestinations: aux destinations.
+    - path: "^/$"
+      json_each: "$.result.response.AuxDestination"
+      json: { id: "$.id", name: "$.Name", mode: "$.AuxStreamMode" }
+      state:
+        "aux.{id}.name": "{name}"
+        "aux.{id}.stream_mode": "{mode}"
+
+    # listAuxContent: the only reply with PvwLastSrcIndex and PgmLastSrcIndex.
+    - path: "^/$"
+      json: { id: "$.result.response.id", pvw: "$.result.response.PvwLastSrcIndex", pgm: "$.result.response.PgmLastSrcIndex" }
+      state:
+        "aux.{id}.preview_source": "{pvw}"
+        "aux.{id}.program_source": "{pgm}"
+
+    # listContent: whether the screen destination is active (Doc 8.2, Encore3).
+    - path: "^/$"
+      json: { id: "$.result.response.id", active: "$.result.response.IsActive" }
+      state:
+        "screens.{id}.active": { value: "{active}", map: { "0": false, "1": true } }
+
+    # listSources: the only list whose elements hold InputCfgVideoStatus.
+    - path: "^/$"
+      json_each: "$.result.response"
+      json: { id: "$.id", status: "$.InputCfgVideoStatus", freeze: "$.Freeze", src_type: "$.SrcType" }
+      state:
+        "sources.{id}.video_status":
+          value: "{status}"
+          map: { "0": invalid, "1": valid, "2": format_mismatch, "3": out_of_range, "4": no_sync }
+        "sources.{id}.frozen": { value: "{freeze}", map: { "0": false, "1": true } }
+        "sources.{id}.type": { value: "{src_type}", map: { "0": input, "1": still } }
+
+    # listInputs (Doc 8.2, Encore3): the only list whose elements hold SyncStatus.
+    - path: "^/$"
+      json_each: "$.result.response"
+      json: { id: "$.id", sync: "$.SyncStatus" }
+      state:
+        "inputs.{id}.sync_status": "{sync}"
+
+    # listStill: the only list whose elements hold StillState and FileSize.
+    - path: "^/$"
+      json_each: "$.result.response"
+      json: { id: "$.id", state: "$.StillState.$t", size: "$.FileSize.$t", width: "$.HSize.$t", height: "$.VSize.$t" }
+      state:
+        "stills.{id}.state": "{state}"
+        "stills.{id}.file_size_kb": "{size}"
+        "stills.{id}.width": "{width}"
+        "stills.{id}.height": "{height}"
+
+    # listOperators: the only list whose elements hold Enable, StartRange, EndRange.
+    - path: "^/$"
+      json_each: "$.result.response"
+      json: { id: "$.id", enable: "$.Enable", start: "$.StartRange", end: "$.EndRange" }
+      state:
+        "operators.{id}.enabled": { value: "{enable}", map: { "0": false, "1": true } }
+        "operators.{id}.preset_start": "{start}"
+        "operators.{id}.preset_end": "{end}"
+
+state:
+  frame.name: { type: string, description: "Frame name (getFrameSettings Frame.Name)" }
+  frame.version: { type: string, description: "Event Master software version on the frame" }
+  frame.os_version: { type: string, description: "Operating system version on the frame" }
+  frame.type: { type: int, description: "Frame type: 0 E2, 1 S3, 2 EX, 3 IP-4K, 5 E2-Gen2, 6 PDS-4K, 8 Encore3" }
+  frame.type_name: { type: string, description: "Frame type name, such as E2, S3, Ex or Encore3" }
+  frame.ip: { type: string, description: "Frame IP address" }
+  frame.mac: { type: string, description: "Frame MAC address" }
+  frame.over_temp: { type: bool, description: "System card over-temperature flag (Encore3 document)" }
+  frame.fan_warning: { type: bool, description: "System card fan warning flag (Encore3 document)" }
+  cards.*.status: { type: string, description: "Card status label (Ready, Not Installed, ...), keyed by the card's CardID" }
+  cards.*.type: { type: string, description: "Card type label (HDMI 2.0 Input, VPU Scaler, ...), keyed by the card's CardID" }
+  screens.*.name: { type: string, description: "Screen destination name, keyed by its 0-based id" }
+  screens.*.width: { type: int, unit: px, description: "Screen destination width" }
+  screens.*.height: { type: int, unit: px, description: "Screen destination height" }
+  screens.*.active: { type: bool, description: "Screen destination is active (listContent IsActive)" }
+  aux.*.name: { type: string, description: "Aux destination name, keyed by its 0-based id" }
+  aux.*.stream_mode: { type: int, description: "Aux destination AuxStreamMode, as the processor reports it" }
+  aux.*.preview_source: { type: int, description: "Source id in the aux destination's preview (listAuxContent)" }
+  aux.*.program_source: { type: int, description: "Source id in the aux destination's program (listAuxContent)" }
+  sources.*.video_status: { type: string, description: "Input video status: valid, invalid, format_mismatch, out_of_range or no_sync" }
+  sources.*.frozen: { type: bool, description: "Source is frozen" }
+  sources.*.type: { type: string, description: "Source type: input or still" }
+  inputs.*.sync_status: { type: string, description: "Input sync status as the processor words it (listInputs SyncStatus)" }
+  stills.*.state: { type: int, description: "Still state (StillState), 0 to 4: capturing, ready or deleting; the document does not name each value" }
+  stills.*.file_size_kb: { type: float, unit: kB, description: "Still file size" }
+  stills.*.width: { type: int, unit: px, description: "Still width" }
+  stills.*.height: { type: int, unit: px, description: "Still height" }
+  operators.*.enabled: { type: bool, description: "Multi-operator profile enabled" }
+  operators.*.preset_start: { type: int, description: "First preset serial number in the operator's range" }
+  operators.*.preset_end: { type: int, description: "Last preset serial number in the operator's range" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Requests go to the fixed port 9999 as HTTP POST with Content-Type
+      application/json (Encore3 v10.0 p.1; R5919184/00 2.1). The documents give
+      no request path ("HTTP:// followed by the request URL with port 9999");
+      the root path / is used. The Encore3 document announces a secure port
+      9997 for a future release; it is not used here.
+
+  - models: [all]
+    severity: warning
+    text: >
+      In a linked system (master/slave, or host and clients on Encore3), JSON
+      must be sent to the master (host) unit. Requests, method names and
+      parameter names are case sensitive.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Failures arrive in a 200 reply: result.success other than 0 is an
+      error, and a JSON-RPC error member comes with a null result (Doc 8.2 and
+      Encore3 v10.0 p.2). Every command therefore requires
+      $.result.success = 0. The documents list no error codes or messages.
+
+  - models: [all]
+    severity: info
+    text: >
+      Destination, layer, source, still, cue, user key and preset ids are the
+      processor's 0-based indexes, as the list commands return them. A preset
+      id is not its serial number: "Preset3.00" can have id 0 and presetSno 3.00.
+      Serial numbers are sent with two decimals; the documents say 1.1 and 1.10
+      are the same and recommend no more than two decimal places. A still file
+      id N creates StillStore N+1.
+
+  - models: [all]
+    severity: info
+    text: >
+      activatePreset recalls to preview unless type is 1 (program). The
+      by-name form is documented without type, so activate_preset_by_name
+      always recalls to preview. recall_next_preset fails when no preset has
+      been recalled yet or the last one recalled is the last in the list.
+
+  - models: [all]
+    severity: warning
+    text: >
+      With one or more operators enabled (multi-operator mode), cut, allTrans,
+      savePreset, activatePreset and deletePreset need operatorId 0 to 2 (the
+      _as_operator commands) or the super operator password (the
+      _as_super_operator commands, which send the super_operator_password
+      setting). cut and allTrans then act only on that operator's
+      destinations. The plain commands are for systems with no operator enabled.
+
+  - models: [all]
+    severity: warning
+    text: >
+      activateDestGroup by name is documented with the key destGrName in its
+      parameter list and destGrpName in its example. The example's destGrpName
+      is sent; which key the processor accepts is not settled by the documents.
+
+  - models: [all]
+    severity: info
+    text: >
+      The user key list method is headed listUserKey in both documents but its
+      example calls listUserKeys, which is what is sent; both documents also
+      give its response as null, an apparent copy error. recallUserKey's name
+      key is userkeyName in the examples and userKeyName in the Encore3
+      parameter list; the examples' spelling is sent.
+
+  - models: [all]
+    severity: info
+    text: >
+      Shapes the documents leave open: powerStatus's response is written as
+      {FrameId1:{PwrStatus1, PwrStatus2}, ...}, which is not JSON, so
+      get_power_status returns the response unchanged; listCues returns an
+      "Array of cue objects" with no fields given. Test pattern numbers are
+      not listed: the examples name 3 (100% colour bars) and 5 (32x32 grid),
+      and 0 is off.
+
+  - models: [all]
+    severity: info
+    text: >
+      Partial changeContent: the Encore3 document says Mask must be sent
+      separately from Window and LastSrcIdx, hence set_layer_mask and
+      change_layer_source are separate. PvwMode 1 puts the change in preview
+      (the default) and PgmMode 1 in program. change_content takes the
+      documented params object for backgrounds (BGLyr), Source cropping and
+      several layers at once.
+
+  - models: [all]
+    severity: warning
+    text: >
+      State is limited to replies the core can tell apart. Every method shares
+      one URL, and telemetry rules are matched by URL, so a reply is
+      recognised only by fields no other reply holds. Source, preset, cue,
+      still, operator and user key names and the layers in a screen are not
+      tracked as state, because those replies share their field names (id,
+      Name) with others; read them with the list commands, whose value is the
+      whole list.
+
+  - models: [e2, s3-4k, ex]
+    severity: warning
+    text: >
+      subscribe makes the processor POST notifications such as {result:
+      {method: "notification", notificationType: "ScreenDestChanged", change:
+      {add: [2], remove: [], update: [0, 1, 2]}}} to http://hostname:port/.
+      The core runs no HTTP server for them, so it polls instead; the commands
+      are here for installations that run their own receiver. Subscriptions
+      are lost when the processor restarts. The document's example sends the
+      port as a string ("3000"), which is how it is sent.
+
+  - models: [e2, s3-4k, ex]
+    severity: critical
+    text: >
+      reset_frame codes 1 to 4 are factory resets and 5 powers the processor
+      down; nothing asks for confirmation.
+
+  - models: [encore3]
+    severity: critical
+    text: >
+      reset_frame_encore3 codes 1 and 2 are factory resets, 3 powers the
+      processor down, and factory_reset_keep is a factory reset that keeps
+      only the chosen setting. Encore3 numbers its resets differently from E2,
+      S3-4K and EX (0 soft, 1 factory, 2 factory and keep with saveOptions, 3
+      power down), hence the separate commands.
+
+  - models: [encore3]
+    severity: warning
+    text: >
+      API calls can be blocked by the Encore3's security settings (Encore3
+      User guide 6.5.1, front panel and web page Security). getFrameSettings
+      reports an ApiExtControl flag in its example; the document does not say
+      what it means.
+
+  - models: [encore3]
+    severity: warning
+    text: >
+      The Encore3 JSON document (v10.0) is marked preliminary in its metadata.
+      It omits methods the E2/S3/EX documents have (3dControl, 3dControlOutput,
+      super destination methods, subscribe and unsubscribe, cue and
+      destination group recall by name or serial number, background sources in
+      listSources, takeStill and freezeDestSource), so those are not listed for
+      Encore3. It adds DestOutMap (a screen destination's output index) to
+      listContent, changeContent, fillHV, clearLayers and recallUserKey, MVR
+      presets, and a multiviewer number on mvrLayoutChange.
+
+  - models: [all]
+    severity: info
+    text: >
+      listSourceMainBackup's inputType differs: on E2, S3-4K and EX it is -1
+      all, 0 inputs, 1 backgrounds (Doc 8.2); on Encore3 it is -1 all or an
+      input id 0-99 (Encore3 v10.0). mvrLayoutChange takes layouts 0-3 on E2,
+      S3-4K and EX, and a multiviewer 0-1 with layouts 0-9 on Encore3.
+      clearLayers is documented for Custom mode only (Doc 8.2).
+
+  - models: [all]
+    severity: info
+    text: >
+      takeStill fails if the source id given is a destination's. Pause and
+      stop are documented both with a cue id (activate_cue) and with type
+      alone (cue_transport); what type alone applies to is not explained.
