@@ -58,7 +58,7 @@ const REQUEST: Key = "request";
 /// Why a request was sent.
 #[derive(Debug, Clone, PartialEq)]
 enum Purpose {
-    Command { id: CommandId, returns_scenes: bool },
+    Command { id: CommandId },
     Version,
     SceneList,
     StudioMode,
@@ -306,7 +306,7 @@ impl Obs {
         }
 
         match pending.purpose {
-            Purpose::Command { id, returns_scenes } => {
+            Purpose::Command { id } => {
                 let result = if !ok {
                     Err(CommandError::DeviceError {
                         code: status
@@ -319,12 +319,11 @@ impl Obs {
                             .unwrap_or("")
                             .to_string(),
                     })
-                } else if returns_scenes {
-                    Ok(Outcome::Value {
-                        value: json!(scene_names(&data)),
-                    })
-                } else {
+                } else if data.is_null() {
                     Ok(Outcome::Ack)
+                } else {
+                    // The request's responseData, as obs-websocket documents it.
+                    Ok(Outcome::Value { value: data })
                 };
                 cx.complete(id, result);
             }
@@ -501,66 +500,33 @@ fn scene_names(data: &Value) -> Vec<String> {
     scenes.into_iter().map(|(_, name)| name).collect()
 }
 
-/// A command's request type and data. `None` for a command OBS has no request
-/// for, which catalogue validation already prevents.
-fn request_for(name: &str, params: &Params) -> Option<(&'static str, Option<Value>)> {
-    let s = |key: &str| json!(str_param(params, key));
-    Some(match name {
-        "set_program_scene" => (
-            "SetCurrentProgramScene",
-            Some(json!({"sceneName": s("scene")})),
-        ),
-        "set_preview_scene" => (
-            "SetCurrentPreviewScene",
-            Some(json!({"sceneName": s("scene")})),
-        ),
-        "transition" => ("TriggerStudioModeTransition", None),
-        "set_studio_mode" => (
-            "SetStudioModeEnabled",
-            Some(
-                json!({"studioModeEnabled": params.get("enabled").cloned().unwrap_or(json!(false))}),
-            ),
-        ),
-        "set_transition" => (
-            "SetCurrentSceneTransition",
-            Some(json!({"transitionName": s("name")})),
-        ),
-        "set_transition_duration" => (
-            "SetCurrentSceneTransitionDuration",
-            Some(
-                json!({"transitionDuration": params.get("duration_ms").cloned().unwrap_or(Value::Null)}),
-            ),
-        ),
-        "start_stream" => ("StartStream", None),
-        "stop_stream" => ("StopStream", None),
-        "start_record" => ("StartRecord", None),
-        "stop_record" => ("StopRecord", None),
-        "pause_record" => ("PauseRecord", None),
-        "resume_record" => ("ResumeRecord", None),
-        "start_virtualcam" => ("StartVirtualCam", None),
-        "stop_virtualcam" => ("StopVirtualCam", None),
-        "save_replay_buffer" => ("SaveReplayBuffer", None),
-        "set_input_mute" => (
-            "SetInputMute",
-            Some(json!({
-                "inputName": s("input"),
-                "inputMuted": params.get("muted").cloned().unwrap_or(json!(true)),
-            })),
-        ),
-        "set_input_volume" => (
-            "SetInputVolume",
-            Some(json!({
-                "inputName": s("input"),
-                "inputVolumeDb": params.get("volume_db").cloned().unwrap_or(Value::Null),
-            })),
-        ),
-        "trigger_hotkey" => (
-            "TriggerHotkeyByName",
-            Some(json!({"hotkeyName": s("name")})),
-        ),
-        "get_scenes" => ("GetSceneList", None),
-        _ => return None,
-    })
+/// A command's request: the spec names commands and parameters after
+/// obs-websocket's requests and fields in snake_case (`tools/generate_obs.py`),
+/// so the conversion back is mechanical: get_scene_list -> GetSceneList,
+/// scene_name -> sceneName.
+fn camel(name: &str, upper: bool) -> String {
+    let mut out = String::with_capacity(name.len());
+    let mut up = upper;
+    for c in name.chars() {
+        if c == '_' {
+            up = true;
+        } else if up {
+            out.extend(c.to_uppercase());
+            up = false;
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn request_for(name: &str, params: &Params) -> (String, Option<Value>) {
+    let data: serde_json::Map<String, Value> = params
+        .iter()
+        .map(|(k, v)| (camel(k, false), v.clone()))
+        .collect();
+    let data = (!data.is_empty()).then_some(Value::Object(data));
+    (camel(name, true), data)
 }
 
 impl Module for Obs {
@@ -583,20 +549,9 @@ impl Module for Obs {
             cx.complete(id, Err(CommandError::NotConnected));
             return;
         }
-        let Some((request_type, data)) = request_for(name, params) else {
-            cx.complete(
-                id,
-                Err(CommandError::UnknownCommand {
-                    command: name.into(),
-                }),
-            );
-            return;
-        };
-        let purpose = Purpose::Command {
-            id,
-            returns_scenes: name == "get_scenes",
-        };
-        self.request(cx, purpose, request_type, data);
+        // The catalogue has already checked the command and its parameters.
+        let (request_type, data) = request_for(name, params);
+        self.request(cx, Purpose::Command { id }, &request_type, data);
     }
 
     fn ws(&mut self, cx: &mut Cx, _socket: Key, input: WsInput) {
@@ -938,7 +893,7 @@ mod tests {
             &mut cx,
             9,
             "set_input_mute",
-            &json!({"input": "Mic", "muted": true})
+            &json!({"input_name": "Mic", "input_muted": true})
                 .as_object()
                 .unwrap()
                 .clone(),
@@ -962,7 +917,12 @@ mod tests {
         }));
 
         let mut cx = Cx::new(120);
-        m.command(&mut cx, 10, "transition", &Params::new());
+        m.command(
+            &mut cx,
+            10,
+            "trigger_studio_mode_transition",
+            &Params::new(),
+        );
         let request = sent(&cx.take())[0]["d"].clone();
         let a = feed(
             &mut m,
@@ -981,11 +941,31 @@ mod tests {
     }
 
     #[test]
-    fn get_scenes_returns_names_top_first() {
+    fn names_convert_mechanically_to_obs_websocket() {
+        assert_eq!(camel("get_scene_list", true), "GetSceneList");
+        assert_eq!(camel("input_volume_db", false), "inputVolumeDb");
+        let params = json!({"scene_name": "Wide", "scene_item_enabled": true})
+            .as_object()
+            .unwrap()
+            .clone();
+        let (request_type, data) = request_for("set_scene_item_enabled", &params);
+        assert_eq!(request_type, "SetSceneItemEnabled");
+        assert_eq!(
+            data,
+            Some(json!({"sceneName": "Wide", "sceneItemEnabled": true}))
+        );
+        assert_eq!(
+            request_for("start_stream", &Params::new()),
+            ("StartStream".into(), None)
+        );
+    }
+
+    #[test]
+    fn a_reply_with_data_is_the_value() {
         let mut m = obs("");
         identified(&mut m);
         let mut cx = Cx::new(100);
-        m.command(&mut cx, 3, "get_scenes", &Params::new());
+        m.command(&mut cx, 3, "get_scene_list", &Params::new());
         let request = sent(&cx.take())[0]["d"].clone();
         let a = feed(
             &mut m,
@@ -997,12 +977,17 @@ mod tests {
                     {"sceneName": "B", "sceneIndex": 1},
                     {"sceneName": "A", "sceneIndex": 2}]}}}),
         );
-        assert!(a.contains(&Action::Complete {
-            id: 3,
-            result: Ok(Outcome::Value {
-                value: json!(["A", "B", "C"])
+        let value = a
+            .iter()
+            .find_map(|x| match x {
+                Action::Complete {
+                    id: 3,
+                    result: Ok(Outcome::Value { value }),
+                } => Some(value.clone()),
+                _ => None,
             })
-        }));
+            .unwrap();
+        assert_eq!(value["scenes"][2]["sceneName"], "A");
     }
 
     #[test]

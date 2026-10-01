@@ -197,7 +197,11 @@ async fn obs_end_to_end() {
     assert_eq!(snapshot.state["scenes"], json!(["Wide", "Close"]));
 
     let outcome = core
-        .execute(id, "set_program_scene", params(json!({"scene": "Close"})))
+        .execute(
+            id,
+            "set_current_program_scene",
+            params(json!({"scene_name": "Close"})),
+        )
         .await;
     assert_eq!(outcome, Ok(Outcome::Ack));
     wait_for(
