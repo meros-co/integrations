@@ -1,0 +1,443 @@
+spec: 1
+id: allenheath-dlive
+name: Allen & Heath dLive and Avantis
+vendor: Allen & Heath
+category: mixer
+implementation: native
+reason: >
+  MIDI on a TCP byte stream: messages are delimited by MIDI's own rules
+  (running status, which the console uses, SysEx, real-time bytes), not by
+  lines. The channel is chosen by a MIDI channel offset from a base channel
+  set on the console plus a note number, levels are NRPN sequences, and
+  every read is a SysEx request answered by an ordinary channel message, so
+  a reply can only be matched by decoding it. Reading the console's state
+  means thousands of requests that have to be paced, and dB values follow
+  the documents' formulas and tables.
+
+source:
+  - title: "dLive MIDI Over TCP/IP Protocol, Firmware V2.0 (reference table v2.0)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2024/06/dLive-MIDI-Over-TCP-Protocol-V2.0.pdf"
+    note: >
+      Manufacturer document, 9 pages, for firmware V2.0 and later. Ports: MixRack TCP 51325 (TLS 51327),
+      Surface TCP 51328 (TLS 51329); functions; TLS authentication ("UserProfile, UserPassword", reply
+      "AuthOK"); running status example 9B 00 7F 01 7F 02 7F; MIDI channels N to N+4 (p.1). Channel
+      selection by MIDI channel offset and note; SysEx header F0 00 00 1A 50 10 01 00; mute on/off and the
+      received velocity ranges; get mute; fader NRPN 17 and get; main assignment NRPN 18 (p.2). Main
+      assignment off and get; send level SysEx 0D and get; input to group/aux assignment SysEx 0E and get;
+      DCA and mute group assignment NRPN 40 values; preamp socket numbers MP (p.3). Preamp gain Pitch Bend
+      and get; pad and 48V set, get and reply; channel name and colour set, get and reply; scene recall
+      banks 00-03 (p.4). Cue list recall by Recall Id 0-1999, banks 00-0F (Surface only); Go/Next/Previous
+      by user CC (p.5). PEQ NRPN 1A-29 with type table, frequency formula and examples, gain formula and
+      examples, width table (p.6-7); PEQ get; HPF frequency NRPN 30 formula and get; HPF on NRPN 31 and get;
+      UFX global key CC 0C and scale CC 0D (p.7). UFX unit MIDI channel M and parameter CCs; MIDI strips
+      (p.8). Reference table: scene, channel, socket, character, colour, gain and fader values (p.9).
+  - title: "Avantis MIDI TCP/IP Protocol (firmware V2.0 and later; article updated 2026-04-13)"
+    author: "Allen & Heath"
+    url: "https://support.allen-heath.com/hc/en-gb/articles/45146889174801-Avantis-MIDI-TCP-IP-Protocol"
+    note: >
+      Manufacturer support article (read through the help centre's article API). Sections: TCP port 51325;
+      controllable functions; running status; MIDI channel N, at most 12, default 12 to 16; channel selection
+      (inputs 1-96, groups, auxes and matrices 1-54 mono and 1-27 stereo, FX sends and returns 1-12, mains
+      1-3, DCAs 1-16 at 36-45, mute groups 1-8 at 46-4D, UFX sends and returns); SysEx header; mute; fader
+      NRPN 17; main assignment NRPN 18; send level SysEx 0D; DCA assignment 40-4F/00-0F and mute group
+      assignment 50-57/10-17 (NRPN 40); channel name (up to 8 characters) and colour with get and reply;
+      scene recall banks 00-03; MIDI strips; MMC; UFX global key and scale and unit parameters; reference
+      tables including the fader table.
+  - title: "Avantis MIDI TCP Protocol, Firmware V1.10 (V1.0 document)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2023/05/Avantis-MIDI-TCP-Protocol-V1.0.pdf"
+    note: >
+      Manufacturer document, 4 pages; the earlier edition of the article above. Its reference table (p.4)
+      gives the colour values (Off 00 to White 07) that the article's table images do not carry as text.
+  - title: "dLive Firmware Release Notes - Firmware Version 2.12 (2026-02-18)"
+    author: "Allen & Heath"
+    url: "https://support.allen-heath.com/hc/en-gb/articles/42059219284753"
+    note: >
+      Manufacturer article. Cumulative notes: MIDI/TCP "On / Off / Secure Modes" and GET messages, PEQ, HPF
+      and group assignment commands (V1.9 notes); ID7237, a scene recall sent to the MixRack MIDI/TCP port
+      ignores Surface role filters.
+
+settings:
+  # The console's base MIDI channel N (Utility / Control / MIDI); the console
+  # uses N to N+4. Required: a wrong channel makes every message miss.
+  midi_channel: { type: int, min: 1, max: 12, required: true }
+  # Read every preamp's gain, pad and 48V on connecting (MixRack only).
+  sync_preamps: { type: bool, default: true }
+
+models:
+  - id: dlive-mixrack
+    name: "dLive MixRack (CDM32, CDM48, CDM64, DM0, DM32, DM48, DM64), TCP 51325"
+    supports:
+      [set_mute, get_mute, set_level, get_level, set_main_assign, get_main_assign, set_send_level,
+      get_send_level, set_send_assign, get_send_assign, set_dca_assign, set_mute_group_assign,
+      set_preamp_gain, get_preamp_gain, set_preamp_pad, get_preamp_pad, set_phantom_power, get_phantom_power,
+      set_channel_name, get_channel_name, set_channel_colour, get_channel_colour, recall_scene, set_peq_type,
+      set_peq_frequency, set_peq_width, set_peq_gain, get_peq, set_hpf_frequency, get_hpf_frequency, set_hpf,
+      get_hpf, set_ufx_global_key, set_ufx_global_scale, control_change, raw_midi, refresh]
+    verification: none
+  - id: dlive-surface
+    name: "dLive Surface (S Class, C Class), TCP 51328"
+    supports:
+      [set_mute, get_mute, set_level, get_level, set_main_assign, get_main_assign, set_send_level,
+      get_send_level, set_send_assign, get_send_assign, set_dca_assign, set_mute_group_assign,
+      set_preamp_gain, get_preamp_gain, set_preamp_pad, get_preamp_pad, set_phantom_power, get_phantom_power,
+      set_channel_name, get_channel_name, set_channel_colour, get_channel_colour, recall_cue, set_peq_type,
+      set_peq_frequency, set_peq_width, set_peq_gain, get_peq, set_hpf_frequency, get_hpf_frequency, set_hpf,
+      get_hpf, set_ufx_global_key, set_ufx_global_scale, control_change, raw_midi, refresh]
+    verification: none
+    notes: >
+      The Surface recalls cues by Recall Id rather than scenes, and takes the user-defined Go / Next /
+      Previous CCs (p.5). Scene recall is MixRack only (p.4).
+  - id: avantis
+    name: "Avantis and Avantis Solo, TCP 51325"
+    supports:
+      [set_mute, set_level, set_main_assign, set_send_level, set_dca_assign, set_mute_group_assign,
+      set_channel_name, get_channel_name, set_channel_colour, get_channel_colour, recall_scene,
+      set_ufx_global_key, set_ufx_global_scale, control_change, raw_midi, refresh]
+    verification: none
+    notes: >
+      The Avantis protocol documents no reads except names and colours, and no preamp, PEQ, HPF or send
+      assignment messages.
+
+commands:
+  set_mute:
+    summary: "Mute or unmute a channel (Note On 7F or 3F, then 00, p.2)"
+    params:
+      channel_type: &channel_type
+        type: enum
+        values: [input, mono_group, stereo_group, mono_aux, stereo_aux, mono_matrix, stereo_matrix, mono_fx_send,
+          stereo_fx_send, fx_return, main, dca, mute_group, ufx_send, ufx_return]
+        required: true
+      channel: &channel { type: int, min: 1, max: 128, required: true }
+      muted: { type: bool, default: true }
+    returns: none
+  get_mute:
+    summary: "Read a channel's mute (SysEx 0N 05 09 CH, answered by the mute Note On, p.2)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_level:
+    summary: "Set a channel's fader (NRPN 17, p.2): level_db -54 to +10 by [(dB + 54) / 64] * 7F rounded down, or level_raw 0-127 where 0 is -inf"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      level_db: &level_db { type: float, min: -54, max: 10 }
+      level_raw: &level_raw { type: int, min: 0, max: 127 }
+    returns: none
+  get_level:
+    summary: "Read a channel's fader (SysEx 0N 05 0B 17 CH, p.2); returns {level_db, level_raw}, level_db null at -inf"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_main_assign:
+    summary: "Assign a channel to the main mix or not (NRPN 18: 7F on, 3F off, p.2-3)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      assigned: { type: bool, default: true }
+    returns: none
+  get_main_assign:
+    summary: "Read a channel's main mix assignment (SysEx 0N 05 0B 18 CH, p.3)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_send_level:
+    summary: "Set a send level to an aux, FX send or matrix (SysEx 0N 0D CH SndN SndCH LV, p.3), as set_level"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: &send_level_destination
+        type: enum
+        values: [mono_aux, stereo_aux, mono_matrix, stereo_matrix, mono_fx_send, stereo_fx_send, ufx_send]
+        required: true
+      destination: &destination { type: int, min: 1, max: 62, required: true }
+      level_db: *level_db
+      level_raw: *level_raw
+    returns: none
+  get_send_level:
+    summary: "Read a send level (SysEx 0N 05 0F 0D CH SndN SndCH, p.3); returns {level_db, level_raw}"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *send_level_destination
+      destination: *destination
+    returns: value
+  set_send_assign:
+    summary: "Assign a channel to a group or aux or not (SysEx 0N 0E CH SndN SndCH V: 7F on, 3F off, p.3)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: &send_assign_destination
+        type: enum
+        values: [mono_group, stereo_group, mono_aux, stereo_aux]
+        required: true
+      destination: *destination
+      assigned: { type: bool, default: true }
+    returns: none
+  get_send_assign:
+    summary: "Read a group or aux assignment (SysEx 0N 05 0F 0E CH SndN SndCH, p.3)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *send_assign_destination
+      destination: *destination
+    returns: value
+  set_dca_assign:
+    summary: "Assign a channel to a DCA or not (NRPN 40; dLive DCA 1-24 on 40-57 off 00-17, Avantis DCA 1-16 on 40-4F off 00-0F)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      dca: { type: int, min: 1, max: 24, required: true }
+      assigned: { type: bool, default: true }
+    returns: none
+  set_mute_group_assign:
+    summary: "Assign a channel to a mute group or not (NRPN 40; dLive on 58-5F off 18-1F, Avantis on 50-57 off 10-17)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      mute_group: { type: int, min: 1, max: 8, required: true }
+      assigned: { type: bool, default: true }
+    returns: none
+  set_preamp_gain:
+    summary: "Set a MixRack socket preamp's gain (Pitch Bend EN MP GV, p.4): gain_db +5 to +60 by the p.9 table, or gain_raw 0-127. Socket 1-64 MixRack, 65-96 DX 1/2, 97-128 DX 3/4"
+    params:
+      socket: &socket { type: int, min: 1, max: 128, required: true }
+      gain_db: { type: float, min: 5, max: 60 }
+      gain_raw: { type: int, min: 0, max: 127 }
+    returns: none
+  get_preamp_gain:
+    summary: "Read a socket preamp's gain (SysEx 0N 05 0B 19 MP, p.4); returns {gain_db, gain_raw}"
+    params: { socket: *socket }
+    returns: value
+  set_preamp_pad:
+    summary: "Switch a socket preamp's pad (SysEx 0N 09 MP 7F/00, p.4)"
+    params: { socket: *socket, enabled: { type: bool, default: true } }
+    returns: none
+  get_preamp_pad:
+    summary: "Read a socket preamp's pad (SysEx 0N 07 MP, reply 0N 08 MP Pad, p.4)"
+    params: { socket: *socket }
+    returns: value
+  set_phantom_power:
+    summary: "Switch a socket preamp's 48V (SysEx 0N 0C MP 7F/00, p.4)"
+    params: { socket: *socket, enabled: { type: bool, default: true } }
+    returns: none
+  get_phantom_power:
+    summary: "Read a socket preamp's 48V (SysEx 0N 0A MP, reply 0N 0B MP 48V, p.4)"
+    params: { socket: *socket }
+    returns: value
+  set_channel_name:
+    summary: "Name a channel (SysEx 0N 03 CH Name, printable ASCII; Avantis up to 8 characters)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      name: { type: string, pattern: "^[ -~]*$", required: true }
+    returns: none
+  get_channel_name:
+    summary: "Read a channel's name (SysEx 0N 01 CH, reply 0N 02 CH Name, p.4)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_channel_colour:
+    summary: "Set a channel's colour (SysEx 0N 06 CH Col, p.4, colours p.9)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      colour:
+        type: enum
+        values: ["off", red, green, yellow, blue, purple, light_blue, white]
+        required: true
+    returns: none
+  get_channel_colour:
+    summary: "Read a channel's colour (SysEx 0N 04 CH, reply 0N 05 CH Col, p.4)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  recall_scene:
+    summary: "Recall scene 1-500 (CC 00 bank 00-03, Program Change, on channel N, p.4-5). MixRack and Avantis"
+    params:
+      scene: { type: int, min: 1, max: 500, required: true }
+    returns: none
+  recall_cue:
+    summary: "Recall a cue by Recall Id 0-1999 (CC 00 bank 00-0F, Program Change, p.5). dLive Surface only"
+    params:
+      recall_id: { type: int, min: 0, max: 1999, required: true }
+    returns: none
+  set_peq_type:
+    summary: "Set a PEQ band's type (NRPN 1A/1E/22/26, p.6). Band 1-4 is the document's band 0-3; bell on bands 1 and 4, lf_shelf and high_pass band 1, hf_shelf and low_pass band 4"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      band: &band { type: int, min: 1, max: 4, required: true }
+      type: { type: enum, values: [bell, lf_shelf, hf_shelf, low_pass, high_pass], required: true }
+    returns: none
+  set_peq_frequency:
+    summary: "Set a PEQ band's frequency, 20 Hz to 20 kHz (NRPN 1B/1F/23/27, p.6: INT(127 * ((4608 * log2(F / 4)) - 10699) / 45922))"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      band: *band
+      frequency_hz: { type: float, min: 20, max: 20000, required: true }
+    returns: none
+  set_peq_width:
+    summary: "Set a PEQ band's width in octaves (NRPN 1C/20/24/28, table p.6-7)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      band: *band
+      width:
+        type: enum
+        values: ["1.5", "1.4", "1.3", "1.2", "1.1", "1", "0.95", "0.9", "0.85", "0.8", "3/4", "0.7", "2/3", "0.6",
+          "0.55", "0.5", "0.45", "0.4", "1/3", "0.3", "1/4", "0.2", "1/6", "0.13", "1/9"]
+        required: true
+    returns: none
+  set_peq_gain:
+    summary: "Set a PEQ band's gain (NRPN 1D/21/25/29, p.6): gain_db -15 to +15 by (dB + 15) * 126 / 30, or gain_raw 0-126"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      band: *band
+      gain_db: { type: float, min: -15, max: 15 }
+      gain_raw: { type: int, min: 0, max: 126 }
+    returns: none
+  get_peq:
+    summary: "Read a PEQ band parameter (SysEx 0N 05 0B nn CH, p.7)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      band: *band
+      parameter: { type: enum, values: [type, frequency, width, gain], required: true }
+    returns: value
+  set_hpf_frequency:
+    summary: "Set the HPF frequency (NRPN 30, p.7: the PEQ formula with 41314, which reaches 7F near 10 kHz)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      frequency_hz: { type: float, min: 20, max: 10000, required: true }
+    returns: none
+  get_hpf_frequency:
+    summary: "Read the HPF frequency (SysEx 0N 05 0B 30 CH, p.7); returns {frequency_hz, frequency_raw}"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_hpf:
+    summary: "Switch the HPF in or out (NRPN 31: 7F on, 00 off, p.7)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      enabled: { type: bool, default: true }
+    returns: none
+  get_hpf:
+    summary: "Read whether the HPF is in (SysEx 0N 05 0B 31 CH, p.7)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_ufx_global_key:
+    summary: "Set the UFX global key (CC 0C on channel N, p.7)"
+    params:
+      key: { type: enum, values: [C, "C#", D, "D#", E, F, "F#", G, "G#", A, "A#", B], required: true }
+    returns: none
+  set_ufx_global_scale:
+    summary: "Set the UFX global scale (CC 0D on channel N, p.7). Chromatic is Avantis only"
+    params:
+      scale: { type: enum, values: [major, minor, chromatic], required: true }
+    returns: none
+  control_change:
+    summary: "Send a Control Change: the user-defined Scene Go / Next / Previous CCs (Surface, p.5) or a UFX unit parameter on its MIDI channel M (p.8)"
+    params:
+      midi_channel: { type: int, min: 1, max: 16, required: true }
+      controller: { type: int, min: 0, max: 127, required: true }
+      value: { type: int, min: 0, max: 127, required: true }
+    returns: none
+  raw_midi:
+    summary: "Send MIDI bytes given as hex, such as 'B0 63 00', for messages not modelled here (MIDI strips, custom SoftKey messages)"
+    params:
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: none
+  refresh:
+    summary: "Read the console's state again: every channel's name and colour, and on dLive its mute, fader and main assignment, and the preamps"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Ports are from the dLive document (p.1): MixRack 51325, Surface 51328 (Avantis 51325). The encrypted
+      ports (MixRack 51327, Surface 51329), whose first message is "UserProfile, UserPassword" answered by
+      "AuthOK", are not supported: the core has no TLS socket for native modules. MIDI/TCP must be On (not
+      Secure) on the console (dLive V1.9 release notes); the console accepts the connection either way, and
+      the core logs a warning when it then never answers.
+  - models: [all]
+    severity: critical
+    text: >
+      midi_channel must be the console's base MIDI channel N. The console uses N to N+4 for the channel
+      types and N for preamps and scenes (p.1); messages on any other channel are ignored, so a wrong setting
+      shows as a console that never answers.
+  - models: [all]
+    severity: info
+    text: >
+      MIDI has no acknowledgement: writes are reported unverified. On dLive each write is followed by the
+      matching get, so the state shows what the console did; Avantis documents gets only for names and
+      colours. The dLive and Avantis documents say the console transmits the scene recall message when a
+      scene is recalled on it (p.4); they do not say other changes made on the console are transmitted. The
+      core applies whatever the console sends and reads names, colours, mutes, faders and main assignments
+      (and preamps) on connecting, paced at about 500 requests a second; refresh reads them again.
+  - models: [all]
+    severity: info
+    text: >
+      Fader and send levels use the documents' formula [(dB + 54) / 64] * 7F rounded down, which the hex
+      column of both tables follows. dLive's table prints +5 dB as "74 117"; 117 is 75 hex, which the formula
+      gives, so 74 is a typo. Avantis's decimal column rounds instead (-25 dB "39 58") and prints -40 dB as
+      "1B 23"; the hex column is used. A received value reads back as level_db, the whole (or else half) dB
+      within the 0.5 dB step it covers, so 6B reads 0 dB; 00 is -inf (level_db null).
+  - models: [dlive-mixrack, dlive-surface]
+    severity: info
+    text: >
+      Preamp gain uses the p.9 table (+5 dB 00 to +60 dB 7F in 5 dB steps), interpolated between its points.
+      Its printed formula [(Gain - 5) / 55] * 7F disagrees with the table in rounding (+30 dB is 3A in the
+      table, 39 by the formula rounded down). The get is printed "0N, 05, 0B, 19, CH"; the socket number MP is
+      sent in place of CH. Sockets are numbered 1-128 here: MP 00-3F MixRack 1-64, 40-5F DX 1/2, 60-7F DX 3/4.
+  - models: [dlive-mixrack, dlive-surface]
+    severity: info
+    text: >
+      Group and aux assignment (SysEx 0E) documents only the on value (40-7F); off is sent as 3F, the value the
+      main mix assignment uses for off. PEQ gain 15 dB is printed "126 7F"; 126 is 7E, which the formula
+      gives. PEQ types are restricted to the bands p.6 names. The HPF formula reaches 7F near 10 kHz, so higher
+      frequencies are refused.
+  - models: [dlive-mixrack, dlive-surface]
+    severity: info
+    text: >
+      dLive's text gives the UFX global scale as 00-01 (major, minor) and its table lists those two; Avantis's
+      and SQ+'s tables add chromatic (02), so chromatic is accepted on Avantis only.
+  - models: [avantis]
+    severity: info
+    text: >
+      Avantis names are at most 8 characters. dLive gives no limit; names longer than the console's are
+      presumably truncated by it.
+  - models: [all]
+    severity: info
+    text: >
+      MIDI strips, SoftKeys and the Surface's Go / Next / Previous and cue Recall Ids send messages the
+      operator configures on the console, so they are not modelled; use control_change or raw_midi. MMC is
+      transmitted by the console for a DAW and is not a console control.
+
+state:
+  channels.*.*.mute: { type: bool, description: "Mute, keyed by channel type then number" }
+  channels.*.*.level_raw: { type: int, description: "Fader, raw 0-127 (0 is -inf)" }
+  channels.*.*.level_db: { type: float, unit: dB, description: "Fader in dB; absent at -inf" }
+  channels.*.*.main_assign: { type: bool, description: "Assigned to the main mix" }
+  channels.*.*.dca.*: { type: bool, description: "Assigned to the DCA" }
+  channels.*.*.mute_group.*: { type: bool, description: "Assigned to the mute group" }
+  channels.*.*.name: { type: string, description: "Channel name" }
+  channels.*.*.colour: { type: string, description: "'off', 'red', 'green', 'yellow', 'blue', 'purple', 'light_blue' or 'white'" }
+  channels.*.*.peq.*.type: { type: string, description: "PEQ band 1-4 type" }
+  channels.*.*.peq.*.frequency_raw: { type: int, description: "PEQ band frequency, raw 0-127" }
+  channels.*.*.peq.*.frequency_hz: { type: float, unit: Hz, description: "PEQ band frequency, the lowest the raw value covers" }
+  channels.*.*.peq.*.width: { type: string, description: "PEQ band width in octaves, as in the p.6 table" }
+  channels.*.*.peq.*.gain_raw: { type: int, description: "PEQ band gain, raw 0-126" }
+  channels.*.*.peq.*.gain_db: { type: float, unit: dB, description: "PEQ band gain" }
+  channels.*.*.hpf.frequency_raw: { type: int, description: "HPF frequency, raw 0-127" }
+  channels.*.*.hpf.frequency_hz: { type: float, unit: Hz, description: "HPF frequency, the lowest the raw value covers" }
+  channels.*.*.hpf.enabled: { type: bool, description: "HPF in" }
+  sends.*.*.*.*.level_raw: { type: int, description: "Send level, raw 0-127; keyed by source type, number, destination type, number" }
+  sends.*.*.*.*.level_db: { type: float, unit: dB, description: "Send level; absent at -inf" }
+  sends.*.*.*.*.assigned: { type: bool, description: "Assigned to the group or aux" }
+  preamps.*.gain_raw: { type: int, description: "Socket preamp gain, raw 0-127" }
+  preamps.*.gain_db: { type: float, unit: dB, description: "Socket preamp gain, +5 to +60" }
+  preamps.*.pad: { type: bool, description: "Socket preamp pad" }
+  preamps.*.phantom_power: { type: bool, description: "Socket preamp 48V" }
+  scene.current: { type: int, description: "Scene last recalled (MixRack, Avantis), 1-500" }
+  cue.last_recall_id: { type: int, description: "Recall Id of the cue last recalled (Surface), 0-1999" }

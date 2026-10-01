@@ -1,0 +1,269 @@
+spec: 1
+id: allenheath-ahm
+name: Allen & Heath AHM
+vendor: Allen & Heath
+category: mixer
+implementation: native
+reason: >
+  MIDI on a TCP byte stream: messages are delimited by MIDI's own rules
+  (running status, SysEx, real-time bytes), not by lines. Channels are chosen
+  by MIDI channel and note number, levels are NRPN sequences, and every read
+  is a SysEx request answered by an ordinary channel message or a SysEx
+  whose layout depends on its contents (a source selector reply carries a
+  variable list of sources), so replies can only be matched by decoding
+  them. Reading the processor's state means hundreds of paced requests.
+
+source:
+  - title: "AHM TCP/IP Protocol, Firmware V1.4 (Issue 2; reference table v1.10)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2023/11/AHM-TCP-Protocol-V1.4.pdf"
+    note: >
+      Manufacturer document, 7 pages. TCP 51325, TLS 51327; functions; TLS authentication; channel selection
+      by MIDI channel (inputs 0, zones 1, control groups 2, rooms 3) and note; SysEx header
+      F0 00 00 1A 50 12 01 00 (p.1). Mute on/off and received velocities; get mute; level NRPN 17 and get;
+      level increment/decrement NRPN 20 (p.2). Input trim NRPN 18 (-24 to +24 dB = 00-7F), preamp gain
+      NRPN 19 (5 to 60 dB = 00-7F), pad NRPN 1A, phantom power NRPN 1B, each with a get (p.3). Input to zone
+      and zone to zone send level (02), mute (03) and increment/decrement (04) with gets; preset recall
+      banks 00-03 on channel 0 (p.4). Audio playback (06); source selector (08) with the message sent on
+      selection and the get reply; room source selector (0D); room combiners (0E) (p.5). Name get (09, reply
+      0A) and colour get (0B, reply 0C) (p.6). Reference table: presets, channels, characters, colours,
+      source numbers and the channel level table with its formula [(Gain + 48) / 58] * 127 (p.7).
+  - title: "Allen & Heath for IT managers (white paper, updated 2026-03-30)"
+    author: "Allen & Heath"
+    url: "https://support.allen-heath.com/hc/en-gb/articles/37287399691409-Allen-Heath-for-IT-managers"
+    note: >
+      Manufacturer article. External control on TCP 51325 (unsecured) or TLS 51327, "TCP encapsulated MIDI";
+      on AHM it can be disabled in System Manager, and the TLS port needs an SSL certificate and key uploaded.
+
+models:
+  - id: ahm-16
+    name: AHM-16
+    supports: &all
+      [set_mute, get_mute, set_level, adjust_level, get_level, set_input_trim, get_input_trim, set_preamp_gain,
+      get_preamp_gain, set_preamp_pad, get_preamp_pad, set_phantom_power, get_phantom_power, set_send_level,
+      get_send_level, set_send_mute, get_send_mute, adjust_send_level, recall_preset, play_track,
+      select_source, get_source, select_room_source, set_room_divider, get_channel_name, get_channel_colour,
+      raw_midi, refresh]
+    verification: none
+  - id: ahm-32
+    name: AHM-32
+    supports: *all
+    verification: none
+  - id: ahm-64
+    name: AHM-64
+    supports: *all
+    verification: none
+
+commands:
+  set_mute:
+    summary: "Mute or unmute an input, zone or control group (Note On 7F or 3F, then 00, p.2)"
+    params:
+      channel_type: &level_type { type: enum, values: [input, zone, control_group], required: true }
+      channel: &channel { type: int, min: 1, max: 64, required: true }
+      muted: { type: bool, default: true }
+    returns: none
+  get_mute:
+    summary: "Read a mute (SysEx 0N 01 09 CH, answered by the mute Note On, p.2)"
+    params: { channel_type: *level_type, channel: *channel }
+    returns: value
+  set_level:
+    summary: "Set an input, zone or control group level (NRPN 17, p.2): level_db -48 to +10 by [(dB + 48) / 58] * 127 rounded down (-48 dB is 01), or level_raw 0-127 where 0 is -inf"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      level_db: &level_db { type: float, min: -48, max: 10 }
+      level_raw: &level_raw { type: int, min: 0, max: 127 }
+    returns: none
+  adjust_level:
+    summary: "Step a level up or down (NRPN 20: 7F increment, 3F decrement, p.2)"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      direction: &direction { type: enum, values: [up, down], required: true }
+    returns: none
+  get_level:
+    summary: "Read a level (SysEx 0N 01 0B 17 CH, p.2); returns {level_db, level_raw}, level_db null at -inf"
+    params: { channel_type: *level_type, channel: *channel }
+    returns: value
+  set_input_trim:
+    summary: "Set an input's trim (NRPN 18, p.3): trim_db -24 to +24 over 00-7F, or trim_raw"
+    params:
+      channel: *channel
+      trim_db: { type: float, min: -24, max: 24 }
+      trim_raw: { type: int, min: 0, max: 127 }
+    returns: none
+  get_input_trim:
+    summary: "Read an input's trim (SysEx 00 01 0B 18 CH, p.3); returns {trim_db, trim_raw}"
+    params: { channel: *channel }
+    returns: value
+  set_preamp_gain:
+    summary: "Set an input's preamp gain (NRPN 19, p.3): gain_db +5 to +60 over 00-7F, or gain_raw"
+    params:
+      channel: *channel
+      gain_db: { type: float, min: 5, max: 60 }
+      gain_raw: { type: int, min: 0, max: 127 }
+    returns: none
+  get_preamp_gain:
+    summary: "Read an input's preamp gain (SysEx 00 01 0B 19 CH, p.3); returns {gain_db, gain_raw}"
+    params: { channel: *channel }
+    returns: value
+  set_preamp_pad:
+    summary: "Switch an input's pad (NRPN 1A: 7F on, 00 off, p.3)"
+    params: { channel: *channel, enabled: { type: bool, default: true } }
+    returns: none
+  get_preamp_pad:
+    summary: "Read an input's pad (SysEx 00 01 0B 1A CH, p.3)"
+    params: { channel: *channel }
+    returns: value
+  set_phantom_power:
+    summary: "Switch an input's phantom power (NRPN 1B: 7F on, 00 off, p.3)"
+    params: { channel: *channel, enabled: { type: bool, default: true } }
+    returns: none
+  get_phantom_power:
+    summary: "Read an input's phantom power (SysEx 00 01 0B 1B CH, p.3)"
+    params: { channel: *channel }
+    returns: value
+  set_send_level:
+    summary: "Set an input-to-zone or zone-to-zone send level (SysEx 0N 02 CH 01 zone LV, p.4), as set_level"
+    params:
+      channel_type: &send_type { type: enum, values: [input, zone], required: true }
+      channel: *channel
+      zone: &zone { type: int, min: 1, max: 64, required: true }
+      level_db: *level_db
+      level_raw: *level_raw
+    returns: none
+  get_send_level:
+    summary: "Read a send level (SysEx 0N 01 0F 02 CH 01 zone, p.4); returns {level_db, level_raw}"
+    params: { channel_type: *send_type, channel: *channel, zone: *zone }
+    returns: value
+  set_send_mute:
+    summary: "Mute or unmute a send (SysEx 0N 03 CH 01 zone 7F/3F, p.4)"
+    params:
+      channel_type: *send_type
+      channel: *channel
+      zone: *zone
+      muted: { type: bool, default: true }
+    returns: none
+  get_send_mute:
+    summary: "Read a send's mute (SysEx 0N 01 0F 03 CH 01 zone, p.4)"
+    params: { channel_type: *send_type, channel: *channel, zone: *zone }
+    returns: value
+  adjust_send_level:
+    summary: "Step a send level up or down (SysEx 0N 04 CH 01 zone 7F/3F, p.4)"
+    params: { channel_type: *send_type, channel: *channel, zone: *zone, direction: *direction }
+    returns: none
+  recall_preset:
+    summary: "Recall preset 1-500 (B0 00 bank, C0 program, p.4)"
+    params:
+      preset: { type: int, min: 1, max: 500, required: true }
+    returns: none
+  play_track:
+    summary: "Play an audio file (SysEx 00 06 PlaybackChannel TrackID, p.5); the channel is ignored for stereo playback"
+    params:
+      track_id: { type: int, min: 0, max: 127, required: true }
+      playback_channel: { type: enum, values: [mono_1, mono_2], default: mono_1 }
+    returns: none
+  select_source:
+    summary: "Select a zone's source selector source 1-20 (SysEx 00 08 CH SourceNumber, p.5)"
+    params:
+      zone: *zone
+      source: &source { type: int, min: 1, max: 20, required: true }
+    returns: none
+  get_source:
+    summary: "Read a zone's selected source and its source list (SysEx 01 01 0F 08 CH, p.5); returns the source number"
+    params: { zone: *zone }
+    returns: value
+  select_room_source:
+    summary: "Select a room's source 1-20 (SysEx 00 0D CH SourceNumber, p.5)"
+    params:
+      room: &room { type: int, min: 1, max: 16, required: true }
+      source: *source
+    returns: none
+  set_room_divider:
+    summary: "Combine or divide two rooms (SysEx 00 0E Room1 Room2 VL: 00-3F combined, 40-7F divided, p.5)"
+    params:
+      room: *room
+      other_room: { type: int, min: 1, max: 16, required: true }
+      divided: { type: bool, required: true }
+    returns: none
+  get_channel_name:
+    summary: "Read a name (SysEx 0N 09 CH, reply 0N 0A CH Name, up to 8 characters, p.6)"
+    params:
+      channel_type: &named_type { type: enum, values: [input, zone, control_group, room], required: true }
+      channel: *channel
+    returns: value
+  get_channel_colour:
+    summary: "Read a colour (SysEx 0N 0B CH, reply 0N 0C CH Colour, p.6)"
+    params: { channel_type: *named_type, channel: *channel }
+    returns: value
+  raw_midi:
+    summary: "Send MIDI bytes given as hex, for messages not modelled here"
+    params:
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: none
+  refresh:
+    summary: "Read the state again: names, colours, mutes and levels of inputs, zones and control groups, input preamps and trims, zone sources, room names and colours"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Plain TCP 51325 only. The TLS port 51327, whose first message is "UserProfile, UserPassword" answered by
+      "AuthOK" (p.1), is not supported: the core has no TLS socket for native modules. External control must
+      be enabled in System Manager (IT managers white paper).
+  - models: [all]
+    severity: info
+    text: >
+      MIDI has no acknowledgement: writes are reported unverified, and each is followed by the matching get
+      so the state shows the processor's result. The processor sends a preset recall, a source selection and
+      a room combination when they happen (p.4-5); the document does not say other changes are transmitted.
+      Names, colours, mutes, levels, preamps, trims and zone sources are read on connecting, paced.
+  - models: [all]
+    severity: info
+    text: >
+      Levels use the p.7 formula [(dB + 48) / 58] * 127 rounded down, which every value in the table follows
+      except -48 dB, listed as 01 where the formula gives 00 (-inf); -48 dB is sent as 01. A received value
+      reads back as the whole (or else half or tenth) dB within the step it covers. Trim (-24 to +24 dB) and
+      preamp gain (+5 to +60 dB) are given only by their ends (p.3) and are spaced evenly between them here;
+      the raw values are always available.
+  - models: [all]
+    severity: info
+    text: >
+      The source selector get is printed "SysEx Header, 0N, 01, 0F, 08, CH" (p.5) while the set uses 00; it is
+      sent with N = 1, the zones' channel. Its reply (count, current source, a colour per source, then
+      NUL-terminated names) and the message sent on a selection (source, colour, name) share the 00 08 CH
+      prefix; a message that parses exactly as the list is taken as the reply. Source numbers 00-13 are
+      sources 1-20 (p.7). Room numbers in the room combiner message are taken as 00-0F for rooms 1-16, as
+      channel numbers are.
+  - models: [all]
+    severity: info
+    text: >
+      The document gives no name or colour set messages, only gets (p.6). The protocol addresses 64 inputs,
+      64 zones, 32 control groups and 16 rooms on every model; the core reads all of them and the processor
+      answers those it has.
+
+state:
+  channels.*.*.mute: { type: bool, description: "Mute; keyed by 'input', 'zone' or 'control_group', then number" }
+  channels.*.*.level_raw: { type: int, description: "Level, raw 0-127 (0 is -inf)" }
+  channels.*.*.level_db: { type: float, unit: dB, description: "Level in dB; absent at -inf" }
+  channels.*.*.name: { type: string, description: "Name, up to 8 characters" }
+  channels.*.*.colour: { type: string, description: "'off', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan' or 'white'" }
+  channels.input.*.trim_raw: { type: int, description: "Input trim, raw 0-127" }
+  channels.input.*.trim_db: { type: float, unit: dB, description: "Input trim, -24 to +24" }
+  channels.input.*.gain_raw: { type: int, description: "Preamp gain, raw 0-127" }
+  channels.input.*.gain_db: { type: float, unit: dB, description: "Preamp gain, +5 to +60" }
+  channels.input.*.pad: { type: bool, description: "Preamp pad" }
+  channels.input.*.phantom_power: { type: bool, description: "Phantom power" }
+  sends.*.*.zone.*.level_raw: { type: int, description: "Send level to a zone, raw 0-127; keyed by source type ('input' or 'zone') and number, then zone" }
+  sends.*.*.zone.*.level_db: { type: float, unit: dB, description: "Send level; absent at -inf" }
+  sends.*.*.zone.*.mute: { type: bool, description: "Send muted" }
+  zones.*.source: { type: int, description: "Selected source, 1-20" }
+  zones.*.source_name: { type: string, description: "Selected source's name" }
+  zones.*.source_colour: { type: string, description: "Selected source's colour" }
+  zones.*.sources: { type: array, description: "The zone's sources, each {number, name, colour}" }
+  rooms.*.source: { type: int, description: "Room's selected source, 1-20" }
+  rooms.*.source_name: { type: string, description: "Room's selected source's name" }
+  rooms.*.source_colour: { type: string, description: "Room's selected source's colour" }
+  rooms.*.divided_from.*: { type: bool, description: "Whether the room is divided from (true) or combined with (false) the other room" }
+  preset.current: { type: int, description: "Preset last recalled, 1-500" }

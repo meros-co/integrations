@@ -1,0 +1,220 @@
+spec: 1
+id: allenheath-cq
+name: Allen & Heath CQ (CQ-12T, CQ-18T, CQ-20B)
+vendor: Allen & Heath
+category: mixer
+implementation: native
+reason: >
+  MIDI on a TCP byte stream: messages are delimited by MIDI's own rules
+  (running status, real-time bytes), not by lines. Every parameter is a
+  14-bit NRPN number computed from the source and destination, with 14-bit
+  values whose dB and pan tables have no formula; a read is an NRPN data
+  increment answered by the parameter's set message, so replies can only be
+  matched by decoding them.
+
+source:
+  - title: "CQ MIDI Protocol, Firmware V1.2, Issue 5 (2024)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2024/06/CQ_MIDI_Protocol_V1_2_0_iss5.pdf"
+    note: >
+      Manufacturer document, 18 pages. TCP port 51325, one TCP/IP MIDI connection at a time (p.3); the CQ
+      transmits changes to any parameter with NRPN control (p.3); MIDI channel 1 for all control (p.4);
+      message types (p.4); scene change, bank 00 then program, examples (p.6); SoftKeys by notes from 30,
+      examples, and the CQ sends no notes for SoftKeys (p.7); mutes with on/off/toggle, examples, and toggle
+      unavailable for DCA and mute group mutes (p.8); levels with examples (p.9); relative levels (p.10);
+      pan/balance with centre 40 00 and examples (p.11-12); getting values with BN 60 7F and examples (p.13);
+      values table (p.14); level, SoftKey and pan tables (p.15); mute parameter numbers (p.16); level
+      parameter numbers (p.17); pan/balance parameter numbers (p.18).
+
+settings:
+  # Also read every send level and pan on connecting (paced).
+  sync_sends: { type: bool, default: false }
+
+models:
+  - id: cq-12t
+    name: CQ-12T
+    supports: &all
+      [set_mute, toggle_mute, get_mute, set_level, adjust_level, get_level, set_send_level, adjust_send_level,
+      get_send_level, set_pan, adjust_pan, get_pan, set_send_pan, adjust_send_pan, get_send_pan, recall_scene,
+      soft_key, raw_midi, refresh]
+    verification: none
+  - id: cq-18t
+    name: CQ-18T
+    supports: *all
+    verification: none
+  - id: cq-20b
+    name: CQ-20B
+    supports: *all
+    verification: none
+
+commands:
+  set_mute:
+    summary: "Mute or unmute a channel (NRPN, B0 06 00 B0 26 01/00, p.8). Linked stereo outputs use the odd output"
+    params:
+      channel_type: &channel_type
+        type: enum
+        values: [input, stereo_input, usb, bluetooth, main, output, fx_send, dca, mute_group]
+        required: true
+      channel: &channel { type: int, min: 1, max: 16, required: true }
+      muted: { type: bool, default: true }
+    returns: none
+  toggle_mute:
+    summary: "Toggle a mute (B0 60 00, p.8); not for DCA or mute group mutes"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: none
+  get_mute:
+    summary: "Read a mute (B0 60 7F, p.13)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_level:
+    summary: "Set a channel's own level: a source to Main LR, or an output, FX unit input or DCA master (p.9, p.17): level_db -89 to +10 by the p.15 table, or level_raw 0-16383 where 0 is -inf"
+    params:
+      channel_type: &level_type
+        type: enum
+        values: [input, stereo_input, usb, bluetooth, fx_return, main, output, fx_send, dca]
+        required: true
+      channel: *channel
+      level_db: &level_db { type: float, min: -89, max: 10 }
+      level_raw: &level_raw { type: int, min: 0, max: 16383 }
+    returns: none
+  adjust_level:
+    summary: "Step a channel's own level 1 dB up or down (B0 60 00 / B0 61 00, p.10)"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      direction: &updown { type: enum, values: [up, down], required: true }
+    returns: none
+  get_level:
+    summary: "Read a channel's own level (p.13); returns {level_db, level_raw}"
+    params: { channel_type: *level_type, channel: *channel }
+    returns: value
+  set_send_level:
+    summary: "Set a source's send to an output or an FX unit (p.17; an FX return has no send to its own FX unit), as set_level"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      destination_type: &destination_type { type: enum, values: [output, fx_send], required: true }
+      destination: &destination { type: int, min: 1, max: 6, required: true }
+      level_db: *level_db
+      level_raw: *level_raw
+    returns: none
+  adjust_send_level:
+    summary: "Step a send level 1 dB up or down (p.10)"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      destination_type: *destination_type
+      destination: *destination
+      direction: *updown
+    returns: none
+  get_send_level:
+    summary: "Read a send level (p.13); returns {level_db, level_raw}"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      destination_type: *destination_type
+      destination: *destination
+    returns: value
+  set_pan:
+    summary: "Set a source's pan to Main LR (p.11, p.18): pan -100 (L100%) to 100 (R100%) by the p.15 table, centre 40 00, or pan_raw 0-16383"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      pan: &pan { type: float, min: -100, max: 100 }
+      pan_raw: &pan_raw { type: int, min: 0, max: 16383 }
+    returns: none
+  adjust_pan:
+    summary: "Step a pan one step left or right (B0 61 00 / B0 60 00, p.12)"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      direction: &leftright { type: enum, values: [left, right], required: true }
+    returns: none
+  get_pan:
+    summary: "Read a pan (p.13); returns {pan, pan_raw}"
+    params: { channel_type: *level_type, channel: *channel }
+    returns: value
+  set_send_pan:
+    summary: "Set a source's pan to a linked stereo output, Out1/2, Out3/4 or Out5/6, given as output 1, 3 or 5 (p.18), as set_pan. 'Follow Main LR Pan' must be off (p.11)"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      destination_type: &pan_destination { type: enum, values: [output], required: true }
+      destination: *destination
+      pan: *pan
+      pan_raw: *pan_raw
+    returns: none
+  adjust_send_pan:
+    summary: "Step a send pan one step left or right (p.12)"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      destination_type: *pan_destination
+      destination: *destination
+      direction: *leftright
+    returns: none
+  get_send_pan:
+    summary: "Read a send pan (p.13); returns {pan, pan_raw}"
+    params:
+      channel_type: *level_type
+      channel: *channel
+      destination_type: *pan_destination
+      destination: *destination
+    returns: value
+  recall_scene:
+    summary: "Recall scene 1-128 (B0 00 00, C0 program, p.6). The scene must exist"
+    params:
+      scene: { type: int, min: 1, max: 128, required: true }
+    returns: none
+  soft_key:
+    summary: "Press (90 SK 7F) or release (80 SK 00) SoftKey 1-3 on notes 30-32 (p.7, p.15)"
+    params:
+      key: { type: int, min: 1, max: 3, required: true }
+      pressed: { type: bool, required: true }
+    returns: none
+  raw_midi:
+    summary: "Send MIDI bytes given as hex, for messages not modelled here"
+    params:
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: none
+  refresh:
+    summary: "Read the mixer's state again: every mute, own level and pan (and with sync_sends, every send)"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Only one TCP/IP MIDI connection is possible at a time (p.3); A&H MIDI Control or another client holding
+      it keeps the core out. The CQ always uses MIDI channel 1 (p.4), so there is no channel setting.
+  - models: [all]
+    severity: info
+    text: >
+      The CQ transmits changes to NRPN parameters made on it or from its apps (p.3) and answers gets (p.13);
+      on connecting the core reads every mute, own level and pan, paced. Writes are reported unverified and
+      each is followed by the matching get.
+  - models: [all]
+    severity: info
+    text: >
+      Levels follow the p.15 "Example Level Values", the same values as SQ's audio taper table, interpolated
+      between points; the CQ has no fader law setting. Pan follows the p.15 table, whose centre is 40 00 where
+      SQ's is 3F 7F. The document lists no assignments, no FX return mutes (its "FX1-FX4" mutes are the FX
+      units' inputs, the SQ FX send numbers 00 51-54) and no output balance.
+  - models: [all]
+    severity: info
+    text: >
+      The document has one table for all CQ models: inputs 1-16, ST1, ST2, USB and Bluetooth, outputs 1-6,
+      four FX units, four DCAs and four mute groups. A model with fewer sockets ignores numbers it lacks.
+      SoftKeys 1-3 are listed (p.15) and the CQ sends no notes for its SoftKeys (p.7).
+
+state:
+  channels.*.*.mute: { type: bool, description: "Mute; keyed by channel type then number" }
+  channels.*.*.level_raw: { type: int, description: "Own level (source to Main LR, or output master), raw 0-16383 (0 is -inf)" }
+  channels.*.*.level_db: { type: float, unit: dB, description: "Own level; absent at -inf" }
+  channels.*.*.pan_raw: { type: int, description: "Pan to Main LR, raw 0-16383" }
+  channels.*.*.pan: { type: float, description: "Pan to Main LR, -100 (left) to 100 (right)" }
+  sends.*.*.*.*.level_raw: { type: int, description: "Send level, raw; keyed by source type, number, destination type, number" }
+  sends.*.*.*.*.level_db: { type: float, unit: dB, description: "Send level; absent at -inf" }
+  sends.*.*.*.*.pan_raw: { type: int, description: "Pan to a linked output pair, raw 0-16383" }
+  sends.*.*.*.*.pan: { type: float, description: "Pan to a linked output pair, -100 to 100" }
+  scene.current: { type: int, description: "Scene last recalled, 1-128" }

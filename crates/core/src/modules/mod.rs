@@ -1,6 +1,12 @@
 //! Device modules: the spec engine for spec-driven devices, and a hand-written
 //! module for each native one.
 
+mod allenheath;
+mod allenheath_ahm;
+mod allenheath_dlive;
+mod allenheath_midi;
+mod allenheath_qu;
+mod allenheath_sq;
 mod atem;
 mod obs;
 mod panasonic_notify;
@@ -53,6 +59,8 @@ pub(crate) fn construct(
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         "visca" => Ok(Box::new(visca::Visca::new(context))),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
+        "allenheath-dlive" | "allenheath-ahm" | "allenheath-qu" | "allenheath-sq"
+        | "allenheath-cq" => Ok(Box::new(allenheath::AllenHeath::new(&spec.id, context)?)),
         other => Err(format!("no native module for '{other}'")),
     }
 }

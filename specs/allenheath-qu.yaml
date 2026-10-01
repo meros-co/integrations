@@ -1,0 +1,343 @@
+spec: 1
+id: allenheath-qu
+name: Allen & Heath Qu (Qu-16, Qu-24, Qu-32, Qu-Pac, Qu-SB)
+vendor: Allen & Heath
+category: mixer
+implementation: native
+reason: >
+  MIDI on a TCP byte stream: messages are delimited by MIDI's own rules
+  (running status, SysEx, Active Sensing bytes), not by lines. Parameters
+  are NRPN sequences whose data LSB carries a second address (a mix, a band
+  or a dSNAKE socket), the mixer's state arrives as a push of NRPN messages
+  after a SysEx request, and the connection must be kept alive with Active
+  Sensing, which the format cannot express.
+
+source:
+  - title: "Qu Mixer MIDI Protocol - Firmware V1.9+ (V1.9+ ISS.2, October 2021)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2023/06/Qu_MIDI_Protocol_V1.9.pdf"
+    note: >
+      Manufacturer document, 13 pages, for Qu-16, Qu-24, Qu-32, Qu-Pac and Qu-SB on firmware V1.9 or later.
+      Transmits changes made on the mixer; one TCP MIDI connection at a time; A&H MIDI Control or BomeBox
+      (p.1). Functions; MIDI fader strips (p.2). Key; MIDI channel N (strips N+1); channel numbers CH; Active
+      Sensing: FE on connecting and every 300 ms when idle, and a 12 s timeout once the client sends FE (p.3).
+      DAW strips, bank up/down, MMC (p.4). Mutes by Note On; NRPN layout BN 63 CH, BN 62 ID, BN 06 VA,
+      BN 26 VX; group mode, fader 17, pan 16, LR assign 18, mix assign 55, mute group assign 5C (p.5). DCA
+      assign 40, pre/post 50, send level 20, PAFL 51, USB source 12, preamp source 57, dSNAKE patch 5D,
+      local preamp gain 19 and 48V 69, dSNAKE gain 58, pad 59, 48V 5A (p.6). Digital trim 52, stereo trim 54,
+      polarity 6A, insert 6B, PEQ 01-11, HPF 13-14, GEQ 70-71 (p.7). Gate 41-46, compressor 61-68, delay
+      6C-6D, remote shutdown (p.8). FX delay time 48/49 and link; scene recall with Bank 1 (p.9). TCP port
+      51325; SysEx header F0 00 00 1A 50 11 01 00 0N; Get System State (All Call 7F, 10 iPadFlag; reply 11
+      BoxID major minor; push; end 14) (p.10). Names get 01, reply 02, set 03; meter data 12/13 (p.11-12).
+      Reference tables: MIDI channels, channel numbers, gain tables, fader/send level table, GEQ bands,
+      scenes, delay times, compressor types (p.13).
+
+settings:
+  # The mixer's MIDI channel (Setup / Control / MIDI). Required: a wrong
+  # channel makes every message miss.
+  midi_channel: { type: int, min: 1, max: 16, required: true }
+
+models:
+  - id: qu-16
+    name: Qu-16
+    channels: 16
+    supports: &all
+      [set_mute, set_level, set_pan, set_main_assign, set_send_assign, set_send_level, set_send_pre_post,
+      set_mute_group_assign, set_dca_assign, set_pafl, set_usb_source, set_preamp_source, set_preamp_gain,
+      set_phantom_power, set_dsnake_gain, set_dsnake_pad, set_dsnake_phantom_power, set_trim, set_processing,
+      set_geq_band, set_fx_delay_time, set_fx_delay_link, recall_scene, set_channel_name, get_channel_name,
+      remote_shutdown, raw_midi, refresh]
+    verification: none
+    notes: No groups or matrices; sends to FX 1 and 2 only (p.2, p.5-6).
+  - id: qu-24
+    name: Qu-24
+    channels: 24
+    supports: *all
+    verification: none
+  - id: qu-32
+    name: Qu-32
+    channels: 32
+    supports: *all
+    verification: none
+  - id: qu-pac
+    name: Qu-Pac
+    channels: 32
+    supports: *all
+    verification: none
+  - id: qu-sb
+    name: Qu-SB
+    channels: 32
+    supports: *all
+    verification: none
+
+commands:
+  set_mute:
+    summary: "Mute or unmute a channel (Note On 7F or 3F, then 00, p.5). Stereo mixes, groups and matrices are addressed by their odd number (mix 5 is Mix 5-6)"
+    params:
+      channel_type: &channel_type
+        type: enum
+        values: [input, stereo_input, fx_send, fx_return, mix, main, group, matrix, dca, mute_group]
+        required: true
+      channel: &channel { type: int, min: 1, max: 32, required: true }
+      muted: { type: bool, default: true }
+    returns: none
+  set_level:
+    summary: "Set a channel's fader (NRPN 17, index 07, p.5): level_db -45 to +10 by the p.13 table, or level_raw 0-127 where 0 is -inf"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      level_db: &level_db { type: float, min: -45, max: 10 }
+      level_raw: &level_raw { type: int, min: 0, max: 127 }
+    returns: none
+  set_pan:
+    summary: "Set a channel's pan to main (LR), a stereo mix, a group or a matrix (NRPN 16, p.5): pan -100 (left) to 100 (right) over 00-4A, or pan_raw"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: { type: enum, values: [main, mix, group, matrix], required: true }
+      destination: &destination { type: int, min: 1, max: 10, required: true }
+      pan: { type: float, min: -100, max: 100 }
+      pan_raw: { type: int, min: 0, max: 74 }
+    returns: none
+  set_main_assign:
+    summary: "Assign a channel to LR or not (NRPN 18, p.5)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      assigned: { type: bool, default: true }
+    returns: none
+  set_send_assign:
+    summary: "Assign a channel to a mix, LR, group, matrix or FX send (NRPN 55, p.5)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: { type: enum, values: [mix, main, group, matrix, fx_send], required: true }
+      destination: *destination
+      assigned: { type: bool, default: true }
+    returns: none
+  set_send_level:
+    summary: "Set a send level to a mix, group (in mix mode), matrix or FX send (NRPN 20, p.6), as set_level"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: &send_destination { type: enum, values: [mix, group, matrix, fx_send], required: true }
+      destination: *destination
+      level_db: *level_db
+      level_raw: *level_raw
+    returns: none
+  set_send_pre_post:
+    summary: "Set a send pre-fader (true) or post-fader (NRPN 50, p.6)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *send_destination
+      destination: *destination
+      pre: { type: bool, required: true }
+    returns: none
+  set_mute_group_assign:
+    summary: "Assign a channel to mute group 1-4 or not (NRPN 5C: on 40-43, off 00-03, p.5)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      mute_group: { type: int, min: 1, max: 4, required: true }
+      assigned: { type: bool, default: true }
+    returns: none
+  set_dca_assign:
+    summary: "Assign a channel to DCA 1-4 or not (NRPN 40: on 40-43, off 00-03, p.6)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      dca: { type: int, min: 1, max: 4, required: true }
+      assigned: { type: bool, default: true }
+    returns: none
+  set_pafl:
+    summary: "Select a channel's PAFL (NRPN 51, p.6)"
+    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true } }
+    returns: none
+  set_usb_source:
+    summary: "Switch a channel between its preamp (false) and its USB source (NRPN 12, p.6)"
+    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true } }
+    returns: none
+  set_preamp_source:
+    summary: "Switch a channel's preamp between the rear panel (local) and a remote AR rack (dsnake) (NRPN 57, p.6)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      source: { type: enum, values: [local, dsnake], required: true }
+    returns: none
+  set_preamp_gain:
+    summary: "Set a local preamp's gain (NRPN 19, index 07, p.6): gain_db -5 to +60 by the p.13 table, or gain_raw"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      gain_db: { type: float, min: -5, max: 60 }
+      gain_raw: { type: int, min: 0, max: 127 }
+    returns: none
+  set_phantom_power:
+    summary: "Switch a local preamp's 48V (NRPN 69, p.6)"
+    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true } }
+    returns: none
+  set_dsnake_gain:
+    summary: "Set a dSNAKE (AR rack) preamp's gain (NRPN 58, index = socket 1-40 as 00-27, p.6): gain_db +5 to +60 by the p.13 table, or gain_raw"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      socket: &socket { type: int, min: 1, max: 40, required: true }
+      gain_db: { type: float, min: 5, max: 60 }
+      gain_raw: { type: int, min: 0, max: 127 }
+    returns: none
+  set_dsnake_pad:
+    summary: "Switch a dSNAKE preamp's pad (NRPN 59, p.6)"
+    params: { channel_type: *channel_type, channel: *channel, socket: *socket, enabled: { type: bool, default: true } }
+    returns: none
+  set_dsnake_phantom_power:
+    summary: "Switch a dSNAKE preamp's 48V (NRPN 5A, p.6)"
+    params: { channel_type: *channel_type, channel: *channel, socket: *socket, enabled: { type: bool, default: true } }
+    returns: none
+  set_trim:
+    summary: "Set the digital trim of an input's USB source (NRPN 52) or a stereo input's trim (NRPN 54) (p.7): trim_db -24 to +24, or trim_raw (0 dB is 40)"
+    params:
+      channel_type: { type: enum, values: [input, stereo_input], required: true }
+      channel: *channel
+      trim_db: { type: float, min: -24, max: 24 }
+      trim_raw: { type: int, min: 0, max: 127 }
+    returns: none
+  set_processing:
+    summary: "Set a processing parameter to its raw value 0-127 (p.7-8): PEQ, HPF, gate, compressor, delay, polarity, insert and GEQ in/out; the document gives each range by its ends"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      parameter:
+        type: enum
+        values: [peq_lf_gain, peq_lf_frequency, peq_lf_width, peq_lf_type, peq_lm_gain, peq_lm_frequency, peq_lm_width,
+          peq_hm_gain, peq_hm_frequency, peq_hm_width, peq_hf_gain, peq_hf_frequency, peq_hf_width, peq_hf_type,
+          peq_in, hpf_frequency, hpf_in, gate_attack, gate_release, gate_hold, gate_threshold, gate_depth, gate_in,
+          compressor_type, compressor_attack, compressor_release, compressor_knee, compressor_ratio,
+          compressor_threshold, compressor_gain, compressor_in, polarity, insert_in, delay_time, delay_in, geq_in]
+        required: true
+      value: { type: int, min: 0, max: 127, required: true }
+    returns: none
+  set_geq_band:
+    summary: "Set a GEQ band's gain, raw 0-127 for -12 to +12 dB (NRPN 70, index = band 1-28, 31.5 Hz to 16 kHz, p.7, p.13)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      band: { type: int, min: 1, max: 28, required: true }
+      value: { type: int, min: 0, max: 127, required: true }
+    returns: none
+  set_fx_delay_time:
+    summary: "Set an FX delay tap time (NRPN 49 fine then 48 coarse, index 05 left or 07 right, p.9); examples p.13: 5 ms 00 00, 100 ms 44 31, 1.36 s 7F 7F (coarse, fine)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      tap: { type: enum, values: [left, right], required: true }
+      coarse: { type: int, min: 0, max: 127, required: true }
+      fine: { type: int, min: 0, max: 127 }
+    returns: none
+  set_fx_delay_link:
+    summary: "Link or unlink an FX delay's left and right taps (NRPN 48, index 06: 7F linked, 00 unlinked, p.9)"
+    params: { channel_type: *channel_type, channel: *channel, linked: { type: bool, required: true } }
+    returns: none
+  recall_scene:
+    summary: "Recall scene 1-100 (Bank 1 select BN 00 00 BN 20 00, then CN SS, p.9)"
+    params:
+      scene: { type: int, min: 1, max: 100, required: true }
+    returns: none
+  set_channel_name:
+    summary: "Name a channel (SysEx 03 CH Name, printable ASCII, p.11)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      name: { type: string, pattern: "^[ -~]*$", required: true }
+    returns: none
+  get_channel_name:
+    summary: "Read a channel's name (SysEx 01 CH, reply 02 CH Name, p.11)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  remote_shutdown:
+    summary: "Shut the mixer down (B0 63 00 B0 62 5F B0 06 00 B0 26 00, p.8). It then needs a hard power reset to switch on"
+    returns: none
+  raw_midi:
+    summary: "Send MIDI bytes given as hex, for messages not modelled here"
+    params:
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: none
+  refresh:
+    summary: "Ask for the mixer's whole state again (Get System State) and every channel's name"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Qu allows one TCP MIDI connection at a time (p.1, p.10); A&H MIDI Control or another client holding it
+      keeps the core out. The core sends Active Sensing (FE) on connecting and every second, as the
+      document's "active" connection expects, and takes the mixer's own FE every 300 ms as proof of life.
+  - models: [all]
+    severity: info
+    text: >
+      State comes from the mixer: on connecting the core sends Get System State with the All Call header and
+      iPadFlag 0 (p.10), after which the mixer pushes every parameter as NRPN, and it transmits changes made
+      on the mixer (p.1). Writes are reported unverified (MIDI has no acknowledgement); the document has no
+      parameter gets other than names.
+  - models: [all]
+    severity: info
+    text: >
+      Fader and send levels and both gain tables are the p.13 tables, interpolated between their points;
+      values below the table's lowest point (-45 dB, 0C) other than 00 (-inf) have no documented dB and read
+      as level_raw only. Pan (00 left, 25 centre, 4A right), trims (-24 to +24 dB, 0 dB = 40) and the
+      processing parameters are given by their ends only; pan and trim are spaced evenly between them, and
+      processing is set and reported raw.
+  - models: [all]
+    severity: info
+    text: >
+      Mixes 5-6, 7-8 and 9-10, groups and matrices are stereo pairs with one channel number (p.3); they are
+      addressed here by their odd number (mix 5, group 3, matrix 3). The DCA assign entry repeats "Mute Grp
+      1-4" from the mute group entry (p.6); the values are read as DCAs 1-4. The LR destination is index 07
+      (p.5, "Mix1 to 9-10, LR"). Group mode (5E) and the dSNAKE patch (5D) are sent by the mixer only.
+  - models: [all]
+    severity: info
+    text: >
+      Remote shutdown is printed with MIDI channel 1 written out (B0, p.8) and is sent that way. Meter data
+      (SysEx 12/13, p.11-12) is not read: it is a continuous stream for the Qu-Pad app. MMC and the MIDI
+      fader strips are for DAW control on channel N+1 and are not modelled.
+
+state:
+  channels.*.*.mute: { type: bool, description: "Mute; keyed by channel type then number (odd number for stereo pairs)" }
+  channels.*.*.level_raw: { type: int, description: "Fader, raw 0-127 (0 is -inf)" }
+  channels.*.*.level_db: { type: float, unit: dB, description: "Fader; absent at -inf or below -45 dB" }
+  channels.*.*.pan_raw: { type: int, description: "Pan to LR, raw 00-4A" }
+  channels.*.*.pan: { type: float, description: "Pan to LR, -100 (left) to 100 (right)" }
+  channels.*.*.main_assign: { type: bool, description: "Assigned to LR" }
+  channels.*.*.dca.*: { type: bool, description: "Assigned to DCA 1-4" }
+  channels.*.*.mute_group.*: { type: bool, description: "Assigned to mute group 1-4" }
+  channels.*.*.pafl: { type: bool, description: "PAFL selected" }
+  channels.*.*.usb_source: { type: bool, description: "USB source selected" }
+  channels.*.*.preamp_source: { type: string, description: "'local' or 'dsnake'" }
+  channels.*.*.dsnake_socket: { type: int, description: "dSNAKE socket patched, 1-40" }
+  channels.*.*.group_mode: { type: string, description: "A group's mode, 'group' or 'mix'" }
+  channels.*.*.gain_raw: { type: int, description: "Local preamp gain, raw" }
+  channels.*.*.gain_db: { type: float, unit: dB, description: "Local preamp gain" }
+  channels.*.*.phantom_power: { type: bool, description: "Local preamp 48V" }
+  channels.*.*.dsnake.gain_raw: { type: int, description: "dSNAKE preamp gain, raw" }
+  channels.*.*.dsnake.gain_db: { type: float, unit: dB, description: "dSNAKE preamp gain" }
+  channels.*.*.dsnake.pad: { type: bool, description: "dSNAKE preamp pad" }
+  channels.*.*.dsnake.phantom_power: { type: bool, description: "dSNAKE preamp 48V" }
+  channels.*.*.trim_raw: { type: int, description: "Digital or stereo trim, raw (0 dB = 40)" }
+  channels.*.*.trim_db: { type: float, unit: dB, description: "Digital or stereo trim" }
+  channels.*.*.processing.*: { type: int, description: "Processing parameter raw value, keyed as set_processing's parameter" }
+  channels.*.*.processing.geq_band.*: { type: int, description: "GEQ band 1-28 gain, raw" }
+  channels.*.*.fx_delay.linked: { type: bool, description: "FX delay taps linked" }
+  channels.*.*.fx_delay.*.coarse: { type: int, description: "FX delay tap ('left' or 'right') time, coarse" }
+  channels.*.*.fx_delay.*.fine: { type: int, description: "FX delay tap time, fine" }
+  channels.*.*.name: { type: string, description: "Channel name" }
+  sends.*.*.*.*.level_raw: { type: int, description: "Send level, raw; keyed by source type, number, destination type, number" }
+  sends.*.*.*.*.level_db: { type: float, unit: dB, description: "Send level; absent at -inf" }
+  sends.*.*.*.*.pan_raw: { type: int, description: "Pan to a stereo mix, group or matrix, raw 00-4A" }
+  sends.*.*.*.*.pan: { type: float, description: "Pan to a stereo destination, -100 to 100" }
+  sends.*.*.*.*.assigned: { type: bool, description: "Assigned to the destination" }
+  sends.*.*.*.*.pre: { type: bool, description: "Send is pre-fader" }
+  scene.current: { type: int, description: "Scene last recalled, 1-100" }
+  device.model: { type: string, description: "Model the mixer reports (BoxID): 'qu-16', 'qu-24', 'qu-32', 'qu-pac' or 'qu-sb'" }
+  device.firmware: { type: string, description: "Firmware version the mixer reports, major.minor" }
+  device.synced: { type: bool, description: "The mixer has finished pushing its state" }

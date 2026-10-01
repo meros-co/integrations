@@ -1,0 +1,375 @@
+spec: 1
+id: allenheath-sq
+name: Allen & Heath SQ, SQ+ and Qu-5/6/7
+vendor: Allen & Heath
+category: mixer
+implementation: native
+reason: >
+  MIDI on a TCP byte stream: messages are delimited by MIDI's own rules
+  (running status, SysEx, real-time bytes), not by lines. Every parameter is
+  a 14-bit NRPN number computed from the source and destination, with
+  14-bit values whose dB and pan tables have no formula; a read is an NRPN
+  data increment answered by the parameter's set message, so replies can
+  only be matched by decoding them. Reading the mixer's state means hundreds
+  (or thousands) of paced requests.
+
+source:
+  - title: "SQ MIDI Protocol, Issue 5 (SQ firmware V1.5.0 or later)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2023/11/SQ-MIDI-Protocol-Issue5.pdf"
+    note: >
+      Manufacturer document, 31 pages. TCP port 51325 (p.3); MIDI channel, DAW channel N+1 and NRPN fader law
+      (p.4); message types (p.5); MIDI strips (p.7); SoftKeys (p.8); scene recall by bank 00-02 and program,
+      cue list banks 0A-0C, examples (p.9); SoftKeys by notes from 30 (p.10); mutes with on/off/toggle and
+      examples (p.11); levels, fader laws and examples (p.12-13); relative levels (p.14); pan/balance and
+      examples (p.15-16); assignments (p.17); getting values with BN 60 7F and examples (p.18); MIDI
+      channels and values (p.19); SoftKey notes, linear taper, audio taper and pan tables (p.20); NRPN
+      parameter numbers: mutes (p.21), levels (p.22-24), pan/balance (p.25-27), assignments (p.28-31).
+  - title: "SQ. MIDI Protocol - Firmware V1.6 (article updated 2026-07-07)"
+    author: "Allen & Heath"
+    url: "https://support.allen-heath.com/hc/en-gb/articles/47793519540497-SQ-MIDI-Protocol-Firmware-V1-6"
+    note: >
+      Manufacturer support article, the current edition of the document above with the same sections and
+      examples; its tables are images. Its mute and output tables list Matrix 4-6, which SQ-5/6/7 do not
+      have; Issue 5's tables are used for SQ.
+  - title: "SQ+. MIDI Protocol - Firmware V2.0.3 (article updated 2026-07-07)"
+    author: "Allen & Heath"
+    url: "https://support.allen-heath.com/hc/en-gb/articles/47793537575953-SQ-MIDI-Protocol-Firmware-V2-0-3"
+    note: >
+      Manufacturer support article for SQ5+, SQ6+ and SQ7+. Same messages as SQ; MIDI channels including up
+      to 4 for RackUltra FX; RackUltra FX parameter, key/scale and note control; global key (CC 0C) and
+      scale (CC 0D, 00-02) on the main channel. Its table images give six matrices: mix sends to matrices
+      at 4E 24 (LR) with six per mix, outputs from 4F 50 (LR), 4F 5D (FX sends), 4F 61 (matrices 1-6), 4F 67
+      (DCAs), output balance 5F 50 to 5F 63 (LR, auxes, matrices 1-3); the other tables match SQ's.
+  - title: "Qu-5/6/7 MIDI Protocol, Issue 2 (Qu-5/6/7 firmware V1.1 or later)"
+    author: "Allen & Heath"
+    url: "https://www.allen-heath.com/content/uploads/2025/06/Qu567_MIDI_Protocol_Iss2.pdf"
+    note: >
+      Manufacturer document, 31 pages, the SQ protocol for Qu-5, Qu-6 and Qu-7 (and their D versions). Port
+      51325, also through the Dante port with Control Network Bridge on (p.3); MIDI setup and fader law
+      (p.4); scenes 1-300 (p.9); MIDI Show Control for the cue list (p.9); SoftKeys 1-16 (p.10); mutes,
+      levels, pan, assignments, gets, with "use the left/odd channel" for stereo (p.11-18); tables (p.19-21);
+      parameter numbers: 32 inputs, ST1 20, ST2 22, USB 24, six FX returns, no group mutes, Mtx4 not
+      controllable "for protocol cross-compatibility with SQ" (p.22-31).
+
+settings:
+  # The mixer's MIDI channel (Utility / General / MIDI). Required: a wrong
+  # channel makes every message miss.
+  midi_channel: { type: int, min: 1, max: 16, required: true }
+  # The mixer's "NRPN Fader Law" (Utility / General / MIDI): level values
+  # follow the linear taper table or the audio taper table.
+  fader_law: { type: enum, values: [linear, audio], default: linear }
+  # Also read every send level, pan and assignment on connecting (thousands
+  # of requests, paced; several seconds).
+  sync_sends: { type: bool, default: false }
+
+models:
+  - id: sq-5
+    name: SQ-5
+    supports: &sq
+      [set_mute, toggle_mute, get_mute, set_level, adjust_level, get_level, set_send_level, adjust_send_level,
+      get_send_level, set_pan, adjust_pan, get_pan, set_send_pan, adjust_send_pan, get_send_pan,
+      set_main_assign, toggle_main_assign, get_main_assign, set_send_assign, toggle_send_assign,
+      get_send_assign, recall_scene, recall_cue, soft_key, raw_midi, refresh]
+    verification: none
+    notes: 8 SoftKeys (p.8).
+  - id: sq-6
+    name: SQ-6
+    supports: *sq
+    verification: none
+  - id: sq-7
+    name: SQ-7
+    supports: *sq
+    verification: none
+  - id: sq-5-plus
+    name: SQ5+
+    supports: &sqplus
+      [set_mute, toggle_mute, get_mute, set_level, adjust_level, get_level, set_send_level, adjust_send_level,
+      get_send_level, set_pan, adjust_pan, get_pan, set_send_pan, adjust_send_pan, get_send_pan,
+      set_main_assign, toggle_main_assign, get_main_assign, set_send_assign, toggle_send_assign,
+      get_send_assign, recall_scene, recall_cue, soft_key, set_ufx_global_key, set_ufx_global_scale, raw_midi,
+      refresh]
+    verification: none
+    notes: 8 SoftKeys.
+  - id: sq-6-plus
+    name: SQ6+
+    supports: *sqplus
+    verification: none
+  - id: sq-7-plus
+    name: SQ7+
+    supports: *sqplus
+    verification: none
+  - id: qu-5
+    name: Qu-5 / Qu-5D
+    supports: &qu
+      [set_mute, toggle_mute, get_mute, set_level, adjust_level, get_level, set_send_level, adjust_send_level,
+      get_send_level, set_pan, adjust_pan, get_pan, set_send_pan, adjust_send_pan, get_send_pan,
+      set_main_assign, toggle_main_assign, get_main_assign, set_send_assign, toggle_send_assign,
+      get_send_assign, recall_scene, soft_key, raw_midi, refresh]
+    verification: none
+    notes: >
+      The aux channel type is the Qu's MIX 1-12. The cue list is driven by MIDI Show Control, not bank
+      messages (Qu p.9).
+  - id: qu-6
+    name: Qu-6 / Qu-6D
+    supports: *qu
+    verification: none
+  - id: qu-7
+    name: Qu-7 / Qu-7D
+    supports: *qu
+    verification: none
+
+commands:
+  set_mute:
+    summary: "Mute or unmute a channel (NRPN, BN 06 00 BN 26 01/00, p.11)"
+    params:
+      channel_type: &channel_type
+        type: enum
+        values: [input, stereo_input, usb, group, fx_return, main, aux, fx_send, matrix, dca, mute_group]
+        required: true
+      channel: &channel { type: int, min: 1, max: 48, required: true }
+      muted: { type: bool, default: true }
+    returns: none
+  toggle_mute:
+    summary: "Toggle a mute (data increment BN 60 00, p.11)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: none
+  get_mute:
+    summary: "Read a mute (BN 60 7F, p.18)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_level:
+    summary: "Set a channel's own level: a source's level to LR, or an output's master (LR, aux, FX send, matrix, DCA). level_db -89 to +10 by the fader law's table (p.20), or level_raw 0-16383 where 0 is -inf"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      level_db: &level_db { type: float, min: -89, max: 10 }
+      level_raw: &level_raw { type: int, min: 0, max: 16383 }
+    returns: none
+  adjust_level:
+    summary: "Step a channel's own level 1 dB up or down (BN 60 00 / BN 61 00, p.14)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      direction: &updown { type: enum, values: [up, down], required: true }
+    returns: none
+  get_level:
+    summary: "Read a channel's own level (p.18); returns {level_db, level_raw}, level_db null at -inf"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_send_level:
+    summary: "Set a send level: a source to an aux or FX send, or LR, an aux or a group to a matrix (p.12, tables p.22-24), as set_level"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: &destination_type { type: enum, values: [aux, fx_send, matrix], required: true }
+      destination: &destination { type: int, min: 1, max: 12, required: true }
+      level_db: *level_db
+      level_raw: *level_raw
+    returns: none
+  adjust_send_level:
+    summary: "Step a send level 1 dB up or down (p.14)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *destination_type
+      destination: *destination
+      direction: *updown
+    returns: none
+  get_send_level:
+    summary: "Read a send level (p.18); returns {level_db, level_raw}"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *destination_type
+      destination: *destination
+    returns: value
+  set_pan:
+    summary: "Set a source's pan to LR, or an output's balance (SQ and SQ+: LR, auxes, matrices 1-3): pan -100 (L100%) to 100 (R100%) by the p.20 table, or pan_raw 0-16383"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      pan: &pan { type: float, min: -100, max: 100 }
+      pan_raw: &pan_raw { type: int, min: 0, max: 16383 }
+    returns: none
+  adjust_pan:
+    summary: "Step a pan or balance one step left or right (BN 61 00 / BN 60 00, p.16)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      direction: &leftright { type: enum, values: [left, right], required: true }
+    returns: none
+  get_pan:
+    summary: "Read a pan or balance (p.18); returns {pan, pan_raw}"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_send_pan:
+    summary: "Set a source's pan to an aux, or a mix's balance to a matrix (tables p.25-27), as set_pan"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: &pan_destination { type: enum, values: [aux, matrix], required: true }
+      destination: *destination
+      pan: *pan
+      pan_raw: *pan_raw
+    returns: none
+  adjust_send_pan:
+    summary: "Step a send pan one step left or right (p.16)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *pan_destination
+      destination: *destination
+      direction: *leftright
+    returns: none
+  get_send_pan:
+    summary: "Read a send pan (p.18); returns {pan, pan_raw}"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *pan_destination
+      destination: *destination
+    returns: value
+  set_main_assign:
+    summary: "Assign a source to LR or not (p.17, table p.28)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      assigned: { type: bool, default: true }
+    returns: none
+  toggle_main_assign:
+    summary: "Toggle a source's LR assignment (BN 60 00, p.17)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: none
+  get_main_assign:
+    summary: "Read a source's LR assignment (p.18)"
+    params: { channel_type: *channel_type, channel: *channel }
+    returns: value
+  set_send_assign:
+    summary: "Assign a source to an aux, group or FX send, or a mix to a matrix, or not (p.17, tables p.28-31)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: &assign_destination { type: enum, values: [aux, group, fx_send, matrix], required: true }
+      destination: *destination
+      assigned: { type: bool, default: true }
+    returns: none
+  toggle_send_assign:
+    summary: "Toggle an assignment (BN 60 00, p.17)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *assign_destination
+      destination: *destination
+    returns: none
+  get_send_assign:
+    summary: "Read an assignment (p.18)"
+    params:
+      channel_type: *channel_type
+      channel: *channel
+      destination_type: *assign_destination
+      destination: *destination
+    returns: value
+  recall_scene:
+    summary: "Recall scene 1-300 (BN 00 bank 00-02, CN program, p.9). The scene must exist"
+    params:
+      scene: { type: int, min: 1, max: 300, required: true }
+    returns: none
+  recall_cue:
+    summary: "Recall cue list position 1-300 (BN 00 bank 0A-0C, CN program, p.9)"
+    params:
+      cue: { type: int, min: 1, max: 300, required: true }
+    returns: none
+  soft_key:
+    summary: "Press (Note On 7F) or release (Note Off 00) SoftKey 1-16 on notes 30-3F (p.10); SQ-5 and SQ5+ have 8"
+    params:
+      key: { type: int, min: 1, max: 16, required: true }
+      pressed: { type: bool, required: true }
+    returns: none
+  set_ufx_global_key:
+    summary: "Set the RackUltra FX global key (CC 0C on the main MIDI channel, SQ+ article)"
+    params:
+      key: { type: enum, values: [C, "C#", D, "D#", E, F, "F#", G, "G#", A, "A#", B], required: true }
+    returns: none
+  set_ufx_global_scale:
+    summary: "Set the RackUltra FX global scale (CC 0D: 00 major, 01 minor, 02 chromatic, SQ+ article)"
+    params:
+      scale: { type: enum, values: [major, minor, chromatic], required: true }
+    returns: none
+  raw_midi:
+    summary: "Send MIDI bytes given as hex, for messages not modelled here (RackUltra FX units, MIDI Show Control)"
+    params:
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: none
+  refresh:
+    summary: "Read the mixer's state again: every mute, own level, pan and LR assignment (and with sync_sends, every send)"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      midi_channel and fader_law must match the mixer's MIDI settings (Utility / General / MIDI). With the
+      wrong channel nothing is answered; with the wrong fader law every level is misread and mis-set.
+  - models: [all]
+    severity: info
+    text: >
+      MIDI has no acknowledgement: writes are reported unverified, and each is followed by the matching get
+      (BN 60 7F) so the state shows the mixer's result. The mixer sends a scene recall when one is recalled
+      on it (p.9) and answers gets; on connecting the core reads every mute, own level, pan and LR assignment
+      (about 350 requests on SQ, paced), and every send too with sync_sends.
+  - models: [all]
+    severity: info
+    text: >
+      Level and pan values follow the p.20 tables, interpolated between their points and rounded; the
+      tables' points read back exactly. The linear taper examples on p.13 (-20 dB as 63 49, -12 dB as 6B 06,
+      -24 dB as 5F 57) disagree with the linear taper table (64 16, 6B 4B, 60 3B), and the Qu-5/6/7 document
+      repeats both; the table is used. The audio taper table is "approximate" by its title. Pan values follow
+      no single formula (L30% is 2C 65, R50% 5F 7F), so the table is used too. Levels below -89 dB other than
+      00 00 (-inf) have no documented dB and read as level_raw only.
+  - models: [sq-5, sq-6, sq-7, sq-5-plus, sq-6-plus, sq-7-plus]
+    severity: info
+    text: >
+      SQ and SQ+ list group-to-aux levels, pans and assignments only for aux numbers up to 12 minus the
+      group number (group 1 to auxes 1-11, group 11 to aux 1, none for group 12, p.23, p.26, p.30); other
+      combinations are refused. The "LR Mute" get example on p.18 uses 00 00, which the table gives as Ip1;
+      LR's mute is 00 44.
+  - models: [sq-5, sq-6, sq-7]
+    severity: info
+    text: >
+      The firmware V1.6 article's mute and output tables list Matrix 4-6 (00 58-5A, 4F 14-16), while its mix
+      send tables and Issue 5 list three; SQ-5/6/7 are driven with three matrices.
+  - models: [sq-5-plus, sq-6-plus, sq-7-plus]
+    severity: info
+    text: >
+      SQ+ output balance is listed for matrices 1-3 only. RackUltra FX units have their own MIDI channels with
+      sends, returns and parameters reusing the main parameter numbers; they are not modelled (raw_midi).
+  - models: [qu-5, qu-6, qu-7]
+    severity: info
+    text: >
+      Qu-5/6/7 lists no group mutes, no input-to-group assignments and no group-to-matrix sends; a group's send
+      to the aux of the same number is left out; pan to auxes is by the odd aux of pairs 1&2, 3&4, 5&6, and to
+      auxes 7-12, and to matrices by Mtx1&2 and Mtx3&4 (matrix 1 or 3); Mtx4 "cannot currently be controlled
+      via MIDI" (Qu p.22-31). The "USB to LR -20dB" audio taper example (Qu p.13) uses 40 27, but the table
+      and the linear example give USB as 40 24; 40 24 is used. The assignment example "Grp2 to Mtx1&2" (Qu
+      p.17) uses 6E 2A, which the table gives as MIX2 to Mtx1.
+  - models: [all]
+    severity: info
+    text: >
+      MIDI Show Control for the cue list (GO, LOAD, RESET; SQ p.9, Qu p.9) is named without its messages and
+      is not modelled; MIDI strips and DAW control use channel N+1 and are not modelled.
+
+state:
+  channels.*.*.mute: { type: bool, description: "Mute; keyed by channel type then number" }
+  channels.*.*.level_raw: { type: int, description: "Own level (source to LR, or output master), raw 0-16383 (0 is -inf)" }
+  channels.*.*.level_db: { type: float, unit: dB, description: "Own level; absent at -inf" }
+  channels.*.*.pan_raw: { type: int, description: "Pan to LR or output balance, raw 0-16383" }
+  channels.*.*.pan: { type: float, description: "Pan or balance, -100 (left) to 100 (right)" }
+  channels.*.*.main_assign: { type: bool, description: "Source assigned to LR" }
+  sends.*.*.*.*.level_raw: { type: int, description: "Send level, raw; keyed by source type, number, destination type, number" }
+  sends.*.*.*.*.level_db: { type: float, unit: dB, description: "Send level; absent at -inf" }
+  sends.*.*.*.*.pan_raw: { type: int, description: "Send pan, raw 0-16383" }
+  sends.*.*.*.*.pan: { type: float, description: "Send pan, -100 to 100" }
+  sends.*.*.*.*.assigned: { type: bool, description: "Assigned to the destination" }
+  scene.current: { type: int, description: "Scene last recalled, 1-300" }
+  cue.current: { type: int, description: "Cue list position last recalled (SQ), 1-300" }
