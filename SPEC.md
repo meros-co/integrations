@@ -272,6 +272,11 @@ password is not sent again until the host opens the device with corrected
 settings. This is still not a handshake: the step is sent once, unchanged,
 whatever the device says.
 
+A step the device answers (a login acknowledged with `ACK`) declares
+`await_reply: true`. It is then queued like a query: sent in turn, its reply
+consumed so it cannot be taken as the answer to the next command, and no
+command goes ahead of it.
+
 ## 3. Models and capabilities
 
 A spec covers a device family. Differences between models are expressed as data.

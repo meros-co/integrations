@@ -143,6 +143,9 @@ struct Job {
     /// For an internal job without a command: the message to send, such as a
     /// telemetry subscription. Without one, an internal job is the probe.
     item: Option<Value>,
+    /// A connection step that waits for its reply (`on_connect` with
+    /// `await_reply`): commands do not go ahead of it.
+    setup: bool,
 }
 
 pub(crate) struct SpecEngine {
@@ -800,14 +803,15 @@ impl SpecEngine {
         let empty_specs = BTreeMap::new();
         let steps = self.spec.on_connect.clone();
         for (index, step) in steps.iter().enumerate().skip(from) {
-            let (item, when_set, prompt, refused) = match step {
+            let (item, when_set, prompt, refused, await_reply) = match step {
                 Value::Object(m) if m.contains_key("send") => (
                     m.get("send").cloned().unwrap_or(Value::Null),
                     m.get("when_set").and_then(Value::as_str),
                     m.get("after_prompt").and_then(Value::as_str),
                     m.get("refused").and_then(Value::as_str),
+                    m.get("await_reply").and_then(Value::as_bool) == Some(true),
                 ),
-                other => (other.clone(), None, None, None),
+                other => (other.clone(), None, None, None, false),
             };
             if let Some(setting) = when_set {
                 let set = self
@@ -830,6 +834,18 @@ impl SpecEngine {
                     Ok(re) => self.refusals.push(re),
                     Err(e) => cx.log(Level::Warning, format!("on_connect refused: {e}")),
                 }
+            }
+            if await_reply && self.transport.replies() {
+                // Queued like a query: sent in turn, its reply consumed, and
+                // nothing else goes ahead of it.
+                self.queue.push_back(Job {
+                    id: None,
+                    name: String::new(),
+                    params: Params::new(),
+                    item: Some(item),
+                    setup: true,
+                });
+                continue;
             }
             let values = self.values(&empty, &empty_specs);
             match self.build(&item, &values) {
@@ -867,6 +883,7 @@ impl SpecEngine {
             name: String::new(),
             params: Params::new(),
             item: None,
+            setup: false,
         });
         self.pump(cx);
     }
@@ -893,6 +910,7 @@ impl SpecEngine {
                     name: String::new(),
                     params: Params::new(),
                     item: Some(item),
+                    setup: false,
                 });
                 continue;
             }
@@ -1061,7 +1079,7 @@ impl Module for SpecEngine {
         let at = self
             .queue
             .iter()
-            .position(|j| j.id.is_none() && j.item.is_some())
+            .position(|j| j.id.is_none() && j.item.is_some() && !j.setup)
             .unwrap_or(self.queue.len());
         self.queue.insert(
             at,
@@ -1070,6 +1088,7 @@ impl Module for SpecEngine {
                 name: name.to_string(),
                 params: params.clone(),
                 item: None,
+                setup: false,
             },
         );
         self.pump(cx);
@@ -1517,6 +1536,55 @@ mod tests {
             .take()
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+    }
+
+    #[test]
+    fn a_login_step_can_wait_for_its_reply() {
+        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        spec.on_connect = vec![json!({"send": "#LOGIN admin", "await_reply": true})];
+        spec.telemetry = None;
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        // A command issued now waits behind the login step.
+        let params = json!({"input": 3, "output": 2})
+            .as_object()
+            .unwrap()
+            .clone();
+        e.command(&mut cx, 7, "route_video", &params);
+        assert_eq!(tcp_sent(&cx.take()), vec!["#LOGIN admin\r"]);
+        // The login's reply is consumed by the login; the command goes next.
+        let mut cx = Cx::new(1);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"~01@LOGIN admin OK\r\n".to_vec()),
+        );
+        assert_eq!(tcp_sent(&cx.take()), vec!["#ROUTE 1,2,3\r"]);
+        let mut cx = Cx::new(2);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"~01@ROUTE 1,2,3 OK\r\n".to_vec()),
+        );
+        assert!(cx.take().iter().any(|a| matches!(
+            a,
+            Action::Complete {
+                id: 7,
+                result: Ok(Outcome::Ack)
+            }
+        )));
     }
 
     #[test]
