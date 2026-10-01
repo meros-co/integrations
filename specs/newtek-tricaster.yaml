@@ -45,13 +45,15 @@ models:
     name: TriCaster 410, 460, 860, 8000 and Mini on Advanced Edition
     supports: [take, auto, background_take, background_auto, set_program, set_preview,
                dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
-               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros]
+               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
+               shortcut, shortcut_with_value, trigger, set_datalink]
     verification: none
   - id: tricaster-8
     name: TriCaster TC1, TC2 Elite, Mini 4K / X and Vizion (software 7 and 8)
     supports: [take, auto, background_take, background_auto, set_program, set_preview,
                dsk_take, dsk_auto, start_recording, stop_recording, start_streaming,
-               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros]
+               stop_streaming, ddr_play, ddr_stop, play_macro, stop_all_macros,
+               shortcut, shortcut_with_value, trigger, set_datalink]
     verification: none
 
 commands:
@@ -176,6 +178,44 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  shortcut:
+    summary: >
+      Run any shortcut by name. Shortcut names combine a prefix (main, v1-v8,
+      main_dsk1-4, ddr1-4, gfx1-2 and others) with an action; the system's own
+      list is in its shortcuts_cfg.xml and on the LivePanel Shortcut Commands
+      page (guide p.16-18).
+    params:
+      name: { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  shortcut_with_value:
+    summary: Run a shortcut that takes a value, such as main_a_row with a source index
+    params:
+      name:  { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true }
+      value: { type: string, max_length: 256, required: true }
+    send: { method: GET, path: /v1/shortcut, query: { name: "{name}", value: "{value}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger:
+    summary: Fire a named trigger (guide p.63)
+    params:
+      name: { type: string, max_length: 128, required: true }
+    send: { method: GET, path: /v1/trigger, query: { name: "{name}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_datalink:
+    summary: Set a DataLink key's value, for titles and graphics (guide p.63-64)
+    params:
+      key:   { type: string, max_length: 128, required: true }
+      value: { type: string, max_length: 4096, required: true }
+    send: { method: GET, path: /v1/datalink, query: { key: "{key}", value: "{value}" } }
+    expect: { status: 200 }
+    returns: ack
+
 telemetry:
   # The tally dictionary (Automation and Integration Guide p.67-68): one
   # <column> per source, with on_pgm and on_prev as "true" or "false". Asked
@@ -184,16 +224,33 @@ telemetry:
     every_ms: 500
     send:
       - { method: GET, path: /v1/dictionary, query: { key: tally } }
+      - { method: GET, path: /v1/dictionary, query: { key: switcher } }
+      - { method: GET, path: /v1/dictionary, query: { key: shortcut_states } }
   updates:
     - path: "^/v1/dictionary\\?key=tally$"
       xml_each: column
       state:
         "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
         "tally.{name}.preview": { value: "{on_prev}", map: { "true": true, "false": false } }
+    # The switcher dictionary (guide p.69): the main program and preview sources.
+    - path: "^/v1/dictionary\\?key=switcher$"
+      xml_each: switcher_update
+      state:
+        switcher.program: "{main_source}"
+        switcher.preview: "{preview_source}"
+    # Every shortcut state the system reports: record and stream state, DDR
+    # play state, source names (<input>_long_name), DSK values and more.
+    - path: "^/v1/dictionary\\?key=shortcut_states$"
+      xml_each: shortcut_state
+      state:
+        "shortcuts.{name}": "{value}"
 
 state:
   tally.*.program: { type: bool, description: "Source visible on program (through any layer), keyed by internal source name such as input1 or ddr1" }
   tally.*.preview: { type: bool, description: "Source on preview" }
+  switcher.program: { type: string, description: "Main program source, such as BFR4 or INPUT1" }
+  switcher.preview: { type: string, description: "Main preview source" }
+  shortcuts.*:      { type: string, description: "Each shortcut state the system reports, keyed by its name: record_toggle, streaming_toggle, ddr1_play, input1_long_name and others" }
 
 quirks:
   - models: [all]
@@ -222,5 +279,7 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Tally is polled twice a second from the tally dictionary. The change
-      notification WebSocket, which would push it instead, is not used yet.
+      Tally, the switcher's sources and every shortcut state are polled twice a
+      second from the tally, switcher and shortcut_states dictionaries. The
+      change notification WebSocket, which would push them instead, is not
+      used yet.
