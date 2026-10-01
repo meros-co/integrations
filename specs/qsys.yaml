@@ -1,0 +1,541 @@
+spec: 1
+id: qsys
+name: QSC Q-SYS Core (Q-SYS Remote Control, QRC)
+vendor: QSC
+category: other
+implementation: native
+reason: >
+  JSON-RPC 2.0 over TCP with NUL-terminated messages: replies are matched to
+  requests by id, and the Core also pushes unsolicited messages (EngineStatus,
+  AutoPoll change group results, PA page and zone status, Loop Player errors)
+  that become state. The session logs on only when credentials are configured
+  and judges the refusal from the Core's answer, sends something at least
+  every 15 s because the Core closes a connection idle for 60 s, and keeps a
+  record of each change group's controls and AutoPoll rate to create them
+  again after a reconnection, since the Core deletes them with the
+  connection.
+
+source:
+  - title: "Q-SYS Help 10.5.0: Q-SYS Remote Control Protocol (QRC)"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/QRC/QRC_Overview.htm"
+    note: >
+      Manufacturer help page (Q-SYS 10.5.0, footer copyright 2026). Features (Named Controls, component
+      control, mixer control, PA Router control); "Connections": TCP port 1710; a client must communicate at
+      least once every 60 seconds or the Core closes the socket, "NoOp" for that; Access Control logs QRC
+      logons in the Core Manager Event Log; a Core must have a design loaded and running; "Connecting to
+      Q-SYS Designer in Emulate Mode": the design open and in Emulate mode, port 1710 on localhost, the PC's
+      name or address. "Change Groups": at most four, AddControl/AddComponentControl create the group, a
+      poll returns what changed since the last poll and everything on the first poll, AutoPoll. "Controlling
+      Redundant Cores": connect to both, EngineStatus sent on connection and on change, send commands to the
+      active Core, check IsRedundant and DesignCode, commands to the inactive Core are ignored.
+  - title: "Q-SYS Help 10.5.0: QRC Commands"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/QRC/QRC_Commands.htm"
+    note: >
+      Manufacturer help page; the method reference. Intro: Unicode TCP/IP protocol, port 1710, JSON-RPC 2.0
+      null-terminated commands, id a number copied into the response. "Formatting Requirements": a supported
+      command, terminated in a null. "Connection Methods": Logon (User, Password; users created in
+      Administrator), NoOp. "Status Methods": EngineStatus (State Idle/Active/Standby, DesignName, DesignCode,
+      IsRedundant, IsEmulator; pushed on connecting and on any status change), StatusGet (adds Platform, the
+      Core model, e.g. "Core 510i", and Status {Code, String}). "Control Methods": Control.Get (array of
+      names; Name, Value, String), Control.Set (Name, Value, optional Ramp). "Component Control Methods":
+      Component.Get, Component.GetControls (Type, Value, ValueMin/Max, StringMin/Max, String, Position,
+      Direction), Component.Set (Controls with Name/Value/Ramp, ResponseValues; returns unknown controls),
+      Component.GetComponents (ID, Name, Type, Properties, Controls, ControlSource). "Change Group Methods":
+      maximum four; AddControl, AddComponentControl, Remove, Poll (response {Id, Changes}), Destroy,
+      Invalidate, Clear, AutoPoll (Rate in seconds; response {Id, Changes}). "Mixer Control Methods": string
+      syntax (*, lists, ranges, !) and SetCrossPointGain/Delay/Mute/Solo, SetInputGain/Mute/Solo,
+      SetOutputGain/Mute, SetCueMute/Gain, SetInputCueEnable/Afl. "Loop Player Control Methods":
+      LoopPlayer.Start (table of fields), LoopPlayer.Error, LoopPlayer.Stop, LoopPlayer.Cancel. "Snapshot
+      Methods": Snapshot.Load (Name, Bank, Ramp), Snapshot.Save. "Error Code Reference": -32700 to -32604 and
+      2 to 10.
+  - title: "Q-SYS Help 10.5.0: Q-SYS PA Remote API (PARAPI)"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/QRC/PARAPI.htm"
+    note: >
+      Manufacturer help page; part of QRC. Commands PA.PageSubmit (parameter table: Mode, Description, Zones,
+      ZoneTags, Priority, Preamble, Message, MessageDelete, Station, Start, QueueTimeout, Archive, Split,
+      RetryCount, MaxPageTime, CancelDelay, Originator, SplitOnInterrupt), PA.PageStart, PA.PageStop,
+      PA.PageCancel, PA.ZoneStatusConfigure, PA.GetConfig, PA.PageProceed, PA.SourceWatchdog; notifications
+      PA.PageStatus (State/SubState/Count/Message table) and PA.ZoneStatus; error codes 1-4 with an example
+      error object {"message", "code"}; the 60-second idle close; examples (live page, message play, zone
+      status configure, get configuration).
+  - title: "Q-SYS Help 10.5.0: Change Groups for ECP and QRC"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/external_controls_change_groups.htm"
+    note: >
+      Manufacturer help page. A control added to an existing group is reported on the next poll; 512 change
+      groups at most across all clients, an external control system uses 0-4; "Connection Loss and
+      Re-initialization": every change group is deleted when the TCP connection goes down, so they must be
+      created again; redundant Cores each addressed by their own host; a change on a standby Core is an
+      error.
+  - title: "How To | Formatting a QRC command (updated 2023-06-28)"
+    author: QSC
+    url: "https://support.qsys.com/application-notes/how-to-|-formatting-a-qrc-command/version/1?kb_language=en_US"
+    note: >
+      Manufacturer knowledge-base article. The NUL terminator, written \0, and two correctly formatted
+      commands: {"jsonrpc": "2.0", "method": "StatusGet", "id": 1234,"params": 0} and a Control.Get of "Gain"
+      and "Mute".
+  - title: "Q-SYS Help 10.5.0: Users (Administrator)"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/Administrator/Users.htm"
+    note: >
+      Manufacturer help page. External Control users are created in Q-SYS Administrator with a name (A-Z a-z
+      0-9 - . _) and a PIN, and the External Control Protocol access permission; the Guest user (no PIN)
+      grants a permission to everyone.
+  - title: "Q-SYS Help 10.5.0: Processing hardware and vCore pages"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/Hardware/Processing/Core_510i.htm"
+    note: >
+      Manufacturer help pages under Hardware > Processing (Core Nano, Core 8 Flex, Core 24f, Core 110c, Core
+      110f, Core 510c, Core 510i, Core 610, Core 5200, Core 6000 CXR, Server Core X10, X20r, X50r), the
+      NV-32-H (Core Capable) page, and "vCore Virtualized Processor" (vCore/vCore_Overview.htm, now
+      discontinued). Used for the model list only: the QRC pages make no distinction between Core models.
+
+settings:
+  # A Q-SYS Administrator user with External Control access, and its PIN.
+  # Leave both unset when Access Control is off (or Guest has External
+  # Control access): no Logon is sent then.
+  username: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]*$" }
+  pin: { type: string, secret: true }
+  # The AutoPoll rate, in seconds, a change group is given when controls are
+  # first added to it (0: none; poll with change_group_poll instead).
+  auto_poll_rate: { type: float, min: 0, max: 3600, default: 0.25 }
+
+models:
+  - id: core
+    name: "Q-SYS Core processor (Core Nano, Core 8 Flex, Core 24f, Core 110c, Core 110f, Core 510c, Core 510i, Core 610, Core 5200, Core 6000 CXR, Server Core X10/X20r/X50r, NV-32-H in Core mode, vCore), TCP 1710"
+    supports: &all
+      [status_get, no_op, control_get, control_set, component_get, component_get_controls, component_get_components,
+      component_set, component_set_controls, change_group_add_controls, change_group_add_component_controls,
+      change_group_remove, change_group_poll, change_group_auto_poll, change_group_clear, change_group_destroy,
+      change_group_invalidate, mixer_set_crosspoint_gain, mixer_set_crosspoint_delay, mixer_set_crosspoint_mute,
+      mixer_set_crosspoint_solo, mixer_set_input_gain, mixer_set_input_mute, mixer_set_input_solo,
+      mixer_set_output_gain, mixer_set_output_mute, mixer_set_cue_mute, mixer_set_cue_gain,
+      mixer_set_input_cue_enable, mixer_set_input_cue_afl, loop_player_start, loop_player_stop, loop_player_cancel,
+      snapshot_load, snapshot_save, pa_page_submit, pa_page_start, pa_page_stop, pa_page_cancel, pa_page_proceed,
+      pa_zone_status_configure, pa_get_config, pa_source_watchdog, raw_rpc]
+    verification: none
+    notes: >
+      QRC is served by the Core running a design, whatever the model; the Core reports its model as
+      engine.platform (StatusGet "Platform"). What a design contains (named controls, components, mixers,
+      Loop Players, snapshot banks, a PA Router) decides which commands find something to act on.
+  - id: designer-emulation
+    name: "Q-SYS Designer in Emulate mode, TCP 1710 on the PC"
+    supports: *all
+    verification: none
+    notes: >
+      The design must be open in Q-SYS Designer and in Emulate mode; connect to localhost, the PC's name or
+      its address (QRC Overview). EngineStatus reports IsEmulator true.
+
+commands:
+  status_get:
+    summary: "StatusGet: the engine status (Platform, State, DesignName, DesignCode, IsRedundant, IsEmulator, Status); also updates engine.*"
+    returns: value
+  no_op:
+    summary: "NoOp: does nothing; keeps the socket open (the module already sends one when idle)"
+    returns: ack
+  control_get:
+    summary: "Control.Get: the named controls' values; returns the result array [{Name, Value, String}] and updates controls.*"
+    params:
+      controls: { type: json, required: true }
+    returns: value
+  control_set:
+    summary: >
+      Control.Set: set a named control's Value, a number (value), string (value_string) or boolean (value_bool),
+      exactly one, with an optional ramp in seconds
+    params:
+      name: &control_name { type: string, required: true, max_length: 256 }
+      value: &number { type: float }
+      value_string: &value_string { type: string }
+      value_bool: &value_bool { type: bool }
+      ramp: &ramp { type: float, min: 0 }
+    returns: ack
+  component_get:
+    summary: "Component.Get: values of controls of a named component; controls is an array of control names. Returns {Name, Controls} and updates components.*"
+    params:
+      component: &component { type: string, required: true, max_length: 256 }
+      controls: { type: json, required: true }
+    returns: value
+  component_get_controls:
+    summary: "Component.GetControls: every control of a named component with Type, Value, ranges, String, Position and Direction; updates components.*"
+    params:
+      component: *component
+    returns: value
+  component_get_components:
+    summary: "Component.GetComponents: every named component in the design with ID, Name, Type and Properties"
+    returns: value
+  component_set:
+    summary: >
+      Component.Set of one control: value, value_string or value_bool (exactly one), optional ramp. Returns the
+      result: the unknown controls, or with response_values the controls' new values (also state)
+    params:
+      component: *component
+      control: *control_name
+      value: *number
+      value_string: *value_string
+      value_bool: *value_bool
+      ramp: *ramp
+      response_values: &response_values { type: bool, default: false }
+    returns: value
+  component_set_controls:
+    summary: >
+      Component.Set of several controls: controls is QRC's array [{"Name", "Value", "Ramp"?}] (QRC Commands,
+      Component.Set example 2)
+    params:
+      component: *component
+      controls: { type: json, required: true }
+      response_values: *response_values
+    returns: value
+  change_group_add_controls:
+    summary: >
+      ChangeGroup.AddControl: add named controls (array of names) to a change group, creating it. A group's first
+      controls start its AutoPoll at the auto_poll_rate setting; its results update controls.*
+    params:
+      group: &group { type: string, default: meros, max_length: 128 }
+      controls: { type: json, required: true }
+    returns: ack
+  change_group_add_component_controls:
+    summary: "ChangeGroup.AddComponentControl: add a named component's controls (array of names) to a change group; results update components.*"
+    params:
+      group: *group
+      component: *component
+      controls: { type: json, required: true }
+    returns: ack
+  change_group_remove:
+    summary: "ChangeGroup.Remove: remove named controls (array of names) from a change group; returns the unknown controls"
+    params:
+      group: *group
+      controls: { type: json, required: true }
+    returns: value
+  change_group_poll:
+    summary: "ChangeGroup.Poll: the controls changed since the last poll (all on the first); returns {Id, Changes} and updates state"
+    params:
+      group: *group
+    returns: value
+  change_group_auto_poll:
+    summary: "ChangeGroup.AutoPoll: have the Core poll the group every rate seconds and push the results"
+    params:
+      group: *group
+      rate: { type: float, min: 0, max: 3600, required: true }
+    returns: ack
+  change_group_clear:
+    summary: "ChangeGroup.Clear: remove every control from a change group"
+    params:
+      group: *group
+    returns: ack
+  change_group_destroy:
+    summary: "ChangeGroup.Destroy: destroy a change group"
+    params:
+      group: *group
+    returns: ack
+  change_group_invalidate:
+    summary: "ChangeGroup.Invalidate: the next poll returns every control of the group"
+    params:
+      group: *group
+    returns: ack
+  mixer_set_crosspoint_gain:
+    summary: "Mixer.SetCrossPointGain: crosspoint gain for inputs x outputs (QRC string syntax: '*', '1 2 3', '1-6 9', '1-8 !3'), optional ramp"
+    params:
+      mixer: &mixer { type: string, required: true, max_length: 256 }
+      inputs: &inputs { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$" }
+      outputs: &outputs { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$" }
+      value: &gain { type: float, required: true }
+      ramp: *ramp
+    returns: ack
+  mixer_set_crosspoint_delay:
+    summary: "Mixer.SetCrossPointDelay: crosspoint delay for inputs x outputs, optional ramp (unit not documented)"
+    params: { mixer: *mixer, inputs: *inputs, outputs: *outputs, value: *gain, ramp: *ramp }
+    returns: ack
+  mixer_set_crosspoint_mute:
+    summary: "Mixer.SetCrossPointMute: crosspoint mute for inputs x outputs"
+    params:
+      mixer: *mixer
+      inputs: *inputs
+      outputs: *outputs
+      value: &flag { type: bool, required: true }
+    returns: ack
+  mixer_set_crosspoint_solo:
+    summary: "Mixer.SetCrossPointSolo: crosspoint solo for inputs x outputs"
+    params: { mixer: *mixer, inputs: *inputs, outputs: *outputs, value: *flag }
+    returns: ack
+  mixer_set_input_gain:
+    summary: "Mixer.SetInputGain: input gain, optional ramp"
+    params: { mixer: *mixer, inputs: *inputs, value: *gain, ramp: *ramp }
+    returns: ack
+  mixer_set_input_mute:
+    summary: "Mixer.SetInputMute: input mute"
+    params: { mixer: *mixer, inputs: *inputs, value: *flag }
+    returns: ack
+  mixer_set_input_solo:
+    summary: "Mixer.SetInputSolo: input solo"
+    params: { mixer: *mixer, inputs: *inputs, value: *flag }
+    returns: ack
+  mixer_set_output_gain:
+    summary: "Mixer.SetOutputGain: output gain, optional ramp"
+    params: { mixer: *mixer, outputs: *outputs, value: *gain, ramp: *ramp }
+    returns: ack
+  mixer_set_output_mute:
+    summary: "Mixer.SetOutputMute: output mute"
+    params: { mixer: *mixer, outputs: *outputs, value: *flag }
+    returns: ack
+  mixer_set_cue_mute:
+    summary: "Mixer.SetCueMute: cue mute"
+    params:
+      mixer: *mixer
+      cues: &cues { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$" }
+      value: *flag
+    returns: ack
+  mixer_set_cue_gain:
+    summary: "Mixer.SetCueGain: cue gain, optional ramp"
+    params: { mixer: *mixer, cues: *cues, value: *gain, ramp: *ramp }
+    returns: ack
+  mixer_set_input_cue_enable:
+    summary: "Mixer.SetInputCueEnable: enable cues for inputs"
+    params: { mixer: *mixer, cues: *cues, inputs: *inputs, value: *flag }
+    returns: ack
+  mixer_set_input_cue_afl:
+    summary: "Mixer.SetInputCueAfl: cue AFL (after fader level) for inputs"
+    params: { mixer: *mixer, cues: *cues, inputs: *inputs, value: *flag }
+    returns: ack
+  loop_player_start:
+    summary: >
+      LoopPlayer.Start: play files on a Loop Player (its Code Name), either files as QRC's array
+      [{"Name": path, "Output": n}] or one file with output. start_time -1 now, -2 after the current track, 0 or
+      more a time of day in seconds; failures arrive as LoopPlayer.Error (loop_player.last_error)
+    params:
+      name: &loop_player { type: string, required: true, max_length: 256 }
+      files: { type: json }
+      file: { type: string, max_length: 1024 }
+      output: { type: int, min: 1 }
+      start_time: { type: float, min: -2 }
+      loop: { type: bool }
+      log: &log { type: bool }
+      ref_id: &ref_id { type: string, max_length: 256 }
+      seek: { type: float, min: 0 }
+    returns: ack
+  loop_player_stop:
+    summary: "LoopPlayer.Stop: stop playback on outputs (array of output numbers)"
+    params:
+      name: *loop_player
+      outputs: &outputs_list { type: json, required: true }
+      log: *log
+      ref_id: *ref_id
+    returns: ack
+  loop_player_cancel:
+    summary: "LoopPlayer.Cancel: cancel a queued job on outputs (array of output numbers) without disturbing playback"
+    params: { name: *loop_player, outputs: *outputs_list, log: *log, ref_id: *ref_id }
+    returns: ack
+  snapshot_load:
+    summary: "Snapshot.Load: load snapshot number snapshot (QRC 'Bank') of the bank named bank (QRC 'Name'), optional ramp"
+    params:
+      bank: &bank { type: string, required: true, max_length: 256 }
+      snapshot: &snapshot { type: int, min: 1, required: true }
+      ramp: *ramp
+    returns: ack
+  snapshot_save:
+    summary: "Snapshot.Save: save the current settings to snapshot number snapshot of the bank named bank"
+    params: { bank: *bank, snapshot: *snapshot }
+    returns: ack
+  pa_page_submit:
+    summary: >
+      PA.PageSubmit (PARAPI): submit a page; returns {PageID}. zones is an array of zone numbers and names,
+      zone_tags an array of tags (one or both); a message page needs message, a voice page station.
+      Progress arrives as PA.PageStatus (pa.pages.*)
+    params:
+      mode: { type: enum, values: [message, live, delay, auto], required: true }
+      description: { type: string, max_length: 1024 }
+      zones: { type: json }
+      zone_tags: { type: json }
+      priority: { type: int, min: 1, required: true }
+      preamble: { type: string, max_length: 1024 }
+      message: { type: string, max_length: 1024 }
+      message_delete: { type: bool }
+      station: { type: int, min: 1 }
+      start: { type: bool }
+      queue_timeout: { type: int, min: -1 }
+      archive: { type: bool }
+      split: { type: bool }
+      retry_count: { type: int, min: 0 }
+      max_page_time: { type: int, min: 0 }
+      cancel_delay: { type: int, min: 0 }
+      originator: { type: string, max_length: 256 }
+      split_on_interrupt: { type: bool }
+    returns: value
+  pa_page_start:
+    summary: "PA.PageStart: start a submitted page"
+    params:
+      page_id: &page_id { type: int, min: 0, required: true }
+    returns: ack
+  pa_page_stop:
+    summary: "PA.PageStop: end a voice page (the announcer has finished)"
+    params: { page_id: *page_id }
+    returns: ack
+  pa_page_cancel:
+    summary: "PA.PageCancel: cancel a page"
+    params: { page_id: *page_id }
+    returns: ack
+  pa_page_proceed:
+    summary: "PA.PageProceed: start a remote page"
+    params: { page_id: *page_id }
+    returns: ack
+  pa_zone_status_configure:
+    summary: "PA.ZoneStatusConfigure: start or stop PA.ZoneStatus notifications (pa.zones.*); enabling sends every zone's status at once"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  pa_get_config:
+    summary: "PA.GetConfig: the PA Router's configured Zones, Tags and Priorities"
+    returns: value
+  pa_source_watchdog:
+    summary: "PA.SourceWatchdog: start a watchdog on a remote system; a page playing when its client disconnects is ended"
+    params:
+      remote_system: { type: string, required: true, max_length: 256 }
+    returns: ack
+  raw_rpc:
+    summary: >
+      Any QRC method by name with its params as JSON (default {}), for methods the help documents later than
+      this spec; returns the result. Replies that carry change group Changes still update state
+    params:
+      method: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z][A-Za-z0-9.]*$" }
+      params: { type: json }
+    returns: value
+
+state:
+  engine.platform:          { type: string, description: "Core model, from StatusGet (e.g. \"Core 510i\")" }
+  engine.state:             { type: string, description: "Idle, Active or Standby (Standby: the backup of a redundant pair)" }
+  engine.design_name:       { type: string, description: "Name of the running design" }
+  engine.design_code:       { type: string, description: "GUID of the running design; when it changes, controls and components are cleared and the change groups invalidated" }
+  engine.is_redundant:      { type: bool, description: "The design is configured for redundant Cores" }
+  engine.is_emulator:       { type: bool, description: "The design is running in Q-SYS Designer's emulator" }
+  engine.status.code:       { type: int, description: "StatusGet Status.Code (0 is OK)" }
+  engine.status.string:     { type: string, description: "StatusGet Status.String" }
+  controls.*.value:         { type: float, description: "A named control's Value, keyed by its name. A number for most controls; QSC documents Value as a number, string or boolean, so a consumer must accept all three" }
+  controls.*.string:        { type: string, description: "The control's String, its text form such as \"-12.0dB\"" }
+  controls.*.position:      { type: float, description: "The control's Position, 0 to 1 within its range, when reported" }
+  components.*.*.value:     { type: float, description: "A named component's control Value, keyed by component name then control name (control names may contain dots, such as \"ent.xfade.gain\"; they are single keys). Number, string or boolean" }
+  components.*.*.string:    { type: string, description: "The component control's String" }
+  components.*.*.position:  { type: float, description: "The component control's Position, 0 to 1" }
+  components.*.*.type:      { type: string, description: "Control type from Component.GetControls (e.g. Float, Boolean)" }
+  components.*.*.direction: { type: string, description: "Direction from Component.GetControls (e.g. Read/Write)" }
+  components.*.*.value_min: { type: float, description: "ValueMin from Component.GetControls" }
+  components.*.*.value_max: { type: float, description: "ValueMax from Component.GetControls" }
+  components.*.*.string_min: { type: string, description: "StringMin from Component.GetControls" }
+  components.*.*.string_max: { type: string, description: "StringMax from Component.GetControls" }
+  pa.pages.*.state:         { type: string, description: "PA.PageStatus State of a page, keyed by PageID: ready, wait, input, output or done" }
+  pa.pages.*.sub_state:     { type: string, description: "PA.PageStatus SubState (queued, immediate, preamble, zones, system, cancel, live, record, output, success, timeout, interrupt, fail)" }
+  pa.pages.*.message:       { type: string, description: "PA.PageStatus Message, such as \"Paging\" or \"Page complete\"" }
+  pa.pages.*.count:         { type: int, unit: s, description: "Seconds left of CancelDelay or MaxPageTime, counted down once per second; null when not counting" }
+  pa.zones.*.active:        { type: bool, description: "PA.ZoneStatus: the PA Router output zone is playing a page, keyed by zone number" }
+  pa.zones.*.time:          { type: string, description: "Time of the zone status change (ISO 8601 UTC)" }
+  pa.zones.*.page_id:       { type: int, description: "PageID playing in the zone, when reported" }
+  pa.zones.*.priority:      { type: int, description: "Priority of the page playing in the zone" }
+  pa.zones.*.priority_name: { type: string, description: "Name of that priority, such as Urgent" }
+  pa.zones.*.station:       { type: int, description: "Page station of the page playing in the zone" }
+  loop_player.last_error.error:  { type: string, description: "The last LoopPlayer.Error, such as JobInPast" }
+  loop_player.last_error.ref_id: { type: string, description: "RefID given with the failed Loop Player job" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Logon (QRC Commands, Connection Methods) documents its parameters but not how a refusal is answered: the
+      example has no id, and the response template lists "error" and "response" rather than JSON-RPC's
+      "result". The module sends Logon with an id only when a username is set, follows it with StatusGet, and
+      treats an error reply to Logon, or error 10 "Logon required" to anything, as a refusal: terminal,
+      commands fail with auth and nothing is sent until the device is opened again with corrected settings.
+      A reply's "response" member is read as its result.
+  - models: [all]
+    severity: warning
+    text: >
+      The help says commands are NUL-terminated but not that the Core's replies are. The module ends a message
+      at a NUL and also accepts complete JSON messages without one.
+  - models: [all]
+    severity: warning
+    text: >
+      ChangeGroup.AutoPoll's documented response is a result {Id, Changes} carrying the AutoPoll request's id;
+      how each later automatic poll is framed (another result with that id, or a "ChangeGroup.Poll"
+      notification) is not stated. The module applies Changes from either, and from any reply whose id it does
+      not recognise.
+  - models: [all]
+    severity: info
+    text: >
+      Control.Set documents only Name, Value and Ramp: QRC has no documented way to set a control by Position
+      or String (ECP has csp/css), so the module offers neither. Value may be a number, string or boolean, so
+      string and boolean controls are set through value_string and value_bool.
+  - models: [all]
+    severity: info
+    text: >
+      Several examples in "QRC Commands" are not valid JSON as printed: minus signs are U+2010 hyphens, commas
+      are missing (StatusGet's response, Control.Get example 2's response, Component.Get's response,
+      ChangeGroup.Remove, the Poll and AutoPoll responses), Snapshot.Save and LoopPlayer.Error have trailing
+      commas, and GetComponents' response has a broken "Pretty Name" entry. The PARAPI examples also contain
+      broken keys (" PageID", "Stat e"). The module sends and expects well-formed JSON with ASCII minus signs.
+  - models: [all]
+    severity: info
+    text: >
+      StatusGet is sent with "params": 0, as in QSC's knowledge-base example. Component.GetComponents' example
+      sends "params": "test" while the method takes no parameters; the module sends {} as QSC's NoOp and
+      PA.GetConfig examples do. The Component.Get response example has no id; a reply without an id cannot
+      complete a command, though its values still become state.
+  - models: [all]
+    severity: info
+    text: >
+      In Snapshot.Load and Snapshot.Save, "Name" is the snapshot bank and "Bank" is the snapshot's number
+      within it (1 to the bank's size); the spec calls them bank and snapshot.
+  - models: [all]
+    severity: info
+    text: >
+      Mixer.SetInputMute's example includes "Ramp": 0.0, which its parameter list does not; the module sends
+      Ramp only for the gain and delay methods whose lists include it. Mixer.SetCrossPointDelay's value unit is
+      not documented. Channel specifications use ASCII '-' (the help prints "4-6" with U+2010).
+  - models: [all]
+    severity: info
+    text: >
+      LoopPlayer.Start's table spells the reference "RefID" while the LoopPlayer.Error example spells "RefId";
+      the module sends RefID and reads either. The table lists Loop, Log, RefID and Seek after the file fields
+      without saying whether Seek is per file; the module sends it at the top level with the others, as the
+      example does Loop and Log.
+  - models: [all]
+    severity: info
+    text: >
+      ChangeGroup.Remove removes named controls; removing a component's controls from a group is not
+      documented (use change_group_clear and add again). A connection may hold at most four change groups
+      (error 5 "Change Groups exhausted" beyond), and a Core 512 across all clients.
+  - models: [all]
+    severity: warning
+    text: >
+      The Core deletes every change group when the connection drops ("Change Groups for ECP and QRC"). The
+      module remembers what each group held and its AutoPoll rate, and creates them again once the Core
+      answers after a reconnection; the first results then report every control again.
+  - models: [all]
+    severity: warning
+    text: >
+      Redundant Cores: each Core is a separate device, opened by its own address. Commands sent to the
+      standby Core are ignored or fail with -32604 "Core is on Standby"; engine.state says which Core is
+      Active, and engine.is_redundant with engine.design_code confirm the two run the same design (QRC
+      Overview, "Controlling Redundant Cores").
+  - models: [all]
+    severity: info
+    text: >
+      The Core closes a connection idle for 60 seconds. The module sends NoOp when it has sent nothing for
+      15 s, and StatusGet when it has heard nothing for 15 s; no answer to that within 10 s drops and reopens
+      the connection.
+  - models: [all]
+    severity: info
+    text: >
+      PARAPI's examples use string ids ("8561") while QRC says the id must be a number; the module always
+      sends numbers and accepts either in replies. PARAPI error codes 1-4 (Bad Parameters, Bad PageID, Bad
+      Request, Bad File) overlap QRC's 2-4.
+  - models: [all]
+    severity: info
+    text: >
+      A Core must have a design running for QRC to connect; the module reports a connection that the Core
+      accepts but never answers. QRC must not be disabled under Core Manager > Network Services ("Q-SYS
+      External Control Protocol (ASCII and JSONRPC)").
+  - models: [designer-emulation]
+    severity: info
+    text: >
+      Emulation answers only while the design is open and in Emulate mode in Q-SYS Designer; whether PA
+      Router paging and Loop Player file playback behave in emulation as on a Core is not documented.

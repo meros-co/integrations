@@ -10,6 +10,8 @@ mod allenheath_sq;
 mod atem;
 mod obs;
 mod panasonic_notify;
+mod pjlink;
+mod qsys;
 mod sennheiser_d6000;
 mod sennheiser_ewdx;
 mod sennheiser_mcp;
@@ -58,6 +60,8 @@ pub(crate) fn construct(
         },
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         "visca" => Ok(Box::new(visca::Visca::new(context))),
+        "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
+        "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         "allenheath-dlive" | "allenheath-ahm" | "allenheath-qu" | "allenheath-sq"
         | "allenheath-cq" => Ok(Box::new(allenheath::AllenHeath::new(&spec.id, context)?)),
