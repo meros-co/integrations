@@ -858,8 +858,8 @@ commands:
     summary: "RTMP stream key for stream 1 or 2"
     params:
       stream: { type: "int", min: 1, max: 2, required: true }
-      key: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_key={key}" }
+      key: { type: "string", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_key={key:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt:
@@ -879,8 +879,8 @@ commands:
   srt_server:
     summary: "SRT server address (caller mode)"
     params:
-      server: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_server={server}" }
+      server: { type: "string", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_server={server:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_port:
@@ -914,15 +914,15 @@ commands:
   srt_password:
     summary: "SRT passphrase for encrypted streams"
     params:
-      password: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_passtr={password}" }
+      password: { type: "string", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_passtr={password:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_stream_id:
     summary: "SRT stream ID"
     params:
-      stream_id: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_streamid_str={stream_id}" }
+      stream_id: { type: "string", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_streamid_str={stream_id:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtsp_port:
@@ -986,15 +986,15 @@ commands:
   ndi_name:
     summary: "NDI channel name"
     params:
-      name: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&channelName={name}" }
+      name: { type: "string", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&channelName={name:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   ndi_group:
     summary: "NDI receive group"
     params:
-      group: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&group={group}" }
+      group: { type: "string", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&group={group:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   ndi_discovery:
@@ -1014,8 +1014,8 @@ commands:
   device_name:
     summary: "Set the camera's device name"
     params:
-      name: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
-    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_devinfo_conf&devname={name}" }
+      name: { type: "string", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_devinfo_conf&devname={name:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   dhcp:
@@ -1797,11 +1797,11 @@ quirks:
   - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
     severity: info
     text: >
-      Text values (names, addresses, stream keys, SRT settings, RTMP URLs) are sent
-      unencoded in the positional query, so they are limited to characters that need
-      no percent-encoding: letters, digits and . _ ~ - (RTMP URLs also : / @ and the
-      RFC 3986 sub-delimiters other than &, and % for a value the caller has already
-      percent-encoded). Names with spaces cannot be sent.
+      Names, stream keys and SRT settings are percent-encoded in the positional
+      query. The document does not say whether the camera decodes them; its
+      examples use only letters, digits and _ -. RTMP URLs are sent as given,
+      limited to the RFC 3986 characters other than &, with % for a value the
+      caller has already percent-encoded.
 
   - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
     severity: warning

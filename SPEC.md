@@ -302,7 +302,7 @@ Encoding depends on where the value lands:
 | Line/TCP payload, OSC address, OSC string argument | None; text encoded per `encoding` |
 | HTTP `path` | Percent-encoded as a path segment (RFC 3986 unreserved characters kept) |
 | HTTP `query` value | Percent-encoded as a query value; pairs are sent in the order the spec lists them |
-| HTTP `raw_query` | None. Only `int`, `float`, `bool`, `enum`, or a `string` with a `pattern`, may appear here |
+| HTTP `raw_query` | None. Only `int`, `float`, `bool`, `enum`, a `string` with a `pattern`, or a `string` with the `url` directive, may appear here |
 
 ### Formatting directives
 
@@ -316,6 +316,7 @@ The directive set is closed.
 | `bool10` | Boolean → `0` / `1`, inverted |
 | `upper`, `lower` | String case |
 | `json` | String as a JSON string literal, quotes and escapes included: `{text:json}` → `"Say \"hi\""`. For JSON request bodies |
+| `url` | String percent-encoded, RFC 3986 unreserved characters kept: `{name:url}` → `Cam%201`. For free text in a `raw_query` |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Integer with an explicit leading sign: `7` → `+7`, `-7` → `-7` |
 | `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75` |

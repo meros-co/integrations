@@ -176,6 +176,8 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     "lower" => s.to_lowercase(),
                     // A JSON string literal, quotes included, for request bodies.
                     "json" => Value::String(s).to_string(),
+                    // Percent-encoded, for a raw_query.
+                    "url" => percent_encode(&s),
                     _ => return Err(format!("directive ':{d}' does not apply to a string")),
                 };
             }
@@ -299,5 +301,9 @@ mod tests {
             "GO"
         );
         assert_eq!(percent_encode("#PTS 50/50"), "%23PTS%2050%2F50");
+        assert_eq!(
+            go("{s:url}", json!({"s": "Cam 1 & 2"}), "s: { type: string }").unwrap(),
+            "Cam%201%20%26%202"
+        );
     }
 }

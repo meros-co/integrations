@@ -155,7 +155,7 @@ http(P, "onvif", {"enabled": True}, "POST", PRM + "post_network_other_conf&onvif
 http(P, "onvif_auth", {"enabled": True}, "POST", PRM + "post_network_other_conf&onvif_auth_en=1")
 
 # Network (p.139-158) and ports (p.163-168)
-http(P, "ndi_name", {"name": "PTZOptics"}, "GET", PRM + "post_ndi_info&channelName=PTZOptics")
+http(P, "ndi_name", {"name": "Stage Left #2"}, "GET", PRM + "post_ndi_info&channelName=Stage%20Left%20%232")
 http(P, "ndi_group", {"group": "PTZGroup"}, "GET", PRM + "post_ndi_info&group=PTZGroup")
 http(P, "ndi_discovery", {"enabled": True}, "GET", PRM + "post_ndi_info&discovery_en=1")
 http(P, "ndi_multicast", {"enabled": True}, "GET", PRM + "post_ndi_info&multicast_en=1")
