@@ -1,0 +1,1082 @@
+spec: 1
+id: visca
+name: VISCA PTZ cameras (Sony VISCA over IP, and VISCA over TCP/UDP)
+vendor: Sony and others
+category: camera
+implementation: native
+reason: >
+  VISCA over IP numbers every message and the camera's replies carry that
+  number; the session starts with a RESET handshake, lost messages are
+  resent with the same number and the camera's sequence-error reply decides
+  what happened. A command is answered twice, ACK naming one of two
+  sockets and later Completion or an error for that socket, and the next
+  message may go only after the previous one's first reply. Positions are
+  written as nibbles whose count differs by model, and nothing is pushed,
+  so state comes from paced polling.
+
+source:
+  - title: "Color Video Camera VISCA Command List, Software Version 2.00, BRC-X400/X401, SRG-X400/X402/201M2, SRG-X120/HD1M2 (E-042-100-12 (1), 2019)"
+    author: "Sony Corporation"
+    url: "https://shop.ccisolutions.com/StoreFront/jsp/pdf/SON-SRGX400_visca_commandList.pdf"
+    note: >
+      Manufacturer document, read from a dealer's copy because pro.sony refuses scripted downloads (Sony's
+      own copy: https://pro.sony/support/res/manuals/5011/c63d0ae378bdbcf267ab0dc410789a99/50112501M.pdf).
+      Packet, ACK/Completion/error replies, sockets and the 4V timing (p.4-5); IF_Clear, CAM_VersionInq,
+      Cancel (p.6-7); camera-issued messages and error meanings (p.8); VISCA over IP: UDP 52381, up to 5
+      controllers, header with payload types 0100/0110/0111/0120/0200/0201, payload length, 32-bit
+      sequence number, RESET 01 and ACK 01, ERROR 0F01/0F02 (p.9-11); retransmission with the same
+      sequence number and the lost-message table (p.12); limitations, including the 15-second tally expiry
+      (p.13); command list (p.14-21); inquiry list (p.22-27); block inquiries (p.28-33); setting values:
+      shutter, iris, gain, exposure compensation, pan/tilt range and speeds, preset speeds, zoom and focus
+      positions (p.34-39); pan/tilt status code (p.39); preset modes (p.40).
+  - title: "Color Video Camera Command List BRC-X1000/H800/H780 (C-456-100-14 (1), revision 2.02)"
+    author: "Sony Corporation"
+    url: "https://cdn.assetserver.net/_assets/sony/pdf/brch8001-manual.pdf"
+    note: >
+      Manufacturer document, from a reseller's asset server. Same VISCA over IP description (p.9-13, with
+      the sequence-number timing charts on p.13); command list with five-nibble pan positions, ND filter,
+      pan/tilt reverse, gain priority (p.14-18); inquiries (p.19-22); pan/tilt angles to position values,
+      five pan nibbles (p.31); status code (p.33).
+  - title: "PTZOptics VISCA API, Developer Documentation (API version 1.0, 2026-09-29)"
+    author: "PTZOptics"
+    url: "https://downloads.ptzoptics.com/docs/visca-api"
+    note: >
+      Manufacturer document (28 pages). Replies and errors (p.4-5); exposure and white balance (p.6-11),
+      focus (p.12-14), image (p.15-16), pan/tilt drive and positions with VV WW and tilt speed to 0x14
+      (p.17-18), zoom (p.21), network (p.22), OSD navigation (p.23), inquiries (p.24-27). Several entries
+      are inconsistent; see the quirks.
+  - title: "PTZOptics VISCA over IP Commands (2022-05-19)"
+    author: "PTZOptics"
+    url: "https://f.hubspotusercontent20.net/hubfs/418770/PTZOptics%20Documentation/Misc/PTZOptics%20VISCA%20over%20IP%20Commands.pdf"
+    note: >
+      Manufacturer document (3 pages): IF_Clear, presets 0-127 (CAM_Memory), the inquiry list with
+      replies, and block inquiries. Used where the 2026 document omits or garbles an entry.
+  - title: "PTZOptics HTTP API, Developer Documentation (API version 1.0, 2026-09-29)"
+    author: "PTZOptics"
+    url: "https://downloads.ptzoptics.com/docs/http-api"
+    note: >
+      VISCA TCP port default 5678 (p.165) and UDP port default 1259 (p.167).
+  - title: "BirdDog X4 Series - VISCA over IP Commands (Rev. 2026-06-11)"
+    author: "BirdDog"
+    url: "https://birddog.tv/x4-series-visca-over-ip-commands/"
+    note: >
+      Manufacturer page: the 8-byte header with examples 01 00 00 09 00 00 00 00 81 01 06 01 09 09 03 01
+      FF and 01 10 00 05 00 00 00 00 81 09 06 12 FF, default UDP port 52381, replies with type 01 11 and
+      the sequence number echoed; absolute position with VV WW; 64 presets (00-3F); tally, AI tracking and
+      other BirdDog extensions.
+  - title: "BirdDog Eyes P400 Extended Command List (VISCA) (2021-03-22)"
+    author: "BirdDog"
+    url: "https://desk.birddog.tv/portal/en/kb/articles/visca-command-list-for-p400-attached"
+    note: >
+      Manufacturer attachment: exposure, white balance (04 ATW, 05 manual1, 06 manual2), picture and
+      colour-matrix commands; block inquiry 81 09 7E 7E EE FF.
+  - title: "RS135 - VC-A71P RS-232 command set (v1.4, 2021-06-28)"
+    author: "Lumens"
+    url: "https://www.mylumens.com/Download/RS135%20-%20VC-A71P%20RS-232%20command%20set_1_4.pdf"
+    note: >
+      Manufacturer document. Presets 0x00-0x7F and 128-255 through 3F 10/11/12 (p.15); pan/tilt drive
+      speeds 01-18, stop 00 00 03 03, absolute and relative with VV WW and pan 0000-6A40 / 95C0-FFFF, tilt
+      0000-3840 / ED40-FFFF (p.16); VISCA over IP on UDP 52381 with Sony's header (p.41-48).
+  - title: "CV730-BK/WH Visca over RS232 & IP Command Set (2023-03-17)"
+    author: "Marshall Electronics"
+    url: "https://marshall-usa.com/pdf/CV730-BK-WH-RS-232-IP-commands-set.pdf"
+    note: >
+      Manufacturer document. Pan/tilt drive and absolute/relative positions with VV WW (p.12); presets
+      0x00-0x7F and the second bank 3F 1x (p.14); VISCA over IP on UDP 52381 with Sony's header (p.37 on).
+      The CV630-IP RS-232 command set (2020) gives the same IP section.
+  - title: "AVer Pro-AV Quick Start Guide to Camera Control using Visca over IP (UDP) (updated 2024-01-26)"
+    author: "AVer Information"
+    url: "https://www.averusa.com/pro-av/downloads/quick-start/AVer%20Pro-AV%20QSG%20for%20PTZ%20Visca%20over%20IP-UDP%20v1.pdf"
+    note: >
+      Manufacturer guide: whole messages 01 00 00 09 00 00 00 01 81 01 06 01 08 08 03 01 FF (PT up), the
+      inquiry 01 00 00 05 00 00 00 01 81 09 00 02 FF and power off 01 00 00 06 00 00 00 00 81 01 04 00 03
+      FF (p.2); the PTZ310/330 stop quirk before firmware 0.70 (p.2); VISCA customised functions on
+      presets (p.4-6); VISCA control port UDP 52381 (p.8).
+  - title: "Remote Camera CR-N500/CR-N300 Settings Guide (2021)"
+    author: "Canon"
+    url: "https://www.adorama.com/col/productManuals/CACRN500B.pdf"
+    note: >
+      Manufacturer guide, read from a reseller's copy. Standard Communication (IP): enable, Response Port
+      Number fixed (52381) or the source port, camera IP inquiry and network setting permissions (p.64);
+      defaults, Response Port Number 'Specified Port Number (52381)' (p.103).
+  - title: "The Datavideo PTZ and Block Camera Control Protocol (Rev 2.7, 2025-09-18)"
+    author: "Datavideo"
+    url: "https://datavideo.com/us/protocol/150/ptc-140-visca-control-protocol"
+    note: >
+      Manufacturer document (download 'Datavideo PTZ VISCA Commands_main V2.7_E4'). Serial VISCA only;
+      presets 0-127 (p.12); pan/tilt speeds 01-12h and absolute position with five pan nibbles (p.13);
+      tally and two-tally, preset speed 7E 01 0B with presets 0-50 (p.14); inquiries (p.16-20).
+  - title: "Summary of PTZ Camera Control Protocol (Revision 1.01, September 2019)"
+    author: "Panasonic"
+    url: "https://na.panasonic.com/ns/268725_Summary_of_PRO_PTZ_Camera_Control_Protocols.pdf"
+    note: >
+      Panasonic's AW cameras are controlled by Panasonic's AW protocol (see panasonic-ptz); this summary
+      and the AW-UE50/UE40 Operating Instructions (DVQP2618YA) name no VISCA transport, so no Panasonic
+      model is listed here.
+
+settings:
+  # sony-ip (UDP with Sony's 8-byte header), raw-tcp or raw-udp (no header).
+  # Unset: the model's own (raw-tcp for PTZOptics, sony-ip otherwise). The
+  # port defaults to 52381, 5678 or 1259 by transport.
+  transport: { type: enum, values: ["sony-ip", "raw-tcp", "raw-udp"] }
+  # Bind local UDP 52381 because the camera replies there rather than to the
+  # sending port. Unset: on for Canon, off otherwise.
+  fixed_reply_port: { type: bool }
+  # How often to poll zoom, focus and pan/tilt positions; 0 = never.
+  poll_position_ms: { type: int, min: 0, max: 60000, default: 500 }
+  # How often to poll the settings held in the state; 0 = never.
+  poll_settings_ms: { type: int, min: 0, max: 600000, default: 5000 }
+
+models:
+  - id: sony-visca-ip
+    name: "Sony VISCA over IP (SRG-X400/X402/X120/201M2/HD1M2, BRC-X400/X401, and cameras following the same list)"
+    supports:
+      [power, if_clear, cancel, camera_id, raw_command, raw_inquiry, zoom, zoom_to, zoom_mode, focus,
+      focus_to, focus_mode, focus_one_push, focus_infinity, focus_near_limit, af_mode, af_interval,
+      af_sensitivity, ir_correction, pan_tilt, pan_tilt_stop, pan_tilt_absolute, pan_tilt_relative,
+      pan_tilt_home, pan_tilt_reset, pan_tilt_limit_set, pan_tilt_limit_clear, pan_tilt_ramp_curve,
+      pan_tilt_slow, preset_recall, preset_set, preset_reset, preset_speed, preset_speed_mode,
+      preset_common_speed, preset_call_mode, preset_mode, exposure_mode, iris, iris_direct, gain,
+      gain_direct, gain_limit, shutter, shutter_direct, max_shutter, min_shutter, auto_slow_shutter,
+      ae_speed, exposure_compensation, exposure_compensation_level, exposure_compensation_step, backlight,
+      spotlight, high_sensitivity, visibility_enhancer, white_balance_mode, white_balance_one_push, red_gain,
+      blue_gain, red_gain_step, blue_gain_step, white_balance_speed, detail_level, detail_step,
+      noise_reduction, picture_effect, flip, image_stabilizer, tally, tally_level, ir_receive, ir_cut_filter,
+      auto_icr, menu, menu_enter, get_version, get_power, get_zoom_position, get_zoom_mode,
+      get_focus_position, get_focus_mode, get_af_sensitivity, get_af_mode, get_focus_near_limit,
+      get_pan_tilt_position, get_pan_tilt_status, get_pan_tilt_max_speed, get_pan_tilt_slow,
+      get_pan_tilt_limit, get_white_balance_mode, get_red_gain, get_blue_gain, get_white_balance_speed,
+      get_exposure_mode, get_iris, get_shutter, get_gain, get_gain_limit, get_max_shutter, get_min_shutter,
+      get_ae_speed, get_auto_slow_shutter, get_exposure_compensation, get_exposure_compensation_level,
+      get_backlight, get_spotlight, get_high_sensitivity, get_visibility_enhancer, get_detail_level,
+      get_noise_reduction, get_picture_effect, get_flip, get_image_stabilizer, get_last_preset,
+      get_preset_speed, get_preset_speed_mode, get_preset_common_speed, get_tally, get_ir_receive,
+      get_ir_cut_filter, get_menu, get_camera_id]
+    verification: none
+    notes: >
+      Sony VISCA over IP on UDP 52381 with the 8-byte header. The command set is Sony's VISCA Command List
+      v2.00 for these models; use it for any camera that speaks Sony VISCA over IP. Pan positions are four
+      nibbles; tilt speed 01-17; presets 1-100.
+  - id: sony-brc-x1000
+    name: "Sony BRC-X1000 / BRC-H800 / BRC-H780"
+    supports:
+      [power, if_clear, cancel, raw_command, raw_inquiry, zoom, zoom_to, zoom_mode, focus, focus_to,
+      focus_mode, focus_one_push, focus_infinity, focus_near_limit, af_sensitivity, ir_correction, pan_tilt,
+      pan_tilt_stop, pan_tilt_absolute, pan_tilt_relative, pan_tilt_home, pan_tilt_reset, pan_tilt_limit_set,
+      pan_tilt_limit_clear, pan_tilt_ramp_curve, pan_tilt_slow, pan_reverse, tilt_reverse, preset_recall,
+      preset_set, preset_reset, preset_speed, preset_mode, exposure_mode, iris, iris_direct, gain,
+      gain_direct, gain_limit, shutter, shutter_direct, max_shutter, min_shutter, ae_speed,
+      exposure_compensation, exposure_compensation_level, exposure_compensation_step, backlight, spotlight,
+      visibility_enhancer, nd_filter, white_balance_mode, white_balance_one_push, red_gain, blue_gain,
+      red_gain_step, blue_gain_step, white_balance_speed, detail_level, detail_step, noise_reduction, flip,
+      tally, tally_level, ir_receive, ir_cut_filter, menu, get_version, get_power, get_zoom_position,
+      get_zoom_mode, get_focus_position, get_focus_mode, get_af_sensitivity, get_focus_near_limit,
+      get_pan_tilt_position, get_pan_tilt_status, get_pan_tilt_slow, get_pan_tilt_limit, get_pan_reverse,
+      get_tilt_reverse, get_white_balance_mode, get_red_gain, get_blue_gain, get_white_balance_speed,
+      get_exposure_mode, get_iris, get_shutter, get_gain, get_gain_limit, get_max_shutter, get_min_shutter,
+      get_ae_speed, get_exposure_compensation, get_exposure_compensation_level, get_backlight, get_spotlight,
+      get_visibility_enhancer, get_nd_filter, get_detail_level, get_noise_reduction, get_flip,
+      get_last_preset, get_preset_speed, get_tally, get_ir_receive, get_ir_cut_filter, get_menu]
+    verification: none
+    notes: >
+      Sony VISCA over IP. Pan positions are five nibbles (H800 p.17); tilt speed 01-18; ND filter and
+      pan/tilt reverse; no picture effect, image stabiliser or camera ID in this command list.
+  - id: ptzoptics
+    name: "PTZOptics (Move 4K, Link 4K, Move SE, Studio, G2/G3)"
+    supports:
+      [power, if_clear, cancel, raw_command, raw_inquiry, zoom, zoom_to, focus, focus_to, focus_mode,
+      af_sensitivity, pan_tilt, pan_tilt_stop, pan_tilt_absolute, pan_tilt_relative, pan_tilt_home,
+      pan_tilt_reset, pan_tilt_limit_set, pan_tilt_limit_clear, preset_recall, preset_set, preset_reset,
+      exposure_mode, iris, iris_direct, gain, gain_direct, gain_limit, shutter, shutter_direct, bright,
+      bright_direct, exposure_compensation, exposure_compensation_level, exposure_compensation_step,
+      backlight, white_balance_mode, white_balance_one_push, red_gain, blue_gain, red_gain_step,
+      blue_gain_step, color_temperature, detail_level, detail_step, aperture_mode, noise_reduction,
+      picture_effect, flip, mirror, freeze, menu, menu_enter, menu_back, menu_navigate, get_power,
+      get_zoom_position, get_focus_position, get_focus_mode, get_af_sensitivity, get_pan_tilt_position,
+      get_white_balance_mode, get_red_gain, get_blue_gain, get_color_temperature, get_exposure_mode,
+      get_iris, get_shutter, get_gain, get_bright, get_gain_limit, get_exposure_compensation,
+      get_exposure_compensation_level, get_backlight, get_detail_level, get_aperture_mode,
+      get_noise_reduction, get_picture_effect, get_flip, get_mirror, get_menu]
+    verification: none
+    notes: >
+      VISCA with no header on TCP 5678 by default; set transport raw-udp for UDP 1259. Absolute and
+      relative moves carry a tilt speed (VV WW); tilt speed 01-14; presets 1-128. Menu navigation by
+      pan/tilt drive at speed 0E.
+  - id: birddog
+    name: "BirdDog PTZ (X4/X5, P200/P400 and Eyes series)"
+    supports:
+      [power, cancel, raw_command, raw_inquiry, zoom, zoom_to, focus, focus_to, focus_mode, focus_one_push,
+      af_sensitivity, pan_tilt, pan_tilt_stop, pan_tilt_absolute, pan_tilt_home, pan_tilt_reset,
+      preset_recall, preset_set, preset_reset, exposure_mode, iris, iris_direct, gain, gain_direct,
+      gain_limit, shutter, shutter_direct, bright, bright_direct, exposure_compensation,
+      exposure_compensation_level, exposure_compensation_step, white_balance_mode, white_balance_one_push,
+      red_gain, blue_gain, red_gain_step, blue_gain_step, color_temperature, picture_effect, flip, mirror,
+      freeze, tally, menu, get_power, get_zoom_position, get_focus_position, get_focus_mode,
+      get_pan_tilt_position, get_white_balance_mode, get_red_gain, get_blue_gain, get_exposure_mode,
+      get_iris, get_shutter, get_gain]
+    verification: none
+    notes: >
+      Sony VISCA over IP on UDP 52381. Absolute move carries a tilt speed; tilt speed up to 14 hex;
+      presets 1-64 (X4: 00-3F).
+  - id: lumens
+    name: "Lumens VC-A series (VC-A71P and others)"
+    supports:
+      [power, cancel, raw_command, raw_inquiry, zoom, zoom_to, focus, focus_to, focus_mode, focus_one_push,
+      pan_tilt, pan_tilt_stop, pan_tilt_absolute, pan_tilt_relative, pan_tilt_home, pan_tilt_reset,
+      pan_tilt_limit_set, pan_tilt_limit_clear, preset_recall, preset_set, preset_reset, exposure_mode, iris,
+      iris_direct, gain, gain_direct, gain_limit, shutter, shutter_direct, bright, bright_direct,
+      exposure_compensation, exposure_compensation_level, exposure_compensation_step, backlight,
+      white_balance_mode, white_balance_one_push, red_gain, blue_gain, red_gain_step, blue_gain_step,
+      detail_level, detail_step, noise_reduction, picture_effect, flip, mirror, tally, ir_receive, menu,
+      get_version, get_power, get_zoom_position, get_focus_position, get_focus_mode, get_pan_tilt_position,
+      get_white_balance_mode, get_red_gain, get_blue_gain, get_exposure_mode, get_iris, get_shutter,
+      get_gain, get_flip, get_last_preset, get_tally]
+    verification: none
+    notes: >
+      Sony VISCA over IP on UDP 52381. Absolute and relative moves carry a tilt speed; tilt speed 01-18;
+      presets 1-256 (129-256 through 3F 1x).
+  - id: marshall
+    name: "Marshall CV-series PTZ (CV630-IP, CV730)"
+    supports:
+      [power, cancel, raw_command, raw_inquiry, zoom, zoom_to, focus, focus_to, focus_mode, focus_one_push,
+      pan_tilt, pan_tilt_stop, pan_tilt_absolute, pan_tilt_relative, pan_tilt_home, pan_tilt_reset,
+      pan_tilt_limit_set, pan_tilt_limit_clear, preset_recall, preset_set, preset_reset, exposure_mode, iris,
+      iris_direct, gain, gain_direct, gain_limit, shutter, shutter_direct, bright, bright_direct,
+      exposure_compensation, exposure_compensation_level, exposure_compensation_step, backlight,
+      white_balance_mode, white_balance_one_push, red_gain, blue_gain, red_gain_step, blue_gain_step,
+      detail_level, detail_step, noise_reduction, picture_effect, flip, mirror, tally, ir_receive, menu,
+      get_power, get_zoom_position, get_focus_position, get_focus_mode, get_pan_tilt_position,
+      get_white_balance_mode, get_red_gain, get_blue_gain, get_exposure_mode, get_iris, get_shutter,
+      get_gain, get_flip, get_last_preset, get_tally]
+    verification: none
+    notes: >
+      Sony VISCA over IP on UDP 52381, the same command layout as Lumens: tilt speed with absolute moves,
+      presets 1-256.
+  - id: aver
+    name: "AVer Pro-AV PTZ (PTZ3xx, PTZ2xx, TR3xx, TR5xx)"
+    supports:
+      [power, cancel, raw_command, raw_inquiry, pan_tilt, pan_tilt_stop, preset_recall, preset_set,
+      preset_reset, get_version]
+    verification: none
+    notes: >
+      Sony VISCA over IP on UDP 52381 per AVer's guide, which documents the header and a few example
+      commands only.
+  - id: canon
+    name: "Canon CR-N / CR-X remote cameras (Standard Communication (IP))"
+    supports:
+      [power, cancel, raw_command, raw_inquiry, pan_tilt, pan_tilt_stop, preset_recall, preset_set,
+      preset_reset, get_version]
+    verification: none
+    notes: >
+      Sony VISCA over IP on UDP 52381 ('Standard Communication (IP)'). By default the camera replies to
+      the controller's port 52381, so the core listens there.
+  - id: datavideo
+    name: "Datavideo PTC / BC / PTR series"
+    supports:
+      [power, cancel, raw_command, raw_inquiry, zoom, zoom_to, focus, focus_to, focus_mode, focus_one_push,
+      pan_tilt, pan_tilt_stop, pan_tilt_absolute, pan_tilt_home, pan_tilt_reset, pan_reverse, tilt_reverse,
+      preset_recall, preset_set, preset_reset, preset_speed, exposure_mode, iris, iris_direct, gain,
+      gain_direct, shutter, shutter_direct, backlight, white_balance_mode, white_balance_one_push, red_gain,
+      blue_gain, red_gain_step, blue_gain_step, flip, tally, menu, get_version, get_power, get_zoom_position,
+      get_focus_position, get_focus_mode, get_white_balance_mode, get_red_gain, get_blue_gain,
+      get_exposure_mode, get_iris, get_shutter, get_gain, get_backlight, get_last_preset, get_menu]
+    verification: none
+    notes: >
+      Datavideo's VISCA command set: five-nibble pan, speeds 01-12 hex, presets 1-128. Its document does
+      not describe an IP transport; see the quirks.
+
+commands:
+  power:
+    summary: "Power on, or to standby (CAM_Power 8x 01 04 00 0p: 2 on, 3 standby)"
+    params:
+      "on": { type: bool, default: true }
+    returns: ack
+  if_clear:
+    summary: "Clear the camera's command buffers (IF_Clear 8x 01 00 01, sent as a device setting command; answered 90 50 FF)"
+    returns: ack
+  cancel:
+    summary: "Cancel the command executing in a socket (8x 2z FF). The cancelled command fails with error 04"
+    params:
+      socket: { type: int, min: 1, max: 2, required: true }
+    returns: ack
+  camera_id:
+    summary: "Set the camera ID, 0000-FFFF (8x 01 04 22 0p 0p 0p 0p)"
+    params:
+      id: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+  raw_command:
+    summary: "Send any VISCA command, given as hex '81 01 ... FF' (3-16 bytes, FF only at the end); completes on Completion. For vendor commands not modelled here"
+    params:
+      hex: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: ack
+  raw_inquiry:
+    summary: "Send any VISCA inquiry, given as hex '81 09 ... FF'; returns the whole reply as hex"
+    params:
+      hex: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f ]+$", required: true }
+    returns: value
+  zoom:
+    summary: "Zoom tele or wide, at the standard speed or a variable speed 0 (low) - 7 (high), or stop (8x 01 04 07 ...)"
+    params:
+      action: { type: enum, values: ["tele", "wide", "stop"], required: true }
+      speed: { type: int, min: 0, max: 7 }
+    returns: ack
+  zoom_to:
+    summary: "Zoom to a position, 0000 (wide) to the model's tele end: 4000 optical on SRG-X400, 7AC0 with digital zoom (p.39); written as four nibbles (8x 01 04 47 0z 0z 0z 0z)"
+    params:
+      position: { type: int, min: 0, max: 31424, required: true }
+    returns: ack
+  zoom_mode:
+    summary: "Optical only, Clear Image Zoom or digital zoom (8x 01 04 06 0p)"
+    params:
+      mode: { type: enum, values: ["optical", "clear_image", "digital"], required: true }
+    returns: ack
+  focus:
+    summary: "Focus far or near, at the standard speed or a variable speed 0-7, or stop (8x 01 04 08 ...)"
+    params:
+      action: { type: enum, values: ["far", "near", "stop"], required: true }
+      speed: { type: int, min: 0, max: 7 }
+    returns: ack
+  focus_to:
+    summary: "Focus to a position, 1000 (far, infinity) to F000 (near) on Sony (p.39); four nibbles (8x 01 04 48)"
+    params:
+      position: { type: int, min: 0, max: 61440, required: true }
+    returns: ack
+  focus_mode:
+    summary: "Auto focus, manual focus, or toggle (8x 01 04 38 02/03/10)"
+    params:
+      mode: { type: enum, values: ["auto", "manual", "toggle"], required: true }
+    returns: ack
+  focus_one_push:
+    summary: "One-push auto focus (8x 01 04 18 01)"
+    returns: ack
+  focus_infinity:
+    summary: "Focus at infinity (8x 01 04 18 02)"
+    returns: ack
+  focus_near_limit:
+    summary: "Nearest distance auto focus will use, 1000 (infinity) to F000 (8 cm); the low byte is fixed at 00 (p.39)"
+    params:
+      position: { type: int, min: 4096, max: 61440, required: true }
+    returns: ack
+  af_mode:
+    summary: "Auto focus mode: normal, interval, or triggered by zoom (8x 01 04 57 0p)"
+    params:
+      mode: { type: enum, values: ["normal", "interval", "zoom_trigger"], required: true }
+    returns: ack
+  af_interval:
+    summary: "Interval AF timing in seconds, 0-255 each (8x 01 04 27 0p 0p 0q 0q)"
+    params:
+      operating_s: { type: int, min: 0, max: 255, required: true }
+      staying_s: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  af_sensitivity:
+    summary: "Auto focus sensitivity (8x 01 04 58 0p: 1 high on PTZOptics/BirdDog, 2 normal, 3 low)"
+    params:
+      level: { type: enum, values: ["high", "normal", "low"], required: true }
+    returns: ack
+  ir_correction:
+    summary: "Focus correction for IR light (8x 01 04 11 0p)"
+    params:
+      mode: { type: enum, values: ["standard", "ir_light"], required: true }
+    returns: ack
+  pan_tilt:
+    summary: "Drive pan and tilt in a direction until stopped. Speeds 01-18 hex; the tilt maximum differs by model (17 Sony SRG/BRC-X400, 18 BRC-H800/Lumens/Marshall, 14 PTZOptics/BirdDog, 12 Datavideo) (8x 01 06 01 vv ww 0p 0t)"
+    params:
+      pan: { type: enum, values: ["left", "right", "stop"], required: true }
+      tilt: { type: enum, values: ["up", "down", "stop"], required: true }
+      pan_speed: { type: int, min: 1, max: 24, required: true }
+      tilt_speed: { type: int, min: 1, max: 24, required: true }
+    returns: ack
+  pan_tilt_stop:
+    summary: "Stop pan/tilt drive (8x 01 06 01 vv ww 03 03)"
+    returns: ack
+  pan_tilt_absolute:
+    summary: "Move to a pan/tilt position, signed, in the camera's own units (SRG-X400: pan DE00-2200 = -170 to +170 degrees, p.37). Pan is four nibbles, or five on BRC-X1000/H800 and Datavideo. tilt_speed is used by models whose move carries one (PTZOptics, BirdDog, Lumens, Marshall) and defaults to speed (8x 01 06 02)"
+    params:
+      pan: { type: int, min: -524288, max: 524287, required: true }
+      tilt: { type: int, min: -32768, max: 32767, required: true }
+      speed: { type: int, min: 1, max: 24, required: true }
+      tilt_speed: { type: int, min: 1, max: 24 }
+    returns: ack
+  pan_tilt_relative:
+    summary: "Move by a pan/tilt offset, as pan_tilt_absolute (8x 01 06 03)"
+    params:
+      pan: { type: int, min: -524288, max: 524287, required: true }
+      tilt: { type: int, min: -32768, max: 32767, required: true }
+      speed: { type: int, min: 1, max: 24, required: true }
+      tilt_speed: { type: int, min: 1, max: 24 }
+    returns: ack
+  pan_tilt_home:
+    summary: "Move to the home position (8x 01 06 04)"
+    returns: ack
+  pan_tilt_reset:
+    summary: "Re-initialise the pan/tilt mechanism (8x 01 06 05)"
+    returns: ack
+  pan_tilt_limit_set:
+    summary: "Set the up-right or down-left pan/tilt limit (8x 01 06 07 00 0w ...)"
+    params:
+      corner: { type: enum, values: ["up_right", "down_left"], required: true }
+      pan: { type: int, min: -524288, max: 524287, required: true }
+      tilt: { type: int, min: -32768, max: 32767, required: true }
+    returns: ack
+  pan_tilt_limit_clear:
+    summary: "Clear the up-right or down-left pan/tilt limit (8x 01 06 07 01 0w 07 0F ...)"
+    params:
+      corner: { type: enum, values: ["up_right", "down_left"], required: true }
+    returns: ack
+  pan_tilt_ramp_curve:
+    summary: "Acceleration curve (8x 01 06 31 0p; SRG-X400 documents only sharpness)"
+    params:
+      curve: { type: enum, values: ["sharpness", "standard", "gentle"], required: true }
+    returns: ack
+  pan_tilt_slow:
+    summary: "Slow pan/tilt mode (8x 01 06 44 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  pan_reverse:
+    summary: "Reverse pan direction (8x 01 7E 01 06 00 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  tilt_reverse:
+    summary: "Reverse tilt direction (8x 01 7E 01 09 00 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  preset_recall:
+    summary: "Recall a preset, numbered from 1 (wire number - 1); the model's range applies (100 Sony, 128 PTZOptics/Datavideo, 64 BirdDog, 256 Lumens/Marshall) (8x 01 04 3F 02 pp)"
+    params:
+      preset: { type: int, min: 1, max: 256, required: true }
+    returns: ack
+  preset_set:
+    summary: "Store the current position and settings in a preset (8x 01 04 3F 01 pp)"
+    params:
+      preset: { type: int, min: 1, max: 256, required: true }
+    returns: ack
+  preset_reset:
+    summary: "Clear a preset (8x 01 04 3F 00 pp)"
+    params:
+      preset: { type: int, min: 1, max: 256, required: true }
+    returns: ack
+  preset_speed:
+    summary: "Recall speed for one preset, 01-19 hex on SRG-X400 (300 deg/s pan at 19, p.38), 01-18 on BRC-H800, 01-12 on Datavideo (8x 01 7E 01 0B pp qq)"
+    params:
+      preset: { type: int, min: 1, max: 128, required: true }
+      speed: { type: int, min: 1, max: 25, required: true }
+    returns: ack
+  preset_speed_mode:
+    summary: "Whether recall speed is per preset (separate), shared (common), or given with the recall (compatible) (8x 01 7E 04 1B 0p)"
+    params:
+      mode: { type: enum, values: ["compatible", "separate", "common"], required: true }
+    returns: ack
+  preset_common_speed:
+    summary: "Recall speed shared by all presets, 01-19 hex (8x 01 7E 04 1C 0p 0p)"
+    params:
+      speed: { type: int, min: 1, max: 25, required: true }
+    returns: ack
+  preset_call_mode:
+    summary: "Freeze the picture while a preset is recalled, or not (8x 01 7E 04 3B 0p)"
+    params:
+      mode: { type: enum, values: ["freeze", "normal"], required: true }
+    returns: ack
+  preset_mode:
+    summary: "BRC preset mode: MODE1 recalls positions and picture settings, MODE2 positions only, TRACE makes presets drive PTZ trace (8x 01 7E 04 3D pp)"
+    params:
+      mode: { type: enum, values: ["mode1", "mode2", "trace"], required: true }
+    returns: ack
+  exposure_mode:
+    summary: "Exposure mode (8x 01 04 39 0p: 0 full auto, 3 manual, A shutter priority, B iris priority, D bright, E gain priority). Not every model has every mode"
+    params:
+      mode: { type: enum, values: ["full_auto", "manual", "shutter_priority", "iris_priority", "bright", "gain_priority"], required: true }
+    returns: ack
+  iris:
+    summary: "Iris one step open (up), closed (down), or to default (8x 01 04 0B)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  iris_direct:
+    summary: "Iris position, in the camera's table (SRG-X400: 19 = F2.0 open ... 05 = F11, 00 closed, p.35) (8x 01 04 4B 00 00 0p 0p)"
+    params:
+      position: { type: int, min: 0, max: 25, required: true }
+    returns: ack
+  gain:
+    summary: "Gain one step up, down, or to default (8x 01 04 0C)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  gain_direct:
+    summary: "Gain position, in the camera's table (SRG-X400: 01 = 0 dB ... 11 = 48 dB, p.35) (8x 01 04 4C 00 00 0p 0p)"
+    params:
+      position: { type: int, min: 0, max: 17, required: true }
+    returns: ack
+  gain_limit:
+    summary: "Gain limit (SRG-X400: 4-D = 9-36 dB, p.36; BRC-H800: 4-9, F off) (8x 01 04 2C 0p)"
+    params:
+      limit: { type: int, min: 0, max: 15, required: true }
+    returns: ack
+  shutter:
+    summary: "Shutter one step faster (up), slower (down), or to default (8x 01 04 0A)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  shutter_direct:
+    summary: "Shutter position, in the camera's table (SRG-X400: 06 = 1/1 ... 21 = 1/10000 s, by frame rate, p.34) (8x 01 04 4A 00 00 0p 0p)"
+    params:
+      position: { type: int, min: 0, max: 33, required: true }
+    returns: ack
+  max_shutter:
+    summary: "Fastest shutter auto exposure may use, in the shutter table (8x 01 05 2A 00 0p 0p)"
+    params:
+      position: { type: int, min: 0, max: 33, required: true }
+    returns: ack
+  min_shutter:
+    summary: "Slowest shutter auto exposure may use, in the shutter table (8x 01 05 2A 01 0p 0p)"
+    params:
+      position: { type: int, min: 0, max: 33, required: true }
+    returns: ack
+  auto_slow_shutter:
+    summary: "Auto slow shutter (8x 01 04 5A 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  ae_speed:
+    summary: "Auto exposure response speed, 01-30 hex (8x 01 04 5D pp)"
+    params:
+      speed: { type: int, min: 1, max: 48, required: true }
+    returns: ack
+  bright:
+    summary: "Bright (exposure level in bright mode) one step up, down, or to default (8x 01 04 0D)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  bright_direct:
+    summary: "Bright position (8x 01 04 4D 00 00 0p 0q; BirdDog X4 0-17 hex)"
+    params:
+      position: { type: int, min: 0, max: 31, required: true }
+    returns: ack
+  exposure_compensation:
+    summary: "Exposure compensation on or off (8x 01 04 3E 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  exposure_compensation_level:
+    summary: "Exposure compensation level, 00 (-7, -10.5 dB) to 0E (+7, +10.5 dB), 07 = 0 (p.36) (8x 01 04 4E 00 00 0p 0p)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    returns: ack
+  exposure_compensation_step:
+    summary: "Exposure compensation one step up, down, or to 0 (8x 01 04 0E)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  backlight:
+    summary: "Backlight compensation (8x 01 04 33 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  spotlight:
+    summary: "Spotlight compensation (8x 01 04 3A 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  high_sensitivity:
+    summary: "High sensitivity mode, which moves the gain and gain-limit tables up 12 dB (8x 01 04 5E 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  visibility_enhancer:
+    summary: "Visibility enhancer (8x 01 04 3D 06 on / 03 off)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  nd_filter:
+    summary: "ND filter: off, 1/4, 1/16, 1/64 (8x 01 7E 01 53 0p, BRC-X1000/H800)"
+    params:
+      filter: { type: enum, values: ["off", "nd4", "nd16", "nd64"], required: true }
+    returns: ack
+  white_balance_mode:
+    summary: "White balance mode (8x 01 04 35 pp: 00 auto, 01 indoor, 02 outdoor, 03 one push, 04 auto2/ATW, 05 manual, 20 colour temperature on PTZOptics/BirdDog)"
+    params:
+      mode: { type: enum, values: ["auto", "indoor", "outdoor", "one_push", "auto2", "manual", "color_temperature"], required: true }
+    returns: ack
+  white_balance_one_push:
+    summary: "Trigger one-push white balance (8x 01 04 10 05)"
+    returns: ack
+  red_gain:
+    summary: "Red gain, 00 (-128) - 80 (0) - FF (+127) on Sony (8x 01 04 43 00 00 0p 0p)"
+    params:
+      gain: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  blue_gain:
+    summary: "Blue gain, 00 (-128) - 80 (0) - FF (+127) on Sony (8x 01 04 44 00 00 0p 0p)"
+    params:
+      gain: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  red_gain_step:
+    summary: "Red gain one step up, down, or to default (8x 01 04 03)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  blue_gain_step:
+    summary: "Blue gain one step up, down, or to default (8x 01 04 04)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  white_balance_speed:
+    summary: "Auto white balance speed, 1 (slow) - 5 (fast) (8x 01 04 56 0p)"
+    params:
+      speed: { type: int, min: 1, max: 5, required: true }
+    returns: ack
+  color_temperature:
+    summary: "Colour temperature, 00 = 2500 K to 37 = 8000 K in 100 K steps (PTZOptics p.7, BirdDog X4) (8x 01 04 20 0p 0q)"
+    params:
+      position: { type: int, min: 0, max: 55, required: true }
+    returns: ack
+  detail_level:
+    summary: "Detail (aperture/sharpness) level, 00-0F (8x 01 04 42 00 00 0p 0p)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    returns: ack
+  detail_step:
+    summary: "Detail (aperture) one step up, down, or to default (8x 01 04 02)"
+    params:
+      action: { type: enum, values: ["up", "down", "reset"], required: true }
+    returns: ack
+  aperture_mode:
+    summary: "Sharpness auto or manual (8x 01 04 05 02/03, PTZOptics)"
+    params:
+      mode: { type: enum, values: ["auto", "manual"], required: true }
+    returns: ack
+  noise_reduction:
+    summary: "Noise reduction level, 00 off, 01 weak - 05 strong (8x 01 04 53 pp)"
+    params:
+      level: { type: int, min: 0, max: 5, required: true }
+    returns: ack
+  picture_effect:
+    summary: "Picture effect (8x 01 04 63 0p: 0 off, 2 negative, 4 black and white; Sony SRG-X400 has off and B&W only)"
+    params:
+      effect: { type: enum, values: ["off", "negative", "black_white"], required: true }
+    returns: ack
+  flip:
+    summary: "Image flip, vertical (8x 01 04 66 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  mirror:
+    summary: "Image mirror, horizontal (8x 01 04 61 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  image_stabilizer:
+    summary: "Image stabiliser (8x 01 04 34 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  freeze:
+    summary: "Freeze the picture (8x 01 04 62 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  tally:
+    summary: "Tally lamp on or off (8x 01 7E 01 0A 00 0p). Over Sony VISCA over IP the core repeats ON every 10 s while on"
+    params:
+      "on": { type: bool, default: true }
+    returns: ack
+  tally_level:
+    summary: "Tally lamp brightness: off, low, high (8x 01 7E 01 0A 01 0p: 0, 4, 5)"
+    params:
+      level: { type: enum, values: ["off", "low", "high"], required: true }
+    returns: ack
+  ir_receive:
+    summary: "Accept the IR remote, or not, or toggle (8x 01 06 08 pp)"
+    params:
+      mode: { type: enum, values: ["on", "off", "toggle"], required: true }
+    returns: ack
+  ir_cut_filter:
+    summary: "IR cut filter out (night) or in (day) (8x 01 04 01 0p)"
+    params:
+      night: { type: bool, default: true }
+    returns: ack
+  auto_icr:
+    summary: "Automatic day/night switching (8x 01 04 51 0p)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  menu:
+    summary: "Open, close or toggle the on-screen menu (8x 01 06 06 pp)"
+    params:
+      mode: { type: enum, values: ["on", "off", "toggle"], required: true }
+    returns: ack
+  menu_enter:
+    summary: "Select the highlighted menu item (Sony 8x 01 7E 01 02 00 01; PTZOptics 8x 01 06 06 05)"
+    returns: ack
+  menu_back:
+    summary: "Go back one menu level (8x 01 06 06 04, PTZOptics)"
+    returns: ack
+  menu_navigate:
+    summary: "Move the menu cursor (pan/tilt drive at speed 0E, PTZOptics p.23)"
+    params:
+      direction: { type: enum, values: ["up", "down", "left", "right"], required: true }
+    returns: ack
+  get_version:
+    summary: "Vendor ID, model ID, ROM revision and socket count (CAM_VersionInq 8x 09 00 02)"
+    returns: value
+  get_power:
+    summary: "'on', 'standby' or 'power_error' (8x 09 04 00)"
+    returns: value
+  get_zoom_position:
+    summary: "Zoom position (8x 09 04 47)"
+    returns: value
+  get_zoom_mode:
+    summary: "'optical', 'clear_image' or 'digital' (8x 09 04 06)"
+    returns: value
+  get_focus_position:
+    summary: "Focus position (8x 09 04 48)"
+    returns: value
+  get_focus_mode:
+    summary: "'auto' or 'manual' (8x 09 04 38)"
+    returns: value
+  get_af_sensitivity:
+    summary: "'high', 'normal' or 'low' (8x 09 04 58)"
+    returns: value
+  get_af_mode:
+    summary: "'normal', 'interval' or 'zoom_trigger' (8x 09 04 57)"
+    returns: value
+  get_focus_near_limit:
+    summary: "Focus near limit (8x 09 04 28)"
+    returns: value
+  get_pan_tilt_position:
+    summary: "{pan, tilt}, signed, in the camera's units (8x 09 06 12)"
+    returns: value
+  get_pan_tilt_status:
+    summary: "{code, motion, initialization} from the pan/tilt status code (8x 09 06 10, p.39)"
+    returns: value
+  get_pan_tilt_max_speed:
+    summary: "{pan, tilt} maximum drive speeds (8x 09 06 11)"
+    returns: value
+  get_pan_tilt_slow:
+    summary: "Pan/tilt slow mode (8x 09 06 44)"
+    returns: value
+  get_pan_tilt_limit:
+    summary: "{pan, tilt} of one corner's limit (8x 09 06 07 0q)"
+    params:
+      corner: { type: enum, values: ["up_right", "down_left"], required: true }
+    returns: value
+  get_pan_reverse:
+    summary: "Pan reversed (8x 09 7E 01 06)"
+    returns: value
+  get_tilt_reverse:
+    summary: "Tilt reversed (8x 09 7E 01 09)"
+    returns: value
+  get_white_balance_mode:
+    summary: "White balance mode (8x 09 04 35)"
+    returns: value
+  get_red_gain:
+    summary: "Red gain 0-255 (8x 09 04 43)"
+    returns: value
+  get_blue_gain:
+    summary: "Blue gain 0-255 (8x 09 04 44)"
+    returns: value
+  get_white_balance_speed:
+    summary: "Auto white balance speed (8x 09 04 56)"
+    returns: value
+  get_color_temperature:
+    summary: "Colour temperature position, 00-37 (8x 09 04 20)"
+    returns: value
+  get_exposure_mode:
+    summary: "Exposure mode (8x 09 04 39)"
+    returns: value
+  get_iris:
+    summary: "Iris position (8x 09 04 4B)"
+    returns: value
+  get_shutter:
+    summary: "Shutter position (8x 09 04 4A)"
+    returns: value
+  get_gain:
+    summary: "Gain position (8x 09 04 4C)"
+    returns: value
+  get_bright:
+    summary: "Bright position (8x 09 04 4D)"
+    returns: value
+  get_gain_limit:
+    summary: "Gain limit (8x 09 04 2C)"
+    returns: value
+  get_max_shutter:
+    summary: "Fastest auto shutter (8x 09 05 2A 00)"
+    returns: value
+  get_min_shutter:
+    summary: "Slowest auto shutter (8x 09 05 2A 01)"
+    returns: value
+  get_ae_speed:
+    summary: "Auto exposure speed (8x 09 04 5D)"
+    returns: value
+  get_auto_slow_shutter:
+    summary: "Auto slow shutter (8x 09 04 5A)"
+    returns: value
+  get_exposure_compensation:
+    summary: "Exposure compensation on (8x 09 04 3E)"
+    returns: value
+  get_exposure_compensation_level:
+    summary: "Exposure compensation level 00-0E (8x 09 04 4E)"
+    returns: value
+  get_backlight:
+    summary: "Backlight compensation on (8x 09 04 33)"
+    returns: value
+  get_spotlight:
+    summary: "Spotlight compensation on (8x 09 04 3A)"
+    returns: value
+  get_high_sensitivity:
+    summary: "High sensitivity on (8x 09 04 5E)"
+    returns: value
+  get_visibility_enhancer:
+    summary: "Visibility enhancer on (8x 09 04 3D)"
+    returns: value
+  get_nd_filter:
+    summary: "ND filter (8x 09 7E 01 53)"
+    returns: value
+  get_detail_level:
+    summary: "Detail level (8x 09 04 42)"
+    returns: value
+  get_aperture_mode:
+    summary: "Sharpness 'auto' or 'manual' (8x 09 04 05)"
+    returns: value
+  get_noise_reduction:
+    summary: "Noise reduction level (8x 09 04 53)"
+    returns: value
+  get_picture_effect:
+    summary: "Picture effect (8x 09 04 63)"
+    returns: value
+  get_flip:
+    summary: "Image flip on (8x 09 04 66)"
+    returns: value
+  get_mirror:
+    summary: "Image mirror on (8x 09 04 61)"
+    returns: value
+  get_image_stabilizer:
+    summary: "Image stabiliser on (8x 09 04 34)"
+    returns: value
+  get_freeze:
+    summary: "Picture frozen (8x 09 04 62)"
+    returns: value
+  get_last_preset:
+    summary: "Preset last recalled, from 1, or null (8x 09 04 3F; 7F = none)"
+    returns: value
+  get_preset_speed:
+    summary: "One preset's recall speed (8x 09 7E 01 0B pp)"
+    params:
+      preset: { type: int, min: 1, max: 128, required: true }
+    returns: value
+  get_preset_speed_mode:
+    summary: "Preset speed mode (8x 09 7E 04 1B)"
+    returns: value
+  get_preset_common_speed:
+    summary: "Common preset speed (8x 09 7E 04 1C)"
+    returns: value
+  get_tally:
+    summary: "Tally lamp on (8x 09 7E 01 0A)"
+    returns: value
+  get_ir_receive:
+    summary: "IR remote accepted (8x 09 06 08)"
+    returns: value
+  get_ir_cut_filter:
+    summary: "IR cut filter out, night (8x 09 04 01)"
+    returns: value
+  get_menu:
+    summary: "Menu open (8x 09 06 06)"
+    returns: value
+  get_camera_id:
+    summary: "Camera ID (8x 09 04 22)"
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      VISCA pushes nothing. The core polls zoom, focus and pan/tilt positions and the pan/tilt status
+      every poll_position_ms (500 ms by default) and the settings in the state every poll_settings_ms (5
+      s); an inquiry the camera answers with a syntax error is not polled again in that session. Every set
+      command is followed by the matching inquiry.
+  - models: [all]
+    severity: info
+    text: >
+      A command completes on its Completion (90 5z FF), not on its ACK, so a preset recall or absolute
+      move completes when the move ends. One message at a time awaits its first reply, as Sony requires
+      (p.5, p.12); while both command sockets are busy further commands wait but inquiries still go, and
+      'command buffer full' (90 60 03) is retried every 100 ms, up to 20 times. Errors map to device_error
+      with the VISCA code: 01 message length, 02 syntax, 03 buffer full, 04 cancelled, 05 no socket, 41
+      not executable.
+  - models: [sony-visca-ip, sony-brc-x1000, birddog, lumens, marshall, aver, canon, datavideo]
+    severity: info
+    text: >
+      Sony VISCA over IP: the core sends RESET (control command 01) on connecting and reports connected on
+      its ACK. Sony says RESET sets the sequence number to 0 but not whether the next message must carry 0
+      or 1; the core sends 1 next, and if the camera answers ERROR 0F 01 to a message that was not a
+      retransmission it sends RESET and the message once more. On a reply timeout the message is sent
+      again with the same sequence number; ERROR 0F 01 to that copy means the first was performed (p.12),
+      and a command is then reported done.
+  - models: [sony-visca-ip, sony-brc-x1000]
+    severity: warning
+    text: >
+      Sony turns the tally lamp off when no controller has sent tally ON for 15 seconds over VISCA over IP
+      (p.13). The core repeats ON every 10 s while it is on, so turning tally off from another controller
+      is overridden until this session sends tally off.
+  - models: [all]
+    severity: warning
+    text: >
+      Positions, iris, shutter, gain and similar values are the camera's own codes, not degrees, f-stops
+      or dB: the tables differ by model (SRG-X400 p.34-39, BRC-H800 p.29-31, PTZOptics and BirdDog give
+      ranges only). Ranges in this spec are the widest any document gives; a model's own range is checked
+      where the document states it (pan/tilt speeds, preset numbers and preset speeds) and otherwise the
+      camera answers a syntax error.
+  - models: [sony-visca-ip]
+    severity: info
+    text: >
+      Preset numbers and preset speeds in Sony's lists are hexadecimal: presets 00-63 hex are 1-100, and
+      the preset speed 01-19 hex is 25 steps, 19 being 300 deg/s pan (p.21, p.38). The SRG-X400/X120 list
+      marks the matrix, gamma, knee, colour bar, overlay name, tally and H phase commands as BRC-X400/X401
+      only.
+  - models: [sony-visca-ip, sony-brc-x1000]
+    severity: info
+    text: >
+      Sony's list describes the device setting command payload type as 0x0120 and the control
+      command/reply as 0x0200/0x0201 (p.11), which is what the core sends.
+  - models: [sony-visca-ip, sony-brc-x1000]
+    severity: warning
+    text: >
+      Sony: do not send commands other than Address Set, IF_Clear, Cancel and power while the camera's
+      menu is displayed (p.7); close it with menu off first. To cancel a pan/tilt drive, wait 200 ms after
+      starting it, and wait 200 ms after 'command cancelled' before driving again (p.6).
+  - models: [sony-brc-x1000]
+    severity: info
+    text: >
+      BRC-X1000/H800 positions: pan is five nibbles, 10 degrees = 00937 to the left and FF6C9 to the right
+      (H800 p.31), so left is positive; the SRG-X400 list gives DE00-2200 for -170 to +170 degrees without
+      naming the direction (p.37). The core reads the pan width from each reply's length.
+  - models: [ptzoptics]
+    severity: warning
+    text: >
+      PTZOptics documents 'IP VISCA: TCP/IP-encapsulated VISCA' on TCP 5678 and UDP 1259 (HTTP API p.165,
+      p.167) but not whether UDP 1259 carries Sony's 8-byte header. The core sends no header on either
+      (transport raw-tcp, the default, or raw-udp); a camera that expects the header on UDP needs
+      transport sony-ip and its port. Without sequence numbers, a command on UDP whose reply is lost is
+      reported as a timeout rather than resent.
+  - models: [ptzoptics]
+    severity: warning
+    text: >
+      The 2026 PTZOptics VISCA API has entries that contradict the VISCA set and its own 2022 list:
+      shutter up/down and direct are printed with the iris codes 0B/4B, gain direct as 0C, bright direct
+      as 0D, DRC as a pan/tilt drive, FocusAFModeInq as 81 09 04 48 and FocusPosInq as 81 09 04 35, and
+      the picture-effect inquiry lists 02 as off. The core uses the codes the 2022 list and Sony agree on
+      (0A/4A shutter, 4C gain, 4D bright, 04 38 focus mode, 04 48 focus position).
+  - models: [ptzoptics]
+    severity: warning
+    text: >
+      On PTZOptics, recalling preset 96 (wire 5F) opens or closes the OSD menu (p.23). PTZOptics tally (81
+      0A 02 02 0p), NDI mode, RTMP and other vendor commands are reachable with raw_command.
+  - models: [birddog]
+    severity: info
+    text: >
+      BirdDog writes the sequence number range as 0-0xFFFF; the core uses the full 32 bits Sony defines.
+      BirdDog P400 white balance uses 04 for ATW and 05/06 for manual 1/2, so 'auto2' is ATW and the
+      P400's manual 2 needs raw_command.
+  - models: [lumens, marshall]
+    severity: info
+    text: >
+      Lumens and Marshall number presets 0-127 with 3F 00/01/02 and 128-255 with 3F 10/11/12; preset 1
+      here is wire 00, which Lumens says is preset 1 on the web page and remote (Lumens p.15).
+  - models: [aver]
+    severity: warning
+    text: >
+      AVer's guide documents only the transport and a few example messages. Absolute positions, limits and
+      the full command set are not documented, so only drive, presets and power are listed; raw_command
+      reaches the rest. AVer's example for preset 32 uses wire 20 hex, which suggests AVer numbers presets
+      from 0; preset n here is wire n-1. PTZ310/330 firmware before 0.70 needs stop sent with sequence
+      number 3 (p.2).
+  - models: [aver]
+    severity: info
+    text: >
+      AVer cameras can map functions (tracking on, presenter switch and so on) onto preset numbers ('VISCA
+      Customized Function'); a mapped preset then runs the function instead of recalling a position (AVer
+      guide p.4-6).
+  - models: [canon]
+    severity: warning
+    text: >
+      Canon's 'Standard Communication (IP)' must be enabled on the camera. With the default 'Response Port
+      Number: Specified Port Number (52381)' replies go to the controller's UDP 52381, so the core binds
+      52381 locally (shared with other Canon sessions); set fixed_reply_port false if the camera is set to
+      reply to the source port. Canon's guide gives no command list, so only drive, presets and power are
+      listed; raw_command reaches the rest.
+  - models: [datavideo]
+    severity: critical
+    text: >
+      Datavideo's protocol document covers RS-232/RS-422 only and gives no IP framing or port. The core
+      defaults to Sony VISCA over IP on 52381; set transport and the port to what the camera's network
+      settings show. Datavideo has no pan/tilt position inquiry, so pan/tilt is not polled successfully.
+  - models: [all]
+    severity: info
+    text: >
+      Panasonic AW cameras are not in this spec: Panasonic's own documents describe only its AW protocol
+      (panasonic-ptz). A Panasonic or other camera that does speak Sony VISCA over IP can use the sony-
+      visca-ip model.
+
+state:
+  power: { type: string, description: "'on', 'standby' or 'power_error'" }
+  zoom.position: { type: int, description: "Zoom position, camera units (0000 wide)" }
+  zoom.mode: { type: string, description: "'optical', 'clear_image' or 'digital'" }
+  focus.position: { type: int, description: "Focus position, camera units" }
+  focus.mode: { type: string, description: "'auto' or 'manual'" }
+  focus.af_sensitivity: { type: string, description: "'high', 'normal' or 'low'" }
+  focus.af_mode: { type: string, description: "'normal', 'interval' or 'zoom_trigger'" }
+  focus.near_limit: { type: int, description: "Focus near limit, camera units" }
+  pan_tilt.pan: { type: int, description: "Pan position, signed camera units" }
+  pan_tilt.tilt: { type: int, description: "Tilt position, signed camera units" }
+  pan_tilt.status.code: { type: int, description: "Raw pan/tilt status code (Sony p.39)" }
+  pan_tilt.status.motion: { type: string, description: "'idle', 'moving', 'complete' or 'failed'" }
+  pan_tilt.status.initialization: { type: string, description: "'not_initialized', 'initializing', 'initialized' or 'failed'" }
+  pan_tilt.max_speed.pan: { type: int, description: "Maximum pan drive speed" }
+  pan_tilt.max_speed.tilt: { type: int, description: "Maximum tilt drive speed" }
+  pan_tilt.slow: { type: bool, description: "Pan/tilt slow mode" }
+  pan_tilt.pan_reverse: { type: bool, description: "Pan reversed" }
+  pan_tilt.tilt_reverse: { type: bool, description: "Tilt reversed" }
+  white_balance.mode: { type: string, description: "'auto', 'indoor', 'outdoor', 'one_push', 'auto2', 'manual' or 'color_temperature'" }
+  white_balance.red_gain: { type: int, description: "Red gain, 0-255 (128 = 0 on Sony)" }
+  white_balance.blue_gain: { type: int, description: "Blue gain, 0-255 (128 = 0 on Sony)" }
+  white_balance.speed: { type: int, description: "Auto white balance speed, 1-5" }
+  white_balance.color_temperature: { type: int, description: "Colour temperature position, 0 = 2500 K, 100 K per step" }
+  exposure.mode: { type: string, description: "'full_auto', 'manual', 'shutter_priority', 'iris_priority', 'bright' or 'gain_priority'" }
+  exposure.iris: { type: int, description: "Iris position, camera table" }
+  exposure.shutter: { type: int, description: "Shutter position, camera table" }
+  exposure.gain: { type: int, description: "Gain position, camera table" }
+  exposure.bright: { type: int, description: "Bright position" }
+  exposure.gain_limit: { type: int, description: "Gain limit, camera table" }
+  exposure.max_shutter: { type: int, description: "Fastest auto shutter, camera table" }
+  exposure.min_shutter: { type: int, description: "Slowest auto shutter, camera table" }
+  exposure.ae_speed: { type: int, description: "Auto exposure speed, 1-48" }
+  exposure.auto_slow_shutter: { type: bool, description: "Auto slow shutter on" }
+  exposure.compensation.enabled: { type: bool, description: "Exposure compensation on" }
+  exposure.compensation.level: { type: int, description: "Exposure compensation level, 0-14 (7 = 0)" }
+  exposure.backlight: { type: bool, description: "Backlight compensation on" }
+  exposure.spotlight: { type: bool, description: "Spotlight compensation on" }
+  exposure.high_sensitivity: { type: bool, description: "High sensitivity mode on" }
+  exposure.visibility_enhancer: { type: bool, description: "Visibility enhancer on" }
+  exposure.nd_filter: { type: string, description: "'off', 'nd4', 'nd16' or 'nd64'" }
+  image.detail_level: { type: int, description: "Detail level, 0-15" }
+  image.aperture_mode: { type: string, description: "Sharpness 'auto' or 'manual'" }
+  image.noise_reduction: { type: int, description: "Noise reduction level (0 off; 7F on Sony means 2D/3D set separately)" }
+  image.picture_effect: { type: string, description: "'off', 'negative' or 'black_white'" }
+  image.flip: { type: bool, description: "Image flipped vertically" }
+  image.mirror: { type: bool, description: "Image mirrored horizontally" }
+  image.stabilizer: { type: bool, description: "Image stabiliser on" }
+  image.freeze: { type: bool, description: "Picture frozen" }
+  presets.last_recalled: { type: int, description: "Preset last recalled, from 1; null when none" }
+  presets.speed_mode: { type: string, description: "'compatible', 'separate' or 'common'" }
+  presets.common_speed: { type: int, description: "Recall speed shared by all presets" }
+  tally.on: { type: bool, description: "Tally lamp on" }
+  ir.receive: { type: bool, description: "IR remote accepted" }
+  ir.cut_filter_night: { type: bool, description: "IR cut filter out (night)" }
+  menu.open: { type: bool, description: "On-screen menu displayed" }
+  device.vendor_id: { type: int, description: "VISCA vendor ID (0001 = Sony)" }
+  device.model_id: { type: int, description: "VISCA model ID (Sony: 0617 SRG-X400, 0618 SRG-X120, 051C BRC-X400, p.6)" }
+  device.rom_version: { type: int, description: "ROM revision" }
+  device.sockets: { type: int, description: "Command sockets" }
+  device.camera_id: { type: int, description: "Camera ID" }

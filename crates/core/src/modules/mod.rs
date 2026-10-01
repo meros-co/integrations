@@ -9,6 +9,7 @@ mod sennheiser_ewdx;
 mod sennheiser_mcp;
 mod shure;
 mod tsl;
+mod visca;
 mod vmix;
 mod vmix_functions;
 
@@ -50,6 +51,7 @@ pub(crate) fn construct(
             None => Err("TSL UMD has no standard port: give the display's port".into()),
         },
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
+        "visca" => Ok(Box::new(visca::Visca::new(context))),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         other => Err(format!("no native module for '{other}'")),
     }
