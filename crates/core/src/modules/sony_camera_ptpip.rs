@@ -9,9 +9,10 @@
 /// The PTP-IP protocol version an initiator announces: 1.0.
 pub(crate) const PROTOCOL_VERSION: u32 = 0x0001_0000;
 
-/// A packet larger than this is treated as a broken stream. The largest
-/// thing this module asks for is the property dataset, well under 1 MiB.
-const MAX_PACKET: usize = 16 * 1024 * 1024;
+/// A packet larger than this is treated as a broken stream. Downloads ask
+/// for 4 MiB at a time, but a captured image comes in one GetObject whose
+/// data a camera may send as a single packet the size of a RAW file.
+const MAX_PACKET: usize = 256 * 1024 * 1024;
 
 const INIT_COMMAND_REQUEST: u32 = 1;
 const INIT_COMMAND_ACK: u32 = 2;

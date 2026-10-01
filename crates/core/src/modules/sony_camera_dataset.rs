@@ -291,6 +291,8 @@ pub(crate) fn parse_ext_device_info(bytes: &[u8]) -> Result<ExtDeviceInfo, Strin
 /// The identifying strings of the standard DeviceInfo dataset.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct DeviceInfo {
+    /// The operation codes the camera supports.
+    pub operations: Vec<u16>,
     pub manufacturer: String,
     pub model: String,
     pub version: String,
@@ -304,11 +306,13 @@ pub(crate) fn parse_device_info(bytes: &[u8]) -> Result<DeviceInfo, String> {
     r.u16()?; // vendor extension version
     r.string()?; // vendor extension description
     r.u16()?; // functional mode
-    for _ in 0..5 {
-        // operations, events, properties, capture formats, image formats
+    let operations = r.u16_array()?;
+    for _ in 0..4 {
+        // events, properties, capture formats, image formats
         r.u16_array()?;
     }
     Ok(DeviceInfo {
+        operations,
         manufacturer: r.string()?,
         model: r.string()?,
         version: r.string()?,
@@ -536,13 +540,23 @@ pub(crate) mod build {
         version: &str,
         serial: &str,
     ) -> Vec<u8> {
+        device_info_with(&[0x1001, 0x1002], manufacturer, model, version, serial)
+    }
+
+    pub(crate) fn device_info_with(
+        operations: &[u16],
+        manufacturer: &str,
+        model: &str,
+        version: &str,
+        serial: &str,
+    ) -> Vec<u8> {
         let mut b = Vec::new();
         b.extend_from_slice(&100u16.to_le_bytes());
         b.extend_from_slice(&0x11u32.to_le_bytes());
         b.extend_from_slice(&100u16.to_le_bytes());
         write_string(&mut b, "");
         b.extend_from_slice(&0u16.to_le_bytes());
-        for list in [&[0x1001u16, 0x1002][..], &[], &[], &[], &[]] {
+        for list in [operations, &[][..], &[][..], &[][..], &[][..]] {
             b.extend_from_slice(&(list.len() as u32).to_le_bytes());
             for c in list {
                 b.extend_from_slice(&c.to_le_bytes());

@@ -1,20 +1,35 @@
 //! Sony Alpha, FX, ZV, cinema line and pan/tilt cameras over Sony's Camera
-//! Control PTP 3, carried by PTP-IP on TCP 15740.
+//! Control PTP 3, and the earlier bodies over Camera Control PTP 2, carried by
+//! PTP-IP on TCP 15740.
 //!
-//! The session, as Sony's Camera Control PTP 3 Reference (2.02.00) lays it
-//! out: a PTP-IP command connection opened with Init Command Request (this
-//! initiator's GUID and friendly name), an event connection opened with Init
-//! Event Request (the connection number the camera gave), OpenSession, then
-//! Sony's handshake (SDIO_Connect phases 1 and 2, SDIO_GetExtDeviceInfo until
-//! it returns data, SDIO_Connect phase 3). After that the camera's whole
-//! property set is read with SDIO_GetAllExtDevicePropInfo, and read again,
-//! changes only, when the camera signals a change and on a steady poll, which
-//! the reference recommends because events alone are not guaranteed. Writes
-//! are SDIO_SetExtDevicePropValue and SDIO_ControlDevice; pan/tilt cameras add
+//! The session, as Sony's Camera Control PTP 3 and PTP 2 References
+//! (Camera Remote Command 2.02.00) lay it out: a PTP-IP command connection
+//! opened with Init Command Request (this initiator's GUID and friendly name),
+//! an event connection opened with Init Event Request (the connection number
+//! the camera gave), OpenSession (or SDIO_OpenSession with a function mode),
+//! then Sony's handshake (SDIO_Connect phases 1 and 2, SDIO_GetExtDeviceInfo
+//! until it returns data, SDIO_Connect phase 3). After that the camera's whole
+//! property set is read with SDIO_GetAllExtDevicePropInfo, and read again when
+//! the camera signals a change and on a steady poll, which the references
+//! recommend because events alone are not guaranteed. PTP 3 reads only what
+//! changed; PTP 2 has no such option and reads everything. Writes are
+//! SDIO_SetExtDevicePropValue and SDIO_ControlDevice; pan/tilt cameras add
 //! SDIO_ControlPTZF and SDIO_SetPresetPTZF.
+//!
+//! The two protocols share the transport, the handshake and the property
+//! dataset; they differ in the version announced (3.00 or 2.00), in the
+//! option parameters PTP 3 adds, and in the property set. Where PTP 2 only
+//! reports a value (iris, shutter speed, ISO, exposure and flash
+//! compensation), it is changed by steps through a control of the same code,
+//! and the module converts a target value into those steps.
 //!
 //! PTP allows one transaction at a time on the command connection, so every
 //! operation goes through one queue: commands first, then background reads.
+//! Live view frames, content lists and downloads, and FTP settings are
+//! operations on that queue too. Downloads stream into a file on the host as
+//! the data arrives. Pan/tilt cameras serve live view, and video-only cameras
+//! their clips, over HTTP on the camera's own localhost; the module opens
+//! those through the SSH tunnel and speaks HTTP itself.
 //!
 //! A camera with pairing enabled shows the friendly name and waits for the
 //! operator to approve it before answering Init Command Request. The module
@@ -27,21 +42,25 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, SocketAddr};
 
+use base64::Engine as _;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
+use super::sony_camera_content as content;
 use super::sony_camera_dataset::{
     self as ds, dt, parse_device_info, parse_ext_device_info, parse_prop_info_array, Enabled, Form,
     PropInfo, PtpValue,
 };
+use super::sony_camera_ftp as ftp;
+use super::sony_camera_http::{parse_url, HttpEvent, HttpReader, Url};
 use super::sony_camera_props::{self as props, Decode};
 use super::sony_camera_ptpip::{
     request_with_data, DataPhase, FailReason, Framer, Packet, PROTOCOL_VERSION,
 };
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    SshTunnel, TcpInput,
+    CommandError, CommandId, Connection, Cx, FileInput, Key, Level, Millis, Module, OpenContext,
+    Outcome, SshTunnel, TcpInput,
 };
 
 const PTP_IP_PORT: u16 = 15740;
@@ -49,6 +68,10 @@ const SSH_PORT: u16 = 22;
 
 const CMD: Key = "command";
 const EVT: Key = "event";
+/// The HTTP stream to a pan/tilt camera's live view or a video-only
+/// camera's MediaProfile, through the SSH tunnel.
+const HTTP: Key = "http";
+const FILE: Key = "download";
 
 const REPLY: Key = "reply";
 const INIT: Key = "init";
@@ -56,9 +79,11 @@ const RETRY: Key = "retry";
 const POLL: Key = "poll";
 const PAUSE: Key = "pause";
 const EXT_RETRY: Key = "ext-info-retry";
+const HTTP_TIMEOUT: Key = "http-timeout";
 
 const INIT_TIMEOUT: Millis = 10_000;
 const REPLY_TIMEOUT: Millis = 10_000;
+const HTTP_TIMEOUT_MS: Millis = 15_000;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 /// SDIO_GetExtDeviceInfo returns no data until the camera is ready; the
@@ -67,24 +92,52 @@ const EXT_INFO_RETRY: Millis = 500;
 const EXT_INFO_ATTEMPTS: u32 = 40;
 /// Between the down and up halves of a momentary button press.
 const PRESS: Millis = 100;
+/// Live view: at most 30 frames a second, and a frame asked for too soon
+/// comes back empty and is asked for again.
+const LIVE_VIEW_RETRY: Millis = 40;
+const LIVE_VIEW_ATTEMPTS: u32 = 15;
+/// Bytes asked for per partial read when downloading.
+const CHUNK: u32 = 4 * 1024 * 1024;
+/// A MediaProfile larger than this is not a MediaProfile.
+const MAX_PROFILE: usize = 16 * 1024 * 1024;
 
 const OP_GET_DEVICE_INFO: u16 = 0x1001;
 const OP_OPEN_SESSION: u16 = 0x1002;
 const OP_CLOSE_SESSION: u16 = 0x1003;
+const OP_GET_OBJECT_HANDLES: u16 = 0x1007;
+const OP_GET_OBJECT_INFO: u16 = 0x1008;
+const OP_GET_OBJECT: u16 = 0x1009;
 const OP_CONNECT: u16 = 0x9201;
 const OP_EXT_DEVICE_INFO: u16 = 0x9202;
 const OP_SET_PROPERTY: u16 = 0x9205;
 const OP_CONTROL: u16 = 0x9207;
 const OP_GET_ALL_PROPERTIES: u16 = 0x9209;
+const OP_SDIO_OPEN_SESSION: u16 = 0x9210;
+const OP_GET_PARTIAL_LARGE_OBJECT: u16 = 0x9211;
+const OP_SET_CONTENTS_TRANSFER_MODE: u16 = 0x9212;
+const OP_GET_FTP_JOB_LIST: u16 = 0x9217;
+const OP_CONTROL_FTP_JOB_LIST: u16 = 0x9218;
+const OP_GET_FTP_SETTING_LIST: u16 = 0x921F;
+const OP_SET_FTP_SETTING_LIST: u16 = 0x9220;
+const OP_GET_DISPLAY_FTP_RESULT: u16 = 0x9233;
+const OP_GET_CONTENT_INFO_LIST: u16 = 0x923C;
+const OP_GET_CONTENT_DATA: u16 = 0x923D;
+const OP_GET_CONTENT_COMPRESSED_DATA: u16 = 0x923E;
 const OP_CONTROL_PTZF: u16 = 0x9245;
 const OP_SET_PRESET_PTZF: u16 = 0x9246;
 
 const RC_OK: u16 = 0x2001;
+const RC_ACCESS_DENIED: u16 = 0x200F;
 const RC_SESSION_ALREADY_OPEN: u16 = 0x201E;
 const RC_AUTHENTICATION_FAILED: u16 = 0xA101;
 
-/// The Camera Control PTP version this module speaks, 100 times 3.00.
-const INITIATOR_VERSION: u32 = 0x012C;
+const LIVE_VIEW_HANDLE: u32 = 0xFFFF_C002;
+const CAPTURED_HANDLE: u32 = 0xFFFF_C001;
+
+/// The Camera Control PTP versions this module speaks, 100 times 3.00 and
+/// 2.00.
+const PTP3_VERSION: u32 = 0x012C;
+const PTP2_VERSION: u32 = 0x00C8;
 /// Vendor code version from which the extended codes (0xE000 properties,
 /// 0xF000 controls) need the option flag, 100 times 3.10.
 const EXTENDED_CODES_VERSION: u32 = 310;
@@ -98,6 +151,43 @@ const PTZF_DIRECTION: u32 = 3;
 const PTZF_HOME: u32 = 4;
 const PTZF_RESET: u32 = 5;
 const PTZF_CANCEL: u32 = 6;
+
+/// Models that speak only Camera Control PTP 2 over IP (README protocol
+/// and interface tables).
+const PTP2_ONLY: &[&str] = &["ilce-7m3"];
+
+/// Models whose compatibility tables list the Remote Control with Transfer
+/// Mode content operations, opened in that mode unless the setting says
+/// otherwise.
+const TRANSFER_WITH_REMOTE: &[&str] = &[
+    "ilce-1m2",
+    "ilce-1",
+    "ilce-9m3",
+    "ilce-7rm6",
+    "ilce-7rm5",
+    "ilce-7m5",
+    "ilce-7m4",
+    "ilce-7sm3",
+    "ilce-7cm2",
+    "ilce-7cr",
+    "ilce-6700",
+    "ilx-lr1",
+    "ilme-fx3",
+    "ilme-fx30",
+    "ilme-fx2",
+    "zv-e1",
+    "dsc-rx1rm3",
+];
+
+/// What the module may do in Content Transfer Mode, where the camera takes
+/// no remote control.
+const CONTENT_TRANSFER_COMMANDS: &[&str] = &[
+    "list_content",
+    "download_content",
+    "get_property",
+    "refresh",
+    "switch_session_mode",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -117,6 +207,63 @@ impl Mode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Protocol {
+    Ptp3,
+    Ptp2,
+}
+
+impl Protocol {
+    fn name(self) -> &'static str {
+        match self {
+            Protocol::Ptp3 => "ptp3",
+            Protocol::Ptp2 => "ptp2",
+        }
+    }
+
+    fn version(self) -> u32 {
+        match self {
+            Protocol::Ptp3 => PTP3_VERSION,
+            Protocol::Ptp2 => PTP2_VERSION,
+        }
+    }
+}
+
+/// The function mode a session is opened in (SDIO_OpenSession).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Function {
+    Remote,
+    RemoteWithTransfer,
+    ContentTransfer,
+}
+
+impl Function {
+    fn name(self) -> &'static str {
+        match self {
+            Function::Remote => "remote",
+            Function::RemoteWithTransfer => "remote_with_transfer",
+            Function::ContentTransfer => "content_transfer",
+        }
+    }
+
+    fn parse(text: &str) -> Option<Function> {
+        Some(match text {
+            "remote" => Function::Remote,
+            "remote_with_transfer" => Function::RemoteWithTransfer,
+            "content_transfer" => Function::ContentTransfer,
+            _ => return None,
+        })
+    }
+
+    fn sdio_mode(self) -> u32 {
+        match self {
+            Function::Remote => 0,
+            Function::ContentTransfer => 1,
+            Function::RemoteWithTransfer => 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     /// Nothing open; a reconnect may be pending.
     Idle,
@@ -131,9 +278,21 @@ enum Phase {
     Refused,
 }
 
+/// What a command's data turns into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Parse {
+    ContentList,
+    Thumbnail,
+    FtpSettings,
+    FtpJobs,
+    FtpResult,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 enum Step {
-    OpenSession,
+    OpenSession {
+        sdio: bool,
+    },
     DeviceInfo,
     Connect(u32),
     ExtInfo {
@@ -142,10 +301,26 @@ enum Step {
     GetAll {
         diff: bool,
     },
+    TransferMode,
     /// Part of an operator command.
     Command,
     /// A wait between two parts of a command.
     Pause(Millis),
+    LiveView {
+        attempt: u32,
+    },
+    /// The data becomes the command's value.
+    Value(Parse),
+    ListHandles,
+    ListInfo(u32),
+    DownloadInfo,
+    DownloadChunk,
+    DownloadWhole,
+    /// Close the session to reopen it in another function mode.
+    Switch(Function),
+    /// Background reads of the FTP lists into the state.
+    FtpRefresh,
+    JobsRefresh,
 }
 
 #[derive(Debug, Clone)]
@@ -185,12 +360,80 @@ impl Op {
     fn pause(ms: Millis) -> Op {
         Op::new(0, vec![], Step::Pause(ms))
     }
+
+    fn for_command(mut self, id: CommandId) -> Op {
+        self.command = Some(id);
+        self
+    }
 }
 
 struct InFlight {
     op: Op,
     transaction: u32,
     data: Vec<u8>,
+    /// Bytes written straight to the download file.
+    streamed: u64,
+}
+
+/// Where a download comes from.
+#[derive(Debug, Clone, PartialEq)]
+enum Source {
+    /// A PTP object in Content Transfer Mode.
+    Object(u32),
+    /// A file of a listed content in Remote Control with Transfer Mode.
+    Content { slot: u32, content: u32, file: u32 },
+    /// The image just shot, from the camera's transfer buffer.
+    Captured,
+    /// A clip of a video-only camera, over HTTP.
+    Http,
+}
+
+struct Download {
+    id: CommandId,
+    path: String,
+    source: Source,
+    offset: u64,
+    total: Option<u64>,
+    name: Option<String>,
+    error: Option<String>,
+    /// The file has been asked to close; its result completes the command.
+    closing: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum HttpPurpose {
+    LiveView,
+    Profile { slot: u32 },
+    Download,
+}
+
+struct HttpJob {
+    id: CommandId,
+    purpose: HttpPurpose,
+    url: Url,
+    reader: HttpReader,
+    body: Vec<u8>,
+    chunked: bool,
+}
+
+struct Listing {
+    id: CommandId,
+    slot: u32,
+    handles: VecDeque<u32>,
+    items: Vec<Value>,
+    total: usize,
+}
+
+/// What a command turns into.
+enum Plan {
+    Ops(Vec<Op>),
+    Value(Value),
+    Refresh,
+    Http(HttpPurpose, Url),
+    Download(Download, Option<Op>),
+    HttpDownload(Download, Url),
+    Listing(u32, u32, Op),
+    Switch(Function),
 }
 
 pub(crate) struct SonyCamera {
@@ -203,6 +446,9 @@ pub(crate) struct SonyCamera {
     ssh_password: String,
     ssh_fingerprint: Option<String>,
     poll_every: Millis,
+
+    protocol: Protocol,
+    function: Function,
 
     phase: Phase,
     cmd_framer: Framer,
@@ -221,10 +467,22 @@ pub(crate) struct SonyCamera {
     /// The handshake is done and the property set has been read once.
     ready: bool,
     extended: bool,
+    operations: Vec<u16>,
     controls: Vec<u16>,
     props: HashMap<u16, PropInfo>,
     reported_raw: HashMap<u16, Value>,
     reported_named: HashMap<&'static str, Value>,
+
+    live_view_enabled: bool,
+    download: Option<Download>,
+    listing: Option<Listing>,
+    http: Option<HttpJob>,
+    /// Sizes of listed files, by download id.
+    sizes: HashMap<String, u64>,
+    ftp_setting_version: u16,
+    ftp_job_version: u16,
+    ftp_servers: Vec<String>,
+    ftp_jobs: Vec<String>,
 }
 
 fn text_setting(settings: &Params, name: &str) -> String {
@@ -256,6 +514,10 @@ fn parse_guid(text: &str) -> Option<[u8; 16]> {
 
 fn hex(code: u16) -> String {
     format!("{code:04X}")
+}
+
+fn b64(data: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(data)
 }
 
 /// Sets a dotted path in a merge patch.
@@ -290,6 +552,10 @@ fn refused(code: &str, message: impl Into<String>) -> CommandError {
     }
 }
 
+fn rejected(code: u16) -> CommandError {
+    refused(&format!("0x{code:04X}"), props::response_name(code))
+}
+
 fn param_bool(params: &Params, name: &str) -> Option<bool> {
     params.get(name).and_then(Value::as_bool)
 }
@@ -313,11 +579,20 @@ fn param_int_or(params: &Params, name: &str, default: i128) -> Result<i128, Comm
     }
 }
 
+fn param_u32(params: &Params, name: &str) -> Result<u32, CommandError> {
+    u32::try_from(param_int(params, name)?)
+        .map_err(|_| invalid(format!("'{name}' is out of range")))
+}
+
 fn param_str<'a>(params: &'a Params, name: &str) -> Result<&'a str, CommandError> {
     params
         .get(name)
         .and_then(Value::as_str)
         .ok_or_else(|| invalid(format!("'{name}' must be text")))
+}
+
+fn param_str_or<'a>(params: &'a Params, name: &str) -> &'a str {
+    params.get(name).and_then(Value::as_str).unwrap_or("")
 }
 
 /// A property or control code given as `0xD21D`, `D21D` or a number.
@@ -376,6 +651,23 @@ fn ptzf_type_name(v: u32) -> &'static str {
     }
 }
 
+/// A live view frame as a command's value.
+fn frame_value(frame: &content::LiveFrame) -> Value {
+    let mut v = json!({
+        "format": "jpeg",
+        "bytes": frame.jpeg.len(),
+        "image": b64(&frame.jpeg),
+    });
+    if let Some((w, h)) = content::jpeg_size(&frame.jpeg) {
+        v["width"] = json!(w);
+        v["height"] = json!(h);
+    }
+    if let Some(ffi) = &frame.focal_frame_info {
+        v["focal_frame_info"] = json!(b64(ffi));
+    }
+    v
+}
+
 impl SonyCamera {
     pub(crate) fn new(ctx: OpenContext) -> Result<SonyCamera, String> {
         let s = &ctx.settings;
@@ -409,6 +701,32 @@ impl SonyCamera {
             .and_then(Value::as_u64)
             .unwrap_or(1_000)
             .max(250);
+        let protocol = match text_setting(s, "protocol").as_str() {
+            "" | "auto" => {
+                if PTP2_ONLY.contains(&ctx.model.as_str()) {
+                    Protocol::Ptp2
+                } else {
+                    Protocol::Ptp3
+                }
+            }
+            "ptp3" => Protocol::Ptp3,
+            "ptp2" => Protocol::Ptp2,
+            other => return Err(format!("unknown protocol '{other}'")),
+        };
+        let function = match text_setting(s, "session_mode").as_str() {
+            "" | "auto" => {
+                if protocol == Protocol::Ptp3 && TRANSFER_WITH_REMOTE.contains(&ctx.model.as_str())
+                {
+                    Function::RemoteWithTransfer
+                } else {
+                    Function::Remote
+                }
+            }
+            other => Function::parse(other).ok_or(format!("unknown session_mode '{other}'"))?,
+        };
+        if protocol == Protocol::Ptp2 && function != Function::Remote {
+            return Err("Camera Control PTP 2 has only the remote control session mode".into());
+        }
         Ok(SonyCamera {
             host: ctx.host,
             port: ctx.port,
@@ -419,6 +737,8 @@ impl SonyCamera {
             ssh_password,
             ssh_fingerprint: (!fingerprint.is_empty()).then_some(fingerprint),
             poll_every,
+            protocol,
+            function,
             phase: Phase::Idle,
             cmd_framer: Framer::default(),
             evt_framer: Framer::default(),
@@ -433,31 +753,42 @@ impl SonyCamera {
             ext_info_attempts: 0,
             ready: false,
             extended: false,
+            operations: Vec::new(),
             controls: Vec::new(),
             props: HashMap::new(),
             reported_raw: HashMap::new(),
             reported_named: HashMap::new(),
+            live_view_enabled: false,
+            download: None,
+            listing: None,
+            http: None,
+            sizes: HashMap::new(),
+            ftp_setting_version: 100,
+            ftp_job_version: 100,
+            ftp_servers: Vec::new(),
+            ftp_jobs: Vec::new(),
         })
     }
 
     // ----- connections -----
 
+    fn tunnel(&self, target_host: &str, target_port: u16) -> SshTunnel {
+        SshTunnel {
+            ssh: SocketAddr::new(self.host, self.port.unwrap_or(SSH_PORT)),
+            username: self.ssh_username.clone(),
+            password: self.ssh_password.clone(),
+            fingerprint: self.ssh_fingerprint.clone(),
+            cipher: Some("aes128-ctr".into()),
+            target_host: target_host.into(),
+            target_port,
+        }
+    }
+
     /// Opens one of the two PTP-IP connections, directly or through the SSH
     /// tunnel the camera requires when its Access Authentication is on.
     fn open(&self, cx: &mut Cx, socket: Key) {
         match self.mode {
-            Mode::Ssh => cx.tcp_open_ssh(
-                socket,
-                SshTunnel {
-                    ssh: SocketAddr::new(self.host, self.port.unwrap_or(SSH_PORT)),
-                    username: self.ssh_username.clone(),
-                    password: self.ssh_password.clone(),
-                    fingerprint: self.ssh_fingerprint.clone(),
-                    cipher: Some("aes128-ctr".into()),
-                    target_host: "localhost".into(),
-                    target_port: PTP_IP_PORT,
-                },
-            ),
+            Mode::Ssh => cx.tcp_open_ssh(socket, self.tunnel("localhost", PTP_IP_PORT)),
             Mode::Plain | Mode::Pairing => cx.tcp_open(
                 socket,
                 SocketAddr::new(self.host, self.port.unwrap_or(PTP_IP_PORT)),
@@ -472,7 +803,8 @@ impl SonyCamera {
         cx.set_timer(INIT, INIT_TIMEOUT);
     }
 
-    /// Clears the session; the caller decides whether to try again.
+    /// Clears the session; the caller decides whether to try again. HTTP
+    /// streams through the tunnel are separate and carry on.
     fn teardown(&mut self, cx: &mut Cx, error: CommandError) {
         let mut failed = Vec::new();
         if let Some(inflight) = self.current.take() {
@@ -481,6 +813,19 @@ impl SonyCamera {
         failed.extend(self.pausing.take().and_then(|op| op.command));
         failed.extend(self.commands.drain(..).filter_map(|op| op.command));
         failed.extend(self.background.drain(..).filter_map(|op| op.command));
+        if let Some(listing) = self.listing.take() {
+            failed.push(listing.id);
+        }
+        if self
+            .download
+            .as_ref()
+            .is_some_and(|d| d.source != Source::Http)
+        {
+            let d = self.download.take().unwrap();
+            failed.push(d.id);
+            cx.file_close(FILE);
+        }
+        failed.sort_unstable();
         failed.dedup();
         for id in failed {
             cx.complete(id, Err(error.clone()));
@@ -493,6 +838,7 @@ impl SonyCamera {
         self.cmd_framer = Framer::default();
         self.evt_framer = Framer::default();
         self.ready = false;
+        self.live_view_enabled = false;
         self.ext_info_attempts = 0;
         self.props.clear();
         self.reported_raw.clear();
@@ -566,8 +912,8 @@ impl SonyCamera {
     // ----- the operation queue -----
 
     fn transaction(&mut self, code: u16) -> u32 {
-        if code == OP_OPEN_SESSION {
-            // OpenSession is transaction 0; numbering restarts after it.
+        if code == OP_OPEN_SESSION || code == OP_SDIO_OPEN_SESSION {
+            // Opening a session is transaction 0; numbering restarts after it.
             self.next_transaction = 1;
             return 0;
         }
@@ -612,6 +958,7 @@ impl SonyCamera {
             op,
             transaction,
             data: Vec::new(),
+            streamed: 0,
         });
     }
 
@@ -619,7 +966,17 @@ impl SonyCamera {
         self.extended as u32
     }
 
-    /// Reads the property set again: changes only unless `full`.
+    /// The parameters that name a property or control: PTP 3 adds the
+    /// extended-codes option flag.
+    fn code_params(&self, code: u16) -> Vec<u32> {
+        match self.protocol {
+            Protocol::Ptp3 => vec![code as u32, self.flag()],
+            Protocol::Ptp2 => vec![code as u32],
+        }
+    }
+
+    /// Reads the property set again: changes only unless `full` (PTP 2
+    /// always reads everything).
     fn want_refresh(&mut self, cx: &mut Cx, full: bool) {
         if !self.ready {
             return;
@@ -630,7 +987,7 @@ impl SonyCamera {
             .find(|op| matches!(op.step, Step::GetAll { .. }));
         match queued {
             Some(op) => {
-                if full {
+                if full && !op.params.is_empty() {
                     op.step = Step::GetAll { diff: false };
                     op.params[0] = 0;
                 }
@@ -644,25 +1001,42 @@ impl SonyCamera {
     }
 
     fn get_all(&self, diff: bool) -> Op {
-        Op::new(
-            OP_GET_ALL_PROPERTIES,
-            vec![diff as u32, self.flag()],
-            Step::GetAll { diff },
-        )
+        match self.protocol {
+            Protocol::Ptp3 => Op::new(
+                OP_GET_ALL_PROPERTIES,
+                vec![diff as u32, self.flag()],
+                Step::GetAll { diff },
+            ),
+            Protocol::Ptp2 => Op::new(OP_GET_ALL_PROPERTIES, vec![], Step::GetAll { diff: false }),
+        }
+    }
+
+    fn ext_info_op(&self, extended: bool) -> Op {
+        let params = match self.protocol {
+            Protocol::Ptp3 => vec![PTP3_VERSION, extended as u32],
+            Protocol::Ptp2 => vec![PTP2_VERSION],
+        };
+        Op::new(OP_EXT_DEVICE_INFO, params, Step::ExtInfo { extended })
     }
 
     fn start_session(&mut self, cx: &mut Cx) {
         self.phase = Phase::Session;
+        let open = if self.function == Function::Remote {
+            Op::new(OP_OPEN_SESSION, vec![1], Step::OpenSession { sdio: false })
+        } else {
+            Op::new(
+                OP_SDIO_OPEN_SESSION,
+                vec![1, self.function.sdio_mode()],
+                Step::OpenSession { sdio: true },
+            )
+        };
+        let ext = self.ext_info_op(false);
         self.background.extend([
-            Op::new(OP_OPEN_SESSION, vec![1], Step::OpenSession),
+            open,
             Op::new(OP_GET_DEVICE_INFO, vec![], Step::DeviceInfo),
             Op::new(OP_CONNECT, vec![1, 0, 0], Step::Connect(1)),
             Op::new(OP_CONNECT, vec![2, 0, 0], Step::Connect(2)),
-            Op::new(
-                OP_EXT_DEVICE_INFO,
-                vec![INITIATOR_VERSION, 0],
-                Step::ExtInfo { extended: false },
-            ),
+            ext,
         ]);
         self.pump(cx);
     }
@@ -681,15 +1055,62 @@ impl SonyCamera {
         }
         cx.cancel_timer(REPLY);
         let inflight = self.current.take().unwrap();
-        self.finish(cx, inflight.op, code, &params, inflight.data);
+        self.finish(
+            cx,
+            inflight.op,
+            code,
+            &params,
+            inflight.data,
+            inflight.streamed,
+        );
         self.pump(cx);
     }
 
-    fn finish(&mut self, cx: &mut Cx, op: Op, code: u16, params: &[u32], data: Vec<u8>) {
+    fn complete_op(&mut self, cx: &mut Cx, op: &Op, code: u16) {
+        let Some(id) = op.command else { return };
+        if code == RC_OK {
+            if op.last {
+                cx.complete(id, Ok(Outcome::Ack));
+            }
+        } else {
+            // The rest of this command is not sent.
+            self.commands.retain(|o| o.command != Some(id));
+            cx.complete(id, Err(rejected(code)));
+        }
+    }
+
+    fn finish(
+        &mut self,
+        cx: &mut Cx,
+        op: Op,
+        code: u16,
+        params: &[u32],
+        data: Vec<u8>,
+        streamed: u64,
+    ) {
         let ok = code == RC_OK;
         match op.step {
-            Step::OpenSession => {
-                if !ok && code != RC_SESSION_ALREADY_OPEN {
+            Step::OpenSession { sdio } => {
+                if ok || code == RC_SESSION_ALREADY_OPEN {
+                    cx.state(json!({"session": {"function_mode": self.function.name()}}));
+                } else if sdio {
+                    // Not every firmware takes every function mode: fall
+                    // back to plain remote control.
+                    cx.log(
+                        Level::Warning,
+                        format!(
+                            "the camera refused session mode {} ({}); using remote control only",
+                            self.function.name(),
+                            props::response_name(code)
+                        ),
+                    );
+                    self.function = Function::Remote;
+                    self.background.push_front(Op::new(
+                        OP_OPEN_SESSION,
+                        vec![1],
+                        Step::OpenSession { sdio: false },
+                    ));
+                } else {
                     self.lost(
                         cx,
                         format!("OpenSession failed: {}", props::response_name(code)),
@@ -697,12 +1118,15 @@ impl SonyCamera {
                 }
             }
             Step::DeviceInfo => match parse_device_info(&data) {
-                Ok(info) if ok => cx.state(json!({"device": {
-                    "manufacturer": info.manufacturer,
-                    "model": info.model,
-                    "version": info.version,
-                    "serial": info.serial,
-                }})),
+                Ok(info) if ok => {
+                    self.operations = info.operations.clone();
+                    cx.state(json!({"device": {
+                        "manufacturer": info.manufacturer,
+                        "model": info.model,
+                        "version": info.version,
+                        "serial": info.serial,
+                    }}))
+                }
                 _ => cx.log(Level::Debug, "the camera's DeviceInfo could not be read"),
             },
             Step::Connect(phase) => {
@@ -722,6 +1146,17 @@ impl SonyCamera {
                 }
             }
             Step::ExtInfo { extended } => self.ext_info(cx, extended, code, params, &data),
+            Step::TransferMode => {
+                if !ok {
+                    cx.log(
+                        Level::Warning,
+                        format!(
+                            "the camera refused content transfer mode: {}",
+                            props::response_name(code)
+                        ),
+                    );
+                }
+            }
             Step::GetAll { diff } => {
                 if ok {
                     match parse_prop_info_array(&data) {
@@ -749,36 +1184,70 @@ impl SonyCamera {
                     );
                 }
                 if let Some(id) = op.command {
-                    let result = if ok {
-                        Ok(Outcome::Ack)
-                    } else {
-                        Err(refused(
-                            &format!("0x{code:04X}"),
-                            props::response_name(code),
-                        ))
-                    };
-                    cx.complete(id, result);
+                    cx.complete(
+                        id,
+                        if ok {
+                            Ok(Outcome::Ack)
+                        } else {
+                            Err(rejected(code))
+                        },
+                    );
                 }
             }
             Step::Pause(_) => {}
             Step::Command => {
-                let Some(id) = op.command else { return };
-                if ok {
-                    if op.last {
-                        cx.complete(id, Ok(Outcome::Ack));
-                    }
-                } else {
-                    // The rest of this command is not sent.
-                    self.commands.retain(|o| o.command != Some(id));
-                    cx.complete(
-                        id,
-                        Err(refused(
-                            &format!("0x{code:04X}"),
-                            props::response_name(code),
-                        )),
-                    );
+                if ok && op.code == OP_CONTROL && op.params.first() == Some(&0xD313) {
+                    self.live_view_enabled = true;
+                }
+                self.complete_op(cx, &op, code);
+                if ok && op.code == OP_SET_FTP_SETTING_LIST {
+                    self.background.push_back(Op::new(
+                        OP_GET_FTP_SETTING_LIST,
+                        vec![],
+                        Step::FtpRefresh,
+                    ));
+                }
+                if ok && op.code == OP_CONTROL_FTP_JOB_LIST {
+                    self.queue_jobs_refresh();
                 }
                 self.want_refresh(cx, false);
+            }
+            Step::LiveView { attempt } => self.live_view(cx, op, code, &data, attempt),
+            Step::Value(parse) => {
+                let Some(id) = op.command else { return };
+                if !ok {
+                    cx.complete(id, Err(rejected(code)));
+                    return;
+                }
+                let result = self.parse_value(cx, parse, &data);
+                cx.complete(
+                    id,
+                    result
+                        .map(|value| Outcome::Value { value })
+                        .map_err(|e| refused("unreadable", e)),
+                );
+            }
+            Step::ListHandles => self.listed_handles(cx, code, &data),
+            Step::ListInfo(handle) => self.listed_info(cx, handle, code, &data),
+            Step::DownloadInfo => self.download_info(cx, code, &data),
+            Step::DownloadChunk | Step::DownloadWhole => {
+                self.download_chunk(cx, op.step == Step::DownloadWhole, code, streamed)
+            }
+            Step::Switch(function) => {
+                if let Some(id) = op.command {
+                    cx.complete(id, Ok(Outcome::Ack));
+                }
+                self.reopen(cx, function);
+            }
+            Step::FtpRefresh => {
+                if ok {
+                    let _ = self.parse_value(cx, Parse::FtpSettings, &data);
+                }
+            }
+            Step::JobsRefresh => {
+                if ok {
+                    let _ = self.parse_value(cx, Parse::FtpJobs, &data);
+                }
             }
         }
     }
@@ -787,8 +1256,14 @@ impl SonyCamera {
         if code == RC_AUTHENTICATION_FAILED {
             return self.refuse(
                 cx,
-                "the camera refused this initiator's protocol version (Camera Control PTP 3.00)"
-                    .into(),
+                format!(
+                    "the camera refused this initiator's protocol version (Camera Control PTP {})",
+                    if self.protocol == Protocol::Ptp3 {
+                        "3.00"
+                    } else {
+                        "2.00"
+                    }
+                ),
             );
         }
         if code != RC_OK {
@@ -825,29 +1300,43 @@ impl SonyCamera {
             Ok(info) => info,
             Err(e) => return self.lost(cx, format!("unreadable extension info: {e}")),
         };
-        let vendor = params.first().copied().unwrap_or(0);
-        if info.version / 100 < 3 {
+        let major = info.version / 100;
+        if major < 2 {
             return self.refuse(
                 cx,
                 format!(
-                    "the camera speaks Camera Control PTP {}.{:02}, not 3",
-                    info.version / 100,
+                    "the camera speaks Camera Control PTP {}.{:02}, not 2 or 3",
+                    major,
                     info.version % 100
                 ),
             );
         }
-        if info.version != INITIATOR_VERSION as u16 {
+        if major == 2 && self.protocol == Protocol::Ptp3 {
+            // A camera that answers 3.00 with a 2.xx extension speaks PTP 2.
+            cx.log(
+                Level::Info,
+                "the camera answers with Camera Control PTP 2; using PTP 2",
+            );
+            self.protocol = Protocol::Ptp2;
+        }
+        if info.version as u32 != self.protocol.version() {
             cx.log(
                 Level::Info,
                 format!(
-                    "camera extension version {:#06X}; this module speaks 0x012C",
-                    info.version
+                    "camera extension version {:#06X}; this module speaks {:#06X}",
+                    info.version,
+                    self.protocol.version()
                 ),
             );
         }
+        let vendor = match self.protocol {
+            Protocol::Ptp3 => params.first().copied().unwrap_or(0),
+            Protocol::Ptp2 => 0,
+        };
         self.controls = info.controls.clone();
         cx.state(json!({
             "session": {
+                "protocol": self.protocol.name(),
                 "protocol_version": info.version,
                 "vendor_code_version": vendor,
                 "extended_codes": extended,
@@ -857,19 +1346,42 @@ impl SonyCamera {
         if !extended {
             self.background
                 .push_back(Op::new(OP_CONNECT, vec![3, 0, 0], Step::Connect(3)));
-            if vendor >= EXTENDED_CODES_VERSION {
+            if self.protocol == Protocol::Ptp3 && vendor >= EXTENDED_CODES_VERSION {
                 self.extended = true;
-                self.background.push_back(Op::new(
-                    OP_EXT_DEVICE_INFO,
-                    vec![INITIATOR_VERSION, 1],
-                    Step::ExtInfo { extended: true },
-                ));
+                let op = self.ext_info_op(true);
+                self.background.push_back(op);
             } else {
                 self.extended = false;
+            }
+            if self.function == Function::ContentTransfer {
+                // Content selected from this side, transfer on.
+                self.background.push_back(Op::new(
+                    OP_SET_CONTENTS_TRANSFER_MODE,
+                    vec![2, 1, 0],
+                    Step::TransferMode,
+                ));
             }
             let op = self.get_all(false);
             self.background.push_back(op);
         }
+    }
+
+    /// Closes the session and opens it again in another function mode.
+    fn reopen(&mut self, cx: &mut Cx, function: Function) {
+        self.teardown(
+            cx,
+            CommandError::Transport {
+                message: "the session was closed to change its mode".into(),
+            },
+        );
+        self.function = function;
+        self.phase = Phase::Idle;
+        cx.cancel_timer(RETRY);
+        cx.log(
+            Level::Info,
+            format!("reopening the session in {} mode", function.name()),
+        );
+        self.connect(cx);
     }
 
     // ----- state -----
@@ -877,6 +1389,7 @@ impl SonyCamera {
     fn apply(&mut self, cx: &mut Cx, list: Vec<PropInfo>) {
         let mut patch = json!({});
         let mut changed = false;
+        let mut jobs_changed = false;
         for info in list {
             let raw = info.to_json();
             if self.reported_raw.get(&info.code) != Some(&raw) {
@@ -899,12 +1412,28 @@ impl SonyCamera {
                     put(&mut patch, prop.path, named.clone());
                     self.reported_named.insert(prop.path, named);
                     changed = true;
+                    jobs_changed |= info.code == 0xD02A;
                 }
             }
             self.props.insert(info.code, info);
         }
         if changed {
             cx.state(patch);
+        }
+        // The camera's FTP job list moved on: read it again.
+        if jobs_changed && self.operations.contains(&OP_GET_FTP_JOB_LIST) {
+            self.queue_jobs_refresh();
+        }
+    }
+
+    fn queue_jobs_refresh(&mut self) {
+        if !self
+            .background
+            .iter()
+            .any(|op| op.step == Step::JobsRefresh)
+        {
+            self.background
+                .push_back(Op::new(OP_GET_FTP_JOB_LIST, vec![0], Step::JobsRefresh));
         }
     }
 
@@ -990,6 +1519,24 @@ impl SonyCamera {
                 "white_balance.custom_capture_result",
                 json!(props::drive_result_name(p(0))),
             ),
+            0xC211 => {
+                put(
+                    &mut patch,
+                    "ftp.last_job_result",
+                    json!(props::drive_result_name(p(0))),
+                );
+                self.queue_jobs_refresh();
+            }
+            0xC234 => put(
+                &mut patch,
+                "content.last_change",
+                json!({"slot": p(0), "change": match p(1) { 1 => "added", 2 => "deleted", 3 => "changed", _ => "unknown" }}),
+            ),
+            0xC210 => put(
+                &mut patch,
+                "content.last_change",
+                json!({"slot": p(0), "change": "media_profile"}),
+            ),
             0xC203 | 0xC201 | 0xC202 | 0xC206 | 0xC21B | 0xC228 | 0x4004 | 0x4005 => {}
             other => cx.log(
                 Level::Debug,
@@ -1052,8 +1599,18 @@ impl SonyCamera {
                 transaction,
                 payload,
             } => {
+                let streaming = self.download.is_some();
                 if let Some(c) = self.current.as_mut().filter(|c| c.transaction == transaction) {
-                    c.data.extend_from_slice(&payload);
+                    if streaming
+                        && matches!(c.op.step, Step::DownloadChunk | Step::DownloadWhole)
+                    {
+                        // Downloads go to the file as they arrive.
+                        c.streamed += payload.len() as u64;
+                        cx.file_write(FILE, payload);
+                        cx.set_timer(REPLY, REPLY_TIMEOUT);
+                    } else {
+                        c.data.extend_from_slice(&payload);
+                    }
                 }
             }
             Packet::Event { code, params, .. } => {
@@ -1066,6 +1623,463 @@ impl SonyCamera {
         }
     }
 
+    // ----- live view -----
+
+    fn live_view(&mut self, cx: &mut Cx, op: Op, code: u16, data: &[u8], attempt: u32) {
+        let Some(id) = op.command else { return };
+        let frame = if code == RC_OK {
+            match content::parse_live_view(data) {
+                Ok(frame) => frame,
+                Err(e) => {
+                    cx.complete(id, Err(refused("unreadable", e)));
+                    return;
+                }
+            }
+        } else if code == RC_ACCESS_DENIED {
+            None
+        } else {
+            cx.complete(id, Err(rejected(code)));
+            return;
+        };
+        match frame {
+            Some(frame) => cx.complete(
+                id,
+                Ok(Outcome::Value {
+                    value: frame_value(&frame),
+                }),
+            ),
+            None if attempt + 1 < LIVE_VIEW_ATTEMPTS => {
+                // Asked too soon after the last frame: ask again shortly.
+                let mut again = Op::new(
+                    OP_GET_OBJECT,
+                    vec![LIVE_VIEW_HANDLE],
+                    Step::LiveView {
+                        attempt: attempt + 1,
+                    },
+                )
+                .for_command(id);
+                again.last = true;
+                self.commands.push_front(again);
+                self.commands
+                    .push_front(Op::pause(LIVE_VIEW_RETRY).for_command(id));
+            }
+            None => cx.complete(
+                id,
+                Err(refused(
+                    "no_frame",
+                    "the camera returned no live view image",
+                )),
+            ),
+        }
+    }
+
+    // ----- values -----
+
+    fn parse_value(&mut self, cx: &mut Cx, parse: Parse, data: &[u8]) -> Result<Value, String> {
+        match parse {
+            Parse::ContentList => {
+                let (value, files) = content::parse_content_info_list(data)?;
+                for f in files {
+                    self.sizes.insert(f.id, f.size);
+                }
+                Ok(value)
+            }
+            Parse::Thumbnail => {
+                let jpeg = content::find_jpeg(data).unwrap_or(data);
+                let mut v = json!({"format": "jpeg", "bytes": jpeg.len(), "image": b64(jpeg)});
+                if let Some((w, h)) = content::jpeg_size(jpeg) {
+                    v["width"] = json!(w);
+                    v["height"] = json!(h);
+                }
+                Ok(v)
+            }
+            Parse::FtpSettings => {
+                let (version, servers) = ftp::parse_setting_list(data)?;
+                self.ftp_setting_version = version;
+                let mut patch = json!({});
+                let mut ids = Vec::new();
+                for s in &servers {
+                    let id = s.id.to_string();
+                    put(&mut patch, &format!("ftp.servers.{id}"), s.to_json());
+                    ids.push(id);
+                }
+                for gone in self.ftp_servers.iter().filter(|g| !ids.contains(g)) {
+                    put(&mut patch, &format!("ftp.servers.{gone}"), Value::Null);
+                }
+                self.ftp_servers = ids;
+                cx.state(patch);
+                Ok(json!({
+                    "version": version,
+                    "servers": servers.iter().map(ftp::FtpServer::to_json).collect::<Vec<_>>(),
+                }))
+            }
+            Parse::FtpJobs => {
+                let (version, sync, jobs) = ftp::parse_job_list(data)?;
+                self.ftp_job_version = version;
+                let mut patch = json!({});
+                let mut ids = Vec::new();
+                for j in &jobs {
+                    let id = j["job_id"].to_string();
+                    put(&mut patch, &format!("ftp.jobs.{id}"), j.clone());
+                    ids.push(id);
+                }
+                for gone in self.ftp_jobs.iter().filter(|g| !ids.contains(g)) {
+                    put(&mut patch, &format!("ftp.jobs.{gone}"), Value::Null);
+                }
+                self.ftp_jobs = ids;
+                cx.state(patch);
+                Ok(json!({"version": version, "sync_id": sync, "jobs": jobs}))
+            }
+            Parse::FtpResult => {
+                let (succeeded, failed) = ftp::parse_ftp_result(data)?;
+                Ok(json!({"succeeded": succeeded, "failed": failed}))
+            }
+        }
+    }
+
+    // ----- content listing (Content Transfer Mode) -----
+
+    fn listed_handles(&mut self, cx: &mut Cx, code: u16, data: &[u8]) {
+        let Some(listing) = self.listing.as_mut() else {
+            return;
+        };
+        let id = listing.id;
+        if code != RC_OK {
+            self.listing = None;
+            cx.complete(id, Err(rejected(code)));
+            return;
+        }
+        match content::parse_u32_array(data) {
+            Ok(handles) => {
+                listing.total = handles.len();
+                listing.handles = handles.into_iter().collect();
+                self.next_listed(cx);
+            }
+            Err(e) => {
+                self.listing = None;
+                cx.complete(id, Err(refused("unreadable", e)));
+            }
+        }
+    }
+
+    fn listed_info(&mut self, cx: &mut Cx, handle: u32, code: u16, data: &[u8]) {
+        let Some(listing) = self.listing.as_mut() else {
+            return;
+        };
+        if code == RC_OK {
+            if let Ok(info) = content::parse_object_info(data) {
+                // Folders are not content.
+                if info.format != 0x3001 {
+                    if info.size != u32::MAX {
+                        self.sizes.insert(format!("o:{handle}"), info.size as u64);
+                    }
+                    listing.items.push(info.to_json(handle));
+                }
+            }
+        }
+        self.next_listed(cx);
+    }
+
+    fn next_listed(&mut self, cx: &mut Cx) {
+        let Some(listing) = self.listing.as_mut() else {
+            return;
+        };
+        match listing.handles.pop_front() {
+            Some(h) => {
+                let op =
+                    Op::new(OP_GET_OBJECT_INFO, vec![h], Step::ListInfo(h)).for_command(listing.id);
+                self.commands.push_front(op);
+            }
+            None => {
+                let listing = self.listing.take().unwrap();
+                cx.complete(
+                    listing.id,
+                    Ok(Outcome::Value {
+                        value: json!({
+                            "source": "ptp_objects",
+                            "slot": listing.slot,
+                            "total": listing.total,
+                            "items": listing.items,
+                        }),
+                    }),
+                );
+            }
+        }
+    }
+
+    // ----- downloads -----
+
+    fn chunk_op(&self, d: &Download) -> Option<Op> {
+        let lo = d.offset as u32;
+        let hi = (d.offset >> 32) as u32;
+        let op = match d.source {
+            Source::Object(h) => Op::new(
+                OP_GET_PARTIAL_LARGE_OBJECT,
+                vec![h, lo, hi, CHUNK],
+                Step::DownloadChunk,
+            ),
+            Source::Content {
+                slot,
+                content,
+                file,
+            } => Op::new(
+                OP_GET_CONTENT_DATA,
+                vec![content, (slot << 24) | file, lo, hi, CHUNK],
+                Step::DownloadChunk,
+            ),
+            Source::Captured => Op::new(OP_GET_OBJECT, vec![CAPTURED_HANDLE], Step::DownloadWhole),
+            Source::Http => return None,
+        };
+        Some(op.for_command(d.id))
+    }
+
+    fn download_info(&mut self, cx: &mut Cx, code: u16, data: &[u8]) {
+        let Some(d) = self.download.as_mut() else {
+            return;
+        };
+        let info = if code == RC_OK {
+            content::parse_object_info(data).map_err(|e| refused("unreadable", e))
+        } else {
+            Err(rejected(code))
+        };
+        match info {
+            Ok(info) => {
+                if info.size != u32::MAX {
+                    d.total = Some(info.size as u64);
+                }
+                d.name = Some(info.filename);
+                cx.file_open(FILE, d.path.clone());
+                let d = self.download.as_ref().unwrap();
+                if let Some(op) = self.chunk_op(d) {
+                    self.commands.push_front(op);
+                }
+            }
+            Err(e) => {
+                let d = self.download.take().unwrap();
+                cx.complete(d.id, Err(e));
+            }
+        }
+    }
+
+    fn download_chunk(&mut self, cx: &mut Cx, whole: bool, code: u16, received: u64) {
+        let Some(d) = self.download.as_mut() else {
+            // The file failed and the command has already ended.
+            return;
+        };
+        if code != RC_OK {
+            d.error = Some(format!(
+                "the camera stopped the transfer: {}",
+                props::response_name(code)
+            ));
+            self.close_download(cx);
+            return;
+        }
+        d.offset += received;
+        let done = whole
+            || received == 0
+            || match d.total {
+                Some(total) => d.offset >= total,
+                None => received < CHUNK as u64,
+            };
+        if done {
+            self.close_download(cx);
+        } else {
+            let d = self.download.as_ref().unwrap();
+            if let Some(op) = self.chunk_op(d) {
+                self.commands.push_front(op);
+            }
+        }
+    }
+
+    fn close_download(&mut self, cx: &mut Cx) {
+        if let Some(d) = self.download.as_mut() {
+            if !d.closing {
+                d.closing = true;
+                cx.file_close(FILE);
+            }
+        }
+    }
+
+    // ----- HTTP through the tunnel -----
+
+    fn start_http(&mut self, cx: &mut Cx, id: CommandId, purpose: HttpPurpose, url: Url) {
+        cx.tcp_open_ssh(HTTP, self.tunnel(&url.host, url.port));
+        cx.set_timer(HTTP_TIMEOUT, HTTP_TIMEOUT_MS);
+        self.http = Some(HttpJob {
+            id,
+            purpose,
+            url,
+            reader: HttpReader::default(),
+            body: Vec::new(),
+            chunked: false,
+        });
+    }
+
+    fn end_http(&mut self, cx: &mut Cx) {
+        cx.tcp_close(HTTP);
+        cx.cancel_timer(HTTP_TIMEOUT);
+        self.http = None;
+    }
+
+    fn fail_http(&mut self, cx: &mut Cx, error: CommandError) {
+        let Some(job) = self.http.take() else { return };
+        cx.tcp_close(HTTP);
+        cx.cancel_timer(HTTP_TIMEOUT);
+        if job.purpose != HttpPurpose::Download {
+            cx.complete(job.id, Err(error));
+            return;
+        }
+        let opened = self.download_file_open();
+        let closing = self.download.as_ref().is_some_and(|d| d.closing);
+        if self.download.is_none() || closing {
+            return;
+        }
+        if opened {
+            if let Some(d) = self.download.as_mut() {
+                d.error = Some(error.to_string());
+            }
+            self.close_download(cx);
+        } else {
+            let d = self.download.take().unwrap();
+            cx.complete(d.id, Err(error));
+        }
+    }
+
+    /// Whether the file of an HTTP download has been opened (on the
+    /// response head).
+    fn download_file_open(&self) -> bool {
+        self.download
+            .as_ref()
+            .is_some_and(|d| d.total.is_some() || d.name.is_some())
+    }
+
+    fn http_events(&mut self, cx: &mut Cx, events: Vec<HttpEvent>) {
+        for event in events {
+            let Some(job) = self.http.as_mut() else {
+                return;
+            };
+            match event {
+                HttpEvent::Head { status, length, .. } => {
+                    if status != 200 {
+                        let message =
+                            format!("the camera answered HTTP {status} for {}", job.url.path);
+                        return self.fail_http(cx, refused("http_status", message));
+                    }
+                    job.chunked = length.is_none();
+                    if job.purpose == HttpPurpose::Download {
+                        if let Some(d) = self.download.as_mut() {
+                            d.total = length;
+                            d.name =
+                                Some(job.url.path.rsplit('/').next().unwrap_or("").to_string());
+                            cx.file_open(FILE, d.path.clone());
+                        }
+                    }
+                }
+                HttpEvent::Body(bytes) => match job.purpose {
+                    HttpPurpose::Download => {
+                        if let Some(d) = self.download.as_mut() {
+                            d.offset += bytes.len() as u64;
+                            cx.file_write(FILE, bytes);
+                        }
+                        cx.set_timer(HTTP_TIMEOUT, HTTP_TIMEOUT_MS);
+                    }
+                    HttpPurpose::Profile { .. } => {
+                        job.body.extend_from_slice(&bytes);
+                        if job.body.len() > MAX_PROFILE {
+                            return self
+                                .fail_http(cx, refused("unreadable", "MediaProfile too large"));
+                        }
+                    }
+                    HttpPurpose::LiveView => {
+                        job.body.extend_from_slice(&bytes);
+                        if job.body.len() > MAX_PROFILE {
+                            return self
+                                .fail_http(cx, refused("no_frame", "no live view frame found"));
+                        }
+                    }
+                },
+                HttpEvent::ChunkEnd => {
+                    if job.purpose == HttpPurpose::LiveView {
+                        // One live view dataset per chunk.
+                        let body = std::mem::take(&mut job.body);
+                        if let Ok(Some(frame)) = content::parse_live_view(&body) {
+                            return self.http_frame(cx, frame);
+                        }
+                        if let Some(jpeg) = content::find_jpeg(&body) {
+                            let frame = content::LiveFrame {
+                                jpeg: jpeg.to_vec(),
+                                focal_frame_info: None,
+                            };
+                            return self.http_frame(cx, frame);
+                        }
+                    }
+                }
+                HttpEvent::End => return self.http_done(cx),
+            }
+            // A stream that is not chunked: take the first whole JPEG.
+            if let Some(job) = self.http.as_ref() {
+                if job.purpose == HttpPurpose::LiveView && !job.chunked {
+                    if let Some(jpeg) = content::find_jpeg(&job.body) {
+                        let frame = content::LiveFrame {
+                            jpeg: jpeg.to_vec(),
+                            focal_frame_info: None,
+                        };
+                        return self.http_frame(cx, frame);
+                    }
+                }
+            }
+        }
+    }
+
+    fn http_frame(&mut self, cx: &mut Cx, frame: content::LiveFrame) {
+        if let Some(job) = self.http.as_ref() {
+            cx.complete(
+                job.id,
+                Ok(Outcome::Value {
+                    value: frame_value(&frame),
+                }),
+            );
+        }
+        self.end_http(cx);
+    }
+
+    fn http_done(&mut self, cx: &mut Cx) {
+        let Some(job) = self.http.as_mut() else {
+            return;
+        };
+        match job.purpose {
+            HttpPurpose::Download => {
+                self.end_http(cx);
+                self.close_download(cx);
+            }
+            HttpPurpose::Profile { slot } => {
+                let text = String::from_utf8_lossy(&job.body).into_owned();
+                let id = job.id;
+                let result = content::parse_media_profile(&text, slot);
+                self.end_http(cx);
+                cx.complete(
+                    id,
+                    result
+                        .map(|value| Outcome::Value { value })
+                        .map_err(|e| refused("unreadable", e)),
+                );
+            }
+            HttpPurpose::LiveView => {
+                let body = std::mem::take(&mut job.body);
+                let frame = content::parse_live_view(&body).ok().flatten().or_else(|| {
+                    content::find_jpeg(&body).map(|j| content::LiveFrame {
+                        jpeg: j.to_vec(),
+                        focal_frame_info: None,
+                    })
+                });
+                match frame {
+                    Some(frame) => self.http_frame(cx, frame),
+                    None => self.fail_http(cx, refused("no_frame", "no live view frame found")),
+                }
+            }
+        }
+    }
+
     // ----- commands -----
 
     fn prop(&self, code: u16) -> Result<&PropInfo, CommandError> {
@@ -1075,6 +2089,40 @@ impl SonyCamera {
                 format!("the camera does not report property 0x{code:04X} (not on this model, firmware or setting)"),
             )
         })
+    }
+
+    fn has_control(&self, code: u16) -> bool {
+        self.controls.contains(&code)
+    }
+
+    /// A text property's value, when the camera reports one.
+    fn text_prop(&self, code: u16) -> Option<String> {
+        match self.props.get(&code).map(|p| &p.current) {
+            Some(PtpValue::Str(s)) if !s.is_empty() => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    fn need_ssh(&self, what: &str) -> Result<(), CommandError> {
+        if self.mode == Mode::Ssh {
+            Ok(())
+        } else {
+            Err(refused(
+                "needs_ssh",
+                format!("{what} is served over HTTP on the camera's own localhost, reached only through SSH: open the device with connection ssh"),
+            ))
+        }
+    }
+
+    /// The MediaProfile URL of a video-only camera's slot.
+    fn profile_url(&self, slot: u32) -> Option<Url> {
+        let code = match slot {
+            1 => 0xD031,
+            2 => 0xD032,
+            3 => 0xD191,
+            _ => return None,
+        };
+        parse_url(&self.text_prop(code)?)
     }
 
     /// A property write, checked against what the camera says it accepts.
@@ -1119,11 +2167,55 @@ impl SonyCamera {
             _ => {}
         }
         let data = ds::encode(info.datatype, &value).map_err(invalid)?;
-        Ok(Op::with_data(
-            OP_SET_PROPERTY,
-            vec![code as u32, self.flag()],
-            data,
-        ))
+        Ok(Op::with_data(OP_SET_PROPERTY, self.code_params(code), data))
+    }
+
+    /// Sets a value: directly, or, where the camera only reports it and
+    /// offers a step control of the same code (Camera Control PTP 2), by the
+    /// number of steps between the current and the target value in the
+    /// camera's own list.
+    fn set_value(&self, code: u16, value: PtpValue) -> Result<Vec<Op>, CommandError> {
+        let stepped = props::STEPPED.iter().any(|(_, c)| *c == code);
+        match self.props.get(&code) {
+            Some(info) if !info.writable && stepped && self.has_control(code) => {
+                let list = match &info.form {
+                    Form::Enum { values, settable } => {
+                        if values.is_empty() {
+                            settable
+                        } else {
+                            values
+                        }
+                    }
+                    _ => {
+                        return Err(refused(
+                            "not_available",
+                            format!("property 0x{code:04X} lists no values to step through"),
+                        ))
+                    }
+                };
+                let target = list.iter().position(|v| *v == value).ok_or_else(|| {
+                    invalid(format!(
+                        "{} is not among the values the camera lists for 0x{code:04X}",
+                        value.to_json()
+                    ))
+                })?;
+                let current = list
+                    .iter()
+                    .position(|v| *v == info.current)
+                    .ok_or_else(|| {
+                        refused(
+                            "not_available",
+                            "the current value is not in the camera's list; use exposure_step",
+                        )
+                    })?;
+                let steps = (target as i128 - current as i128).clamp(-127, 127);
+                if steps == 0 {
+                    return Ok(vec![]);
+                }
+                Ok(vec![self.control(code, steps)?])
+            }
+            _ => Ok(vec![self.set_prop(code, value)?]),
+        }
     }
 
     fn control_op(&self, code: u16, value: PtpValue, datatype: u16) -> Result<Op, CommandError> {
@@ -1134,11 +2226,7 @@ impl SonyCamera {
             ));
         }
         let data = ds::encode(datatype, &value).map_err(invalid)?;
-        Ok(Op::with_data(
-            OP_CONTROL,
-            vec![code as u32, self.flag()],
-            data,
-        ))
+        Ok(Op::with_data(OP_CONTROL, self.code_params(code), data))
     }
 
     fn control(&self, code: u16, value: i128) -> Result<Op, CommandError> {
@@ -1157,6 +2245,16 @@ impl SonyCamera {
                 self.control(code, UP)?,
             ],
         })
+    }
+
+    /// The first of these buttons the camera offers (PTP 3 code first).
+    fn first_button(&self, codes: &[u16]) -> Result<Vec<Op>, CommandError> {
+        let code = codes
+            .iter()
+            .copied()
+            .find(|c| self.has_control(*c))
+            .unwrap_or(codes[0]);
+        self.button(code, None)
     }
 
     /// A property that behaves as a button (the push-auto functions).
@@ -1182,11 +2280,7 @@ impl SonyCamera {
             ));
         }
         let data = ds::encode(info.datatype, &PtpValue::Int(value)).map_err(invalid)?;
-        Ok(Op::with_data(
-            OP_SET_PROPERTY,
-            vec![code as u32, self.flag()],
-            data,
-        ))
+        Ok(Op::with_data(OP_SET_PROPERTY, self.code_params(code), data))
     }
 
     /// The range a speed property reports, for scaling a ±32767 speed.
@@ -1308,8 +2402,148 @@ impl SonyCamera {
         Ok(ch as usize - 1)
     }
 
+    fn get_live_view(&self) -> Result<Plan, CommandError> {
+        if let Some(url) = self.text_prop(0xD278).and_then(|u| parse_url(&u)) {
+            self.need_ssh("this camera's live view")?;
+            return Ok(Plan::Http(HttpPurpose::LiveView, url));
+        }
+        if let Some(info) = self.props.get(&0xD221) {
+            if info.current != PtpValue::Int(1) {
+                return Err(refused(
+                    "live_view_unavailable",
+                    "the camera reports live view unavailable now (Live View Status)",
+                ));
+            }
+        }
+        let mut ops = Vec::new();
+        if self.function == Function::RemoteWithTransfer
+            && !self.live_view_enabled
+            && self.has_control(0xD313)
+        {
+            ops.push(self.control(0xD313, DOWN)?);
+        }
+        let mut frame = Op::new(
+            OP_GET_OBJECT,
+            vec![LIVE_VIEW_HANDLE],
+            Step::LiveView { attempt: 0 },
+        );
+        frame.last = true;
+        ops.push(frame);
+        Ok(Plan::Ops(ops))
+    }
+
+    fn list_content(&self, params: &Params) -> Result<Plan, CommandError> {
+        let slot = param_int_or(params, "slot", 1)? as u32;
+        let limit = param_int_or(params, "limit", 100)? as u32;
+        if let Some(url) = self.profile_url(slot) {
+            self.need_ssh("this camera's clip list")?;
+            return Ok(Plan::Http(HttpPurpose::Profile { slot }, url));
+        }
+        match self.function {
+            Function::RemoteWithTransfer => {
+                let since = param_int_or(params, "since", 0)? as u64;
+                let mut op = Op::new(
+                    OP_GET_CONTENT_INFO_LIST,
+                    vec![since as u32, (since >> 32) as u32, limit, slot, 0],
+                    Step::Value(Parse::ContentList),
+                );
+                op.last = true;
+                Ok(Plan::Ops(vec![op]))
+            }
+            Function::ContentTransfer => {
+                let storage = (slot << 16) | 1;
+                Ok(Plan::Listing(
+                    slot,
+                    limit,
+                    Op::new(OP_GET_OBJECT_HANDLES, vec![storage, 0, 0], Step::ListHandles),
+                ))
+            }
+            Function::Remote => Err(refused(
+                "session_mode",
+                "the session is in remote control mode; switch_session_mode to remote_with_transfer or content_transfer to reach the card",
+            )),
+        }
+    }
+
+    fn download_content(&self, params: &Params, id: CommandId) -> Result<Plan, CommandError> {
+        if self.download.is_some() {
+            return Err(refused("busy", "another download is in progress"));
+        }
+        let content_id = param_str(params, "id")?;
+        let path = param_str(params, "path")?.to_string();
+        let bad = || invalid(format!("'{content_id}' is not an id from list_content"));
+        let mut parts = content_id.splitn(4, ':');
+        let new = |source, total| Download {
+            id,
+            path: path.clone(),
+            source,
+            offset: 0,
+            total,
+            name: None,
+            error: None,
+            closing: false,
+        };
+        match parts.next() {
+            Some("c") => {
+                if self.function != Function::RemoteWithTransfer {
+                    return Err(refused(
+                        "session_mode",
+                        "content list ids need remote_with_transfer mode",
+                    ));
+                }
+                let mut n = || {
+                    parts
+                        .next()
+                        .and_then(|p| p.parse::<u32>().ok())
+                        .ok_or_else(bad)
+                };
+                let (slot, content, file) = (n()?, n()?, n()?);
+                let total = self.sizes.get(content_id).copied();
+                let d = new(
+                    Source::Content {
+                        slot,
+                        content,
+                        file,
+                    },
+                    total,
+                );
+                let op = self.chunk_op(&d);
+                Ok(Plan::Download(d, op))
+            }
+            Some("o") => {
+                if self.function != Function::ContentTransfer {
+                    return Err(refused(
+                        "session_mode",
+                        "object ids need content_transfer mode",
+                    ));
+                }
+                let handle: u32 = parts.next().and_then(|p| p.parse().ok()).ok_or_else(bad)?;
+                let d = new(Source::Object(handle), None);
+                let op =
+                    Op::new(OP_GET_OBJECT_INFO, vec![handle], Step::DownloadInfo).for_command(id);
+                Ok(Plan::Download(d, Some(op)))
+            }
+            Some("m") => {
+                let slot: u32 = parts.next().and_then(|p| p.parse().ok()).ok_or_else(bad)?;
+                let uri = parts.next().ok_or_else(bad)?;
+                self.need_ssh("this camera's clips")?;
+                if self.http.is_some() {
+                    return Err(refused("busy", "another HTTP transfer is in progress"));
+                }
+                let url = self
+                    .profile_url(slot)
+                    .ok_or_else(|| {
+                        refused("not_reported", format!("no MediaProfile for slot {slot}"))
+                    })?
+                    .join(uri);
+                Ok(Plan::Download(new(Source::Http, None), None).with_http(url))
+            }
+            _ => Err(bad()),
+        }
+    }
+
     /// The operations for a command, or its immediate result.
-    fn plan(&self, name: &str, params: &Params) -> Result<Plan, CommandError> {
+    fn plan(&self, name: &str, params: &Params, id: CommandId) -> Result<Plan, CommandError> {
         let pressed = param_bool(params, "pressed");
         let ops = |v: Result<Op, CommandError>| v.map(|op| Plan::Ops(vec![op]));
         if let Some(prop) = props::by_command(name) {
@@ -1317,7 +2551,7 @@ impl SonyCamera {
                 .get("value")
                 .ok_or_else(|| invalid("'value' is required"))?;
             let wire = props::encode(prop.decode, value).map_err(invalid)?;
-            return ops(self.set_prop(prop.code, wire));
+            return Ok(Plan::Ops(self.set_value(prop.code, wire)?));
         }
         match name {
             "set_property" => {
@@ -1327,7 +2561,7 @@ impl SonyCamera {
                     .get("value")
                     .ok_or_else(|| invalid("'value' is required"))?;
                 let wire = raw_value(info.datatype, value)?;
-                ops(self.set_prop(code, wire))
+                Ok(Plan::Ops(self.set_value(code, wire)?))
             }
             "get_property" => {
                 let code = param_code(params)?;
@@ -1355,7 +2589,19 @@ impl SonyCamera {
                 } else {
                     (0xD016, Decode::Shutter64)
                 };
-                ops(self.set_prop(code, props::encode(decode, value).map_err(invalid)?))
+                Ok(Plan::Ops(self.set_value(
+                    code,
+                    props::encode(decode, value).map_err(invalid)?,
+                )?))
+            }
+            "exposure_step" => {
+                let target = param_str(params, "target")?;
+                let code = props::STEPPED
+                    .iter()
+                    .find(|(n, _)| *n == target)
+                    .map(|(_, c)| *c)
+                    .ok_or_else(|| invalid(format!("unknown target '{target}'")))?;
+                ops(self.control(code, param_int(params, "steps")?))
             }
             "set_tally" => {
                 let lamp = param_str(params, "lamp")?;
@@ -1398,7 +2644,7 @@ impl SonyCamera {
             }
             "shutter_half_press" => Ok(Plan::Ops(self.button(0xD2C1, pressed)?)),
             "shutter_full_press" => Ok(Plan::Ops(self.button(0xD2C2, pressed)?)),
-            "take_photo" => Ok(Plan::Ops(self.button(0xD2E6, None)?)),
+            "take_photo" => Ok(Plan::Ops(self.first_button(&[0xD2E6, 0xD2C7])?)),
             "record" => {
                 let on = param_bool(params, "recording")
                     .ok_or_else(|| invalid("'recording' is required"))?;
@@ -1406,9 +2652,28 @@ impl SonyCamera {
             }
             "record_toggle" => Ok(Plan::Ops(self.button(0xF001, None)?)),
             "ae_lock" => Ok(Plan::Ops(self.button(0xD2C3, pressed)?)),
+            "af_lock" => Ok(Plan::Ops(self.button(0xD2C4, pressed)?)),
             "awb_lock" => Ok(Plan::Ops(self.button(0xD2D9, pressed)?)),
             "fe_lock" => Ok(Plan::Ops(self.button(0xD2C9, pressed)?)),
             "tracking_af_on" => Ok(Plan::Ops(self.button(0xD30D, pressed)?)),
+            "af_mf_hold" => Ok(Plan::Ops(self.button(0xD2D2, pressed)?)),
+            "release_lock" => {
+                let locked =
+                    param_bool(params, "locked").ok_or_else(|| invalid("'locked' is required"))?;
+                ops(self.control(0xD2C5, if locked { DOWN } else { UP }))
+            }
+            "focus_magnifier" => Ok(Plan::Ops(self.button(0xD2CB, None)?)),
+            "focus_magnifier_cancel" => Ok(Plan::Ops(self.button(0xD2CC, None)?)),
+            "focus_step" => {
+                let code = match param_str(params, "direction")? {
+                    "near" => 0xD2D7,
+                    "far" => 0xD2D8,
+                    other => return Err(invalid(format!("unknown direction '{other}'"))),
+                };
+                Ok(Plan::Ops(self.button(code, None)?))
+            }
+            "hfr_standby" => Ok(Plan::Ops(self.button(0xD2D5, None)?)),
+            "hfr_recording_cancel" => Ok(Plan::Ops(self.button(0xD2D6, None)?)),
             "push_auto_focus" => Ok(Plan::Ops(self.prop_button(0xD05E, pressed)?)),
             "push_auto_iris" => Ok(Plan::Ops(self.prop_button(0xD05B, pressed)?)),
             "push_agc" => Ok(Plan::Ops(self.prop_button(0xD05C, pressed)?)),
@@ -1435,6 +2700,10 @@ impl SonyCamera {
             }
             "flicker_scan" => Ok(Plan::Ops(self.button(0xD2F1, None)?)),
             "format_media" => {
+                if !self.has_control(0xD2E2) && self.has_control(0xD2CA) {
+                    // Camera Control PTP 2: one card, formatted by a press.
+                    return Ok(Plan::Ops(self.button(0xD2CA, None)?));
+                }
                 let slot = param_int(params, "slot")?;
                 let quick = param_bool(params, "quick").unwrap_or(false);
                 ops(self.control(0xD2E2, slot + if quick { 0x10 } else { 0 }))
@@ -1486,6 +2755,169 @@ impl SonyCamera {
             }
             "preset_set" => ops(self.preset_ptzf(true, params)),
             "preset_clear" => ops(self.preset_ptzf(false, params)),
+            // Live view
+            "get_live_view_image" => self.get_live_view(),
+            // Content
+            "list_content" => self.list_content(params),
+            "download_content" => self.download_content(params, id),
+            "download_captured_image" => {
+                if self.download.is_some() {
+                    return Err(refused("busy", "another download is in progress"));
+                }
+                let d = Download {
+                    id,
+                    path: param_str(params, "path")?.to_string(),
+                    source: Source::Captured,
+                    offset: 0,
+                    total: None,
+                    name: None,
+                    error: None,
+                    closing: false,
+                };
+                let op = Op::new(
+                    OP_GET_OBJECT_INFO,
+                    vec![CAPTURED_HANDLE],
+                    Step::DownloadInfo,
+                )
+                .for_command(id);
+                Ok(Plan::Download(d, Some(op)))
+            }
+            "get_thumbnail" => {
+                let text = param_str(params, "id")?;
+                let parts: Vec<u32> = text
+                    .strip_prefix("c:")
+                    .map(|r| r.split(':').filter_map(|p| p.parse().ok()).collect())
+                    .unwrap_or_default();
+                let [slot, content, file] = parts[..] else {
+                    return Err(invalid(format!(
+                        "'{text}' is not a content list id (c:slot:content:file)"
+                    )));
+                };
+                let mut op = Op::new(
+                    OP_GET_CONTENT_COMPRESSED_DATA,
+                    vec![content, (slot << 24) | file, 1],
+                    Step::Value(Parse::Thumbnail),
+                );
+                op.last = true;
+                Ok(Plan::Ops(vec![op]))
+            }
+            "switch_session_mode" => {
+                let mode = param_str(params, "mode")?;
+                let function = Function::parse(mode)
+                    .ok_or_else(|| invalid(format!("unknown mode '{mode}'")))?;
+                if self.protocol == Protocol::Ptp2 && function != Function::Remote {
+                    return Err(refused(
+                        "session_mode",
+                        "Camera Control PTP 2 has only the remote control session mode",
+                    ));
+                }
+                Ok(Plan::Switch(function))
+            }
+            // FTP
+            "get_ftp_settings" => {
+                let mut op = Op::new(
+                    OP_GET_FTP_SETTING_LIST,
+                    vec![],
+                    Step::Value(Parse::FtpSettings),
+                );
+                op.last = true;
+                Ok(Plan::Ops(vec![op]))
+            }
+            "set_ftp_server" => {
+                if let Some(info) = self.props.get(&0xD09A) {
+                    if info.current != PtpValue::Int(1) {
+                        return Err(refused(
+                            "not_available",
+                            "the camera does not accept FTP settings now (FTPSettingList Operation Enable Status)",
+                        ));
+                    }
+                }
+                let server = ftp::FtpServerWrite {
+                    id: u16::try_from(param_int(params, "server_id")?)
+                        .map_err(|_| invalid("'server_id' is out of range"))?,
+                    name: param_str_or(params, "name").into(),
+                    host: param_str(params, "host")?.into(),
+                    port: u16::try_from(param_int_or(params, "port", 21)?)
+                        .map_err(|_| invalid("'port' is out of range"))?,
+                    user: param_str_or(params, "username").into(),
+                    password: params
+                        .get("password")
+                        .and_then(Value::as_str)
+                        .map(String::from),
+                    passive: param_bool(params, "passive").unwrap_or(true),
+                    directory: param_str_or(params, "directory").into(),
+                    secure: match params
+                        .get("secure")
+                        .and_then(Value::as_str)
+                        .unwrap_or("off")
+                    {
+                        "ftps" => 2,
+                        "sftp" => 3,
+                        _ => 1,
+                    },
+                    hierarchy: match param_str_or(params, "directory_hierarchy") {
+                        "same_as_camera" => 2,
+                        _ => 1,
+                    },
+                    overwrite: if param_bool(params, "overwrite").unwrap_or(false) {
+                        1
+                    } else {
+                        2
+                    },
+                    certificate_error: match param_str_or(params, "certificate_error") {
+                        "connect" => 1,
+                        _ => 2,
+                    },
+                };
+                let data = ftp::encode_setting_list(self.ftp_setting_version, &server);
+                let mut op = Op::with_data(OP_SET_FTP_SETTING_LIST, vec![], data);
+                op.last = true;
+                Ok(Plan::Ops(vec![op]))
+            }
+            "get_ftp_jobs" => {
+                let mut op = Op::new(OP_GET_FTP_JOB_LIST, vec![0], Step::Value(Parse::FtpJobs));
+                op.last = true;
+                Ok(Plan::Ops(vec![op]))
+            }
+            "add_ftp_job" => {
+                let job = ftp::NewJob {
+                    server: param_u32(params, "server_id")?,
+                    slot: param_u32(params, "slot")?,
+                    clip_path: param_str(params, "clip_path")?.into(),
+                    directory: param_str_or(params, "directory").into(),
+                    name: param_str_or(params, "name").into(),
+                };
+                let data = ftp::encode_job_add(self.ftp_job_version, &job).map_err(invalid)?;
+                ops(Ok(Op::with_data(OP_CONTROL_FTP_JOB_LIST, vec![1, 0], data)))
+            }
+            "ftp_job" => {
+                let action = param_str(params, "action")?;
+                let job =
+                    || -> Result<Vec<u32>, CommandError> { Ok(vec![param_u32(params, "job_id")?]) };
+                let (control, target, ids) = match action {
+                    "suspend" => (3, 0, Some(job()?)),
+                    "resume" => (4, 0, Some(job()?)),
+                    "delete" => (2, 1, Some(job()?)),
+                    "delete_all" => (2, 2, None),
+                    "delete_finished" => (2, 3, None),
+                    other => return Err(invalid(format!("unknown action '{other}'"))),
+                };
+                let data = ftp::encode_job_ids(self.ftp_job_version, ids.as_deref());
+                ops(Ok(Op::with_data(
+                    OP_CONTROL_FTP_JOB_LIST,
+                    vec![control, target],
+                    data,
+                )))
+            }
+            "get_ftp_result" => {
+                let mut op = Op::new(
+                    OP_GET_DISPLAY_FTP_RESULT,
+                    vec![param_u32(params, "slot")?],
+                    Step::Value(Parse::FtpResult),
+                );
+                op.last = true;
+                Ok(Plan::Ops(vec![op]))
+            }
             other => Err(CommandError::UnknownCommand {
                 command: other.into(),
             }),
@@ -1493,15 +2925,23 @@ impl SonyCamera {
     }
 }
 
-enum Plan {
-    Ops(Vec<Op>),
-    Value(Value),
-    Refresh,
+impl Plan {
+    /// An HTTP download: the download plus where it comes from.
+    fn with_http(self, url: Url) -> Plan {
+        match self {
+            Plan::Download(d, _) => Plan::HttpDownload(d, url),
+            other => other,
+        }
+    }
 }
 
 impl Module for SonyCamera {
     fn start(&mut self, cx: &mut Cx) {
-        let mut session = json!({"mode": self.mode.name()});
+        let mut session = json!({
+            "mode": self.mode.name(),
+            "protocol": self.protocol.name(),
+            "function_mode": self.function.name(),
+        });
         if self.mode == Mode::Pairing {
             session["pairing"] = Value::Null;
         }
@@ -1514,12 +2954,27 @@ impl Module for SonyCamera {
             cx.complete(id, Err(CommandError::NotConnected));
             return;
         }
-        match self.plan(name, params) {
+        if self.function == Function::ContentTransfer && !CONTENT_TRANSFER_COMMANDS.contains(&name)
+        {
+            cx.complete(
+                id,
+                Err(refused(
+                    "session_mode",
+                    "the camera is in content transfer mode and takes no remote control; switch_session_mode to remote or remote_with_transfer",
+                )),
+            );
+            return;
+        }
+        match self.plan(name, params, id) {
             Ok(Plan::Ops(ops)) => {
+                if ops.is_empty() {
+                    cx.complete(id, Ok(Outcome::Ack));
+                    return;
+                }
                 let count = ops.len();
                 for (i, mut op) in ops.into_iter().enumerate() {
                     op.command = Some(id);
-                    op.last = i + 1 == count;
+                    op.last = op.last || i + 1 == count;
                     self.commands.push_back(op);
                 }
                 self.pump(cx);
@@ -1532,11 +2987,74 @@ impl Module for SonyCamera {
                 self.commands.push_back(op);
                 self.pump(cx);
             }
+            Ok(Plan::Http(purpose, url)) => {
+                if self.http.is_some() {
+                    cx.complete(
+                        id,
+                        Err(refused("busy", "another HTTP transfer is in progress")),
+                    );
+                    return;
+                }
+                self.start_http(cx, id, purpose, url);
+            }
+            Ok(Plan::HttpDownload(d, url)) => {
+                self.download = Some(d);
+                self.start_http(cx, id, HttpPurpose::Download, url);
+            }
+            Ok(Plan::Download(d, op)) => {
+                let open_now = !matches!(op.as_ref().map(|o| &o.step), Some(Step::DownloadInfo));
+                if open_now {
+                    cx.file_open(FILE, d.path.clone());
+                }
+                self.download = Some(d);
+                if let Some(op) = op {
+                    self.commands.push_back(op);
+                }
+                self.pump(cx);
+            }
+            Ok(Plan::Listing(slot, limit, op)) => {
+                if self.listing.is_some() {
+                    cx.complete(id, Err(refused("busy", "another listing is in progress")));
+                    return;
+                }
+                self.listing = Some(Listing {
+                    id,
+                    slot,
+                    handles: VecDeque::new(),
+                    items: Vec::new(),
+                    total: limit as usize,
+                });
+                self.commands.push_back(op.for_command(id));
+                self.pump(cx);
+            }
+            Ok(Plan::Switch(function)) => {
+                if function == self.function {
+                    cx.complete(id, Ok(Outcome::Ack));
+                    return;
+                }
+                if self.function == Function::ContentTransfer {
+                    self.commands.push_back(
+                        Op::new(
+                            OP_SET_CONTENTS_TRANSFER_MODE,
+                            vec![2, 0, 0],
+                            Step::TransferMode,
+                        )
+                        .for_command(id),
+                    );
+                }
+                self.commands.push_back(
+                    Op::new(OP_CLOSE_SESSION, vec![], Step::Switch(function)).for_command(id),
+                );
+                self.pump(cx);
+            }
             Err(e) => cx.complete(id, Err(e)),
         }
     }
 
     fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
+        if socket == HTTP {
+            return self.http_input(cx, input);
+        }
         match input {
             TcpInput::Connected => match socket {
                 CMD if self.phase == Phase::ConnectingCommand => {
@@ -1599,6 +3117,41 @@ impl Module for SonyCamera {
         }
     }
 
+    fn file(&mut self, cx: &mut Cx, file: Key, input: FileInput) {
+        if file != FILE {
+            return;
+        }
+        let Some(d) = self.download.take() else {
+            return;
+        };
+        match input {
+            FileInput::Closed { bytes } => {
+                let result = match d.error {
+                    Some(e) => Err(refused("download_failed", e)),
+                    None => {
+                        let mut v = json!({"path": d.path, "bytes": bytes});
+                        if let Some(name) = d.name {
+                            v["name"] = json!(name);
+                        }
+                        Ok(Outcome::Value { value: v })
+                    }
+                };
+                cx.complete(d.id, result);
+            }
+            FileInput::Failed { message } => {
+                // Later chunks find no download and stop.
+                cx.complete(d.id, Err(refused("file", message)));
+                if self
+                    .http
+                    .as_ref()
+                    .is_some_and(|j| j.purpose == HttpPurpose::Download)
+                {
+                    self.end_http(cx);
+                }
+            }
+        }
+    }
+
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         match key {
             RETRY => {
@@ -1637,11 +3190,8 @@ impl Module for SonyCamera {
             }
             EXT_RETRY => {
                 if self.phase == Phase::Session {
-                    self.background.push_front(Op::new(
-                        OP_EXT_DEVICE_INFO,
-                        vec![INITIATOR_VERSION, 0],
-                        Step::ExtInfo { extended: false },
-                    ));
+                    let op = self.ext_info_op(false);
+                    self.background.push_front(op);
                     self.pump(cx);
                 }
             }
@@ -1650,6 +3200,9 @@ impl Module for SonyCamera {
                 if self.ready {
                     cx.set_timer(POLL, self.poll_every);
                 }
+            }
+            HTTP_TIMEOUT => {
+                self.fail_http(cx, CommandError::Timeout);
             }
             _ => {}
         }
@@ -1669,15 +3222,66 @@ impl Module for SonyCamera {
                 .encode(),
             );
         }
+        if self.http.is_some() {
+            cx.tcp_close(HTTP);
+        }
+        if self.download.is_some() {
+            cx.file_close(FILE);
+        }
         cx.tcp_close(EVT);
         cx.tcp_close(CMD);
+    }
+}
+
+impl SonyCamera {
+    fn http_input(&mut self, cx: &mut Cx, input: TcpInput) {
+        match input {
+            TcpInput::Connected => {
+                if let Some(job) = self.http.as_ref() {
+                    cx.tcp_send(HTTP, job.url.request());
+                }
+            }
+            TcpInput::Data(data) => {
+                let Some(job) = self.http.as_mut() else {
+                    return;
+                };
+                match job.reader.feed(&data) {
+                    Ok(events) => self.http_events(cx, events),
+                    Err(e) => self.fail_http(cx, refused("http", e)),
+                }
+            }
+            TcpInput::Closed { reason } => {
+                let Some(job) = self.http.as_mut() else {
+                    return;
+                };
+                match job.reader.closed() {
+                    Ok(events) => {
+                        self.http_events(cx, events);
+                        if self.http.is_some() {
+                            self.fail_http(
+                                cx,
+                                CommandError::Transport {
+                                    message: format!("HTTP stream closed: {reason}"),
+                                },
+                            );
+                        }
+                    }
+                    Err(e) => self.fail_http(
+                        cx,
+                        CommandError::Transport {
+                            message: format!("{e}: {reason}"),
+                        },
+                    ),
+                }
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::module::Action;
+    use crate::module::{Action, CommandResult};
     use crate::session::merge_patch;
     use ds::build;
     use std::net::Ipv4Addr;
@@ -1686,15 +3290,23 @@ mod tests {
         v.as_object().unwrap().clone()
     }
 
-    fn camera(s: Value) -> SonyCamera {
+    /// A camera of the given model; the session mode is remote control
+    /// unless the settings say otherwise.
+    fn camera_model(model: &str, s: Value) -> SonyCamera {
+        let mut s = settings(s);
+        s.entry("session_mode").or_insert(json!("remote"));
         SonyCamera::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
             port: None,
-            model: "ilce-7sm3".into(),
+            model: model.into(),
             channels: None,
-            settings: settings(s),
+            settings: s,
         })
         .unwrap()
+    }
+
+    fn camera(s: Value) -> SonyCamera {
+        camera_model("ilce-7sm3", s)
     }
 
     fn sent(actions: &[Action], key: Key) -> Vec<Packet> {
@@ -1787,8 +3399,39 @@ mod tests {
         ])
     }
 
+    /// What the simulated camera answers during the handshake.
+    struct Sim {
+        vendor: u32,
+        version: u16,
+        props: Vec<u8>,
+        controls: Vec<u16>,
+        operations: Vec<u16>,
+    }
+
+    impl Default for Sim {
+        fn default() -> Sim {
+            Sim {
+                vendor: 300,
+                version: 0x012C,
+                props: props_dataset(),
+                controls: vec![0xD2C1, 0xD2C2, 0xD2C8, 0xD2DD],
+                operations: vec![0x1001, 0x1002],
+            }
+        }
+    }
+
     /// Runs the whole connection sequence and returns the actions.
     fn connected(m: &mut SonyCamera, vendor: u32) -> Vec<Action> {
+        connected_with(
+            m,
+            Sim {
+                vendor,
+                ..Sim::default()
+            },
+        )
+    }
+
+    fn connected_with(m: &mut SonyCamera, sim: Sim) -> Vec<Action> {
         let mut cx = Cx::new(0);
         m.start(&mut cx);
         m.tcp(&mut cx, CMD, TcpInput::Connected);
@@ -1807,15 +3450,19 @@ mod tests {
         m.tcp(&mut cx, EVT, TcpInput::Connected);
         all.extend(cx.take());
         all.extend(feed(m, EVT, &[Packet::InitEventAck]));
-        // OpenSession, DeviceInfo, Connect 1 and 2, ExtInfo, Connect 3.
-        let mut replies: Vec<(u16, Vec<Packet>)> = Vec::new();
-        loop {
+        for _ in 0..20 {
             let (code, t, _) = last_request(&all);
             let packets = match code {
                 OP_GET_DEVICE_INFO => {
                     let mut v = data_in(
                         t,
-                        build::device_info("Sony Corporation", "ILCE-7SM3", "3.00", "5001"),
+                        build::device_info_with(
+                            &sim.operations,
+                            "Sony Corporation",
+                            "ILCE-7SM3",
+                            "3.00",
+                            "5001",
+                        ),
                     );
                     v.push(ok(t, vec![]));
                     v
@@ -1829,27 +3476,58 @@ mod tests {
                     let mut v = data_in(
                         t,
                         build::ext_device_info(
-                            0x012C,
+                            sim.version,
                             &[0x5005, 0x5007, 0xD21D],
-                            &[0xD2C1, 0xD2C2, 0xD2C8, 0xD2DD],
+                            &sim.controls,
                         ),
                     );
-                    v.push(ok(t, vec![vendor]));
+                    v.push(ok(
+                        t,
+                        if sim.version >= 300 {
+                            vec![sim.vendor]
+                        } else {
+                            vec![]
+                        },
+                    ));
                     v
                 }
                 OP_GET_ALL_PROPERTIES => {
-                    let mut v = data_in(t, props_dataset());
+                    let mut v = data_in(t, sim.props.clone());
                     v.push(ok(t, vec![]));
-                    replies.push((code, v.clone()));
                     all.extend(feed(m, CMD, &v));
                     return all;
                 }
                 _ => vec![ok(t, vec![])],
             };
-            replies.push((code, packets.clone()));
             all.extend(feed(m, CMD, &packets));
-            assert!(replies.len() < 20, "the handshake does not end");
         }
+        panic!("the handshake does not end");
+    }
+
+    /// Answers the pending request with data and OK.
+    fn answer(
+        m: &mut SonyCamera,
+        actions: &[Action],
+        payload: Vec<u8>,
+        params: Vec<u32>,
+    ) -> Vec<Action> {
+        let (_, t, _) = last_request(actions);
+        let mut packets = data_in(t, payload);
+        packets.push(ok(t, params));
+        feed(m, CMD, &packets)
+    }
+
+    fn run(m: &mut SonyCamera, id: CommandId, name: &str, p: Value) -> Vec<Action> {
+        let mut cx = Cx::new(10);
+        m.command(&mut cx, id, name, &settings(p));
+        cx.take()
+    }
+
+    fn completion(actions: &[Action], id: CommandId) -> Option<CommandResult> {
+        actions.iter().find_map(|a| match a {
+            Action::Complete { id: i, result } if *i == id => Some(result.clone()),
+            _ => None,
+        })
     }
 
     #[test]
@@ -2375,7 +4053,7 @@ mod tests {
         let spec = catalog.device("sony-camera").expect("the sony-camera spec");
         let m = camera(json!({}));
         for (name, command) in &spec.commands {
-            if let Err(CommandError::UnknownCommand { .. }) = m.plan(name, &Params::new()) {
+            if let Err(CommandError::UnknownCommand { .. }) = m.plan(name, &Params::new(), 0) {
                 panic!("the spec's '{name}' has no implementation");
             }
             if let Some(prop) = props::by_command(name) {
@@ -2414,5 +4092,553 @@ mod tests {
         put(&mut v, "a.b.c", json!(1));
         put(&mut v, "a.d", json!(2));
         assert_eq!(v, json!({"a": {"b": {"c": 1}, "d": 2}}));
+    }
+
+    // ----- Camera Control PTP 2 -----
+
+    fn ops_sent(actions: &[Action]) -> Vec<(u16, Vec<u32>)> {
+        sent(actions, CMD)
+            .into_iter()
+            .filter_map(|p| match p {
+                Packet::OperationRequest { code, params, .. } => Some((code, params)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn ptp2_props() -> Vec<u8> {
+        build::prop_array(&[
+            // F-number reported only, with the values it steps through.
+            build::enum_prop(0x5007, dt::UINT16, false, 1, 280, &[280, 400, 560]),
+            build::enum_prop(0x5005, dt::UINT16, true, 1, 2, &[2, 4]),
+            build::enum_prop(0xD221, dt::UINT8, false, 1, 1, &[]),
+        ])
+    }
+
+    #[test]
+    fn ptp2_bodies_announce_2_00_and_read_everything() {
+        let mut m = camera_model("ilce-7m3", json!({}));
+        let all = connected_with(
+            &mut m,
+            Sim {
+                version: 0x00C8,
+                props: ptp2_props(),
+                controls: vec![0x5007, 0xD2C1, 0xD2C7],
+                ..Sim::default()
+            },
+        );
+        let ops = ops_sent(&all);
+        assert!(ops.contains(&(OP_EXT_DEVICE_INFO, vec![0x00C8])));
+        assert_eq!(ops.last().unwrap(), &(OP_GET_ALL_PROPERTIES, vec![]));
+        assert!(ops.contains(&(OP_OPEN_SESSION, vec![1])));
+        let s = state(&all);
+        assert_eq!(s["session"]["protocol"], "ptp2");
+        assert_eq!(s["exposure"]["iris"], 2.8);
+
+        // A writable property: just the code as parameter.
+        let a = run(&mut m, 1, "set_white_balance", json!({"value": "daylight"}));
+        assert_eq!(last_request(&a).2, vec![0x5005]);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Ok(Outcome::Ack)
+        }));
+        // The read after it is a full one.
+        assert_eq!(last_request(&a).2, Vec::<u32>::new());
+        answer(&mut m, &a, ptp2_props(), vec![]);
+
+        // A reported-only value: two steps up the camera's list.
+        let a = run(&mut m, 2, "set_iris", json!({"value": 5.6}));
+        let packets = sent(&a, CMD);
+        assert!(
+            matches!(&packets[0], Packet::OperationRequest { code: OP_CONTROL, params, .. } if params == &vec![0x5007])
+        );
+        assert!(matches!(&packets[2], Packet::EndData { payload, .. } if payload == &vec![2]));
+        let a = answer(&mut m, &a, vec![], vec![]);
+        answer(&mut m, &a, ptp2_props(), vec![]);
+        // Already there: nothing to send.
+        let a = run(&mut m, 3, "set_iris", json!({"value": 2.8}));
+        assert_eq!(completion(&a, 3), Some(Ok(Outcome::Ack)));
+        assert!(sent(&a, CMD).is_empty());
+        // One-shot release where the PTP 3 button is missing.
+        let a = run(&mut m, 4, "take_photo", json!({}));
+        assert!(
+            matches!(&sent(&a, CMD)[0], Packet::OperationRequest { params, .. } if params == &vec![0xD2C7])
+        );
+        // Transfer modes do not exist in PTP 2.
+        let a = run(
+            &mut m,
+            5,
+            "switch_session_mode",
+            json!({"mode": "content_transfer"}),
+        );
+        assert!(matches!(
+            completion(&a, 5),
+            Some(Err(CommandError::DeviceError { .. }))
+        ));
+    }
+
+    #[test]
+    fn a_ptp2_answer_to_a_ptp3_request_switches_protocol() {
+        let mut m = camera(json!({}));
+        let all = connected_with(
+            &mut m,
+            Sim {
+                version: 0x00C8,
+                ..Sim::default()
+            },
+        );
+        assert!(all.contains(&Action::Connection(Connection::Connected)));
+        assert_eq!(state(&all)["session"]["protocol"], "ptp2");
+        assert_eq!(
+            ops_sent(&all).last().unwrap(),
+            &(OP_GET_ALL_PROPERTIES, vec![])
+        );
+    }
+
+    // ----- live view -----
+
+    #[test]
+    fn live_view_frames_with_a_retry_when_asked_too_soon() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        let a = run(&mut m, 7, "get_live_view_image", json!({}));
+        assert_eq!(last_request(&a), (OP_GET_OBJECT, 7, vec![LIVE_VIEW_HANDLE]));
+        // No image yet.
+        let a = answer(&mut m, &a, vec![16, 0, 0, 0, 0, 0, 0, 0], vec![]);
+        assert!(a.contains(&Action::SetTimer {
+            key: PAUSE,
+            after: LIVE_VIEW_RETRY
+        }));
+        let mut cx = Cx::new(60);
+        m.timer(&mut cx, PAUSE);
+        let a = cx.take();
+        assert_eq!(last_request(&a).0, OP_GET_OBJECT);
+        let jpeg = content::build::jpeg(1024, 576);
+        let a = answer(&mut m, &a, content::build::live_view(&jpeg, true), vec![]);
+        match completion(&a, 7) {
+            Some(Ok(Outcome::Value { value })) => {
+                assert_eq!(value["width"], 1024);
+                assert_eq!(value["height"], 576);
+                assert_eq!(value["image"], b64(&jpeg));
+                assert_eq!(value["focal_frame_info"], b64(&[7; 4]));
+            }
+            other => panic!("expected a frame, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pan_tilt_live_view_is_read_over_http_through_the_tunnel() {
+        let mut m = camera(json!({"connection": "ssh", "ssh_username": "u", "ssh_password": "p"}));
+        let mut props = vec![build::string_prop(
+            0xD278,
+            "http://localhost:8080/liveview/stream",
+        )];
+        props.push(build::enum_prop(0xD221, dt::UINT8, false, 1, 1, &[]));
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&props),
+                ..Sim::default()
+            },
+        );
+        let a = run(&mut m, 8, "get_live_view_image", json!({}));
+        let tunnel = a
+            .iter()
+            .find_map(|x| match x {
+                Action::TcpOpenSsh { socket, tunnel } if *socket == HTTP => Some(tunnel.clone()),
+                _ => None,
+            })
+            .expect("an HTTP stream through the tunnel");
+        assert_eq!(
+            (tunnel.target_host.as_str(), tunnel.target_port),
+            ("localhost", 8080)
+        );
+        let mut cx = Cx::new(20);
+        m.tcp(&mut cx, HTTP, TcpInput::Connected);
+        let a = cx.take();
+        let request = a
+            .iter()
+            .find_map(|x| match x {
+                Action::TcpSend { socket, data } if *socket == HTTP => {
+                    Some(String::from_utf8(data.clone()).unwrap())
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert!(request.starts_with("GET /liveview/stream HTTP/1.1\r\n"));
+        let jpeg = content::build::jpeg(640, 360);
+        let dataset = content::build::live_view(&jpeg, true);
+        let mut response = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n".to_vec();
+        response.extend_from_slice(format!("{:x}\r\n", dataset.len()).as_bytes());
+        response.extend_from_slice(&dataset);
+        response.extend_from_slice(b"\r\n");
+        let mut cx = Cx::new(30);
+        m.tcp(&mut cx, HTTP, TcpInput::Data(response));
+        let a = cx.take();
+        assert!(
+            matches!(completion(&a, 8), Some(Ok(Outcome::Value { value })) if value["width"] == 640)
+        );
+        assert!(a.contains(&Action::TcpClose { socket: HTTP }));
+    }
+
+    // ----- content -----
+
+    #[test]
+    fn remote_with_transfer_lists_and_downloads_content() {
+        let mut m = camera(json!({"session_mode": "auto"}));
+        let all = connected(&mut m, 300);
+        assert_eq!(ops_sent(&all)[0], (OP_SDIO_OPEN_SESSION, vec![1, 2]));
+        assert_eq!(
+            state(&all)["session"]["function_mode"],
+            "remote_with_transfer"
+        );
+
+        let a = run(&mut m, 9, "list_content", json!({"slot": 1, "limit": 50}));
+        assert_eq!(last_request(&a).2, vec![0, 0, 50, 1, 0]);
+        let list = content::build::content_info_list(1, 42, "DCIM/100MSDCF/DSC00001.JPG", 10);
+        let a = answer(&mut m, &a, list, vec![]);
+        let Some(Ok(Outcome::Value { value })) = completion(&a, 9) else {
+            panic!("no listing")
+        };
+        assert_eq!(value["items"][0]["files"][0]["id"], "c:1:42:1");
+
+        let a = run(
+            &mut m,
+            10,
+            "download_content",
+            json!({"id": "c:1:42:1", "path": "/tmp/x.jpg"}),
+        );
+        assert!(a.contains(&Action::FileOpen {
+            file: FILE,
+            path: "/tmp/x.jpg".into()
+        }));
+        assert_eq!(
+            last_request(&a),
+            (OP_GET_CONTENT_DATA, 8, vec![42, (1 << 24) | 1, 0, 0, CHUNK])
+        );
+        let a = answer(&mut m, &a, b"0123456789".to_vec(), vec![]);
+        assert!(a.contains(&Action::FileWrite {
+            file: FILE,
+            data: b"0123456789".to_vec()
+        }));
+        assert!(a.contains(&Action::FileClose { file: FILE }));
+        let mut cx = Cx::new(40);
+        m.file(&mut cx, FILE, FileInput::Closed { bytes: 10 });
+        assert_eq!(
+            completion(&cx.take(), 10),
+            Some(Ok(Outcome::Value {
+                value: json!({"path": "/tmp/x.jpg", "bytes": 10})
+            }))
+        );
+    }
+
+    #[test]
+    fn content_transfer_mode_turns_transfer_on_and_refuses_control() {
+        let mut m = camera(json!({"session_mode": "content_transfer"}));
+        let all = connected(&mut m, 300);
+        let ops = ops_sent(&all);
+        assert_eq!(ops[0], (OP_SDIO_OPEN_SESSION, vec![1, 1]));
+        assert!(ops.contains(&(OP_SET_CONTENTS_TRANSFER_MODE, vec![2, 1, 0])));
+        let a = run(
+            &mut m,
+            11,
+            "set_white_balance",
+            json!({"value": "daylight"}),
+        );
+        assert!(
+            matches!(completion(&a, 11), Some(Err(CommandError::DeviceError { code: Some(c), .. })) if c == "session_mode")
+        );
+
+        // Listing: the handles on the card, then each one's ObjectInfo.
+        let a = run(&mut m, 12, "list_content", json!({"slot": 2}));
+        assert_eq!(
+            last_request(&a),
+            (OP_GET_OBJECT_HANDLES, 8, vec![0x0002_0001, 0, 0])
+        );
+        let a = answer(&mut m, &a, vec![1, 0, 0, 0, 0x33, 0, 0, 0], vec![]);
+        assert_eq!(last_request(&a).2, vec![0x33]);
+        let mut info = Vec::new();
+        info.extend_from_slice(&0x0002_0001u32.to_le_bytes());
+        info.extend_from_slice(&0x3801u16.to_le_bytes());
+        info.extend_from_slice(&0u16.to_le_bytes());
+        info.extend_from_slice(&3u32.to_le_bytes());
+        info.extend_from_slice(&0u16.to_le_bytes());
+        for v in [0u32; 7] {
+            info.extend_from_slice(&v.to_le_bytes());
+        }
+        info.extend_from_slice(&0u16.to_le_bytes());
+        info.extend_from_slice(&[0; 8]);
+        ds::write_string(&mut info, "DSC00051.JPG");
+        let a = answer(&mut m, &a, info.clone(), vec![]);
+        let Some(Ok(Outcome::Value { value })) = completion(&a, 12) else {
+            panic!("no listing")
+        };
+        assert_eq!(value["items"][0]["id"], "o:51");
+        assert_eq!(value["items"][0]["name"], "DSC00051.JPG");
+
+        // Download: ObjectInfo for the size, then partial reads.
+        let a = run(
+            &mut m,
+            13,
+            "download_content",
+            json!({"id": "o:51", "path": "out.jpg"}),
+        );
+        assert_eq!(last_request(&a).0, OP_GET_OBJECT_INFO);
+        let a = answer(&mut m, &a, info, vec![]);
+        assert!(a.contains(&Action::FileOpen {
+            file: FILE,
+            path: "out.jpg".into()
+        }));
+        assert_eq!(last_request(&a).2, vec![51, 0, 0, CHUNK]);
+        let a = answer(&mut m, &a, b"abc".to_vec(), vec![3]);
+        assert!(a.contains(&Action::FileClose { file: FILE }));
+        let mut cx = Cx::new(50);
+        m.file(&mut cx, FILE, FileInput::Closed { bytes: 3 });
+        assert!(
+            matches!(completion(&cx.take(), 13), Some(Ok(Outcome::Value { value })) if value["name"] == "DSC00051.JPG")
+        );
+
+        // Back to remote control: CloseSession, then a new connection.
+        let a = run(&mut m, 14, "switch_session_mode", json!({"mode": "remote"}));
+        assert_eq!(last_request(&a).0, OP_SET_CONTENTS_TRANSFER_MODE);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert_eq!(last_request(&a).0, OP_CLOSE_SESSION);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert_eq!(completion(&a, 14), Some(Ok(Outcome::Ack)));
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::TcpOpen { socket: CMD, .. })));
+        assert_eq!(m.function, Function::Remote);
+    }
+
+    #[test]
+    fn a_failed_file_ends_the_download() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        let a = run(
+            &mut m,
+            15,
+            "download_captured_image",
+            json!({"path": "shot.jpg"}),
+        );
+        assert_eq!(
+            last_request(&a),
+            (OP_GET_OBJECT_INFO, 7, vec![CAPTURED_HANDLE])
+        );
+        let mut info = vec![0u8; 52];
+        info.push(0);
+        info.extend_from_slice(&[0, 0, 0]);
+        let a = answer(&mut m, &a, info, vec![]);
+        assert_eq!(last_request(&a), (OP_GET_OBJECT, 8, vec![CAPTURED_HANDLE]));
+        let mut cx = Cx::new(60);
+        m.file(
+            &mut cx,
+            FILE,
+            FileInput::Failed {
+                message: "disk full".into(),
+            },
+        );
+        assert!(matches!(
+            completion(&cx.take(), 15),
+            Some(Err(CommandError::DeviceError { .. }))
+        ));
+        // The camera's data still arrives and is dropped without a second completion.
+        let a = answer(&mut m, &a, vec![1, 2, 3], vec![]);
+        assert!(completion(&a, 15).is_none());
+    }
+
+    #[test]
+    fn a_session_mode_the_camera_refuses_falls_back_to_remote() {
+        let mut m = camera(json!({"session_mode": "remote_with_transfer"}));
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, CMD, TcpInput::Connected);
+        cx.take();
+        feed(
+            &mut m,
+            CMD,
+            &[Packet::InitCommandAck {
+                connection: 1,
+                guid: [0; 16],
+                name: "x".into(),
+                version: PROTOCOL_VERSION,
+            }],
+        );
+        let mut cx = Cx::new(0);
+        m.tcp(&mut cx, EVT, TcpInput::Connected);
+        cx.take();
+        feed(&mut m, EVT, &[Packet::InitEventAck]);
+        let a = feed(
+            &mut m,
+            CMD,
+            &[Packet::OperationResponse {
+                code: 0x2006,
+                transaction: 0,
+                params: vec![],
+            }],
+        );
+        assert_eq!(last_request(&a), (OP_OPEN_SESSION, 0, vec![1]));
+        assert_eq!(m.function, Function::Remote);
+    }
+
+    #[test]
+    fn video_only_clips_come_from_the_media_profile() {
+        let mut m = camera_model(
+            "ilme-fx6",
+            json!({"connection": "ssh", "ssh_username": "u", "ssh_password": "p"}),
+        );
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&[build::string_prop(
+                    0xD031,
+                    "http://localhost:8080/A/MEDIAPRO.XML",
+                )]),
+                ..Sim::default()
+            },
+        );
+        run(&mut m, 16, "list_content", json!({"slot": 1}));
+        let mut cx = Cx::new(20);
+        m.tcp(&mut cx, HTTP, TcpInput::Connected);
+        cx.take();
+        let xml = r#"<MediaProfile><Contents><Material uri="./Clip/C0001.MXF" type="MXF" dur="10"/></Contents></MediaProfile>"#;
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{xml}",
+            xml.len()
+        );
+        let mut cx = Cx::new(30);
+        m.tcp(&mut cx, HTTP, TcpInput::Data(response.into_bytes()));
+        let a = cx.take();
+        assert!(
+            matches!(completion(&a, 16), Some(Ok(Outcome::Value { value })) if value["items"][0]["id"] == "m:1:./Clip/C0001.MXF")
+        );
+
+        // The clip itself, streamed to the file.
+        let a = run(
+            &mut m,
+            17,
+            "download_content",
+            json!({"id": "m:1:./Clip/C0001.MXF", "path": "c.mxf"}),
+        );
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::TcpOpenSsh { socket: HTTP, .. })));
+        let mut cx = Cx::new(40);
+        m.tcp(&mut cx, HTTP, TcpInput::Connected);
+        let request = String::from_utf8(match &cx.take()[0] {
+            Action::TcpSend { data, .. } => data.clone(),
+            other => panic!("{other:?}"),
+        })
+        .unwrap();
+        assert!(request.starts_with("GET /A/Clip/C0001.MXF HTTP/1.1"));
+        let mut cx = Cx::new(50);
+        m.tcp(
+            &mut cx,
+            HTTP,
+            TcpInput::Data(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nclip".to_vec()),
+        );
+        let a = cx.take();
+        assert!(a.contains(&Action::FileOpen {
+            file: FILE,
+            path: "c.mxf".into()
+        }));
+        assert!(a.contains(&Action::FileWrite {
+            file: FILE,
+            data: b"clip".to_vec()
+        }));
+        assert!(a.contains(&Action::FileClose { file: FILE }));
+        let mut cx = Cx::new(60);
+        m.file(&mut cx, FILE, FileInput::Closed { bytes: 4 });
+        assert!(
+            matches!(completion(&cx.take(), 17), Some(Ok(Outcome::Value { value })) if value["name"] == "C0001.MXF")
+        );
+    }
+
+    // ----- FTP -----
+
+    #[test]
+    fn ftp_settings_round_trip_without_echoing_passwords() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        let a = run(&mut m, 20, "get_ftp_settings", json!({}));
+        assert_eq!(last_request(&a).0, OP_GET_FTP_SETTING_LIST);
+        let a = answer(
+            &mut m,
+            &a,
+            ftp::build::setting_list(101, &[(1, "News", "ftp.example")]),
+            vec![],
+        );
+        let s = state(&a);
+        assert_eq!(s["ftp"]["servers"]["1"]["host"], "ftp.example");
+        assert_eq!(s["ftp"]["servers"]["1"]["password_set"], true);
+        assert!(
+            matches!(completion(&a, 20), Some(Ok(Outcome::Value { value })) if value["version"] == 101)
+        );
+
+        let a = run(
+            &mut m,
+            21,
+            "set_ftp_server",
+            json!({"server_id": 1, "host": "10.1.1.1", "username": "cam", "password": "hunter2", "secure": "ftps"}),
+        );
+        let packets = sent(&a, CMD);
+        let Packet::EndData { payload, .. } = &packets[2] else {
+            panic!("no data")
+        };
+        let (_, servers) = ftp::parse_setting_list(payload).unwrap();
+        assert_eq!(
+            (servers[0].host.as_str(), servers[0].secure),
+            ("10.1.1.1", 2)
+        );
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert_eq!(completion(&a, 21), Some(Ok(Outcome::Ack)));
+        // The list is read back into the state; the password never appears.
+        assert!(!format!("{a:?}").contains("hunter2\""));
+    }
+
+    #[test]
+    fn ftp_jobs_follow_the_sync_id() {
+        let mut m = camera_model("ilme-fx6", json!({}));
+        let props = build::prop_array(&[build::range_prop(
+            0xD02A,
+            dt::UINT32,
+            false,
+            4,
+            (0, 0xFFFF, 1),
+        )]);
+        let all = connected_with(
+            &mut m,
+            Sim {
+                props,
+                operations: vec![0x1001, 0x1002, OP_GET_FTP_JOB_LIST, OP_CONTROL_FTP_JOB_LIST],
+                ..Sim::default()
+            },
+        );
+        // A new sync id: the job list is read.
+        assert_eq!(last_request(&all).0, OP_GET_FTP_JOB_LIST);
+        let a = answer(
+            &mut m,
+            &all,
+            ftp::build::job_list(101, 4, &[(5, 0x200, "C0001.MXF")]),
+            vec![],
+        );
+        assert_eq!(state(&a)["ftp"]["jobs"]["5"]["status"], "transferring");
+
+        let a = run(
+            &mut m,
+            22,
+            "add_ftp_job",
+            json!({"server_id": 1, "slot": 1, "clip_path": "/Clip/C0002.MXF"}),
+        );
+        assert_eq!(last_request(&a).2, vec![1, 0]);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert_eq!(completion(&a, 22), Some(Ok(Outcome::Ack)));
+        run(&mut m, 23, "ftp_job", json!({"action": "delete_finished"}));
+        // Queued behind the job list read the add triggered.
+        assert!(m
+            .commands
+            .iter()
+            .any(|op| op.code == OP_CONTROL_FTP_JOB_LIST && op.params == vec![2, 3]));
     }
 }

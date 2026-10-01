@@ -559,6 +559,57 @@ pub(crate) const AUDIO_INPUT: &[(i128, &str)] = &[
     (8, "mic_jack_right"),
 ];
 
+const LIVE_VIEW_QUALITY: &[(i128, &str)] = &[(1, "low"), (2, "high")];
+const FTP_STATUS: &[(i128, &str)] = &[
+    (1, "connecting"),
+    (2, "connected"),
+    (3, "connected_certificate_error"),
+    (4, "error"),
+];
+const FTP_ERROR: &[(i128, &str)] = &[
+    (0x00, "none"),
+    (0x01, "camera_system_error"),
+    (0x02, "wifi_hardware_error"),
+    (0x03, "wired_lan_hardware_error"),
+    (0x04, "access_point_not_registered"),
+    (0x05, "access_point_not_found"),
+    (0x06, "access_point_connection_error"),
+    (0x07, "access_point_password_error"),
+    (0x08, "wep_key_or_static_ip_error"),
+    (0x09, "wep_key_or_ip_address_error"),
+    (0x0A, "dhcp_error"),
+    (0x0B, "dns_error"),
+    (0x0C, "airplane_mode"),
+    (0x0D, "lan_cable_error"),
+    (0x0E, "server_not_set"),
+    (0x0F, "server_login_error"),
+    (0x10, "server_disconnected"),
+    (0x11, "certificate_error"),
+    (0x12, "directory_create_error"),
+    (0x13, "permission_or_capacity_error"),
+    (0x14, "usb_lan_adapter_not_recognised"),
+    (0x15, "usb_tethering_not_recognised"),
+    (0x16, "check_connected_device"),
+    (0x17, "reconnecting_to_server"),
+    (0x18, "transfer_failed_reconnecting"),
+    (0xFFFF, "unknown"),
+];
+const FTP_AUTO_TARGET: &[(i128, &str)] = &[(1, "still"), (2, "movie"), (3, "still_and_movie")];
+const FTP_STILL_TARGET: &[(i128, &str)] = &[(1, "all"), (2, "protected_only")];
+const FTP_MOVIE_TARGET: &[(i128, &str)] =
+    &[(1, "all"), (2, "shot_mark_only"), (3, "protected_only")];
+const FTP_FILE_TARGET: &[(i128, &str)] = &[
+    (1, "jpeg_heif_only"),
+    (2, "raw_only"),
+    (3, "raw_and_jpeg_heif"),
+];
+const FTP_PROXY_TARGET: &[(i128, &str)] = &[
+    (1, "proxy_only"),
+    (2, "original_only"),
+    (3, "proxy_and_original"),
+];
+const FTP_STILL_SIZE: &[(i128, &str)] = &[(1, "small"), (2, "large")];
+
 use Decode::*;
 
 /// The operator-facing properties: their state paths, readings and typed
@@ -657,6 +708,12 @@ pub(crate) const PROPS: &[Prop] = &[
         "exposure.metering",
         Labels(METERING),
         Some("set_metering_mode"),
+    ),
+    p(
+        0xD200,
+        "exposure.flash_compensation",
+        Scaled(1000.0),
+        Some("set_flash_compensation"),
     ),
     p(0xD237, "exposure.step", Scaled(100.0), None),
     p(0xD217, "exposure.ae_locked", OnOff, None),
@@ -1057,6 +1114,89 @@ pub(crate) const PROPS: &[Prop] = &[
     p(0xE0BE, "pan_tilt.pan_limit.enabled", OnOff, None),
     p(0xE0BF, "pan_tilt.tilt_limit.enabled", OnOff, None),
     p(0xE0CB, "pan_tilt.preset_slots", Raw, None),
+    // Live view
+    p(0xD221, "live_view.available", Flag, None),
+    p(0xD278, "live_view.url", Raw, None),
+    p(
+        0xD26A,
+        "live_view.quality",
+        Labels(LIVE_VIEW_QUALITY),
+        Some("set_live_view_quality"),
+    ),
+    p(
+        0xE0CE,
+        "live_view.quality_level",
+        Raw,
+        Some("set_live_view_quality_level"),
+    ),
+    // Content transfer
+    p(0xD295, "content.transfer_ready", Flag, None),
+    p(0xD1D4, "content.slot1.list_available", Flag, None),
+    p(0xD1D5, "content.slot2.list_available", Flag, None),
+    p(0xD1D6, "content.slot1.list_regenerated", Raw, None),
+    p(0xD1D7, "content.slot2.list_regenerated", Raw, None),
+    p(0xE0D9, "content.slot1.list_updated", Raw, None),
+    p(0xE0DA, "content.slot2.list_updated", Raw, None),
+    p(0xD031, "media.slot1.profile_url", Raw, None),
+    p(0xD032, "media.slot2.profile_url", Raw, None),
+    p(0xD191, "media.slot3.profile_url", Raw, None),
+    // FTP upload by the camera
+    p(0xD041, "ftp.enabled", OnOff, Some("set_ftp_function")),
+    p(
+        0xD04E,
+        "ftp.auto_transfer",
+        OnOff,
+        Some("set_auto_ftp_transfer"),
+    ),
+    p(
+        0xD04F,
+        "ftp.auto_transfer_target",
+        Labels(FTP_AUTO_TARGET),
+        Some("set_auto_ftp_transfer_target"),
+    ),
+    p(
+        0xD216,
+        "ftp.auto_transfer_stills",
+        Labels(FTP_STILL_TARGET),
+        Some("set_auto_ftp_transfer_stills"),
+    ),
+    p(
+        0xD199,
+        "ftp.auto_transfer_movies",
+        Labels(FTP_MOVIE_TARGET),
+        Some("set_auto_ftp_transfer_movies"),
+    ),
+    p(
+        0xD19A,
+        "ftp.transfer_files",
+        Labels(FTP_FILE_TARGET),
+        Some("set_ftp_transfer_files"),
+    ),
+    p(
+        0xD14B,
+        "ftp.transfer_proxy",
+        Labels(FTP_PROXY_TARGET),
+        Some("set_ftp_transfer_proxy"),
+    ),
+    p(
+        0xD14A,
+        "ftp.still_size",
+        Labels(FTP_STILL_SIZE),
+        Some("set_ftp_still_size"),
+    ),
+    p(0xD14C, "ftp.power_save", OnOff, Some("set_ftp_power_save")),
+    p(
+        0xD225,
+        "ftp.protect_after_transfer",
+        OnOff,
+        Some("set_ftp_protect_after_transfer"),
+    ),
+    p(0xD27C, "ftp.server", Raw, Some("select_ftp_server")),
+    p(0xD02E, "ftp.server_id", Raw, Some("select_ftp_server_id")),
+    p(0xD27F, "ftp.connection_status", Labels(FTP_STATUS), None),
+    p(0xD280, "ftp.connection_error", Labels(FTP_ERROR), None),
+    p(0xD09A, "ftp.settings_editable", Flag, None),
+    p(0xD02A, "ftp.job_sync_id", Raw, None),
 ];
 
 /// Properties read by code that has its own commands: tally lamps by colour,
@@ -1427,6 +1567,26 @@ pub(crate) const CONTROL_TYPES: &[(u16, u16)] = &[
     (0xF00C, dt::UINT16),
     (0xF012, dt::UINT16),
     (0xF015, dt::UINT16),
+    // Camera Control PTP 2: step controls for values its properties only
+    // report, and its own buttons.
+    (0x5007, dt::INT8),
+    (0x5010, dt::INT8),
+    (0xD200, dt::INT8),
+    (0xD20D, dt::INT8),
+    (0xD21E, dt::INT8),
+    (0xD2C4, dt::UINT16),
+    (0xD2C5, dt::UINT16),
+    (0xD2C7, dt::UINT16),
+    (0xD2CA, dt::UINT16),
+    (0xD2CB, dt::UINT16),
+    (0xD2CC, dt::UINT16),
+    (0xD2D2, dt::UINT16),
+    (0xD2D3, dt::UINT16),
+    (0xD2D4, dt::UINT16),
+    (0xD2D5, dt::UINT16),
+    (0xD2D6, dt::UINT16),
+    (0xD2D7, dt::UINT16),
+    (0xD2D8, dt::UINT16),
 ];
 
 pub(crate) fn control_type(code: u16) -> Option<u16> {
@@ -1435,6 +1595,16 @@ pub(crate) fn control_type(code: u16) -> Option<u16> {
         .find(|(c, _)| *c == code)
         .map(|(_, t)| *t)
 }
+
+/// Values a Camera Control PTP 2 camera reports as properties but changes
+/// only by steps, through a control of the same code.
+pub(crate) const STEPPED: [(&str, u16); 5] = [
+    ("iris", 0x5007),
+    ("exposure_compensation", 0x5010),
+    ("flash_compensation", 0xD200),
+    ("shutter_speed", 0xD20D),
+    ("iso", 0xD21E),
+];
 
 /// Remote keys for menu navigation, by name.
 pub(crate) const REMOTE_KEYS: &[(&str, u16)] = &[

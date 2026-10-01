@@ -1,6 +1,6 @@
 spec: 1
 id: sony-camera
-name: Sony cameras over Camera Control PTP 3 (Alpha, FX, ZV, cinema line, pan/tilt)
+name: Sony cameras over Camera Control PTP 3 and PTP 2 (Alpha, FX, ZV, cinema line, pan/tilt)
 vendor: Sony
 category: camera
 implementation: native
@@ -10,11 +10,17 @@ reason: >
   connection number the camera assigns; one PTP transaction at a time, with
   data phases split across Start Data and End Data packets. Sony's
   authentication follows (SDIO_Connect in three phases around
-  SDIO_GetExtDeviceInfo, which is repeated until it returns data), and the
-  camera's state is a binary property-description array whose values, forms
-  and enumerations are typed per property and read again on events and on a
-  poll. Pairing waits on an operator's approval at the camera, and secured
-  cameras take PTP-IP only through an SSH tunnel.
+  SDIO_GetExtDeviceInfo, which is repeated until it returns data), the session
+  is opened in one of three function modes that decide what else the camera
+  allows, and the camera's state is a binary property-description array whose
+  values, forms and enumerations are typed per property and read again on
+  events and on a poll. Camera Control PTP 2 bodies change some values only by
+  steps, computed from the camera's own value list. Live view, content lists and
+  downloads are binary datasets on the same transaction queue, downloads are
+  streamed to a file, and pan/tilt and video-only bodies serve live view and
+  clips over HTTP on their own localhost, reached through the SSH tunnel.
+  Pairing waits on an operator's approval at the camera, and secured cameras
+  take PTP-IP only through an SSH tunnel.
 
 source:
   - title: "Camera Control PTP 3 Reference (Camera Remote Command 2.02.00, document dated June 2026)"
@@ -24,29 +30,50 @@ source:
       redistributed and nothing from it is copied here. Used: Overview; For Connections Using
       PTP-IP (TCP 15740, camera settings, Device Discovery with dd.xml and DigitalImagingDesc.xml,
       Connection by SSH, Connection by Pairing); Connect; Get Property; Set Property; Send Control
-      Command; About Events; Live View for Pan/Tilt Type Cameras; Disconnect; Command List
+      Command; About Events; Get Image File; Live View; Live View for Pan/Tilt Type Cameras;
+      Content Transfer Mode; Acquiring Content from Video Only Models; Disconnect; Command List
       (operations, device properties, controls, events, vendor response codes); Compatibility
       (per-model operations, properties, controls and events, from which each model's supports
-      list is derived); Operations (SDIO_Connect, SDIO_GetExtDeviceInfo,
-      SDIO_SetExtDevicePropValue, SDIO_ControlDevice, SDIO_GetAllExtDevicePropInfo,
-      SDIO_OpenSession, SDIO_ControlPTZF, SDIO_SetPresetPTZF, SDIO_GetExtDeviceProp); Device
-      Properties and Controls (codes, datatypes and value meanings of the properties and
-      controls this module names); Events; Data Format (ControlPTZF, SetPresetPTZF); Tips (PTZF
-      Operation, Detailed SDIO_ControlPTZF Usage, Preset PTZF Operation).
+      list is derived); Operations (GetStorageIDs, GetObjectHandles, GetObjectInfo, GetObject,
+      SDIO_Connect, SDIO_GetExtDeviceInfo, SDIO_SetExtDevicePropValue, SDIO_ControlDevice,
+      SDIO_GetAllExtDevicePropInfo, SDIO_OpenSession, SDIO_GetPartialLargeObject,
+      SDIO_SetContentsTransferMode, SDIO_GetFTPJobList, SDIO_ControlFTPJobList,
+      SDIO_GetFTPSettingList, SDIO_SetFTPSettingList, SDIO_GetDisplayFTPResult,
+      SDIO_GetContentInfoList, SDIO_GetContentData, SDIO_GetContentCompressedData,
+      SDIO_ControlPTZF, SDIO_SetPresetPTZF, SDIO_GetExtDeviceProp); Device Properties and Controls
+      (codes, datatypes and value meanings of the properties and controls this module names);
+      Events; Data Format (FTPSettingList, FTPJobList, ControlPTZF, SetPresetPTZF,
+      ContentInfoList, FTPResultDataset); Tips (PTZF Operation, Detailed SDIO_ControlPTZF Usage,
+      Preset PTZF Operation, Remote Control with Transfer Mode).
+  - title: "Camera Control PTP 2 Reference (Camera Remote Command 2.02.00, document dated June 2026)"
+    author: "Sony Corporation"
+    note: >
+      Licensed with the reference above and not redistributed. Used: Overview; Connect (the
+      2.00 handshake); Get Property; Set Property; Send Control Command (step controls); Get
+      Image File; Live View; Command List; Compatibility (per-model operations, properties,
+      controls and events, merged into each model's supports list); Operations (GetObject and
+      the live view dataset, SDIO_GetExtDeviceInfo, SDIO_GetAllExtDevicePropInfo,
+      SDIO_SetExtDevicePropValue, SDIO_ControlDevice); Controls (the step controls and the PTP 2
+      buttons).
   - title: "Camera Remote Command 2.02.00 README"
     author: "Sony Corporation"
     note: >
-      Licensed with the reference above and not redistributed. Protocol Compatibility (which
+      Licensed with the references above and not redistributed. Protocol Compatibility (which
       models speak Camera Control PTP 3 and which PTP 2) and the USB/IP table; the models listed
-      here are those marked for both Camera Control PTP 3 and IP. PXW-Z380 is called PXW-Z300 in
+      here are those marked for IP and for either protocol. PXW-Z380 is called PXW-Z300 in
       Sony's documents.
   - title: "ISO 15740:2013 Photography - Electronic still picture imaging - Picture transfer protocol (PTP) for digital still photography devices"
     author: "ISO"
     note: >
-      The PTP-IP transport the Sony reference builds on: packet header (length and type), Init
+      The PTP-IP transport the Sony references build on: packet header (length and type), Init
       Command and Init Event request/ack/fail, operation request and response, event, Start
-      Data / Data / End Data, probe; PTP datatypes, strings and arrays; DeviceInfo,
+      Data / Data / End Data, probe; PTP datatypes, strings and arrays; DeviceInfo, ObjectInfo,
       OpenSession and CloseSession; standard response codes.
+  - title: "RFC 9112 HTTP/1.1"
+    author: "IETF"
+    note: >
+      The request and response framing (Content-Length, chunked transfer coding) the module
+      speaks over the SSH tunnel for pan/tilt live view and video-only clips.
 
 settings:
   # plain: PTP-IP straight to TCP 15740 (the port can be overridden).
@@ -71,6 +98,15 @@ settings:
   # How often the camera's changed properties are read, in addition to the
   # reads its change events trigger.
   poll_ms: { type: int, min: 250, max: 60000, default: 1000 }
+  # Which Camera Control protocol to speak. auto: PTP 2 for bodies that have
+  # only PTP 2 (ILCE-7M3), PTP 3 for the rest; a body that answers PTP 3 with
+  # a 2.xx version is driven with PTP 2.
+  protocol: { type: enum, values: [auto, ptp3, ptp2], default: auto }
+  # The session's function mode. auto: remote_with_transfer on bodies whose
+  # compatibility tables list its content operations, remote otherwise. A
+  # mode the camera refuses falls back to remote. switch_session_mode changes
+  # it while connected.
+  session_mode: { type: enum, values: [auto, remote, remote_with_transfer, content_transfer], default: auto }
 
 
 models:
@@ -78,276 +114,355 @@ models:
     name: "Sony Alpha 1 II (ILCE-1M2)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
-       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save,
+       set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, remote_key,
+       exposure_step, af_lock, get_live_view_image, list_content, download_content, download_captured_image,
+       get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-1
     name: "Sony Alpha 1 (ILCE-1)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look,
-       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
-       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
-       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
-       timecode_preset_reset, user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset,
+       set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save,
+       set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, remote_key,
+       exposure_step, af_lock, get_live_view_image, list_content, download_content, download_captured_image,
+       get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-9m3
     name: "Sony Alpha 9 III (ILCE-9M3)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
-       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save,
+       set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, remote_key,
+       exposure_step, af_lock, get_live_view_image, list_content, download_content, download_captured_image,
+       get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-9m2
     name: "Sony Alpha 9 II (ILCE-9M2)"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
-       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_movie_file_format, set_movie_recording_setting, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style,
+       set_live_view_quality, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, zoom, focus_near_far, shutter_half_press, shutter_full_press, take_photo, record,
+       ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel,
+       custom_wb_capture, format_media, exposure_step, release_lock, focus_step, hfr_standby,
+       hfr_recording_cancel, get_live_view_image, download_captured_image]
     verification: none
   - id: ilce-7rm6
     name: "Sony ILCE-7RM6"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
-       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save,
+       set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, get_live_view_image,
+       list_content, download_content, download_captured_image, get_thumbnail, switch_session_mode,
+       get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-7rm5
     name: "Sony Alpha 7R V (ILCE-7RM5)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look,
-       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
-       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
-       set_audio_master_level, set_property, get_property, control, refresh, set_shutter_speed,
-       set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position, zoom,
-       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
-       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset,
+       set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line,
+       set_gamma_display_assist, set_audio_master_level, set_live_view_quality, set_ftp_function,
+       set_auto_ftp_transfer, set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills,
+       set_auto_ftp_transfer_movies, set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size,
+       set_ftp_power_save, set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property,
+       control, refresh, set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position,
+       cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position,
+       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan,
+       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset,
+       remote_key, exposure_step, af_lock, get_live_view_image, list_content, download_content,
+       download_captured_image, get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server,
+       get_ftp_result]
     verification: none
   - id: ilce-7rm4a
     name: "Sony Alpha 7R IVA (ILCE-7RM4A)"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
-       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
-       shutter_full_press, record, ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, format_media]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_movie_file_format, set_movie_recording_setting, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style,
+       set_live_view_quality, set_property, get_property, control, refresh, set_shutter_speed, zoom,
+       focus_near_far, shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       exposure_step, release_lock, focus_step, hfr_standby, hfr_recording_cancel, get_live_view_image,
+       list_content, download_content, download_captured_image, switch_session_mode]
     verification: none
   - id: ilce-7rm4
     name: "Sony Alpha 7R IV (ILCE-7RM4)"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
-       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
-       shutter_full_press, record, ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_movie_file_format, set_movie_recording_setting, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style,
+       set_live_view_quality, set_property, get_property, control, refresh, set_shutter_speed, zoom,
+       focus_near_far, shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       exposure_step, release_lock, focus_step, hfr_standby, hfr_recording_cancel, get_live_view_image,
+       download_captured_image]
     verification: none
   - id: ilce-7m5
     name: "Sony ILCE-7M5"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
-       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save,
+       set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, get_live_view_image,
+       list_content, download_content, download_captured_image, get_thumbnail, switch_session_mode,
+       get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-7m4
     name: "Sony Alpha 7 IV (ILCE-7M4)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting, set_remote_zoom_speed_type,
-       set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate, set_audio_recording,
-       set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format, set_still_quality,
-       set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look, set_steady_shot,
-       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look,
+       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
        set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
-       set_audio_master_level, set_property, get_property, control, refresh, set_shutter_speed,
-       set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position, zoom,
-       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save,
+       set_ftp_protect_after_transfer, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
        shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
        custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
-       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, remote_key,
+       exposure_step, af_lock, get_live_view_image, list_content, download_content, download_captured_image,
+       get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
+    verification: none
+  - id: ilce-7m3
+    name: "Sony Alpha 7 III (ILCE-7M3), Camera Control PTP 2"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_drive_mode, set_aspect_ratio, set_property, get_property, control, refresh,
+       set_shutter_speed, focus_near_far, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       fe_lock, remote_key, exposure_step, release_lock, af_mf_hold, focus_magnifier, focus_magnifier_cancel,
+       get_live_view_image, download_captured_image]
     verification: none
   - id: ilce-7sm3
     name: "Sony Alpha 7S III (ILCE-7SM3)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
-       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel,
-       custom_wb_capture, format_media, cancel_media_format, power_off, timecode_preset_reset,
-       user_bits_preset_reset]
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_power_save, set_ftp_protect_after_transfer,
+       select_ftp_server, set_property, get_property, control, refresh, set_shutter_speed, set_zoom_position,
+       set_focus_position, cancel_zoom_position, cancel_focus_position, zoom, focus_near_far,
+       save_zoom_focus_position, load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo,
+       record, ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
+       timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock, get_live_view_image,
+       list_content, download_content, download_captured_image, get_thumbnail, switch_session_mode,
+       get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-7cm2
     name: "Sony Alpha 7C II (ILCE-7CM2)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_power_save, select_ftp_server, set_property,
        get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
        cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
        load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
        awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
        custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       power_off, timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock,
+       get_live_view_image, list_content, download_content, download_captured_image, get_thumbnail,
+       switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-7cr
     name: "Sony Alpha 7CR (ILCE-7CR)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
-       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
-       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
-       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies,
+       set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_power_save, select_ftp_server, set_property,
        get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
        cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
        load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
        awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
        custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       power_off, timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock,
+       get_live_view_image, list_content, download_content, download_captured_image, get_thumbnail,
+       switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilce-7c
     name: "Sony Alpha 7C (ILCE-7C)"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
-       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_movie_file_format, set_movie_recording_setting, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style,
+       set_live_view_quality, select_ftp_server, set_property, get_property, control, refresh,
+       set_shutter_speed, zoom, focus_near_far, shutter_half_press, shutter_full_press, take_photo, record,
+       ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel,
+       custom_wb_capture, format_media, exposure_step, release_lock, focus_step, hfr_standby,
+       hfr_recording_cancel, get_live_view_image, list_content, download_content, download_captured_image,
+       switch_session_mode]
     verification: none
   - id: ilce-6700
     name: "Sony Alpha 6700 (ILCE-6700)"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, set_zoom_position, cancel_zoom_position, zoom,
-       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
-       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
+       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
+       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_monitor_lut, set_audio_master_level, set_live_view_quality, set_property, get_property, control,
+       refresh, set_shutter_speed, set_zoom_position, cancel_zoom_position, zoom, focus_near_far,
+       save_zoom_focus_position, load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo,
+       record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock,
+       get_live_view_image, list_content, download_content, download_captured_image, get_thumbnail,
+       switch_session_mode]
     verification: none
   - id: ilx-lr1
     name: "Sony ILX-LR1"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
-       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
-       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
-       set_movie_frame_rate, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
-       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
-       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_peaking, set_zebra, set_zebra_level, set_marker, set_monitor_lut, set_property, get_property,
-       control, refresh, set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position,
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
+       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
+       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
+       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_peaking, set_zebra, set_zebra_level,
+       set_marker, set_monitor_lut, set_live_view_quality, set_ftp_function, set_auto_ftp_transfer,
+       set_auto_ftp_transfer_target, set_auto_ftp_transfer_movies, set_ftp_transfer_files,
+       set_ftp_transfer_proxy, set_ftp_power_save, select_ftp_server, set_property, get_property, control,
+       refresh, set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position,
        cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position,
-       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, tracking_af_on,
+       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on,
        af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan,
-       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset,
+       remote_key, exposure_step, af_lock, get_live_view_image, list_content, download_content,
+       download_captured_image, get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server,
+       get_ftp_result]
     verification: none
   - id: mpc-2610
     name: "Sony BURANO (MPC-2610)"
@@ -358,8 +473,9 @@ models:
        set_color_temperature, set_tint, set_focus_control, set_focus_area, set_subject_recognition_af,
        set_af_transition_speed, set_af_subject_shift_sensitivity, set_movie_file_format, set_movie_frame_rate,
        set_slow_and_quick, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look,
-       set_steady_shot_movie, set_property, get_property, control, refresh, set_shutter_speed, set_tally,
-       zoom, focus, record_toggle, one_push_awb, color_temperature_step, tint_step]
+       set_steady_shot_movie, select_ftp_server_id, set_property, get_property, control, refresh,
+       set_shutter_speed, set_tally, zoom, focus, record_toggle, one_push_awb, color_temperature_step,
+       tint_step, list_content, download_content, get_ftp_jobs, add_ftp_job, ftp_job]
     verification: none
   - id: ilme-fr7
     name: "Sony FR7 (ILME-FR7)"
@@ -370,10 +486,11 @@ models:
        set_color_temperature, set_tint, set_focus_control, set_focus_area, set_subject_recognition_af,
        set_af_transition_speed, set_af_subject_shift_sensitivity, set_movie_file_format, set_movie_frame_rate,
        set_simul_rec, set_slow_and_quick, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
-       set_base_look, set_property, get_property, control, refresh, set_shutter_speed, set_tally, zoom, focus,
-       record_toggle, one_push_awb, color_temperature_step, tint_step, camera_standby, power_on, remote_key,
-       pan_tilt_absolute, pan_tilt_relative, pan_tilt_drive, pan_tilt_stop, pan_tilt_home, pan_tilt_reset,
-       preset_recall, preset_set, preset_clear]
+       set_base_look, set_live_view_quality_level, set_property, get_property, control, refresh,
+       set_shutter_speed, set_tally, zoom, focus, record_toggle, one_push_awb, color_temperature_step,
+       tint_step, camera_standby, power_on, remote_key, pan_tilt_absolute, pan_tilt_relative, pan_tilt_drive,
+       pan_tilt_stop, pan_tilt_home, pan_tilt_reset, preset_recall, preset_set, preset_clear,
+       get_live_view_image, list_content, download_content]
     verification: none
   - id: ilme-fx6
     name: "Sony FX6 (ILME-FX6)"
@@ -384,131 +501,156 @@ models:
        set_color_temperature, set_tint, set_focus_control, set_focus_area, set_subject_recognition_af,
        set_af_transition_speed, set_af_subject_shift_sensitivity, set_movie_file_format, set_movie_frame_rate,
        set_slow_and_quick, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look,
-       set_property, get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle,
-       one_push_awb, color_temperature_step, tint_step]
+       select_ftp_server_id, set_property, get_property, control, refresh, set_shutter_speed, zoom, focus,
+       record, record_toggle, one_push_awb, color_temperature_step, tint_step, list_content, download_content,
+       get_ftp_jobs, add_ftp_job, ftp_job]
     verification: none
   - id: ilme-fx3
     name: "Sony FX3 and FX3A (ILME-FX3, ILME-FX3A)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_angle,
        set_shutter_mode, set_shutter_control, set_iso, set_exposure_index, set_gain_control, set_base_iso,
-       set_exposure_compensation, set_metering_mode, set_dro, set_white_balance, set_color_temperature,
-       set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
-       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
-       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
-       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
-       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
-       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
-       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
-       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
-       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
-       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
-       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level,
+       set_live_view_quality, set_ftp_function, set_auto_ftp_transfer, set_auto_ftp_transfer_target,
+       set_auto_ftp_transfer_movies, set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_power_save,
+       select_ftp_server, set_property, get_property, control, refresh, set_shutter_speed, set_zoom_position,
+       set_focus_position, cancel_zoom_position, cancel_focus_position, zoom, focus_near_far,
+       save_zoom_focus_position, load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo,
+       record, ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
+       timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock, get_live_view_image,
+       list_content, download_content, download_captured_image, get_thumbnail, switch_session_mode,
+       get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilme-fx2
     name: "Sony FX2 (ILME-FX2)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_angle,
        set_shutter_mode, set_shutter_control, set_iso, set_exposure_index, set_gain_control, set_base_iso,
-       set_exposure_compensation, set_metering_mode, set_dro, set_white_balance, set_color_temperature,
-       set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
-       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
-       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
-       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
-       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
-       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
-       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
-       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
-       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
-       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
-       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+       set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level,
+       set_live_view_quality, set_ftp_function, set_auto_ftp_transfer, set_auto_ftp_transfer_target,
+       set_auto_ftp_transfer_stills, set_auto_ftp_transfer_movies, set_ftp_transfer_files,
+       set_ftp_transfer_proxy, set_ftp_still_size, set_ftp_power_save, set_ftp_protect_after_transfer,
+       select_ftp_server, set_property, get_property, control, refresh, set_shutter_speed, set_zoom_position,
+       set_focus_position, cancel_zoom_position, cancel_focus_position, zoom, focus_near_far,
+       save_zoom_focus_position, load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo,
+       record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock,
+       get_live_view_image, list_content, download_content, download_captured_image, get_thumbnail,
+       switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
     verification: none
   - id: ilme-fx30
     name: "Sony FX30 (ILME-FX30)"
     supports:
       [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_angle,
        set_shutter_mode, set_shutter_control, set_iso, set_exposure_index, set_gain_control, set_base_iso,
-       set_exposure_compensation, set_metering_mode, set_dro, set_white_balance, set_color_temperature,
-       set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
+       set_exposure_compensation, set_metering_mode, set_flash_compensation, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level,
+       set_live_view_quality, set_ftp_function, set_auto_ftp_transfer, set_auto_ftp_transfer_target,
+       set_auto_ftp_transfer_movies, set_ftp_transfer_files, set_ftp_transfer_proxy, set_ftp_still_size,
+       set_ftp_power_save, select_ftp_server, set_property, get_property, control, refresh, set_shutter_speed,
+       set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position, zoom,
+       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset, remote_key,
+       exposure_step, af_lock, get_live_view_image, list_content, download_content, download_captured_image,
+       get_thumbnail, switch_session_mode, get_ftp_settings, set_ftp_server, get_ftp_result]
+    verification: none
+  - id: zv-e1
+    name: "Sony ZV-E1"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_property, get_property, control, refresh,
+       set_shutter_speed, zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position,
+       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan,
+       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset,
+       remote_key, exposure_step, af_lock, get_live_view_image, list_content, download_content,
+       download_captured_image, get_thumbnail, switch_session_mode]
+    verification: none
+  - id: zv-e10m2
+    name: "Sony ZV-E10 II (ZV-E10M2)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
        set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
        set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
        set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
        set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
        set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
        set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
-       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
-       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
-       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
-       timecode_preset_reset, user_bits_preset_reset]
-    verification: none
-  - id: zv-e1
-    name: "Sony ZV-E1"
-    supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
-       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look, set_base_look,
-       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
-       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
-       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
-       set_shutter_speed, zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position,
-       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on,
-       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan,
-       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
-    verification: none
-  - id: zv-e10m2
-    name: "Sony ZV-E10 II (ZV-E10M2)"
-    supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
-       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
-       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
-       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
-       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
-       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
-       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
-       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
-       set_audio_master_level, set_property, get_property, control, refresh, set_shutter_speed,
-       set_focus_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
-       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
-       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       set_monitor_lut, set_audio_master_level, set_live_view_quality, set_property, get_property, control,
+       refresh, set_shutter_speed, set_focus_position, cancel_focus_position, zoom, focus_near_far,
+       save_zoom_focus_position, load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo,
+       record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
        custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
-       power_off, timecode_preset_reset, user_bits_preset_reset]
+       power_off, timecode_preset_reset, user_bits_preset_reset, remote_key, exposure_step, af_lock,
+       get_live_view_image, list_content, download_content, download_captured_image, switch_session_mode]
     verification: none
   - id: zv-e10
     name: "Sony ZV-E10"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
-       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
-       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
-       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, fe_lock, af_area_position, custom_wb_capture_standby,
-       custom_wb_capture_cancel, custom_wb_capture]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_area, set_zoom_setting, set_movie_file_format, set_movie_recording_setting, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style,
+       set_live_view_quality, set_property, get_property, control, refresh, set_shutter_speed, zoom,
+       focus_near_far, shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       exposure_step, release_lock, focus_step, hfr_standby, hfr_recording_cancel, get_live_view_image,
+       download_captured_image]
     verification: none
   - id: dsc-rx1rm3
     name: "Sony RX1R III (DSC-RX1RM3)"
     supports:
-      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
-       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
-       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
-       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
-       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
-       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
-       set_gamma, set_creative_look, set_base_look, set_steady_shot_movie, set_timecode_preset,
-       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
-       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
-       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
-       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
-       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
-       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode,
+       set_flash_compensation, set_dro, set_white_balance, set_color_temperature, set_focus_mode,
+       set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
+       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
+       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_live_view_quality, set_property, get_property, control, refresh,
+       set_shutter_speed, zoom, focus_near_far, shutter_half_press, shutter_full_press, take_photo, record,
+       ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
+       timecode_preset_reset, user_bits_preset_reset, get_live_view_image, list_content, download_content,
+       download_captured_image, get_thumbnail, switch_session_mode]
     verification: none
   - id: pxw-z380
     name: "Sony PXW-Z380 (PXW-Z300 in the reference)"
@@ -518,10 +660,11 @@ models:
        set_color_temperature, set_tint, set_white_balance_memory, set_preset_color_temperature,
        set_white_balance_r_gain, set_white_balance_b_gain, set_focus_control, set_focus_area,
        set_subject_recognition_af, set_movie_file_format, set_movie_frame_rate, set_simul_rec,
-       set_slow_and_quick, set_slow_and_quick_frame_rate, set_base_look, set_property, get_property, control,
-       refresh, set_shutter_speed, zoom, focus, record, record_toggle, push_auto_focus, push_auto_iris,
-       push_agc, push_auto_nd, one_push_awb, color_temperature_step, tint_step, format_media,
-       cancel_media_format, stream, remote_key]
+       set_slow_and_quick, set_slow_and_quick_frame_rate, set_base_look, select_ftp_server_id, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle, push_auto_focus,
+       push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step, tint_step, format_media,
+       cancel_media_format, stream, remote_key, list_content, download_content, switch_session_mode,
+       get_ftp_jobs, add_ftp_job, ftp_job]
     verification: none
   - id: pxw-z200
     name: "Sony PXW-Z200"
@@ -533,9 +676,10 @@ models:
        set_focus_area, set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
        set_zoom_setting, set_movie_file_format, set_movie_frame_rate, set_simul_rec, set_slow_and_quick,
        set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look, set_steady_shot_movie,
-       set_property, get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle,
-       push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step,
-       tint_step, format_media, cancel_media_format, stream, remote_key]
+       select_ftp_server_id, set_property, get_property, control, refresh, set_shutter_speed, zoom, focus,
+       record, record_toggle, push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb,
+       color_temperature_step, tint_step, format_media, cancel_media_format, stream, remote_key, list_content,
+       download_content, get_ftp_jobs, add_ftp_job, ftp_job]
     verification: none
   - id: hxr-nx800
     name: "Sony HXR-NX800"
@@ -547,9 +691,10 @@ models:
        set_focus_area, set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
        set_zoom_setting, set_movie_file_format, set_movie_frame_rate, set_simul_rec, set_slow_and_quick,
        set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look, set_steady_shot_movie,
-       set_property, get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle,
-       push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step,
-       tint_step, format_media, cancel_media_format, stream, remote_key]
+       select_ftp_server_id, set_property, get_property, control, refresh, set_shutter_speed, zoom, focus,
+       record, record_toggle, push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb,
+       color_temperature_step, tint_step, format_media, cancel_media_format, stream, remote_key, list_content,
+       download_content, get_ftp_jobs, add_ftp_job, ftp_job]
     verification: none
   - id: brc-am7
     name: "Sony BRC-AM7"
@@ -561,12 +706,13 @@ models:
        set_white_balance_b_gain, set_focus_control, set_focus_area, set_subject_recognition_af,
        set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting, set_movie_file_format,
        set_movie_frame_rate, set_simul_rec, set_slow_and_quick, set_slow_and_quick_frame_rate,
-       set_movie_shooting_mode, set_base_look, set_audio_master_level, set_property, get_property, control,
-       refresh, set_shutter_speed, set_tally, set_audio_level, set_audio_level_control, set_audio_input,
-       set_zoom_position, set_focus_position, zoom, focus, record, record_toggle, push_auto_focus,
-       push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step, tint_step,
-       camera_standby, power_on, remote_key, pan_tilt_absolute, pan_tilt_relative, pan_tilt_drive,
-       pan_tilt_stop, pan_tilt_home, pan_tilt_reset, preset_recall, preset_set, preset_clear]
+       set_movie_shooting_mode, set_base_look, set_audio_master_level, set_live_view_quality_level,
+       set_property, get_property, control, refresh, set_shutter_speed, set_tally, set_audio_level,
+       set_audio_level_control, set_audio_input, set_zoom_position, set_focus_position, zoom, focus, record,
+       record_toggle, push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb,
+       color_temperature_step, tint_step, camera_standby, power_on, remote_key, pan_tilt_absolute,
+       pan_tilt_relative, pan_tilt_drive, pan_tilt_stop, pan_tilt_home, pan_tilt_reset, preset_recall,
+       preset_set, preset_clear, get_live_view_image, list_content, download_content]
     verification: none
 
 commands:
@@ -654,6 +800,11 @@ commands:
     summary: "Set exposure metering (Sony: Exposure Metering Mode, 0x500B)"
     params:
       value: { type: enum, values: [average, center_weighted_average, multi_spot, center_spot, multi, center_weighted, entire_screen_average, spot_standard, spot_large, highlight, standard, backlight, spotlight], required: true }
+    returns: ack
+  set_flash_compensation:
+    summary: "Set exposure flash compensation (Sony: Flash Compensation, 0xD200)"
+    params:
+      value: { type: float, required: true }
     returns: ack
   set_dro:
     summary: "Set exposure dro (Sony: Dynamic Range Optimizer, 0xD201)"
@@ -915,6 +1066,76 @@ commands:
     params:
       value: { type: int, required: true }
     returns: ack
+  set_live_view_quality:
+    summary: "Set live view quality (Sony: Live View Image Quality, 0xD26A)"
+    params:
+      value: { type: enum, values: [low, high], required: true }
+    returns: ack
+  set_live_view_quality_level:
+    summary: "Set live view quality level (Sony: Live View Image Quality by Numerical Value, 0xE0CE)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_ftp_function:
+    summary: "Set ftp enabled (Sony: FTP Function, 0xD041)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_auto_ftp_transfer:
+    summary: "Set ftp auto transfer (Sony: Auto FTP Transfer, 0xD04E)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_auto_ftp_transfer_target:
+    summary: "Set ftp auto transfer target (Sony: Auto FTP Transfer Target, 0xD04F)"
+    params:
+      value: { type: enum, values: [still, movie, still_and_movie], required: true }
+    returns: ack
+  set_auto_ftp_transfer_stills:
+    summary: "Set ftp auto transfer stills (Sony: Auto FTP Transfer Target (Still), 0xD216)"
+    params:
+      value: { type: enum, values: [all, protected_only], required: true }
+    returns: ack
+  set_auto_ftp_transfer_movies:
+    summary: "Set ftp auto transfer movies (Sony: Auto FTP Transfer Target (Movie), 0xD199)"
+    params:
+      value: { type: enum, values: [all, shot_mark_only, protected_only], required: true }
+    returns: ack
+  set_ftp_transfer_files:
+    summary: "Set ftp transfer files (Sony: FTP Transfer Target, 0xD19A)"
+    params:
+      value: { type: enum, values: [jpeg_heif_only, raw_only, raw_and_jpeg_heif], required: true }
+    returns: ack
+  set_ftp_transfer_proxy:
+    summary: "Set ftp transfer proxy (Sony: FTP Transfer Target (Proxy), 0xD14B)"
+    params:
+      value: { type: enum, values: [proxy_only, original_only, proxy_and_original], required: true }
+    returns: ack
+  set_ftp_still_size:
+    summary: "Set ftp still size (Sony: FTP Transfer Still Quality Size, 0xD14A)"
+    params:
+      value: { type: enum, values: [small, large], required: true }
+    returns: ack
+  set_ftp_power_save:
+    summary: "Set ftp power save (Sony: FTP Power Save, 0xD14C)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_ftp_protect_after_transfer:
+    summary: "Set ftp protect after transfer (Sony: Protect Image in FTP Transfer, 0xD225)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  select_ftp_server:
+    summary: "Set ftp server (Sony: Select FTP Server, 0xD27C)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  select_ftp_server_id:
+    summary: "Set ftp server id (Sony: Select FTP ServerID, 0xD02E)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
   set_property:
     summary: "Write any property by code, with a raw value in the property's own type (a number, 0x-hex text, or text for string properties). Checked against what the camera reports as writable and accepted"
     params:
@@ -1017,7 +1238,7 @@ commands:
       pressed: { type: bool }
     returns: ack
   take_photo:
-    summary: "Half and full press together, then release: one still"
+    summary: "Half and full press together, then release: one still (on Camera Control PTP 2 bodies without that button, the one-shot release)"
     returns: ack
   record:
     summary: "Start or stop movie recording (the hold-type record button: pressed starts, released stops)"
@@ -1104,7 +1325,7 @@ commands:
     summary: "Scan for light flicker"
     returns: ack
   format_media:
-    summary: "Format the card in a slot. Erases everything on it; the result arrives as media.last_format_result"
+    summary: "Format the card in a slot. Erases everything on it; the result arrives as media.last_format_result. Camera Control PTP 2 bodies format their one card and ignore slot and quick"
     params:
       slot: { type: int, min: 1, max: 2, required: true }
       quick: { type: bool, default: false }
@@ -1185,11 +1406,122 @@ commands:
     params:
       preset: { type: int, min: 0, max: 65535, required: true }
     returns: ack
+  exposure_step:
+    summary: "Step a value a Camera Control PTP 2 body only reports (iris, shutter speed, ISO, exposure or flash compensation) up or down by notches; the typed setters convert a target value into such steps"
+    params:
+      target: { type: enum, values: [iris, exposure_compensation, flash_compensation, shutter_speed, iso], required: true }
+      steps: { type: int, min: -127, max: 127, required: true }
+    returns: ack
+  af_lock:
+    summary: "The AF lock button (Camera Control PTP 2). Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  release_lock:
+    summary: "Lock or unlock the shutter release (Camera Control PTP 2)"
+    params:
+      locked: { type: bool, required: true }
+    returns: ack
+  af_mf_hold:
+    summary: "The AF/MF hold button (Camera Control PTP 2). Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  focus_magnifier:
+    summary: "Press the focus magnifier button (Camera Control PTP 2)"
+    returns: ack
+  focus_magnifier_cancel:
+    summary: "Leave the focus magnifier (Camera Control PTP 2)"
+    returns: ack
+  focus_step:
+    summary: "One focus step toward near or far (Camera Control PTP 2)"
+    params:
+      direction: { type: enum, values: [near, far], required: true }
+    returns: ack
+  hfr_standby:
+    summary: "Enter high frame rate recording standby (Camera Control PTP 2)"
+    returns: ack
+  hfr_recording_cancel:
+    summary: "Cancel a high frame rate recording (Camera Control PTP 2)"
+    returns: ack
+  get_live_view_image:
+    summary: "One live view frame as a base64 JPEG with its width and height (and, from PTP 3 bodies, the focus frame data). Poll it for a preview: the camera serves up to 30 frames a second. Pan/tilt bodies serve it over HTTP through the SSH tunnel"
+    returns: value
+  list_content:
+    summary: "List the contents of a card slot: the content list in remote_with_transfer mode, the PTP objects in content_transfer mode, or the MediaProfile clips of a video-only body (over SSH). Each file has the id download_content takes"
+    params:
+      slot: { type: int, min: 1, max: 3, default: 1 }
+      limit: { type: int, min: 1, max: 10000, default: 100 }
+      since: { type: int, min: 0 }
+    returns: value
+  download_content:
+    summary: "Download a listed file into a file on the host, streamed as it arrives; the result is the path and the byte count"
+    params:
+      id: { type: string, max_length: 1024, required: true }
+      path: { type: string, max_length: 4096, required: true }
+    returns: value
+  download_captured_image:
+    summary: "Download the image just shot from the camera transfer buffer (while still.pending_files is not zero) into a file on the host"
+    params:
+      path: { type: string, max_length: 4096, required: true }
+    returns: value
+  get_thumbnail:
+    summary: "The thumbnail of a listed still (remote_with_transfer mode) as a base64 JPEG"
+    params:
+      id: { type: string, max_length: 1024, required: true }
+    returns: value
+  switch_session_mode:
+    summary: "Close the session and open it again in another mode: remote (control only), remote_with_transfer (control and content list), content_transfer (card access, no control)"
+    params:
+      mode: { type: enum, values: [remote, remote_with_transfer, content_transfer], required: true }
+    returns: ack
+  get_ftp_settings:
+    summary: "The camera's FTP server list (no passwords); also kept in ftp.servers"
+    returns: value
+  set_ftp_server:
+    summary: "Write one FTP server entry. The password goes to the camera only and is never put in the state; leave it out to keep the one the camera has"
+    params:
+      server_id: { type: int, min: 1, max: 65535, required: true }
+      name: { type: string, max_length: 64 }
+      host: { type: string, max_length: 255, required: true }
+      port: { type: int, min: 1, max: 65535, default: 21 }
+      username: { type: string, max_length: 64 }
+      password: { type: string, max_length: 64 }
+      passive: { type: bool, default: true }
+      directory: { type: string, max_length: 255 }
+      secure: { type: enum, values: ["off", ftps, sftp], default: "off" }
+      directory_hierarchy: { type: enum, values: [standard, same_as_camera], default: standard }
+      overwrite: { type: bool, default: false }
+      certificate_error: { type: enum, values: [connect, do_not_connect], default: do_not_connect }
+    returns: ack
+  get_ftp_jobs:
+    summary: "The camera's FTP transfer jobs (video bodies); also kept in ftp.jobs"
+    returns: value
+  add_ftp_job:
+    summary: "Queue a clip for FTP upload by the camera, by its path relative to the MediaProfile (for example /Clip/C0001.MXF)"
+    params:
+      server_id: { type: int, min: 0, max: 4294967295, required: true }
+      slot: { type: int, min: 1, max: 3, required: true }
+      clip_path: { type: string, max_length: 254, required: true }
+      directory: { type: string, max_length: 255 }
+      name: { type: string, max_length: 127 }
+    returns: ack
+  ftp_job:
+    summary: "Suspend, resume or delete a transfer job, or delete all or all finished jobs"
+    params:
+      action: { type: enum, values: [suspend, resume, delete, delete_all, delete_finished], required: true }
+      job_id: { type: int, min: 0, max: 4294967295 }
+    returns: ack
+  get_ftp_result:
+    summary: "How many images the camera has transferred and failed to transfer by FTP from a slot"
+    params:
+      slot: { type: int, min: 1, max: 2, required: true }
+    returns: value
 
 state:
   session.mode: { type: string, description: "The connection setting in use: plain, pairing or ssh" }
   session.pairing: { type: string, description: "With connection: pairing, waiting_for_approval while the camera shows its prompt, then approved or refused" }
-  session.protocol_version: { type: int, description: "The camera's Camera Control PTP extension version, 100 times the version (300 is 3.00)" }
+  session.protocol_version: { type: int, description: "The camera's Camera Control PTP extension version, 100 times the version (300 is 3.00, 200 is 2.00)" }
   session.vendor_code_version: { type: int, description: "The camera's vendor code version, 100 times the version; from 310 the extended property and control codes are in use" }
   session.extended_codes: { type: bool, description: "Whether the extended codes (0xE000 properties, 0xF000 controls) are enabled for this session" }
   device.manufacturer: { type: string, description: "From the camera's PTP DeviceInfo" }
@@ -1208,6 +1540,12 @@ state:
   streaming.streams.*: { type: string, description: "Status of video stream N from the camera's stream events: inactive, idle, streaming or error" }
   media.last_format_result: { type: string, description: "Result of the last media format: ok, failed or canceled" }
   white_balance.custom_capture_result: { type: string, description: "Result of the last custom white balance capture: ok or failed" }
+  session.protocol: { type: string, description: "The Camera Control protocol in use: ptp3 or ptp2" }
+  session.function_mode: { type: string, description: "The session's function mode: remote, remote_with_transfer or content_transfer" }
+  content.last_change: { type: object, description: "The camera's last content change event: slot and change (added, deleted, changed, or media_profile on video-only bodies)" }
+  ftp.servers.*: { type: object, description: "FTP server N as last read with get_ftp_settings: name, host, port, username, password_set (never the password), passive, directory, secure, directory_hierarchy, overwrite, certificate_error" }
+  ftp.jobs.*: { type: object, description: "FTP transfer job N (video bodies): server_id, slot, status, chunks, size, transferred, name, main_file, meta_file; read again when ftp.job_sync_id changes" }
+  ftp.last_job_result: { type: string, description: "Result of the last job list change: ok or failed" }
   exposure.mode: { type: string, description: "Sony Exposure Program Mode (0x500E) (a value the module has no name for reads as its hex code)" }
   exposure.control_type: { type: string, description: "Sony Exposure Ctrl Type (0xD099) (a value the module has no name for reads as its hex code)" }
   exposure.iris: { type: float, description: "Sony F-Number (0x5007) (the text \"closed\" when the iris is closed)" }
@@ -1231,6 +1569,7 @@ state:
   exposure.base_sensitivity: { type: string, description: "Sony Gain Base Sensitivity (0xD021) (a value the module has no name for reads as its hex code)" }
   exposure.compensation: { type: float, description: "Sony Exposure Bias Compensation (0x5010)" }
   exposure.metering: { type: string, description: "Sony Exposure Metering Mode (0x500B) (a value the module has no name for reads as its hex code)" }
+  exposure.flash_compensation: { type: float, description: "Sony Flash Compensation (0xD200)" }
   exposure.step: { type: float, description: "Sony Exposure Step (0xD237)" }
   exposure.ae_locked: { type: bool, description: "Sony AELock Indication (0xD217)" }
   exposure.metered_manual_level: { type: float, description: "Sony Metered Manual Level (0xD1B5)" }
@@ -1379,6 +1718,36 @@ state:
   pan_tilt.pan_limit.enabled: { type: bool, description: "Sony Pan Limit Mode (0xE0BE)" }
   pan_tilt.tilt_limit.enabled: { type: bool, description: "Sony Tilt Limit Mode (0xE0BF)" }
   pan_tilt.preset_slots: { type: int, description: "Sony Preset PTZF Number of Slots (0xE0CB)" }
+  live_view.available: { type: bool, description: "Sony Live View Status (0xD221)" }
+  live_view.url: { type: string, description: "Sony LiveViewURL (0xD278)" }
+  live_view.quality: { type: string, description: "Sony Live View Image Quality (0xD26A) (a value the module has no name for reads as its hex code)" }
+  live_view.quality_level: { type: int, description: "Sony Live View Image Quality by Numerical Value (0xE0CE)" }
+  content.transfer_ready: { type: bool, description: "Sony Contents Transfer Enable Status (0xD295)" }
+  content.slot1.list_available: { type: bool, description: "Sony ContentInfoList Enable Status (SLOT1) (0xD1D4)" }
+  content.slot2.list_available: { type: bool, description: "Sony ContentInfoList Enable Status (SLOT2) (0xD1D5)" }
+  content.slot1.list_regenerated: { type: int, description: "Sony ContentInfoList regenerate time (SLOT1) (0xD1D6)" }
+  content.slot2.list_regenerated: { type: int, description: "Sony ContentInfoList regenerate time (SLOT2) (0xD1D7)" }
+  content.slot1.list_updated: { type: int, description: "Sony ContentInfoList update time (SLOT1) (0xE0D9)" }
+  content.slot2.list_updated: { type: int, description: "Sony ContentInfoList update time (SLOT2) (0xE0DA)" }
+  media.slot1.profile_url: { type: string, description: "Sony Media SLOT1 ProfileUrl (0xD031)" }
+  media.slot2.profile_url: { type: string, description: "Sony Media SLOT2 ProfileUrl (0xD032)" }
+  media.slot3.profile_url: { type: string, description: "Sony Media SLOT3 ProfileUrl (0xD191)" }
+  ftp.enabled: { type: bool, description: "Sony FTP Function (0xD041)" }
+  ftp.auto_transfer: { type: bool, description: "Sony Auto FTP Transfer (0xD04E)" }
+  ftp.auto_transfer_target: { type: string, description: "Sony Auto FTP Transfer Target (0xD04F) (a value the module has no name for reads as its hex code)" }
+  ftp.auto_transfer_stills: { type: string, description: "Sony Auto FTP Transfer Target (Still) (0xD216) (a value the module has no name for reads as its hex code)" }
+  ftp.auto_transfer_movies: { type: string, description: "Sony Auto FTP Transfer Target (Movie) (0xD199) (a value the module has no name for reads as its hex code)" }
+  ftp.transfer_files: { type: string, description: "Sony FTP Transfer Target (0xD19A) (a value the module has no name for reads as its hex code)" }
+  ftp.transfer_proxy: { type: string, description: "Sony FTP Transfer Target (Proxy) (0xD14B) (a value the module has no name for reads as its hex code)" }
+  ftp.still_size: { type: string, description: "Sony FTP Transfer Still Quality Size (0xD14A) (a value the module has no name for reads as its hex code)" }
+  ftp.power_save: { type: bool, description: "Sony FTP Power Save (0xD14C)" }
+  ftp.protect_after_transfer: { type: bool, description: "Sony Protect Image in FTP Transfer (0xD225)" }
+  ftp.server: { type: int, description: "Sony Select FTP Server (0xD27C)" }
+  ftp.server_id: { type: int, description: "Sony Select FTP ServerID (0xD02E)" }
+  ftp.connection_status: { type: string, description: "Sony FTP Connection Status (0xD27F) (a value the module has no name for reads as its hex code)" }
+  ftp.connection_error: { type: string, description: "Sony FTP Connection Error Info (0xD280) (a value the module has no name for reads as its hex code)" }
+  ftp.settings_editable: { type: bool, description: "Sony FTPSettingList Operation Enable Status (0xD09A)" }
+  ftp.job_sync_id: { type: int, description: "Sony Sync ID for FTP Job List (0xD02A)" }
 
 quirks:
   - models: [all]
@@ -1507,17 +1876,77 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Out of scope: live view (an HTTP stream behind its own SSH port forward on pan/tilt
-      cameras), still and clip transfer (Content Transfer Mode, Remote Control with Transfer
-      Mode and the MediaProfile download of video-only models), FTP, firmware update, LUT and
-      scene file upload, and the stream setting lists. The module opens the session in Remote
-      Control Mode. Cameras that speak only Camera Control PTP 2 (such as ILCE-7M3, ILCE-6600,
-      ILCE-7RM3A and the earlier RX models) are not covered.
+      Out of scope: firmware update, LUT and scene file upload, camera-setting and FTP-setting
+      file transfer, the stream setting lists, the OSD image, content deletion, and the
+      continuous live view stream (get_live_view_image returns single frames for polling).
+      Bodies that are USB-only for remote control (ILCE-7RM3A, ILCE-7M2, ILCE-6600, ILCE-6400,
+      ILCE-6100, the ZV-1 series and the RX models other than RX1R III) are not listed.
 
   - models: [all]
     severity: info
     text: >
       Cameras announce themselves over SSDP with the service type
       urn:schemas-sony-com:service:DigitalImaging:1, pointing at a dd.xml whose
-      DigitalImagingDesc.xml says whether pairing or SSH is required. The core's discovery does
-      not query it yet: open the camera by address.
+      DigitalImagingDesc.xml says which protocol versions it speaks and whether pairing or SSH is
+      required. The core's SSDP discovery reads both and suggests the connection setting (SSH
+      where the camera supports it, as the reference recommends, otherwise pairing where it is
+      required, otherwise plain).
+
+  - models: [ilce-7m3]
+    severity: warning
+    text: >
+      ILCE-7M3 speaks only Camera Control PTP 2 and is driven with it (protocol auto). PTP 2 has
+      no changes-only read, so every poll reads the whole property set; it has no function
+      modes, so content listing and transfer are not available, only download_captured_image
+      for the shot just taken; and its property set is the smaller PTP 2 one. The other listed
+      bodies speak both protocols and are driven with PTP 3 unless protocol is ptp2, which Sony
+      deprecates for removal by 2027.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Camera Control PTP 2 reports iris, shutter speed, ISO and exposure and flash compensation
+      as read-only properties and changes them by steps (exposure_step). The typed setters
+      convert a target value into steps between the current value and the target in the
+      camera's own value list, taking a positive step as one entry further along that list;
+      the reference does not say which way a positive step moves, so check the state after the
+      first use on a body. Where a PTP 2 body offers no step control, these values cannot be
+      changed remotely and the setter reports read_only.
+
+  - models: [all]
+    severity: info
+    text: >
+      get_live_view_image returns one frame as a base64 JPEG with its size. Poll it no faster
+      than 30 times a second; a frame asked for too soon comes back empty and is asked for again
+      after 40 ms. The frame size follows live_view.quality (set_live_view_quality low for
+      previews). In remote_with_transfer mode the module turns live view on first. Pan/tilt
+      bodies (ILME-FR7, BRC-AM7) serve live view over HTTP at live_view.url on their own
+      localhost, one live view dataset per HTTP chunk; the module reads one frame through the
+      SSH tunnel, so those bodies need connection: ssh. At most five live view clients may be
+      connected to a pan/tilt body at once.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Content access depends on the session mode. remote_with_transfer (the default where the
+      compatibility tables list it) lists a slot's contents with their files and streams a
+      file to the host while remote control keeps working. content_transfer reaches the card as
+      PTP objects but the camera then takes no remote control at all; remote control only
+      cannot reach the card. switch_session_mode closes the session and opens it again in the
+      other mode, which drops any command in progress. Video-only bodies (FX6, BURANO, FR7,
+      PXW-Z380, PXW-Z200, HXR-NX800, BRC-AM7) have no content transfer mode: their clips are
+      listed from the MediaProfile at media.slotN.profile_url and downloaded over HTTP through
+      the SSH tunnel, so they need connection: ssh. Downloads go to a file on the host the
+      consumer names; one download and one HTTP transfer run at a time.
+
+  - models: [all]
+    severity: info
+    text: >
+      FTP: the camera uploads by itself to servers configured on it. Stills bodies keep a server
+      list (get_ftp_settings, set_ftp_server, select_ftp_server, FTP function, auto transfer and
+      its targets, power save) and report transfer counts (get_ftp_result) and the connection
+      status and error in ftp.connection_status and ftp.connection_error. Video bodies keep a
+      job list (get_ftp_jobs, add_ftp_job, ftp_job) that the module reads into ftp.jobs whenever
+      ftp.job_sync_id changes. Server passwords are written to the camera and never read back
+      or reported; ftp.servers shows only whether one is set. A set_ftp_server is refused while
+      the camera reports it cannot take FTP settings (ftp.settings_editable false).

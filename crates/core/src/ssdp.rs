@@ -586,7 +586,7 @@ fn discovered(
     } else if imaging.ptp_versions.is_empty() {
         "unknown: X_PTP_Versions was not read"
     } else {
-        "PTP 2 only: X_PTP_Versions lacks 3.00, so this module cannot drive it"
+        "PTP 2 only: X_PTP_Versions lacks 3.00; the module drives it with Camera Control PTP 2 (protocol ptp2, or auto for ILCE-7M3)"
     };
     let mut evidence = json!({
         "protocol": match advert.kind {
