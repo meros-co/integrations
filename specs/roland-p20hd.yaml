@@ -58,14 +58,17 @@ settings:
 
 # "Transmit the user ID command ... Transmit the password command ... Once
 # the ACK (06H) response is verified, the connection is established" (p.53).
-# The manual gives no prompt, so the steps are sent on connecting. A NAK
-# (15H) is the documented refusal (p.77).
+# The manual gives no prompt, so the steps are sent on connecting, each
+# waiting for its ACK before anything else is sent. A NAK (15H) is the
+# documented refusal (p.77).
 on_connect:
   - when_set: user_id
     send: "USR:{settings.user_id}"
+    await_reply: true
     refused: '^\x15$'
   - when_set: password
     send: "PSS:{settings.password}"
+    await_reply: true
     refused: '^\x15$'
 
 models:
@@ -502,8 +505,14 @@ commands:
     expect: { matches: '^[\x02\x11\x13]*QNC:(-?\d+);' }
     returns: value
 telemetry:
-  # Nothing is pushed. The inquiry replies land in state when asked; there is
-  # no scheduled poll (see the login quirk).
+  # Nothing is pushed. The version is asked once on connecting and the
+  # transport, clip and routing status every second; every inquiry reply
+  # lands in state.
+  subscribe:
+    send: ["VER"]
+  poll:
+    send: ["QPJ", "QRC", "QPL", "QSP", "QSR", "QMI", "QIS", "QOS", "QAL", "QPS", "QCS", "QPQ", "QCQ", "QMD"]
+    every_ms: 1000
   updates:
     - match: '^[\x02\x11\x13]*QPJ:([01]);'
       state: { "project.open": { value: "{1}", map: { "1": true, "0": false } } }
@@ -562,11 +571,11 @@ quirks:
       (4-8 characters) and password (8-12 characters) set under User Account
       (p.52-53). The session logs in with USR then PSS; ACK confirms each and
       NAK (15H) refuses, which marks the device unauthorized. The manual gives
-      no prompt to wait for, and both steps are sent on connecting without
-      waiting for the first ACK (the Bitfocus module waits). The core does not
-      consume the two login ACKs, so they can be taken as the replies to the
-      first commands queued after connecting; for that reason this spec polls
-      nothing on a schedule.
+      no prompt to wait for, so USR is sent on connecting; each step waits for
+      its ACK, which is consumed, before PSS and then any command is sent (as
+      the Bitfocus module does). With no user ID or password configured the
+      steps are skipped; the manual establishes the connection only after
+      the password's ACK, so commands are not expected to work.
 
   - models: [all]
     severity: warning
