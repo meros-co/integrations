@@ -73,6 +73,11 @@ pub(crate) enum Inbound {
         generation: u64,
         input: WsInput,
     },
+    /// A connection the device opened to a port this session listens on.
+    Accepted {
+        socket: Key,
+        stream: tokio::net::TcpStream,
+    },
 }
 
 /// What every session shares.
@@ -81,6 +86,7 @@ pub(crate) struct Services {
     /// Local address every UDP socket binds to.
     pub(crate) bind_address: IpAddr,
     pub(crate) shared_udp: SharedUdp,
+    pub(crate) shared_tcp: crate::tcp_listen::SharedTcp,
     pub(crate) http: HttpClients,
 }
 
@@ -125,6 +131,8 @@ pub(crate) struct Session {
     streams: HashMap<Key, Stream>,
     tcp: HashMap<Key, crate::tcp::Connection>,
     ws: HashMap<Key, crate::ws::Connection>,
+    /// TCP ports this session listens on, by key.
+    listening: HashMap<Key, u16>,
     next_generation: u64,
     pending: HashMap<CommandId, Pending>,
     next_command: CommandId,
@@ -154,6 +162,7 @@ impl Session {
             streams: HashMap::new(),
             tcp: HashMap::new(),
             ws: HashMap::new(),
+            listening: HashMap::new(),
             next_generation: 1,
             pending: HashMap::new(),
             next_command: 1,
@@ -233,6 +242,20 @@ impl Session {
                                 self.tcp.remove(socket);
                             }
                             self.module.tcp(&mut cx, socket, input);
+                        }
+                        Inbound::Accepted { socket, stream } => {
+                            // The newest connection from the device replaces
+                            // any before it.
+                            self.close_tcp(socket);
+                            let generation = self.next_generation;
+                            self.next_generation += 1;
+                            let connection = crate::tcp::adopt(
+                                socket,
+                                generation,
+                                stream,
+                                self.inbound_tx.clone(),
+                            );
+                            self.tcp.insert(socket, connection);
                         }
                         Inbound::Ws { socket, generation, input } => {
                             let current = self.ws.get(socket).map(|c| c.generation);
@@ -319,6 +342,25 @@ impl Session {
                     }
                 }
                 Action::TcpClose { socket } => self.close_tcp(socket),
+                Action::TcpListen { socket, port } => {
+                    let result = self.services.shared_tcp.register(
+                        self.services.bind_address,
+                        port,
+                        self.host,
+                        socket,
+                        self.inbound_tx.clone(),
+                    );
+                    match result {
+                        Ok(()) => {
+                            self.listening.insert(socket, port);
+                        }
+                        Err(message) => {
+                            let mut cx = self.cx();
+                            self.module.socket_error(&mut cx, socket, &message);
+                            Box::pin(self.apply(cx.take())).await;
+                        }
+                    }
+                }
                 Action::WsOpen { socket, request } => {
                     self.close_ws(socket);
                     let generation = self.next_generation;
@@ -553,6 +595,9 @@ impl Session {
         let ws: Vec<Key> = self.ws.keys().copied().collect();
         for key in ws {
             self.close_ws(key);
+        }
+        for (_, port) in self.listening.drain() {
+            self.services.shared_tcp.unregister(port, self.host);
         }
         self.services.events.push(Event::Closed {
             device: self.device,

@@ -256,17 +256,82 @@ fn wrap_stream(packet: &[u8]) -> Vec<u8> {
 
 // ── Receiving ────────────────────────────────────────────────────────────
 
+/// Undoes the V5.0 stream wrapper: waits for DLE STX, un-doubles DLE, and
+/// ends each packet by its own byte count. A DLE STX inside a packet starts a
+/// new one, which recovers from a truncated packet.
+#[derive(Default)]
+struct Deframer {
+    packet: Option<Vec<u8>>,
+    after_dle: bool,
+}
+
+impl Deframer {
+    fn feed(&mut self, data: &[u8]) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        for &b in data {
+            if self.after_dle {
+                self.after_dle = false;
+                match b {
+                    STX => {
+                        self.packet = Some(Vec::new());
+                        continue;
+                    }
+                    DLE => {} // a doubled DLE: one data byte
+                    _ => {
+                        // Not valid after DLE: drop the packet and resync.
+                        self.packet = None;
+                        continue;
+                    }
+                }
+            } else if b == DLE {
+                self.after_dle = true;
+                continue;
+            }
+            let Some(packet) = self.packet.as_mut() else {
+                continue;
+            };
+            packet.push(b);
+            if packet.len() >= 2 && packet.len() == le16(packet, 0) as usize + 2 {
+                out.push(self.packet.take().unwrap());
+            } else if packet.len() > 2050 {
+                // Beyond the 2048-byte maximum: not a packet.
+                self.packet = None;
+            }
+        }
+        out
+    }
+}
+
 pub(crate) struct Listener {
     port: u16,
+    /// V5.0 over TCP: the switcher connects to us.
+    tcp: bool,
+    deframer: Deframer,
     /// Displays seen per screen, for V5.0 broadcasts.
     known: BTreeMap<u16, BTreeSet<u16>>,
 }
 
 impl Listener {
-    pub(crate) fn new(port: u16) -> Listener {
+    pub(crate) fn new(port: u16, model: &str) -> Listener {
         Listener {
             port,
+            tcp: model == "tsl-umd-5-tcp",
+            deframer: Deframer::default(),
             known: BTreeMap::new(),
+        }
+    }
+
+    fn receive(&mut self, cx: &mut Cx, data: &[u8]) {
+        cx.alive();
+        match decode(data) {
+            Some((version, updates)) => {
+                let patch = self.patch(version, updates);
+                cx.state(patch);
+            }
+            None => cx.log(
+                Level::Debug,
+                format!("{} bytes that are not a TSL UMD packet", data.len()),
+            ),
         }
     }
 
@@ -317,8 +382,40 @@ impl Listener {
 
 impl Module for Listener {
     fn start(&mut self, cx: &mut Cx) {
-        cx.udp_open(SOCKET, Bind::Shared(self.port));
-        cx.connection(Connection::Unmonitored);
+        if self.tcp {
+            cx.tcp_listen(SOCKET, self.port);
+            cx.connection(Connection::Disconnected {
+                reason: "waiting for the switcher to connect".into(),
+            });
+        } else {
+            cx.udp_open(SOCKET, Bind::Shared(self.port));
+            cx.connection(Connection::Unmonitored);
+        }
+    }
+
+    fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
+        match input {
+            TcpInput::Connected => {
+                self.deframer = Deframer::default();
+                cx.connection(Connection::Connected);
+            }
+            TcpInput::Data(data) => {
+                for packet in self.deframer.feed(&data) {
+                    self.receive(cx, &packet);
+                }
+            }
+            // Still listening: the switcher reconnects when it can.
+            TcpInput::Closed { reason } => cx.connection(Connection::Disconnected {
+                reason: format!("the switcher's connection closed: {reason}"),
+            }),
+        }
+    }
+
+    fn socket_error(&mut self, cx: &mut Cx, _socket: Key, message: &str) {
+        cx.log(Level::Warning, message.to_string());
+        cx.connection(Connection::Disconnected {
+            reason: message.to_string(),
+        });
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, _params: &Params) {
@@ -331,17 +428,7 @@ impl Module for Listener {
     }
 
     fn datagram(&mut self, cx: &mut Cx, _socket: Key, _from: SocketAddr, data: &[u8]) {
-        cx.alive();
-        match decode(data) {
-            Some((version, updates)) => {
-                let patch = self.patch(version, updates);
-                cx.state(patch);
-            }
-            None => cx.log(
-                Level::Debug,
-                format!("{} bytes that are not a TSL UMD packet", data.len()),
-            ),
-        }
+        self.receive(cx, data);
     }
 
     fn timer(&mut self, _cx: &mut Cx, _key: Key) {}
@@ -575,6 +662,21 @@ mod tests {
     }
 
     #[test]
+    fn the_stream_wrapper_round_trips_across_reads() {
+        let mut d = display("A");
+        // An index whose bytes include DLE, so stuffing is exercised.
+        d.index = 0x00FE;
+        let packet = encode_v5(&d, false);
+        let wrapped = [wrap_stream(&packet), wrap_stream(&packet)].concat();
+        let mut f = Deframer::default();
+        let mut out = Vec::new();
+        for chunk in wrapped.chunks(3) {
+            out.extend(f.feed(chunk));
+        }
+        assert_eq!(out, [packet.clone(), packet]);
+    }
+
+    #[test]
     fn a_long_v5_packet_is_not_read_as_v3() {
         let mut d = display(&"x".repeat(200));
         d.index = 1;
@@ -607,7 +709,7 @@ mod tests {
 
     #[test]
     fn the_listener_reports_state_and_applies_broadcasts() {
-        let mut l = Listener::new(8900);
+        let mut l = Listener::new(8900, "tsl-umd");
         let mut cx = Cx::new(0);
         l.start(&mut cx);
         let a = cx.take();

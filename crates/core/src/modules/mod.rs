@@ -33,7 +33,7 @@ pub(crate) fn construct(
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
         // TSL defines no port, so the host must give one.
         "tsl-umd-listener" => match context.port {
-            Some(port) => Ok(Box::new(tsl::Listener::new(port))),
+            Some(port) => Ok(Box::new(tsl::Listener::new(port, &context.model))),
             None => Err("TSL UMD has no standard port: give the port to listen on".into()),
         },
         "tsl-umd-display" => match context.port {

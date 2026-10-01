@@ -83,3 +83,65 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
         })
         .is_err());
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tsl_over_tcp_the_switcher_connects_to_the_listener() {
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+
+    let receiver = Core::new().unwrap();
+    let listener = receiver
+        .open(OpenRequest {
+            device: "tsl-umd-listener".into(),
+            model: "tsl-umd-5-tcp".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: Default::default(),
+        })
+        .unwrap();
+
+    let sender = Core::new().unwrap();
+    let display = sender
+        .open(OpenRequest {
+            device: "tsl-umd-display".into(),
+            model: "tsl-5-0-tcp".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: Default::default(),
+        })
+        .unwrap();
+
+    let got = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            // NotConnected until the sender's reconnect reaches the listener.
+            let _ = sender
+                .execute(
+                    display,
+                    "set_display",
+                    // Index 254 is 0xFE: DLE inside the packet, stuffed on the wire.
+                    params(json!({"index": 254, "text": "PGM", "text_tally": "red"})),
+                )
+                .await;
+            for e in receiver.poll_events(64) {
+                if let Event::State { device, patch } = e {
+                    if device == listener {
+                        return patch;
+                    }
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("the listener receives the display update over TCP");
+    let d = &got["screens"]["0"]["displays"]["254"];
+    assert_eq!(d["text"], "PGM");
+    assert_eq!(d["tally"]["text"], "red");
+    assert_eq!(
+        receiver.snapshot(listener).unwrap().connection,
+        meros_integrations::Connection::Connected
+    );
+}

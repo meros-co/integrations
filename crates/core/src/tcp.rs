@@ -29,6 +29,25 @@ pub(crate) fn spawn(
     to: SocketAddr,
     inbound: mpsc::Sender<Inbound>,
 ) -> Connection {
+    start(socket, generation, inbound, Stream::Connect(to))
+}
+
+/// A connection the device opened to us, accepted by a listener.
+pub(crate) fn adopt(
+    socket: Key,
+    generation: u64,
+    stream: TcpStream,
+    inbound: mpsc::Sender<Inbound>,
+) -> Connection {
+    start(socket, generation, inbound, Stream::Accepted(stream))
+}
+
+enum Stream {
+    Connect(SocketAddr),
+    Accepted(TcpStream),
+}
+
+fn start(socket: Key, generation: u64, inbound: mpsc::Sender<Inbound>, how: Stream) -> Connection {
     let (writer, mut outgoing) = mpsc::unbounded_channel::<Vec<u8>>();
     let task = tokio::spawn(async move {
         let send = |input: TcpInput| {
@@ -45,21 +64,26 @@ pub(crate) fn spawn(
             }
         };
 
-        let stream = match tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(to)).await {
-            Ok(Ok(s)) => s,
-            Ok(Err(e)) => {
-                send(TcpInput::Closed {
-                    reason: format!("connect: {e}"),
-                })
-                .await;
-                return;
-            }
-            Err(_) => {
-                send(TcpInput::Closed {
-                    reason: "connect: timed out".into(),
-                })
-                .await;
-                return;
+        let stream = match how {
+            Stream::Accepted(stream) => stream,
+            Stream::Connect(to) => {
+                match tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(to)).await {
+                    Ok(Ok(s)) => s,
+                    Ok(Err(e)) => {
+                        send(TcpInput::Closed {
+                            reason: format!("connect: {e}"),
+                        })
+                        .await;
+                        return;
+                    }
+                    Err(_) => {
+                        send(TcpInput::Closed {
+                            reason: "connect: timed out".into(),
+                        })
+                        .await;
+                        return;
+                    }
+                }
             }
         };
         let _ = stream.set_nodelay(true);

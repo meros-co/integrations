@@ -30,6 +30,7 @@ mod modules;
 mod session;
 pub mod sse;
 mod tcp;
+mod tcp_listen;
 mod udp;
 mod ws;
 
@@ -136,6 +137,7 @@ impl Core {
                     .bind_address
                     .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
                 shared_udp: Default::default(),
+                shared_tcp: Default::default(),
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
             }),
         })

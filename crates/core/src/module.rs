@@ -205,6 +205,13 @@ pub enum Action {
     TcpClose {
         socket: Key,
     },
+    /// Accept connections from the device on a local TCP port, shared with
+    /// other sessions and routed by peer address. Each accepted connection is
+    /// reported on `socket` as `TcpInput::Connected`, replacing any before it.
+    TcpListen {
+        socket: Key,
+        port: u16,
+    },
     /// Open a WebSocket, replacing any open under this key.
     WsOpen {
         socket: Key,
@@ -309,6 +316,10 @@ impl Cx {
 
     pub fn tcp_close(&mut self, socket: Key) {
         self.push(Action::TcpClose { socket });
+    }
+
+    pub fn tcp_listen(&mut self, socket: Key, port: u16) {
+        self.push(Action::TcpListen { socket, port });
     }
 
     pub fn ws_open(&mut self, socket: Key, request: WsRequest) {
