@@ -1,0 +1,3273 @@
+spec: 1
+id: birddog
+name: BirdDog cameras (RESTful API)
+vendor: BirdDog
+category: camera
+
+# BirdDog's RESTful API: GET and POST on port 8080, JSON bodies whose values
+# are all strings, and plain text for a few endpoints. BirdDog publishes it in
+# two generations, linked from https://birddog.tv/api/: API 2.0 for the
+# P-series and A-series PTZ cameras (and converters), and API 2.1 for the
+# X-series and MAKI Ultra. Endpoint names are shared, but each generation, and
+# each camera, documents different keys and ranges, so commands carry a model
+# suffix where the ranges differ (_x4u, _x5u, _maki; _p for every 2.0 camera;
+# _p200 for P200/A200/A300, _p100 for P100/PF120/P110/P120, _p400 for
+# P400/P4K/P240). Summaries end with the method and endpoint.
+#
+# Pan, tilt, zoom, focus and presets are also reachable over VISCA, which the
+# native `visca` module covers (specs/visca.yaml, model birddog); see quirks.
+source:
+  - title: "BirdDog RESTful API 2.0, API and SDK Documentation (Version 2.0.0)"
+    author: BirdDog
+    url: https://birddog.tv/AV/API/index.html
+    note: >
+      Manufacturer document, the "P-Series & Converters" link on
+      https://birddog.tv/api/, retrieved 2026-10-01; an HTML page without page
+      numbers, so references are to its sections. Endpoints, example requests
+      (curl) and example replies by section: API Methods - BasicDeviceInfo
+      (about, hostname, reboot, restart, version), DEVICESETTINGS
+      (analogaudiosetup, operationmode, videooutputinterface), NDIENCODE
+      (encodeTransport, encodesetup), NDIDECODE (capture, connectTo,
+      decodeTransport, decodesetup, decodestatus), NDIFINDER (List,
+      NDIDisServer, NDIGrpName, NDIOffSnSrc, refresh, reset), PTZ
+      (birddogptzsetup, recall, save), EXPOSURE, WHITEBALANCE,
+      PICTURESETTINGS, COLOURMATRIX, ADVANCEDSETTINGS, EXTERNALSETTINGS,
+      DETAIL, GAMMA and SILICON2. Each section's DEVICE SUPPORT table gives
+      the keys and ranges per camera (columns P200 A2_A3, P200 A4_A5, A200
+      Gen1/Gen2, A300 Gen1/Gen2, P100, PF120, P110, P120, P400, P4K, P240);
+      models and ranges here follow those tables.
+  - title: "X1, X1 Ultra, MAX & X4 Ultra & X5 Ultra Cameras (BirdDog API 2.1, Postman documentation, published 2025-01-16)"
+    author: BirdDog
+    url: https://documenter.getpostman.com/view/29602224/2sAYHxn45i
+    note: >
+      Manufacturer document, the "X-Series & MAX" link on
+      https://birddog.tv/api/, retrieved 2026-10-01 (collection data from
+      documenter.gw.postman.com). Folders: Device Information, Network
+      Settings, Encoder Settings, Decoder Settings, Camera PTZ and Colour
+      Settings, NDI Finder Settings, Miscellaneous Camera Settings. Each
+      folder's description lists the keys and ranges per camera; each request
+      has an example body and reply. States that all calls use port 8080 and
+      that API 2.1 is fully supported on X5 Ultra from firmware 6.1.034 and
+      X4 Ultra from 6.1.31.
+  - title: "Maki Ultra 12 & 20x (BirdDog API 2.1, Postman documentation, published 2025-08-21)"
+    author: BirdDog
+    url: https://documenter.getpostman.com/view/29602224/2sB3BLiSnk
+    note: >
+      Manufacturer document, the "MAKI Ultra" link on https://birddog.tv/api/,
+      retrieved 2026-10-01, in the same folder structure as the X-series
+      collection, with MAKI Ultra keys and ranges. BirdDog's earlier "RESTful
+      API v1.0" PDF (bird-dog.tv/extra/BirdDog_RESTful_API_1.0.pdf) is
+      superseded by these and no longer served; it was not used.
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /version }
+
+models:
+  - id: x1
+    name: "BirdDog X1"
+    supports:
+      [get_about, get_version, get_hostname, get_operation_mode, set_operation_mode, reboot, restart_video,
+      factory_reset, reset_image, get_video_output, set_output_format, set_privacy_mode, get_ethernet, set_ethernet,
+      set_ip_mode, set_ip_address, set_netmask, set_gateway, set_dns_primary, set_dns_secondary, set_fallback_ip,
+      set_fallback_netmask, set_fallback_gateway, set_dhcp_timeout, get_wifi, set_wifi_enabled, set_wifi_dhcp,
+      set_wifi_ip_address, set_wifi_netmask, set_wifi_gateway, set_wifi_dns, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_network_setup, set_preferred_nic, get_encode_setup,
+      set_encode_setup, set_video_format, set_video_compression, set_stream_protocol, set_stream_name,
+      set_stream_to_network, set_screensaver_mode, set_ndi_group, set_ndi_group_name, get_sil2_codec, set_sil2_codec,
+      set_bitrate_control, set_encoder_mode, set_encoder_mode_preset, set_gop_size, set_bitrate,
+      get_secondary_protocol, set_secondary_protocol, get_encode_transport, set_ndi_transmit_method,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, get_decode_transport,
+      set_ndi_receive_method, get_genlock_failover, set_genlock_source, set_failover_source, get_decode_setup,
+      set_decode_audio, set_decode_screensaver, get_decode_status, get_connected_source, connect_source,
+      get_exposure, set_exposure, set_exposure_mode, set_exposure_comp_level, set_gain_level, set_shutter_speed,
+      set_iris_level, set_bright_level, get_picture, set_picture, set_flip, set_mirror, set_sharpness,
+      set_saturation, set_hue, set_contrast, set_brightness, set_3dnr, set_2dnr, set_backlight_comp, set_wdr,
+      set_highlight_comp, set_gamma, set_deflicker, get_white_balance, set_white_balance, set_wb_mode, set_red_gain,
+      set_blue_gain, set_color_temp, wb_one_push, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue,
+      get_advanced, set_advanced, set_af_zone, set_scene, set_af_sensitivity, get_ptz_setup, set_ptz_setup,
+      set_pan_speed, set_tilt_speed, set_zoom_speed, set_focus_mode, set_preset_mode, set_preset_speed,
+      set_speed_control, recall_preset, save_preset, get_ptz_control, pan_tilt, zoom, focus, set_menu,
+      set_pan_tilt_position, set_zoom_position, get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet,
+      set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh, get_ndi_sources, get_tally, set_tally,
+      set_tally_rest_state]
+    verification: none
+    notes: >
+      API 2.1 (Postman: X1, X1 Ultra, MAX & X4 Ultra & X5 Ultra Cameras).
+  - id: x1-ultra
+    name: "BirdDog X1 Ultra"
+    supports:
+      [get_about, get_version, get_hostname, get_operation_mode, set_operation_mode, reboot, restart_video,
+      factory_reset, reset_image, get_video_output, set_output_format, set_privacy_mode, get_ethernet, set_ethernet,
+      set_ip_mode, set_ip_address, set_netmask, set_gateway, set_dns_primary, set_dns_secondary, set_fallback_ip,
+      set_fallback_netmask, set_fallback_gateway, set_dhcp_timeout, get_wifi, set_wifi_enabled, set_wifi_dhcp,
+      set_wifi_ip_address, set_wifi_netmask, set_wifi_gateway, set_wifi_dns, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_network_setup, set_preferred_nic, get_encode_setup,
+      set_encode_setup, set_video_format, set_video_compression, set_stream_protocol, set_stream_name,
+      set_stream_to_network, set_screensaver_mode, set_ndi_group, set_ndi_group_name, get_sil2_codec, set_sil2_codec,
+      set_bitrate_control, set_encoder_mode, set_encoder_mode_preset, set_gop_size, set_bitrate,
+      get_secondary_protocol, set_secondary_protocol, get_encode_transport, set_ndi_transmit_method,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, get_decode_transport,
+      set_ndi_receive_method, get_genlock_failover, set_genlock_source, set_failover_source, get_decode_setup,
+      set_decode_audio, set_decode_screensaver, get_decode_status, get_connected_source, connect_source,
+      get_exposure, set_exposure, set_exposure_mode, set_exposure_comp_level, set_gain_level, set_shutter_speed,
+      set_iris_level, set_bright_level, get_picture, set_picture, set_flip, set_mirror, set_sharpness,
+      set_saturation, set_hue, set_contrast, set_brightness, set_3dnr, set_2dnr, set_backlight_comp,
+      set_highlight_comp, set_gamma, set_deflicker, get_white_balance, set_white_balance, set_wb_mode, set_red_gain,
+      set_blue_gain, set_color_temp, wb_one_push, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue,
+      get_advanced, set_advanced, set_af_zone, set_scene, set_af_sensitivity, get_ptz_setup, set_ptz_setup,
+      set_pan_speed, set_tilt_speed, set_zoom_speed, set_focus_mode, set_preset_mode, set_preset_speed,
+      set_speed_control, recall_preset, save_preset, get_ptz_control, pan_tilt, zoom, focus, set_menu,
+      set_pan_tilt_position, set_zoom_position, get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet,
+      set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh, get_ndi_sources, get_tally, set_tally,
+      set_tally_rest_state]
+    verification: none
+    notes: >
+      API 2.1.
+  - id: max
+    name: "BirdDog MAX"
+    supports:
+      [get_about, get_version, get_hostname, get_operation_mode, set_operation_mode, reboot, restart_video,
+      factory_reset, reset_image, get_video_output, set_output_format, set_privacy_mode, get_ethernet, set_ethernet,
+      set_ip_mode, set_ip_address, set_netmask, set_gateway, set_dns_primary, set_dns_secondary, set_fallback_ip,
+      set_fallback_netmask, set_fallback_gateway, set_dhcp_timeout, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, get_sil2_codec,
+      set_sil2_codec, set_bitrate_control, set_encoder_mode, set_encoder_mode_preset, set_gop_size, set_bitrate,
+      get_secondary_protocol, set_secondary_protocol, get_encode_transport, set_ndi_transmit_method,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, get_decode_transport,
+      set_ndi_receive_method, get_genlock_failover, set_genlock_source, set_failover_source, get_decode_setup,
+      set_decode_audio, set_decode_screensaver, get_decode_status, get_exposure, set_exposure, set_exposure_mode,
+      set_exposure_comp_level, set_gain_level, set_shutter_speed, set_iris_level, set_bright_level, get_picture,
+      set_picture, set_flip, set_mirror, set_sharpness, set_saturation, set_hue, set_contrast, set_brightness,
+      set_3dnr, set_2dnr, set_backlight_comp, set_highlight_comp, set_gamma, set_deflicker, get_white_balance,
+      set_white_balance, set_wb_mode, set_red_gain, set_blue_gain, set_color_temp, wb_one_push, get_colour_matrix,
+      set_colour_matrix, set_colour_matrix_hue, get_advanced, set_advanced, set_af_zone, set_scene,
+      set_af_sensitivity, get_ptz_setup, set_ptz_setup, set_pan_speed, set_tilt_speed, set_zoom_speed,
+      set_focus_mode, set_preset_mode, set_preset_speed, set_speed_control, recall_preset, save_preset,
+      get_ptz_control, pan_tilt, zoom, focus, set_menu, set_pan_tilt_position, set_zoom_position,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources, get_tally, set_tally, set_tally_rest_state]
+    verification: none
+    notes: >
+      API 2.1. The collection names MAX in its title and in the exposure, picture, advanced, white balance, PTZ, colour matrix, video output and decoder field lists; it is not named in the encode setup field list or the wireless lists, so those typed commands are not listed for it.
+  - id: x4-ultra
+    name: "BirdDog X4 Ultra"
+    supports:
+      [get_about, get_version, get_hostname, get_operation_mode, reboot, restart_video, factory_reset, reset_image,
+      get_video_output, set_output_format, set_video_output, get_ethernet, set_ethernet, set_ip_mode, set_ip_address,
+      set_netmask, set_gateway, set_dns_primary, set_dns_secondary, set_fallback_ip, set_fallback_netmask,
+      set_fallback_gateway, set_dhcp_timeout, get_wifi, set_wifi_enabled, set_wifi_dhcp, set_wifi_ip_address,
+      set_wifi_netmask, set_wifi_gateway, set_wifi_dns, get_ndi_discovery_server, set_ndi_discovery_server,
+      set_ndi_discovery_server_ip, get_network_setup, set_preferred_nic, set_dante, get_encode_setup,
+      set_encode_setup, set_video_format, set_video_compression, set_stream_protocol, set_stream_name,
+      set_stream_to_network, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio_mute,
+      get_sil2_codec, set_sil2_codec, set_bitrate_control, set_encoder_mode, set_encoder_mode_preset, set_gop_size,
+      set_bitrate, get_secondary_protocol, set_secondary_protocol, get_analog_audio, set_audio_in_gain_x4u,
+      get_encode_transport, set_ndi_transmit_method, set_ndi_multicast_prefix, set_ndi_multicast_netmask,
+      set_ndi_multicast_ttl, get_genlock_failover, set_genlock_source, set_failover_source, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level, set_gain_level_x4u,
+      set_gain_limit, set_shutter_speed_x4u, set_iris_level_x4u, set_bright_level, set_backlight, set_meter,
+      get_picture, set_picture, set_flip, set_mirror, set_sharpness_x4u, set_saturation_x4u, set_hue_x4u,
+      set_contrast_x4u, set_brightness_x4u, set_3dnr_x4u, set_backlight_comp, set_highlight_comp, set_gamma_x4u,
+      set_deflicker, set_bw_mode, get_white_balance, set_white_balance, set_wb_mode, set_red_gain, set_blue_gain,
+      set_color_temp, wb_one_push, set_red_tuning, set_blue_tuning, get_colour_matrix, set_colour_matrix,
+      set_colour_matrix_hue, get_advanced, set_advanced, set_af_zone_x4u, set_scene_x4u, set_af_sensitivity,
+      set_af_mode, get_ptz_setup, set_ptz_setup, set_pan_speed_x4u, set_tilt_speed_x4u, set_zoom_speed,
+      set_focus_mode, set_preset_mode_x4u, set_speed_control, recall_preset, save_preset, get_ptz_control, pan_tilt,
+      zoom, focus, set_menu, set_pan_tilt_position_x4u, set_zoom_position_x4u, get_ndi_group_names,
+      set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh,
+      get_ndi_sources, get_tally, set_tally, set_tally_rest_state]
+    verification: none
+    notes: >
+      API 2.1, fully supported from firmware 6.1.31 (collection description).
+  - id: x5-ultra
+    name: "BirdDog X5 Ultra"
+    supports:
+      [get_about, get_version, get_hostname, get_operation_mode, reboot, restart_video, factory_reset, reset_image,
+      get_video_output, set_output_format_x5u, set_output_frequency, set_hdmi1_output_decoder, get_ethernet,
+      set_ethernet, set_ip_mode, set_ip_address, set_netmask, set_gateway, set_dns_primary, set_dns_secondary,
+      set_fallback_ip, set_fallback_netmask, set_fallback_gateway, set_dhcp_timeout, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_video_compression, set_stream_protocol, set_stream_name, set_stream_to_network, set_screensaver_mode,
+      set_ndi_group, set_ndi_group_name, set_ndi_audio_mute, get_sil2_codec, set_sil2_codec, set_bitrate_control,
+      set_encoder_mode, set_encoder_mode_preset, set_gop_size, set_bitrate, get_secondary_protocol,
+      set_secondary_protocol, get_analog_audio, set_audio_in_gain_x5u, set_audio_input_type, get_encode_transport,
+      set_ndi_transmit_method, set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl,
+      get_decode_transport, set_ndi_receive_method, get_genlock_failover, set_genlock_source, set_failover_source,
+      get_decode_setup, set_decode_audio, set_decode_screensaver, get_decode_status, get_connected_source,
+      connect_source, get_exposure, set_exposure, set_exposure_mode, set_exposure_comp_x5u, set_gain_x5u,
+      set_gain_limit_x5u, set_shutter_speed_x5u, set_iris_level_x5u, set_bright_level_x5u, set_slow_shutter_x5u,
+      set_high_sensitivity, set_backlight_x5u, get_picture, set_picture, set_flip, set_mirror, set_sharpness_x5u,
+      set_saturation_x5u, set_hue_x5u, set_contrast_x5u, set_3dnr_x5u, set_wdr, set_stabilizer_x5u,
+      get_white_balance, set_white_balance, set_wb_mode_x5u, set_red_gain, set_blue_gain, get_ptz_setup,
+      set_ptz_setup, set_pan_speed_x5u, set_tilt_speed_x5u, set_zoom_speed, set_focus_mode, set_preset_mode_x4u,
+      set_preset_speed_x5u, set_pan_tilt_slow, recall_preset, save_preset, get_ptz_control, pan_tilt, zoom, focus,
+      set_menu, set_pan_tilt_position_x5u, set_zoom_position_x5u, get_ndi_group_names, set_ndi_group_names,
+      get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh, get_ndi_sources, get_tally,
+      set_tally, set_tally_rest_state]
+    verification: none
+    notes: >
+      API 2.1, fully supported from firmware 6.1.034 (collection description). Advanced setup and colour matrix are not supported.
+  - id: maki-ultra
+    name: "BirdDog MAKI Ultra (12x and 20x)"
+    supports:
+      [get_about, get_version, get_hostname, get_operation_mode, reboot, restart_video, factory_reset, reset_image,
+      get_video_output, set_output_format, get_ethernet, set_ethernet, set_ip_mode, set_ip_address, set_netmask,
+      set_gateway, set_dns_primary, set_dns_secondary, set_fallback_ip, set_fallback_netmask, set_fallback_gateway,
+      set_dhcp_timeout, get_ndi_discovery_server, set_ndi_discovery_server, set_ndi_discovery_server_ip,
+      get_network_setup, get_encode_setup, set_encode_setup, set_video_format, set_video_compression,
+      set_stream_protocol, set_stream_name, set_stream_to_network, set_screensaver_mode, set_ndi_group,
+      set_ndi_group_name, set_ndi_audio, get_sil2_codec, set_sil2_codec, set_bitrate_control, set_encoder_mode,
+      set_encoder_mode_hx3, set_gop_size, set_bitrate, get_secondary_protocol, set_secondary_protocol, set_srt_mode,
+      set_srt_port, set_srt_latency, set_srt_encryption, set_srt_encryption_length, set_srt_passphrase,
+      set_rtsp_stream_name, set_rtsp_port, set_rtsp_authentication, set_rtsp_user_name, set_rtsp_password,
+      set_rtmp_server_selection, set_rtmp_server_url, set_rtmp_stream_key, set_rtmp_authentication, get_analog_audio,
+      set_audio_in_gain, set_audio_input_type, get_encode_transport, set_ndi_transmit_method,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, get_exposure, set_exposure,
+      set_exposure_mode, set_exposure_comp, set_exposure_comp_level, set_gain_level_x4u, set_gain_limit,
+      set_shutter_speed_x4u, set_iris_level_x4u, set_bright_level, set_backlight, set_meter, get_picture,
+      set_picture, set_flip, set_mirror, set_sharpness_maki, set_saturation_x4u, set_hue_x4u, set_contrast_x4u,
+      set_brightness, set_3dnr_x4u, set_2dnr_maki, set_backlight_comp, set_wdr, set_wide_dynamic_range_maki,
+      set_highlight_comp, set_gamma_maki, set_deflicker, set_bw_mode, get_white_balance, set_white_balance,
+      set_wb_mode, set_red_gain, set_blue_gain, set_color_temp_maki, wb_one_push, set_red_tuning_maki,
+      set_blue_tuning_maki, set_wb_sensitivity, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue_64,
+      get_advanced, set_advanced, set_af_zone_maki, set_scene_maki, set_af_sensitivity, set_af_mode, set_teleconvert,
+      set_image_ratio, set_eptz, get_ptz_setup, set_ptz_setup, set_zoom_speed, set_focus_mode, set_preset_mode,
+      set_preset_speed_maki, set_digital_zoom_limit, recall_preset, save_preset, get_ptz_control, zoom, focus,
+      set_menu, get_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh,
+      get_ndi_sources, get_tally, set_tally]
+    verification: none
+    notes: >
+      API 2.1 (Postman: Maki Ultra 12 & 20x). Encode mode only; no pan/tilt keys in PTZ control.
+  - id: p200-a2a3
+    name: "BirdDog Eyes P200 (hardware A2/A3)"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p200, set_bright_level_p200, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit, set_high_sensitivity, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p200, set_backlight_comp, set_highlight_comp_p200, set_highlight_comp_mask_p200a2,
+      set_gamma_p200, set_stabilizer, set_chroma_suppress, set_effect_p200a2, set_noise_reduction, get_white_balance,
+      set_white_balance, set_wb_mode_p200, set_red_gain, set_blue_gain, get_colour_matrix, set_colour_matrix,
+      set_colour_matrix_hue_64, set_colour_matrix_gain_64, set_colour_gain, set_hue_phase, get_advanced,
+      set_advanced, set_gamma_offset, set_high_resolution, set_brightness_comp, set_comp_level, set_brightness_p200,
+      set_video_enhancement, get_ptz_setup, set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed,
+      recall_preset, save_preset, get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet,
+      ndi_finder_reset, ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P200_A2_A3'.
+  - id: p200-a4a5
+    name: "BirdDog Eyes P200 (hardware A4/A5)"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p200, set_bright_level_p200, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit, set_high_sensitivity, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p200, set_backlight_comp, set_highlight_comp_p200, set_highlight_comp_mask, set_gamma_p200,
+      set_stabilizer, set_chroma_suppress, set_ir_cut_filter, set_effect, set_noise_reduction, set_low_latency,
+      get_white_balance, set_white_balance, set_wb_mode_p200, set_red_gain, set_blue_gain, get_colour_matrix,
+      set_colour_matrix, set_colour_matrix_hue_64, set_colour_matrix_gain_64, set_colour_gain, set_hue_phase,
+      get_advanced, set_advanced, set_gamma_offset, set_high_resolution, set_brightness_comp, set_comp_level,
+      set_brightness_p200, set_video_enhancement, get_ptz_setup, set_ptz_setup, set_pan_speed_p, set_tilt_speed_p,
+      set_zoom_speed, recall_preset, save_preset, get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet,
+      set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P200_A4_A5'.
+  - id: a200-gen1
+    name: "BirdDog Eyes A200 (Gen 1)"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p200, set_bright_level_p200, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit, set_high_sensitivity, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p200, set_backlight_comp, set_highlight_comp_p200, set_highlight_comp_mask, set_gamma_p200,
+      set_stabilizer, set_chroma_suppress, set_ir_cut_filter, set_effect, set_noise_reduction, get_white_balance,
+      set_white_balance, set_wb_mode_p200, set_red_gain, set_blue_gain, get_colour_matrix, set_colour_matrix,
+      set_colour_matrix_hue_64, set_colour_matrix_gain_64, set_colour_gain, set_hue_phase, get_advanced,
+      set_advanced, set_gamma_offset, set_high_resolution, set_brightness_comp, set_comp_level, set_brightness_p200,
+      set_video_enhancement, get_external, set_external, set_aux, set_v12_out, set_defog, get_ptz_setup,
+      set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog A200_GEN1'.
+  - id: a200-gen2
+    name: "BirdDog Eyes A200 (Gen 2)"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p200, set_bright_level_p200, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit, set_high_sensitivity, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p200, set_backlight_comp, set_highlight_comp_p200, set_highlight_comp_mask, set_gamma_p200,
+      set_stabilizer, set_chroma_suppress, set_ir_cut_filter, set_effect, set_noise_reduction, get_white_balance,
+      set_white_balance, set_wb_mode_p200, set_red_gain, set_blue_gain, get_colour_matrix, set_colour_matrix,
+      set_colour_matrix_hue_64, set_colour_matrix_gain_64, set_colour_gain, set_hue_phase, get_advanced,
+      set_advanced, set_gamma_offset, set_high_resolution, set_brightness_comp, set_comp_level, set_brightness_p200,
+      set_video_enhancement, get_external, set_external, set_aux, set_v12_out, set_defog, get_ptz_setup,
+      set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog A200_GEN2'.
+  - id: a300-gen1
+    name: "BirdDog Eyes A300 (Gen 1)"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p200, set_bright_level_p200, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit, set_high_sensitivity, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p200, set_backlight_comp, set_highlight_comp_p200, set_highlight_comp_mask, set_gamma_p200,
+      set_stabilizer, set_chroma_suppress, set_ir_cut_filter, set_effect, set_noise_reduction, get_white_balance,
+      set_white_balance, set_wb_mode_p200, set_red_gain, set_blue_gain, get_colour_matrix, set_colour_matrix,
+      set_colour_matrix_hue_64, set_colour_matrix_gain_64, set_colour_gain, set_hue_phase, get_advanced,
+      set_advanced, set_gamma_offset, set_high_resolution, set_brightness_comp, set_comp_level, set_brightness_p200,
+      set_video_enhancement, get_external, set_external, set_aux, set_v12_out, set_rain_wiper, get_ptz_setup,
+      set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog A300_GEN1'.
+  - id: a300-gen2
+    name: "BirdDog Eyes A300 (Gen 2)"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p200, set_bright_level_p200, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit, set_high_sensitivity, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p200, set_backlight_comp, set_highlight_comp_p200, set_highlight_comp_mask, set_gamma_p200,
+      set_stabilizer, set_chroma_suppress, set_ir_cut_filter, set_effect, set_noise_reduction, get_white_balance,
+      set_white_balance, set_wb_mode_p200, set_red_gain, set_blue_gain, get_colour_matrix, set_colour_matrix,
+      set_colour_matrix_hue_64, set_colour_matrix_gain_64, set_colour_gain, set_hue_phase, get_advanced,
+      set_advanced, set_gamma_offset, set_high_resolution, set_brightness_comp, set_comp_level, set_brightness_p200,
+      set_video_enhancement, get_external, set_external, set_aux, set_v12_out, set_rain_wiper, get_ptz_setup,
+      set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog A300_GEN2'.
+  - id: p100
+    name: "BirdDog P100"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_shutter_speed_p, set_iris_level, set_bright_level_p100, set_shutter_control_overwrite,
+      set_shutter_speed_overwrite, get_picture, set_picture, set_flip, set_mirror, set_sharpness_p100,
+      set_color_p100, set_hue_x5u, set_contrast_p100, set_wide_dynamic_range_p100, set_gamma_p100, set_effect,
+      set_noise_reduction, get_white_balance, set_white_balance, set_wb_mode_p100, set_red_gain, set_blue_gain,
+      set_color_temp_p100, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue_64, set_colour_matrix_gain_64,
+      get_ptz_setup, set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P100'.
+  - id: pf120
+    name: "BirdDog PF120"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_shutter_speed_p, set_iris_level, set_bright_level_p100, set_shutter_control_overwrite,
+      set_shutter_speed_overwrite, get_picture, set_picture, set_flip, set_mirror, set_sharpness_p100,
+      set_color_p100, set_hue_x5u, set_contrast_p100, set_wide_dynamic_range_p100, set_gamma_p100, set_effect,
+      set_noise_reduction, get_white_balance, set_white_balance, set_wb_mode_p100, set_red_gain, set_blue_gain,
+      set_color_temp_p100, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue_64, set_colour_matrix_gain_64,
+      get_ptz_setup, set_ptz_setup, set_zoom_speed_pf120, recall_preset, save_preset, get_ndi_group_names,
+      set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh,
+      get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog PF120'. No pan/tilt speed (PTZ table: none).
+  - id: p110
+    name: "BirdDog P110"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, set_audio_output_select, get_encode_transport,
+      set_ndi_transmit_method_p, set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl,
+      capture_screensaver, get_exposure, set_exposure, set_exposure_mode, set_exposure_comp,
+      set_exposure_comp_level_p, set_gain_level_p, set_shutter_speed_p, set_iris_level, set_bright_level_p100,
+      set_shutter_control_overwrite, set_shutter_speed_overwrite, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p100, set_color_p100, set_hue_x5u, set_contrast_p100, set_gamma_p100, set_effect,
+      set_noise_reduction, get_white_balance, set_white_balance, set_wb_mode_p100, set_red_gain, set_blue_gain,
+      set_color_temp_p100, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue_64, set_colour_matrix_gain_64,
+      get_ptz_setup, set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P110'.
+  - id: p120
+    name: "BirdDog P120"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, set_audio_output_select, get_encode_transport,
+      set_ndi_transmit_method_p, set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl,
+      capture_screensaver, get_exposure, set_exposure, set_exposure_mode, set_exposure_comp,
+      set_exposure_comp_level_p, set_gain_level_p, set_shutter_speed_p, set_iris_level, set_bright_level_p100,
+      set_shutter_control_overwrite, set_shutter_speed_overwrite, get_picture, set_picture, set_flip, set_mirror,
+      set_sharpness_p100, set_color_p100, set_hue_x5u, set_contrast_p100, set_gamma_p100, set_effect,
+      set_noise_reduction, get_white_balance, set_white_balance, set_wb_mode_p100, set_red_gain, set_blue_gain,
+      set_color_temp_p100, get_colour_matrix, set_colour_matrix, set_colour_matrix_hue_64, set_colour_matrix_gain_64,
+      get_ptz_setup, set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P120'.
+  - id: p400
+    name: "BirdDog Eyes P400"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_video_output, set_video_output_mode_p400,
+      get_ndi_discovery_server, set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup,
+      set_encode_setup, set_video_format, set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name,
+      set_ndi_audio, set_video_sample_rate_p400, set_bandwidth_mode, set_bandwidth_p400, set_tally_mode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p400, set_bright_level_p400, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit_p400, set_shutter_max_speed, set_shutter_min_speed, set_gain_point,
+      set_gain_point_position, set_high_sensitivity, set_spotlight, set_backlight, get_picture, set_picture,
+      set_flip, set_mirror, set_3dnr_p400, set_2dnr_p400, set_highlight_comp, set_stabilizer, set_chroma_suppress,
+      set_ir_cut_filter_p400, get_white_balance, set_white_balance, set_wb_mode_p400, set_red_gain, set_blue_gain,
+      set_wb_matrix_coefficient, set_wb_matrix, set_wb_level, set_wb_offset, set_wb_phase, set_wb_select,
+      set_wb_speed, get_detail, set_detail, set_detail_enabled, set_detail_level, set_detail_bandwidth,
+      set_detail_bw_balance, set_detail_crispening, set_detail_highlight, set_detail_hv_balance, set_detail_limit,
+      set_detail_super_low, get_gamma, set_gamma_settings, set_gamma_mode, set_gamma_level, set_black_gamma_level,
+      set_black_level, set_black_level_range, set_gamma_effect, set_gamma_curve_offset, set_gamma_pattern,
+      set_gamma_pattern_fine, set_visibility_enhancer, get_ptz_setup, set_ptz_setup, set_pan_speed_p,
+      set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset, get_ndi_group_names, set_ndi_group_names,
+      get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset, ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P400'.
+  - id: p4k
+    name: "BirdDog Eyes P4K"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_video_output, set_video_output_mode_p400,
+      get_ndi_discovery_server, set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup,
+      set_encode_setup, set_video_format, set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name,
+      set_ndi_audio, set_video_sample_rate_p400, set_bandwidth_mode, set_bandwidth_p400, set_tally_mode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, get_encode_transport, set_ndi_transmit_method_p,
+      set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_screensaver, get_exposure,
+      set_exposure, set_exposure_mode, set_exposure_comp, set_exposure_comp_level_p, set_gain_level_p,
+      set_gain_limit_p, set_shutter_speed_p, set_iris_level_p400, set_bright_level_p400, set_ae_response,
+      set_slow_shutter, set_slow_shutter_limit_p400, set_shutter_max_speed, set_shutter_min_speed, set_gain_point,
+      set_gain_point_position, set_high_sensitivity, set_spotlight, set_backlight, get_picture, set_picture,
+      set_flip, set_mirror, set_3dnr_p400, set_2dnr_p400, set_highlight_comp, set_stabilizer, set_chroma_suppress,
+      set_ir_cut_filter_p400, set_nd_filter, get_white_balance, set_white_balance, set_wb_mode_p400, set_red_gain,
+      set_blue_gain, set_wb_matrix_coefficient, set_wb_matrix, set_wb_level, set_wb_offset, set_wb_phase,
+      set_wb_select, set_wb_speed, get_detail, set_detail, set_detail_enabled, set_detail_level,
+      set_detail_bandwidth, set_detail_bw_balance, set_detail_crispening, set_detail_highlight,
+      set_detail_hv_balance, set_detail_limit, set_detail_super_low, get_gamma, set_gamma_settings, set_gamma_mode,
+      set_gamma_level, set_black_gamma_level, set_black_level, set_black_level_range, set_gamma_effect,
+      set_gamma_curve_offset, set_gamma_pattern, set_gamma_pattern_fine, set_visibility_enhancer, get_ptz_setup,
+      set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed, recall_preset, save_preset,
+      get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet, ndi_finder_reset,
+      ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P4k'.
+  - id: p240
+    name: "BirdDog P240"
+    supports:
+      [get_about, get_version, get_hostname, reboot, restart_video, get_ndi_discovery_server,
+      set_ndi_discovery_server, set_ndi_discovery_server_ip, get_encode_setup, set_encode_setup, set_video_format,
+      set_stream_name, set_screensaver_mode, set_ndi_group, set_ndi_group_name, set_ndi_audio, set_bandwidth_mode,
+      set_bandwidth, set_tally_mode, get_sil2_codec, set_sil2_codec, get_sil2_encode, set_sil2_encode,
+      get_analog_audio, set_audio_in_gain, set_audio_out_gain, set_audio_output_select, get_encode_transport,
+      set_ndi_transmit_method_p, set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl,
+      capture_screensaver, get_exposure, set_exposure, set_exposure_mode, set_exposure_comp,
+      set_exposure_comp_level_p, set_gain_level_p, set_gain_limit_p, set_shutter_speed_p, set_iris_level_p400,
+      set_bright_level_p400, set_ae_response, set_slow_shutter, set_slow_shutter_limit_p400, set_shutter_max_speed,
+      set_shutter_min_speed, set_gain_point, set_gain_point_position, set_high_sensitivity, set_spotlight,
+      set_backlight, get_picture, set_picture, set_flip, set_mirror, set_3dnr_p400, set_2dnr_p400,
+      set_highlight_comp, set_stabilizer, set_chroma_suppress, set_ir_cut_filter_p400, get_white_balance,
+      set_white_balance, set_wb_mode_p400, set_red_gain, set_blue_gain, set_wb_matrix_coefficient, set_wb_matrix,
+      set_wb_level, set_wb_offset, set_wb_phase, set_wb_select, set_wb_speed, get_detail, set_detail,
+      set_detail_enabled, set_detail_level, set_detail_bandwidth, set_detail_bw_balance, set_detail_crispening,
+      set_detail_highlight, set_detail_hv_balance, set_detail_limit, set_detail_super_low, get_gamma,
+      set_gamma_settings, set_gamma_mode, set_gamma_level, set_black_gamma_level, set_black_level,
+      set_black_level_range, set_gamma_effect, set_gamma_curve_offset, set_gamma_pattern, set_gamma_pattern_fine,
+      set_visibility_enhancer, get_ptz_setup, set_ptz_setup, set_pan_speed_p, set_tilt_speed_p, set_zoom_speed,
+      recall_preset, save_preset, get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet,
+      ndi_finder_reset, ndi_finder_refresh, get_ndi_sources]
+    verification: none
+    notes: >
+      API 2.0, column 'BirdDog P240'.
+
+commands:
+  # Device information (2.0: API Methods - BasicDeviceInfo; 2.1: Device Information)
+  get_about:
+    summary: "Basic device information: firmware, hostname, IP settings, serial number (MAC on 2.1) and status (GET /about)"
+    send: { method: GET, path: /about }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_version:
+    summary: "Hardware identifier as plain text, such as 'BirdDog X1' (GET /version)"
+    send: { method: GET, path: /version }
+    expect: { status: 200 }
+    returns: text
+  get_hostname:
+    summary: "Device (mDNS) name as plain text (GET /hostname)"
+    send: { method: GET, path: /hostname }
+    expect: { status: 200 }
+    returns: text
+  get_operation_mode:
+    summary: "Operation mode as plain text: encode, decode, or dual on X5 Ultra (GET /operationmode)"
+    send: { method: GET, path: /operationmode }
+    expect: { status: 200 }
+    returns: text
+  set_operation_mode:
+    summary: "Switch the camera's baseband outputs between camera video (encode) and the NDI decoder (decode); plain-text body (POST /operationmode)"
+    params:
+      mode: { type: enum, values: ["encode", "decode"], required: true }
+    send: { method: POST, path: /operationmode, body: '{mode}', content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+  reboot:
+    summary: "Reboot the device immediately (POST /reboot)"
+    send: { method: POST, path: /reboot }
+    expect: { status: 200 }
+    returns: ack
+  restart_video:
+    summary: "Restart the video subsystem (POST /restart)"
+    send: { method: POST, path: /restart }
+    expect: { status: 200 }
+    returns: ack
+  factory_reset:
+    summary: "Factory reset the device (POST /ResetSystemDefault)"
+    send: { method: POST, path: /ResetSystemDefault }
+    expect: { status: 200 }
+    returns: ack
+  reset_image:
+    summary: "Reset all image settings, as the web UI's Image Settings Reset (POST /RestImage, the collection's spelling)"
+    send: { method: POST, path: /RestImage }
+    expect: { status: 200 }
+    returns: ack
+  # Video output interface (2.0: DEVICESETTINGS; 2.1: Miscellaneous Camera Settings / Video Output Interface)
+  get_video_output:
+    summary: "Baseband output settings: JSON on 2.1 cameras; plain text LowLatency or NormalMode on P400/P4K (GET /videooutputinterface)"
+    send: { method: GET, path: /videooutputinterface }
+    expect: { status: 200 }
+    returns: text
+  set_video_output_mode_p400:
+    summary: "P400/P4K output latency mode; plain-text body (POST /videooutputinterface)"
+    params:
+      mode: { type: enum, values: ["LowLatency", "NormalMode"], required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{mode}', content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+  set_output_format:
+    summary: "Baseband output format, such as 1080p30 (MAKI Ultra: 720p29.97 to 2160p60, reboot required) (POST /videooutputinterface)"
+    params:
+      format: { type: string, pattern: '^(?:[0-9]{3,4}x)?[0-9]{3,4}[pi][0-9]{2}(?:\.[0-9]{1,2})?$', required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{"OutputFormat":{format:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_output_format_x5u:
+    summary: "X5 Ultra baseband output format in the WIDTHxHEIGHT form, such as 1920x1080p50 (POST /videooutputinterface)"
+    params:
+      format: { type: string, pattern: '^(?:[0-9]{3,4}x)?[0-9]{3,4}[pi][0-9]{2}(?:\.[0-9]{1,2})?$', required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{"OutputFormat":{format:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_privacy_mode:
+    summary: "Privacy mode (POST /videooutputinterface)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{"PrivacyMode":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_video_output:
+    summary: "X4 Ultra baseband output interface (POST /videooutputinterface)"
+    params:
+      output: { type: enum, values: ["hdmi", "sdi"], required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{"videoformat":"{output}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_output_frequency:
+    summary: "X5 Ultra output frequency in Hz (POST /videooutputinterface)"
+    params:
+      hz: { type: enum, values: ["60", "59.94", "50"], required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{"Frequency":"{hz}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_hdmi1_output_decoder:
+    summary: "X5 Ultra: HDMI 1 shows the decoder (POST /videooutputinterface)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /videooutputinterface, body: '{"HDMI-1OutputDecoder":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Network (2.1: Network Settings)
+  get_ethernet:
+    summary: "Ethernet settings: IpMode, IpAddr, NetMask, GateWayIp, DNS, DHCP timeout and fallback address (GET /EthSetup)"
+    send: { method: GET, path: /EthSetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ethernet:
+    summary: "Set any Ethernet keys; the body is JSON in the document's EthSetup shape (POST /EthSetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /EthSetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ip_mode:
+    summary: "IP addressing: dhcp or static (POST /EthSetup)"
+    params:
+      mode: { type: enum, values: ["dhcp", "static"], required: true }
+    send: { method: POST, path: /EthSetup, body: '{"IpMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ip_address:
+    summary: "Static IP address (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"IpAddr":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_netmask:
+    summary: "Static subnet mask (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"NetMask":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gateway:
+    summary: "Static gateway (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"GateWayIp":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_dns_primary:
+    summary: "First DNS server (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"DnsSvrIpFirst":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_dns_secondary:
+    summary: "Second DNS server (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"DnsSvrIpSecond":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_fallback_ip:
+    summary: "DHCP fallback IP address (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"DhcpFallbackIPAddr":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_fallback_netmask:
+    summary: "DHCP fallback subnet mask (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"DhcpFallbackNetMask":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_fallback_gateway:
+    summary: "DHCP fallback gateway (POST /EthSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /EthSetup, body: '{"DhcpFallbackGateWayIp":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_dhcp_timeout:
+    summary: "DHCP timeout in seconds, 0-255 (POST /EthSetup)"
+    params:
+      seconds: { type: int, min: 0, max: 255, required: true }
+    send: { method: POST, path: /EthSetup, body: '{"DhcpTimeout":"{seconds}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_wifi:
+    summary: "Wi-Fi settings: Enable, DhcpEnable, EncryptMode, Ssid, IpAddr, NetMask, GateWayIp, Dns (GET /WifiSetup)"
+    send: { method: GET, path: /WifiSetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_wifi_enabled:
+    summary: "Wi-Fi on or off (POST /WifiSetup; see quirks: the example reply shows 1)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /WifiSetup, body: '{"Enable":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wifi_dhcp:
+    summary: "Wi-Fi addressing (POST /WifiSetup; see quirks)"
+    params:
+      mode: { type: enum, values: ["dhcp", "static"], required: true }
+    send: { method: POST, path: /WifiSetup, body: '{"DhcpEnable":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wifi_ip_address:
+    summary: "Wi-Fi IP address (POST /WifiSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /WifiSetup, body: '{"IpAddr":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wifi_netmask:
+    summary: "Wi-Fi subnet mask (POST /WifiSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /WifiSetup, body: '{"NetMask":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wifi_gateway:
+    summary: "Wi-Fi gateway (POST /WifiSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /WifiSetup, body: '{"GateWayIp":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wifi_dns:
+    summary: "Wi-Fi DNS server (POST /WifiSetup)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /WifiSetup, body: '{"Dns":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_ndi_discovery_server:
+    summary: "NDI discovery server: NDIDisServ (NDIDisServEn/NDIDisServDis) and NDIDisServIP (GET /NDIDisServer)"
+    send: { method: GET, path: /NDIDisServer }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ndi_discovery_server:
+    summary: "Use an NDI discovery server (POST /NDIDisServer)"
+    params:
+      state: { type: enum, values: ["NDIDisServEn", "NDIDisServDis"], required: true }
+    send: { method: POST, path: /NDIDisServer, body: '{"NDIDisServ":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_discovery_server_ip:
+    summary: "NDI discovery server address (POST /NDIDisServer)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /NDIDisServer, body: '{"NDIDisServIP":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_network_setup:
+    summary: "Preferred NIC and Dante (GET /NetworkSetup)"
+    send: { method: GET, path: /NetworkSetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_preferred_nic:
+    summary: "Preferred network interface (POST /NetworkSetup)"
+    params:
+      nic: { type: enum, values: ["Ethernet", "WiFi"], required: true }
+    send: { method: POST, path: /NetworkSetup, body: '{"PreferredNIC":"{nic}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_dante:
+    summary: "X4 Ultra Dante audio (POST /NetworkSetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /NetworkSetup, body: '{"Dante":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Encoder (2.0: API Methods - NDIENCODE; 2.1: Encoder Settings)
+  get_encode_setup:
+    summary: "Encoder settings: video format, compression, stream protocol and name, NDI group, audio, screensaver; on 2.0 cameras also bandwidth and tally mode (GET /encodesetup)"
+    send: { method: GET, path: /encodesetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_encode_setup:
+    summary: "Set any encoder keys; the body is JSON in the document's encodesetup shape (2.0 examples include ChNum \"1\") (POST /encodesetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /encodesetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_video_format:
+    summary: "Encoded video format, such as 1080p59.94 (MAKI Ultra: reboot required afterwards) (POST /encodesetup)"
+    params:
+      format: { type: string, pattern: '^(?:[0-9]{3,4}x)?[0-9]{3,4}[pi][0-9]{2}(?:\.[0-9]{1,2})?$', required: true }
+    send: { method: POST, path: /encodesetup, body: '{"VideoFormat":{format:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_video_compression:
+    summary: "NDI|HX compression (POST /encodesetup)"
+    params:
+      codec: { type: enum, values: ["H265", "H264"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"VideoCompression":"{codec}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_stream_protocol:
+    summary: "Stream protocol: NDI|HX, UVC (USB) or both (POST /encodesetup)"
+    params:
+      protocol: { type: enum, values: ["NDI|HX", "UVC", "NDI|HX_UVC"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"StreamProtocol":"{protocol}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_stream_name:
+    summary: "NDI stream name (default CAM) (POST /encodesetup)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /encodesetup, body: '{"StreamName":{name:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_stream_to_network:
+    summary: "Stream to the network on or off (POST /encodesetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"StreamToNetwork":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_screensaver_mode:
+    summary: "Encoder screensaver: BirdDog logo, black, or captured frame (CaptureSS: MAKI Ultra and 2.0 cameras) (POST /encodesetup)"
+    params:
+      mode: { type: enum, values: ["BirdDogSS", "BlackSS", "CaptureSS"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"ScreenSaverMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_group:
+    summary: "Publish the NDI stream in a group (POST /encodesetup)"
+    params:
+      state: { type: enum, values: ["NDIGroupEn", "NDIGroupDis"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"NDIGroup":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_group_name:
+    summary: "NDI group the stream is published in (POST /encodesetup)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /encodesetup, body: '{"NDIGroupName":{name:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_audio:
+    summary: "NDI audio source: analog input or mute (POST /encodesetup)"
+    params:
+      source: { type: enum, values: ["NDIAudioAnalog", "NDIAudioMute"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"NDIAudio":"{source}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_audio_mute:
+    summary: "X4 Ultra/X5 Ultra NDI audio mute (POST /encodesetup)"
+    params:
+      state: { type: enum, values: ["Unmute", "Mute"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"NDIAudio":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_video_sample_rate_p400:
+    summary: "P400/P4K chroma subsampling (POST /encodesetup)"
+    params:
+      rate: { type: enum, values: ["420", "422"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"VideoSampleRate":"{rate}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bandwidth_mode:
+    summary: "NDI bandwidth management (POST /encodesetup)"
+    params:
+      mode: { type: enum, values: ["Manual", "NDIManaged"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"BandwidthMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bandwidth:
+    summary: "Manual NDI bandwidth 80-180 (POST /encodesetup)"
+    params:
+      mbps: { type: int, min: 80, max: 180, required: true }
+    send: { method: POST, path: /encodesetup, body: '{"BandwidthSelect":"{mbps}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bandwidth_p400:
+    summary: "P400/P4K manual NDI bandwidth 60-360 (POST /encodesetup)"
+    params:
+      mbps: { type: int, min: 60, max: 360, required: true }
+    send: { method: POST, path: /encodesetup, body: '{"BandwidthSelect":"{mbps}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_tally_mode:
+    summary: "Onboard tally lamp follows NDI tally (TallyOn) or stays off (POST /encodesetup)"
+    params:
+      mode: { type: enum, values: ["TallyOn", "TallyOff"], required: true }
+    send: { method: POST, path: /encodesetup, body: '{"TallyMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Silicon2 encoder (2.0: API Methods - SILICON2; 2.1: Sil2 Codec Information, Secondary Encoder Protocol)
+  get_sil2_codec:
+    summary: "Silicon2 (NDI|HX) codec settings: flat BitrateControl/ModeSel/GOPSize/Bitrate on 2.1, per-protocol on 2.0 (GET /sil2codec)"
+    send: { method: GET, path: /sil2codec }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_sil2_codec:
+    summary: "Set Silicon2 codec keys; the body is JSON in the document's sil2codec shape (POST /sil2codec)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /sil2codec, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bitrate_control:
+    summary: "Constant or variable bitrate (POST /sil2codec)"
+    params:
+      mode: { type: enum, values: ["cbr", "vbr"], required: true }
+    send: { method: POST, path: /sil2codec, body: '{"BitrateControl":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_encoder_mode:
+    summary: "Encoder quality preset (POST /sil2codec)"
+    params:
+      mode: { type: enum, values: ["high", "med", "low", "custom"], required: true }
+    send: { method: POST, path: /sil2codec, body: '{"ModeSel":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_encoder_mode_preset:
+    summary: "Encoder format preset. X1: 1080p 25/30/50/60 only; X1 Ultra and MAX: 2160p and 1080p at 25/30; X4 Ultra and X5 Ultra add 50, 59.94 and 60 (POST /sil2codec)"
+    params:
+      mode: { type: enum, values: ["h264_2160p60", "h264_2160p59.94", "h264_2160p50", "h264_2160p30", "h264_2160p25", "h264_1080p60", "h264_1080p59.94", "h264_1080p50", "h264_1080p30", "h264_1080p25", "h265_2160p60", "h265_2160p59.94", "h265_2160p50", "h265_2160p30", "h265_2160p25", "h265_1080p60", "h265_1080p59.94", "h265_1080p50", "h265_1080p30", "h265_1080p25"], required: true }
+    send: { method: POST, path: /sil2codec, body: '{"ModeSel":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_encoder_mode_hx3:
+    summary: "MAKI Ultra NDI|HX3 encoder preset (POST /sil2codec; see quirks on the example's spelling)"
+    params:
+      mode: { type: enum, values: ["hx3_264_2160p60", "hx3_264_2160p50", "hx3_264_1080p60", "hx3_264_1080p50", "hx3_265_2160p60", "hx3_265_2160p50", "hx3_265_1080p60", "hx3_265_1080p50"], required: true }
+    send: { method: POST, path: /sil2codec, body: '{"ModeSel":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gop_size:
+    summary: "GOP size 1-60 (POST /sil2codec)"
+    params:
+      frames: { type: int, min: 1, max: 60, required: true }
+    send: { method: POST, path: /sil2codec, body: '{"GOPSize":"{frames}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bitrate:
+    summary: "Bitrate 1-80 (POST /sil2codec)"
+    params:
+      mbps: { type: int, min: 1, max: 80, required: true }
+    send: { method: POST, path: /sil2codec, body: '{"Bitrate":"{mbps}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_sil2_encode:
+    summary: "2.0 Silicon2 streaming settings: StreamingProtocol and the RTSP, SRT and RTMP blocks (GET /sil2enc)"
+    send: { method: GET, path: /sil2enc }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_sil2_encode:
+    summary: "Set 2.0 Silicon2 streaming keys; the body is JSON in the document's sil2enc shape (POST /sil2enc)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /sil2enc, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_secondary_protocol:
+    summary: "Secondary stream protocol and its SRT, RTSP and RTMP settings (GET /secondary_protocol)"
+    send: { method: GET, path: /secondary_protocol }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_secondary_protocol:
+    summary: "Enable a secondary stream protocol (RTMP not on X4 Ultra) (POST /secondary_protocol)"
+    params:
+      protocol: { type: enum, values: ["disable", "SRT", "RTSP", "RTMP", "all-enabled"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"protocol":"{protocol}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_srt_mode:
+    summary: "MAKI Ultra SRT connection type (POST /secondary_protocol)"
+    params:
+      mode: { type: enum, values: ["listener", "caller"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"SRT":{"connection_type":"{mode}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_srt_port:
+    summary: "MAKI Ultra SRT port (POST /secondary_protocol)"
+    params:
+      port: { type: int, min: 1, max: 65535, required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"SRT":{"port":"{port}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_srt_latency:
+    summary: "MAKI Ultra SRT latency in ms (POST /secondary_protocol)"
+    params:
+      ms: { type: int, min: 80, max: 8000, required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"SRT":{"latency_ms":"{ms}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_srt_encryption:
+    summary: "MAKI Ultra SRT encryption (POST /secondary_protocol)"
+    params:
+      state: { type: enum, values: ["enable", "disable"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"SRT":{"encryption":"{state}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_srt_encryption_length:
+    summary: "MAKI Ultra SRT key length (POST /secondary_protocol)"
+    params:
+      length: { type: enum, values: ["AES-128", "AES-192", "AES-256", "none"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"SRT":{"encryption_length":"{length}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_srt_passphrase:
+    summary: "MAKI Ultra SRT passphrase, alphanumeric (POST /secondary_protocol)"
+    params:
+      passphrase: { type: string, pattern: '^[A-Za-z0-9]*$', required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"SRT":{"passphrase":{passphrase:json}}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtsp_stream_name:
+    summary: "MAKI Ultra RTSP stream name (POST /secondary_protocol)"
+    params:
+      name: { type: string, required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTSP":{"stream_name":{name:json}}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtsp_port:
+    summary: "MAKI Ultra RTSP port (POST /secondary_protocol)"
+    params:
+      port: { type: int, min: 1, max: 65535, required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTSP":{"port":"{port}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtsp_authentication:
+    summary: "MAKI Ultra RTSP authentication (POST /secondary_protocol)"
+    params:
+      state: { type: enum, values: ["enable", "disable"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTSP":{"authentication":"{state}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtsp_user_name:
+    summary: "MAKI Ultra RTSP user name, alphanumeric (POST /secondary_protocol)"
+    params:
+      name: { type: string, pattern: '^[A-Za-z0-9]*$', required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTSP":{"user_name":{name:json}}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtsp_password:
+    summary: "MAKI Ultra RTSP password (POST /secondary_protocol)"
+    params:
+      password: { type: string, required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTSP":{"password":{password:json}}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtmp_server_selection:
+    summary: "MAKI Ultra RTMP server: local or remote (POST /secondary_protocol)"
+    params:
+      server: { type: enum, values: ["local", "remote"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTMP":{"server_selection":"{server}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtmp_server_url:
+    summary: "MAKI Ultra remote RTMP server URL (POST /secondary_protocol)"
+    params:
+      url: { type: string, required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTMP":{"server_url":{url:json}}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtmp_stream_key:
+    summary: "MAKI Ultra RTMP stream key, alphanumeric (POST /secondary_protocol)"
+    params:
+      key: { type: string, pattern: '^[A-Za-z0-9]*$', required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTMP":{"stream_key":{key:json}}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rtmp_authentication:
+    summary: "MAKI Ultra RTMP authentication (POST /secondary_protocol)"
+    params:
+      state: { type: enum, values: ["enable", "disable"], required: true }
+    send: { method: POST, path: /secondary_protocol, body: '{"RTMP":{"authentication":"{state}"}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Audio (2.0: DEVICESETTINGS / analogaudiosetup; 2.1: Encoder Settings / Analog Audio Setup)
+  get_analog_audio:
+    summary: "Analog audio settings (GET /analogaudiosetup)"
+    send: { method: GET, path: /analogaudiosetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_audio_in_gain:
+    summary: "Analog audio input gain 0-100 (POST /analogaudiosetup)"
+    params:
+      gain: { type: int, min: 0, max: 100, required: true }
+    send: { method: POST, path: /analogaudiosetup, body: '{"AnalogAudioInGain":"{gain}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_audio_in_gain_x4u:
+    summary: "X4 Ultra analog audio input gain 1-80 (POST /analogaudiosetup)"
+    params:
+      gain: { type: int, min: 1, max: 80, required: true }
+    send: { method: POST, path: /analogaudiosetup, body: '{"AnalogAudioInGain":"{gain}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_audio_in_gain_x5u:
+    summary: "X5 Ultra analog audio input gain (POST /analogaudiosetup)"
+    params:
+      gain: { type: enum, values: ["-36 dB", "-30 dB", "-24 dB", "-12 dB", "-6 dB", "0 dB", "3 dB", "6 dB", "9 dB", "12 dB"], required: true }
+    send: { method: POST, path: /analogaudiosetup, body: '{"AnalogAudioInGain":"{gain}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_audio_out_gain:
+    summary: "Analog audio output gain 0-100 (POST /analogaudiosetup)"
+    params:
+      gain: { type: int, min: 0, max: 100, required: true }
+    send: { method: POST, path: /analogaudiosetup, body: '{"AnalogAudioOutGain":"{gain}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_audio_output_select:
+    summary: "Analog audio output source (POST /analogaudiosetup; see quirks)"
+    params:
+      source: { type: enum, values: ["DecodeLoop", "DecodeComms"], required: true }
+    send: { method: POST, path: /analogaudiosetup, body: '{"AnalogAudiooutputselect":"{source}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_audio_input_type:
+    summary: "Analog audio input level: mic or line (the document's key AnalogAudiooutputselect) (POST /analogaudiosetup)"
+    params:
+      level: { type: enum, values: ["Mic", "Line"], required: true }
+    send: { method: POST, path: /analogaudiosetup, body: '{"AnalogAudiooutputselect":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # NDI transport (2.0: encodeTransport/decodeTransport; 2.1: Encoder Transport, Decode Transport)
+  get_encode_transport:
+    summary: "NDI transmit settings: Txpm, Txnetprefix, Txnetmask, Txmcttl (GET /encodeTransport)"
+    send: { method: GET, path: /encodeTransport }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ndi_transmit_method:
+    summary: "NDI transmit method (POST /encodeTransport)"
+    params:
+      method: { type: enum, values: ["TCP", "UDP", "RUDP", "Multicast"], required: true }
+    send: { method: POST, path: /encodeTransport, body: '{"Txpm":"{method}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_transmit_method_p:
+    summary: "2.0 NDI transmit method (POST /encodeTransport)"
+    params:
+      method: { type: enum, values: ["Multicast", "TCP", "Multi-TCP", "UDP"], required: true }
+    send: { method: POST, path: /encodeTransport, body: '{"Txpm":"{method}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_multicast_prefix:
+    summary: "NDI multicast address prefix, such as 239.255.0.0 (POST /encodeTransport)"
+    params:
+      address: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /encodeTransport, body: '{"Txnetprefix":{address:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_multicast_netmask:
+    summary: "NDI multicast subnet mask (POST /encodeTransport)"
+    params:
+      mask: { type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true }
+    send: { method: POST, path: /encodeTransport, body: '{"Txnetmask":{mask:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ndi_multicast_ttl:
+    summary: "NDI multicast time-to-live 0-255 (POST /encodeTransport)"
+    params:
+      ttl: { type: int, min: 0, max: 255, required: true }
+    send: { method: POST, path: /encodeTransport, body: '{"Txmcttl":"{ttl}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_decode_transport:
+    summary: "NDI receive settings: rxpm (GET /decodeTransport)"
+    send: { method: GET, path: /decodeTransport }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ndi_receive_method:
+    summary: "Decoder NDI receive method (POST /decodeTransport)"
+    params:
+      method: { type: enum, values: ["TCP", "UDP", "RUDP", "Multicast"], required: true }
+    send: { method: POST, path: /decodeTransport, body: '{"rxpm":"{method}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_genlock_failover:
+    summary: "NDI genlock and failover sources, None when unset (GET /Genlock_Failover_Source)"
+    send: { method: GET, path: /Genlock_Failover_Source }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_genlock_source:
+    summary: "NDI genlock source, such as 'BIRDDOG-046CE (CAM)', or None (POST /Genlock_Failover_Source)"
+    params:
+      source: { type: string, required: true }
+    send: { method: POST, path: /Genlock_Failover_Source, body: '{"GenlockSource":{source:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_failover_source:
+    summary: "NDI failover source, such as 'BIRDDOG-046CE (CAM)', or None (POST /Genlock_Failover_Source)"
+    params:
+      source: { type: string, required: true }
+    send: { method: POST, path: /Genlock_Failover_Source, body: '{"FailoverSource":{source:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Decoder (2.1: Decoder Settings; X1, X1 Ultra, MAX and X5 Ultra)
+  get_decode_setup:
+    summary: "Decoder settings: ColorSpace, NDIAudio, ScreenSaverMode, TallyMode (GET /decodesetup?ChNum=1)"
+    send: { method: GET, path: /decodesetup, raw_query: "ChNum=1" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_decode_audio:
+    summary: "Decoder NDI audio (POST /decodesetup?ChNum=1)"
+    params:
+      state: { type: enum, values: ["NDIAudioEn", "NDIAudioDis"], required: true }
+    send: { method: POST, path: /decodesetup, raw_query: "ChNum=1", body: '{"NDIAudio":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_decode_screensaver:
+    summary: "Decoder screensaver (POST /decodesetup?ChNum=1)"
+    params:
+      mode: { type: enum, values: ["BirdDogSS", "BlackSS"], required: true }
+    send: { method: POST, path: /decodesetup, raw_query: "ChNum=1", body: '{"ScreenSaverMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_decode_status:
+    summary: "Decoder status: {\"decoder\":\"disabled\"} in encode mode, else connection, source, resolution, frame rate, audio and bandwidth (GET /decodestatus?ChNum=1)"
+    send: { method: GET, path: /decodestatus, raw_query: "ChNum=1" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  get_connected_source:
+    summary: "Source selected at a location: decoder, EncoderFailOver, DecoderFailOver or Genlock; None when unset (GET /connectTo?location=...)"
+    params:
+      location: { type: enum, values: ["decoder", "EncoderFailOver", "DecoderFailOver", "Genlock"], required: true }
+    send: { method: GET, path: /connectTo, query: { location: "{location}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  connect_source:
+    summary: "Connect a location to an NDI source by hostname and stream name, both required (POST /connectTo?location=...; marked not yet complete)"
+    params:
+      location: { type: enum, values: ["decoder", "EncoderFailOver", "DecoderFailOver", "Genlock"], required: true }
+      hostname: { type: string, required: true }
+      stream: { type: string, required: true }
+    send: { method: POST, path: /connectTo, query: { location: "{location}" }, body: '{"sourceHostname":{hostname:json},"sourceStreamName":{stream:json}}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  capture_screensaver:
+    summary: "Capture the current encoder frame as the CaptureSS screensaver (GET /capture?ChNum=1&status=Encode)"
+    send: { method: GET, path: /capture, raw_query: "ChNum=1&status=Encode" }
+    expect: { status: 200, contains: "Capture Success" }
+    returns: ack
+  # Exposure (2.0: API Methods - EXPOSURE; 2.1: Exposure Setup)
+  get_exposure:
+    summary: "Exposure settings (GET /birddogexpsetup)"
+    send: { method: GET, path: /birddogexpsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_exposure:
+    summary: "Set any exposure keys; the body is JSON in the document's birddogexpsetup shape (POST /birddogexpsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_exposure_mode:
+    summary: "Exposure mode. BRIGHT is not on P200 A2/A3; GAIN-PRI only on P400, P4K and P240 (POST /birddogexpsetup)"
+    params:
+      mode: { type: enum, values: ["FULL-AUTO", "MANUAL", "SHUTTER-PRI", "IRIS-PRI", "BRIGHT", "GAIN-PRI"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ExpMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_exposure_comp:
+    summary: "Exposure compensation on or off (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ExpCompEn":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_exposure_comp_level:
+    summary: "Exposure compensation -7 to +7 (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: -7, max: 7, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ExpCompLvl":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_exposure_comp_level_p:
+    summary: "2.0 exposure compensation index 0-14 (see quirks) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ExpCompLvl":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_exposure_comp_x5u:
+    summary: "X5 Ultra exposure compensation (FULL-AUTO) (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ExposureComp":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_level:
+    summary: "Gain 0-14: 0 = 0 dB, 3 dB steps to 42 dB (MANUAL) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_level_x4u:
+    summary: "Gain 0-7, 0 = 0 dB (MANUAL) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 7, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_level_p:
+    summary: "2.0 gain: P100/PF120/P110/P120 0-15; P200/A200/A300 1 to the gain limit; P400/P4K/P240 1 to the gain limit, or in GAIN-PRI 1-13 (high sensitivity off) or 1-17 (on) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 17, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_x5u:
+    summary: "X5 Ultra gain 0-11: 0 = 0 dB, 3 dB steps to 33 dB (MANUAL) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 11, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"Gain":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_limit:
+    summary: "Gain limit 0-15 (auto, SHUTTER-PRI, IRIS-PRI) (POST /birddogexpsetup)"
+    params:
+      limit: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainLimit":"{limit}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_limit_p:
+    summary: "2.0 gain limit: 4-15 on P200/A200/A300, 4-13 on P400/P4K/P240 (POST /birddogexpsetup)"
+    params:
+      limit: { type: int, min: 4, max: 15, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainLimit":"{limit}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_limit_x5u:
+    summary: "X5 Ultra gain limit in dB (FULL-AUTO) (POST /birddogexpsetup)"
+    params:
+      db: { type: enum, values: ["24", "27", "30", "33"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainLimit":"{db}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_speed:
+    summary: "Shutter speed index 7-27 (MANUAL) (POST /birddogexpsetup)"
+    params:
+      index: { type: int, min: 7, max: 27, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterSpeed":"{index}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_speed_x4u:
+    summary: "Shutter speed index: 0 1/30, 1 1/50, 2 1/60, 3 1/100, 4 1/125, 5 1/200, 6 1/250, 7 1/350, 8 1/500, 9 1/725, 10 1/1000, 11 1/1500, 12 1/2000, 13 1/3000, 14 1/4000, 15 1/6000, 16 1/10000 (MANUAL) (POST /birddogexpsetup)"
+    params:
+      index: { type: int, min: 0, max: 16, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterSpeed":"{index}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_speed_p:
+    summary: "2.0 shutter speed index: 0-21 on P200/A200/A300/P100/PF120, 6-33 on P400/P4K/P240, 5-21 on P110/P120 (POST /birddogexpsetup)"
+    params:
+      index: { type: int, min: 0, max: 33, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterSpeed":"{index}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_speed_x5u:
+    summary: "X5 Ultra shutter speed, as the document lists it (MANUAL) (POST /birddogexpsetup)"
+    params:
+      speed: { type: enum, values: ["1/1", "1/2", "1/4", "1/8", "1/15", "1/30", "1/60", "1/90", "1/100", "1/125", "1/180", "1/250", "1/350", "1/500", "1/725", "1/1000", "1/1.5000", "1/2000", "1/3000", "1/4000", "1/6000", "1/10000"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_iris_level:
+    summary: "Iris 0-13, 0 closed (MANUAL) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 13, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"IrisLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_iris_level_x4u:
+    summary: "Iris: 0 closed, 6 F11, 7 F9.6, 8 F8.0, 9 F6.8, 10 F5.6, 11 F4.8, 12 F4.0, 13 F3.4, 14 F2.8, 15 F2.4, 16 F2.0, 17 F1.86 (MANUAL) (POST /birddogexpsetup)"
+    params:
+      level: { type: enum, values: ["0", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"IrisLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_iris_level_p200:
+    summary: "P200/A200/A300 iris: 0 or 5-17 (POST /birddogexpsetup)"
+    params:
+      level: { type: enum, values: ["0", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"IrisLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_iris_level_p400:
+    summary: "P400/P4K/P240 iris: 0 or 5-21 on P400, 5-21 on P4K and P240 (POST /birddogexpsetup)"
+    params:
+      level: { type: enum, values: ["0", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"IrisLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_iris_level_x5u:
+    summary: "X5 Ultra iris: CLOSED, 1 F14, 2 F11, 3 F9.6, 4 F8.0, 5 F6.8, 6 F5.6, 7 F4.8, 8 F4.0, 9 F3.4, 10 F2.8, 11 F2.4, 12 F2.0, 13 F1.6 (MANUAL) (POST /birddogexpsetup)"
+    params:
+      level: { type: enum, values: ["CLOSED", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"IrisLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bright_level:
+    summary: "Bright level 0-17 (BRIGHT) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 17, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"BrightLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bright_level_x5u:
+    summary: "X5 Ultra bright level 0-31 (BRIGHT) (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 31, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"BrightLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bright_level_p200:
+    summary: "P200/A200/A300 bright level: 0 or 5-31 (POST /birddogexpsetup)"
+    params:
+      level: { type: enum, values: ["0", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"BrightLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bright_level_p100:
+    summary: "P100/PF120/P110/P120 bright level 0-27 (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 0, max: 27, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"BrightLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bright_level_p400:
+    summary: "P400/P4K/P240 bright level: 0 or 5-41 on P400, 5-37 on P4K and P240 (POST /birddogexpsetup)"
+    params:
+      level: { type: enum, values: ["0", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"BrightLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ae_response:
+    summary: "Auto exposure response 1-48 (POST /birddogexpsetup)"
+    params:
+      level: { type: int, min: 1, max: 48, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"AeResponse":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_slow_shutter:
+    summary: "Slow shutter on or off (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"SlowShutterEn":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_slow_shutter_x5u:
+    summary: "X5 Ultra slow shutter (FULL-AUTO) (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"SlowShutter":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_slow_shutter_limit:
+    summary: "P200/A200/A300 slow shutter limit 1-6 (1/30, 1/15, 1/8, 1/4, 1/2, 1/1 in the P200 A2/A3 column) (POST /birddogexpsetup)"
+    params:
+      limit: { type: int, min: 1, max: 6, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"SlowShutterLimit":"{limit}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_slow_shutter_limit_p400:
+    summary: "P400/P4K/P240 slow shutter limit 6-17 (POST /birddogexpsetup)"
+    params:
+      limit: { type: int, min: 6, max: 17, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"SlowShutterLimit":"{limit}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_control_overwrite:
+    summary: "Shutter control overwrite; when On, ShutterSpeed must be disabled (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterControlOverwrite":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_speed_overwrite:
+    summary: "Overwritten shutter speed 30-110 (POST /birddogexpsetup)"
+    params:
+      speed: { type: int, min: 30, max: 110, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterSpeedOverwrite":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_max_speed:
+    summary: "Auto shutter maximum 20-33 (POST /birddogexpsetup)"
+    params:
+      index: { type: int, min: 20, max: 33, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterMaxSpeed":"{index}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_shutter_min_speed:
+    summary: "Auto shutter minimum, 16 to the maximum speed (POST /birddogexpsetup)"
+    params:
+      index: { type: int, min: 16, max: 33, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"ShutterMinSpeed":"{index}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_point:
+    summary: "Gain point on or off (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainPoint":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gain_point_position:
+    summary: "Gain point position 1-13 (POST /birddogexpsetup)"
+    params:
+      position: { type: int, min: 1, max: 13, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"GainPointPosition":"{position}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_high_sensitivity:
+    summary: "High sensitivity on or off (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"HighSensitivity":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_spotlight:
+    summary: "Spotlight compensation on or off (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"Spotlight":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_backlight:
+    summary: "Backlight compensation on or off (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"BackLight":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_backlight_x5u:
+    summary: "X5 Ultra backlight compensation (key Backlight) (POST /birddogexpsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"Backlight":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_meter:
+    summary: "Metering: 0 average, 1 centre, 2 smart, 3 top (POST /birddogexpsetup)"
+    params:
+      mode: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /birddogexpsetup, body: '{"Meter":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Picture (2.0: API Methods - PICTURESETTINGS; 2.1: Picture Setup)
+  get_picture:
+    summary: "Picture settings (GET /birddogpicsetup)"
+    send: { method: GET, path: /birddogpicsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_picture:
+    summary: "Set any picture keys; the body is JSON in the document's birddogpicsetup shape (POST /birddogpicsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_flip:
+    summary: "Flip the picture vertically (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Flip":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_mirror:
+    summary: "Mirror the picture horizontally (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Mirror":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_sharpness:
+    summary: "Sharpness 0-99 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Sharpness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_sharpness_x4u:
+    summary: "X4 Ultra sharpness 0-11 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 11, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Sharpness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_sharpness_x5u:
+    summary: "X5 Ultra sharpness 0-3 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Sharpness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_sharpness_maki:
+    summary: "MAKI Ultra sharpness 0-16 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 16, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Sharpness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_sharpness_p200:
+    summary: "P200/A200/A300 sharpness -128 to 127 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: -128, max: 127, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Sharpness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_sharpness_p100:
+    summary: "P100/PF120/P110/P120 sharpness 0-15 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Sharpness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_saturation:
+    summary: "Saturation 0-99 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Saturation":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_saturation_x4u:
+    summary: "Saturation 0-14: 60% to 200% in 10% steps (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Saturation":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_saturation_x5u:
+    summary: "X5 Ultra saturation 0-10 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 10, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Saturation":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_color_p100:
+    summary: "P100/PF120/P110/P120 colour (saturation) 0-15 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Color":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_hue:
+    summary: "Hue 0-99 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Hue":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_hue_x4u:
+    summary: "Hue 0-14 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Hue":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_hue_x5u:
+    summary: "Hue 0-15 (X5 Ultra, P100/PF120/P110/P120) (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Hue":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_contrast:
+    summary: "Contrast 0-99 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Contrast":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_contrast_x4u:
+    summary: "Contrast 0-14 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Contrast":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_contrast_x5u:
+    summary: "X5 Ultra contrast 0-4 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 4, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Contrast":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_contrast_p100:
+    summary: "P100/PF120/P110/P120 contrast 0-15 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Contrast":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_brightness:
+    summary: "Brightness 0-99 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Brightness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_brightness_x4u:
+    summary: "X4 Ultra brightness 0-14 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Brightness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_3dnr:
+    summary: "3D noise reduction 0-99 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"ThreeDNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_3dnr_x4u:
+    summary: "3D noise reduction 0-9 (MAKI Ultra: 0 off, 1-8 level, 9 auto) (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 9, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"ThreeDNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_3dnr_x5u:
+    summary: "X5 Ultra 3D noise reduction 0-3, 0 off (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"ThreeDNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_3dnr_p400:
+    summary: "P400/P4K/P240 3D noise reduction: Off or 1-5 (POST /birddogpicsetup)"
+    params:
+      level: { type: enum, values: ["Off", "1", "2", "3", "4", "5"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"ThreeDNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_2dnr:
+    summary: "2D noise reduction 0-99 (key TWODNR; see quirks) (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 99, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"TWODNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_2dnr_maki:
+    summary: "MAKI Ultra 2D noise reduction: 0 off, 1-5 level, 6 auto (key TwoDNR) (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 6, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"TwoDNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_2dnr_p400:
+    summary: "P400/P4K/P240 2D noise reduction: Off or 1-5 (POST /birddogpicsetup)"
+    params:
+      level: { type: enum, values: ["Off", "1", "2", "3", "4", "5"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"TWODNR":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_backlight_comp:
+    summary: "Backlight compensation (picture) on or off (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"BackLightCom":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wdr:
+    summary: "Wide dynamic range on or off (X1 only of the X1 family) (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"WDREnable":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wide_dynamic_range_maki:
+    summary: "MAKI Ultra WDR level 0-8 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 8, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"WideDynamicRange":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wide_dynamic_range_p100:
+    summary: "P100/PF120 WDR: Off or 1-6 (POST /birddogpicsetup)"
+    params:
+      level: { type: enum, values: ["Off", "1", "2", "3", "4", "5", "6"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"WideDynamicRange":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_highlight_comp:
+    summary: "Highlight compensation on or off (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"HighlightComp":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_highlight_comp_p200:
+    summary: "P200/A200/A300 highlight compensation (POST /birddogpicsetup)"
+    params:
+      level: { type: enum, values: ["OFF", "LOW", "MEDIUM", "HIGH"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"HighlightComp":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_highlight_comp_mask:
+    summary: "Highlight compensation mask 0-15 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"HighlightCompMask":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_highlight_comp_mask_p200a2:
+    summary: "P200 A2/A3 highlight compensation mask 0-3 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"HighlightCompMask":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma:
+    summary: "Gamma (POST /birddogpicsetup)"
+    params:
+      gamma: { type: enum, values: ["default", "0.45", "0.50", "0.55", "0.63"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Gamma":"{gamma}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_x4u:
+    summary: "X4 Ultra gamma (POST /birddogpicsetup)"
+    params:
+      gamma: { type: enum, values: ["default", "0.45", "0.48", "0.50", "0.56", "PC"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Gamma":"{gamma}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_maki:
+    summary: "MAKI Ultra gamma (POST /birddogpicsetup)"
+    params:
+      gamma: { type: enum, values: ["default", "0.45", "0.50", "0.56", "0.63", "ext"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Gamma":"{gamma}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_p200:
+    summary: "P200/A200/A300 gamma 0-1 (POST /birddogpicsetup)"
+    params:
+      gamma: { type: int, min: 0, max: 1, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Gamma":"{gamma}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_p100:
+    summary: "P100/PF120/P110/P120 gamma 0-4 (POST /birddogpicsetup)"
+    params:
+      gamma: { type: int, min: 0, max: 4, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Gamma":"{gamma}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_deflicker:
+    summary: "Anti-flicker (POST /birddogpicsetup)"
+    params:
+      mode: { type: enum, values: ["Off", "50Hz", "60Hz"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"DeFlicker":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_bw_mode:
+    summary: "Black and white picture (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"BWMode":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_stabilizer:
+    summary: "Image stabiliser (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Stabilizer":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_stabilizer_x5u:
+    summary: "X5 Ultra image stabiliser (the document's key Stablizer); the camera reboots on change (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Stablizer":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_chroma_suppress:
+    summary: "Chroma suppression (the document's key ChromeSuppress) (POST /birddogpicsetup)"
+    params:
+      level: { type: enum, values: ["OFF", "LOW", "MEDIUM", "HIGH"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"ChromeSuppress":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ir_cut_filter:
+    summary: "IR cut filter (POST /birddogpicsetup)"
+    params:
+      mode: { type: enum, values: ["Auto", "On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"IRCutFilter":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_ir_cut_filter_p400:
+    summary: "P400/P4K/P240 IR cut filter (POST /birddogpicsetup)"
+    params:
+      mode: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"IRCutFilter":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_effect:
+    summary: "Black and white effect (POST /birddogpicsetup)"
+    params:
+      effect: { type: enum, values: ["BW", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Effect":"{effect}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_effect_p200a2:
+    summary: "P200 A2/A3 black and white effect (value B&W as listed) (POST /birddogpicsetup)"
+    params:
+      effect: { type: enum, values: ["B&W", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"Effect":"{effect}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_noise_reduction:
+    summary: "Noise reduction: Off or 1-5 (POST /birddogpicsetup)"
+    params:
+      level: { type: enum, values: ["Off", "1", "2", "3", "4", "5"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"NoiseReduction":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_low_latency:
+    summary: "P200 A4/A5 low latency (POST /birddogpicsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"LowLatency":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_nd_filter:
+    summary: "P4K ND filter 0-3 (POST /birddogpicsetup)"
+    params:
+      level: { type: int, min: 0, max: 3, required: true }
+    send: { method: POST, path: /birddogpicsetup, body: '{"NDFilter":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # White balance (2.0: API Methods - WHITEBALANCE; 2.1: White Balance Setup)
+  get_white_balance:
+    summary: "White balance settings (GET /birddogwbsetup)"
+    send: { method: GET, path: /birddogwbsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_white_balance:
+    summary: "Set any white balance keys; the body is JSON in the document's birddogwbsetup shape (POST /birddogwbsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_mode:
+    summary: "White balance mode (POST /birddogwbsetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "INDOOR", "OUTDOOR", "ONEPUSH", "ColorTemp", "MANUAL"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"WbMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_mode_x5u:
+    summary: "X5 Ultra white balance mode; USER for red/blue gain (POST /birddogwbsetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "INDOOR", "OUTDOOR", "ONEPUSH", "ATW", "USER"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"WbMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_mode_p200:
+    summary: "P200/A200/A300 white balance mode (POST /birddogwbsetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "INDOOR", "OUTDOOR", "OUTDOOR-AUTO", "ONEPUSH", "ATW", "USER", "SVL-AUTO", "SVL", "SVL-OUTDOOR-AUTO"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"WbMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_mode_p100:
+    summary: "P100/PF120/P110/P120 white balance mode (POST /birddogwbsetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "INDOOR", "OUTDOOR", "ONEPUSH", "ATW", "USER", "MANUAL2"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"WbMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_mode_p400:
+    summary: "P400/P4K/P240 white balance mode (POST /birddogwbsetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "INDOOR", "OUTDOOR", "OUTDOOR AUTO", "ONEPUSH", "ATW", "MANUAL1", "SVL-AUTO", "SVL", "SVL-OUTDOOR-AUTO"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"WbMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_red_gain:
+    summary: "Red gain 0-255 (manual/user white balance) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"RedGain":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_blue_gain:
+    summary: "Blue gain 0-255 (manual/user white balance) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"BlueGain":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_color_temp:
+    summary: "Colour temperature 2500-9000 K (ColorTemp mode) (POST /birddogwbsetup)"
+    params:
+      kelvin: { type: int, min: 2500, max: 9000, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"ColorTemp":"{kelvin}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_color_temp_maki:
+    summary: "MAKI Ultra colour temperature index 0-55 for 2500-8000 K in 100 K steps (POST /birddogwbsetup)"
+    params:
+      index: { type: int, min: 0, max: 55, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"ColorTemp":"{index}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_color_temp_p100:
+    summary: "P100/PF120/P110/P120 colour temperature 2800-6500 (POST /birddogwbsetup)"
+    params:
+      kelvin: { type: int, min: 2800, max: 6500, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"ColorTemp":"{kelvin}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  wb_one_push:
+    summary: "Trigger a one-push white balance (POST /birddogwbsetup with OnePushTrigger Take)"
+    params:
+      trigger: { type: enum, values: ["Take"], default: "Take" }
+    send: { method: POST, path: /birddogwbsetup, body: '{"OnePushTrigger":"{trigger}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_red_tuning:
+    summary: "X4 Ultra red tuning -10 to 10 (AUTO) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: -10, max: 10, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"RTuning":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_blue_tuning:
+    summary: "X4 Ultra blue tuning -10 to 10 (AUTO) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: -10, max: 10, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"BTuning":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_red_tuning_maki:
+    summary: "MAKI Ultra red tuning, -10 to 245 as listed (AUTO, ONEPUSH) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: -10, max: 245, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"RTuning":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_blue_tuning_maki:
+    summary: "MAKI Ultra blue tuning, -10 to 245 as listed (AUTO, ONEPUSH) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: -10, max: 245, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"BTuning":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_sensitivity:
+    summary: "MAKI Ultra white balance sensitivity 0-2 (AUTO, ONEPUSH) (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"WBSensitivity":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_matrix_coefficient:
+    summary: "P400/P4K/P240 white balance matrix coefficient BG, BR, GB, GR, RB or RG, -99 to 99 (POST /birddogwbsetup)"
+    params:
+      coefficient: { type: enum, values: ["BG", "BR", "GB", "GR", "RB", "RG"], required: true }
+      value: { type: int, min: -99, max: 99, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"{coefficient}":"{value}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_matrix:
+    summary: "White balance colour matrix on or off (POST /birddogwbsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"Matrix":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_level:
+    summary: "White balance level 0-14 (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"Level":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_offset:
+    summary: "White balance offset 0-14 (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"Offset":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_phase:
+    summary: "White balance phase 0-14 (POST /birddogwbsetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"Phase":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_select:
+    summary: "White balance matrix selection (POST /birddogwbsetup)"
+    params:
+      select: { type: enum, values: ["FL LIGHT", "STD", "OFF", "HIGH SAT"], required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"Select":"{select}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_wb_speed:
+    summary: "White balance speed 1-5 (POST /birddogwbsetup)"
+    params:
+      speed: { type: int, min: 1, max: 5, required: true }
+    send: { method: POST, path: /birddogwbsetup, body: '{"Speed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Colour matrix (2.0: API Methods - COLOURMATRIX; 2.1: Colour Matrix Setup)
+  get_colour_matrix:
+    summary: "Colour matrix settings (GET /birddogcmsetup)"
+    send: { method: GET, path: /birddogcmsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_colour_matrix:
+    summary: "Set any colour matrix keys; the body is JSON in the document's birddogcmsetup shape (POST /birddogcmsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogcmsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_colour_matrix_hue:
+    summary: "Hue of one colour 0-100: Red, Yellow, Green, Cyan, Blue or Mag(enta) (POST /birddogcmsetup, key <colour>Hue)"
+    params:
+      colour: { type: enum, values: ["Red", "Yellow", "Green", "Cyan", "Blue", "Mag"], required: true }
+      value: { type: int, min: 0, max: 100, required: true }
+    send: { method: POST, path: /birddogcmsetup, body: '{"{colour}Hue":"{value}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_colour_matrix_hue_64:
+    summary: "Hue of one colour 0-64 (POST /birddogcmsetup, key <colour>Hue)"
+    params:
+      colour: { type: enum, values: ["Red", "Yellow", "Green", "Cyan", "Blue", "Mag"], required: true }
+      value: { type: int, min: 0, max: 64, required: true }
+    send: { method: POST, path: /birddogcmsetup, body: '{"{colour}Hue":"{value}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_colour_matrix_gain_64:
+    summary: "Gain of one colour 0-64 (POST /birddogcmsetup, key <colour>Gain)"
+    params:
+      colour: { type: enum, values: ["Red", "Yellow", "Green", "Cyan", "Blue", "Mag"], required: true }
+      value: { type: int, min: 0, max: 64, required: true }
+    send: { method: POST, path: /birddogcmsetup, body: '{"{colour}Gain":"{value}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_colour_gain:
+    summary: "P200/A200/A300 overall colour gain 0-255 (POST /birddogcmsetup)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: { method: POST, path: /birddogcmsetup, body: '{"ColourGain":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_hue_phase:
+    summary: "P200/A200/A300 hue phase 0-255 (POST /birddogcmsetup)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: { method: POST, path: /birddogcmsetup, body: '{"HuePhase":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Advanced (2.0: API Methods - ADVANCEDSETTINGS; 2.1: Advanced Setup)
+  get_advanced:
+    summary: "Advanced settings: autofocus and scene on 2.1, gamma offset and brightness compensation on P200/A200/A300 (GET /birddogadvancesetup)"
+    send: { method: GET, path: /birddogadvancesetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_advanced:
+    summary: "Set any advanced keys; the body is JSON in the document's birddogadvancesetup shape (POST /birddogadvancesetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_af_zone:
+    summary: "Autofocus zone (POST /birddogadvancesetup)"
+    params:
+      zone: { type: enum, values: ["Top", "Center", "Bottom", "ALL", "Left", "Right"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"AFZone":"{zone}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_af_zone_x4u:
+    summary: "X4 Ultra autofocus zone (POST /birddogadvancesetup)"
+    params:
+      zone: { type: enum, values: ["Top", "Center", "Bottom", "ALL", "default"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"AFZone":"{zone}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_af_zone_maki:
+    summary: "MAKI Ultra autofocus zone (POST /birddogadvancesetup)"
+    params:
+      zone: { type: enum, values: ["Top", "Center", "Bottom", "All", "Default"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"AFZone":"{zone}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_scene:
+    summary: "Scene (POST /birddogadvancesetup)"
+    params:
+      scene: { type: enum, values: ["Normal", "Macro", "Live"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"Scene":"{scene}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_scene_x4u:
+    summary: "X4 Ultra scene (POST /birddogadvancesetup)"
+    params:
+      scene: { type: enum, values: ["Default", "Normal", "Bright", "PC"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"Scene":"{scene}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_scene_maki:
+    summary: "MAKI Ultra scene (POST /birddogadvancesetup)"
+    params:
+      scene: { type: enum, values: ["Normal", "Default", "Clarity"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"Scene":"{scene}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_af_sensitivity:
+    summary: "Autofocus sensitivity (POST /birddogadvancesetup)"
+    params:
+      level: { type: enum, values: ["High", "Middle", "Low"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"AFSensitivity":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_af_mode:
+    summary: "Autofocus mode (POST /birddogadvancesetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "MANUAL"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"AFMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_teleconvert:
+    summary: "MAKI Ultra teleconverter mode; digital zoom drops to 0 when on (POST /birddogadvancesetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"teleconvert_mode":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_image_ratio:
+    summary: "MAKI Ultra image ratio, landscape or portrait (POST /birddogadvancesetup)"
+    params:
+      ratio: { type: enum, values: ["16:9", "9:16"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"img_ratio":"{ratio}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_eptz:
+    summary: "MAKI Ultra electronic PTZ (POST /birddogadvancesetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"eptz_switch":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_offset:
+    summary: "P200/A200/A300 gamma offset -16 to 64 (POST /birddogadvancesetup)"
+    params:
+      offset: { type: int, min: -16, max: 64, required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"GammaOffset":"{offset}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_high_resolution:
+    summary: "P200/A200/A300 high resolution (FULL-AUTO exposure only) (POST /birddogadvancesetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"HighResolution":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_brightness_comp:
+    summary: "P200/A200/A300 brightness compensation (POST /birddogadvancesetup)"
+    params:
+      level: { type: enum, values: ["VERY DARK", "DARK", "STANDARD", "BRIGHT"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"BrightnessComp":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_comp_level:
+    summary: "P200/A200/A300 compensation level (POST /birddogadvancesetup)"
+    params:
+      level: { type: enum, values: ["LOW", "MID", "HIGH"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"CompLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_brightness_p200:
+    summary: "P200/A200/A300 brightness 0-6 (POST /birddogadvancesetup)"
+    params:
+      level: { type: int, min: 0, max: 6, required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"Brightness":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_video_enhancement:
+    summary: "P200/A200/A300 video enhancement (POST /birddogadvancesetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogadvancesetup, body: '{"VideoEnhancement":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # External (2.0: API Methods - EXTERNALSETTINGS; A200 and A300)
+  get_external:
+    summary: "External settings: Aux, RainWiper, V12vOut (GET /birddogexternalsetup)"
+    send: { method: GET, path: /birddogexternalsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_external:
+    summary: "Set any external keys; the body is JSON in the document's birddogexternalsetup shape (POST /birddogexternalsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogexternalsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_aux:
+    summary: "Auxiliary output (POST /birddogexternalsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexternalsetup, body: '{"Aux":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_v12_out:
+    summary: "12 V output (POST /birddogexternalsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexternalsetup, body: '{"V12vOut":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_rain_wiper:
+    summary: "A300 rain wiper (POST /birddogexternalsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexternalsetup, body: '{"RainWiper":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_defog:
+    summary: "A200 defog (POST /birddogexternalsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogexternalsetup, body: '{"DeFog":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Detail (2.0: API Methods - DETAIL; P400, P4K, P240)
+  get_detail:
+    summary: "Detail settings (GET /birddogdetsetup)"
+    send: { method: GET, path: /birddogdetsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_detail:
+    summary: "Set any detail keys; the body is JSON in the document's birddogdetsetup shape (POST /birddogdetsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_enabled:
+    summary: "Detail on or off (POST /birddogdetsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"Detail":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_level:
+    summary: "Detail level 0-15 (POST /birddogdetsetup)"
+    params:
+      level: { type: int, min: 0, max: 15, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"Level":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_bandwidth:
+    summary: "Detail bandwidth (POST /birddogdetsetup)"
+    params:
+      bandwidth: { type: enum, values: ["DEFAULT", "LOW", "MIDDLE", "HIGH", "WIDE"], required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"Bandwidth":"{bandwidth}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_bw_balance:
+    summary: "Detail bandwidth balance (POST /birddogdetsetup)"
+    params:
+      balance: { type: enum, values: ["TYPE1", "TYPE2", "TYPE3", "TYPE4", "TYPE5"], required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"BwBalance":"{balance}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_crispening:
+    summary: "Crispening 0-7 (POST /birddogdetsetup)"
+    params:
+      level: { type: int, min: 0, max: 7, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"Crispening":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_highlight:
+    summary: "Highlight detail 0-4 (POST /birddogdetsetup)"
+    params:
+      level: { type: int, min: 0, max: 4, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"HighLightDetail":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_hv_balance:
+    summary: "H/V balance -2 to 2 (POST /birddogdetsetup)"
+    params:
+      level: { type: int, min: -2, max: 2, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"HvBalance":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_limit:
+    summary: "Detail limit 0-7 (POST /birddogdetsetup)"
+    params:
+      level: { type: int, min: 0, max: 7, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"Limit":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_detail_super_low:
+    summary: "Super low 0-7 (POST /birddogdetsetup)"
+    params:
+      level: { type: int, min: 0, max: 7, required: true }
+    send: { method: POST, path: /birddogdetsetup, body: '{"SuperLow":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Gamma (2.0: API Methods - GAMMA; P400, P4K, P240)
+  get_gamma:
+    summary: "Gamma settings (GET /birddoggammasetup)"
+    send: { method: GET, path: /birddoggammasetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_gamma_settings:
+    summary: "Set any gamma keys; the body is JSON in the document's birddoggammasetup shape (POST /birddoggammasetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_mode:
+    summary: "Gamma curve (POST /birddoggammasetup)"
+    params:
+      mode: { type: enum, values: ["PATTERN", "STANDARD", "STRAIGHT"], required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"Settings":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_level:
+    summary: "Gamma level 0-14 (displayed -7 to 7) (POST /birddoggammasetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"Level":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_black_gamma_level:
+    summary: "Black gamma level 0-14 (displayed -7 to 7) (POST /birddoggammasetup)"
+    params:
+      level: { type: int, min: 0, max: 14, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"BlackGammaLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_black_level:
+    summary: "Black level 0-96 (displayed -48 to 48) (POST /birddoggammasetup)"
+    params:
+      level: { type: int, min: 0, max: 96, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"BlackLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_black_level_range:
+    summary: "Black level range (POST /birddoggammasetup)"
+    params:
+      range: { type: enum, values: ["LOW", "MID", "HIGH"], required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"BlackLevelRange":"{range}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_effect:
+    summary: "Gamma effect -3 to 3 (POST /birddoggammasetup)"
+    params:
+      level: { type: int, min: -3, max: 3, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"Effect":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_curve_offset:
+    summary: "Gamma offset -64 to 64 (POST /birddoggammasetup)"
+    params:
+      offset: { type: int, min: -64, max: 64, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"Offset":"{offset}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_pattern:
+    summary: "Gamma pattern 0-512 (PATTERN mode) (POST /birddoggammasetup)"
+    params:
+      pattern: { type: int, min: 0, max: 512, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"Pattern":"{pattern}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_gamma_pattern_fine:
+    summary: "Gamma pattern fine 0-9 (PATTERN mode) (POST /birddoggammasetup)"
+    params:
+      level: { type: int, min: 0, max: 9, required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"PatternFine":"{level}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_visibility_enhancer:
+    summary: "Visibility enhancer (POST /birddoggammasetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddoggammasetup, body: '{"VisibilityEnhancer":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # PTZ setup (2.0: API Methods - PTZ; 2.1: PTZ Setup)
+  get_ptz_setup:
+    summary: "PTZ settings: speeds, focus mode, preset mode and speed (GET /birddogptzsetup)"
+    send: { method: GET, path: /birddogptzsetup }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_ptz_setup:
+    summary: "Set any PTZ setup keys; the body is JSON in the document's birddogptzsetup shape (POST /birddogptzsetup)"
+    params:
+      body: { type: json, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{body}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_speed:
+    summary: "Pan speed: 1-24 with SpeedControl standard, 1-255 with superfine (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 1, max: 255, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PanSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_speed_x4u:
+    summary: "X4 Ultra pan speed 0-24 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 24, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PanSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_speed_x5u:
+    summary: "X5 Ultra pan speed 0-100 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 100, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PanSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_speed_p:
+    summary: "2.0 pan speed 0-21 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 21, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PanSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_tilt_speed:
+    summary: "Tilt speed: 1-24 with SpeedControl standard, 1-255 with superfine (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 1, max: 255, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"TiltSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_tilt_speed_x4u:
+    summary: "X4 Ultra tilt speed 0-20 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 20, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"TiltSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_tilt_speed_x5u:
+    summary: "X5 Ultra tilt speed 0-100 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 100, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"TiltSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_tilt_speed_p:
+    summary: "2.0 tilt speed 0-18 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 18, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"TiltSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_zoom_speed:
+    summary: "Zoom speed 0-7 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 7, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"ZoomSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_zoom_speed_pf120:
+    summary: "PF120 zoom speed 0-8 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 8, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"ZoomSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_focus_mode:
+    summary: "Focus mode; focus moves need MANUAL (POST /birddogptzsetup)"
+    params:
+      mode: { type: enum, values: ["AUTO", "MANUAL"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"FocusMode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_preset_mode:
+    summary: "What a preset stores: position only (PTZonly) or position and camera settings; see quirks on Birddog (POST /birddogptzsetup)"
+    params:
+      mode: { type: enum, values: ["PTZonly", "Birddog", "Camera"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"Preset":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_preset_mode_x4u:
+    summary: "What a preset stores: PTZonly or Camera (POST /birddogptzsetup)"
+    params:
+      mode: { type: enum, values: ["PTZonly", "Camera"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"Preset":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_preset_speed:
+    summary: "Preset recall speed 5-200 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 5, max: 200, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PresetSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_preset_speed_maki:
+    summary: "MAKI Ultra preset recall speed 0-200 (POST /birddogptzsetup)"
+    params:
+      speed: { type: int, min: 0, max: 200, required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PresetSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_preset_speed_x5u:
+    summary: "X5 Ultra preset recall speed (POST /birddogptzsetup)"
+    params:
+      speed: { type: enum, values: ["5", "25", "50", "100", "150", "200"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PresetSpeed":"{speed}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_speed_control:
+    summary: "Pan/tilt speed resolution (POST /birddogptzsetup)"
+    params:
+      mode: { type: enum, values: ["standard", "superfine"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"SpeedControl":"{mode}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_tilt_slow:
+    summary: "X5 Ultra slow pan/tilt (POST /birddogptzsetup)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"PanTiltSlow":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_digital_zoom_limit:
+    summary: "MAKI Ultra digital zoom limit (POST /birddogptzsetup)"
+    params:
+      limit: { type: enum, values: ["Off", "x2", "x4", "x8", "x16"], required: true }
+    send: { method: POST, path: /birddogptzsetup, body: '{"DZoomLimit":"{limit}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # Presets (2.0: recallPost/savePost; 2.1: Presets)
+  recall_preset:
+    summary: "Recall preset 1-9 (POST /recall with {\"Preset\":\"Preset-n\"})"
+    params:
+      preset: { type: int, min: 1, max: 9, required: true }
+    send: { method: POST, path: /recall, body: '{"Preset":"Preset-{preset}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  save_preset:
+    summary: "Store the current position (and, by preset mode, camera settings) as preset 1-9 (POST /save)"
+    params:
+      preset: { type: int, min: 1, max: 9, required: true }
+    send: { method: POST, path: /save, body: '{"Preset":"Preset-{preset}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # PTZ movement (2.1: PTZ Movement Controls)
+  get_ptz_control:
+    summary: "Absolute position (X-Axis, Y-Axis, Z-Axis), focus mode and OSD menu state (GET /birddogptzcontrol)"
+    send: { method: GET, path: /birddogptzcontrol }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  pan_tilt:
+    summary: "Move pan/tilt in a direction at the PTZ setup speeds until stop, or go home (POST /birddogptzcontrol)"
+    params:
+      direction: { type: enum, values: ["home", "up", "down", "left", "right", "upleft", "upright", "downleft", "downright", "stop"], required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"PanTilt":"{direction}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  zoom:
+    summary: "Zoom tele or wide until stop (POST /birddogptzcontrol)"
+    params:
+      direction: { type: enum, values: ["tele", "wide", "stop"], required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"Zoom":"{direction}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  focus:
+    summary: "Focus in or out until stop; needs manual focus (POST /birddogptzcontrol)"
+    params:
+      direction: { type: enum, values: ["in", "out", "stop"], required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"Focus":"{direction}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_menu:
+    summary: "Show or hide the on-screen menu (POST /birddogptzcontrol)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"Menu":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_tilt_position:
+    summary: "Move to an absolute pan (X-Axis -12996 to 12208) and tilt (Y-Axis -6860 to 5620) position, sent together (POST /birddogptzcontrol)"
+    params:
+      pan: { type: int, min: -12996, max: 12208, required: true }
+      tilt: { type: int, min: -6860, max: 5620, required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"X-Axis":"{pan}","Y-Axis":"{tilt}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_tilt_position_x4u:
+    summary: "X4 Ultra absolute pan (-2448 to 2448) and tilt (-432 to 1296) position (POST /birddogptzcontrol)"
+    params:
+      pan: { type: int, min: -2448, max: 2448, required: true }
+      tilt: { type: int, min: -432, max: 1296, required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"X-Axis":"{pan}","Y-Axis":"{tilt}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_pan_tilt_position_x5u:
+    summary: "X5 Ultra absolute pan (-170 to 170) and tilt (-30 to 90) position (POST /birddogptzcontrol)"
+    params:
+      pan: { type: int, min: -170, max: 170, required: true }
+      tilt: { type: int, min: -30, max: 90, required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"X-Axis":"{pan}","Y-Axis":"{tilt}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_zoom_position:
+    summary: "Absolute zoom position 0-16384 (POST /birddogptzcontrol)"
+    params:
+      position: { type: int, min: 0, max: 16384, required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"Z-Axis":"{position}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_zoom_position_x4u:
+    summary: "X4 Ultra absolute zoom position 0-4912 (POST /birddogptzcontrol)"
+    params:
+      position: { type: int, min: 0, max: 4912, required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"Z-Axis":"{position}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_zoom_position_x5u:
+    summary: "X5 Ultra absolute zoom position 100-2000 (POST /birddogptzcontrol)"
+    params:
+      position: { type: int, min: 100, max: 2000, required: true }
+    send: { method: POST, path: /birddogptzcontrol, body: '{"Z-Axis":"{position}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  # NDI finder (2.0: API Methods - NDIFINDER; 2.1: NDI Finder Settings)
+  get_ndi_group_names:
+    summary: "NDI groups the finder subscribes to, as plain text (GET /NDIGrpName)"
+    send: { method: GET, path: /NDIGrpName }
+    expect: { status: 200 }
+    returns: text
+  set_ndi_group_names:
+    summary: "NDI groups the finder subscribes to, comma separated; plain-text body (POST /NDIGrpName)"
+    params:
+      groups: { type: string, required: true }
+    send: { method: POST, path: /NDIGrpName, body: '{groups}', content_type: text/plain }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  get_ndi_off_subnet:
+    summary: "Off-subnet NDI source IP list, as plain text (GET /NDIOffSnSrc)"
+    send: { method: GET, path: /NDIOffSnSrc }
+    expect: { status: 200 }
+    returns: text
+  set_ndi_off_subnet:
+    summary: "Off-subnet NDI source IP addresses, comma separated with no spaces; plain-text body (POST /NDIOffSnSrc)"
+    params:
+      addresses: { type: string, pattern: '^[0-9]{1,3}(?:\.[0-9]{1,3}){3}(?:,[0-9]{1,3}(?:\.[0-9]{1,3}){3})*$', required: true }
+    send: { method: POST, path: /NDIOffSnSrc, body: '{addresses}', content_type: text/plain }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  ndi_finder_reset:
+    summary: "Clear the NDI finder list and add every available source (GET /reset)"
+    send: { method: GET, path: /reset }
+    expect: { status: 200 }
+    returns: ack
+  ndi_finder_refresh:
+    summary: "Add any newly available NDI sources to the finder list (GET /refresh)"
+    send: { method: GET, path: /refresh }
+    expect: { status: 200 }
+    returns: ack
+  get_ndi_sources:
+    summary: "NDI sources the finder sees; {\"None\":\"None\"} when empty (GET /List)"
+    send: { method: GET, path: /List }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  # Tally (2.1: Miscellaneous Camera Settings / Tally)
+  get_tally:
+    summary: "Tally lamp: tally_state and tally_rest_state (GET /tally)"
+    send: { method: GET, path: /tally }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+  set_tally:
+    summary: "Tally lamp on or off (POST /tally)"
+    params:
+      state: { type: enum, values: ["On", "Off"], required: true }
+    send: { method: POST, path: /tally, body: '{"tally_state":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+  set_tally_rest_state:
+    summary: "Tally lamp colour at rest: white or off (POST /tally)"
+    params:
+      state: { type: enum, values: ["white", "Off"], required: true }
+    send: { method: POST, path: /tally, body: '{"tally_rest_state":"{state}"}', content_type: application/json }
+    expect: { status: 200, not_contains: "Invalid" }
+    returns: ack
+
+telemetry:
+  # The API has no push or subscription: state comes from polling the
+  # settings endpoints every camera serves, and from the reply to any get_ or
+  # set_ command on the endpoints below (POST replies carry the whole
+  # endpoint object). Tally, PTZ position, transport, audio, decoder and
+  # video output exist only on some cameras, so they update when their get_
+  # command is sent (see quirks).
+  poll:
+    every_ms: 5000
+    send:
+      - { method: GET, path: /about }
+      - { method: GET, path: /encodesetup }
+      - { method: GET, path: /birddogexpsetup }
+      - { method: GET, path: /birddogpicsetup }
+      - { method: GET, path: /birddogwbsetup }
+      - { method: GET, path: /birddogptzsetup }
+  updates:
+    - path: "^/about$"
+      json: { firmware: "$.FirmwareVersion", hardware: "$.HardwareVersion", hostname: "$.HostName", ip: "$.IPAddress",
+              netmask: "$.NetworkMask", gateway: "$.GateWay", method: "$.NetworkConfigMethod", serial: "$.SerialNumber",
+              status: "$.Status", format: "$.Format", fallback: "$.FallbackIP" }
+      state:
+        device.firmware: "{firmware}"
+        device.hardware: "{hardware}"
+        device.hostname: "{hostname}"
+        device.ip_address: "{ip}"
+        device.netmask: "{netmask}"
+        device.gateway: "{gateway}"
+        device.network_method: "{method}"
+        device.serial: "{serial}"
+        device.status: "{status}"
+        device.stream_name: "{format}"
+        device.fallback_ip: "{fallback}"
+    - path: "^/encodesetup$"
+      json: { format: "$.VideoFormat", compression: "$.VideoCompression", protocol: "$.StreamProtocol", name: "$.StreamName",
+              network: "$.StreamToNetwork", screensaver: "$.ScreenSaverMode", group: "$.NDIGroup", group_name: "$.NDIGroupName",
+              audio: "$.NDIAudio", tally: "$.TallyMode", bw_mode: "$.BandwidthMode", bw: "$.BandwidthSelect" }
+      state:
+        encoder.video_format: "{format}"
+        encoder.compression: "{compression}"
+        encoder.stream_protocol: "{protocol}"
+        encoder.stream_name: "{name}"
+        encoder.stream_to_network: { value: "{network}", map: { "On": true, "Off": false } }
+        encoder.screensaver: "{screensaver}"
+        encoder.ndi_group: { value: "{group}", map: { "NDIGroupEn": true, "NDIGroupDis": false } }
+        encoder.ndi_group_name: "{group_name}"
+        encoder.ndi_audio: "{audio}"
+        encoder.tally_mode: "{tally}"
+        encoder.bandwidth_mode: "{bw_mode}"
+        encoder.bandwidth: "{bw}"
+    - path: "^/birddogexpsetup$"
+      json: { mode: "$.ExpMode", comp: "$.ExpCompEn", comp_x5: "$.ExposureComp", comp_level: "$.ExpCompLvl", gain: "$.GainLevel",
+              gain_x5: "$.Gain", gain_limit: "$.GainLimit", shutter: "$.ShutterSpeed", iris: "$.IrisLevel", bright: "$.BrightLevel",
+              backlight: "$.BackLight", backlight_x5: "$.Backlight", meter: "$.Meter", high_sens: "$.HighSensitivity",
+              slow: "$.SlowShutterEn", slow_x5: "$.SlowShutter", ae_response: "$.AeResponse" }
+      state:
+        exposure.mode: "{mode}"
+        exposure.compensation: { value: "{comp}", map: { "On": true, "Off": false, "1": true, "0": false } }
+        exposure.compensation_x5: { value: "{comp_x5}", map: { "On": true, "Off": false } }
+        exposure.compensation_level: "{comp_level}"
+        exposure.gain: "{gain}"
+        exposure.gain_x5: "{gain_x5}"
+        exposure.gain_limit: "{gain_limit}"
+        exposure.shutter: "{shutter}"
+        exposure.iris: "{iris}"
+        exposure.bright: "{bright}"
+        exposure.backlight: { value: "{backlight}", map: { "On": true, "Off": false } }
+        exposure.backlight_x5: { value: "{backlight_x5}", map: { "On": true, "Off": false } }
+        exposure.meter: "{meter}"
+        exposure.high_sensitivity: { value: "{high_sens}", map: { "On": true, "Off": false } }
+        exposure.slow_shutter: { value: "{slow}", map: { "On": true, "Off": false } }
+        exposure.slow_shutter_x5: { value: "{slow_x5}", map: { "On": true, "Off": false } }
+        exposure.ae_response: "{ae_response}"
+    - path: "^/birddogpicsetup$"
+      json: { flip: "$.Flip", mirror: "$.Mirror", saturation: "$.Saturation", color: "$.Color", hue: "$.Hue", contrast: "$.Contrast",
+              sharpness: "$.Sharpness", brightness: "$.Brightness", gamma: "$.Gamma", deflicker: "$.DeFlicker", nr3d: "$.ThreeDNR",
+              nr2d: "$.TWODNR", nr2d_maki: "$.TwoDNR", blc: "$.BackLightCom", hlc: "$.HighlightComp", wdr: "$.WDREnable",
+              bw: "$.BWMode", effect: "$.Effect", nr: "$.NoiseReduction" }
+      state:
+        picture.flip: { value: "{flip}", map: { "On": true, "Off": false } }
+        picture.mirror: { value: "{mirror}", map: { "On": true, "Off": false } }
+        picture.saturation: "{saturation}"
+        picture.color: "{color}"
+        picture.hue: "{hue}"
+        picture.contrast: "{contrast}"
+        picture.sharpness: "{sharpness}"
+        picture.brightness: "{brightness}"
+        picture.gamma: "{gamma}"
+        picture.deflicker: "{deflicker}"
+        picture.noise_reduction_3d: "{nr3d}"
+        picture.noise_reduction_2d: "{nr2d}"
+        picture.noise_reduction_2d_maki: "{nr2d_maki}"
+        picture.backlight_comp: { value: "{blc}", map: { "On": true, "Off": false } }
+        picture.highlight_comp: "{hlc}"
+        picture.wdr: { value: "{wdr}", map: { "On": true, "Off": false } }
+        picture.bw_mode: { value: "{bw}", map: { "On": true, "Off": false, "1": true, "0": false } }
+        picture.effect: "{effect}"
+        picture.noise_reduction: "{nr}"
+    - path: "^/birddogwbsetup$"
+      json: { mode: "$.WbMode", red: "$.RedGain", blue: "$.BlueGain", temp: "$.ColorTemp", rt: "$.RTuning", bt: "$.BTuning" }
+      state:
+        white_balance.mode: "{mode}"
+        white_balance.red_gain: "{red}"
+        white_balance.blue_gain: "{blue}"
+        white_balance.color_temp: "{temp}"
+        white_balance.red_tuning: "{rt}"
+        white_balance.blue_tuning: "{bt}"
+    - path: "^/birddogptzsetup$"
+      json: { pan: "$.PanSpeed", tilt: "$.TiltSpeed", zoom: "$.ZoomSpeed", focus: "$.FocusMode", preset: "$.Preset",
+              preset_speed: "$.PresetSpeed", control: "$.SpeedControl" }
+      state:
+        ptz.pan_speed: "{pan}"
+        ptz.tilt_speed: "{tilt}"
+        ptz.zoom_speed: "{zoom}"
+        ptz.focus_mode: "{focus}"
+        ptz.preset_mode: "{preset}"
+        ptz.preset_speed: "{preset_speed}"
+        ptz.speed_control: "{control}"
+    - path: "^/birddogptzcontrol$"
+      json: { x: "$.X-Axis", y: "$.Y-Axis", z: "$.Z-Axis", menu: "$.Menu" }
+      state:
+        position.pan: "{x}"
+        position.tilt: "{y}"
+        position.zoom: "{z}"
+        ptz.menu: { value: "{menu}", map: { "On": true, "Off": false } }
+    - path: "^/tally$"
+      json: { lamp: "$.tally_state", rest: "$.tally_rest_state" }
+      state:
+        tally.on: { value: "{lamp}", map: { "On": true, "Off": false } }
+        tally.rest_state: "{rest}"
+    - path: "^/encodeTransport$"
+      json: { tx: "$.Txpm", prefix: "$.Txnetprefix", mask: "$.Txnetmask", ttl: "$.Txmcttl", rx: "$.rxpm" }
+      state:
+        ndi.transmit_method: "{tx}"
+        ndi.multicast_prefix: "{prefix}"
+        ndi.multicast_netmask: "{mask}"
+        ndi.multicast_ttl: "{ttl}"
+        ndi.receive_method: "{rx}"
+    - path: "^/decodeTransport$"
+      json: { rx: "$.rxpm" }
+      state:
+        ndi.receive_method: "{rx}"
+    - path: "^/NDIDisServer$"
+      json: { enabled: "$.NDIDisServ", ip: "$.NDIDisServIP" }
+      state:
+        ndi.discovery_server: { value: "{enabled}", map: { "NDIDisServEn": true, "NDIDisServDis": false } }
+        ndi.discovery_server_ip: "{ip}"
+    - path: "^/analogaudiosetup$"
+      json: { in_gain: "$.AnalogAudioInGain", out_gain: "$.AnalogAudioOutGain", select: "$.AnalogAudiooutputselect" }
+      state:
+        audio.in_gain: "{in_gain}"
+        audio.out_gain: "{out_gain}"
+        audio.select: "{select}"
+    - path: "^/decodestatus\\?ChNum=1$"
+      json: { decoder: "$.decoder", status: "$.ConnectionStatus", name: "$.SourceName", ip: "$.SourceIP", res: "$.VideoResolution",
+              fps: "$.VideoFramerate", channels: "$.AudioChannel", rate: "$.AudioSampleRate", bw: "$.StreamBandwidth" }
+      state:
+        decoder.enabled: { value: "{decoder}", map: { "enabled": true, "disabled": false } }
+        decoder.connection: "{status}"
+        decoder.source_name: "{name}"
+        decoder.source_ip: "{ip}"
+        decoder.video_resolution: "{res}"
+        decoder.video_frame_rate: "{fps}"
+        decoder.audio_channels: "{channels}"
+        decoder.audio_sample_rate: "{rate}"
+        decoder.bandwidth: "{bw}"
+    - path: "^/videooutputinterface$"
+      json: { format: "$.OutputFormat", privacy: "$.PrivacyMode", output: "$.videooutput", freq: "$.Frequency",
+              hdmi1: "$.HDMI-1OutputDecoder" }
+      state:
+        video_output.format: "{format}"
+        video_output.privacy_mode: { value: "{privacy}", map: { "On": true, "Off": false } }
+        video_output.interface: "{output}"
+        video_output.frequency: "{freq}"
+        video_output.hdmi1_decoder: { value: "{hdmi1}", map: { "On": true, "Off": false } }
+    - path: "^/sil2codec$"
+      json: { control: "$.BitrateControl", mode: "$.ModeSel", gop: "$.GOPSize", bitrate: "$.Bitrate" }
+      state:
+        encoder.bitrate_control: "{control}"
+        encoder.mode: "{mode}"
+        encoder.gop_size: "{gop}"
+        encoder.bitrate: "{bitrate}"
+    - path: "^/secondary_protocol$"
+      json: { protocol: "$.protocol" }
+      state:
+        encoder.secondary_protocol: "{protocol}"
+
+state:
+  device.firmware:              { type: string, description: "Installed firmware version" }
+  device.hardware:              { type: string, description: "Hardware version (2.1)" }
+  device.hostname:              { type: string, description: "Device (mDNS) name" }
+  device.ip_address:            { type: string, description: "Current IP address" }
+  device.netmask:               { type: string, description: "Current subnet mask" }
+  device.gateway:               { type: string, description: "Current gateway (2.1)" }
+  device.network_method:        { type: string, description: "dhcp or static, as the camera spells it" }
+  device.serial:                { type: string, description: "Serial number; the MAC address on 2.1 cameras" }
+  device.status:                { type: string, description: "Camera application status, such as Active, Streaming NDI, Ready to Connect or inactive" }
+  device.stream_name:           { type: string, description: "NDI stream name (the about reply's Format)" }
+  device.fallback_ip:           { type: string, description: "DHCP fallback IP address (2.1)" }
+  encoder.video_format:         { type: string, description: "Encoded video format, such as 1080p59.94" }
+  encoder.compression:          { type: string, description: "H264 or H265" }
+  encoder.stream_protocol:      { type: string, description: "NDI|HX, UVC or NDI|HX_UVC" }
+  encoder.stream_name:          { type: string, description: "NDI stream name" }
+  encoder.stream_to_network:    { type: bool, description: "Streaming to the network" }
+  encoder.screensaver:          { type: string, description: "Encoder screensaver as reported (BirdDogSS, BlackSS, CaptureSS; MAKI Ultra reports Black)" }
+  encoder.ndi_group:            { type: bool, description: "Stream published in an NDI group" }
+  encoder.ndi_group_name:       { type: string, description: "NDI group of the stream" }
+  encoder.ndi_audio:            { type: string, description: "NDI audio setting as reported (NDIAudioAnalog, NDIAudioMute, Unmute, Mute)" }
+  encoder.tally_mode:           { type: string, description: "Onboard tally mode (2.0): TallyOn or TallyOff" }
+  encoder.bandwidth_mode:       { type: string, description: "NDI bandwidth management (2.0): Manual or NDIManaged" }
+  encoder.bandwidth:            { type: int, description: "Manual NDI bandwidth (2.0)" }
+  encoder.bitrate_control:      { type: string, description: "Silicon2 bitrate control (2.1): cbr or vbr" }
+  encoder.mode:                 { type: string, description: "Silicon2 encoder preset (2.1)" }
+  encoder.gop_size:             { type: int, description: "Silicon2 GOP size (2.1)" }
+  encoder.bitrate:              { type: int, description: "Silicon2 bitrate (2.1)" }
+  encoder.secondary_protocol:   { type: string, description: "Secondary stream protocol (2.1): disable, SRT, RTSP or RTMP" }
+  exposure.mode:                { type: string, description: "FULL-AUTO, MANUAL, SHUTTER-PRI, IRIS-PRI, BRIGHT or GAIN-PRI" }
+  exposure.compensation:        { type: bool, description: "Exposure compensation on (ExpCompEn)" }
+  exposure.compensation_x5:     { type: bool, description: "X5 Ultra exposure compensation on (ExposureComp)" }
+  exposure.compensation_level:  { type: int, description: "Exposure compensation: -7 to 7 on 2.1, index 0-14 on 2.0" }
+  exposure.gain:                { type: int, description: "Gain index (GainLevel); scale per model, see the set_gain_level commands" }
+  exposure.gain_x5:             { type: int, description: "X5 Ultra gain index (Gain), 0 = 0 dB in 3 dB steps" }
+  exposure.gain_limit:          { type: int, description: "Gain limit: an index, or dB on X5 Ultra" }
+  exposure.shutter:             { type: string, description: "Shutter: an index, or a speed such as 1/60 on X5 Ultra" }
+  exposure.iris:                { type: string, description: "Iris: an index, or CLOSED on X5 Ultra" }
+  exposure.bright:              { type: int, description: "Bright level" }
+  exposure.backlight:           { type: bool, description: "Backlight compensation (exposure BackLight)" }
+  exposure.backlight_x5:        { type: bool, description: "X5 Ultra backlight compensation (Backlight)" }
+  exposure.meter:               { type: int, description: "Metering: 0 average, 1 centre, 2 smart, 3 top" }
+  exposure.high_sensitivity:    { type: bool, description: "High sensitivity on" }
+  exposure.slow_shutter:        { type: bool, description: "Slow shutter on (2.0 SlowShutterEn)" }
+  exposure.slow_shutter_x5:     { type: bool, description: "X5 Ultra slow shutter on (SlowShutter)" }
+  exposure.ae_response:         { type: int, description: "Auto exposure response 1-48 (2.0)" }
+  picture.flip:                 { type: bool, description: "Picture flipped" }
+  picture.mirror:               { type: bool, description: "Picture mirrored" }
+  picture.saturation:           { type: int, description: "Saturation; scale per model" }
+  picture.color:                { type: int, description: "Colour 0-15 (P100/PF120/P110/P120)" }
+  picture.hue:                  { type: int, description: "Hue; scale per model" }
+  picture.contrast:             { type: int, description: "Contrast; scale per model" }
+  picture.sharpness:            { type: int, description: "Sharpness; scale per model" }
+  picture.brightness:           { type: int, description: "Brightness; scale per model" }
+  picture.gamma:                { type: string, description: "Gamma as reported (default, 0.45, ... or an index on 2.0)" }
+  picture.deflicker:            { type: string, description: "Anti-flicker: Off, 50Hz or 60Hz (MAKI Ultra also reports default)" }
+  picture.noise_reduction_3d:   { type: string, description: "3D noise reduction, a level or Off" }
+  picture.noise_reduction_2d:   { type: string, description: "2D noise reduction (TWODNR), a level or Off" }
+  picture.noise_reduction_2d_maki: { type: string, description: "MAKI Ultra 2D noise reduction (TwoDNR): 0 off, 1-5, 6 auto" }
+  picture.backlight_comp:       { type: bool, description: "Backlight compensation (picture BackLightCom)" }
+  picture.highlight_comp:       { type: string, description: "Highlight compensation: On/Off, or OFF/LOW/MEDIUM/HIGH on P200/A200/A300" }
+  picture.wdr:                  { type: bool, description: "Wide dynamic range on (WDREnable)" }
+  picture.bw_mode:              { type: bool, description: "Black and white picture (BWMode)" }
+  picture.effect:               { type: string, description: "Picture effect (2.0): BW or Off" }
+  picture.noise_reduction:      { type: string, description: "Noise reduction (2.0): Off or 1-5" }
+  white_balance.mode:           { type: string, description: "White balance mode as reported" }
+  white_balance.red_gain:       { type: int, description: "Red gain 0-255" }
+  white_balance.blue_gain:      { type: int, description: "Blue gain 0-255" }
+  white_balance.color_temp:     { type: int, description: "Colour temperature in K, or an index 0-55 on MAKI Ultra" }
+  white_balance.red_tuning:     { type: int, description: "Red tuning (2.1)" }
+  white_balance.blue_tuning:    { type: int, description: "Blue tuning (2.1)" }
+  ptz.pan_speed:                { type: int, description: "Pan speed setting" }
+  ptz.tilt_speed:               { type: int, description: "Tilt speed setting" }
+  ptz.zoom_speed:               { type: int, description: "Zoom speed setting" }
+  ptz.focus_mode:               { type: string, description: "AUTO or MANUAL" }
+  ptz.preset_mode:              { type: string, description: "What presets store: PTZonly, Birddog or Camera" }
+  ptz.preset_speed:             { type: int, description: "Preset recall speed" }
+  ptz.speed_control:            { type: string, description: "standard or superfine" }
+  ptz.menu:                     { type: bool, description: "On-screen menu shown" }
+  position.pan:                 { type: int, description: "Absolute pan position (X-Axis), camera units" }
+  position.tilt:                { type: int, description: "Absolute tilt position (Y-Axis), camera units" }
+  position.zoom:                { type: int, description: "Absolute zoom position (Z-Axis), camera units" }
+  tally.on:                     { type: bool, description: "Tally lamp on (2.1)" }
+  tally.rest_state:             { type: string, description: "Tally lamp at rest: white, Off, or as reported" }
+  ndi.transmit_method:          { type: string, description: "NDI transmit method (Txpm)" }
+  ndi.multicast_prefix:         { type: string, description: "NDI multicast address prefix" }
+  ndi.multicast_netmask:        { type: string, description: "NDI multicast subnet mask" }
+  ndi.multicast_ttl:            { type: int, description: "NDI multicast time-to-live" }
+  ndi.receive_method:           { type: string, description: "Decoder NDI receive method (rxpm)" }
+  ndi.discovery_server:         { type: bool, description: "NDI discovery server in use" }
+  ndi.discovery_server_ip:      { type: string, description: "NDI discovery server address" }
+  audio.in_gain:                { type: string, description: "Analog input gain: 0-100, 1-80 on X4 Ultra, or dB such as -6 dB on X5 Ultra" }
+  audio.out_gain:               { type: int, description: "Analog output gain 0-100 (2.0)" }
+  audio.select:                 { type: string, description: "AnalogAudiooutputselect: output source on 2.0, Mic or Line on X5 Ultra and MAKI Ultra" }
+  decoder.enabled:              { type: bool, description: "Decoder enabled (false in encode mode)" }
+  decoder.connection:           { type: string, description: "Connected or Disconnected" }
+  decoder.source_name:          { type: string, description: "Connected NDI source name" }
+  decoder.source_ip:            { type: string, description: "Connected NDI source address" }
+  decoder.video_resolution:     { type: string, description: "Decoded resolution, such as 2160p" }
+  decoder.video_frame_rate:     { type: string, description: "Decoded frame rate, such as 29.97" }
+  decoder.audio_channels:       { type: int, description: "Decoded audio channels" }
+  decoder.audio_sample_rate:    { type: string, description: "Decoded audio sample rate" }
+  decoder.bandwidth:            { type: int, description: "Average NDI stream bitrate" }
+  video_output.format:          { type: string, description: "Baseband output format" }
+  video_output.privacy_mode:    { type: bool, description: "Privacy mode on (X1, X1 Ultra, MAX)" }
+  video_output.interface:       { type: string, description: "hdmi or sdi" }
+  video_output.frequency:       { type: string, description: "X5 Ultra output frequency: 60, 59.94 or 50" }
+  video_output.hdmi1_decoder:   { type: bool, description: "X5 Ultra HDMI 1 shows the decoder" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      The API listens on TCP port 8080 over plain HTTP. Neither document
+      describes authentication for it or gives credentials, and every
+      example request is sent without any.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Pan, tilt, zoom, focus and presets overlap with VISCA over IP, which the
+      native visca module covers (specs/visca.yaml, model birddog). This spec
+      covers what the REST API documents. The REST pan/tilt and zoom moves
+      carry no speed (they use the birddogptzsetup speeds), presets are
+      limited to 1-9 (API 2.0, recallPost: "Preset-1 (Range from 1 to 9)";
+      API 2.1 gives no range), and the 2.0 cameras have no REST movement or
+      position endpoint at all. Use VISCA for variable-speed moves, presets
+      above 9 and P-series movement.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Every POST answers 200 with the whole endpoint object, and the
+      documents' example replies often still show the old value (the reply
+      to {"Flip":"On"} shows "Flip":"On", but the reply to a GainLimit change
+      does not), so a POST's acknowledgement does not prove the setting took;
+      the next poll or get_ command reports the camera's value. A refused
+      request answers 500 with {"error": "..."} (connectTo in encode mode),
+      {"status": "Invalid Command"} (X-Axis without Y-Axis) or plain text
+      "Invalid API command" (MAKI Ultra NDIGrpName POST); commands fail on a
+      non-200 status or on the word Invalid. All values, numbers included,
+      are sent as JSON strings, as in every example.
+
+  - models: [p200-a2a3, p200-a4a5, a200-gen1, a200-gen2, a300-gen1, a300-gen2, p100, pf120, p110, p120, p400, p4k, p240]
+    severity: warning
+    text: >
+      API 2.0 examples always POST the whole object (every exposure key, every
+      picture key). The 2.1 collections show single-key POSTs merged into the
+      current settings, but the 2.0 document does not say whether a partial
+      body is accepted. The single-key commands send one key; if a camera
+      needs the full object, read it with the get_ command and send it whole
+      with the set_<endpoint> JSON command (set_exposure, set_picture,
+      set_white_balance, ...). The 2.0 encodesetup and decodesetup examples
+      also carry ChNum "1" (Range 1 to 4), which the single-key commands do not
+      send; set_encode_setup can include it.
+
+  - models: [all]
+    severity: info
+    text: >
+      Ranges and value lists differ per camera, even within one generation,
+      and each documented range has its own command (model suffixes) so an
+      out-of-range value is refused before sending. Some ranges depend on
+      other settings and are not limited further: GainLevel up to the gain
+      limit, ShutterMinSpeed up to ShutterMaxSpeed, X1 pan and tilt speed
+      1-24 unless SpeedControl is superfine (1-255). Several keys only take
+      effect in one exposure, white balance or focus mode (noted in the
+      summaries), and focus moves need FocusMode MANUAL.
+
+  - models: [maki-ultra, x5-ultra]
+    severity: warning
+    text: >
+      MAKI Ultra: a change to VideoFormat (encodesetup) or OutputFormat
+      (videooutputinterface) needs a reboot to take effect ("must be followed
+      by a /reboot command"; "A manual reboot is required"). X5 Ultra: turning
+      the stabiliser (Stablizer) on or off reboots the camera.
+
+  - models: [x1, x1-ultra, max, x4-ultra, x5-ultra]
+    severity: warning
+    text: >
+      PTZ movement: PanTilt, Zoom and Focus moves continue until a separate
+      stop request ("stop"). X-Axis and Y-Axis must be sent together, which
+      set_pan_tilt_position does. MAKI Ultra has only Zoom, Focus and Menu;
+      its Z-Axis is "yet to be implemented". The GET range for X1 pan is
+      -12992 to 12208 but the POST range -12996 to 12208; the POST range is
+      used.
+
+  - models: [x5-ultra, maki-ultra, x1, x1-ultra, max]
+    severity: info
+    text: >
+      Parts of API 2.1 are marked unfinished: connectTo "NOT YET COMPLETE ON
+      ANY CAMERAS"; Genlock & Failover Sources "API Not yet implemented" on
+      MAKI Ultra (not listed for it); decodeTransport "NOT UPDATED FOR X5
+      YET"; Sil2 HX3 modes "not yet implemented for X5"; MAKI Ultra
+      tally_rest_state "NOT YET IMPLEMENTED" (set_tally_rest_state not listed
+      for it). The deprecated POST /capture?location=... is not included.
+
+  - models: [all]
+    severity: info
+    text: >
+      Document inconsistencies, resolved as follows. X1 picture: the
+      description and GET use TWODNR but the POST example sends TwoDNR;
+      set_2dnr sends TWODNR (MAKI Ultra documents TwoDNR). MAKI Ultra Sil2:
+      ModeSel is listed as hx3_264_2160p60 and so on but the example body
+      sends "NDI|HX3_H264_2160p60"; the listed values are used. Sil2 codec
+      path: the 2.0 tables and 2.1 use /sil2codec and /sil2enc, the 2.0 curl
+      examples /birddogsil2codec and /birddogsil2enc; the table path is used.
+      Image reset: the request URL is /RestImage, the description says
+      /ResetImage; the URL is used. NDIGrpName and NDIOffSnSrc 2.0 curl
+      examples post to /NdiGrpName and /NdiOffSnSrc; the endpoint heading's
+      spelling is used. Wi-Fi Enable and DhcpEnable are documented as On/Off
+      and dhcp/static but the example reply shows "1"; the documented values
+      are sent. The X1 and MAKI preset mode is documented as '"PTZonly" &
+      "Birddog" or "Camera"'; all three are accepted. MAKI Ultra tuning is
+      listed as -10 to 245 and WBSensitivity 0-2 while the example shows
+      "Middle". The P200 A2/A3 IRCutFilter cell reads "NoiseReduction", so
+      set_ir_cut_filter is not listed for it. 2.0 ExpCompLvl is 0-14 in the
+      tables, but the P200 A2/A3 cell adds "change to Range(-128, 127)" and
+      the example sends "-123"; 0-14 is used. AnalogAudiooutputselect is
+      listed for every 2.0 camera in the table, but the section text says it
+      is not present on P200/A200/A300, P100/PF120 and P4K/P400; it is listed
+      only for P110, P120 and P240. Likewise the 2.0 videooutputinterface
+      text says the mode is not present on P4K/P400 while its table lists
+      LowLatency and NormalMode for them; the table is followed.
+
+  - models: [all]
+    severity: info
+    text: >
+      The camera pushes nothing; the six settings endpoints every camera
+      serves are polled every 5 seconds. Tally (2.1), PTZ position, NDI
+      transport, discovery server, audio, decoder, video output, Sil2 and
+      secondary protocol state update from their get_ commands only, because
+      a poll list is shared by every model and those endpoints exist only on
+      some. The plain-text replies (version, hostname, operation mode, NDI
+      groups, off-subnet list, P400/P4K output mode) are not in the state.
+      Keys some cameras report but neither document defines (FreeD,
+      SmartExposure, DRC, NearLimit, Portrait, GTuning and others) are not
+      settable here except through the set_<endpoint> JSON commands.
+
+  - models: [x5-ultra, x4-ultra]
+    severity: info
+    text: >
+      BirdDog states that API 2.1 is fully supported on X5 Ultra from firmware
+      6.1.034 and on X4 Ultra from firmware 6.1.31. Earlier firmware may lack
+      endpoints.
