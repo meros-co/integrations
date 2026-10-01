@@ -361,8 +361,8 @@ telemetry("aja-kipro", "transport", inbound_http={
     expect_state={"transport": {"state": "Recording"}})
 
 # X32: /xremote on connect; pushed changes arrive on the same addresses as sets.
-# The /info liveness probe follows the subscription.
-telemetry(X, "channel-mute", expect_connect_wire_hex=[hexs(osc("/xremote")), hexs(osc("/info"))],
+# The subscription, then the first of the one-at-a-time queries for current values.
+telemetry(X, "channel-mute", expect_connect_wire_hex=[hexs(osc("/xremote")), hexs(osc("/ch/01/mix/on"))],
           inbound_hex=hexs(osc("/ch/07/mix/on", ("i", 0))),
           expect_state={"channels": {"7": {"mute": True}}})
 telemetry(X, "channel-name", inbound_hex=hexs(osc("/ch/12/config/name", ("s", "Vox"))),

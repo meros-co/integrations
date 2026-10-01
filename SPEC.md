@@ -516,9 +516,14 @@ telemetry:
       state: { "outputs.{1:+1}.input": "{2:+1}" }
 ```
 
-`send` items are the same as a command's. On a line transport whose device
-answers, they go through the command queue like commands, so their replies are
-never taken as a command's reply; otherwise they are sent straight away.
+`send` items are the same as a command's. They go through the command queue,
+one at a time, wherever a reply is expected: `subscribe` items on a line
+transport whose device answers, and `poll` items (queries) on any transport
+that answers, including OSC, where each query waits for the reply on its own
+address. A long poll list, such as every channel's mute, fader and name, is
+therefore paced by the device's replies. Commands go ahead of queued telemetry,
+so an operator never waits for a poll to finish. Other items are sent straight
+away.
 
 Every inbound message is offered to every rule: pushed changes and replies to
 commands alike, since a reply to a query carries the same data. A rule is one

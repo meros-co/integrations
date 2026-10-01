@@ -126,7 +126,13 @@ async fn x32_over_udp() {
                     osc_string("Snare"),
                 ]
                 .concat(),
-                _ => continue,
+                // Like the console, answer any other query with its value.
+                _ => [
+                    osc_string(&address),
+                    osc_string(",i"),
+                    0i32.to_be_bytes().to_vec(),
+                ]
+                .concat(),
             };
             socket.send_to(&reply, from).await.unwrap();
         }

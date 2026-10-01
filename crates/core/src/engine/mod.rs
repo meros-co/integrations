@@ -409,7 +409,15 @@ impl SpecEngine {
         let values = self.values(&job.params, param_specs);
         let awaited_address = match expect.get("address").and_then(Value::as_str) {
             Some(a) => Some(render(a, &values, no_escape)?),
-            None => None,
+            // A telemetry query is answered on its own address; anything else
+            // arriving meanwhile (a pushed change) is not its reply.
+            None => match (&job.item, &self.transport) {
+                (
+                    Some(Value::String(address)),
+                    Transport::OscUdp { .. } | Transport::OscTcp { .. },
+                ) => Some(address.clone()),
+                _ => None,
+            },
         };
         let mut messages = VecDeque::new();
         for item in &items {
@@ -494,7 +502,7 @@ impl SpecEngine {
                     }
                     match &self.transport {
                         Transport::LineTcp { .. } => Await::Text,
-                        _ => Await::Osc(if flight.id.is_none() { None } else { address }),
+                        _ => Await::Osc(address),
                     }
                 }
                 Outgoing::Http(request) => {
@@ -711,12 +719,16 @@ impl SpecEngine {
     /// Send telemetry messages. On a line transport whose device answers, each
     /// goes through the command queue so its reply is not mistaken for a
     /// command's; otherwise it is sent straight away, like `on_connect`.
-    fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>) {
-        // HTTP requests are always queued: each reply is matched to its request.
-        let queued = matches!(
-            self.transport,
-            Transport::LineTcp { replies: true, .. } | Transport::Http { .. }
-        );
+    fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>, poll: bool) {
+        // HTTP requests are always queued: each reply is matched to its
+        // request. Poll items are queries, so on any transport that answers
+        // they go one at a time, which also paces a long list.
+        let queued = match self.transport {
+            Transport::LineTcp { replies, .. } => replies,
+            Transport::Http { .. } => true,
+            Transport::OscUdp { replies, .. } => poll && replies,
+            Transport::OscTcp { .. } => poll,
+        };
         for item in items {
             if queued {
                 self.queue.push_back(Job {
@@ -759,8 +771,8 @@ impl SpecEngine {
         }
         let subscribe = self.telemetry.subscribe.clone();
         let poll = self.telemetry.poll.clone();
-        self.send_telemetry(cx, subscribe);
-        self.send_telemetry(cx, poll);
+        self.send_telemetry(cx, subscribe, false);
+        self.send_telemetry(cx, poll, true);
         if let Some(every) = self.telemetry.renew_every {
             cx.set_timer(RENEW, every);
         }
@@ -871,12 +883,23 @@ impl Module for SpecEngine {
             cx.complete(id, Err(CommandError::Auth { message }));
             return;
         }
-        self.queue.push_back(Job {
-            id: Some(id),
-            name: name.to_string(),
-            params: params.clone(),
-            item: None,
-        });
+        // Ahead of queued telemetry queries, behind other commands: an
+        // operator's command does not wait for a poll of every channel.
+        // Replies are still matched one at a time, in sending order.
+        let at = self
+            .queue
+            .iter()
+            .position(|j| j.id.is_none() && j.item.is_some())
+            .unwrap_or(self.queue.len());
+        self.queue.insert(
+            at,
+            Job {
+                id: Some(id),
+                name: name.to_string(),
+                params: params.clone(),
+                item: None,
+            },
+        );
         self.pump(cx);
     }
 
@@ -1004,14 +1027,14 @@ impl Module for SpecEngine {
             RECONNECT => self.connect(cx),
             RENEW => {
                 let items = self.telemetry.subscribe.clone();
-                self.send_telemetry(cx, items);
+                self.send_telemetry(cx, items, false);
                 if let Some(every) = self.telemetry.renew_every {
                     cx.set_timer(RENEW, every);
                 }
             }
             POLL => {
                 let items = self.telemetry.poll.clone();
-                self.send_telemetry(cx, items);
+                self.send_telemetry(cx, items, true);
                 if let Some(every) = self.telemetry.poll_every {
                     cx.set_timer(POLL, every);
                 }
@@ -1065,6 +1088,52 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn commands_go_ahead_of_queued_telemetry_queries() {
+        let spec = Catalog::embedded().device("behringer-x32").unwrap().clone();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "x32".into(),
+                channels: Some(32),
+                settings: Params::new(),
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        // The first of the current-value queries is in flight; the rest wait.
+        let queued = e.queue.len();
+        assert!(queued > 100, "{queued} queries queued");
+
+        let mut cx = Cx::new(1);
+        let params = json!({"channel": 3}).as_object().unwrap().clone();
+        e.command(&mut cx, 9, "get_channel_name", &params);
+        assert_eq!(e.queue.front().and_then(|j| j.id), Some(9));
+
+        // Once the query in flight is answered, the command is sent next.
+        let reply = osc::encode("/ch/01/mix/on", &[osc::Arg::Int(1)]);
+        let mut cx = Cx::new(2);
+        e.datagram(
+            &mut cx,
+            SOCKET,
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 10023),
+            &reply,
+        );
+        let sent: Vec<Vec<u8>> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { data, .. } => Some(data),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sent, [osc::encode("/ch/03/config/name", &[])]);
     }
 
     #[test]
