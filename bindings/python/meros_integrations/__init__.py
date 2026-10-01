@@ -51,6 +51,14 @@ class Core:
             raise IntegrationsError(result["error"])
         return result["device"]
 
+    def discover(self, request: dict[str, Any]) -> None:
+        """Listen for devices, scan for them now, or stop:
+        {"action": "listen" | "scan" | "stop", "protocols": [...], "hints": [...]}.
+        Found devices arrive as {"event": "discovered", ...} events."""
+        result = json.loads(self._native.discover(json.dumps(request)))
+        if "error" in result:
+            raise IntegrationsError(result["error"])
+
     def execute(self, device: int, command: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """Run a command and wait for its outcome: {"kind": "ack" | "value" | "unverified", ...}."""
         result = json.loads(self._native.execute(device, command, json.dumps(params or {})))

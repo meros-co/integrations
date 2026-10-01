@@ -34,6 +34,12 @@ char *mi_catalog(const MiCore *core);
  * returns: {"device":<id>} or {"error":{...}} */
 char *mi_open(const MiCore *core, const char *request);
 
+/* request: {"action":"listen"|"scan"|"stop","protocols":["mcp"],
+ *           "hints":["<address where a device was last seen>",...]}
+ * returns: {"ok":true} or {"error":{...}}; found devices arrive as
+ * {"event":"discovered",...} events. */
+char *mi_discover(const MiCore *core, const char *request);
+
 /* params: a JSON object, or NULL for none.
  * returns: {"ok":{"kind":"ack"|"value"|"unverified",...}} or {"error":{...}} */
 char *mi_execute(const MiCore *core, uint64_t device, const char *command, const char *params);

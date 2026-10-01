@@ -13,8 +13,9 @@ use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
-use crate::module::Key;
-use crate::session::Inbound;
+use crate::events::{Event, EventQueue};
+use crate::module::{Key, Level};
+use crate::session::{DeviceId, Inbound};
 
 /// Large buffers because one shared socket carries telemetry from every device
 /// on it; at OS defaults a burst can overflow the receive queue and drop live
@@ -36,20 +37,85 @@ pub(crate) struct Buffers {
 
 struct Route {
     key: Key,
+    device: DeviceId,
     inbound: mpsc::Sender<Inbound>,
+    /// Datagrams dropped because the session's queue was full, not yet
+    /// reported.
+    dropped: u64,
+    reported: Option<std::time::Instant>,
 }
+
+/// Where datagrams from an address no session claims go: discovery.
+pub(crate) type Fallback = mpsc::Sender<(SocketAddr, Vec<u8>)>;
 
 struct Port {
     socket: Arc<UdpSocket>,
     routes: Arc<Mutex<HashMap<IpAddr, Route>>>,
+    fallback: Arc<Mutex<Option<Fallback>>>,
 }
 
-#[derive(Default)]
 pub(crate) struct SharedUdp {
     ports: Mutex<HashMap<u16, Port>>,
+    events: Arc<EventQueue>,
 }
 
 impl SharedUdp {
+    pub(crate) fn new(events: Arc<EventQueue>) -> SharedUdp {
+        SharedUdp {
+            ports: Mutex::new(HashMap::new()),
+            events,
+        }
+    }
+
+    /// The port's socket, binding it on first use. Returns the granted buffer
+    /// sizes when this call bound it.
+    fn port<'a>(
+        &self,
+        ports: &'a mut HashMap<u16, Port>,
+        bind_address: IpAddr,
+        port: u16,
+    ) -> Result<(&'a mut Port, Option<Buffers>), String> {
+        let mut bound = None;
+        let entry = match ports.entry(port) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(e) => {
+                let (socket, buffers) =
+                    bind_shared(bind_address, port).map_err(|e| format!("bind :{port}: {e}"))?;
+                let socket = Arc::new(socket);
+                let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
+                let fallback: Arc<Mutex<Option<Fallback>>> = Default::default();
+                spawn_router(
+                    socket.clone(),
+                    routes.clone(),
+                    fallback.clone(),
+                    self.events.clone(),
+                );
+                bound = Some(buffers);
+                e.insert(Port {
+                    socket,
+                    routes,
+                    fallback,
+                })
+            }
+        };
+        Ok((entry, bound))
+    }
+
+    /// Send datagrams from addresses no session claims to `fallback`, binding
+    /// the port if no session has. Discovery listens this way, on the same
+    /// socket as the devices it finds.
+    pub(crate) fn set_fallback(
+        &self,
+        bind_address: IpAddr,
+        port: u16,
+        fallback: Option<Fallback>,
+    ) -> Result<(), String> {
+        let mut ports = self.ports.lock().unwrap();
+        let (entry, _) = self.port(&mut ports, bind_address, port)?;
+        *entry.fallback.lock().unwrap() = fallback;
+        Ok(())
+    }
+
     /// Route datagrams from `host` on `port` to a session, binding the port on
     /// first use. Every session on a port shares its one socket: with
     /// SO_REUSEADDR and no SO_REUSEPORT, a datagram reaches exactly one socket
@@ -62,29 +128,27 @@ impl SharedUdp {
         port: u16,
         host: IpAddr,
         key: Key,
+        device: DeviceId,
         inbound: mpsc::Sender<Inbound>,
     ) -> Result<Option<Buffers>, String> {
         let mut ports = self.ports.lock().unwrap();
-        let mut bound = None;
-        let entry = match ports.entry(port) {
-            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
-            std::collections::hash_map::Entry::Vacant(e) => {
-                let (socket, buffers) =
-                    bind_shared(bind_address, port).map_err(|e| format!("bind :{port}: {e}"))?;
-                let socket = Arc::new(socket);
-                let routes: Arc<Mutex<HashMap<IpAddr, Route>>> = Default::default();
-                spawn_router(socket.clone(), routes.clone());
-                bound = Some(buffers);
-                e.insert(Port { socket, routes })
-            }
-        };
+        let (entry, bound) = self.port(&mut ports, bind_address, port)?;
         let mut routes = entry.routes.lock().unwrap();
         if routes.contains_key(&host) {
             return Err(format!(
                 "{host} already has a session on shared port {port}"
             ));
         }
-        routes.insert(host, Route { key, inbound });
+        routes.insert(
+            host,
+            Route {
+                key,
+                device,
+                inbound,
+                dropped: 0,
+                reported: None,
+            },
+        );
         Ok(bound)
     }
 
@@ -107,6 +171,8 @@ fn bind_shared(address: IpAddr, port: u16) -> std::io::Result<(UdpSocket, Buffer
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
     let buffers = size_buffers(&socket)?;
+    // Discovery broadcasts its probe on the same socket.
+    socket.set_broadcast(true)?;
     socket.set_nonblocking(true)?;
     socket.bind(&SocketAddr::new(address, port).into())?;
     Ok((UdpSocket::from_std(socket.into())?, buffers))
@@ -130,23 +196,37 @@ fn size_buffers(socket: &Socket) -> std::io::Result<Buffers> {
     })
 }
 
-fn spawn_router(socket: Arc<UdpSocket>, routes: Arc<Mutex<HashMap<IpAddr, Route>>>) {
+fn spawn_router(
+    socket: Arc<UdpSocket>,
+    routes: Arc<Mutex<HashMap<IpAddr, Route>>>,
+    fallback: Arc<Mutex<Option<Fallback>>>,
+    events: Arc<EventQueue>,
+) {
     tokio::spawn(async move {
         let mut buf = vec![0u8; 65_536];
         loop {
             match socket.recv_from(&mut buf).await {
                 Ok((n, from)) => {
-                    let target = routes
-                        .lock()
-                        .unwrap()
-                        .get(&from.ip())
-                        .map(|r| (r.key, r.inbound.clone()));
-                    if let Some((key, inbound)) = target {
-                        let _ = inbound.try_send(Inbound::Datagram {
-                            socket: key,
-                            from,
-                            data: buf[..n].to_vec(),
-                        });
+                    let data = buf[..n].to_vec();
+                    let mut routes = routes.lock().unwrap();
+                    match routes.get_mut(&from.ip()) {
+                        Some(route) => {
+                            let sent = route.inbound.try_send(Inbound::Datagram {
+                                socket: route.key,
+                                from,
+                                data,
+                            });
+                            if sent.is_err() {
+                                route.dropped += 1;
+                            }
+                            report_drops(route, from.ip(), &events);
+                        }
+                        None => {
+                            drop(routes);
+                            if let Some(f) = fallback.lock().unwrap().as_ref() {
+                                let _ = f.try_send((from, data));
+                            }
+                        }
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::ConnectionReset => continue,
@@ -154,6 +234,31 @@ fn spawn_router(socket: Arc<UdpSocket>, routes: Arc<Mutex<HashMap<IpAddr, Route>
             }
         }
     });
+}
+
+/// Datagrams dropped because a session fell behind are lost telemetry with no
+/// other symptom, so they are reported: at most once a second per device.
+fn report_drops(route: &mut Route, from: IpAddr, events: &EventQueue) {
+    if route.dropped == 0 {
+        return;
+    }
+    let now = std::time::Instant::now();
+    if route
+        .reported
+        .is_some_and(|at| now.duration_since(at) < std::time::Duration::from_secs(1))
+    {
+        return;
+    }
+    events.push(Event::Log {
+        device: route.device,
+        level: Level::Warning,
+        message: format!(
+            "{} datagram(s) from {from} dropped: the session fell behind",
+            route.dropped
+        ),
+    });
+    route.dropped = 0;
+    route.reported = Some(now);
 }
 
 #[cfg(test)]
@@ -186,18 +291,18 @@ mod tests {
     /// datagrams (RFDeck review item N.3).
     #[tokio::test]
     async fn every_session_on_a_port_shares_one_socket() {
-        let shared = SharedUdp::default();
+        let shared = SharedUdp::new(Arc::new(EventQueue::new(16)));
         let (tx, _rx) = mpsc::channel(8);
         let a = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
         let b = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2));
-        let first = shared.register(LOCAL, 0, a, "mcp", tx.clone()).unwrap();
+        let first = shared.register(LOCAL, 0, a, "mcp", 1, tx.clone()).unwrap();
         assert!(
             first.is_some(),
             "the first session binds and reports buffers"
         );
-        let second = shared.register(LOCAL, 0, b, "mcp", tx.clone()).unwrap();
+        let second = shared.register(LOCAL, 0, b, "mcp", 2, tx.clone()).unwrap();
         assert!(second.is_none(), "the second session binds nothing");
         assert_eq!(shared.ports.lock().unwrap().len(), 1);
-        assert!(shared.register(LOCAL, 0, a, "mcp", tx).is_err());
+        assert!(shared.register(LOCAL, 0, a, "mcp", 1, tx).is_err());
     }
 }

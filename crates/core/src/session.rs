@@ -487,6 +487,7 @@ impl Session {
                     port,
                     self.host,
                     key,
+                    self.device,
                     self.inbound_tx.clone(),
                 )?;
                 if let Some(buffers) = bound {

@@ -52,6 +52,16 @@ class Core extends EventEmitter {
     return result.device;
   }
 
+  /**
+   * Listen for devices, scan for them now, or stop. Found devices arrive as
+   * 'discovered' events. Throws an IntegrationsError for an invalid request.
+   */
+  discover(request) {
+    const result = this.#native.discover(request);
+    if (result.error) throw new IntegrationsError(result.error);
+    this.#pump();
+  }
+
   /** Resolves with the outcome, or rejects with an IntegrationsError. */
   async execute(device, command, params = {}) {
     const result = await this.#native.execute(device, command, params);

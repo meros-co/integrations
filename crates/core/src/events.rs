@@ -35,6 +35,23 @@ pub enum Event {
     /// State patches were discarded because the consumer fell behind. Read
     /// each affected device's snapshot to resynchronise.
     Dropped { count: u64 },
+    /// Discovery found a device, or learned more about one (its name, or
+    /// whether it is a receiver or a transmitter). `models` are the models it
+    /// can be; more than one when the protocol cannot tell them apart.
+    /// `evidence` says what each part of the identification rests on.
+    Discovered {
+        protocol: String,
+        address: String,
+        port: u16,
+        device: String,
+        models: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        evidence: Value,
+    },
+    /// Something about discovery itself, such as a scan bounded short of the
+    /// whole network.
+    Discovery { protocol: String, message: String },
 }
 
 /// Bounded so a stalled consumer cannot grow memory without limit. On

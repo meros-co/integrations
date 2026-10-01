@@ -21,6 +21,7 @@
 //! ```
 
 pub mod catalog;
+mod discovery;
 mod engine;
 pub mod events;
 mod http;
@@ -43,6 +44,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
 pub use catalog::{Catalog, Params};
+pub use discovery::{DiscoverAction, DiscoverRequest};
 pub use events::Event;
 pub use module::{CommandError, CommandResult, Connection, Outcome};
 pub use session::{DeviceId, DeviceSnapshot};
@@ -100,6 +102,7 @@ pub struct Core {
     devices: Mutex<HashMap<DeviceId, DeviceEntry>>,
     next_device: AtomicU64,
     services: Arc<Services>,
+    discovery: discovery::Discovery,
 }
 
 /// How a core is set up. Every field has a default suitable for most hosts.
@@ -126,21 +129,32 @@ impl Core {
             .thread_name("meros-integrations")
             .enable_all()
             .build()?;
+        let events = Arc::new(EventQueue::new(EVENT_CAPACITY));
         Ok(Core {
             runtime: Some(runtime),
             catalog: Catalog::embedded(),
             devices: Mutex::new(HashMap::new()),
             next_device: AtomicU64::new(1),
+            discovery: Default::default(),
             services: Arc::new(Services {
-                events: Arc::new(EventQueue::new(EVENT_CAPACITY)),
+                events: events.clone(),
                 bind_address: options
                     .bind_address
                     .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
-                shared_udp: Default::default(),
+                shared_udp: udp::SharedUdp::new(events),
                 shared_tcp: Default::default(),
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
             }),
         })
+    }
+
+    /// Start or stop listening for devices, or scan for them now. Found
+    /// devices arrive as `Discovered` events. When to scan is the host's
+    /// decision; how a scan is done, and how much traffic it may cost, is the
+    /// core's.
+    pub fn discover(&self, request: DiscoverRequest) -> Result<(), String> {
+        let _runtime = self.runtime().enter();
+        self.discovery.handle(&self.services, request)
     }
 
     pub fn catalog(&self) -> &Catalog {

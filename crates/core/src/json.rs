@@ -31,6 +31,18 @@ pub fn open(core: &Core, request: &Value) -> Value {
     }
 }
 
+/// `{"ok": true}` or `{"error": {...}}`. Found devices arrive as events.
+pub fn discover(core: &Core, request: &Value) -> Value {
+    let request: crate::DiscoverRequest = match serde_json::from_value(request.clone()) {
+        Ok(r) => r,
+        Err(e) => return json!({"error": {"error": "invalid_request", "message": e.to_string()}}),
+    };
+    match core.discover(request) {
+        Ok(()) => json!({ "ok": true }),
+        Err(message) => json!({"error": {"error": "invalid_request", "message": message}}),
+    }
+}
+
 fn open_error(e: &OpenError) -> Value {
     let mut v = serde_json::to_value(e).expect("OpenError serialises");
     v["message"] = json!(e.to_string());

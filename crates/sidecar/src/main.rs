@@ -14,6 +14,7 @@
 //! |------------------------------|---------------------------------------|----------------------------|
 //! | GET  /v1/catalog             |                                       | the catalogue              |
 //! | POST /v1/open                | an OpenRequest                        | {device} or {error}        |
+//! | POST /v1/discover            | {action, protocols?, hints?}          | {ok} or {error}            |
 //! | POST /v1/execute             | {device, command, params}             | {ok} or {error}            |
 //! | GET  /v1/snapshot/{device}   |                                       | snapshot, or null          |
 //! | POST /v1/close               | {device}                              | {}                         |
@@ -87,6 +88,17 @@ async fn open(State(app): State<Shared>, headers: HeaderMap, Json(body): Json<Va
     Json(api::open(&app.core, &body)).into_response()
 }
 
+async fn discover(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    Json(api::discover(&app.core, &body)).into_response()
+}
+
 #[derive(Deserialize)]
 struct Execute {
     device: u64,
@@ -156,6 +168,7 @@ fn router(app: Shared) -> Router {
     Router::new()
         .route("/v1/catalog", get(catalog))
         .route("/v1/open", post(open))
+        .route("/v1/discover", post(discover))
         .route("/v1/execute", post(execute))
         .route("/v1/snapshot/{device}", get(snapshot))
         .route("/v1/close", post(close))

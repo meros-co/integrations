@@ -119,6 +119,20 @@ pub unsafe extern "C" fn mi_open(core: *const MiCore, request: *const c_char) ->
     })
 }
 
+/// Listen for devices, scan for them now, or stop:
+/// `{"action":"listen"|"scan"|"stop","protocols":[...],"hints":[...]}`.
+/// Returns `{"ok":true}` or `{"error":...}`; found devices arrive as events.
+///
+/// # Safety
+/// `core` must be a live core and `request` a NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn mi_discover(core: *const MiCore, request: *const c_char) -> *mut c_char {
+    guard(|| match read_json(request) {
+        Ok(request) => to_c(api::discover(&(*core).core, &request)),
+        Err(e) => e,
+    })
+}
+
 /// Run a command and wait for its result: `{"ok":...}` or `{"error":...}`.
 /// `params` may be NULL for none.
 ///

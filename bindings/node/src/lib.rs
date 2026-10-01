@@ -52,6 +52,12 @@ impl NativeCore {
         json::open(&self.core, &request)
     }
 
+    /// `{ok: true}` or `{error}`. Found devices arrive as events.
+    #[napi]
+    pub fn discover(&self, request: Value) -> Value {
+        json::discover(&self.core, &request)
+    }
+
     /// `{ok}` or `{error}`. Never rejects for a device or validation error.
     #[napi]
     pub async fn execute(

@@ -43,6 +43,13 @@ impl NativeCore {
         api::catalog(&self.core).to_string()
     }
 
+    fn discover(&self, request: &str) -> String {
+        match parse(request) {
+            Ok(request) => api::discover(&self.core, &request).to_string(),
+            Err(e) => e,
+        }
+    }
+
     fn open(&self, request: &str) -> String {
         match parse(request) {
             Ok(request) => api::open(&self.core, &request).to_string(),
