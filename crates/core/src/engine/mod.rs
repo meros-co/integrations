@@ -55,6 +55,14 @@ enum Transport {
         replies: bool,
         reply_match: Option<Regex>,
     },
+    /// Text messages, one per datagram (ChamSys, XPression over UDP).
+    LineUdp {
+        port: u16,
+        send: SendFraming,
+        ascii: bool,
+        replies: bool,
+        listen: Option<u16>,
+    },
     OscUdp {
         port: u16,
         replies: bool,
@@ -93,7 +101,9 @@ impl Transport {
 
     fn replies(&self) -> bool {
         match self {
-            Transport::LineTcp { replies, .. } | Transport::OscUdp { replies, .. } => *replies,
+            Transport::LineTcp { replies, .. }
+            | Transport::LineUdp { replies, .. }
+            | Transport::OscUdp { replies, .. } => *replies,
             Transport::OscTcp { .. } | Transport::Http { .. } => true,
         }
     }
@@ -229,6 +239,19 @@ impl SpecEngine {
                     reply_match,
                 }
             }
+            "line-udp" => Transport::LineUdp {
+                port,
+                send: SendFraming::Terminated(match str_field(&t, "terminator") {
+                    None | Some("none") => "",
+                    Some("cr") => "\r",
+                    Some("lf") => "\n",
+                    Some("crlf") => "\r\n",
+                    Some(other) => return Err(format!("line-udp terminator '{other}'")),
+                }),
+                ascii: str_field(&t, "encoding") != Some("utf-8"),
+                replies: str_field(&t, "reply") == Some("to-source"),
+                listen: listen_port(t.get("listen_port"), &ctx.settings)?,
+            },
             "osc-udp" => Transport::OscUdp {
                 port,
                 replies: str_field(&t, "reply") == Some("to-source"),
@@ -322,6 +345,7 @@ impl SpecEngine {
     fn port(&self) -> u16 {
         match &self.transport {
             Transport::LineTcp { port, .. }
+            | Transport::LineUdp { port, .. }
             | Transport::OscUdp { port, .. }
             | Transport::OscTcp { port, .. } => *port,
             Transport::Http { .. } => 0,
@@ -355,8 +379,8 @@ impl SpecEngine {
     /// separately.
     fn build(&self, item: &Value, values: &Values) -> Result<Outgoing, String> {
         match &self.transport {
-            Transport::LineTcp { send, ascii, .. } => {
-                let template = item.as_str().ok_or("a line-tcp message must be a string")?;
+            Transport::LineTcp { send, ascii, .. } | Transport::LineUdp { send, ascii, .. } => {
+                let template = item.as_str().ok_or("a line message must be a string")?;
                 let payload = render(template, values, no_escape)?;
                 let framed = framing::frame(send, &payload);
                 if *ascii && !framed.is_ascii() {
@@ -573,13 +597,13 @@ impl SpecEngine {
             let awaiting = match outgoing {
                 Outgoing::Bytes(bytes) => {
                     match &self.transport {
-                        Transport::OscUdp { port, .. } => {
+                        Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
                             cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
                         }
                         _ => cx.tcp_send(SOCKET, bytes),
                     }
                     match &self.transport {
-                        Transport::LineTcp { .. } => Await::Text,
+                        Transport::LineTcp { .. } | Transport::LineUdp { .. } => Await::Text,
                         _ => Await::Osc(address),
                     }
                 }
@@ -716,7 +740,7 @@ impl SpecEngine {
                 self.packets = Some(PacketReader::new(*framing));
                 cx.tcp_open(SOCKET, SocketAddr::new(self.host, self.port()));
             }
-            Transport::OscUdp { listen, .. } => {
+            Transport::OscUdp { listen, .. } | Transport::LineUdp { listen, .. } => {
                 cx.udp_open(SOCKET, listen.map_or(Bind::Ephemeral, Bind::Shared));
                 self.send_on_connect(cx, 0, false);
                 self.start_telemetry(cx);
@@ -797,7 +821,7 @@ impl SpecEngine {
             let values = self.values(&empty, &empty_specs);
             match self.build(&item, &values) {
                 Ok(Outgoing::Bytes(bytes)) => match &self.transport {
-                    Transport::OscUdp { port, .. } => {
+                    Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
                         cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
                     }
                     _ => cx.tcp_send(SOCKET, bytes),
@@ -844,7 +868,9 @@ impl SpecEngine {
         let queued = match self.transport {
             Transport::LineTcp { replies, .. } => replies,
             Transport::Http { .. } => true,
-            Transport::OscUdp { replies, .. } => poll && replies,
+            Transport::OscUdp { replies, .. } | Transport::LineUdp { replies, .. } => {
+                poll && replies
+            }
             Transport::OscTcp { .. } => poll,
         };
         for item in items {
@@ -868,7 +894,7 @@ impl SpecEngine {
             let values = self.values(&empty, &empty_specs);
             match self.build(&item, &values) {
                 Ok(Outgoing::Bytes(bytes)) => match &self.transport {
-                    Transport::OscUdp { port, .. } => {
+                    Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
                         cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
                     }
                     _ => cx.tcp_send(SOCKET, bytes),
@@ -1086,7 +1112,13 @@ impl Module for SpecEngine {
     }
 
     fn datagram(&mut self, cx: &mut Cx, _socket: Key, _from: SocketAddr, data: &[u8]) {
-        self.inbound_osc(cx, data);
+        if matches!(self.transport, Transport::LineUdp { .. }) {
+            // One message per datagram; its line ending is not part of it.
+            let text = String::from_utf8_lossy(data);
+            self.inbound_text(cx, text.trim_end_matches(['\r', '\n']).to_string());
+        } else {
+            self.inbound_osc(cx, data);
+        }
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
@@ -1354,6 +1386,52 @@ mod tests {
         assert!(request
             .headers
             .contains(&("Authorization".to_string(), "Bearer abc123".to_string())));
+    }
+
+    #[test]
+    fn line_udp_sends_one_message_per_datagram() {
+        let mut spec = Catalog::embedded().device("rosstalk").unwrap().clone();
+        spec.transport = Some(json!({"type": "line-udp", "port": 6553, "terminator": "none"}));
+        spec.telemetry = None;
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "carbonite".into(),
+                channels: None,
+                settings: Params::new(),
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert!(a.iter().any(|a| matches!(
+            a,
+            Action::UdpOpen {
+                bind: Bind::Ephemeral,
+                ..
+            }
+        )));
+        let mut cx = Cx::new(1);
+        e.command(&mut cx, 1, "fade_to_black", &Params::new());
+        let a = cx.take();
+        let sent: Vec<&[u8]> = a
+            .iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { data, to, .. } if to.port() == 6553 => Some(data.as_slice()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sent, vec![&b"FTB"[..]]);
+        assert!(a.iter().any(|a| matches!(
+            a,
+            Action::Complete {
+                result: Ok(Outcome::Unverified),
+                ..
+            }
+        )));
     }
 
     #[test]

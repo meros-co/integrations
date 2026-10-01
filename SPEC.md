@@ -109,6 +109,23 @@ transport:
   reply_match: "^[12][0-9][0-9] "
 ```
 
+### `line-udp`
+
+Text messages over UDP, one message per datagram (ChamSys MagicQ's remote
+protocol, XPression's RossTalk over UDP).
+
+```yaml
+transport:
+  type: line-udp
+  port: 6553
+  terminator: none            # none | cr | lf | crlf, appended to each message
+  reply: none                 # to-source | none
+```
+
+Templates and directives are as for `line-tcp`. With `reply: to-source`, each
+datagram from the device is one reply line, its trailing line ending removed;
+`listen_port` works as for `osc-udp`.
+
 ### `osc-udp`
 
 OSC 1.0 over UDP.
