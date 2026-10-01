@@ -81,6 +81,17 @@ pub struct HttpRequest {
     /// device's self-signed one. The connection is still encrypted; the peer is
     /// not authenticated.
     pub accept_invalid_certs: bool,
+    /// Answer a Digest challenge (RFC 7616) with these credentials. The
+    /// session retries the request once with the answer and reuses the
+    /// challenge for later requests to the same origin.
+    pub digest: Option<Credentials>,
+}
+
+/// A username and password.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

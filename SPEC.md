@@ -153,7 +153,13 @@ transport:
 ```
 
 With `auth: basic`, the `username` and `password` settings are sent on every
-request. A 401 or 403 on any request is a refusal of the credential, and it is
+request, and a Digest challenge in reply is answered as below, for devices
+that can be set to either. With `auth: digest`, requests go without credentials until the device
+answers 401 with a Digest challenge (RFC 7616: MD5, MD5-sess, SHA-256 or
+SHA-256-sess, with `qop=auth` or none); the request is then repeated once with
+the answer, and later requests to the same device answer the same challenge
+until it is replaced. A challenge the core cannot answer leaves the 401 as it
+is. A 401 or 403 on any request is a refusal of the credential, and it is
 terminal: pending and later commands fail with `auth`, the connection reports
 `unauthorized`, and nothing further is sent until the host opens the device
 again. A credential is never retried on a schedule, because repeated failed

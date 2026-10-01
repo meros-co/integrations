@@ -123,6 +123,7 @@ impl Ewdx {
             body: body.map(|b| b.to_string().into_bytes()),
             timeout,
             accept_invalid_certs: true,
+            digest: None,
         }
     }
 

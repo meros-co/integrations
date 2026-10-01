@@ -21,6 +21,7 @@
 //! ```
 
 pub mod catalog;
+mod digest;
 mod discovery;
 mod engine;
 pub mod events;

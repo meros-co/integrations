@@ -37,12 +37,18 @@ transport:
   type: http
   port: 80
   scheme: http
-  auth: none
+  auth: digest
   timeout_ms: 4000
   probe:
     method: GET
     path: /cgi-bin/ptzctrl.cgi
     raw_query: "ptzcmd&ptzstop&1&1"
+
+settings:
+  # The camera's web login, answered only when the camera challenges (HTTP
+  # authentication on). The document gives no default credentials.
+  username: { type: string }
+  password: { type: string, secret: true }
 
 models:
   - id: move-4k
@@ -1674,9 +1680,10 @@ quirks:
     text: >
       The HTTP API document states that all endpoints use digest authentication
       (p.2), while its examples send no credentials and get_system_conf reports an
-      "httpauth" setting ("0" in the example, p.169). The spec declares auth: none
-      because the core does not implement digest authentication; a camera with HTTP
-      authentication enabled will refuse every command until it does.
+      "httpauth" setting ("0" in the example, p.169). Requests go without
+      credentials until the camera challenges; the challenge is then answered with
+      the username and password settings. A refused login is not retried: the
+      device reports unauthorized until it is opened again with corrected settings.
 
   - models: [all]
     severity: warning

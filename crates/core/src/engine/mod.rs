@@ -24,8 +24,8 @@ use serde_json::{Map, Value};
 
 use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
-    Bind, CommandError, CommandId, Connection, Cx, HttpRequest, HttpResponse, Key, Level, Millis,
-    Module, OpenContext, Outcome, RequestId, TcpInput,
+    Bind, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest, HttpResponse, Key,
+    Level, Millis, Module, OpenContext, Outcome, RequestId, TcpInput,
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
@@ -64,8 +64,16 @@ enum Transport {
     },
     Http {
         base: String,
-        basic_auth: bool,
+        auth: HttpAuth,
     },
+}
+
+/// How an HTTP device authenticates (SPEC.md §2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HttpAuth {
+    None,
+    Basic,
+    Digest,
 }
 
 impl Transport {
@@ -218,9 +226,10 @@ impl SpecEngine {
             },
             "http" => {
                 let scheme = str_field(&t, "scheme").unwrap_or("http");
-                let basic_auth = match str_field(&t, "auth").unwrap_or("none") {
-                    "none" => false,
-                    "basic" => true,
+                let auth = match str_field(&t, "auth").unwrap_or("none") {
+                    "none" => HttpAuth::None,
+                    "basic" => HttpAuth::Basic,
+                    "digest" => HttpAuth::Digest,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
                 let host = match ctx.host {
@@ -229,7 +238,7 @@ impl SpecEngine {
                 };
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
-                    basic_auth,
+                    auth,
                 }
             }
             other => return Err(format!("transport '{other}' is not implemented")),
@@ -310,7 +319,7 @@ impl SpecEngine {
                     _ => packet,
                 }))
             }
-            Transport::Http { base, basic_auth } => {
+            Transport::Http { base, auth } => {
                 let method = str_field(item, "method").unwrap_or("GET");
                 let method: &'static str = match method {
                     "GET" => "GET",
@@ -338,18 +347,16 @@ impl SpecEngine {
                     url.push_str(&pairs.join("&"));
                 }
                 let mut headers = Vec::new();
-                if *basic_auth {
+                let setting = |name: &str| {
+                    self.settings
+                        .get(name)
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string()
+                };
+                let (user, pass) = (setting("username"), setting("password"));
+                if *auth == HttpAuth::Basic {
                     use base64::Engine;
-                    let user = self
-                        .settings
-                        .get("username")
-                        .and_then(Value::as_str)
-                        .unwrap_or("");
-                    let pass = self
-                        .settings
-                        .get("password")
-                        .and_then(Value::as_str)
-                        .unwrap_or("");
                     let token =
                         base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}"));
                     headers.push(("Authorization".to_string(), format!("Basic {token}")));
@@ -368,6 +375,12 @@ impl SpecEngine {
                     body,
                     timeout: Some(self.timeout),
                     accept_invalid_certs: false,
+                    // Basic devices that answer with a Digest challenge get it
+                    // answered too (SPEC.md §2).
+                    digest: (*auth != HttpAuth::None).then_some(Credentials {
+                        username: user,
+                        password: pass,
+                    }),
                 }))
             }
         }
@@ -984,7 +997,7 @@ impl Module for SpecEngine {
         let credentialed = matches!(
             self.transport,
             Transport::Http {
-                basic_auth: true,
+                auth: HttpAuth::Basic,
                 ..
             }
         );

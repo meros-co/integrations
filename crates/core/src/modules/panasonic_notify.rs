@@ -128,6 +128,7 @@ impl PanasonicNotify {
                 body: None,
                 timeout: Some(4_000),
                 accept_invalid_certs: false,
+                digest: None,
             },
         );
     }
