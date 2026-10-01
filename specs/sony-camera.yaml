@@ -1,0 +1,1523 @@
+spec: 1
+id: sony-camera
+name: Sony cameras over Camera Control PTP 3 (Alpha, FX, ZV, cinema line, pan/tilt)
+vendor: Sony
+category: camera
+implementation: native
+reason: >
+  PTP-IP on two TCP connections (command and event), each opened with its own
+  Init handshake that carries the initiator's GUID, friendly name and the
+  connection number the camera assigns; one PTP transaction at a time, with
+  data phases split across Start Data and End Data packets. Sony's
+  authentication follows (SDIO_Connect in three phases around
+  SDIO_GetExtDeviceInfo, which is repeated until it returns data), and the
+  camera's state is a binary property-description array whose values, forms
+  and enumerations are typed per property and read again on events and on a
+  poll. Pairing waits on an operator's approval at the camera, and secured
+  cameras take PTP-IP only through an SSH tunnel.
+
+source:
+  - title: "Camera Control PTP 3 Reference (Camera Remote Command 2.02.00, document dated June 2026)"
+    author: "Sony Corporation"
+    note: >
+      Licensed to Meros by Sony under the Camera Remote Command licence; the document is not
+      redistributed and nothing from it is copied here. Used: Overview; For Connections Using
+      PTP-IP (TCP 15740, camera settings, Device Discovery with dd.xml and DigitalImagingDesc.xml,
+      Connection by SSH, Connection by Pairing); Connect; Get Property; Set Property; Send Control
+      Command; About Events; Live View for Pan/Tilt Type Cameras; Disconnect; Command List
+      (operations, device properties, controls, events, vendor response codes); Compatibility
+      (per-model operations, properties, controls and events, from which each model's supports
+      list is derived); Operations (SDIO_Connect, SDIO_GetExtDeviceInfo,
+      SDIO_SetExtDevicePropValue, SDIO_ControlDevice, SDIO_GetAllExtDevicePropInfo,
+      SDIO_OpenSession, SDIO_ControlPTZF, SDIO_SetPresetPTZF, SDIO_GetExtDeviceProp); Device
+      Properties and Controls (codes, datatypes and value meanings of the properties and
+      controls this module names); Events; Data Format (ControlPTZF, SetPresetPTZF); Tips (PTZF
+      Operation, Detailed SDIO_ControlPTZF Usage, Preset PTZF Operation).
+  - title: "Camera Remote Command 2.02.00 README"
+    author: "Sony Corporation"
+    note: >
+      Licensed with the reference above and not redistributed. Protocol Compatibility (which
+      models speak Camera Control PTP 3 and which PTP 2) and the USB/IP table; the models listed
+      here are those marked for both Camera Control PTP 3 and IP. PXW-Z380 is called PXW-Z300 in
+      Sony's documents.
+  - title: "ISO 15740:2013 Photography - Electronic still picture imaging - Picture transfer protocol (PTP) for digital still photography devices"
+    author: "ISO"
+    note: >
+      The PTP-IP transport the Sony reference builds on: packet header (length and type), Init
+      Command and Init Event request/ack/fail, operation request and response, event, Start
+      Data / Data / End Data, probe; PTP datatypes, strings and arrays; DeviceInfo,
+      OpenSession and CloseSession; standard response codes.
+
+settings:
+  # plain: PTP-IP straight to TCP 15740 (the port can be overridden).
+  # pairing: the camera's pairing menu is showing; it asks the operator to
+  #   approve friendly_name, and the module waits without a timeout.
+  # ssh: Access Authentication is on; PTP-IP goes through an SSH tunnel to the
+  #   camera's localhost:15740 (the port override then applies to SSH, 22).
+  connection: { type: enum, values: [plain, pairing, ssh], default: plain }
+  # Shown on the camera's pairing prompt and stored with the approval.
+  friendly_name: { type: string, max_length: 39, default: Meros }
+  # The initiator GUID the camera remembers after pairing (up to 20 per
+  # camera). Unset: derived from friendly_name, so it is stable as long as the
+  # name is. Set it to keep one approval across renamed installations.
+  guid: { type: string, pattern: "^([0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$" }
+  # The camera's SSH user and password (set on the camera under its access
+  # authentication settings), for connection: ssh.
+  ssh_username: { type: string }
+  ssh_password: { type: string, secret: true }
+  # The camera's SSH host key fingerprint as OpenSSH prints it
+  # (SHA256:...), checked on every connection. Unset: not verified.
+  ssh_fingerprint: { type: string, pattern: "^SHA256:[A-Za-z0-9+/=]+$" }
+  # How often the camera's changed properties are read, in addition to the
+  # reads its change events trigger.
+  poll_ms: { type: int, min: 250, max: 60000, default: 1000 }
+
+
+models:
+  - id: ilce-1m2
+    name: "Sony Alpha 1 II (ILCE-1M2)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-1
+    name: "Sony Alpha 1 (ILCE-1)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look,
+       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
+       timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-9m3
+    name: "Sony Alpha 9 III (ILCE-9M3)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-9m2
+    name: "Sony Alpha 9 II (ILCE-9M2)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media]
+    verification: none
+  - id: ilce-7rm6
+    name: "Sony ILCE-7RM6"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-7rm5
+    name: "Sony Alpha 7R V (ILCE-7RM5)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look,
+       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_audio_master_level, set_property, get_property, control, refresh, set_shutter_speed,
+       set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position, zoom,
+       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-7rm4a
+    name: "Sony Alpha 7R IVA (ILCE-7RM4A)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
+       shutter_full_press, record, ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, format_media]
+    verification: none
+  - id: ilce-7rm4
+    name: "Sony Alpha 7R IV (ILCE-7RM4)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
+       shutter_full_press, record, ae_lock, awb_lock, fe_lock, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture]
+    verification: none
+  - id: ilce-7m5
+    name: "Sony ILCE-7M5"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-7m4
+    name: "Sony Alpha 7 IV (ILCE-7M4)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting, set_remote_zoom_speed_type,
+       set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate, set_audio_recording,
+       set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format, set_still_quality,
+       set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look, set_steady_shot,
+       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_audio_master_level, set_property, get_property, control, refresh, set_shutter_speed,
+       set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position, zoom,
+       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-7sm3
+    name: "Sony Alpha 7S III (ILCE-7SM3)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel,
+       custom_wb_capture, format_media, cancel_media_format, power_off, timecode_preset_reset,
+       user_bits_preset_reset]
+    verification: none
+  - id: ilce-7cm2
+    name: "Sony Alpha 7C II (ILCE-7CM2)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-7cr
+    name: "Sony Alpha 7CR (ILCE-7CR)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_control, set_iso,
+       set_gain_control, set_exposure_compensation, set_metering_mode, set_dro, set_white_balance,
+       set_color_temperature, set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, set_focus_position,
+       cancel_zoom_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilce-7c
+    name: "Sony Alpha 7C (ILCE-7C)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media]
+    verification: none
+  - id: ilce-6700
+    name: "Sony Alpha 6700 (ILCE-6700)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, set_zoom_position, cancel_zoom_position, zoom,
+       focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilx-lr1
+    name: "Sony ILX-LR1"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_drive_mode,
+       set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma,
+       set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_peaking, set_zebra, set_zebra_level, set_marker, set_monitor_lut, set_property, get_property,
+       control, refresh, set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position,
+       cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position,
+       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, tracking_af_on,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan,
+       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: mpc-2610
+    name: "Sony BURANO (MPC-2610)"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control,
+       set_shutter_enabled, set_iso, set_exposure_index, set_gain_db, set_gain_control, set_gain_unit,
+       set_base_iso, set_base_sensitivity, set_nd_filter, set_nd_control, set_white_balance_control,
+       set_color_temperature, set_tint, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_movie_file_format, set_movie_frame_rate,
+       set_slow_and_quick, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look,
+       set_steady_shot_movie, set_property, get_property, control, refresh, set_shutter_speed, set_tally,
+       zoom, focus, record_toggle, one_push_awb, color_temperature_step, tint_step]
+    verification: none
+  - id: ilme-fr7
+    name: "Sony FR7 (ILME-FR7)"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control,
+       set_shutter_enabled, set_iso, set_exposure_index, set_gain_db, set_gain_control, set_gain_unit,
+       set_base_iso, set_base_sensitivity, set_nd_filter, set_nd_control, set_white_balance_control,
+       set_color_temperature, set_tint, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_movie_file_format, set_movie_frame_rate,
+       set_simul_rec, set_slow_and_quick, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_base_look, set_property, get_property, control, refresh, set_shutter_speed, set_tally, zoom, focus,
+       record_toggle, one_push_awb, color_temperature_step, tint_step, camera_standby, power_on, remote_key,
+       pan_tilt_absolute, pan_tilt_relative, pan_tilt_drive, pan_tilt_stop, pan_tilt_home, pan_tilt_reset,
+       preset_recall, preset_set, preset_clear]
+    verification: none
+  - id: ilme-fx6
+    name: "Sony FX6 (ILME-FX6)"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control,
+       set_shutter_enabled, set_iso, set_exposure_index, set_gain_db, set_gain_control, set_gain_unit,
+       set_base_iso, set_base_sensitivity, set_nd_filter, set_nd_control, set_white_balance_control,
+       set_color_temperature, set_tint, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_movie_file_format, set_movie_frame_rate,
+       set_slow_and_quick, set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look,
+       set_property, get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle,
+       one_push_awb, color_temperature_step, tint_step]
+    verification: none
+  - id: ilme-fx3
+    name: "Sony FX3 and FX3A (ILME-FX3, ILME-FX3A)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_angle,
+       set_shutter_mode, set_shutter_control, set_iso, set_exposure_index, set_gain_control, set_base_iso,
+       set_exposure_compensation, set_metering_mode, set_dro, set_white_balance, set_color_temperature,
+       set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
+       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
+       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
+       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilme-fx2
+    name: "Sony FX2 (ILME-FX2)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_angle,
+       set_shutter_mode, set_shutter_control, set_iso, set_exposure_index, set_gain_control, set_base_iso,
+       set_exposure_compensation, set_metering_mode, set_dro, set_white_balance, set_color_temperature,
+       set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
+       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
+       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
+       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: ilme-fx30
+    name: "Sony FX30 (ILME-FX30)"
+    supports:
+      [set_exposure_mode, set_exposure_control_type, set_iris, set_iris_control, set_shutter_angle,
+       set_shutter_mode, set_shutter_control, set_iso, set_exposure_index, set_gain_control, set_base_iso,
+       set_exposure_compensation, set_metering_mode, set_dro, set_white_balance, set_color_temperature,
+       set_focus_mode, set_focus_control, set_focus_area, set_subject_recognition_af, set_af_transition_speed,
+       set_af_subject_shift_sensitivity, set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format,
+       set_movie_recording_setting, set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio,
+       set_picture_profile, set_gamma, set_creative_look, set_base_look, set_steady_shot,
+       set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
+       set_shutter_speed, set_zoom_position, set_focus_position, cancel_zoom_position, cancel_focus_position,
+       zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, format_media, cancel_media_format, power_off,
+       timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: zv-e1
+    name: "Sony ZV-E1"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting, set_movie_frame_rate,
+       set_audio_recording, set_slow_and_quick_frame_rate, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_gamma, set_creative_look, set_base_look,
+       set_steady_shot, set_steady_shot_movie, set_timecode_preset, set_user_bits_preset, set_timecode_format,
+       set_timecode_run, set_timecode_make, set_user_bits_time_rec, set_grid_line, set_gamma_display_assist,
+       set_monitor_lut, set_audio_master_level, set_property, get_property, control, refresh,
+       set_shutter_speed, zoom, focus_near_far, save_zoom_focus_position, load_zoom_focus_position,
+       shutter_half_press, shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on,
+       af_area_position, custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, flicker_scan,
+       format_media, cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: zv-e10m2
+    name: "Sony ZV-E10 II (ZV-E10M2)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot, set_steady_shot_movie,
+       set_timecode_preset, set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make,
+       set_user_bits_time_rec, set_grid_line, set_gamma_display_assist, set_monitor_lut,
+       set_audio_master_level, set_property, get_property, control, refresh, set_shutter_speed,
+       set_focus_position, cancel_focus_position, zoom, focus_near_far, save_zoom_focus_position,
+       load_zoom_focus_position, shutter_half_press, shutter_full_press, take_photo, record, ae_lock,
+       awb_lock, fe_lock, tracking_af_on, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture, flicker_scan, format_media, cancel_media_format,
+       power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: zv-e10
+    name: "Sony ZV-E10"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_area, set_zoom_setting,
+       set_movie_file_format, set_movie_recording_setting, set_drive_mode, set_still_file_format,
+       set_still_quality, set_aspect_ratio, set_picture_profile, set_creative_style, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, fe_lock, af_area_position, custom_wb_capture_standby,
+       custom_wb_capture_cancel, custom_wb_capture]
+    verification: none
+  - id: dsc-rx1rm3
+    name: "Sony RX1R III (DSC-RX1RM3)"
+    supports:
+      [set_exposure_mode, set_iris, set_iso, set_exposure_compensation, set_metering_mode, set_dro,
+       set_white_balance, set_color_temperature, set_focus_mode, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_remote_zoom_speed_type, set_movie_file_format, set_movie_recording_setting,
+       set_movie_frame_rate, set_audio_recording, set_slow_and_quick_frame_rate, set_movie_shooting_mode,
+       set_drive_mode, set_still_file_format, set_still_quality, set_aspect_ratio, set_picture_profile,
+       set_gamma, set_creative_look, set_base_look, set_steady_shot_movie, set_timecode_preset,
+       set_user_bits_preset, set_timecode_format, set_timecode_run, set_timecode_make, set_user_bits_time_rec,
+       set_grid_line, set_gamma_display_assist, set_monitor_lut, set_audio_master_level, set_property,
+       get_property, control, refresh, set_shutter_speed, zoom, focus_near_far, shutter_half_press,
+       shutter_full_press, take_photo, record, ae_lock, awb_lock, fe_lock, tracking_af_on, af_area_position,
+       custom_wb_capture_standby, custom_wb_capture_cancel, custom_wb_capture, format_media,
+       cancel_media_format, power_off, timecode_preset_reset, user_bits_preset_reset]
+    verification: none
+  - id: pxw-z380
+    name: "Sony PXW-Z380 (PXW-Z300 in the reference)"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control, set_gain_db,
+       set_gain_control, set_gain_unit, set_nd_filter, set_nd_control, set_white_balance_control,
+       set_color_temperature, set_tint, set_white_balance_memory, set_preset_color_temperature,
+       set_white_balance_r_gain, set_white_balance_b_gain, set_focus_control, set_focus_area,
+       set_subject_recognition_af, set_movie_file_format, set_movie_frame_rate, set_simul_rec,
+       set_slow_and_quick, set_slow_and_quick_frame_rate, set_base_look, set_property, get_property, control,
+       refresh, set_shutter_speed, zoom, focus, record, record_toggle, push_auto_focus, push_auto_iris,
+       push_agc, push_auto_nd, one_push_awb, color_temperature_step, tint_step, format_media,
+       cancel_media_format, stream, remote_key]
+    verification: none
+  - id: pxw-z200
+    name: "Sony PXW-Z200"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control,
+       set_shutter_enabled, set_iso, set_gain_db, set_gain_control, set_gain_unit, set_nd_filter,
+       set_nd_control, set_white_balance_control, set_color_temperature, set_tint, set_white_balance_memory,
+       set_preset_color_temperature, set_white_balance_r_gain, set_white_balance_b_gain, set_focus_control,
+       set_focus_area, set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_movie_file_format, set_movie_frame_rate, set_simul_rec, set_slow_and_quick,
+       set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look, set_steady_shot_movie,
+       set_property, get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle,
+       push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step,
+       tint_step, format_media, cancel_media_format, stream, remote_key]
+    verification: none
+  - id: hxr-nx800
+    name: "Sony HXR-NX800"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control,
+       set_shutter_enabled, set_iso, set_gain_db, set_gain_control, set_gain_unit, set_nd_filter,
+       set_nd_control, set_white_balance_control, set_color_temperature, set_tint, set_white_balance_memory,
+       set_preset_color_temperature, set_white_balance_r_gain, set_white_balance_b_gain, set_focus_control,
+       set_focus_area, set_subject_recognition_af, set_af_transition_speed, set_af_subject_shift_sensitivity,
+       set_zoom_setting, set_movie_file_format, set_movie_frame_rate, set_simul_rec, set_slow_and_quick,
+       set_slow_and_quick_frame_rate, set_movie_shooting_mode, set_base_look, set_steady_shot_movie,
+       set_property, get_property, control, refresh, set_shutter_speed, zoom, focus, record, record_toggle,
+       push_auto_focus, push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step,
+       tint_step, format_media, cancel_media_format, stream, remote_key]
+    verification: none
+  - id: brc-am7
+    name: "Sony BRC-AM7"
+    supports:
+      [set_iris, set_iris_control, set_shutter_angle, set_shutter_mode, set_shutter_control,
+       set_shutter_enabled, set_iso, set_gain_db, set_gain_control, set_gain_unit, set_exposure_compensation,
+       set_metering_mode, set_nd_filter, set_nd_control, set_white_balance_control, set_color_temperature,
+       set_tint, set_white_balance_memory, set_preset_color_temperature, set_white_balance_r_gain,
+       set_white_balance_b_gain, set_focus_control, set_focus_area, set_subject_recognition_af,
+       set_af_transition_speed, set_af_subject_shift_sensitivity, set_zoom_setting, set_movie_file_format,
+       set_movie_frame_rate, set_simul_rec, set_slow_and_quick, set_slow_and_quick_frame_rate,
+       set_movie_shooting_mode, set_base_look, set_audio_master_level, set_property, get_property, control,
+       refresh, set_shutter_speed, set_tally, set_audio_level, set_audio_level_control, set_audio_input,
+       set_zoom_position, set_focus_position, zoom, focus, record, record_toggle, push_auto_focus,
+       push_auto_iris, push_agc, push_auto_nd, one_push_awb, color_temperature_step, tint_step,
+       camera_standby, power_on, remote_key, pan_tilt_absolute, pan_tilt_relative, pan_tilt_drive,
+       pan_tilt_stop, pan_tilt_home, pan_tilt_reset, preset_recall, preset_set, preset_clear]
+    verification: none
+
+commands:
+  set_exposure_mode:
+    summary: "Set exposure mode (Sony: Exposure Program Mode, 0x500E)"
+    params:
+      value: { type: enum, values: [manual, program, aperture_priority, shutter_priority, program_creative, program_action, portrait, auto, auto_plus, program_aperture, program_shutter, scene_sports, scene_sunset, scene_night, scene_landscape, scene_macro, scene_handheld_twilight, scene_night_portrait, scene_anti_motion_blur, scene_pet, scene_food, scene_fireworks, scene_high_sensitivity, memory_recall, continuous_priority_ae, tele_zoom_continuous_8, tele_zoom_continuous_10, continuous_priority_ae_12, sweep_panorama_3d, sweep_panorama, movie_program, movie_aperture_priority, movie_shutter_priority, movie_manual, movie_auto, movie_sq_program, movie_sq_aperture_priority, movie_sq_shutter_priority, movie_sq_manual, movie_sq_auto, flash_off, picture_effect, hfr_program, hfr_aperture_priority, hfr_shutter_priority, hfr_manual, sq_program, sq_aperture_priority, sq_shutter_priority, sq_manual, movie, still, flexible_movie_or_sq, movie_flexible, sq_flexible, interval_movie_flexible, interval_movie_program, interval_movie_aperture_priority, interval_movie_shutter_priority, interval_movie_manual, interval_movie_auto], required: true }
+    returns: ack
+  set_exposure_control_type:
+    summary: "Set exposure control type (Sony: Exposure Ctrl Type, 0xD099)"
+    params:
+      value: { type: enum, values: [pasm, flexible], required: true }
+    returns: ack
+  set_iris:
+    summary: "Set exposure iris (Sony: F-Number, 0x5007)"
+    params:
+      value: { type: float, required: true }
+    returns: ack
+  set_iris_control:
+    summary: "Set exposure iris control (Sony: Iris Mode Setting, 0xD001)"
+    params:
+      value: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_shutter_angle:
+    summary: "Set exposure shutter angle (Sony: Shutter Angle, 0xD00E)"
+    params:
+      value: { type: float, required: true }
+    returns: ack
+  set_shutter_mode:
+    summary: "Set exposure shutter mode (Sony: Shutter Mode, 0xD010)"
+    params:
+      value: { type: enum, values: [speed, angle], required: true }
+    returns: ack
+  set_shutter_control:
+    summary: "Set exposure shutter control (Sony: Shutter Mode Setting, 0xD013)"
+    params:
+      value: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_shutter_enabled:
+    summary: "Set exposure shutter enabled (Sony: Shutter Setting, 0xD00F)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_iso:
+    summary: "Set exposure iso (Sony: ISO Sensitivity, 0xD21E)"
+    params:
+      value: { type: string, pattern: "^(auto|[0-9]{1,7})$", required: true }
+    returns: ack
+  set_exposure_index:
+    summary: "Set exposure exposure index (Sony: Exposure Index, 0xD022)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_gain_db:
+    summary: "Set exposure gain db (Sony: Gain dB Value, 0xD01E)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_gain_control:
+    summary: "Set exposure gain control (Sony: Gain Control Setting, 0xD01C)"
+    params:
+      value: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_gain_unit:
+    summary: "Set exposure gain unit (Sony: Gain Unit Setting, 0xD01D)"
+    params:
+      value: { type: enum, values: [db, iso], required: true }
+    returns: ack
+  set_base_iso:
+    summary: "Set exposure base iso (Sony: Gain Base ISO Sensitivity, 0xD020)"
+    params:
+      value: { type: enum, values: [high, low], required: true }
+    returns: ack
+  set_base_sensitivity:
+    summary: "Set exposure base sensitivity (Sony: Gain Base Sensitivity, 0xD021)"
+    params:
+      value: { type: enum, values: [high, low], required: true }
+    returns: ack
+  set_exposure_compensation:
+    summary: "Set exposure compensation (Sony: Exposure Bias Compensation, 0x5010)"
+    params:
+      value: { type: float, required: true }
+    returns: ack
+  set_metering_mode:
+    summary: "Set exposure metering (Sony: Exposure Metering Mode, 0x500B)"
+    params:
+      value: { type: enum, values: [average, center_weighted_average, multi_spot, center_spot, multi, center_weighted, entire_screen_average, spot_standard, spot_large, highlight, standard, backlight, spotlight], required: true }
+    returns: ack
+  set_dro:
+    summary: "Set exposure dro (Sony: Dynamic Range Optimizer, 0xD201)"
+    params:
+      value: { type: enum, values: ["off", dro, dro_plus, dro_manual_1, dro_manual_2, dro_manual_3, dro_manual_4, dro_manual_5, dro_manual_6, dro_manual_7, dro_manual_8, dro_auto, hdr_auto, hdr_1ev, hdr_2ev, hdr_3ev, hdr_4ev, hdr_5ev, hdr_6ev], required: true }
+    returns: ack
+  set_nd_filter:
+    summary: "Set nd enabled (Sony: ND Filter, 0xD018)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_nd_control:
+    summary: "Set nd control (Sony: ND Filter Mode Setting, 0xD01A)"
+    params:
+      value: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_white_balance:
+    summary: "Set white balance mode (Sony: White Balance, 0x5005)"
+    params:
+      value: { type: enum, values: [manual, auto, one_push_auto, daylight, fluorescent, tungsten, flash, fluorescent_warm_white, fluorescent_cool_white, fluorescent_day_white, fluorescent_daylight, cloudy, shade, color_temperature, custom_1, custom_2, custom_3, custom, underwater_auto], required: true }
+    returns: ack
+  set_white_balance_control:
+    summary: "Set white balance control (Sony: White Balance Mode Setting, 0xD00C)"
+    params:
+      value: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_color_temperature:
+    summary: "Set white balance color temperature (Sony: Color Temperature, 0xD20F)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_tint:
+    summary: "Set white balance tint (Sony: White Balance Tint, 0xD00D)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_white_balance_memory:
+    summary: "Set white balance memory (Sony: White Balance Switch, 0xD085)"
+    params:
+      value: { type: enum, values: [preset, memory_a, memory_b], required: true }
+    returns: ack
+  set_preset_color_temperature:
+    summary: "Set white balance preset color temperature (Sony: White Balance Preset Color Temperature, 0xD086)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_white_balance_r_gain:
+    summary: "Set white balance r gain (Sony: White Balance R Gain, 0xD087)"
+    params:
+      value: { type: float, required: true }
+    returns: ack
+  set_white_balance_b_gain:
+    summary: "Set white balance b gain (Sony: White Balance B Gain, 0xD088)"
+    params:
+      value: { type: float, required: true }
+    returns: ack
+  set_focus_mode:
+    summary: "Set focus mode (Sony: Focus Mode, 0x500A)"
+    params:
+      value: { type: enum, values: [manual, af_single, af_macro, af_continuous, af_auto, direct_manual, manual_reverse, af_d, preset_focus], required: true }
+    returns: ack
+  set_focus_control:
+    summary: "Set focus control (Sony: Focus Mode Setting, 0xD007)"
+    params:
+      value: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_focus_area:
+    summary: "Set focus area (Sony: Focus Area, 0xD22C)"
+    params:
+      value: { type: enum, values: [unknown, wide, zone, center, flexible_spot_s, flexible_spot_m, flexible_spot_l, expand_flexible_spot, flexible_spot, flexible_spot_xs, flexible_spot_xl, flexible_spot_free_1, flexible_spot_free_2, flexible_spot_free_3, tracking_wide, tracking_zone, tracking_center, tracking_flexible_spot_s, tracking_flexible_spot_m, tracking_flexible_spot_l, tracking_expand_flexible_spot, tracking_flexible_spot, tracking_flexible_spot_xs, tracking_flexible_spot_xl, tracking_flexible_spot_free_1, tracking_flexible_spot_free_2, tracking_flexible_spot_free_3], required: true }
+    returns: ack
+  set_subject_recognition_af:
+    summary: "Set focus subject recognition (Sony: Subject Recognition AF, 0xD060)"
+    params:
+      value: { type: enum, values: ["off", af_only, af_priority], required: true }
+    returns: ack
+  set_af_transition_speed:
+    summary: "Set focus af transition speed (Sony: AF Transition Speed, 0xD061)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_af_subject_shift_sensitivity:
+    summary: "Set focus af subject shift sensitivity (Sony: AF Subj Shift Sens, 0xD062)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_zoom_setting:
+    summary: "Set zoom setting (Sony: Zoom Setting, 0xD25F)"
+    params:
+      value: { type: enum, values: [optical_only, smart_only, clear_image_zoom, digital_zoom], required: true }
+    returns: ack
+  set_remote_zoom_speed_type:
+    summary: "Set zoom remote speed type (Sony: Remote Control Zoom Speed Type, 0xD299)"
+    params:
+      value: { type: enum, values: [invalid, variable, fixed], required: true }
+    returns: ack
+  set_movie_file_format:
+    summary: "Set recording file format (Sony: File Format (Movie), 0xD241)"
+    params:
+      value: { type: enum, values: [dvd, m2ps, avchd, mp4, dv, xavc, mxf, xavc_s_4k, xavc_s_hd, xavc_hs_8k, xavc_hs_4k, xavc_s_l_4k, xavc_s_l_hd, xavc_s_i_4k, xavc_s_i_hd, xavc_i, xavc_l, xavc_proxy, xavc_hs_hd, xavc_s_i_dci_4k, xavc_h_i_hq, xavc_h_i_sq, xavc_h_l, x_ocn_xt, x_ocn_st, x_ocn_lt, xavc_hs_l_422, xavc_hs_l_420, xavc_s_l_422, xavc_s_l_420, xavc_s_i_422, mpeg_hd_422], required: true }
+    returns: ack
+  set_movie_recording_setting:
+    summary: "Set recording setting (Sony: Recording Setting (Movie), 0xD242)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_movie_frame_rate:
+    summary: "Set recording frame rate (Sony: Recording Frame Rate Setting (Movie), 0xD286)"
+    params:
+      value: { type: enum, values: ["120p", "100p", "60p", "50p", "30p", "25p", "24p", "23.98p", "29.97p", "59.94p", "19.98p", "14.99p", "12.50p", "12.00p", "11.99p", "10.00p", "9.99p", "6.00p", "5.99p", "5.00p", "4.995p", "24.00p", "119.88p", "120i", "100i", "60i", "50i", "30i", "25i", "24i", "23.98i", "29.97i", "59.94i", "19.98i", "14.99i", "12.50i", "12.00i", "11.99i", "10.00i", "9.99i", "6.00i", "5.99i", "5.00i", "4.995i", "24.00i", "119.88i"], required: true }
+    returns: ack
+  set_simul_rec:
+    summary: "Set recording simul rec (Sony: Simul Rec Setting, 0xD050)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_audio_recording:
+    summary: "Set recording audio (Sony: Audio Recording, 0xD0D2)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_slow_and_quick:
+    summary: "Set recording slow and quick (Sony: S&Q Mode Setting, 0xD051)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_slow_and_quick_frame_rate:
+    summary: "Set recording slow and quick frame rate (Sony: S&Q Frame Rate, 0xD052)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_movie_shooting_mode:
+    summary: "Set recording shooting mode (Sony: Movie Shooting Mode, 0xE000)"
+    params:
+      value: { type: enum, values: ["off", sdr, hdr, cine_ei, cine_ei_quick, custom, flexible_iso], required: true }
+    returns: ack
+  set_drive_mode:
+    summary: "Set still drive mode (Sony: Still Capture Mode, 0x5013)"
+    params:
+      value: { type: enum, values: [single, continuous_hi, continuous_hi_plus, continuous_hi_live, continuous_lo, continuous, continuous_speed_priority, continuous_mid, continuous_mid_live, continuous_lo_live, timelapse, self_timer_5s, self_timer_10s, self_timer_2s, remote_commander, mirror_up, self_portrait_1, self_portrait_2, self_timer_continuous_3, self_timer_continuous_5, self_timer_continuous_3_5s, self_timer_continuous_5_5s, self_timer_continuous_3_2s, self_timer_continuous_5_2s, spot_burst_lo, spot_burst_mid, spot_burst_hi], required: true }
+    returns: ack
+  set_still_file_format:
+    summary: "Set still file format (Sony: File Format (Still), 0xD253)"
+    params:
+      value: { type: enum, values: [raw, raw_jpeg, jpeg, raw_heif, heif], required: true }
+    returns: ack
+  set_still_quality:
+    summary: "Set still quality (Sony: Still Image Quality, 0xD252)"
+    params:
+      value: { type: enum, values: [extra_fine, fine, standard, light], required: true }
+    returns: ack
+  set_aspect_ratio:
+    summary: "Set still aspect ratio (Sony: Aspect Ratio, 0xD211)"
+    params:
+      value: { type: enum, values: ["3:2", "16:9", "4:3", "1:1"], required: true }
+    returns: ack
+  set_picture_profile:
+    summary: "Set image picture profile (Sony: Picture Profile, 0xD23F)"
+    params:
+      value: { type: enum, values: ["off", pp1, pp2, pp3, pp4, pp5, pp6, pp7, pp8, pp9, pp10, pp11, pp_lut1, pp_lut2, pp_lut3, pp_lut4], required: true }
+    returns: ack
+  set_gamma:
+    summary: "Set image gamma (Sony: Picture Profile Gamma, 0xD0E1)"
+    params:
+      value: { type: enum, values: [movie, still, s_cinetone, cine1, cine2, cine3, cine4, itu709, itu709_800, s_log2, s_log3, hlg, hlg1, hlg2, hlg3], required: true }
+    returns: ack
+  set_creative_look:
+    summary: "Set image creative look (Sony: Creative Look, 0xD0FA)"
+    params:
+      value: { type: enum, values: [st, pt, nt, vv, vv2, fl, in, sh, bw, se, fl2, fl3, custom_1, custom_2, custom_3, custom_4, custom_5, custom_6], required: true }
+    returns: ack
+  set_creative_style:
+    summary: "Set image creative style (Sony: Creative Style, 0xD240)"
+    params:
+      value: { type: enum, values: [standard, vivid, portrait, landscape, sunset, black_and_white, light, neutral, clear, deep, night_view, autumn_leaves, sepia, creative_box_1, creative_box_2, creative_box_3, creative_box_4, creative_box_5, creative_box_6], required: true }
+    returns: ack
+  set_base_look:
+    summary: "Set image base look (Sony: BaseLook Value, 0xD03C)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_steady_shot:
+    summary: "Set image steady shot (Sony: Image Stabilization Steady Shot, 0xD0D9)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_steady_shot_movie:
+    summary: "Set image steady shot movie (Sony: Image Stabilization Steady Shot (Movie), 0xD0DA)"
+    params:
+      value: { type: enum, values: ["off", standard, active, hybrid], required: true }
+    returns: ack
+  set_timecode_preset:
+    summary: "Set timecode preset (Sony: Time Code Preset, 0xD0D3)"
+    params:
+      value: { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]:[0-5][0-9]$", required: true }
+    returns: ack
+  set_user_bits_preset:
+    summary: "Set timecode user bits preset (Sony: User Bit Preset, 0xD0D4)"
+    params:
+      value: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true }
+    returns: ack
+  set_timecode_format:
+    summary: "Set timecode format (Sony: Time Code Format, 0xD0D5)"
+    params:
+      value: { type: enum, values: [df, ndf], required: true }
+    returns: ack
+  set_timecode_run:
+    summary: "Set timecode run (Sony: Time Code Run, 0xD0D6)"
+    params:
+      value: { type: enum, values: [rec_run, free_run], required: true }
+    returns: ack
+  set_timecode_make:
+    summary: "Set timecode make (Sony: Time Code Make, 0xD0D7)"
+    params:
+      value: { type: enum, values: [preset, regenerate], required: true }
+    returns: ack
+  set_user_bits_time_rec:
+    summary: "Set timecode user bits time rec (Sony: User Bit Time Rec, 0xD0D8)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_peaking:
+    summary: "Set monitoring peaking (Sony: Peaking Display, 0xE11A)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_zebra:
+    summary: "Set monitoring zebra (Sony: Zebra Display, 0xE11D)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_zebra_level:
+    summary: "Set monitoring zebra level (Sony: Zebra Level, 0xE11E)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_marker:
+    summary: "Set monitoring marker (Sony: Marker Display, 0xE123)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_grid_line:
+    summary: "Set monitoring grid line (Sony: Grid Line Display, 0xD1DE)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_gamma_display_assist:
+    summary: "Set monitoring gamma assist (Sony: Gamma Display Assist, 0xD1FE)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_monitor_lut:
+    summary: "Set monitoring lut (Sony: Monitor LUT Setting (All Line), 0xD04D)"
+    params:
+      value: { type: bool, required: true }
+    returns: ack
+  set_audio_master_level:
+    summary: "Set audio master level (Sony: Audio Input Master Level, 0xE050)"
+    params:
+      value: { type: int, required: true }
+    returns: ack
+  set_property:
+    summary: "Write any property by code, with a raw value in the property's own type (a number, 0x-hex text, or text for string properties). Checked against what the camera reports as writable and accepted"
+    params:
+      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true }
+      value: { type: json, required: true }
+    returns: ack
+  get_property:
+    summary: "The property as last read from the camera: value, type, writable, enabled, and its accepted values or range"
+    params:
+      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true }
+    returns: value
+  control:
+    summary: "Send any SDIO control code with a raw value. The value's type is the documented one for known codes, else uint16 unless 'type' says otherwise"
+    params:
+      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true }
+      value: { type: json, required: true }
+      type: { type: enum, values: [int8, uint8, int16, uint16, int32, uint32, int64, uint64, string] }
+    returns: ack
+  refresh:
+    summary: "Read every property again now rather than waiting for the next changes-only read"
+    returns: ack
+  set_shutter_speed:
+    summary: "Set the shutter speed: 1/50, 1.5\" (seconds), or bulb. Uses the stills shutter speed where the camera has it, otherwise the cinema shutter speed value"
+    params:
+      value: { type: string, pattern: "^(1/[0-9]{1,5}|[0-9]{1,4}(\\.[0-9])?\"?|bulb)$", required: true }
+    returns: ack
+  set_tally:
+    summary: "Turn one tally lamp on the camera on or off"
+    params:
+      lamp: { type: enum, values: [red, green, yellow], required: true }
+      lit: { type: bool, required: true }
+    returns: ack
+  set_audio_level:
+    summary: "Set the recording level of an audio input channel, in the range the camera reports"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+  set_audio_level_control:
+    summary: "Set automatic or manual level control for an audio input channel"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      mode: { type: enum, values: [auto, manual], required: true }
+    returns: ack
+  set_audio_input:
+    summary: "Select the source of an audio input channel"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      input: { type: enum, values: ["off", input1, input2, internal_mic, shoe_ch1, shoe_ch2, mic_jack_left, mic_jack_right], required: true }
+    returns: ack
+  set_zoom_position:
+    summary: "Drive the zoom to an absolute position, in the range the camera reports; the result arrives as zoom.last_position_result"
+    params:
+      position: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+  set_focus_position:
+    summary: "Drive the focus to an absolute position, in the range the camera reports; the result arrives as focus.last_position_result"
+    params:
+      position: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+  cancel_zoom_position:
+    summary: "Stop a zoom position drive"
+    returns: ack
+  cancel_focus_position:
+    summary: "Stop a focus position drive"
+    returns: ack
+  zoom:
+    summary: "Zoom continuously: positive toward tele, negative toward wide, 0 stops. Sent at full resolution where the camera has the 16-bit zoom control, otherwise scaled to its coarse zoom speed range"
+    params:
+      speed: { type: int, min: -32767, max: 32767, required: true }
+    returns: ack
+  focus:
+    summary: "Focus continuously: positive toward far, negative toward near, 0 stops. Scaled as for zoom"
+    params:
+      speed: { type: int, min: -32767, max: 32767, required: true }
+    returns: ack
+  focus_near_far:
+    summary: "Step the focus toward near (negative) or far (positive)"
+    params:
+      step: { type: int, min: -7, max: 7, required: true }
+    returns: ack
+  save_zoom_focus_position:
+    summary: "Store the current zoom and focus positions in a slot"
+    params:
+      slot: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  load_zoom_focus_position:
+    summary: "Recall zoom and focus positions stored in a slot"
+    params:
+      slot: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  shutter_half_press:
+    summary: "Half-press the shutter button (focus and meter). Without pressed, press and release; with it, hold or release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  shutter_full_press:
+    summary: "Fully press the shutter button. Press it only while half-pressed, and release in the reverse order"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  take_photo:
+    summary: "Half and full press together, then release: one still"
+    returns: ack
+  record:
+    summary: "Start or stop movie recording (the hold-type record button: pressed starts, released stops)"
+    params:
+      recording: { type: bool, required: true }
+    returns: ack
+  record_toggle:
+    summary: "Press and release the movie record button, toggling recording"
+    returns: ack
+  ae_lock:
+    summary: "The AE lock button. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  awb_lock:
+    summary: "The AWB lock button. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  fe_lock:
+    summary: "The flash exposure lock button. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  tracking_af_on:
+    summary: "The tracking on + AF on button. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  push_auto_focus:
+    summary: "Push auto focus (one-shot AF in manual focus, manual while held in AF). Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  push_auto_iris:
+    summary: "Push auto iris. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  push_agc:
+    summary: "Push automatic gain control. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  push_auto_nd:
+    summary: "Push auto ND filter. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  one_push_awb:
+    summary: "One-push auto white balance. Without pressed, press and release"
+    params:
+      pressed: { type: bool }
+    returns: ack
+  af_area_position:
+    summary: "Move the AF area to a point on a 640 x 480 grid"
+    params:
+      x: { type: int, min: 0, max: 639, required: true }
+      y: { type: int, min: 0, max: 479, required: true }
+    returns: ack
+  color_temperature_step:
+    summary: "Step the colour temperature"
+    params:
+      step: { type: int, min: -30, max: 30, required: true }
+    returns: ack
+  tint_step:
+    summary: "Step the white balance tint"
+    params:
+      step: { type: int, min: -198, max: 198, required: true }
+    returns: ack
+  custom_wb_capture_standby:
+    summary: "Enter custom white balance capture standby"
+    returns: ack
+  custom_wb_capture_cancel:
+    summary: "Leave custom white balance capture standby"
+    returns: ack
+  custom_wb_capture:
+    summary: "Capture custom white balance at a point inside the area the camera reports; the result arrives as white_balance.custom_capture_result"
+    params:
+      x: { type: int, min: 0, max: 65535, required: true }
+      y: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+  flicker_scan:
+    summary: "Scan for light flicker"
+    returns: ack
+  format_media:
+    summary: "Format the card in a slot. Erases everything on it; the result arrives as media.last_format_result"
+    params:
+      slot: { type: int, min: 1, max: 2, required: true }
+      quick: { type: bool, default: false }
+    returns: ack
+  cancel_media_format:
+    summary: "Cancel a format in progress"
+    returns: ack
+  power_off:
+    summary: "Put the camera into standby; it is woken with its power button"
+    returns: ack
+  camera_standby:
+    summary: "Put the camera into standby"
+    returns: ack
+  power_on:
+    summary: "Wake the camera from standby"
+    returns: ack
+  stream:
+    summary: "Start or stop streaming to the selected destination"
+    params:
+      streaming: { type: bool, required: true }
+    returns: ack
+  timecode_preset_reset:
+    summary: "Reset the timecode preset"
+    returns: ack
+  user_bits_preset_reset:
+    summary: "Reset the user bits preset"
+    returns: ack
+  remote_key:
+    summary: "A menu navigation key. Without pressed, press and release"
+    params:
+      key: { type: enum, values: [up, down, left, right, up_right, down_right, up_left, down_left, set, menu, back, display], required: true }
+      pressed: { type: bool }
+    returns: ack
+  pan_tilt_absolute:
+    summary: "Move pan and/or tilt to absolute angles in degrees (pan positive anticlockwise seen from above, tilt positive upward), at speeds up to the model maximum; the result arrives as pan_tilt.last_result"
+    params:
+      pan: { type: float, min: -360, max: 360 }
+      tilt: { type: float, min: -360, max: 360 }
+      pan_speed: { type: int, min: 0, max: 127, default: 12 }
+      tilt_speed: { type: int, min: 0, max: 127, default: 12 }
+    returns: ack
+  pan_tilt_relative:
+    summary: "Move pan and/or tilt by angles in degrees from where they are; a move past the pan range is ignored by the camera"
+    params:
+      pan: { type: float, min: -360, max: 360 }
+      tilt: { type: float, min: -360, max: 360 }
+      pan_speed: { type: int, min: 0, max: 127, default: 12 }
+      tilt_speed: { type: int, min: 0, max: 127, default: 12 }
+    returns: ack
+  pan_tilt_drive:
+    summary: "Pan and tilt continuously at signed speeds until stopped or at the end of travel; both 0 stops"
+    params:
+      pan_speed: { type: int, min: -127, max: 127, default: 0 }
+      tilt_speed: { type: int, min: -127, max: 127, default: 0 }
+    returns: ack
+  pan_tilt_stop:
+    summary: "Stop any pan/tilt move or preset recall"
+    returns: ack
+  pan_tilt_home:
+    summary: "Move pan and tilt to their home position (0, 0)"
+    returns: ack
+  pan_tilt_reset:
+    summary: "Reinitialise pan and tilt, for when their status reads unknown"
+    returns: ack
+  preset_recall:
+    summary: "Recall a pan/tilt/zoom/focus preset; completion arrives as pan_tilt.preset_result"
+    params:
+      preset: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+  preset_set:
+    summary: "Store the current pan, tilt, zoom and focus as a preset"
+    params:
+      preset: { type: int, min: 0, max: 65535, required: true }
+      thumbnail: { type: bool, default: true }
+    returns: ack
+  preset_clear:
+    summary: "Delete a preset"
+    params:
+      preset: { type: int, min: 0, max: 65535, required: true }
+    returns: ack
+
+state:
+  session.mode: { type: string, description: "The connection setting in use: plain, pairing or ssh" }
+  session.pairing: { type: string, description: "With connection: pairing, waiting_for_approval while the camera shows its prompt, then approved or refused" }
+  session.protocol_version: { type: int, description: "The camera's Camera Control PTP extension version, 100 times the version (300 is 3.00)" }
+  session.vendor_code_version: { type: int, description: "The camera's vendor code version, 100 times the version; from 310 the extended property and control codes are in use" }
+  session.extended_codes: { type: bool, description: "Whether the extended codes (0xE000 properties, 0xF000 controls) are enabled for this session" }
+  device.manufacturer: { type: string, description: "From the camera's PTP DeviceInfo" }
+  device.model: { type: string, description: "Model name from the camera's PTP DeviceInfo" }
+  device.version: { type: string, description: "Device version from the camera's PTP DeviceInfo" }
+  device.serial: { type: string, description: "Serial number from the camera's PTP DeviceInfo" }
+  device.friendly_name: { type: string, description: "The camera's own name, from its PTP-IP Init Command Ack" }
+  controls: { type: array, description: "The SDIO control codes the camera offers, as four hex digits" }
+  properties.*: { type: object, description: "Every property the camera reports, keyed by its code as four hex digits: value (raw), type, writable, enabled (enabled, disabled or display_only), and options (the values it accepts now) or range (min, max, step)" }
+  operation.last: { type: object, description: "The camera's last operation-result event: operation and target codes and the result (ok, failed, invalid_parameter, camera_status_error, canceled, or a white-balance capture error)" }
+  recording.last_result: { type: string, description: "Result of the last movie record operation: ok or failed" }
+  zoom.last_position_result: { type: string, description: "Result of the last zoom position drive: ok, failed or canceled" }
+  focus.last_position_result: { type: string, description: "Result of the last focus position drive: ok, failed or canceled" }
+  pan_tilt.last_result: { type: object, description: "Result of the last pan/tilt control: result (ok, failed, canceled) and control (absolute, relative, direction, home, reset, cancel)" }
+  pan_tilt.preset_result: { type: string, description: "How the last preset recall ended: completed, interrupted or error" }
+  streaming.streams.*: { type: string, description: "Status of video stream N from the camera's stream events: inactive, idle, streaming or error" }
+  media.last_format_result: { type: string, description: "Result of the last media format: ok, failed or canceled" }
+  white_balance.custom_capture_result: { type: string, description: "Result of the last custom white balance capture: ok or failed" }
+  exposure.mode: { type: string, description: "Sony Exposure Program Mode (0x500E) (a value the module has no name for reads as its hex code)" }
+  exposure.control_type: { type: string, description: "Sony Exposure Ctrl Type (0xD099) (a value the module has no name for reads as its hex code)" }
+  exposure.iris: { type: float, description: "Sony F-Number (0x5007) (the text \"closed\" when the iris is closed)" }
+  exposure.t_number: { type: float, description: "Sony T-Number (0xD000) (the text \"closed\" when the iris is closed)" }
+  exposure.iris_control: { type: string, description: "Sony Iris Mode Setting (0xD001) (a value the module has no name for reads as its hex code)" }
+  exposure.shutter_speed: { type: string, description: "Sony Shutter Speed (0xD20D) (1/50, 1.5\", or bulb)" }
+  exposure.shutter_speed_setting: { type: string, description: "Sony Shutter Speed Value (0xD016) (1/50, 1.5\", or bulb)" }
+  exposure.shutter_speed_current: { type: string, description: "Sony Shutter Speed Current Value (0xD017) (1/50, 1.5\", or bulb)" }
+  exposure.shutter_angle: { type: float, description: "Sony Shutter Angle (0xD00E)" }
+  exposure.shutter_mode: { type: string, description: "Sony Shutter Mode (0xD010) (a value the module has no name for reads as its hex code)" }
+  exposure.shutter_control: { type: string, description: "Sony Shutter Mode Setting (0xD013) (a value the module has no name for reads as its hex code)" }
+  exposure.shutter_enabled: { type: bool, description: "Sony Shutter Setting (0xD00F)" }
+  exposure.iso: { type: int, description: "Sony ISO Sensitivity (0xD21E) (the text \"auto\" in auto ISO)" }
+  exposure.iso_current: { type: int, description: "Sony ISO Current Sensitivity (0xD023) (the text \"auto\" in auto ISO)" }
+  exposure.exposure_index: { type: int, description: "Sony Exposure Index (0xD022)" }
+  exposure.gain_db: { type: int, description: "Sony Gain dB Value (0xD01E)" }
+  exposure.gain_db_current: { type: int, description: "Sony Gain dB Current Value (0xD01F)" }
+  exposure.gain_control: { type: string, description: "Sony Gain Control Setting (0xD01C) (a value the module has no name for reads as its hex code)" }
+  exposure.gain_unit: { type: string, description: "Sony Gain Unit Setting (0xD01D) (a value the module has no name for reads as its hex code)" }
+  exposure.base_iso: { type: string, description: "Sony Gain Base ISO Sensitivity (0xD020) (a value the module has no name for reads as its hex code)" }
+  exposure.base_sensitivity: { type: string, description: "Sony Gain Base Sensitivity (0xD021) (a value the module has no name for reads as its hex code)" }
+  exposure.compensation: { type: float, description: "Sony Exposure Bias Compensation (0x5010)" }
+  exposure.metering: { type: string, description: "Sony Exposure Metering Mode (0x500B) (a value the module has no name for reads as its hex code)" }
+  exposure.step: { type: float, description: "Sony Exposure Step (0xD237)" }
+  exposure.ae_locked: { type: bool, description: "Sony AELock Indication (0xD217)" }
+  exposure.metered_manual_level: { type: float, description: "Sony Metered Manual Level (0xD1B5)" }
+  exposure.dro: { type: string, description: "Sony Dynamic Range Optimizer (0xD201) (a value the module has no name for reads as its hex code)" }
+  nd.enabled: { type: bool, description: "Sony ND Filter (0xD018)" }
+  nd.mode: { type: string, description: "Sony ND Filter Mode (0xD019) (a value the module has no name for reads as its hex code)" }
+  nd.control: { type: string, description: "Sony ND Filter Mode Setting (0xD01A) (a value the module has no name for reads as its hex code)" }
+  nd.transmittance: { type: string, description: "Sony ND Filter Value (0xD01B) (transmittance as a fraction)" }
+  white_balance.mode: { type: string, description: "Sony White Balance (0x5005) (a value the module has no name for reads as its hex code)" }
+  white_balance.control: { type: string, description: "Sony White Balance Mode Setting (0xD00C) (a value the module has no name for reads as its hex code)" }
+  white_balance.color_temperature: { type: int, description: "Sony Color Temperature (0xD20F)" }
+  white_balance.tint: { type: int, description: "Sony White Balance Tint (0xD00D)" }
+  white_balance.green_magenta: { type: int, description: "Sony Biaxial Fine-Tuning G-M Direction (0xD210)" }
+  white_balance.amber_blue: { type: int, description: "Sony Biaxial Fine-Tuning A-B Direction (0xD21C)" }
+  white_balance.memory: { type: string, description: "Sony White Balance Switch (0xD085) (a value the module has no name for reads as its hex code)" }
+  white_balance.preset_color_temperature: { type: int, description: "Sony White Balance Preset Color Temperature (0xD086)" }
+  white_balance.r_gain: { type: float, description: "Sony White Balance R Gain (0xD087)" }
+  white_balance.b_gain: { type: float, description: "Sony White Balance B Gain (0xD088)" }
+  white_balance.awb_locked: { type: bool, description: "Sony AWBLock Indication (0xD24E)" }
+  focus.mode: { type: string, description: "Sony Focus Mode (0x500A) (a value the module has no name for reads as its hex code)" }
+  focus.control: { type: string, description: "Sony Focus Mode Setting (0xD007) (a value the module has no name for reads as its hex code)" }
+  focus.area: { type: string, description: "Sony Focus Area (0xD22C) (a value the module has no name for reads as its hex code)" }
+  focus.indication: { type: string, description: "Sony Focus Indication (0xD213) (a value the module has no name for reads as its hex code)" }
+  focus.status: { type: string, description: "Sony Focus Mode status (0xE044) (a value the module has no name for reads as its hex code)" }
+  focus.position: { type: int, description: "Sony Focus Position Current Value (0xE043)" }
+  focus.position_target: { type: int, description: "Sony Focus Position Setting (0xE042)" }
+  focus.focal_position: { type: int, description: "Sony Focal position (0xD24C)" }
+  focus.distance: { type: int, description: "Sony Focal Distance in Meter (0xD004)" }
+  focus.driving: { type: bool, description: "Sony Focus Driving Status (Absolute) (0xD19C)" }
+  focus.subject_recognition: { type: string, description: "Sony Subject Recognition AF (0xD060) (a value the module has no name for reads as its hex code)" }
+  focus.af_transition_speed: { type: int, description: "Sony AF Transition Speed (0xD061)" }
+  focus.af_subject_shift_sensitivity: { type: int, description: "Sony AF Subj Shift Sens (0xD062)" }
+  zoom.scale: { type: float, description: "Sony Zoom Scale (0xD25C)" }
+  zoom.digital_scale: { type: float, description: "Sony Digital Zoom Scale (0xD00A)" }
+  zoom.distance_mm: { type: float, description: "Sony Zoom Distance (0xD00B)" }
+  zoom.position: { type: int, description: "Sony Zoom Position Current Value (0xE041)" }
+  zoom.position_target: { type: int, description: "Sony Zoom Position Setting (0xE040)" }
+  zoom.setting: { type: string, description: "Sony Zoom Setting (0xD25F) (a value the module has no name for reads as its hex code)" }
+  zoom.type: { type: string, description: "Sony Zoom Type Status (0xD260) (a value the module has no name for reads as its hex code)" }
+  zoom.operation_enabled: { type: bool, description: "Sony Zoom Operation Enable Status (0xD25B)" }
+  zoom.remote_speed_type: { type: string, description: "Sony Remote Control Zoom Speed Type (0xD299) (a value the module has no name for reads as its hex code)" }
+  zoom.driving: { type: bool, description: "Sony Zoom Driving Status (Absolute) (0xD19D)" }
+  recording.state: { type: string, description: "Sony Movie Recording State (0xD21D) (a value the module has no name for reads as its hex code)" }
+  recording.duration: { type: int, description: "Sony Recording Duration (0xD120)" }
+  recording.main_status: { type: string, description: "Sony Recorder Main Status (0xE010) (a value the module has no name for reads as its hex code)" }
+  recording.proxy_status: { type: string, description: "Sony Recorder Proxy Status (0xE011) (a value the module has no name for reads as its hex code)" }
+  recording.clip_name: { type: string, description: "Sony Recorder Clip Name (0xE00B)" }
+  recording.file_format: { type: string, description: "Sony File Format (Movie) (0xD241) (a value the module has no name for reads as its hex code)" }
+  recording.setting: { type: int, description: "Sony Recording Setting (Movie) (0xD242)" }
+  recording.frame_rate: { type: string, description: "Sony Recording Frame Rate Setting (Movie) (0xD286)" }
+  recording.proxy_setting: { type: int, description: "Sony Proxy Record Setting (0xD109)" }
+  recording.simul_rec: { type: bool, description: "Sony Simul Rec Setting (0xD050)" }
+  recording.audio: { type: bool, description: "Sony Audio Recording (0xD0D2)" }
+  recording.slow_and_quick: { type: bool, description: "Sony S&Q Mode Setting (0xD051)" }
+  recording.slow_and_quick_frame_rate: { type: int, description: "Sony S&Q Frame Rate (0xD052)" }
+  recording.shooting_mode: { type: string, description: "Sony Movie Shooting Mode (0xE000) (a value the module has no name for reads as its hex code)" }
+  still.drive_mode: { type: string, description: "Sony Still Capture Mode (0x5013) (a value the module has no name for reads as its hex code)" }
+  still.file_format: { type: string, description: "Sony File Format (Still) (0xD253) (a value the module has no name for reads as its hex code)" }
+  still.quality: { type: string, description: "Sony Still Image Quality (0xD252) (a value the module has no name for reads as its hex code)" }
+  still.image_size: { type: int, description: "Sony Image Size (0xD203)" }
+  still.aspect_ratio: { type: string, description: "Sony Aspect Ratio (0xD211) (a value the module has no name for reads as its hex code)" }
+  still.pending_files: { type: int, description: "Sony Shooting File Info (0xD215)" }
+  image.picture_profile: { type: string, description: "Sony Picture Profile (0xD23F) (a value the module has no name for reads as its hex code)" }
+  image.gamma: { type: string, description: "Sony Picture Profile Gamma (0xD0E1) (a value the module has no name for reads as its hex code)" }
+  image.creative_look: { type: string, description: "Sony Creative Look (0xD0FA) (a value the module has no name for reads as its hex code)" }
+  image.creative_style: { type: string, description: "Sony Creative Style (0xD240) (a value the module has no name for reads as its hex code)" }
+  image.base_look: { type: int, description: "Sony BaseLook Value (0xD03C)" }
+  image.steady_shot: { type: bool, description: "Sony Image Stabilization Steady Shot (0xD0D9)" }
+  image.steady_shot_movie: { type: string, description: "Sony Image Stabilization Steady Shot (Movie) (0xD0DA) (a value the module has no name for reads as its hex code)" }
+  timecode.preset: { type: string, description: "Sony Time Code Preset (0xD0D3) (HH:MM:SS:FF)" }
+  timecode.user_bits_preset: { type: string, description: "Sony User Bit Preset (0xD0D4) (eight hex digits)" }
+  timecode.format: { type: string, description: "Sony Time Code Format (0xD0D5) (a value the module has no name for reads as its hex code)" }
+  timecode.run: { type: string, description: "Sony Time Code Run (0xD0D6) (a value the module has no name for reads as its hex code)" }
+  timecode.make: { type: string, description: "Sony Time Code Make (0xD0D7) (a value the module has no name for reads as its hex code)" }
+  timecode.user_bits_time_rec: { type: bool, description: "Sony User Bit Time Rec (0xD0D8)" }
+  tally.red: { type: bool, description: "Sony Red Tally Lamp Control (0xE0D2)" }
+  tally.green: { type: bool, description: "Sony Green Tally Lamp Control (0xE0D3)" }
+  tally.yellow: { type: bool, description: "Sony Yellow Tally Lamp Control (0xE0D4)" }
+  media.slot1.status: { type: string, description: "Sony Media SLOT1 Status (0xD248) (a value the module has no name for reads as its hex code)" }
+  media.slot1.remaining_shots: { type: int, description: "Sony Media SLOT1 Remaining number shots (0xD249) (absent when the camera has no reading)" }
+  media.slot1.remaining_seconds: { type: int, description: "Sony Media SLOT1 Remaining shooting time (0xD24A) (absent when the camera has no reading)" }
+  media.slot1.writing: { type: bool, description: "Sony Media SLOT1 Writing State (0xD197)" }
+  media.slot1.format_available: { type: bool, description: "Sony Media SLOT1 Format Enable Status (0xD279)" }
+  media.slot1.recordable: { type: string, description: "Sony Media SLOT1 Rec Available Type (0xD02B) (a value the module has no name for reads as its hex code)" }
+  media.slot2.status: { type: string, description: "Sony Media SLOT2 Status (0xD256) (a value the module has no name for reads as its hex code)" }
+  media.slot2.remaining_shots: { type: int, description: "Sony Media SLOT2 Remaining number shots (0xD257) (absent when the camera has no reading)" }
+  media.slot2.remaining_seconds: { type: int, description: "Sony Media SLOT2 Remaining shooting time (0xD258) (absent when the camera has no reading)" }
+  media.slot2.writing: { type: bool, description: "Sony Media SLOT2 Writing State (0xD198)" }
+  media.slot2.format_available: { type: bool, description: "Sony Media SLOT2 Format Enable Status (0xD27A)" }
+  media.slot2.recordable: { type: string, description: "Sony Media SLOT2 Rec Available Type (0xD02C) (a value the module has no name for reads as its hex code)" }
+  media.slot3.status: { type: string, description: "Sony Media SLOT3 Status (0xD18E) (a value the module has no name for reads as its hex code)" }
+  media.slot3.remaining_seconds: { type: int, description: "Sony Media SLOT3 Remaining shooting time (0xD18F) (absent when the camera has no reading)" }
+  media.slot3.recordable: { type: string, description: "Sony Media SLOT3 Rec Available Type (0xD190) (a value the module has no name for reads as its hex code)" }
+  media.format_progress: { type: int, description: "Sony Media Format Progress Rate (0xD27B) (percent)" }
+  power.source: { type: string, description: "Sony Power Source (0xD03A) (a value the module has no name for reads as its hex code)" }
+  power.status: { type: string, description: "Sony Camera Power Status (0xE0AF) (a value the module has no name for reads as its hex code)" }
+  power.battery.percent: { type: int, description: "Sony Battery Remaining (0xD218) (absent when the camera has no reading)" }
+  power.battery.level: { type: string, description: "Sony Battery Level Indicator (0xD20E) (a value the module has no name for reads as its hex code)" }
+  power.battery.minutes: { type: int, description: "Sony Battery Remaining in Minutes (0xD038) (absent when the camera has no reading)" }
+  power.battery.volts: { type: float, description: "Sony Battery Remaining in Voltage (0xD039) (absent when the camera has no reading)" }
+  power.battery.total_percent: { type: int, description: "Sony Total Battery Remaining (0xD204) (absent when the camera has no reading)" }
+  power.battery.total_level: { type: string, description: "Sony Total Battery Level Indicator (0xD205) (a value the module has no name for reads as its hex code)" }
+  power.battery.second_percent: { type: int, description: "Sony Second Battery Remaining (0xD12D) (absent when the camera has no reading)" }
+  power.dc_volts: { type: float, description: "Sony DC Voltage (0xD03E) (absent when the camera has no reading)" }
+  power.overheating: { type: string, description: "Sony Device Overheating State (0xD251) (a value the module has no name for reads as its hex code)" }
+  lens.model: { type: string, description: "Sony Lens Model Name (0xD07B)" }
+  lens.serial: { type: string, description: "Sony Lens Serial Number (0xD07C)" }
+  lens.version: { type: string, description: "Sony Lens Version Number (0xD07D)" }
+  device.software_version: { type: string, description: "Sony Software Version (0xD040)" }
+  status.operating_mode: { type: string, description: "Sony Camera Operating Mode (0xD0BC) (a value the module has no name for reads as its hex code)" }
+  status.remote_restricted: { type: bool, description: "Sony Remote Control Restriction Status (0xD264)" }
+  status.camera_error: { type: bool, description: "Sony Camera Error Caution Status (0xD1BB)" }
+  status.system_error: { type: bool, description: "Sony System Error Caution Status (0xD1BC)" }
+  status.system_error_info: { type: string, description: "Sony Camera System Error Info (0xD07A)" }
+  status.menu: { type: string, description: "Sony Displayed Menu Status (0xD080) (a value the module has no name for reads as its hex code)" }
+  monitoring.peaking: { type: bool, description: "Sony Peaking Display (0xE11A)" }
+  monitoring.zebra: { type: bool, description: "Sony Zebra Display (0xE11D)" }
+  monitoring.zebra_level: { type: int, description: "Sony Zebra Level (0xE11E)" }
+  monitoring.marker: { type: bool, description: "Sony Marker Display (0xE123)" }
+  monitoring.grid_line: { type: bool, description: "Sony Grid Line Display (0xD1DE)" }
+  monitoring.gamma_assist: { type: bool, description: "Sony Gamma Display Assist (0xD1FE)" }
+  monitoring.lut: { type: bool, description: "Sony Monitor LUT Setting (All Line) (0xD04D)" }
+  audio.ch1.level_control: { type: string, description: "Sony Audio Input CH1 Level Control (0xE048) (a value the module has no name for reads as its hex code)" }
+  audio.ch2.level_control: { type: string, description: "Sony Audio Input CH2 Level Control (0xE049) (a value the module has no name for reads as its hex code)" }
+  audio.ch3.level_control: { type: string, description: "Sony Audio Input CH3 Level Control (0xE04A) (a value the module has no name for reads as its hex code)" }
+  audio.ch4.level_control: { type: string, description: "Sony Audio Input CH4 Level Control (0xE04B) (a value the module has no name for reads as its hex code)" }
+  audio.ch1.level: { type: int, description: "Sony Audio Input CH1 Level (0xE04C)" }
+  audio.ch2.level: { type: int, description: "Sony Audio Input CH2 Level (0xE04D)" }
+  audio.ch3.level: { type: int, description: "Sony Audio Input CH3 Level (0xE04E)" }
+  audio.ch4.level: { type: int, description: "Sony Audio Input CH4 Level (0xE04F)" }
+  audio.ch1.input: { type: string, description: "Sony Audio Input CH1 Input Select (0xE051) (a value the module has no name for reads as its hex code)" }
+  audio.ch2.input: { type: string, description: "Sony Audio Input CH2 Input Select (0xE052) (a value the module has no name for reads as its hex code)" }
+  audio.ch3.input: { type: string, description: "Sony Audio Input CH3 Input Select (0xE053) (a value the module has no name for reads as its hex code)" }
+  audio.ch4.input: { type: string, description: "Sony Audio Input CH4 Input Select (0xE054) (a value the module has no name for reads as its hex code)" }
+  audio.master_level: { type: int, description: "Sony Audio Input Master Level (0xE050)" }
+  streaming.status: { type: string, description: "Sony Stream Status (0xD119) (a value the module has no name for reads as its hex code)" }
+  streaming.destination: { type: int, description: "Sony Target Streaming Destination Select (0xD2BE)" }
+  pan_tilt.pan: { type: float, description: "Sony Pan Position Current Value (0xE0B6) (degrees)" }
+  pan_tilt.tilt: { type: float, description: "Sony Tilt Position Current Value (0xE0B8) (degrees)" }
+  pan_tilt.pan_status: { type: string, description: "Sony Pan Position Status (0xE0B7) (a value the module has no name for reads as its hex code)" }
+  pan_tilt.tilt_status: { type: string, description: "Sony Tilt Position Status (0xE0B9) (a value the module has no name for reads as its hex code)" }
+  pan_tilt.pan_limit.min: { type: float, description: "Sony Pan Limit Range Minimum (0xE0BA) (degrees)" }
+  pan_tilt.pan_limit.max: { type: float, description: "Sony Pan Limit Range Maximum (0xE0BB) (degrees)" }
+  pan_tilt.tilt_limit.min: { type: float, description: "Sony Tilt Limit Range Minimum (0xE0BC) (degrees)" }
+  pan_tilt.tilt_limit.max: { type: float, description: "Sony Tilt Limit Range Maximum (0xE0BD) (degrees)" }
+  pan_tilt.pan_limit.enabled: { type: bool, description: "Sony Pan Limit Mode (0xE0BE)" }
+  pan_tilt.tilt_limit.enabled: { type: bool, description: "Sony Tilt Limit Mode (0xE0BF)" }
+  pan_tilt.preset_slots: { type: int, description: "Sony Preset PTZF Number of Slots (0xE0CB)" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Warranty notice, required by Sony's Camera Remote Command licence: every product that
+      controls these cameras through this module must tell its end users that once a DEVICE is
+      used or controlled through the APPLICATION SOFTWARE, the DEVICE will be out of such
+      manufacturer-warranty. Show it before the first connection to a Sony camera, and keep it
+      in the product's documentation.
+
+  - models: [all]
+    severity: critical
+    text: >
+      SSH. A camera with SSH enabled (its DigitalImagingDesc.xml says X_SSH_Support Enable;
+      the pan/tilt cameras need it on) refuses PTP-IP on TCP 15740 and accepts it only
+      through an SSH tunnel to its own localhost:15740. Set it up on the camera: turn SSH on
+      (on BRC-AM7 and ILME-FR7, Network > SSH > SSH Setting: On), turn Access Authentication on
+      with a user name and password, and note the host key fingerprint the camera shows. Then
+      open the device with connection: ssh, ssh_username and ssh_password from the camera, and
+      ssh_fingerprint (SHA256:..., as OpenSSH prints it) so the camera is verified; without a
+      fingerprint the connection is encrypted but the camera is not authenticated. The tunnel
+      uses SSH port 22 (the device's port override applies to it in this mode) and the
+      aes128-ctr cipher Sony requires, runs no remote command, and both PTP-IP connections share
+      one SSH login. A refused login or a fingerprint mismatch is final: the device reports
+      unauthorized and is not retried until it is opened again, so a wrong password cannot lock
+      the camera out.
+
+  - models: [all]
+    severity: critical
+    text: >
+      Pairing. A camera without SSH (or with Access Authentication off) may require pairing
+      (DigitalImagingDesc.xml X_PTP_PairingNecessity). Show the pairing menu on the camera, then
+      open the device with connection: pairing: the camera displays friendly_name and asks the
+      operator to allow it, and session.pairing reads waiting_for_approval until they do. The
+      module waits without a timeout and never retries; if the operator declines, or the camera
+      closes the connection before approving, the device reports unauthorized until it is
+      opened again. The camera stores the approved GUID (up to 20), so later connections need
+      no approval as long as the GUID stays the same: it is derived from friendly_name unless
+      the guid setting fixes it. In plain mode a camera that rejects the initiator is also
+      reported unauthorized, not retried.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The camera must have remote control over the network enabled. On ILCE-1 that is
+      Network > Cnct./Remote Sht. > Remote Shoot Function > Remote Shooting: On; on other models
+      it is the PC Remote function described in the model's Help Guide, set to a network
+      connection (Wi-Fi access point, Wi-Fi station or wired LAN, depending on the model).
+      A camera that answers busy (another controller holds it) is retried with backoff.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The reference warns that property-change events are not guaranteed, so the module reads
+      the camera's changed properties every poll_ms (default 1 s) as well as on each change
+      event, and reads them all on connecting and on refresh. State therefore lags a change made
+      on the camera body by up to poll_ms.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A command's ack means the camera accepted the request, not that it acted: the reference
+      states that SDIO_ControlDevice answers OK even when, for example, the shutter could not be
+      released. Read the outcome in the state (the module reads changed properties after every
+      command) and in operation.last, recording.last_result, zoom/focus last_position_result and
+      pan_tilt.last_result, which come from the camera's result events.
+
+  - models: [all]
+    severity: warning
+    text: >
+      After changing the exposure mode, wait about 500 ms before changing shutter speed, iris
+      or ISO: the reference notes that on some models a value set immediately after may be
+      indeterminate.
+
+  - models: [all]
+    severity: info
+    text: >
+      What a camera accepts depends on its model, firmware, mode and settings. The supports
+      lists follow the reference's per-model compatibility tables; at run time the camera's own
+      property and control lists are authoritative. A typed command for a property the camera
+      does not report fails with device_error not_reported; a read-only one with read_only; one
+      greyed out in the current mode with not_available; and a value outside the options or
+      range the camera currently lists is refused as invalid_params before anything is sent.
+      A property the camera reports as disabled has a null value in the named state (its value
+      is not meaningful), while properties.<code> keeps the raw value and enabled flag.
+
+  - models: [all]
+    severity: info
+    text: >
+      Every property the camera reports appears under properties.<code> with its raw value,
+      type, writability and accepted values, and set_property, get_property and control reach
+      any property or control by code, including those without a named path or typed command.
+      Raw values are as the reference defines them for each code. On cameras with vendor code
+      version 3.10 or later the module enables the extended codes (0xE000 properties and 0xF000
+      controls) for the session.
+
+  - models: [all]
+    severity: info
+    text: >
+      record uses the hold-type movie record button: pressed starts recording and released
+      stops it. A recording started on the camera body is stopped with record recording: false;
+      record_toggle uses the separate toggle button where the camera has it.
+      shutter_half_press and shutter_full_press must be used in the order a person would press
+      them (half, full, release full, release half); take_photo does both in one command.
+
+  - models: [ilme-fr7, brc-am7]
+    severity: info
+    text: >
+      Pan and tilt are in degrees (the camera works in millionths of a degree): pan is positive
+      anticlockwise seen from above and tilt positive upward, whether the camera is on a desk or
+      ceiling-mounted. Speeds run to 24 in the camera's Normal speed step and further in
+      Extended (to 127 on BRC-AM7 and 50 on ILME-FR7), set in the camera's web app; a speed above
+      the Normal maximum in Normal step moves at the Normal maximum. Send pan/tilt commands at
+      least 100 ms apart. Presets are numbered within pan_tilt.preset_slots. These cameras also
+      drive the red, green and yellow tally lamps through set_tally.
+
+  - models: [ilce-7cm2, ilce-7cr, ilx-lr1]
+    severity: info
+    text: >
+      The reference marks the focal distance property as unsupported and unreliable on firmware
+      1.00 of these models, and the focus indication property as not updating on ILX-LR1 1.00
+      unless HDMI has been output; the module also takes focus.indication from the camera's AF
+      status events, which do work there.
+
+  - models: [all]
+    severity: info
+    text: >
+      Out of scope: live view (an HTTP stream behind its own SSH port forward on pan/tilt
+      cameras), still and clip transfer (Content Transfer Mode, Remote Control with Transfer
+      Mode and the MediaProfile download of video-only models), FTP, firmware update, LUT and
+      scene file upload, and the stream setting lists. The module opens the session in Remote
+      Control Mode. Cameras that speak only Camera Control PTP 2 (such as ILCE-7M3, ILCE-6600,
+      ILCE-7RM3A and the earlier RX models) are not covered.
+
+  - models: [all]
+    severity: info
+    text: >
+      Cameras announce themselves over SSDP with the service type
+      urn:schemas-sony-com:service:DigitalImaging:1, pointing at a dd.xml whose
+      DigitalImagingDesc.xml says whether pairing or SSH is required. The core's discovery does
+      not query it yet: open the camera by address.

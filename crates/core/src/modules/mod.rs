@@ -21,6 +21,10 @@ mod sennheiser_d6000;
 mod sennheiser_ewdx;
 mod sennheiser_mcp;
 mod shure;
+mod sony_camera;
+mod sony_camera_dataset;
+mod sony_camera_props;
+mod sony_camera_ptpip;
 mod tsl;
 mod visca;
 mod vmix;
@@ -54,6 +58,7 @@ pub(crate) fn construct(
         "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
+        "sony-camera" => Ok(Box::new(sony_camera::SonyCamera::new(context)?)),
         // TSL defines no port, so the host must give one.
         "tsl-umd-listener" => match context.port {
             Some(port) => Ok(Box::new(tsl::Listener::new(port, &context.model))),
