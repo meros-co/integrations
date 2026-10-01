@@ -1,0 +1,1466 @@
+spec: 1
+id: aja-kumo
+name: AJA KUMO SDI routers and control panels
+vendor: AJA Video Systems
+category: router
+
+source:
+  - title: AJA KUMO REST Automation 4.7.1 (kumo_automation_4.7.1.zip, released March 14, 2024; archive built 2023-12-19)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/9616/kumo_automation_4.7.1.zip
+    note: >
+      Manufacturer package for KUMO 1616, 1616-12G, 3232, 3232-12G, 6464,
+      6464-12G, CP and CP2 (aja.com support item 9616), and the source of the
+      KUMO parameters here unless a command says otherwise.
+      kumo_control/kumo_control.h: crosspoints as eParamID_XPT_Destination{n}_Status
+      set to the source number (SetCrosspoint, GetCrosspoint), the whole
+      router as eParamID_XPT_DestinationAll_Status read with alt=text-plain
+      ([1,2,4,...], "{}" on firmware without it), salvos 1-8 as
+      eParamID_Salvo{n} holding {"index","name","valid","salvodata":[64
+      sources]} (SetSalvo, GetSalvo, written as a form POST to /options with
+      paramName and newValue), and TakeSalvo (eParamID_TakeSalvo).
+      kumo_control/main.cpp: destination button text
+      eParamID_XPT_Destination{n}_Line_1 and _Line_2, eParamID_SuppressPSAlarm.
+      config_control/config_control.h and main.cpp: the generic GET
+      /config?action=set|get, values as base-10 strings or enum numbers, and
+      eParamID_LED_Identify. python_examples: action=connect returning
+      {"connectionid"}, source button text eParamID_XPT_Source{n}_Line_1 and
+      _Line_2 (0-20 characters), button colors eParamID_Button_Settings_{n}
+      with {'classes': 'color_1'..'color_9'} and the button numbering
+      (ConfigureSources.py, GroupChangeColorSources_CL.py,
+      GroupChangeColorDests_CL.py), eParamID_KumoProductID (1 16x16, 2 16x04,
+      3 32x32, 5 64x64; OneToOneDiagonal_CL.py), HTTP 403 on an invalid or
+      locked switch, a 0.1 s pause between requests, and the
+      /authenticator/login cookie (KumoRtrWithAuth.py).
+  - title: KUMO Series Manual, Installation and Operation Guide, version 4.9 (November 1, 2024)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/9966/AJA_KUMO_Series_Manual_v4.9.pdf
+    note: >
+      Manufacturer-documented. Models and I/O counts (p.6-7), firmware
+      features: dual and quad modes from v3.0, salvos from v4.3, 6464-12G
+      serial 1RT901000 needs v4.9 (p.7, p.51); twenty presets (p.7, p.39-41);
+      takes, locked destinations and eight salvos (p.26-27, p.57); switching
+      modes, button names, colors, hide and lock (p.27-30); salvo editing and
+      take rules (p.30-39); user authentication and the default password
+      "password" (p.50); alarms (p.54-55); identify (p.55); control panels
+      (p.10, p.56-57); GVG Native Protocol over RS-422 and TCP (p.91-92).
+  - title: AJA REST API (gitlab.aja.com/pub/rest_api, master, April 2026) and Developer Guide v1.0 (January 29, 2021)
+    author: AJA Video Systems
+    url: https://gitlab.aja.com/pub/rest_api
+    note: >
+      Manufacturer-documented generic framework that "applies to most AJA
+      products that have a web user interface" (README). Chapter 1: /config
+      with action=get|set|connect|wait_for_config_events, paramid and value;
+      the JSON reply {paramid, name, value, value_name}; desc.json. Chapter 2:
+      /descriptors?paramid=, Events, and presets through eParamID_RegisterSave
+      and eParamID_RegisterRecall.
+  - title: Bitfocus Companion module aja-kumo (MIT), index.js and choices.js
+    url: https://github.com/bitfocus/companion-module-aja-kumo
+    note: >
+      Community source, MIT licence, used only where AJA publishes nothing:
+      eParamID_XPT_Destination{n}_Locked (1 lock, 0 unlock),
+      eParamID_NumberOfSources, eParamID_NumberOfDestinations, the
+      eParamID_KumoProductID values for the 12G routers and panels (6-12),
+      eParamID_TakeSalvo taking the salvo number as its value, the salvo JSON
+      reply's value being an object, and
+      /config?action=wait_for_config_events&configid=0&connectionid=N
+      returning [{param_id, int_value, str_value}]. Also corroborates the
+      AJA-documented crosspoint, name and salvo parameters.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe:
+    method: GET
+    path: /config
+    query: { action: get, paramid: eParamID_KumoProductID }
+
+models:
+  - id: kumo-1604
+    name: AJA KUMO 1604
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+    verification: none
+    notes: >
+      16 3G-SDI inputs, 4 outputs (manual v4.9 p.6); KumoProductID 2 (16x04). AJA's
+      button color scripts state they do not support the legacy 1604, so no color
+      commands are offered.
+  - id: kumo-1616
+    name: AJA KUMO 1616
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+      - set_source_color_1_16
+      - set_destination_color_1_16
+    verification: none
+    notes: >
+      16 3G-SDI inputs, 16 outputs (manual v4.9 p.6); KumoProductID 1 (16x16).
+  - id: kumo-1616-12g
+    name: AJA KUMO 1616-12G
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+      - set_source_color_1_16
+      - set_destination_color_1_16
+    verification: none
+    notes: >
+      16 12G-SDI inputs, 16 outputs (manual v4.9 p.6).
+  - id: kumo-3232
+    name: AJA KUMO 3232
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+      - set_source_color_1_16
+      - set_destination_color_1_16
+      - set_source_color_17_32
+      - set_destination_color_17_32
+    verification: none
+    notes: >
+      32 3G-SDI inputs, 32 outputs (manual v4.9 p.6); KumoProductID 3 (32x32).
+  - id: kumo-3232-12g
+    name: AJA KUMO 3232-12G
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+      - set_source_color_1_16
+      - set_destination_color_1_16
+      - set_source_color_17_32
+      - set_destination_color_17_32
+    verification: none
+    notes: >
+      32 12G-SDI inputs, 32 outputs (manual v4.9 p.6).
+  - id: kumo-6464
+    name: AJA KUMO 6464
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+      - set_source_color_1_16
+      - set_destination_color_1_16
+      - set_source_color_17_32
+      - set_destination_color_17_32
+      - set_source_color_33_64
+      - set_destination_color_33_64
+    verification: none
+    notes: >
+      64 3G-SDI inputs, 64 outputs (manual v4.9 p.6-7); KumoProductID 5 (64x64).
+  - id: kumo-6464-12g
+    name: AJA KUMO 6464-12G
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+      - set_route
+      - get_route
+      - get_all_routes
+      - set_source_label
+      - get_source_label
+      - set_destination_label
+      - get_destination_label
+      - lock_destination
+      - unlock_destination
+      - get_destination_lock
+      - set_salvo
+      - get_salvo
+      - take_salvo
+      - get_source_count
+      - get_destination_count
+      - get_ps_alarm_suppression
+      - set_source_color_1_16
+      - set_destination_color_1_16
+      - set_source_color_17_32
+      - set_destination_color_17_32
+      - set_source_color_33_64
+      - set_destination_color_33_64
+    verification: none
+    notes: >
+      64 12G-SDI inputs, 64 outputs (manual v4.9 p.7). Serial 1RT901000 and above needs
+      firmware 4.9 or later (p.7, p.51).
+  - id: kumo-cp
+    name: AJA KUMO CP (32-button control panel)
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+    verification: none
+    notes: >
+      Hardware panel controlling up to four KUMO routers (manual v4.9 p.10, p.56). AJA's
+      REST package lists it as compatible but documents no panel-specific parameter, so
+      only the generic /config access is offered; read the panel's desc.json for its
+      ids.
+  - id: kumo-cp2
+    name: AJA KUMO CP2 (64-button control panel)
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - identify_on
+      - identify_off
+      - get_product_id
+      - open_event_connection
+      - wait_for_events
+    verification: none
+    notes: >
+      Hardware panel controlling up to four KUMO routers (manual v4.9 p.10, p.56). As
+      for the KUMO CP, only the generic /config access is offered.
+commands:
+  # ── Generic parameter access (AJA REST API chapters 1-2) ────────────────
+  get_parameter:
+    summary: >
+      Read any parameter by id. Returns the JSON reply {paramid, name, value,
+      value_name}; ids are listed in the unit's desc.json
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "{paramid}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  set_parameter:
+    summary: >
+      Set any parameter by id. Enum parameters take the enum's number,
+      integers are base-10, strings are sent as they are (config_control.h)
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true }
+      value: { type: string, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "{paramid}", value: "{value}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_descriptor:
+    summary: Read one parameter's descriptor (type, enum values, range, persistence) as JSON
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true }
+    send:
+      method: GET
+      path: /descriptors
+      query: { paramid: "{paramid}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  get_all_descriptors:
+    summary: Read every parameter descriptor on the unit (desc.json)
+    send: { method: GET, path: /desc.json }
+    expect: { json_path: "$" }
+    returns: value
+
+  save_preset:
+    summary: >
+      Store the active configuration (switching mode, crosspoints, button
+      settings, salvos) into one of the twenty presets (eParamID_RegisterSave)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RegisterSave, value: "{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset:
+    summary: Recall one of the twenty presets into the active configuration (eParamID_RegisterRecall)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RegisterRecall, value: "{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  identify_on:
+    summary: Flash the unit's Identify LED (eParamID_LED_Identify 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_LED_Identify, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  identify_off:
+    summary: Stop flashing the Identify LED (eParamID_LED_Identify 0)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_LED_Identify, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_product_id:
+    summary: >
+      Read the product by name, such as KUMO 16x16 Matrix
+      (eParamID_KumoProductID; numbers 1 16x16, 2 16x04, 3 32x32, 5 64x64)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_KumoProductID }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  open_event_connection:
+    summary: Open an event connection (action=connect); returns the connection id for wait_for_events
+    send:
+      method: GET
+      path: /config
+      query: { action: connect }
+    expect: { json_path: "$.connectionid" }
+    returns: value
+
+  wait_for_events:
+    summary: >
+      Wait on an event connection for parameter changes
+      (action=wait_for_config_events). The reply, returned whole, is an array
+      of {param_id, int_value, str_value}; it is held until a change arrives
+    params:
+      connection: { type: int, min: 0, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: wait_for_config_events, configid: "0", connectionid: "{connection}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  # ── Crosspoints ─────────────────────────────────────────────────────────
+  set_route:
+    summary: >
+      Route a source to a destination (eParamID_XPT_Destination{n}_Status).
+      Refused with HTTP 403 when the destination is locked or out of range
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+      source: { type: int, min: 1, max: 64, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_XPT_Destination{destination}_Status", value: "{source}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_route:
+    summary: Read the source routed to a destination (eParamID_XPT_Destination{n}_Status)
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "eParamID_XPT_Destination{destination}_Status" }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  get_all_routes:
+    summary: >
+      Read every destination's source in one request
+      (eParamID_XPT_DestinationAll_Status), as text such as
+      [1,2,4,4,5,6,7,8,10,10,11,12,13,15,15,16] for destinations 1 upwards.
+      Fails on firmware without it, which answers {}
+    send:
+      method: GET
+      path: /options
+      query: { action: get, configid: "0", paramid: eParamID_XPT_DestinationAll_Status, alt: text-plain }
+    expect: { status: 200, matches: "^\\s*(\\[[0-9,]*\\])\\s*$" }
+    returns: value
+
+  # ── Button names (two lines of up to 20 characters) ────────────────────
+  set_source_label:
+    summary: Set line 1 or 2 of a source button's name (eParamID_XPT_Source{n}_Line_1/_2); empty clears it
+    params:
+      source: { type: int, min: 1, max: 64, required: true }
+      line: { type: int, min: 1, max: 2, required: true }
+      text: { type: string, max_length: 20, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_XPT_Source{source}_Line_{line}", value: "{text}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_source_label:
+    summary: Read line 1 or 2 of a source button's name
+    params:
+      source: { type: int, min: 1, max: 64, required: true }
+      line: { type: int, min: 1, max: 2, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "eParamID_XPT_Source{source}_Line_{line}" }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  set_destination_label:
+    summary: Set line 1 or 2 of a destination button's name (eParamID_XPT_Destination{n}_Line_1/_2); empty clears it
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+      line: { type: int, min: 1, max: 2, required: true }
+      text: { type: string, max_length: 20, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_XPT_Destination{destination}_Line_{line}", value: "{text}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_destination_label:
+    summary: Read line 1 or 2 of a destination button's name
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+      line: { type: int, min: 1, max: 2, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "eParamID_XPT_Destination{destination}_Line_{line}" }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  # ── Destination locks (community-documented parameter) ─────────────────
+  lock_destination:
+    summary: Lock a destination against source changes from every controller (eParamID_XPT_Destination{n}_Locked 1)
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_XPT_Destination{destination}_Locked", value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  unlock_destination:
+    summary: Unlock a destination (eParamID_XPT_Destination{n}_Locked 0); any controller may release a lock
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_XPT_Destination{destination}_Locked", value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_destination_lock:
+    summary: Read a destination's lock, 1 locked or 0 unlocked (eParamID_XPT_Destination{n}_Locked)
+    params:
+      destination: { type: int, min: 1, max: 64, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "eParamID_XPT_Destination{destination}_Locked" }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  # ── Salvos (firmware v4.3 and above) ────────────────────────────────────
+  set_salvo:
+    summary: >
+      Write salvo 1-8 (eParamID_Salvo{n}) as AJA's SetSalvo does: a form
+      POST to /options with the name, valid (true highlights the salvo's
+      button) and 64 comma-separated source numbers, one per destination
+      1-64, 0 for destinations the salvo leaves alone or the router lacks
+    params:
+      salvo: { type: int, min: 1, max: 8, required: true }
+      name: { type: string, pattern: "^[^&%+=]{1,32}$", required: true }
+      valid: { type: bool, default: true }
+      sources:
+        type: string
+        pattern: "^(0|[1-9]|[1-5][0-9]|6[0-4])(,(0|[1-9]|[1-5][0-9]|6[0-4])){63}$"
+        required: true
+    send:
+      method: POST
+      path: /options
+      content_type: application/x-www-form-urlencoded
+      body: "paramName=eParamID_Salvo{salvo}&newValue={\"index\":\"{salvo}\",\"name\":{name:json},\"valid\":\"{valid}\",\"salvodata\":[{sources}]}"
+    expect: { status: 200 }
+    returns: ack
+
+  get_salvo:
+    summary: Read salvo 1-8 (eParamID_Salvo{n}); returns {index, name, valid, salvodata[64]}
+    params:
+      salvo: { type: int, min: 1, max: 8, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: "eParamID_Salvo{salvo}" }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  take_salvo:
+    summary: >
+      Take salvo 1-8 (eParamID_TakeSalvo), whether or not it is marked
+      valid. Locked destinations are left unchanged
+    params:
+      salvo: { type: int, min: 1, max: 8, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TakeSalvo, value: "{salvo}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Button colors (color_1 red, color_2 orange, color_3 gold, color_4
+  #    default, color_5 green, color_6 mint, color_7 blue, color_8 purple,
+  #    color_9 pink). eParamID_Button_Settings_{n} numbers sources 1-16 as
+  #    1-16, 17-32 as 33-48, 33-64 as 65-96, and destinations 1-16 as 17-32,
+  #    17-32 as 49-64, 33-64 as 97-128, so each bank is its own command.
+  set_source_color_1_16:
+    summary: Color source button 1-16 (eParamID_Button_Settings_1 to _16)
+    params:
+      source: { type: int, min: 1, max: 16, required: true }
+      color: { type: enum, values: [color_1, color_2, color_3, color_4, color_5, color_6, color_7, color_8, color_9], required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_Button_Settings_{source}", value: "{'classes': '{color}'}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_color_17_32:
+    summary: Color source button 17-32 (eParamID_Button_Settings_33 to _48)
+    params:
+      source: { type: int, min: 17, max: 32, required: true }
+      color: { type: enum, values: [color_1, color_2, color_3, color_4, color_5, color_6, color_7, color_8, color_9], required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_Button_Settings_{source:+16}", value: "{'classes': '{color}'}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_color_33_64:
+    summary: Color source button 33-64 (eParamID_Button_Settings_65 to _96)
+    params:
+      source: { type: int, min: 33, max: 64, required: true }
+      color: { type: enum, values: [color_1, color_2, color_3, color_4, color_5, color_6, color_7, color_8, color_9], required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_Button_Settings_{source:+32}", value: "{'classes': '{color}'}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_destination_color_1_16:
+    summary: Color destination button 1-16 (eParamID_Button_Settings_17 to _32)
+    params:
+      destination: { type: int, min: 1, max: 16, required: true }
+      color: { type: enum, values: [color_1, color_2, color_3, color_4, color_5, color_6, color_7, color_8, color_9], required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_Button_Settings_{destination:+16}", value: "{'classes': '{color}'}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_destination_color_17_32:
+    summary: Color destination button 17-32 (eParamID_Button_Settings_49 to _64)
+    params:
+      destination: { type: int, min: 17, max: 32, required: true }
+      color: { type: enum, values: [color_1, color_2, color_3, color_4, color_5, color_6, color_7, color_8, color_9], required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_Button_Settings_{destination:+32}", value: "{'classes': '{color}'}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_destination_color_33_64:
+    summary: Color destination button 33-64 (eParamID_Button_Settings_97 to _128)
+    params:
+      destination: { type: int, min: 33, max: 64, required: true }
+      color: { type: enum, values: [color_1, color_2, color_3, color_4, color_5, color_6, color_7, color_8, color_9], required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "eParamID_Button_Settings_{destination:+64}", value: "{'classes': '{color}'}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Router information and alarms ───────────────────────────────────────
+  get_source_count:
+    summary: Read the number of sources in the current switching mode (eParamID_NumberOfSources)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_NumberOfSources }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  get_destination_count:
+    summary: Read the number of destinations in the current switching mode (eParamID_NumberOfDestinations)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_NumberOfDestinations }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  get_ps_alarm_suppression:
+    summary: Read the power supply alarm setting by name (eParamID_SuppressPSAlarm)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_SuppressPSAlarm }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+telemetry:
+  # The router pushes parameter changes over an event connection (connect,
+  # then wait_for_config_events with the returned id), which the format
+  # cannot drive: a reply value cannot be carried into a later request. So
+  # the whole routing map is asked for every two seconds, in one request,
+  # and names, locks, salvos and the product are asked once on connecting.
+  # Every command reply also goes through these rules, so this client's own
+  # changes appear at once.
+  subscribe:
+    send:
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_KumoProductID } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_NumberOfSources } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_NumberOfDestinations } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_SuppressPSAlarm } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source1_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source1_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source2_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source2_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source3_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source3_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source4_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source4_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source5_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source5_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source6_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source6_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source7_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source7_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source8_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source8_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source9_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source9_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source10_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source10_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source11_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source11_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source12_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source12_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source13_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source13_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source14_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source14_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source15_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source15_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source16_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source16_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source17_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source17_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source18_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source18_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source19_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source19_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source20_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source20_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source21_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source21_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source22_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source22_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source23_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source23_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source24_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source24_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source25_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source25_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source26_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source26_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source27_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source27_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source28_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source28_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source29_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source29_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source30_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source30_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source31_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source31_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source32_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source32_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source33_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source33_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source34_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source34_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source35_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source35_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source36_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source36_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source37_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source37_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source38_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source38_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source39_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source39_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source40_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source40_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source41_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source41_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source42_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source42_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source43_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source43_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source44_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source44_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source45_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source45_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source46_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source46_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source47_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source47_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source48_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source48_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source49_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source49_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source50_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source50_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source51_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source51_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source52_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source52_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source53_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source53_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source54_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source54_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source55_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source55_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source56_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source56_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source57_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source57_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source58_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source58_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source59_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source59_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source60_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source60_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source61_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source61_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source62_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source62_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source63_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source63_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source64_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Source64_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination1_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination1_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination1_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination2_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination2_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination2_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination3_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination3_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination3_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination4_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination4_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination4_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination5_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination5_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination5_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination6_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination6_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination6_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination7_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination7_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination7_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination8_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination8_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination8_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination9_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination9_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination9_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination10_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination10_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination10_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination11_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination11_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination11_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination12_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination12_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination12_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination13_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination13_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination13_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination14_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination14_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination14_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination15_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination15_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination15_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination16_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination16_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination16_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination17_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination17_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination17_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination18_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination18_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination18_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination19_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination19_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination19_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination20_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination20_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination20_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination21_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination21_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination21_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination22_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination22_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination22_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination23_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination23_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination23_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination24_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination24_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination24_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination25_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination25_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination25_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination26_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination26_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination26_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination27_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination27_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination27_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination28_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination28_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination28_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination29_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination29_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination29_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination30_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination30_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination30_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination31_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination31_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination31_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination32_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination32_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination32_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination33_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination33_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination33_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination34_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination34_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination34_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination35_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination35_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination35_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination36_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination36_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination36_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination37_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination37_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination37_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination38_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination38_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination38_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination39_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination39_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination39_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination40_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination40_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination40_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination41_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination41_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination41_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination42_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination42_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination42_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination43_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination43_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination43_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination44_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination44_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination44_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination45_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination45_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination45_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination46_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination46_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination46_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination47_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination47_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination47_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination48_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination48_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination48_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination49_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination49_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination49_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination50_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination50_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination50_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination51_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination51_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination51_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination52_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination52_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination52_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination53_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination53_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination53_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination54_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination54_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination54_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination55_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination55_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination55_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination56_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination56_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination56_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination57_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination57_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination57_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination58_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination58_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination58_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination59_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination59_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination59_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination60_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination60_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination60_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination61_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination61_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination61_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination62_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination62_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination62_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination63_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination63_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination63_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination64_Line_1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination64_Line_2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_XPT_Destination64_Locked } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo1 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo2 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo3 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo4 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo5 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo6 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo7 } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo8 } }
+  poll:
+    every_ms: 2000
+    send:
+      - { method: GET, path: /options, query: { action: get, configid: "0", paramid: eParamID_XPT_DestinationAll_Status, alt: text-plain } }
+  updates:
+    # Every /config get or set reply is {paramid, name, value, value_name}.
+    - path: "^/config\\?action=(get|set)&paramid="
+      json: { name: "$.name", value: "$.value", value_name: "$.value_name" }
+      state:
+        "params.{name}.value": "{value}"
+        "params.{name}.value_name": "{value_name}"
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_XPT_Destination(\\d+)_Status(?:&|$)"
+      json: { source: "$.value" }
+      state: { "outputs.{1}.input": "{source}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_XPT_Destination(\\d+)_Line_1(?:&|$)"
+      json: { text: "$.value" }
+      state: { "outputs.{1}.label_line_1": "{text}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_XPT_Destination(\\d+)_Line_2(?:&|$)"
+      json: { text: "$.value" }
+      state: { "outputs.{1}.label_line_2": "{text}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_XPT_Source(\\d+)_Line_1(?:&|$)"
+      json: { text: "$.value" }
+      state: { "inputs.{1}.label_line_1": "{text}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_XPT_Source(\\d+)_Line_2(?:&|$)"
+      json: { text: "$.value" }
+      state: { "inputs.{1}.label_line_2": "{text}" }
+    - path: "^/config\\?action=(?:get|set)&paramid=eParamID_XPT_Destination(\\d+)_Locked(?:&|$)"
+      json: { locked: "$.value" }
+      state:
+        "outputs.{1}.locked": { value: "{locked}", map: { "0": false, "1": true } }
+    - path: "^/config\\?action=get&paramid=eParamID_Salvo(\\d+)$"
+      json: { name: "$.value.name", valid: "$.value.valid" }
+      state:
+        "salvos.{1}.name": "{name}"
+        "salvos.{1}.valid": { value: "{valid}", map: { "true": true, "false": false } }
+    - path: "^/config\\?action=get&paramid=eParamID_KumoProductID$"
+      json: { code: "$.value", name: "$.value_name" }
+      state:
+        device.product_id: "{code}"
+        device.product: "{name}"
+    - path: "^/config\\?action=get&paramid=eParamID_NumberOfSources$"
+      json: { n: "$.value" }
+      state: { device.sources: "{n}" }
+    - path: "^/config\\?action=get&paramid=eParamID_NumberOfDestinations$"
+      json: { n: "$.value" }
+      state: { device.destinations: "{n}" }
+    # eParamID_XPT_DestinationAll_Status from a router with 1 destination(s)
+    - match: "^\\[(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+    # eParamID_XPT_DestinationAll_Status from a router with 2 destination(s)
+    - match: "^\\[(\\d+),(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+        outputs.2.input: "{2}"
+    # eParamID_XPT_DestinationAll_Status from a router with 4 destination(s)
+    - match: "^\\[(\\d+),(\\d+),(\\d+),(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+        outputs.2.input: "{2}"
+        outputs.3.input: "{3}"
+        outputs.4.input: "{4}"
+    # eParamID_XPT_DestinationAll_Status from a router with 8 destination(s)
+    - match: "^\\[(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+        outputs.2.input: "{2}"
+        outputs.3.input: "{3}"
+        outputs.4.input: "{4}"
+        outputs.5.input: "{5}"
+        outputs.6.input: "{6}"
+        outputs.7.input: "{7}"
+        outputs.8.input: "{8}"
+    # eParamID_XPT_DestinationAll_Status from a router with 16 destination(s)
+    - match: "^\\[(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+        outputs.2.input: "{2}"
+        outputs.3.input: "{3}"
+        outputs.4.input: "{4}"
+        outputs.5.input: "{5}"
+        outputs.6.input: "{6}"
+        outputs.7.input: "{7}"
+        outputs.8.input: "{8}"
+        outputs.9.input: "{9}"
+        outputs.10.input: "{10}"
+        outputs.11.input: "{11}"
+        outputs.12.input: "{12}"
+        outputs.13.input: "{13}"
+        outputs.14.input: "{14}"
+        outputs.15.input: "{15}"
+        outputs.16.input: "{16}"
+    # eParamID_XPT_DestinationAll_Status from a router with 32 destination(s)
+    - match: "^\\[(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+        outputs.2.input: "{2}"
+        outputs.3.input: "{3}"
+        outputs.4.input: "{4}"
+        outputs.5.input: "{5}"
+        outputs.6.input: "{6}"
+        outputs.7.input: "{7}"
+        outputs.8.input: "{8}"
+        outputs.9.input: "{9}"
+        outputs.10.input: "{10}"
+        outputs.11.input: "{11}"
+        outputs.12.input: "{12}"
+        outputs.13.input: "{13}"
+        outputs.14.input: "{14}"
+        outputs.15.input: "{15}"
+        outputs.16.input: "{16}"
+        outputs.17.input: "{17}"
+        outputs.18.input: "{18}"
+        outputs.19.input: "{19}"
+        outputs.20.input: "{20}"
+        outputs.21.input: "{21}"
+        outputs.22.input: "{22}"
+        outputs.23.input: "{23}"
+        outputs.24.input: "{24}"
+        outputs.25.input: "{25}"
+        outputs.26.input: "{26}"
+        outputs.27.input: "{27}"
+        outputs.28.input: "{28}"
+        outputs.29.input: "{29}"
+        outputs.30.input: "{30}"
+        outputs.31.input: "{31}"
+        outputs.32.input: "{32}"
+    # eParamID_XPT_DestinationAll_Status from a router with 64 destination(s)
+    - match: "^\\[(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)\\]$"
+      state:
+        outputs.1.input: "{1}"
+        outputs.2.input: "{2}"
+        outputs.3.input: "{3}"
+        outputs.4.input: "{4}"
+        outputs.5.input: "{5}"
+        outputs.6.input: "{6}"
+        outputs.7.input: "{7}"
+        outputs.8.input: "{8}"
+        outputs.9.input: "{9}"
+        outputs.10.input: "{10}"
+        outputs.11.input: "{11}"
+        outputs.12.input: "{12}"
+        outputs.13.input: "{13}"
+        outputs.14.input: "{14}"
+        outputs.15.input: "{15}"
+        outputs.16.input: "{16}"
+        outputs.17.input: "{17}"
+        outputs.18.input: "{18}"
+        outputs.19.input: "{19}"
+        outputs.20.input: "{20}"
+        outputs.21.input: "{21}"
+        outputs.22.input: "{22}"
+        outputs.23.input: "{23}"
+        outputs.24.input: "{24}"
+        outputs.25.input: "{25}"
+        outputs.26.input: "{26}"
+        outputs.27.input: "{27}"
+        outputs.28.input: "{28}"
+        outputs.29.input: "{29}"
+        outputs.30.input: "{30}"
+        outputs.31.input: "{31}"
+        outputs.32.input: "{32}"
+        outputs.33.input: "{33}"
+        outputs.34.input: "{34}"
+        outputs.35.input: "{35}"
+        outputs.36.input: "{36}"
+        outputs.37.input: "{37}"
+        outputs.38.input: "{38}"
+        outputs.39.input: "{39}"
+        outputs.40.input: "{40}"
+        outputs.41.input: "{41}"
+        outputs.42.input: "{42}"
+        outputs.43.input: "{43}"
+        outputs.44.input: "{44}"
+        outputs.45.input: "{45}"
+        outputs.46.input: "{46}"
+        outputs.47.input: "{47}"
+        outputs.48.input: "{48}"
+        outputs.49.input: "{49}"
+        outputs.50.input: "{50}"
+        outputs.51.input: "{51}"
+        outputs.52.input: "{52}"
+        outputs.53.input: "{53}"
+        outputs.54.input: "{54}"
+        outputs.55.input: "{55}"
+        outputs.56.input: "{56}"
+        outputs.57.input: "{57}"
+        outputs.58.input: "{58}"
+        outputs.59.input: "{59}"
+        outputs.60.input: "{60}"
+        outputs.61.input: "{61}"
+        outputs.62.input: "{62}"
+        outputs.63.input: "{63}"
+        outputs.64.input: "{64}"
+state:
+  params.*.value: { type: string, description: "A parameter's last value read or set, keyed by its eParamID name: the enum's number, an integer, or a string" }
+  params.*.value_name: { type: string, description: "A parameter's value as text: the enum's name, or the integer repeated" }
+  device.product_id: { type: int, description: "eParamID_KumoProductID: 1 16x16, 2 16x04, 3 32x32, 5 64x64 (AJA); 4 32x4, 6-9 control panels, 10-12 12G routers (community)" }
+  device.product: { type: string, description: "The product as the unit names it, such as KUMO 16x16 Matrix" }
+  device.sources: { type: int, description: "Number of sources in the current switching mode" }
+  device.destinations: { type: int, description: "Number of destinations in the current switching mode" }
+  outputs.*.input: { type: int, description: "Source routed to the destination, both numbered from 1 as on the WebUI" }
+  outputs.*.label_line_1: { type: string, description: "Destination button name, line 1" }
+  outputs.*.label_line_2: { type: string, description: "Destination button name, line 2" }
+  outputs.*.locked: { type: bool, description: "True when the destination is locked against source changes" }
+  inputs.*.label_line_1: { type: string, description: "Source button name, line 1" }
+  inputs.*.label_line_2: { type: string, description: "Source button name, line 2" }
+  salvos.*.name: { type: string, description: "Salvo name, salvos 1-8" }
+  salvos.*.valid: { type: bool, description: "True when the salvo is configured (its WebUI button is highlighted green)" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Sources and destinations are numbered from 1 on the wire, as on the
+      WebUI (kumo_control.h: "1-based source number"). In Dual and Quad
+      switching modes (firmware v3.0 and above) the router has a half or a
+      quarter as many sources and destinations, each a group of BNCs (manual
+      p.27-29), and the numbers address those groups. Changing the mode
+      resets button names and colors to the mode's defaults (p.27).
+
+  - models: [all]
+    severity: warning
+    text: >
+      The format declares one range per command, so destination and source
+      numbers accept 1-64 on every router. A number above the router's
+      count in its current mode (device.sources, device.destinations) is
+      refused by the router; AJA's OneToOneDiagonal_CL.py reports such
+      failures, and switches to a locked destination, as HTTP 403.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Locked destinations cannot be switched, and salvos skip them (manual
+      p.26-27). A lock is universal: it is tallied across the network and
+      any controller can release it (p.30). The lock parameter
+      eParamID_XPT_Destination{n}_Locked is not in AJA's documents; it is
+      taken from the MIT Bitfocus Companion module, which also notes that
+      the router does not reliably report lock changes as events.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The router pushes changes over an event connection: GET
+      /config?action=connect returns {"connectionid": N}, then GET
+      /config?action=wait_for_config_events&configid=0&connectionid=N is
+      held until changes arrive and returns [{param_id, int_value,
+      str_value}]. The format cannot carry the connection id into the next
+      request, so routing is polled every two seconds with
+      eParamID_XPT_DestinationAll_Status, and names, locks and salvos are
+      read once on connecting; changes to those by other controllers are
+      seen only after reconnecting or a get_* command. open_event_connection
+      and wait_for_events are offered for a host that drives the loop itself;
+      a wait may outlast the 4-second request timeout when nothing changes.
+
+  - models: [all]
+    severity: warning
+    text: >
+      eParamID_XPT_DestinationAll_Status needs firmware that has it; older
+      firmware answers {} (kumo_control main.cpp), and the poll then updates
+      nothing, so routing comes only from get_route and set_route replies.
+      AJA reads it through /options?action=get&configid=0&...&alt=text-plain,
+      which this spec sends as documented; it is the only /options read.
+
+  - models: [all]
+    severity: info
+    text: >
+      AJA's examples pause between requests "to not overload queue" (0.1 s in
+      the python examples, 0.25 s in OneToAll.py). The core sends one request
+      at a time, waiting for each reply, but does not add a pause.
+
+  - models: [all]
+    severity: warning
+    text: >
+      With User Authentication set to Login (default Disabled; default
+      password "password", manual p.50) every request needs the session
+      cookie from a form POST of password_provided to /authenticator/login
+      (KumoRtrWithAuth.py). The format has no cookie login, so the unit must
+      have User Authentication set to Disabled.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Every action is an HTTP GET with action=set; a logged, cached or
+      replayed URL repeats it.
+
+  - models: [kumo-1604, kumo-1616, kumo-1616-12g, kumo-3232, kumo-3232-12g, kumo-6464, kumo-6464-12g]
+    severity: warning
+    text: >
+      Salvos need firmware v4.3 or above (manual p.7). set_salvo writes the
+      whole salvo: always 64 sources, one per destination 1-64. AJA's
+      kumo_control.h says a source of 0 "causes the router output to be
+      turned off", while its demo uses 0 for destinations "either not present
+      ... or whose inputs don't matter", and the manual says unassigned
+      crosspoints in a salvo leave the destination unchanged (p.32-33); the
+      effect of 0 is therefore unclear. The salvo is sent, as in AJA's
+      SetSalvo, as a form body without percent-encoding, so its name may not
+      contain &, %, + or =. Salvo names should be unique (p.32).
+
+  - models: [kumo-1604, kumo-1616, kumo-1616-12g, kumo-3232, kumo-3232-12g, kumo-6464, kumo-6464-12g]
+    severity: warning
+    text: >
+      take_salvo sends the salvo number as the value of eParamID_TakeSalvo,
+      as the Companion module does. AJA's own TakeSalvo(salvoNum) documents
+      taking "the indicated salvo" but sends the constant 1 whatever the
+      number, so AJA's documents do not settle the value for salvos 2-8.
+
+  - models: [kumo-1616, kumo-1616-12g, kumo-3232, kumo-3232-12g, kumo-6464, kumo-6464-12g]
+    severity: info
+    text: >
+      Button colors are written as AJA's python scripts send them, the value
+      {'classes': 'color_N'} (a Python dictionary printed with single
+      quotes), percent-encoded. The color applies to both the button's static
+      and active (high tally) states (manual p.29). AJA's color scripts note
+      that they do not support the legacy KUMO 1604.
+
+  - models: [all]
+    severity: info
+    text: >
+      eParamID_LED_Identify comes from AJA's generic config_control example
+      in the KUMO package; the manual describes Identify only from the WebUI
+      (p.55). Identify stays on until it is turned off.
+
+  - models: [all]
+    severity: info
+    text: >
+      AJA documents only these KUMO parameters. Others, such as alarm
+      suppression for reference and temperature, switching mode, hidden
+      destinations and the 6464-12G long-cable setting, are listed with
+      their ids in the unit's desc.json and reached through get_parameter
+      and set_parameter. eParamID_SuppressPSAlarm is read by AJA's demo
+      without its values being described.
+
+  - models: [kumo-cp, kumo-cp2]
+    severity: info
+    text: >
+      AJA lists the CP and CP2 as compatible with the KUMO REST package but
+      documents no panel parameter (router delegation, display intensity,
+      enabled buttons); use desc.json and get_parameter or set_parameter.
+      The 32-button CP controls only the first 32 sources and destinations of
+      a KUMO 6464 in Normal mode (manual p.10).
+
+  - models: [kumo-1604, kumo-1616, kumo-1616-12g, kumo-3232, kumo-3232-12g, kumo-6464, kumo-6464-12g]
+    severity: info
+    text: >
+      The routers also take GVG Native Protocol (Series 7000) over RS-422 at
+      38400 8N1 or over TCP, up to 32 connections (manual p.91-92), with
+      takes by index or name, salvo takes by name, protect and unprotect, and
+      name queries. This spec covers the HTTP interface only.
