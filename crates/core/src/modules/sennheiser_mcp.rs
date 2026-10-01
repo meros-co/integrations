@@ -405,7 +405,9 @@ fn parse_rf_config(line: &str) -> Value {
         .filter_map(|v| v.parse().ok())
         .collect();
     let blocks: Vec<Value> = numbers
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .map(|c| json!({"min_khz": c[0], "max_khz": c[1], "step_khz": c[2]}))
         .collect();
     json!(blocks)

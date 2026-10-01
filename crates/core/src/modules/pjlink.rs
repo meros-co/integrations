@@ -312,7 +312,7 @@ impl PjLink {
             bodies.extend(IDENTITY);
         }
         bodies.extend(STATUS);
-        if self.cycle % SLOW_EVERY == 0 {
+        if self.cycle.is_multiple_of(SLOW_EVERY) {
             bodies.extend(SLOW);
         }
         self.cycle = self.cycle.wrapping_add(1);
@@ -1200,7 +1200,7 @@ fn errors(p: &str) -> Option<Value> {
 /// LAMP ? (§4.8): pairs of hours (0-99999) and on (1) or off (0), 1-8 lamps.
 fn lamps(p: &str) -> Option<Vec<Value>> {
     let parts: Vec<&str> = p.split(' ').filter(|s| !s.is_empty()).collect();
-    if parts.is_empty() || parts.len() % 2 != 0 || parts.len() > 16 {
+    if parts.is_empty() || !parts.len().is_multiple_of(2) || parts.len() > 16 {
         return None;
     }
     parts

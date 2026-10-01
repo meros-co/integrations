@@ -105,7 +105,7 @@ async fn x32_over_udp() {
     fn osc_string(s: &str) -> Vec<u8> {
         let mut b = s.as_bytes().to_vec();
         b.push(0);
-        while b.len() % 4 != 0 {
+        while !b.len().is_multiple_of(4) {
             b.push(0);
         }
         b

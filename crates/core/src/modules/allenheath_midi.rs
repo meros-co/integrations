@@ -396,7 +396,7 @@ pub(crate) fn read_name(bytes: &[u8]) -> String {
 /// Hex text such as `"B0 63 00"` to bytes.
 pub(crate) fn parse_hex(text: &str) -> Result<Vec<u8>, String> {
     let digits: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-    if digits.is_empty() || digits.len() % 2 != 0 {
+    if digits.is_empty() || !digits.len().is_multiple_of(2) {
         return Err("give whole bytes in hex, such as 'B0 63 00'".into());
     }
     (0..digits.len())

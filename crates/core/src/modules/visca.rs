@@ -2022,7 +2022,7 @@ impl Visca {
 
 fn parse_hex(s: &str) -> Option<Vec<u8>> {
     let digits: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if digits.is_empty() || digits.len() % 2 != 0 {
+    if digits.is_empty() || !digits.len().is_multiple_of(2) {
         return None;
     }
     (0..digits.len())
