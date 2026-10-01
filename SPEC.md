@@ -206,6 +206,28 @@ operator's configuration before the socket opens, never from anything the device
 sends. QLab needs it: a workspace without a passcode expects no `/connect`, and
 repeated wrong passcodes, including an empty one, add a growing delay.
 
+Some devices ask for a password with a prompt and read anything sent before it
+as a command. On a line transport, a step can wait for that prompt:
+
+```yaml
+on_connect:
+  - when_set: password
+    after_prompt: "Enter password:"
+    send: "{settings.password}"
+    refused: "^(Authentication error|Wait a moment)"
+```
+
+`after_prompt` is literal text, looked for in the raw stream because a prompt
+usually has no line ending; what arrives before it is discarded. Until it
+arrives nothing is sent, commands wait, and the device is not reported
+connected. Without it within the transport's timeout, the connection is
+dropped and retried with backoff. `refused` is a regex over reply lines: a
+match means the device refused the credential, which is terminal as for HTTP
+(§2): commands fail with `auth`, the connection reports `unauthorized`, and the
+password is not sent again until the host opens the device with corrected
+settings. This is still not a handshake: the step is sent once, unchanged,
+whatever the device says.
+
 ## 3. Models and capabilities
 
 A spec covers a device family. Differences between models are expressed as data.

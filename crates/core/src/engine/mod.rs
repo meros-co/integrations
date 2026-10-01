@@ -37,6 +37,7 @@ const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
 const RENEW: Key = "telemetry-renew";
 const POLL: Key = "telemetry-poll";
+const PROMPT: Key = "login-prompt";
 
 const DEFAULT_TIMEOUT: Millis = 2_000;
 /// A device silent this long, with nothing in flight, is probed.
@@ -148,6 +149,13 @@ pub(crate) struct SpecEngine {
     /// credential is never presented again, since repeated failures can lock
     /// a device out. The host re-opens the device with corrected settings.
     refused: Option<String>,
+    /// An `on_connect` step waiting for its `after_prompt` text: the step's
+    /// index, the prompt, and what has arrived so far. Nothing else is sent,
+    /// and the link is not reported connected, until the prompt arrives.
+    prompt_wait: Option<(usize, String, Vec<u8>)>,
+    /// `refused` patterns of the login steps sent: a line matching one is the
+    /// device refusing the credential.
+    refusals: Vec<Regex>,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -264,6 +272,8 @@ impl SpecEngine {
             telemetry,
             request_paths: Default::default(),
             refused: None,
+            prompt_wait: None,
+            refusals: Vec::new(),
         })
     }
 
@@ -653,7 +663,7 @@ impl SpecEngine {
             }
             Transport::OscUdp { .. } => {
                 cx.udp_open(SOCKET, Bind::Ephemeral);
-                self.send_on_connect(cx);
+                self.send_on_connect(cx, 0, false);
                 self.start_telemetry(cx);
                 if replies && self.probe.is_some() {
                     self.enqueue_probe(cx);
@@ -689,18 +699,23 @@ impl SpecEngine {
         self.backoff = (self.backoff * 2).min(RECONNECT_MAX);
     }
 
-    /// The fixed connection sequence, SPEC.md §2. Nothing waits on a reply:
-    /// it is not a handshake.
-    fn send_on_connect(&mut self, cx: &mut Cx) {
+    /// The fixed connection sequence, SPEC.md §2, from step `from`. Nothing
+    /// waits on a reply: it is not a handshake. A step with `after_prompt`
+    /// first waits for the device's prompt text: this then returns false, and
+    /// the sequence resumes at that step, with `prompted`, when it arrives.
+    fn send_on_connect(&mut self, cx: &mut Cx, from: usize, prompted: bool) -> bool {
         let empty = Params::new();
         let empty_specs = BTreeMap::new();
-        for step in self.spec.on_connect.clone() {
-            let (item, when_set) = match &step {
-                Value::Object(m) if m.contains_key("when_set") => (
+        let steps = self.spec.on_connect.clone();
+        for (index, step) in steps.iter().enumerate().skip(from) {
+            let (item, when_set, prompt, refused) = match step {
+                Value::Object(m) if m.contains_key("send") => (
                     m.get("send").cloned().unwrap_or(Value::Null),
                     m.get("when_set").and_then(Value::as_str),
+                    m.get("after_prompt").and_then(Value::as_str),
+                    m.get("refused").and_then(Value::as_str),
                 ),
-                other => (other.clone(), None),
+                other => (other.clone(), None, None, None),
             };
             if let Some(setting) = when_set {
                 let set = self
@@ -709,6 +724,19 @@ impl SpecEngine {
                     .is_some_and(|v| !v.is_null() && v.as_str() != Some(""));
                 if !set {
                     continue;
+                }
+            }
+            if let Some(prompt) = prompt {
+                if !(prompted && index == from) {
+                    self.prompt_wait = Some((index, prompt.to_string(), Vec::new()));
+                    cx.set_timer(PROMPT, self.timeout);
+                    return false;
+                }
+            }
+            if let Some(pattern) = refused {
+                match Regex::new(pattern) {
+                    Ok(re) => self.refusals.push(re),
+                    Err(e) => cx.log(Level::Warning, format!("on_connect refused: {e}")),
                 }
             }
             let values = self.values(&empty, &empty_specs);
@@ -727,6 +755,15 @@ impl SpecEngine {
                 Err(e) => cx.log(Level::Warning, format!("on_connect step not sent: {e}")),
             }
         }
+        true
+    }
+
+    /// The connection sequence is done: report the link and start traffic.
+    fn ready(&mut self, cx: &mut Cx) {
+        self.set_link(cx, Connection::Connected);
+        cx.set_timer(PROBE, PROBE_WHEN_IDLE);
+        self.start_telemetry(cx);
+        self.pump(cx);
     }
 
     fn enqueue_probe(&mut self, cx: &mut Cx) {
@@ -821,6 +858,10 @@ impl SpecEngine {
     }
 
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
+        if self.refusals.iter().any(|re| re.is_match(&message)) {
+            self.refuse(cx, format!("login refused: {}", message.trim()));
+            return;
+        }
         self.apply_text(cx, &message);
         let waiting = matches!(
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
@@ -945,13 +986,36 @@ impl Module for SpecEngine {
             TcpInput::Connected => {
                 self.backoff = RECONNECT_MIN;
                 self.last_heard = cx.now();
-                self.send_on_connect(cx);
-                self.set_link(cx, Connection::Connected);
-                cx.set_timer(PROBE, PROBE_WHEN_IDLE);
-                self.start_telemetry(cx);
-                self.pump(cx);
+                self.prompt_wait = None;
+                self.refusals.clear();
+                if self.send_on_connect(cx, 0, false) {
+                    self.ready(cx);
+                }
             }
-            TcpInput::Data(bytes) => {
+            TcpInput::Data(mut bytes) => {
+                if let Some((step, prompt, seen)) = self.prompt_wait.as_mut() {
+                    // The prompt has no line ending, so it is looked for in the
+                    // raw stream; what came before it is the greeting.
+                    seen.extend_from_slice(&bytes);
+                    let Some(at) = find(seen, prompt.as_bytes()) else {
+                        if seen.len() > 4096 {
+                            let keep = prompt.len();
+                            seen.drain(..seen.len() - keep);
+                        }
+                        return;
+                    };
+                    bytes = seen.split_off(at + prompt.len());
+                    let step = *step;
+                    self.prompt_wait = None;
+                    cx.cancel_timer(PROMPT);
+                    self.last_heard = cx.now();
+                    if self.send_on_connect(cx, step, true) {
+                        self.ready(cx);
+                    }
+                    if self.prompt_wait.is_some() || bytes.is_empty() {
+                        return;
+                    }
+                }
                 if let Some(framer) = self.framer.as_mut() {
                     for message in framer.feed(&bytes) {
                         self.inbound_text(cx, message);
@@ -1067,6 +1131,11 @@ impl Module for SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             RECONNECT => self.connect(cx),
+            PROMPT => {
+                if self.prompt_wait.take().is_some() {
+                    self.lost(cx, "no login prompt within the timeout".into());
+                }
+            }
             RENEW => {
                 let items = self.telemetry.subscribe.clone();
                 self.send_telemetry(cx, items, false);
@@ -1088,6 +1157,14 @@ impl Module for SpecEngine {
     fn stop(&mut self, cx: &mut Cx) {
         cx.tcp_close(SOCKET);
     }
+}
+
+/// Where `needle` first occurs in `haystack`.
+fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 #[cfg(test)]
@@ -1120,6 +1197,99 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    /// Kramer's line spec, with a login that waits for a password prompt.
+    fn prompted_login() -> SpecEngine {
+        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        spec.on_connect = vec![json!({
+            "after_prompt": "Enter password:",
+            "send": "s3cret",
+            "refused": "^Authentication error",
+        })];
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+            },
+        )
+        .unwrap()
+    }
+
+    fn tcp_sent(actions: &[Action]) -> Vec<String> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::TcpSend { data, .. } => Some(String::from_utf8_lossy(data).into_owned()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn connected(actions: &[Action]) -> bool {
+        actions
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Connected)))
+    }
+
+    #[test]
+    fn a_login_step_waits_for_its_prompt() {
+        let mut e = prompted_login();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+
+        // Nothing is sent, and the link is not up, until the prompt arrives.
+        let mut cx = Cx::new(1);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"Welcome\r\nEnter pass".to_vec()),
+        );
+        let a = cx.take();
+        assert!(tcp_sent(&a).is_empty() && !connected(&a), "{a:?}");
+
+        // The prompt has no line ending; it can arrive split.
+        let mut cx = Cx::new(2);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b"word:".to_vec()));
+        let a = cx.take();
+        let sent = tcp_sent(&a);
+        assert_eq!(sent.first().map(String::as_str), Some("s3cret\r"));
+        assert!(connected(&a));
+        assert!(sent.len() > 1, "telemetry starts after the login: {sent:?}");
+
+        // A refusal is terminal.
+        let mut cx = Cx::new(3);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"Authentication error.\r\n".to_vec()),
+        );
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+    }
+
+    #[test]
+    fn no_prompt_drops_the_connection() {
+        let mut e = prompted_login();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        let mut cx = Cx::new(5_000);
+        e.timer(&mut cx, PROMPT);
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Disconnected { .. }))));
+        assert!(tcp_sent(&a).is_empty());
     }
 
     fn http_ids(actions: &[Action]) -> Vec<RequestId> {

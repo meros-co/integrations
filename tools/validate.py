@@ -231,6 +231,14 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             conditional = step.get("when_set")
             if conditional and conditional not in settings:
                 errors.append(f"on_connect[{i}]: when_set names unknown setting '{conditional}'")
+            transport_type = (doc.get("transport") or {}).get("type")
+            if "after_prompt" in step and transport_type != "line-tcp":
+                errors.append(f"on_connect[{i}]: after_prompt needs a line-tcp transport")
+            if "refused" in step:
+                try:
+                    re.compile(step["refused"])
+                except re.error as e:
+                    errors.append(f"on_connect[{i}]: refused does not compile: {e}")
             step = step["send"]
         for context, text in template_strings(step):
             errors += check_template(context, text, {}, settings, f"on_connect[{i}]", conditional)
