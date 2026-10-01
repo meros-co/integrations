@@ -7,14 +7,33 @@ category: recorder
 source:
   - title: Blackmagic HyperDeck Ethernet Protocol (Developer Information, December 2024)
     url: https://documents.blackmagicdesign.com/DeveloperManuals/HyperDeckEthernetProtocol.pdf
-    note: Manufacturer-documented. Command syntax, response codes and response framing
+    note: >
+      Manufacturer-documented; covers HyperDeck Extreme, HyperDeck Shuttle and
+      HyperDeck Studio. Command table p.2-9 (single-line commands p.2-8,
+      connection protocol response versions p.8, multiline-only commands
+      p.8-9), syntax and response codes p.10-11, 500 connection info p.11,
+      remote state and 210/510 remote info p.12, help p.13, preview p.13,
+      play, playrange, play on startup and play option p.14, goto and commands
+      XML p.15, notify and 209 notify, 204 device info p.16, 202/502 slot info
+      and external drives p.17, 206 disk list and 214 clips count p.18, 205
+      clips info p.19, 208/508 transport info p.20, video and file formats by
+      model p.21, 211/511 configuration and 213 deck rebooting p.22-23, slot
+      select and clips clear p.23, clips add and watchdog p.24, NAS p.25
+  - title: Blackmagic HyperDeck Installation and Operation Manual, Developer Information (earlier edition)
+    url: https://www.manualslib.com/manual/1899983/Blackmagicdesign-Hyperdeck.html?page=66
+    note: >
+      Manufacturer manual, read through a third-party mirror because the
+      earlier edition is no longer on Blackmagic's site. Source of the
+      protocol-version split only: "HyperDeck Studio recorders with SSD slots
+      use version 1.8. HyperDeck Studio Mini uses 1.11", and the play and
+      shuttle speed limits of -1600 to 1600 and -5000 to 5000 (p.66-68)
 
 transport:
   type: line-tcp
   port: 9993
   framing: terminated
   terminator: crlf
-  encoding: ascii
+  encoding: utf-8
   timeout_ms: 2000
   reply: expected
   reply_framing: headed-block
@@ -23,7 +42,7 @@ transport:
 
 models:
   - id: hyperdeck-1-8
-    name: HyperDeck (protocol 1.8)
+    name: HyperDeck Studio with SSD slots (protocol 1.8)
     supports:
       [record, record_named, record_spill, record_spill_to_slot, stop, play,
        goto_clip, goto_clip_offset, get_transport_info, get_device_info,
@@ -31,9 +50,12 @@ models:
        preview_enable, preview_disable]
     verification: none
     notes: >
-      Play speed range is -1600 to 1600 percent on this protocol version.
+      Earlier-generation decks. Play and shuttle speed range is -1600 to 1600
+      percent. The command list is the set this spec has always offered for
+      protocol 1.8; the earlier manual does not mark which later commands each
+      protocol version lacks, so nothing has been added here without a source.
   - id: hyperdeck-1-11
-    name: HyperDeck (protocol 1.11 and later)
+    name: HyperDeck Studio Mini (protocol 1.11)
     supports:
       [record, record_named, record_spill, record_spill_to_slot, stop, play,
        goto_clip, goto_clip_offset, get_transport_info, get_device_info,
@@ -43,45 +65,762 @@ models:
        clear_playrange, set_playback_stop_mode]
     verification: none
     notes: >
-      Play speed range is -5000 to 5000 percent. Playrange and stop-mode
-      commands require this protocol version.
+      Earlier-generation decks. Play speed range is -5000 to 5000 percent.
+      The command list is the set this spec has always offered for protocol
+      1.11, kept unchanged for the same reason as protocol 1.8.
+  - id: hyperdeck-studio
+    name: HyperDeck Studio (HD Mini, HD Plus, HD Pro, 4K Pro)
+    supports:
+      - help
+      - list_commands
+      - ping
+      - get_device_info
+      - get_uptime
+      - set_identify
+      - set_watchdog
+      - reboot
+      - set_response_version
+      - get_remote
+      - set_remote_enabled
+      - set_remote_override
+      - get_notify
+      - set_notify_transport
+      - set_notify_slot
+      - set_notify_remote
+      - set_notify_configuration
+      - set_notify_dropped_frames
+      - set_notify_display_timecode
+      - set_notify_timeline_position
+      - set_notify_playrange
+      - set_notify_cache
+      - set_notify_dynamic_range
+      - set_notify_slate
+      - set_notify_clips
+      - set_notify_disk
+      - set_notify_device_info
+      - set_notify_nas
+      - preview_enable
+      - preview_disable
+      - play_default
+      - play
+      - play_clip
+      - play_clip_timecode_offset
+      - play_timecode
+      - play_timeline_frame
+      - get_transport_info
+      - get_playrange
+      - set_playrange_clip
+      - set_playrange_clips
+      - set_playrange_timecode
+      - set_playrange_frames
+      - clear_playrange
+      - get_play_on_startup
+      - set_play_on_startup
+      - set_play_on_startup_single_clip
+      - get_play_option
+      - set_playback_stop_mode
+      - stop
+      - record
+      - record_named
+      - record_spill
+      - record_spill_to_slot
+      - get_spill_order
+      - goto_clip
+      - goto_clip_offset
+      - goto_first_or_last_clip
+      - goto_clip_edge
+      - goto_clip_frame
+      - goto_clip_frame_offset
+      - goto_timeline_edge
+      - goto_timeline_frame
+      - goto_timeline_frame_offset
+      - goto_timecode
+      - goto_timecode_forward
+      - goto_timecode_backward
+      - goto_slot
+      - goto_clip_and_clip_frame
+      - goto_clip_and_timeline_frame
+      - goto_clip_and_timecode
+      - jog_to_timecode
+      - jog_forward
+      - jog_backward
+      - shuttle
+      - get_clip_count
+      - get_clips
+      - get_clip
+      - get_clips_range
+      - get_clips_version
+      - add_clip
+      - insert_clip
+      - add_clip_timecode_range
+      - add_clip_frame_range
+      - remove_clip
+      - clear_clips
+      - rebuild_clips
+      - get_current_clip_info
+      - get_clip_info
+      - get_clip_info_by_name
+      - disk_list
+      - disk_list_slot
+      - disk_list_device
+      - get_slot_info
+      - get_slot_info_slot
+      - get_slot_info_device
+      - select_slot
+      - select_slot_device
+      - select_video_format
+      - select_slot_video_format
+      - unblock_slot
+      - unblock_slot_id
+      - unblock_device
+      - list_external_drives
+      - select_external_drive
+      - get_selected_external_drive
+      - get_cache_info
+      - format_prepare_slot
+      - format_prepare_current
+      - format_prepare_device
+      - format_confirm
+      - get_dynamic_range
+      - set_playback_dynamic_range
+      - set_record_dynamic_range
+      - get_configuration
+      - set_video_input
+      - set_audio_input
+      - set_file_format
+      - set_audio_codec
+      - set_timecode_input
+      - set_timecode_output
+      - set_timecode_preference
+      - set_timecode_preset
+      - set_audio_input_channels
+      - set_record_trigger
+      - set_record_prefix
+      - set_record_cache
+      - set_append_timestamp
+      - set_usb_spill
+      - set_reference_source
+      - set_genlock_input_resync
+      - set_default_standard
+      - set_xlr_input_type
+      - set_xlr_mapping
+      - unmap_xlr
+      - set_rca_mapping
+      - unmap_rca
+      - get_slate_clips
+      - get_slate_project
+      - get_slate_lens
+      - set_slate_reel
+      - set_slate_scene_id
+      - set_slate_shot_type
+      - set_slate_take
+      - set_slate_take_scenario
+      - set_slate_take_auto_inc
+      - set_slate_good_take
+      - set_slate_environment
+      - set_slate_day_night
+      - set_slate_project_name
+      - set_slate_camera
+      - set_slate_director
+      - set_slate_camera_operator
+      - set_slate_lens_type
+      - set_slate_iris
+      - set_slate_focal_length
+      - set_slate_distance
+      - set_slate_filter
+      - list_nas
+      - list_nas_discovered
+      - get_nas_selected
+      - deselect_nas
+      - add_nas
+      - add_nas_with_credentials
+      - remove_nas
+      - select_nas
+    verification: none
+    notes: >
+      December 2024 protocol. HD video formats on every Studio; Studio Pro and
+      Plus models add 4K up to 30p and Studio 4K Pro adds 4Kp50 to 4Kp60.
+      H.265 and DNxHR file formats on Studio 4K Pro only (p.21).
+  - id: hyperdeck-extreme
+    name: HyperDeck Extreme (8K HDR, 4K HDR)
+    supports:
+      - help
+      - list_commands
+      - ping
+      - get_device_info
+      - get_uptime
+      - set_identify
+      - set_watchdog
+      - reboot
+      - set_response_version
+      - get_remote
+      - set_remote_enabled
+      - set_remote_override
+      - get_notify
+      - set_notify_transport
+      - set_notify_slot
+      - set_notify_remote
+      - set_notify_configuration
+      - set_notify_dropped_frames
+      - set_notify_display_timecode
+      - set_notify_timeline_position
+      - set_notify_playrange
+      - set_notify_cache
+      - set_notify_dynamic_range
+      - set_notify_slate
+      - set_notify_clips
+      - set_notify_disk
+      - set_notify_device_info
+      - set_notify_nas
+      - preview_enable
+      - preview_disable
+      - play_default
+      - play
+      - play_clip
+      - play_clip_timecode_offset
+      - play_timecode
+      - play_timeline_frame
+      - get_transport_info
+      - get_playrange
+      - set_playrange_clip
+      - set_playrange_clips
+      - set_playrange_timecode
+      - set_playrange_frames
+      - clear_playrange
+      - get_play_on_startup
+      - set_play_on_startup
+      - set_play_on_startup_single_clip
+      - get_play_option
+      - set_playback_stop_mode
+      - stop
+      - record
+      - record_named
+      - record_spill
+      - record_spill_to_slot
+      - get_spill_order
+      - goto_clip
+      - goto_clip_offset
+      - goto_first_or_last_clip
+      - goto_clip_edge
+      - goto_clip_frame
+      - goto_clip_frame_offset
+      - goto_timeline_edge
+      - goto_timeline_frame
+      - goto_timeline_frame_offset
+      - goto_timecode
+      - goto_timecode_forward
+      - goto_timecode_backward
+      - goto_slot
+      - goto_clip_and_clip_frame
+      - goto_clip_and_timeline_frame
+      - goto_clip_and_timecode
+      - jog_to_timecode
+      - jog_forward
+      - jog_backward
+      - shuttle
+      - get_clip_count
+      - get_clips
+      - get_clip
+      - get_clips_range
+      - get_clips_version
+      - add_clip
+      - insert_clip
+      - add_clip_timecode_range
+      - add_clip_frame_range
+      - remove_clip
+      - clear_clips
+      - rebuild_clips
+      - get_current_clip_info
+      - get_clip_info
+      - get_clip_info_by_name
+      - disk_list
+      - disk_list_slot
+      - disk_list_device
+      - get_slot_info
+      - get_slot_info_slot
+      - get_slot_info_device
+      - select_slot
+      - select_slot_device
+      - select_video_format
+      - select_slot_video_format
+      - unblock_slot
+      - unblock_slot_id
+      - unblock_device
+      - list_external_drives
+      - select_external_drive
+      - get_selected_external_drive
+      - get_cache_info
+      - format_prepare_slot
+      - format_prepare_current
+      - format_prepare_device
+      - format_confirm
+      - get_dynamic_range
+      - set_playback_dynamic_range
+      - set_record_dynamic_range
+      - get_configuration
+      - set_video_input
+      - set_audio_input
+      - set_file_format
+      - set_audio_codec
+      - set_timecode_input
+      - set_timecode_output
+      - set_timecode_preference
+      - set_timecode_preset
+      - set_audio_input_channels
+      - set_record_trigger
+      - set_record_prefix
+      - set_record_cache
+      - set_append_timestamp
+      - set_usb_spill
+      - set_reference_source
+      - set_genlock_input_resync
+      - set_default_standard
+      - set_xlr_input_type
+      - set_xlr_mapping
+      - unmap_xlr
+      - set_rca_mapping
+      - unmap_rca
+      - get_slate_clips
+      - get_slate_project
+      - get_slate_lens
+      - set_slate_reel
+      - set_slate_scene_id
+      - set_slate_shot_type
+      - set_slate_take
+      - set_slate_take_scenario
+      - set_slate_take_auto_inc
+      - set_slate_good_take
+      - set_slate_environment
+      - set_slate_day_night
+      - set_slate_project_name
+      - set_slate_camera
+      - set_slate_director
+      - set_slate_camera_operator
+      - set_slate_lens_type
+      - set_slate_iris
+      - set_slate_focal_length
+      - set_slate_distance
+      - set_slate_filter
+      - list_nas
+      - list_nas_discovered
+      - get_nas_selected
+      - deselect_nas
+      - add_nas
+      - add_nas_with_credentials
+      - remove_nas
+      - select_nas
+    verification: none
+    notes: >
+      December 2024 protocol. Adds SD, 2160p and 4K formats; Extreme 8K HDR
+      adds 4320p and 8K formats. H.265 and DNxHR file formats supported.
+      Record cache applies where a cache is installed (p.6, p.21).
+  - id: hyperdeck-shuttle
+    name: HyperDeck Shuttle
+    supports:
+      - help
+      - list_commands
+      - ping
+      - get_device_info
+      - get_uptime
+      - set_identify
+      - set_watchdog
+      - reboot
+      - set_response_version
+      - get_remote
+      - set_remote_enabled
+      - set_remote_override
+      - get_notify
+      - set_notify_transport
+      - set_notify_slot
+      - set_notify_remote
+      - set_notify_configuration
+      - set_notify_dropped_frames
+      - set_notify_display_timecode
+      - set_notify_timeline_position
+      - set_notify_playrange
+      - set_notify_cache
+      - set_notify_dynamic_range
+      - set_notify_slate
+      - set_notify_clips
+      - set_notify_disk
+      - set_notify_device_info
+      - set_notify_nas
+      - preview_enable
+      - preview_disable
+      - play_default
+      - play
+      - play_clip
+      - play_clip_timecode_offset
+      - play_timecode
+      - play_timeline_frame
+      - get_transport_info
+      - get_playrange
+      - set_playrange_clip
+      - set_playrange_clips
+      - set_playrange_timecode
+      - set_playrange_frames
+      - clear_playrange
+      - get_play_on_startup
+      - set_play_on_startup
+      - set_play_on_startup_single_clip
+      - get_play_option
+      - set_playback_stop_mode
+      - stop
+      - record
+      - record_named
+      - record_spill
+      - record_spill_to_slot
+      - get_spill_order
+      - goto_clip
+      - goto_clip_offset
+      - goto_first_or_last_clip
+      - goto_clip_edge
+      - goto_clip_frame
+      - goto_clip_frame_offset
+      - goto_timeline_edge
+      - goto_timeline_frame
+      - goto_timeline_frame_offset
+      - goto_timecode
+      - goto_timecode_forward
+      - goto_timecode_backward
+      - goto_slot
+      - goto_clip_and_clip_frame
+      - goto_clip_and_timeline_frame
+      - goto_clip_and_timecode
+      - jog_to_timecode
+      - jog_forward
+      - jog_backward
+      - shuttle
+      - get_clip_count
+      - get_clips
+      - get_clip
+      - get_clips_range
+      - get_clips_version
+      - add_clip
+      - insert_clip
+      - add_clip_timecode_range
+      - add_clip_frame_range
+      - remove_clip
+      - clear_clips
+      - rebuild_clips
+      - get_current_clip_info
+      - get_clip_info
+      - get_clip_info_by_name
+      - disk_list
+      - disk_list_slot
+      - disk_list_device
+      - get_slot_info
+      - get_slot_info_slot
+      - get_slot_info_device
+      - select_slot
+      - select_slot_device
+      - select_video_format
+      - select_slot_video_format
+      - unblock_slot
+      - unblock_slot_id
+      - unblock_device
+      - list_external_drives
+      - select_external_drive
+      - get_selected_external_drive
+      - get_cache_info
+      - format_prepare_slot
+      - format_prepare_current
+      - format_prepare_device
+      - format_confirm
+      - get_dynamic_range
+      - set_playback_dynamic_range
+      - set_record_dynamic_range
+      - get_configuration
+      - set_video_input
+      - set_audio_input
+      - set_file_format
+      - set_audio_codec
+      - set_timecode_input
+      - set_timecode_output
+      - set_timecode_preference
+      - set_timecode_preset
+      - set_audio_input_channels
+      - set_record_trigger
+      - set_record_prefix
+      - set_record_cache
+      - set_append_timestamp
+      - set_usb_spill
+      - set_reference_source
+      - set_genlock_input_resync
+      - set_default_standard
+      - set_xlr_input_type
+      - set_xlr_mapping
+      - unmap_xlr
+      - set_rca_mapping
+      - unmap_rca
+      - get_slate_clips
+      - get_slate_project
+      - get_slate_lens
+      - set_slate_reel
+      - set_slate_scene_id
+      - set_slate_shot_type
+      - set_slate_take
+      - set_slate_take_scenario
+      - set_slate_take_auto_inc
+      - set_slate_good_take
+      - set_slate_environment
+      - set_slate_day_night
+      - set_slate_project_name
+      - set_slate_camera
+      - set_slate_director
+      - set_slate_camera_operator
+      - set_slate_lens_type
+      - set_slate_iris
+      - set_slate_focal_length
+      - set_slate_distance
+      - set_slate_filter
+      - list_nas
+      - list_nas_discovered
+      - get_nas_selected
+      - deselect_nas
+      - add_nas
+      - add_nas_with_credentials
+      - remove_nas
+      - select_nas
+    verification: none
+    notes: >
+      December 2024 protocol. HD video formats and the file formats common to
+      all HyperDeck models (p.21).
 
 commands:
-  record:
-    summary: Start recording from the current input
-    send: "record"
+  # ── Session and device ─────────────────────────────────────────────────
+  help:
+    summary: Human-readable help text for every command and parameter (201 help)
+    send: "help"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  list_commands:
+    summary: The supported commands and parameters as XML (212 commands)
+    send: "commands"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  ping:
+    summary: Check the deck is responding
+    send: "ping"
     expect: { code_range: [200, 299] }
     returns: ack
 
-  record_named:
-    summary: Start recording a named clip
+  get_device_info:
+    summary: Protocol version, model, unique id, slot count, software version and name (204 device info)
+    send: "device info"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_uptime:
+    summary: Time since the deck last booted
+    send: "uptime"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  set_identify:
+    summary: Turn the deck's identify indication on or off
     params:
-      name: { type: string, max_length: 128, required: true }
-    send: "record: name: {name}"
+      enabled: { type: bool, required: true }
+    send: "identify: enable: {enabled}"
     expect: { code_range: [200, 299] }
     returns: ack
 
-  record_spill:
-    summary: Continue the current recording on the next slot
-    send: "record spill"
-    expect: { code_range: [200, 299] }
-    returns: ack
-
-  record_spill_to_slot:
-    summary: Continue the current recording on a specific slot
+  set_watchdog:
+    summary: Close this connection if the client sends nothing for the period; 0 disables
     params:
-      slot_id: { type: int, min: 1, max: 8, required: true }
-    send: "record: spill: slot id: {slot_id}"
+      period: { type: int, min: 0, required: true }
+    send: "watchdog: period: {period}"
     expect: { code_range: [200, 299] }
     returns: ack
 
-  stop:
-    send: "stop"
+  reboot:
+    summary: Reboot the deck
+    send: "reboot"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_response_version:
+    summary: Choose the clip-list layout of clips get, disk list and their notifications for this connection
+    params:
+      version: { type: int, min: 1, max: 2, required: true }
+    send: "connection protocol: response version: {version}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Remote control ─────────────────────────────────────────────────────
+  get_remote:
+    summary: Remote control state (210 remote info)
+    send: "remote"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  set_remote_enabled:
+    summary: Enable or disable remote control of the deck
+    params:
+      enabled: { type: bool, required: true }
+    send: "remote: enable: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_remote_override:
+    summary: Allow this connection to control the deck whatever the remote setting, until it closes
+    params:
+      enabled: { type: bool, required: true }
+    send: "remote: override: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Notifications ──────────────────────────────────────────────────────
+  get_notify:
+    summary: Which asynchronous notifications are enabled (209 notify)
+    send: "notify"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  set_notify_transport:
+    summary: Transport notifications (508 transport info)
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: transport: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_slot:
+    summary: Slot notifications (502 slot info)
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: slot: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_remote:
+    summary: Remote control notifications (510 remote info)
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: remote: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_configuration:
+    summary: Configuration notifications (511 configuration)
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: configuration: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_dropped_frames:
+    summary: Dropped frame notifications; the reported count is approximate
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: dropped frames: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_display_timecode:
+    summary: Display timecode notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: display timecode: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_timeline_position:
+    summary: Playback timeline position notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: timeline position: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_playrange:
+    summary: Playrange notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: playrange: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_cache:
+    summary: Cache notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: cache: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_dynamic_range:
+    summary: Dynamic range settings notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: dynamic range: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_slate:
+    summary: Digital slate notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: slate: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_clips:
+    summary: Timeline clip notifications (519 clips info; partial add or full snapshot)
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: clips: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_disk:
+    summary: Disk clip notifications (520 disk list info; partial add or full snapshot)
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: disk: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_device_info:
+    summary: Device info notifications
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: device info: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_notify_nas:
+    summary: NAS notifications, triggered by commands such as nas add and nas remove
+    params:
+      enabled: { type: bool, required: true }
+    send: "notify: nas: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Preview ────────────────────────────────────────────────────────────
+  preview_enable:
+    summary: Switch to preview (input) mode; stops playback
+    send: "preview: enable: true"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  preview_disable:
+    summary: Switch to output (playback) mode; refused while recording
+    send: "preview: enable: false"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Playback ───────────────────────────────────────────────────────────
+  play_default:
+    summary: Play from the current timecode, giving no options
+    send: "play"
     expect: { code_range: [200, 299] }
     returns: ack
 
   play:
-    summary: Play at a speed given as a percentage of normal
+    summary: Play from the current timecode at a speed given as a percentage of normal
     params:
       single_clip: { type: bool, default: true }
       loop:        { type: bool, default: false }
@@ -90,72 +829,50 @@ commands:
     expect: { code_range: [200, 299] }
     returns: ack
 
-  goto_clip:
-    summary: Jump to a clip by 1-based id
+  play_clip:
+    summary: Play from the start of a timeline clip
+    params:
+      clip_id:     { type: int, min: 1, max: 9999, required: true }
+      speed:       { type: int, min: -5000, max: 5000, default: 100 }
+      loop:        { type: bool, default: false }
+      single_clip: { type: bool, default: true }
+    send: "play: clip id: {clip_id} speed: {speed} loop: {loop} single clip: {single_clip}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  play_clip_timecode_offset:
+    summary: Play from a timecode duration into a timeline clip
     params:
       clip_id: { type: int, min: 1, max: 9999, required: true }
-    send: "goto: clip id: {clip_id}"
+      offset:  { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "play: clip id: {clip_id} timecode: +{offset}"
     expect: { code_range: [200, 299] }
     returns: ack
 
-  goto_clip_offset:
-    summary: Jump forward or backward relative to the current clip
+  play_timecode:
+    summary: Play from an absolute timeline timecode
     params:
-      offset: { type: int, min: -999, max: 999, required: true }
-    send: "goto: clip id: {offset:signed}"
+      timecode:    { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+      speed:       { type: int, min: -5000, max: 5000, default: 100 }
+      loop:        { type: bool, default: false }
+      single_clip: { type: bool, default: true }
+    send: "play: timecode: {timecode} speed: {speed} loop: {loop} single clip: {single_clip}"
     expect: { code_range: [200, 299] }
     returns: ack
 
-  get_transport_info:
-    send: "transport info"
-    expect: { code_range: [200, 299] }
-    returns: fields
-
-  get_device_info:
-    send: "device info"
-    expect: { code_range: [200, 299] }
-    returns: fields
-
-  get_clip_count:
-    send: "clips count"
-    expect: { code_range: [200, 299], matches: "clip count: ([0-9]+)" }
-    returns: value
-
-  get_clips:
-    send: "clips get"
-    expect: { code_range: [200, 299] }
-    returns: text
-
-  get_configuration:
-    send: "configuration"
-    expect: { code_range: [200, 299] }
-    returns: fields
-
-  disk_list:
-    summary: List clips on the active disk
-    send: "disk list"
-    expect: { code_range: [200, 299] }
-    returns: text
-
-  disk_list_slot:
-    summary: List clips on the disk in a specific slot
+  play_timeline_frame:
+    summary: Play from a frame position in the timeline
     params:
-      slot_id: { type: int, min: 1, max: 8, required: true }
-    send: "disk list: slot id: {slot_id}"
-    expect: { code_range: [200, 299] }
-    returns: text
-
-  preview_enable:
-    send: "preview: enable: true"
-    expect: { code_range: [200, 299] }
-    returns: ack
-
-  preview_disable:
-    send: "preview: enable: false"
+      frame:       { type: int, min: 0, required: true }
+      speed:       { type: int, min: -5000, max: 5000, default: 100 }
+      loop:        { type: bool, default: false }
+      single_clip: { type: bool, default: true }
+    send: "play: timeline: {frame} speed: {speed} loop: {loop} single clip: {single_clip}"
     expect: { code_range: [200, 299] }
     returns: ack
 
   get_playrange:
+    summary: The current playrange, if any
     send: "playrange"
     expect: { code_range: [200, 299] }
     returns: text
@@ -196,14 +913,990 @@ commands:
     returns: ack
 
   clear_playrange:
+    summary: Clear the playrange
     send: "playrange clear"
     expect: { code_range: [200, 299] }
     returns: ack
 
+  get_play_on_startup:
+    summary: Whether the deck plays on power-up, and whether a single clip
+    send: "play on startup"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  set_play_on_startup:
+    summary: Start playback after each power-up
+    params:
+      enabled: { type: bool, required: true }
+    send: "play on startup: enable: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_play_on_startup_single_clip:
+    summary: Play a single clip rather than all clips on power-up
+    params:
+      single_clip: { type: bool, required: true }
+    send: "play on startup: single clip: {single_clip}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_play_option:
+    summary: The output frame shown when playback stops
+    send: "play option"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
   set_playback_stop_mode:
+    summary: The output frame shown when playback stops
     params:
       mode: { type: enum, values: [lastframe, nextframe, black], required: true }
     send: "play option: stop mode: {mode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_transport_info:
+    summary: Transport state, speed, slot, clip, timecodes and formats (208 transport info)
+    send: "transport info"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  stop:
+    summary: Stop playback or recording
+    send: "stop"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Recording ──────────────────────────────────────────────────────────
+  record:
+    summary: Start recording from the current input
+    send: "record"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  record_named:
+    summary: Start recording a named clip
+    params:
+      name: { type: string, max_length: 128, required: true }
+    send: "record: name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  record_spill:
+    summary: Continue the current recording on the next slot
+    send: "record spill"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  record_spill_to_slot:
+    summary: Continue the current recording on a specific slot; the current slot spills to itself
+    params:
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "record: spill: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_spill_order:
+    summary: The device order used for record spill
+    send: "spill order"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  # ── Timeline position ──────────────────────────────────────────────────
+  goto_clip:
+    summary: Jump to a clip by 1-based id
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+    send: "goto: clip id: {clip_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_offset:
+    summary: Jump forward or backward a number of clips; clamps at the first and last clip
+    params:
+      offset: { type: int, min: -999, max: 999, required: true }
+    send: "goto: clip id: {offset:signed}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_first_or_last_clip:
+    summary: Jump to the first clip (start) or the last clip (end)
+    params:
+      which: { type: enum, values: [start, end], required: true }
+    send: "goto: clip id: {which}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_edge:
+    summary: Jump to the start or end of the current clip
+    params:
+      which: { type: enum, values: [start, end], required: true }
+    send: "goto: clip: {which}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_frame:
+    summary: Jump to a frame position within the current clip
+    params:
+      frame: { type: int, min: 0, required: true }
+    send: "goto: clip: {frame}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_frame_offset:
+    summary: Move forward or backward a number of frames within the current clip
+    params:
+      offset: { type: int, required: true }
+    send: "goto: clip: {offset:signed}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_timeline_edge:
+    summary: Jump to the start or end of the timeline
+    params:
+      which: { type: enum, values: [start, end], required: true }
+    send: "goto: timeline: {which}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_timeline_frame:
+    summary: Jump to a frame position within the timeline
+    params:
+      frame: { type: int, min: 0, required: true }
+    send: "goto: timeline: {frame}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_timeline_frame_offset:
+    summary: Move forward or backward a number of frames within the timeline
+    params:
+      offset: { type: int, required: true }
+    send: "goto: timeline: {offset:signed}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_timecode:
+    summary: Jump to an absolute timecode in the timeline
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "goto: timecode: {timecode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_timecode_forward:
+    summary: Move forward by a timecode duration
+    params:
+      duration: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "goto: timecode: +{duration}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_timecode_backward:
+    summary: Move backward by a timecode duration
+    params:
+      duration: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "goto: timecode: -{duration}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_slot:
+    summary: Switch to a slot; the same as select_slot
+    params:
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "goto: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_and_clip_frame:
+    summary: Jump to a clip and then to a frame position within that clip
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+      frame:   { type: int, min: 0, required: true }
+    send: "goto: clip id: {clip_id} clip: {frame}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_and_timeline_frame:
+    summary: Jump to a clip and then to a frame position within the timeline
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+      frame:   { type: int, min: 0, required: true }
+    send: "goto: clip id: {clip_id} timeline: {frame}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  goto_clip_and_timecode:
+    summary: Jump to a clip and then offset by a timecode duration
+    params:
+      clip_id:  { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "goto: clip id: {clip_id} timecode: {timecode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Jog and shuttle ────────────────────────────────────────────────────
+  jog_to_timecode:
+    summary: Jog to a timecode
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "jog: timecode: {timecode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  jog_forward:
+    summary: Jog forward by a timecode duration
+    params:
+      duration: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "jog: timecode: +{duration}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  jog_backward:
+    summary: Jog backward by a timecode duration
+    params:
+      duration: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "jog: timecode: -{duration}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  shuttle:
+    summary: Shuttle at a speed given as a percentage of normal
+    params:
+      speed: { type: int, min: -5000, max: 5000, required: true }
+    send: "shuttle: speed: {speed}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Timeline clips ─────────────────────────────────────────────────────
+  get_clip_count:
+    summary: Number of clips on the timeline (214 clips count)
+    send: "clips count"
+    expect: { code_range: [200, 299], matches: "clip count: ([0-9]+)" }
+    returns: value
+
+  get_clips:
+    summary: Every clip on the timeline (205 clips info)
+    send: "clips get"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  get_clip:
+    summary: One timeline clip
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+    send: "clips get: clip id: {clip_id}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  get_clips_range:
+    summary: A run of timeline clips starting at clip_id
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+      count:   { type: int, min: 1, max: 9999, required: true }
+    send: "clips get: clip id: {clip_id} count: {count}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  get_clips_version:
+    summary: Every timeline clip in output version 1, 2 (in and out points, name last) or 3 (with folder path)
+    params:
+      version: { type: int, min: 1, max: 3, required: true }
+    send: "clips get: version: {version}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  add_clip:
+    summary: Append a clip to the timeline; the name may include folders
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: "clips add: name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  insert_clip:
+    summary: Insert a clip before an existing timeline clip
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+      name:    { type: string, max_length: 255, required: true }
+    send: "clips add: clip id: {clip_id} name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  add_clip_timecode_range:
+    summary: Append the part of a clip between two clip timecodes
+    params:
+      in:   { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+      out:  { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+      name: { type: string, max_length: 255, required: true }
+    send: "clips add: in: {in} out: {out} name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  add_clip_frame_range:
+    summary: Append the part of a clip between two clip frame numbers
+    params:
+      frame_in:  { type: int, min: 0, required: true }
+      frame_out: { type: int, min: 0, required: true }
+      name:      { type: string, max_length: 255, required: true }
+    send: "clips add: frame in: {frame_in} frame out: {frame_out} name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  remove_clip:
+    summary: Remove a clip from the timeline; later clip ids shift down
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+    send: "clips remove: clip id: {clip_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  clear_clips:
+    summary: Empty the timeline
+    send: "clips clear"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  rebuild_clips:
+    summary: Rebuild the timeline with the default rules
+    send: "clips rebuild"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_current_clip_info:
+    summary: Information on the clip now playing or recording
+    send: "clip info"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_clip_info:
+    summary: Information on a timeline clip
+    params:
+      clip_id: { type: int, min: 1, max: 9999, required: true }
+    send: "clip info: clip id: {clip_id}"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_clip_info_by_name:
+    summary: Information on a clip on the active disk, by name
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: "clip info: name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  # ── Disks, slots and external drives ───────────────────────────────────
+  disk_list:
+    summary: Playable clips on the active disk (206 disk list)
+    send: "disk list"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  disk_list_slot:
+    summary: Playable clips on the disk in a specific slot
+    params:
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "disk list: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  disk_list_device:
+    summary: Playable clips on a disk device; USB and network devices need not be active
+    params:
+      device: { type: string, max_length: 255, required: true }
+    send: "disk list: device: {device}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  get_slot_info:
+    summary: The active slot (202 slot info)
+    send: "slot info"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_slot_info_slot:
+    summary: A specific slot (202 slot info)
+    params:
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "slot info: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_slot_info_device:
+    summary: The slot holding a disk device; USB and network devices need not be active
+    params:
+      device: { type: string, max_length: 255, required: true }
+    send: "slot info: device: {device}"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  select_slot:
+    summary: Switch to a slot
+    params:
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "slot select: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  select_slot_device:
+    summary: Switch to the slot holding a disk device, including USB drives not yet active
+    params:
+      device: { type: string, max_length: 255, required: true }
+    send: "slot select: device: {device}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  select_video_format:
+    summary: Rebuild the timeline from the clips of one video format
+    params:
+      video_format:
+        type: enum
+        values:
+          [720p50, 720p5994, 720p60,
+           1080p23976, 1080p24, 1080p25, 1080p2997, 1080p30, 1080p60,
+           1080i50, 1080i5994, 1080i60,
+           NTSC, PAL, NTSCp, PALp,
+           2160p23.98, 2160p24, 2160p25, 2160p29.97, 2160p30, 2160p50, 2160p59.94, 2160p60,
+           4Kp23976, 4Kp24, 4Kp25, 4Kp2997, 4Kp30, 4Kp50, 4Kp5994, 4Kp60,
+           4320p23.98, 4320p24, 4320p25, 4320p29.97, 4320p30, 4320p50, 4320p59.94, 4320p60,
+           8Kp23976, 8Kp24, 8Kp25]
+        required: true
+    send: "slot select: video format: {video_format}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  select_slot_video_format:
+    summary: Switch to a slot and play only the clips of one video format
+    params:
+      slot_id:      { type: int, min: 1, max: 8, required: true }
+      video_format: { type: enum, values: [720p50, 720p5994, 720p60, 1080p23976, 1080p24, 1080p25, 1080p2997, 1080p30, 1080p60, 1080i50, 1080i5994, 1080i60, NTSC, PAL, NTSCp, PALp, 2160p23.98, 2160p24, 2160p25, 2160p29.97, 2160p30, 2160p50, 2160p59.94, 2160p60, 4Kp23976, 4Kp24, 4Kp25, 4Kp2997, 4Kp30, 4Kp50, 4Kp5994, 4Kp60, 4320p23.98, 4320p24, 4320p25, 4320p29.97, 4320p30, 4320p50, 4320p59.94, 4320p60, 8Kp23976, 8Kp24, 8Kp25], required: true }
+    send: "slot select: slot id: {slot_id} video format: {video_format}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  unblock_slot:
+    summary: Unblock the active slot
+    send: "slot unblock"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  unblock_slot_id:
+    summary: Unblock a specific slot
+    params:
+      slot_id: { type: int, min: 1, max: 8, required: true }
+    send: "slot unblock: slot id: {slot_id}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  unblock_device:
+    summary: Unblock a disk device
+    params:
+      device: { type: string, max_length: 255, required: true }
+    send: "slot unblock: device: {device}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  list_external_drives:
+    summary: USB and network drives available to the external slot (226 external drive info)
+    send: "external drive list"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  select_external_drive:
+    summary: Switch the external slot to a drive
+    params:
+      device: { type: string, max_length: 255, required: true }
+    send: "external drive select: device: {device}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  get_selected_external_drive:
+    summary: The drive selected for the external slot
+    send: "external drive selected"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  get_cache_info:
+    summary: Record cache status
+    send: "cache info"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  # ── Formatting ─────────────────────────────────────────────────────────
+  format_prepare_slot:
+    summary: Prepare to format the disk in a slot; the reply carries the token format_confirm needs
+    params:
+      slot_id:    { type: int, min: 1, max: 8, required: true }
+      filesystem: { type: enum, values: [exFAT, HFS+], required: true }
+      name:       { type: string, max_length: 255, required: true }
+    send: "format: slot id: {slot_id} prepare: {filesystem} name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  format_prepare_current:
+    summary: Prepare to format the disk in the current mounted slot; the reply carries the token
+    params:
+      filesystem: { type: enum, values: [exFAT, HFS+], required: true }
+      name:       { type: string, max_length: 255, required: true }
+    send: "format: prepare: {filesystem} name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  format_prepare_device:
+    summary: Prepare to format a disk device; the reply carries the token
+    params:
+      device:     { type: string, max_length: 255, required: true }
+      filesystem: { type: enum, values: [exFAT, HFS+], required: true }
+      name:       { type: string, max_length: 255, required: true }
+    send: "format: device: {device} prepare: {filesystem} name: {name}"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  format_confirm:
+    summary: Carry out a prepared format, erasing the disk
+    params:
+      token: { type: string, max_length: 255, required: true }
+    send: "format: confirm: {token}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Dynamic range ──────────────────────────────────────────────────────
+  get_dynamic_range:
+    summary: Playback and record dynamic range overrides
+    send: "dynamic range"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  set_playback_dynamic_range:
+    summary: Override the dynamic range of playback
+    params:
+      mode:
+        type: enum
+        values: ["off", Rec709, Rec2020_SDR, HLG, ST2084_300, ST2084_500, ST2084_800,
+                 ST2084_1000, ST2084_2000, ST2084_4000, ST2084]
+        required: true
+    send: "dynamic range: playback override: {mode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_record_dynamic_range:
+    summary: Override the dynamic range of recordings
+    params:
+      mode:
+        type: enum
+        values: ["off", Rec709, Rec2020_SDR, HLG, ST2084_300, ST2084_500, ST2084_800,
+                 ST2084_1000, ST2084_2000, ST2084_4000, ST2048]
+        required: true
+    send: "dynamic range: record override: {mode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Configuration ──────────────────────────────────────────────────────
+  get_configuration:
+    summary: The deck's configuration (211 configuration)
+    send: "configuration"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  set_video_input:
+    summary: Video input source; the inputs available vary by model
+    params:
+      input: { type: enum, values: [SDI, 4xSDI, HDMI, component, composite], required: true }
+    send: "configuration: video input: {input}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_audio_input:
+    summary: Audio input source; superseded by the XLR and RCA mappings on decks that have them
+    params:
+      input: { type: enum, values: [embedded, XLR, RCA], required: true }
+    send: "configuration: audio input: {input}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_file_format:
+    summary: Recording file format; may reboot the deck (213 deck rebooting)
+    params:
+      format:
+        type: enum
+        values: [H.264High_SDI, H.264High, H.264Medium, H.264Low, H.264High10_422,
+                 H.265High_SDI, H.265High_422, H.265High, H.265Medium, H.265Low,
+                 QuickTimeProResHQ, QuickTimeProRes, QuickTimeProResLT, QuickTimeProResProxy,
+                 QuickTimeDNxHD220x, DNxHD220x, QuickTimeDNxHD145, DNxHD145,
+                 QuickTimeDNxHD45, DNxHD45,
+                 QuickTimeDNxHR_HQX, DNxHR_HQX, QuickTimeDNxHR_SQ, DNxHR_SQ,
+                 QuickTimeDNxHR_LB, DNxHR_LB]
+        required: true
+    send: "configuration: file format: {format}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_audio_codec:
+    summary: Recording audio codec
+    params:
+      codec: { type: enum, values: [PCM, AAC], required: true }
+    send: "configuration: audio codec: {codec}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_timecode_input:
+    summary: Timecode source for recording
+    params:
+      source: { type: enum, values: [external, embedded, internal, preset, clip], required: true }
+    send: "configuration: timecode input: {source}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_timecode_output:
+    summary: Whether timecode output follows the clip or the timeline
+    params:
+      mode: { type: enum, values: [clip, timeline], required: true }
+    send: "configuration: timecode output: {mode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_timecode_preference:
+    summary: Drop-frame timecode use where not otherwise specified
+    params:
+      preference: { type: enum, values: [default, dropframe, nondropframe], required: true }
+    send: "configuration: timecode preference: {preference}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_timecode_preset:
+    summary: The preset timecode
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send: "configuration: timecode preset: {timecode}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_audio_input_channels:
+    summary: Number of audio channels recorded
+    params:
+      channels: { type: int, min: 0, required: true }
+    send: "configuration: audio input channels: {channels}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_record_trigger:
+    summary: What starts recording
+    params:
+      trigger: { type: enum, values: [none, recordbit, timecoderun], required: true }
+    send: "configuration: record trigger: {trigger}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_record_prefix:
+    summary: Prefix of recorded clip names (UTF-8)
+    params:
+      prefix: { type: string, max_length: 255, required: true }
+    send: "configuration: record prefix: {prefix}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_record_cache:
+    summary: Record through the cache; no effect where no cache is installed and formatted
+    params:
+      enabled: { type: bool, required: true }
+    send: "configuration: record cache: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_append_timestamp:
+    summary: Append a timestamp to recorded file names
+    params:
+      enabled: { type: bool, required: true }
+    send: "configuration: append timestamp: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_usb_spill:
+    summary: Spill recording between USB disks
+    params:
+      enabled: { type: bool, required: true }
+    send: "configuration: usb spill: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_reference_source:
+    summary: Source of the reference signal
+    params:
+      source: { type: enum, values: [auto, input, external], required: true }
+    send: "configuration: reference source: {source}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_genlock_input_resync:
+    summary: Genlock input resync; when enabled, set the reference source to auto or external
+    params:
+      enabled: { type: bool, required: true }
+    send: "configuration: genlock input resync: {enabled}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_default_standard:
+    summary: Default playback video format
+    params:
+      video_format: { type: enum, values: [720p50, 720p5994, 720p60, 1080p23976, 1080p24, 1080p25, 1080p2997, 1080p30, 1080p60, 1080i50, 1080i5994, 1080i60, NTSC, PAL, NTSCp, PALp, 2160p23.98, 2160p24, 2160p25, 2160p29.97, 2160p30, 2160p50, 2160p59.94, 2160p60, 4Kp23976, 4Kp24, 4Kp25, 4Kp2997, 4Kp30, 4Kp50, 4Kp5994, 4Kp60, 4320p23.98, 4320p24, 4320p25, 4320p29.97, 4320p30, 4320p50, 4320p59.94, 4320p60, 8Kp23976, 8Kp24, 8Kp25], required: true }
+    send: "configuration: default standard: {video_format}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_xlr_input_type:
+    summary: Line or mic level for one XLR input
+    params:
+      xlr_id: { type: int, min: 1, required: true }
+      type:   { type: enum, values: [line, mic], required: true }
+    send: "configuration: xlr input id: {xlr_id} xlr type: {type}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_xlr_mapping:
+    summary: Map the input XLRs to channels starting from channel
+    params:
+      channel: { type: int, min: 1, required: true }
+    send: "configuration: xlr mapping: {channel}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  unmap_xlr:
+    summary: Unmap the input XLRs
+    send: "configuration: xlr mapping: none"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_rca_mapping:
+    summary: Map the input RCAs to channels starting from channel
+    params:
+      channel: { type: int, min: 1, required: true }
+    send: "configuration: rca mapping: {channel}"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  unmap_rca:
+    summary: Unmap the input RCAs
+    send: "configuration: rca mapping: none"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Digital slate (multiline only) ─────────────────────────────────────
+  get_slate_clips:
+    summary: Slate clip information
+    send: "slate clips"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_slate_project:
+    summary: Slate project information
+    send: "slate project"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  get_slate_lens:
+    summary: Slate lens information
+    send: "slate lens"
+    expect: { code_range: [200, 299] }
+    returns: fields
+
+  set_slate_reel:
+    summary: Slate reel number
+    params:
+      reel: { type: int, min: 1, max: 999, required: true }
+    send: "slate clips:\r\nreel: {reel}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_scene_id:
+    summary: Slate scene id
+    params:
+      scene_id: { type: string, max_length: 255, required: true }
+    send: "slate clips:\r\nscene id: {scene_id}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_shot_type:
+    summary: Slate shot type
+    params:
+      shot_type: { type: enum, values: [WS, MS, CU, BCU, MCU, ECU, none], required: true }
+    send: "slate clips:\r\nshot type: {shot_type}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_take:
+    summary: Slate take number
+    params:
+      take: { type: int, min: 1, max: 99, required: true }
+    send: "slate clips:\r\ntake: {take}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_take_scenario:
+    summary: Slate take scenario
+    params:
+      scenario: { type: enum, values: [PU, VFX, SER, none], required: true }
+    send: "slate clips:\r\ntake scenario: {scenario}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_take_auto_inc:
+    summary: Slate take auto-increment
+    params:
+      enabled: { type: bool, required: true }
+    send: "slate clips:\r\ntake auto inc: {enabled}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_good_take:
+    summary: Mark the slate take good
+    params:
+      good: { type: bool, required: true }
+    send: "slate clips:\r\ngood take: {good}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_environment:
+    summary: Slate environment
+    params:
+      environment: { type: enum, values: [interior, exterior], required: true }
+    send: "slate clips:\r\nenvironment: {environment}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_day_night:
+    summary: Slate day or night
+    params:
+      day_night: { type: enum, values: [day, night], required: true }
+    send: "slate clips:\r\nday night: {day_night}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_project_name:
+    summary: Slate project name (may be empty, UTF-8)
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: "slate project:\r\nproject name: {name}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_camera:
+    summary: Slate camera index, such as A
+    params:
+      camera: { type: string, max_length: 255, required: true }
+    send: "slate project:\r\ncamera: {camera}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_director:
+    summary: Slate director (may be empty, UTF-8)
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: "slate project:\r\ndirector: {name}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_camera_operator:
+    summary: Slate camera operator (may be empty, UTF-8)
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: "slate project:\r\ncamera operator: {name}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_lens_type:
+    summary: Slate lens type (may be empty, UTF-8)
+    params:
+      lens_type: { type: string, max_length: 255, required: true }
+    send: "slate lens:\r\nlens type: {lens_type}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_iris:
+    summary: Slate iris (may be empty, UTF-8)
+    params:
+      iris: { type: string, max_length: 255, required: true }
+    send: "slate lens:\r\niris: {iris}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_focal_length:
+    summary: Slate focal length (may be empty, UTF-8)
+    params:
+      focal_length: { type: string, max_length: 255, required: true }
+    send: "slate lens:\r\nfocal length: {focal_length}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_distance:
+    summary: Slate lens distance (may be empty, UTF-8)
+    params:
+      distance: { type: string, max_length: 255, required: true }
+    send: "slate lens:\r\ndistance: {distance}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  set_slate_filter:
+    summary: Slate lens filter (may be empty, UTF-8)
+    params:
+      filter: { type: string, max_length: 255, required: true }
+    send: "slate lens:\r\nfilter: {filter}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  # ── Network storage ────────────────────────────────────────────────────
+  list_nas:
+    summary: Every NAS share bookmark
+    send: "nas list"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  list_nas_discovered:
+    summary: NAS servers discovered over mDNS (225 nas host info)
+    send: "nas discovered"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  get_nas_selected:
+    summary: The NAS share currently selected
+    send: "nas selected"
+    expect: { code_range: [200, 299] }
+    returns: text
+
+  deselect_nas:
+    summary: Unmount the selected NAS share
+    send: "nas deselect"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  add_nas:
+    summary: Bookmark a NAS share with guest access
+    params:
+      url: { type: string, max_length: 1024, required: true }
+    send: "nas add:\r\nurl: {url}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  add_nas_with_credentials:
+    summary: Bookmark a NAS share with a username and password, sent in plain text on this port
+    params:
+      url:      { type: string, max_length: 1024, required: true }
+      username: { type: string, max_length: 255, required: true }
+      password: { type: string, max_length: 255, required: true }
+    send: "nas add:\r\nurl: {url}\r\nusername: {username}\r\npassword: {password}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  remove_nas:
+    summary: Remove a NAS share bookmark; does not unmount it
+    params:
+      url: { type: string, max_length: 1024, required: true }
+    send: "nas remove:\r\nurl: {url}\r\n"
+    expect: { code_range: [200, 299] }
+    returns: ack
+
+  select_nas:
+    summary: Mount a NAS share asynchronously, with its bookmark's credentials or as guest
+    params:
+      url: { type: string, max_length: 1024, required: true }
+    send: "nas select:\r\nurl: {url}\r\n"
     expect: { code_range: [200, 299] }
     returns: ack
 
@@ -232,36 +1925,185 @@ codes:
   "163": parameterized single line command not supported
 
 telemetry:
-  # "notify: transport: true" makes the deck send "508 transport info:" whenever
-  # the transport changes; "transport info" asks once on connection. Both
-  # answers carry the same fields.
+  # The document defines the asynchronous messages 500 connection info (on
+  # connect), 502 slot info, 508 transport info, 510 remote info and 511
+  # configuration, each carrying the same fields as its 2xx reply (p.11-23).
+  # One notify line per kind, so a deck lacking one still enables the rest.
+  # The queries ask once on connecting; after that the pushes keep state.
   subscribe:
-    send: ["notify: transport: true"]
+    send:
+      - "notify: transport: true"
+      - "notify: slot: true"
+      - "notify: remote: true"
+      - "notify: configuration: true"
   poll:
-    send: ["transport info"]
+    send: ["device info", "transport info", "slot info", "remote", "configuration"]
   updates:
+    - header: "^500 connection info:$"
+      fields:
+        protocol version: device.protocol_version
+        model: device.model
+    - header: "^204 device info:$"
+      fields:
+        protocol version: device.protocol_version
+        model: device.model
+        unique id: device.unique_id
+        slot count: device.slot_count
+        software version: device.software_version
+        name: device.name
     - header: "^[25]08 transport info:$"
       fields:
         status: transport.status
         speed: transport.speed
         slot id: transport.slot
+        slot name: transport.slot_name
+        device name: transport.device_name
         clip id: transport.clip
         single clip: { path: transport.single_clip, map: { "true": true, "false": false } }
-        loop: { path: transport.loop, map: { "true": true, "false": false } }
-        timecode: transport.timecode
         display timecode: transport.display_timecode
+        timecode: transport.timecode
         video format: transport.video_format
+        loop: { path: transport.loop, map: { "true": true, "false": false } }
+        timeline: transport.timeline
+        input video format: transport.input_video_format
+        dynamic range: transport.dynamic_range
+        reference locked: { path: transport.reference_locked, map: { "true": true, "false": false } }
+    - header: "^[25]02 slot info:$"
+      fields:
+        slot id: slot_info.slot_id
+        slot name: slot_info.slot_name
+        device name: slot_info.device_name
+        status: slot_info.status
+        volume name: slot_info.volume_name
+        recording time: slot_info.recording_time
+        video format: slot_info.video_format
+        blocked: { path: slot_info.blocked, map: { "true": true, "false": false } }
+        remaining size: slot_info.remaining_size
+        total size: slot_info.total_size
+    - header: "^[25]10 remote info:$"
+      fields:
+        enabled: { path: remote.enabled, map: { "true": true, "false": false } }
+        override: { path: remote.override, map: { "true": true, "false": false } }
+    - header: "^[25]11 configuration:$"
+      fields:
+        audio input: configuration.audio_input
+        audio mapping: configuration.audio_mapping
+        video input: configuration.video_input
+        file format: configuration.file_format
+        audio codec: configuration.audio_codec
+        timecode input: configuration.timecode_input
+        timecode output: configuration.timecode_output
+        timecode preference: configuration.timecode_preference
+        timecode preset: configuration.timecode_preset
+        audio input channels: configuration.audio_input_channels
+        record trigger: configuration.record_trigger
+        record prefix: configuration.record_prefix
+        record cache: { path: configuration.record_cache, map: { "true": true, "false": false } }
+        append timestamp: { path: configuration.append_timestamp, map: { "true": true, "false": false } }
+        reference source: configuration.reference_source
+        genlock input resync: { path: configuration.genlock_input_resync, map: { "true": true, "false": false } }
+        usb spill: { path: configuration.usb_spill, map: { "true": true, "false": false } }
+        default standard: configuration.default_standard
+        xlr mapping: configuration.xlr_mapping
+        rca mapping: configuration.rca_mapping
+        xlr input id: configuration.xlr_input_id
+        xlr type: configuration.xlr_type
+    - header: "^209 notify:$"
+      fields:
+        transport: { path: notify.transport, map: { "true": true, "false": false } }
+        slot: { path: notify.slot, map: { "true": true, "false": false } }
+        remote: { path: notify.remote, map: { "true": true, "false": false } }
+        configuration: { path: notify.configuration, map: { "true": true, "false": false } }
+        dropped frames: { path: notify.dropped_frames, map: { "true": true, "false": false } }
+        display timecode: { path: notify.display_timecode, map: { "true": true, "false": false } }
+        timeline position: { path: notify.timeline_position, map: { "true": true, "false": false } }
+        playrange: { path: notify.playrange, map: { "true": true, "false": false } }
+        cache: { path: notify.cache, map: { "true": true, "false": false } }
+        dynamic range: { path: notify.dynamic_range, map: { "true": true, "false": false } }
+        slate: { path: notify.slate, map: { "true": true, "false": false } }
+        clips: { path: notify.clips, map: { "true": true, "false": false } }
+        disk: { path: notify.disk, map: { "true": true, "false": false } }
+        device info: { path: notify.device_info, map: { "true": true, "false": false } }
+        nas: { path: notify.nas, map: { "true": true, "false": false } }
+    - header: "^214 clips count:$"
+      fields:
+        clip count: timeline.clip_count
+    - header: "^205 clips info:$"
+      fields:
+        clip count: timeline.clip_count
 
 state:
-  transport.status:           { type: string, description: "preview, stopped, play, forward, rewind, jog, shuttle or record" }
-  transport.speed:            { type: int, unit: "%", description: "Play speed" }
-  transport.slot:             { type: int, description: "Active slot" }
-  transport.clip:             { type: int, description: "Current clip; absent when none" }
-  transport.single_clip:      { type: bool, description: "Single-clip playback" }
-  transport.loop:             { type: bool, description: "Loop playback" }
-  transport.timecode:         { type: string, description: "Timecode" }
+  device.protocol_version:   { type: string, description: "Protocol version, from 500 connection info and 204 device info" }
+  device.model:              { type: string, description: "Model name" }
+  device.unique_id:          { type: string, description: "Unique alphanumeric identifier" }
+  device.slot_count:         { type: int, description: "Number of storage slots" }
+  device.software_version:   { type: string, description: "Software version" }
+  device.name:               { type: string, description: "Device name" }
+  transport.status:          { type: string, description: "preview, stopped, play, forward, rewind, jog, shuttle or record" }
+  transport.speed:           { type: int, unit: "%", description: "Play speed, -5000 to 5000" }
+  transport.slot:            { type: int, description: "Active slot; left unchanged when the deck reports none" }
+  transport.slot_name:       { type: string, description: "Name of the active slot" }
+  transport.device_name:     { type: string, description: "Identifying name of the active disk device" }
+  transport.clip:            { type: int, description: "Current clip; left unchanged when the deck reports none" }
+  transport.single_clip:     { type: bool, description: "Single-clip playback" }
+  transport.loop:            { type: bool, description: "Loop playback" }
+  transport.timecode:        { type: string, description: "Timecode within the timeline in playback, or the clip in record" }
   transport.display_timecode: { type: string, description: "Timecode on the front panel" }
-  transport.video_format:     { type: string, description: "Video format, such as 1080p30" }
+  transport.video_format:    { type: string, description: "Video format, such as 1080p30" }
+  transport.timeline:        { type: int, description: "Timeline value the deck reports (undefined in the document)" }
+  transport.input_video_format: { type: string, description: "Video format at the input" }
+  transport.dynamic_range:   { type: string, description: "off, Rec709, Rec2020_SDR, HLG, ST2084_300 to ST2084_4000, ST2048 or none" }
+  transport.reference_locked: { type: bool, description: "Locked to the reference signal" }
+  slot_info.slot_id:         { type: int, description: "Slot the most recent slot info report describes; every slot_info value belongs to it" }
+  slot_info.slot_name:       { type: string, description: "Name of the reported slot" }
+  slot_info.device_name:     { type: string, description: "Identifying name of the disk device in the reported slot" }
+  slot_info.status:          { type: string, description: "empty, mounting, error or mounted" }
+  slot_info.volume_name:     { type: string, description: "Volume name" }
+  slot_info.recording_time:  { type: int, unit: s, description: "Recording time available" }
+  slot_info.video_format:    { type: string, description: "The disk's default video format" }
+  slot_info.blocked:         { type: bool, description: "Slot blocked" }
+  slot_info.remaining_size:  { type: int, unit: bytes, description: "Remaining space" }
+  slot_info.total_size:      { type: int, unit: bytes, description: "Total space" }
+  remote.enabled:            { type: bool, description: "Remote control enabled" }
+  remote.override:           { type: bool, description: "Remote override active for this connection" }
+  configuration.audio_input:  { type: string, description: "embedded, XLR or RCA" }
+  configuration.audio_mapping: { type: int, description: "Audio mapping (superseded by the XLR and RCA mappings)" }
+  configuration.video_input:  { type: string, description: "SDI, 4xSDI, HDMI, component or composite" }
+  configuration.file_format:  { type: string, description: "Recording file format" }
+  configuration.audio_codec:  { type: string, description: "PCM or AAC" }
+  configuration.timecode_input: { type: string, description: "external, embedded, internal, preset or clip" }
+  configuration.timecode_output: { type: string, description: "clip or timeline" }
+  configuration.timecode_preference: { type: string, description: "default, dropframe or nondropframe" }
+  configuration.timecode_preset: { type: string, description: "Preset timecode" }
+  configuration.audio_input_channels: { type: int, description: "Audio channels recorded" }
+  configuration.record_trigger: { type: string, description: "none, recordbit or timecoderun" }
+  configuration.record_prefix: { type: string, description: "Prefix of recorded clip names" }
+  configuration.record_cache: { type: bool, description: "Recording through the cache" }
+  configuration.append_timestamp: { type: bool, description: "Timestamp appended to recorded file names" }
+  configuration.reference_source: { type: string, description: "auto, input or external" }
+  configuration.genlock_input_resync: { type: bool, description: "Genlock input resync" }
+  configuration.usb_spill:    { type: bool, description: "Spilling between USB disks" }
+  configuration.default_standard: { type: string, description: "Default playback video format" }
+  configuration.xlr_mapping:  { type: string, description: "First channel the input XLRs map to, or none" }
+  configuration.rca_mapping:  { type: string, description: "First channel the input RCAs map to, or none" }
+  configuration.xlr_input_id: { type: int, description: "XLR input the reported xlr_type belongs to" }
+  configuration.xlr_type:     { type: string, description: "line or mic" }
+  notify.transport:          { type: bool, description: "Transport notifications enabled" }
+  notify.slot:               { type: bool, description: "Slot notifications enabled" }
+  notify.remote:             { type: bool, description: "Remote notifications enabled" }
+  notify.configuration:      { type: bool, description: "Configuration notifications enabled" }
+  notify.dropped_frames:     { type: bool, description: "Dropped frame notifications enabled" }
+  notify.display_timecode:   { type: bool, description: "Display timecode notifications enabled" }
+  notify.timeline_position:  { type: bool, description: "Timeline position notifications enabled" }
+  notify.playrange:          { type: bool, description: "Playrange notifications enabled" }
+  notify.cache:              { type: bool, description: "Cache notifications enabled" }
+  notify.dynamic_range:      { type: bool, description: "Dynamic range notifications enabled" }
+  notify.slate:              { type: bool, description: "Slate notifications enabled" }
+  notify.clips:              { type: bool, description: "Timeline clip notifications enabled" }
+  notify.disk:               { type: bool, description: "Disk clip notifications enabled" }
+  notify.device_info:        { type: bool, description: "Device info notifications enabled" }
+  notify.nas:                { type: bool, description: "NAS notifications enabled" }
+  timeline.clip_count:       { type: int, description: "Clips on the timeline, from clips count and clips get replies" }
 
 quirks:
   - models: [all]
@@ -274,22 +2116,45 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Play speed limits differ by protocol version: +/-1600 percent on 1.8,
-      +/-5000 on 1.11 and later. Sending a value outside the device's range
-      returns 109 out of range.
+      Play and shuttle speed limits differ by generation: +/-1600 percent on
+      protocol 1.8 decks, +/-5000 on 1.11 and the current decks. The commands
+      accept +/-5000; a 1.8 deck answers a value beyond its range with an
+      error such as 109 out of range.
 
   - models: [all]
     severity: info
     text: >
       Asynchronous 5xx messages can arrive at any time, starting with "500
       connection info:" on connect. They are not replies to the pending command
-      and are skipped when matching a response.
+      and are skipped when matching a response. Only 500, 502, 508, 510 and
+      511 are documented with their fields; the dropped frames, display
+      timecode, timeline position, playrange, cache, dynamic range, slate,
+      device info and nas notifications are documented by their notify switch
+      only, so no state is taken from them.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A slot info report (202 or 502) describes one slot, named by its slot id
+      field, and the slot_info state holds the most recent report, whichever
+      slot it was. It is not a per-slot table.
+
+  - models: [all]
+    severity: info
+    text: >
+      The deck reports "none" for slot id and clip id when there is none. A
+      numeric state cannot hold "none", so transport.slot and transport.clip
+      keep their previous value until a number is reported.
 
   - models: [all]
     severity: info
     text: >
       A relative goto past the first or last clip clamps to that clip rather
-      than failing.
+      than failing. The document says only one parameter is allowed per goto,
+      yet documents the goto clip id with clip, timeline and timecode
+      combinations; those are offered as documented. It also says the combined
+      forms accept relative offsets without defining what they are relative
+      to, so only the absolute forms are offered.
 
   - models: [all]
     severity: info
@@ -301,4 +2166,81 @@ quirks:
     severity: warning
     text: >
       Code 111, remote control disabled, means the deck is in local mode. No
-      transport command will succeed until remote is enabled on the front panel.
+      command that changes the deck's state succeeds until remote is enabled
+      on the front panel, by set_remote_enabled, or for this connection only by
+      set_remote_override.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Only a limited number of clients may connect at a time; one more is
+      answered "120 connection failed" and disconnected.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Changing the file format may reset the deck. It then answers "213 deck
+      rebooting" instead of "200 ok" and closes the connection.
+
+  - models: [all]
+    severity: critical
+    text: >
+      Formatting is two steps. format_prepare_slot, format_prepare_current or
+      format_prepare_device returns a token, and format_confirm with that token
+      erases the disk. Confirming without a prepared operation answers 162
+      format not prepared; a wrong token answers 161 invalid token. The reply
+      shape carrying the token is not documented, so it is returned as text.
+
+  - models: [all]
+    severity: warning
+    text: >
+      After set_watchdog with a non-zero period the deck closes the connection
+      if the client sends nothing for that period, so a period shorter than the
+      client's own traffic interval drops the session.
+
+  - models: [all]
+    severity: info
+    text: >
+      Slate, nas add, nas remove and nas select are multiline-only: the command
+      name and colon on one line, one parameter per line, then a blank line.
+      The single-line form answers 163. The table prints "slate clips" without
+      the colon the multiline syntax requires; the colon is sent. Each slate
+      command here sets one field, leaving the others unchanged.
+
+  - models: [all]
+    severity: warning
+    text: >
+      NAS credentials go over port 9993 in plain text. The document recommends
+      the protocol's secure mode for them and lists an authenticate command
+      (codes 121 and 122) but does not document how secure mode is reached.
+
+  - models: [all]
+    severity: info
+    text: >
+      Parameter values end at the next "name:" pair, so a clip name, device or
+      record prefix is placed last in its command. Names support UTF-8.
+
+  - models: [all]
+    severity: info
+    text: >
+      Video formats, file formats, video inputs and audio inputs vary by model
+      and software release (p.21-23). The parameter lists hold every value the
+      document names; a deck answers one it lacks with an error. H.265 and
+      DNxHR file formats are documented for Studio 4K Pro and Extreme HDR;
+      clips get version 3 for models with recursive timelines, which are not
+      named. XLR and RCA settings have no effect on decks without them.
+
+  - models: [all]
+    severity: info
+    text: >
+      The document spells the last dynamic range value "ST2084" in the
+      playback override list and "ST2048" in the record override list and in
+      transport info. Each command offers the value as its own list prints it.
+
+  - models: [hyperdeck-1-8, hyperdeck-1-11]
+    severity: info
+    text: >
+      The earlier manual gives no per-version command marking beyond the speed
+      limits. These models keep the command lists this spec has always given
+      them; the other documented commands may work but are not offered without
+      a source.
