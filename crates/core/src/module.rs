@@ -87,6 +87,39 @@ pub struct HttpRequest {
     pub digest: Option<Credentials>,
 }
 
+/// A TCP stream opened through an SSH tunnel (`direct-tcpip`), for devices
+/// that accept their control protocol only over SSH port forwarding.
+#[derive(Clone, PartialEq)]
+pub struct SshTunnel {
+    /// The device's SSH server.
+    pub ssh: SocketAddr,
+    pub username: String,
+    pub password: String,
+    /// The host key's SHA-256 fingerprint as OpenSSH prints it
+    /// (`SHA256:...`). Without it the device is not verified.
+    pub fingerprint: Option<String>,
+    /// A cipher the device requires, offered first (Sony: `aes128-ctr`).
+    pub cipher: Option<String>,
+    /// Where the device forwards the stream, as it sees it
+    /// (Sony: `localhost:15740`).
+    pub target_host: String,
+    pub target_port: u16,
+}
+
+impl std::fmt::Debug for SshTunnel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SshTunnel")
+            .field("ssh", &self.ssh)
+            .field("username", &self.username)
+            .field("password", &"<redacted>")
+            .field("fingerprint", &self.fingerprint)
+            .field("cipher", &self.cipher)
+            .field("target_host", &self.target_host)
+            .field("target_port", &self.target_port)
+            .finish()
+    }
+}
+
 /// A username and password.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Credentials {
@@ -209,6 +242,13 @@ pub enum Action {
         socket: Key,
         to: SocketAddr,
     },
+    /// Connect through an SSH tunnel, replacing any connection open under
+    /// this key. Reported like `TcpOpen`; a refused login or a host key that
+    /// does not match closes it with a reason starting `ssh refused:`.
+    TcpOpenSsh {
+        socket: Key,
+        tunnel: SshTunnel,
+    },
     TcpSend {
         socket: Key,
         data: Vec<u8>,
@@ -316,6 +356,11 @@ impl Cx {
 
     pub fn tcp_open(&mut self, socket: Key, to: SocketAddr) {
         self.push(Action::TcpOpen { socket, to });
+    }
+
+    /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].
+    pub fn tcp_open_ssh(&mut self, socket: Key, tunnel: SshTunnel) {
+        self.push(Action::TcpOpenSsh { socket, tunnel });
     }
 
     pub fn tcp_send(&mut self, socket: Key, data: impl Into<Vec<u8>>) {

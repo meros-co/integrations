@@ -31,6 +31,7 @@ pub mod module;
 mod modules;
 mod session;
 pub mod sse;
+mod ssh;
 mod tcp;
 mod tcp_listen;
 mod udp;

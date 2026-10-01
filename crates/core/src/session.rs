@@ -130,6 +130,8 @@ pub(crate) struct Session {
     sockets: HashMap<Key, Socket>,
     streams: HashMap<Key, Stream>,
     tcp: HashMap<Key, crate::tcp::Connection>,
+    /// SSH sessions shared by this device's tunnelled streams.
+    ssh: crate::ssh::Sessions,
     ws: HashMap<Key, crate::ws::Connection>,
     /// TCP ports this session listens on, by key.
     listening: HashMap<Key, u16>,
@@ -161,6 +163,7 @@ impl Session {
             sockets: HashMap::new(),
             streams: HashMap::new(),
             tcp: HashMap::new(),
+            ssh: crate::ssh::Sessions::default(),
             ws: HashMap::new(),
             listening: HashMap::new(),
             next_generation: 1,
@@ -340,6 +343,19 @@ impl Session {
                     if let Some(c) = self.tcp.get(socket) {
                         let _ = c.writer.send(data);
                     }
+                }
+                Action::TcpOpenSsh { socket, tunnel } => {
+                    self.close_tcp(socket);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let connection = crate::ssh::spawn(
+                        socket,
+                        generation,
+                        tunnel,
+                        self.ssh.clone(),
+                        self.inbound_tx.clone(),
+                    );
+                    self.tcp.insert(socket, connection);
                 }
                 Action::TcpClose { socket } => self.close_tcp(socket),
                 Action::TcpListen { socket, port } => {
