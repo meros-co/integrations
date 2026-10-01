@@ -63,6 +63,11 @@ use crate::module::{
     Outcome, SshTunnel, TcpInput,
 };
 
+#[path = "sony_camera_files.rs"]
+mod files;
+
+use files::{Deletion, Upload};
+
 const PTP_IP_PORT: u16 = 15740;
 const SSH_PORT: u16 = 22;
 
@@ -321,6 +326,15 @@ enum Step {
     /// Background reads of the FTP lists into the state.
     FtpRefresh,
     JobsRefresh,
+    /// Part of an upload; the last one is followed by a result event.
+    Upload {
+        awaits: bool,
+    },
+    /// A step that must succeed for the rest of its command to be sent.
+    Prelude,
+    UploadResultFile,
+    DownloadDataset,
+    Delete,
 }
 
 #[derive(Debug, Clone)]
@@ -382,8 +396,10 @@ enum Source {
     Object(u32),
     /// A file of a listed content in Remote Control with Transfer Mode.
     Content { slot: u32, content: u32, file: u32 },
-    /// The image just shot, from the camera's transfer buffer.
-    Captured,
+    /// A whole object by handle: the image just shot, or a setting file.
+    Handle(u32),
+    /// A file inside an SDIO_DownloadData dataset (a scene file).
+    Dataset,
     /// A clip of a video-only camera, over HTTP.
     Http,
 }
@@ -430,8 +446,11 @@ enum Plan {
     Value(Value),
     Refresh,
     Http(HttpPurpose, Url),
-    Download(Download, Option<Op>),
+    Download(Download, Vec<Op>),
     HttpDownload(Download, Url),
+    /// An upload: the host file to read, and the most it may be.
+    Upload(Upload, String, u64),
+    Delete(Deletion, Op),
     Listing(u32, u32, Op),
     Switch(Function),
 }
@@ -477,6 +496,9 @@ pub(crate) struct SonyCamera {
     download: Option<Download>,
     listing: Option<Listing>,
     http: Option<HttpJob>,
+    upload: Option<Upload>,
+    deletion: Option<Deletion>,
+    last_delete_at: Option<Millis>,
     /// Sizes of listed files, by download id.
     sizes: HashMap<String, u64>,
     ftp_setting_version: u16,
@@ -762,6 +784,9 @@ impl SonyCamera {
             download: None,
             listing: None,
             http: None,
+            upload: None,
+            deletion: None,
+            last_delete_at: None,
             sizes: HashMap::new(),
             ftp_setting_version: 100,
             ftp_job_version: 100,
@@ -816,6 +841,8 @@ impl SonyCamera {
         if let Some(listing) = self.listing.take() {
             failed.push(listing.id);
         }
+        failed.extend(self.upload.take().map(|u| u.id));
+        failed.extend(self.deletion.take().map(|d| d.id));
         if self
             .download
             .as_ref()
@@ -832,7 +859,15 @@ impl SonyCamera {
         }
         cx.tcp_close(CMD);
         cx.tcp_close(EVT);
-        for key in [REPLY, INIT, POLL, PAUSE, EXT_RETRY] {
+        for key in [
+            REPLY,
+            INIT,
+            POLL,
+            PAUSE,
+            EXT_RETRY,
+            files::UPLOAD_WAIT,
+            files::DELETE_WAIT,
+        ] {
             cx.cancel_timer(key);
         }
         self.cmd_framer = Framer::default();
@@ -1249,6 +1284,11 @@ impl SonyCamera {
                     let _ = self.parse_value(cx, Parse::FtpJobs, &data);
                 }
             }
+            Step::Upload { awaits } => self.upload_step(cx, &op, code, awaits),
+            Step::Prelude => self.prelude(cx, &op, code),
+            Step::UploadResultFile => self.upload_result_file(cx, code, &data),
+            Step::DownloadDataset => self.download_dataset(cx, code, &data),
+            Step::Delete => self.delete_step(cx, code),
         }
     }
 
@@ -1537,6 +1577,7 @@ impl SonyCamera {
                 "content.last_change",
                 json!({"slot": p(0), "change": "media_profile"}),
             ),
+            0xC214 | 0xC209 | 0xC20A | 0xC21A | 0xC240 => self.file_event(cx, code, &p),
             0xC203 | 0xC201 | 0xC202 | 0xC206 | 0xC21B | 0xC228 | 0x4004 | 0x4005 => {}
             other => cx.log(
                 Level::Debug,
@@ -1827,8 +1868,8 @@ impl SonyCamera {
                 vec![content, (slot << 24) | file, lo, hi, CHUNK],
                 Step::DownloadChunk,
             ),
-            Source::Captured => Op::new(OP_GET_OBJECT, vec![CAPTURED_HANDLE], Step::DownloadWhole),
-            Source::Http => return None,
+            Source::Handle(h) => Op::new(OP_GET_OBJECT, vec![h], Step::DownloadWhole),
+            Source::Http | Source::Dataset => return None,
         };
         Some(op.for_command(d.id))
     }
@@ -2508,7 +2549,7 @@ impl SonyCamera {
                     total,
                 );
                 let op = self.chunk_op(&d);
-                Ok(Plan::Download(d, op))
+                Ok(Plan::Download(d, op.into_iter().collect()))
             }
             Some("o") => {
                 if self.function != Function::ContentTransfer {
@@ -2521,7 +2562,7 @@ impl SonyCamera {
                 let d = new(Source::Object(handle), None);
                 let op =
                     Op::new(OP_GET_OBJECT_INFO, vec![handle], Step::DownloadInfo).for_command(id);
-                Ok(Plan::Download(d, Some(op)))
+                Ok(Plan::Download(d, vec![op]))
             }
             Some("m") => {
                 let slot: u32 = parts.next().and_then(|p| p.parse().ok()).ok_or_else(bad)?;
@@ -2536,7 +2577,7 @@ impl SonyCamera {
                         refused("not_reported", format!("no MediaProfile for slot {slot}"))
                     })?
                     .join(uri);
-                Ok(Plan::Download(new(Source::Http, None), None).with_http(url))
+                Ok(Plan::Download(new(Source::Http, None), vec![]).with_http(url))
             }
             _ => Err(bad()),
         }
@@ -2544,6 +2585,9 @@ impl SonyCamera {
 
     /// The operations for a command, or its immediate result.
     fn plan(&self, name: &str, params: &Params, id: CommandId) -> Result<Plan, CommandError> {
+        if let Some(plan) = self.plan_files(name, params, id) {
+            return plan;
+        }
         let pressed = param_bool(params, "pressed");
         let ops = |v: Result<Op, CommandError>| v.map(|op| Plan::Ops(vec![op]));
         if let Some(prop) = props::by_command(name) {
@@ -2767,7 +2811,7 @@ impl SonyCamera {
                 let d = Download {
                     id,
                     path: param_str(params, "path")?.to_string(),
-                    source: Source::Captured,
+                    source: Source::Handle(CAPTURED_HANDLE),
                     offset: 0,
                     total: None,
                     name: None,
@@ -2780,7 +2824,7 @@ impl SonyCamera {
                     Step::DownloadInfo,
                 )
                 .for_command(id);
-                Ok(Plan::Download(d, Some(op)))
+                Ok(Plan::Download(d, vec![op]))
             }
             "get_thumbnail" => {
                 let text = param_str(params, "id")?;
@@ -3001,15 +3045,27 @@ impl Module for SonyCamera {
                 self.download = Some(d);
                 self.start_http(cx, id, HttpPurpose::Download, url);
             }
-            Ok(Plan::Download(d, op)) => {
-                let open_now = !matches!(op.as_ref().map(|o| &o.step), Some(Step::DownloadInfo));
+            Ok(Plan::Download(d, ops)) => {
+                // Opened now when the data comes straight away; otherwise
+                // once the object's size, or the dataset, is known.
+                let open_now = matches!(
+                    ops.first().map(|o| &o.step),
+                    Some(Step::DownloadChunk | Step::DownloadWhole)
+                );
                 if open_now {
                     cx.file_open(FILE, d.path.clone());
                 }
                 self.download = Some(d);
-                if let Some(op) = op {
-                    self.commands.push_back(op);
+                self.commands.extend(ops);
+                self.pump(cx);
+            }
+            Ok(Plan::Upload(upload, path, max)) => self.begin_upload(cx, upload, path, max),
+            Ok(Plan::Delete(deletion, op)) => {
+                if let Some(wait) = self.delete_spacing(cx.now()) {
+                    self.commands.push_back(Op::pause(wait).for_command(id));
                 }
+                self.deletion = Some(deletion);
+                self.commands.push_back(op);
                 self.pump(cx);
             }
             Ok(Plan::Listing(slot, limit, op)) => {
@@ -3118,6 +3174,18 @@ impl Module for SonyCamera {
     }
 
     fn file(&mut self, cx: &mut Cx, file: Key, input: FileInput) {
+        if file == files::READ {
+            match input {
+                FileInput::Read { data } => self.upload_read(cx, data),
+                FileInput::Failed { message } => {
+                    if let Some(upload) = self.upload.take() {
+                        cx.complete(upload.id, Err(refused("file", message)));
+                    }
+                }
+                FileInput::Closed { .. } => {}
+            }
+            return;
+        }
         if file != FILE {
             return;
         }
@@ -3125,7 +3193,7 @@ impl Module for SonyCamera {
             return;
         };
         match input {
-            // Not a download's report.
+            // Reads are reported on their own key.
             FileInput::Read { .. } => self.download = Some(d),
             FileInput::Closed { bytes } => {
                 let result = match d.error {
@@ -3206,6 +3274,8 @@ impl Module for SonyCamera {
             HTTP_TIMEOUT => {
                 self.fail_http(cx, CommandError::Timeout);
             }
+            files::UPLOAD_WAIT => self.upload_timeout(cx),
+            files::DELETE_WAIT => self.delete_timeout(cx),
             _ => {}
         }
     }
@@ -4642,5 +4712,328 @@ mod tests {
             .commands
             .iter()
             .any(|op| op.code == OP_CONTROL_FTP_JOB_LIST && op.params == vec![2, 3]));
+    }
+
+    // ----- uploads, setting files and deletion -----
+
+    fn file_read_of(actions: &[Action]) -> Option<(String, u64)> {
+        actions.iter().find_map(|a| match a {
+            Action::FileRead {
+                file,
+                path,
+                max_bytes,
+            } if *file == files::READ => Some((path.clone(), *max_bytes)),
+            _ => None,
+        })
+    }
+
+    fn read_done(m: &mut SonyCamera, data: &[u8]) -> Vec<Action> {
+        let mut cx = Cx::new(100);
+        m.file(
+            &mut cx,
+            files::READ,
+            FileInput::Read {
+                data: data.to_vec(),
+            },
+        );
+        cx.take()
+    }
+
+    fn event_in(m: &mut SonyCamera, code: u16, params: Vec<u32>) -> Vec<Action> {
+        feed(
+            m,
+            EVT,
+            &[Packet::Event {
+                code,
+                transaction: 0,
+                params,
+            }],
+        )
+    }
+
+    fn lut_camera(import_enabled: u8) -> SonyCamera {
+        let mut m = camera(json!({}));
+        let mut props = vec![
+            build::enum_prop(0xD08B, dt::UINT8, false, 1, import_enabled as i128, &[]),
+            // BaseLookImport Command Version: display-only while importable.
+            build::enum_prop(0xD059, dt::UINT32, false, 2, 100, &[]),
+            build::enum_prop(0xD057, dt::UINT32, false, 1, 100, &[]),
+        ];
+        props.push(build::range_prop(0xD0C1, dt::UINT32, false, 0, (0, 64, 1)));
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&props),
+                ..Sim::default()
+            },
+        );
+        m
+    }
+
+    #[test]
+    fn a_lut_is_uploaded_applied_and_reported() {
+        let mut m = lut_camera(1);
+        let a = run(
+            &mut m,
+            30,
+            "import_lut",
+            json!({"path": "/luts/Show.cube", "user_base_look": 3}),
+        );
+        assert_eq!(file_read_of(&a).unwrap().0, "/luts/Show.cube");
+        let cube = b"LUT_3D_SIZE 2\n0 0 0\n";
+        let a = read_done(&mut m, cube);
+        let packets = sent(&a, CMD);
+        assert!(
+            matches!(&packets[0], Packet::OperationRequest { code: 0x921A, params, .. } if params == &vec![0x0002_0001])
+        );
+        let Packet::EndData { payload, .. } = &packets[2] else {
+            panic!()
+        };
+        assert_eq!(payload, &files::upload_dataset(100, "Show.cube", cube));
+        let a = answer(&mut m, &a, vec![], vec![]);
+        let packets = sent(&a, CMD);
+        assert!(
+            matches!(&packets[0], Packet::OperationRequest { code: 0x921B, params, .. } if params == &vec![0x0002_0000])
+        );
+        let Packet::EndData { payload, .. } = &packets[2] else {
+            panic!()
+        };
+        assert_eq!(payload, &[100, 0, 0, 0, 3, 0]);
+        // The result event comes before the answer to the last step.
+        event_in(&mut m, 0xC214, vec![1, 0x0002_0000]);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert!(
+            matches!(completion(&a, 30), Some(Ok(Outcome::Value { value })) if value["result"] == "ok")
+        );
+    }
+
+    #[test]
+    fn uploads_are_refused_when_the_camera_says_so_or_the_file_is_wrong() {
+        let mut m = lut_camera(0);
+        let a = run(
+            &mut m,
+            31,
+            "import_lut",
+            json!({"path": "x.cube", "user_base_look": 1}),
+        );
+        assert!(
+            matches!(completion(&a, 31), Some(Err(CommandError::DeviceError { code: Some(c), .. })) if c == "not_available")
+        );
+        assert!(file_read_of(&a).is_none(), "nothing is read");
+
+        let mut m = lut_camera(1);
+        run(
+            &mut m,
+            32,
+            "import_lut",
+            json!({"path": "x.txt", "user_base_look": 1}),
+        );
+        let a = read_done(&mut m, b"LUT_3D_SIZE 2");
+        assert!(matches!(
+            completion(&a, 32),
+            Some(Err(CommandError::InvalidParams { .. }))
+        ));
+        run(
+            &mut m,
+            33,
+            "import_lut",
+            json!({"path": "x.cube", "user_base_look": 1}),
+        );
+        let a = read_done(&mut m, &[b'x'; 80]);
+        assert!(matches!(
+            completion(&a, 33),
+            Some(Err(CommandError::InvalidParams { .. }))
+        ));
+        // A camera result other than OK fails the command.
+        run(
+            &mut m,
+            34,
+            "import_lut",
+            json!({"path": "x.cube", "user_base_look": 1}),
+        );
+        let a = read_done(&mut m, b"LUT_3D_SIZE 2");
+        let a = answer(&mut m, &a, vec![], vec![]);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert!(completion(&a, 34).is_none());
+        let a = event_in(&mut m, 0xC214, vec![3, 0x0002_0000]);
+        assert!(
+            matches!(completion(&a, 34), Some(Err(CommandError::DeviceError { message, .. })) if message.contains("invalid_file_name"))
+        );
+    }
+
+    #[test]
+    fn a_grid_line_file_goes_in_parts() {
+        let mut m = camera(json!({}));
+        let props = vec![
+            build::enum_prop(0xE110, dt::UINT32, false, 1, 100, &[]),
+            // The camera's largest operation: 12 header bytes and 8 of data.
+            build::range_prop(0xD0C1, dt::UINT32, false, 0, (0, 20, 1)),
+        ];
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&props),
+                ..Sim::default()
+            },
+        );
+        run(
+            &mut m,
+            35,
+            "import_grid_line_file",
+            json!({"path": "grid.png", "custom": 2}),
+        );
+        let mut a = read_done(&mut m, b"0123456789abcdefghij");
+        let mut parts = Vec::new();
+        loop {
+            let (code, _, params) = last_request(&a);
+            if code != 0x9229 {
+                assert_eq!((code, params), (0x921B, vec![0x0009_0000]));
+                break;
+            }
+            parts.push(params);
+            a = answer(&mut m, &a, vec![], vec![]);
+        }
+        assert_eq!(
+            parts,
+            [
+                vec![0x0009_0001, 0, 0, 8, 0],
+                vec![0x0009_0001, 8, 0, 8, 0],
+                vec![0x0009_0001, 16, 0, 4, 1]
+            ]
+        );
+        let a = answer(&mut m, &a, vec![], vec![]);
+        let a2 = event_in(&mut m, 0xC214, vec![1, 0x0009_0000]);
+        assert!(completion(&a, 35).is_none());
+        assert!(matches!(completion(&a2, 35), Some(Ok(_))));
+    }
+
+    #[test]
+    fn camera_settings_export_and_import() {
+        let mut m = camera(json!({}));
+        let props = vec![
+            build::enum_prop(0xD271, dt::UINT8, false, 1, 1, &[]),
+            build::enum_prop(0xD272, dt::UINT8, false, 1, 0, &[]),
+        ];
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&props),
+                ..Sim::default()
+            },
+        );
+        let a = run(
+            &mut m,
+            36,
+            "export_camera_settings",
+            json!({"path": "cam.dat"}),
+        );
+        assert_eq!(last_request(&a).2, vec![files::CAMERA_SETTING_HANDLE]);
+        let mut info = vec![0u8; 52];
+        info.extend_from_slice(&[0, 0]);
+        let a = answer(&mut m, &a, info, vec![]);
+        assert_eq!(
+            last_request(&a),
+            (OP_GET_OBJECT, 8, vec![files::CAMERA_SETTING_HANDLE])
+        );
+        let a = answer(&mut m, &a, b"SETTINGS".to_vec(), vec![]);
+        assert!(a.contains(&Action::FileWrite {
+            file: FILE,
+            data: b"SETTINGS".to_vec()
+        }));
+        assert!(a.contains(&Action::FileClose { file: FILE }));
+        // Reading a setting file into the camera is off right now.
+        let a = run(
+            &mut m,
+            37,
+            "import_camera_settings",
+            json!({"path": "cam.dat"}),
+        );
+        assert!(matches!(
+            completion(&a, 37),
+            Some(Err(CommandError::DeviceError { .. }))
+        ));
+    }
+
+    #[test]
+    fn content_deletion_needs_an_id_and_waits_for_the_result() {
+        let mut m = camera(json!({"session_mode": "auto"}));
+        let props = vec![build::enum_prop(0xE0F3, dt::UINT8, false, 1, 1, &[])];
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&props),
+                ..Sim::default()
+            },
+        );
+        for bad in [
+            json!({}),
+            json!({"id": ""}),
+            json!({"id": "o:5"}),
+            json!({"id": "c:1"}),
+        ] {
+            let a = run(&mut m, 38, "delete_content", bad);
+            assert!(matches!(
+                completion(&a, 38),
+                Some(Err(CommandError::InvalidParams { .. }))
+            ));
+        }
+        let a = run(&mut m, 39, "delete_content", json!({"id": "c:1:42:1"}));
+        assert_eq!(last_request(&a).2, vec![42, 1]);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        assert!(a.contains(&Action::SetTimer {
+            key: files::DELETE_WAIT,
+            after: 30_000
+        }));
+        // A result for another content is not this one's.
+        assert!(completion(&event_in(&mut m, 0xC240, vec![1, 7, 1]), 39).is_none());
+        let a = event_in(&mut m, 0xC240, vec![4, 42, 1]);
+        assert!(
+            matches!(completion(&a, 39), Some(Err(CommandError::DeviceError { message, .. })) if message.contains("protected"))
+        );
+        // The next deletion waits out the spacing the reference asks for.
+        let mut cx = Cx::new(150);
+        m.command(
+            &mut cx,
+            40,
+            "delete_content",
+            &settings(json!({"id": "c:1:43"})),
+        );
+        cx.take();
+        // Queued behind the property read the result event triggered.
+        assert!(matches!(
+            m.commands.front().map(|o| &o.step),
+            Some(Step::Pause(450))
+        ));
+    }
+
+    #[test]
+    fn a_general_setting_file_returns_the_camera_result_file() {
+        let mut m = camera(json!({}));
+        let props = vec![build::enum_prop(0xE081, dt::UINT8, false, 1, 1, &[])];
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&props),
+                ..Sim::default()
+            },
+        );
+        run(
+            &mut m,
+            41,
+            "apply_settings_file",
+            json!({"path": "s.xml", "check_only": true}),
+        );
+        let a = read_done(&mut m, b"<?xml version=\"1.0\"?><CameraSetting/>");
+        assert_eq!(last_request(&a).2, vec![1]);
+        let a = answer(&mut m, &a, vec![], vec![]);
+        let a = [a, event_in(&mut m, 0xC21A, vec![1, 1])].concat();
+        assert_eq!(last_request(&a), (0x9222, 8, vec![1]));
+        let mut result = 8u32.to_le_bytes().to_vec();
+        result.extend_from_slice(&5u32.to_le_bytes());
+        result.extend_from_slice(b"<ok/>");
+        let a = answer(&mut m, &a, result, vec![]);
+        assert!(
+            matches!(completion(&a, 41), Some(Ok(Outcome::Value { value })) if value["result_file"] == "<ok/>")
+        );
     }
 }

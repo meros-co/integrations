@@ -61,7 +61,12 @@ struct Camera {
     ftp: Vec<(u16, String, String, Option<String>)>,
     /// FTP jobs: id and clip.
     jobs: Vec<(u32, String)>,
+    /// Parameters and bytes of every partial upload.
+    parts: Vec<(Vec<u32>, Vec<u8>)>,
 }
+
+/// The camera-setting file the simulated camera saves.
+const SETTINGS_FILE: &[u8] = b"camera settings, binary in a real camera";
 
 type Shared = Arc<Mutex<Camera>>;
 
@@ -454,11 +459,20 @@ async fn command_connection(mut stream: TcpStream, camera: Shared, events: mpsc:
                             let end = (offset + max.min(10)).min(CONTENT.len());
                             [data_in(t, &CONTENT[offset..end]), ok()].concat()
                         }
+                        // The camera-setting file: its ObjectInfo, then the file.
+                        0x1008 if params.first() == Some(&0xFFFF_C004) => {
+                            let mut info = vec![0u8; 52];
+                            info.extend_from_slice(&[0, 0]);
+                            [data_in(t, &info), ok()].concat()
+                        }
+                        0x1009 if params.first() == Some(&0xFFFF_C004) => {
+                            [data_in(t, SETTINGS_FILE), ok()].concat()
+                        }
                         // FTP.
                         0x921F => [data_in(t, &ftp_list(&c.ftp)), ok()].concat(),
                         0x9217 => [data_in(t, &job_list(&c.jobs, 2)), ok()].concat(),
                         // Data follows in Start Data and End Data.
-                        0x9205 | 0x9207 | 0x9220 | 0x9218 => {
+                        0x9205 | 0x9207 | 0x9220 | 0x9218 | 0x9229 | 0x921B => {
                             pending = Some((t, code, params.clone()));
                             continue;
                         }
@@ -482,6 +496,9 @@ async fn command_connection(mut stream: TcpStream, camera: Shared, events: mpsc:
                             c.ftp.retain(|s| s.0 != server.0);
                             c.ftp.push(server);
                         }
+                        0x9229 => c.parts.push((params.clone(), data[12..].to_vec())),
+                        // Applying an upload: the result follows as an event.
+                        0x921B => notify = Some(event(0xC214, &[1, params[0]])),
                         0x9218 => {
                             if params[0] == 1 {
                                 let next = c.jobs.len() as u32 + 1;
@@ -942,5 +959,100 @@ async fn ftp_jobs_on_a_video_body() {
         .unwrap()
         .operations
         .contains(&(0x9218, vec![1, 0])));
+    core.close(id).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn uploads_and_setting_files() {
+    let (port, camera, _events) = simulated_camera(|c| {
+        // Custom grid line import enabled, and the camera's largest
+        // operation small enough that a 20-byte file goes in three parts.
+        c.props.insert(0xE110, prop(UINT32, false, 100, &[]));
+        c.props.insert(0xD0C1, prop(UINT32, false, 20, &[]));
+        // Camera-setting file can be saved.
+        c.props.insert(0xD271, prop(UINT8, false, 1, &[]));
+        // LUT import switched off on the camera.
+        c.props.insert(0xD08B, prop(UINT8, false, 0, &[]));
+    })
+    .await;
+    let core = Core::new().unwrap();
+    let id = connected(
+        &core,
+        "ilce-7sm3",
+        port,
+        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000, "session_mode": "remote"}),
+    )
+    .await;
+    let dir = std::env::temp_dir();
+    let tag = std::process::id();
+
+    // An upload in parts, applied, with the camera's result event.
+    let grid = dir.join(format!("meros-sony-grid-{tag}.png"));
+    std::fs::write(&grid, b"0123456789abcdefghij").unwrap();
+    let result = core
+        .execute(
+            id,
+            "import_grid_line_file",
+            params(json!({"path": grid.to_string_lossy(), "custom": 1})),
+        )
+        .await;
+    let _ = std::fs::remove_file(&grid);
+    assert!(
+        matches!(result, Ok(Outcome::Value { ref value }) if value["result"] == "ok"),
+        "{result:?}"
+    );
+    {
+        let c = camera.lock().unwrap();
+        let parts: Vec<(Vec<u32>, usize)> =
+            c.parts.iter().map(|(p, d)| (p.clone(), d.len())).collect();
+        assert_eq!(
+            parts,
+            [
+                (vec![0x0009_0001, 0, 0, 8, 0], 8),
+                (vec![0x0009_0001, 8, 0, 8, 0], 8),
+                (vec![0x0009_0001, 16, 0, 4, 1], 4)
+            ]
+        );
+        let joined: Vec<u8> = c.parts.iter().flat_map(|(_, d)| d.clone()).collect();
+        assert_eq!(joined, b"0123456789abcdefghij");
+        assert!(c
+            .operations
+            .iter()
+            .any(|(code, p)| *code == 0x921B && p == &vec![0x0009_0000]));
+    }
+
+    // The camera-setting file, saved to a temporary file.
+    let saved = dir.join(format!("meros-sony-settings-{tag}.dat"));
+    let result = core
+        .execute(
+            id,
+            "export_camera_settings",
+            params(json!({"path": saved.to_string_lossy()})),
+        )
+        .await;
+    assert!(
+        matches!(result, Ok(Outcome::Value { ref value }) if value["bytes"] == SETTINGS_FILE.len()),
+        "{result:?}"
+    );
+    assert_eq!(std::fs::read(&saved).unwrap(), SETTINGS_FILE);
+    let _ = std::fs::remove_file(&saved);
+
+    // LUT import is off on the camera: refused before anything is read or sent.
+    let before = camera.lock().unwrap().operations.len();
+    match core
+        .execute(
+            id,
+            "import_lut",
+            params(json!({"path": "/nowhere/Show.cube", "user_base_look": 1})),
+        )
+        .await
+    {
+        Err(CommandError::DeviceError { code, message }) => {
+            assert_eq!(code.as_deref(), Some("not_available"));
+            assert!(message.contains("0xD08B"), "{message}");
+        }
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    assert_eq!(camera.lock().unwrap().operations.len(), before);
     core.close(id).await;
 }
