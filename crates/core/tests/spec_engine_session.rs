@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, UdpSocket};
 
 fn params(v: Value) -> meros_integrations::Params {
@@ -155,27 +155,78 @@ async fn x32_over_udp() {
     );
 }
 
-/// QLab never replies to the sender: the connection is unmonitored, not
-/// connected, and every command is unverified.
+/// QLab: OSC over TCP with double-END SLIP framing. Queries are answered on
+/// /reply/<address> with a JSON string; actions are not answered.
 #[tokio::test(flavor = "multi_thread")]
-async fn qlab_is_unmonitored() {
-    let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-    let port = socket.local_addr().unwrap().port();
+async fn qlab_over_tcp_slip() {
+    fn osc_string(s: &str) -> Vec<u8> {
+        let mut b = s.as_bytes().to_vec();
+        b.resize((b.len() / 4 + 1) * 4, 0);
+        b
+    }
+    fn slip(packet: &[u8]) -> Vec<u8> {
+        let mut out = vec![0xC0];
+        for &b in packet {
+            match b {
+                0xC0 => out.extend([0xDB, 0xDC]),
+                0xDB => out.extend([0xDB, 0xDD]),
+                b => out.push(b),
+            }
+        }
+        out.push(0xC0);
+        out
+    }
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (heard, mut addresses) = tokio::sync::mpsc::unbounded_channel::<String>();
+    tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 1024];
+        loop {
+            let n = match stream.read(&mut chunk).await {
+                Ok(0) | Err(_) => return,
+                Ok(n) => n,
+            };
+            buf.extend_from_slice(&chunk[..n]);
+            // Frames are END ... END; the addresses used here need no unescaping.
+            while let Some(end) = buf.iter().skip(1).position(|&b| b == 0xC0).map(|i| i + 1) {
+                let packet: Vec<u8> = buf.drain(..=end).filter(|&b| b != 0xC0).collect();
+                if packet.is_empty() {
+                    continue;
+                }
+                let nul = packet.iter().position(|&b| b == 0).unwrap_or(packet.len());
+                let address = String::from_utf8_lossy(&packet[..nul]).into_owned();
+                if address == "/version" {
+                    let json =
+                        r#"{"workspace_id":"","address":"/version","status":"ok","data":"5.5.1"}"#;
+                    let reply = [
+                        osc_string("/reply/version"),
+                        osc_string(",s"),
+                        osc_string(json),
+                    ]
+                    .concat();
+                    stream.write_all(&slip(&reply)).await.unwrap();
+                }
+                let _ = heard.send(address);
+            }
+        }
+    });
+
     let core = Core::new().unwrap();
     let id = open(&core, "qlab", "qlab-5", port);
+    wait_connected(&core, id).await;
     assert_eq!(
         core.execute(id, "go", params(json!({}))).await,
         Ok(Outcome::Unverified)
     );
-    assert_eq!(
-        core.snapshot(id).unwrap().connection,
-        Connection::Unmonitored
-    );
-    // The datagram really went out.
-    let mut buf = [0u8; 64];
-    let (n, _) = tokio::time::timeout(Duration::from_secs(2), socket.recv_from(&mut buf))
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(buf[..n].starts_with(b"/go\0"));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while let Some(address) = addresses.recv().await {
+            if address == "/go" {
+                return;
+            }
+        }
+    })
+    .await
+    .expect("/go reached QLab, SLIP-framed");
 }
