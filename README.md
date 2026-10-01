@@ -113,7 +113,7 @@ device looks the same to whoever uses the library.
 | `sennheiser-ew-dx` | Sennheiser Evolution Wireless Digital EW-DX receivers (SSCv2) | HTTPS + SSE (SSCv2), native | 3 | 1 |
 | `sennheiser-ew-g3-g4` | Sennheiser evolution wireless G3 / G4 (Media Control Protocol) | MCP over UDP 53212, native | 3 | 11 |
 | `shure-wireless` | Shure networked wireless (command strings) | Command strings over TCP 2202, native | 9 | 6 |
-| `sony-camera` | Sony cameras over Camera Control PTP 3 (Alpha, FX, ZV, cinema line, pan/tilt) | PTP-IP over TCP 15740, or through SSH, native | 30 | 126 |
+| `sony-camera` | Sony cameras over Camera Control PTP 3 and PTP 2 (Alpha, FX, ZV, cinema line, pan/tilt) | PTP-IP over TCP 15740, or through SSH, native | 31 | 162 |
 | `tsl-umd-display` | TSL UMD tally sent to displays and multiviewers | TSL UMD over UDP, or TCP for V5.0; sends, native | 4 | 1 |
 | `tsl-umd-listener` | TSL UMD tally received from a switcher | TSL UMD over UDP, or TCP for V5.0; receives, native | 2 | 0 |
 | `visca` | VISCA PTZ cameras (Sony VISCA over IP, and VISCA over TCP/UDP) | VISCA over IP (UDP 52381), raw VISCA over TCP or UDP, native | 9 | 142 |
