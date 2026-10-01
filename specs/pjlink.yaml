@@ -1,0 +1,302 @@
+spec: 1
+id: pjlink
+name: PJLink projectors and displays (Class 1 and Class 2)
+vendor: JBMIA (PJLink standard; Epson, Sharp/NEC, Panasonic, Sony, Christie, Barco, Optoma, BenQ, Canon, Maxell and others)
+category: display
+implementation: native
+reason: >
+  Connection setup depends on what the projector says: it opens with "PJLINK 0" (no authentication) or
+  "PJLINK 1 <random>", after which the first command carries a digest of that random number and the password
+  (MD5, or from version 2.10 SHA-256 over a second exchange, "PJLINK 2", with a controller random number), and
+  a projector that does not take up the SHA-256 exchange is reconnected with MD5. "PJLINK ERRA" refuses the
+  password and must end all traffic. Only one command may be outstanding, the controller must close the
+  connection when its commands are done and the projector closes it after 30 s, and the protocol pushes
+  nothing over TCP, so state is a paced poll whose replies (power, inputs, lamps, errors) are parsed per
+  command.
+
+source:
+  - title: "PJLink Specifications Version 2.10 (2024-02-29), Class 2"
+    author: "Japan Business Machine and Information System Industries Association (JBMIA)"
+    url: "https://pjlink.jbmia.or.jp/english/data_cl2/PJLink_5-1.pdf"
+    note: >
+      Linked as "1-1. PJLink Specifications" from https://pjlink.jbmia.or.jp/english/dl_class2.html. Includes
+      Class 1. Command line and response line, class digit 1 or 2 (§2.1, §2.2); OK and ERR1-ERR4 meanings
+      (§2.3, §2.4); TCP 4352 (§3.1); UDP 4352 search, %2SRCH and %2ACKN=<MAC>, responses within 0-10 s,
+      collected for 30 s (§3.2); UDP 4352 status notifications %2LKUP, %2ERST, %2POWR (0 or 1), %2INPT to an
+      address registered in advance (§3.3); POWR (§4.1, §4.2: 0 standby, 1 on, 2 cooling, 3 warm-up); INPT
+      (§4.3, §4.4: sources 1 RGB, 2 VIDEO, 3 DIGITAL, 4 STORAGE, 5 NETWORK, 6 INTERNAL, terminal 1-9 or A-Z
+      in Class 2); AVMT (§4.5, §4.6); ERST (§4.7); LAMP (§4.8, up to 8 lamps, ERR1 no lamp); INST (§4.9);
+      NAME (§4.10, UTF-8, 0-64); INF1, INF2, INFO (§4.11-4.13, 0-32); CLSS (§4.14); SNUM, SVER (§4.15, §4.16);
+      INNM with the §4.17 example "%2INNM ?31" answered "%2INNM=PC"; IRES ("-" no signal, "*" unknown) and RRES
+      (§4.18, §4.19); FILT (§4.20, ERR1 no filter); RLMP, RFIL (§4.21, §4.22); SVOL, MVOL one step up or down
+      (§4.23, §4.24); FREZ (§4.25, §4.26). Authentication (§5.1) with the SHA-256 example: projector random
+      3db25e10f69c47a85adb24cf361897e0, controller random c14b279e603d8a5f17e849ba360f2dc5, password
+      JBMIAProjectorLink, hash 70ab129eac6924d4c129c9c4fcf45be42e1e776325a66db67e5b6eee50f2a692; fall back to
+      the old procedure when the projector does not answer PJLINK 2; PJLINK ERRA after 2 s (1-8); PJLINK 0
+      (§5.2); continuous commands within 30 s, one at a time (§5.3); disconnect when done, projector times out
+      after 30 s (§5.4); responses within 2 s, model-dependent; search and notifications need no
+      authentication (§6). Change history: 2.00 2016-07, 2.01, 2.02 (INNM detail), 2.10 (2024-03-22,
+      authentication security).
+  - title: "PJLink Specifications Version 1.04 (2013-12-10), Class 1"
+    author: "Japan Business Machine and Information System Industries Association (JBMIA)"
+    url: "https://pjlink.jbmia.or.jp/english/data/5-1_PJLink_eng_20131210.pdf"
+    note: >
+      Linked from https://pjlink.jbmia.or.jp/english/dl_class1.html. Chapters 2 and 4 as Class 2's for the
+      Class 1 commands. §5.1 MD5 authentication: "PJLINK 1 498e4a67", password JBMIAProjectorLink, digest of
+      "498e4a67JBMIAProjectorLink" is 5d8409bc1c3fa39749434aa3a5c38682, sent as
+      "5d8409bc1c3fa39749434aa3a5c38682%1POWR 1"; the projector checks only the first 32 bytes; "PJLINK ERRA"
+      on a wrong password (1-4); "PJLINK 0" (1-5).
+
+settings:
+  # Empty for a projector with PJLink security off. Class 1 §5.1 gives "32 or fewer ASCII alphanumeric
+  # characters"; see the quirks.
+  password: { type: string, secret: true, max_length: 32, pattern: "^[!-~]*$", default: "" }
+  # auto: SHA-256 (version 2.10) when the projector takes it up, else MD5. md5 never sends "PJLINK 2";
+  # sha256 refuses a projector that does not offer it.
+  authentication: { type: enum, values: [auto, md5, sha256], default: auto }
+  # Class 2 status notifications to UDP 4352 on this computer, which must be registered on the projector.
+  notifications: { type: bool, default: false }
+
+models:
+  - id: class-1
+    name: "PJLink Class 1 projector or display (any maker), TCP 4352"
+    supports:
+      [set_power, get_power, set_input, get_input, get_inputs, set_mute, get_mute, get_errors, get_lamps,
+      get_name, get_manufacturer, get_product_name, get_other_info, get_class, refresh]
+    verification: none
+  - id: class-2
+    name: "PJLink Class 2 projector or display (any maker), TCP 4352"
+    supports:
+      [set_power, get_power, set_input, get_input, get_inputs, set_mute, get_mute, get_errors, get_lamps,
+      get_name, get_manufacturer, get_product_name, get_other_info, get_class, get_serial_number,
+      get_software_version, get_input_name, get_input_resolution, get_recommended_resolution,
+      get_filter_hours, get_lamp_replacement_models, get_filter_replacement_models, adjust_speaker_volume,
+      adjust_microphone_volume, set_freeze, get_freeze, refresh]
+    verification: none
+    notes: >
+      A Class 2 model on a projector that answers CLSS with 1 falls back to Class 1: INPT and INST are sent as
+      %1, and the commands Class 2 adds are refused without being sent.
+
+commands:
+  set_power:
+    summary: "Power on (lamp on) or off (standby) (%1POWR 1 / 0, §4.1). Then reads the power status"
+    params:
+      "on": { type: bool, required: true }
+    returns: ack
+  get_power:
+    summary: "Read the power status (%1POWR ?, §4.2): 'off' (standby), 'on' (lamp on), 'cooling' or 'warming'"
+    returns: value
+  set_input:
+    summary: "Switch input (INPT, §4.3) by its two-character number: source 1 RGB, 2 VIDEO, 3 DIGITAL, 4 STORAGE, 5 NETWORK, 6 INTERNAL (Class 2), then terminal 1-9, or A-Z on Class 2; such as '31'. Sent %2 on Class 2. Then reads the input"
+    params:
+      input: { type: string, pattern: "^[1-6][1-9A-Z]$", required: true }
+    returns: ack
+  get_input:
+    summary: "Read the current input (INPT ?, §4.4); returns {code, source, terminal}"
+    returns: value
+  get_inputs:
+    summary: "List the inputs the projector has (INST ?, §4.9); returns [{code, source, terminal}]"
+    returns: value
+  set_mute:
+    summary: "Mute or unmute video, audio or both (%1AVMT 11/10, 21/20, 31/30, §4.5). Then reads the mute state"
+    params:
+      target: { type: enum, values: [video, audio, video_and_audio], default: video_and_audio }
+      muted: { type: bool, default: true }
+    returns: ack
+  get_mute:
+    summary: "Read the mute state (%1AVMT ?, §4.6); returns {video, audio}"
+    returns: value
+  get_errors:
+    summary: "Read the error status (%1ERST ?, §4.7); returns {fan, lamp, temperature, cover_open, filter, other}, each 'ok', 'warning' or 'error'"
+    returns: value
+  get_lamps:
+    summary: "Read each lamp's usage hours and whether it is lit (%1LAMP ?, §4.8); returns [{hours, on}]; ERR1 means no lamp"
+    returns: value
+  get_name:
+    summary: "Read the projector name (%1NAME ?, §4.10, UTF-8, up to 64 bytes)"
+    returns: value
+  get_manufacturer:
+    summary: "Read the manufacturer name (%1INF1 ?, §4.11)"
+    returns: value
+  get_product_name:
+    summary: "Read the product name (%1INF2 ?, §4.12)"
+    returns: value
+  get_other_info:
+    summary: "Read the manufacturer's other information (%1INFO ?, §4.13)"
+    returns: value
+  get_class:
+    summary: "Read the PJLink class the projector implements (%1CLSS ?, §4.14); returns 1 or 2"
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (%2SNUM ?, §4.15)"
+    returns: value
+  get_software_version:
+    summary: "Read the software version (%2SVER ?, §4.16)"
+    returns: value
+  get_input_name:
+    summary: "Read an input's name (%2INNM ?<input>, §4.17), such as 'PC' for 31"
+    params:
+      input: { type: string, pattern: "^[1-6][1-9A-Z]$", required: true }
+    returns: value
+  get_input_resolution:
+    summary: "Read the input signal's resolution (%2IRES ?, §4.18); returns {status: 'present', 'none' or 'unknown', horizontal, vertical}"
+    returns: value
+  get_recommended_resolution:
+    summary: "Read the recommended resolution (%2RRES ?, §4.19); returns {horizontal, vertical}"
+    returns: value
+  get_filter_hours:
+    summary: "Read the filter usage hours (%2FILT ?, §4.20); ERR1 means no filter"
+    returns: value
+  get_lamp_replacement_models:
+    summary: "Read the lamp replacement model numbers (%2RLMP ?, §4.21); returns a list"
+    returns: value
+  get_filter_replacement_models:
+    summary: "Read the filter replacement model numbers (%2RFIL ?, §4.22); returns a list"
+    returns: value
+  adjust_speaker_volume:
+    summary: "Step the speaker (audio output) volume one level up or down (%2SVOL 1 / 0, §4.23); ERR1 means no speaker"
+    params:
+      direction: { type: enum, values: [up, down], required: true }
+    returns: ack
+  adjust_microphone_volume:
+    summary: "Step the microphone (audio input) volume one level up or down (%2MVOL 1 / 0, §4.24); ERR1 means no microphone"
+    params:
+      direction: { type: enum, values: [up, down], required: true }
+    returns: ack
+  set_freeze:
+    summary: "Freeze or unfreeze the picture (%2FREZ 1 / 0, §4.25). Then reads the freeze state"
+    params:
+      frozen: { type: bool, default: true }
+    returns: ack
+  get_freeze:
+    summary: "Read whether the picture is frozen (%2FREZ ?, §4.26)"
+    returns: value
+  refresh:
+    summary: "Read the projector's identity, inputs and status again"
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Error responses are device errors with the specification's meanings (§2.3, §2.4): ERR1 undefined command
+      (the projector does not support it; for LAMP no lamp, FILT no filter, SVOL no speaker, MVOL no
+      microphone, FREZ not supported), ERR2 out of parameter (for INPT a nonexistent input source, for AVMT a
+      projector without separate audio or video mute), ERR3 unavailable time (standby, warm-up, cooling,
+      input switching, lamp ignition), ERR4 projector/display failure. Many queries answer ERR3 in standby
+      (§2.4); polling ignores it and keeps the last value. A polled query answered ERR1 is not polled again
+      until the device is reopened. A get whose parameter is literally ERR1-ERR4 (a projector named "ERR3")
+      cannot be told from an error.
+  - models: [all]
+    severity: warning
+    text: >
+      PJLink pushes nothing over TCP, so state is polled: power, input, mute and errors (and freeze and input
+      resolution on Class 2) every 5 s, lamp and filter hours every minute, and identity on the first
+      connection, after the projector has been unreachable, and on refresh. Following §5.4 ("the CONTROLLER
+      must terminate the TCP connection as soon as the required command transmission is completed") the core
+      connects when it has commands or polls, sends them one at a time (§5.3), and closes when done, so a
+      projector that accepts one controller at a time is free between polls. Some projectors accept only one
+      connection (§6 "Simultaneous connection"): another controller holding it shows as unreachable.
+  - models: [all]
+    severity: info
+    text: >
+      Responses are due within 2 s, "refer to the specifications of the projector/display" (§6); the core
+      waits 5 s for the greeting and each response, then fails the command with a timeout and reconnects.
+      Commands sent in the 10 s or so after power-on, while switching signal, or while cooling finishes are
+      "not guaranteed" (§6 "Receiving time").
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication: with security on, the projector greets "PJLINK 1 <random>". Version 2.10 (2024) adds a
+      SHA-256 exchange started by "PJLINK 2"; a projector that does not answer it as specified is reconnected
+      with the MD5 procedure of earlier versions (§5.1 step 5). An older projector reads "PJLINK 2" as a
+      failed digest and may answer "PJLINK ERRA" or close; whether it counts that as a failed login is not
+      specified. With authentication auto the core tries SHA-256 once per opening and then uses MD5 until the
+      device is reopened; set authentication to md5 for a projector known to predate 2.10. The core's
+      controller random number comes from the operating system-seeded hasher keys, the only random source in
+      the core.
+  - models: [all]
+    severity: critical
+    text: >
+      "PJLINK ERRA" after a digest refuses the password. It is terminal: pending and later commands fail with
+      auth, the connection reports unauthorized, and nothing is sent until the device is opened again with a
+      corrected password. A projector that asks for a password (PJLINK 1) when none is set is reported the
+      same way. With security off ("PJLINK 0") a configured password is not used.
+  - models: [all]
+    severity: info
+    text: >
+      Class 1 §5.1 limits passwords to 32 or fewer ASCII alphanumeric characters (the Class 2 table is
+      misaligned in the PDF but gives the same). The setting accepts any printable ASCII without spaces up to
+      32 characters, since a projector's own password rules decide what it stores.
+  - models: [all]
+    severity: info
+    text: >
+      AVMT ? (§4.6) lists 11 (video muted), 21 (audio muted), 31 (both) and 30 (neither); its character
+      ranges also allow 10 and 20, which are read as only "video not muted" and "audio not muted" with the
+      other left as it was. set_mute on a single target reports the result of the following AVMT ?.
+  - models: [all]
+    severity: info
+    text: >
+      Class 1 version 1.04's Fig. 2 prints the power-on response as "%1POWR 1 OK" and the command as
+      "...%1POWR 1"; chapter 2 and §4.1 give "%1POWR=OK", which the core expects. Responses are matched by
+      their four-letter body, case-insensitive (§2.2); lines ending in CR, LF or CRLF are accepted.
+  - models: [all]
+    severity: info
+    text: >
+      Input numbers are a source digit and a terminal: §4.3 gives source 1 RGB, 2 VIDEO, 3 DIGITAL, 4 STORAGE,
+      5 NETWORK (6 INTERNAL in Class 2), which the core follows for input.source. §4.17's INNM example table
+      contradicts it, labelling 31 "RGB1" and 51 "Digital1". Only the number is sent, so commands are
+      unaffected; the source names are labels, and the input names (INNM) are what the projector calls them.
+  - models: [class-2]
+    severity: info
+    text: >
+      Status notifications (§3.3) go by UDP to port 4352 of a controller address registered on the projector
+      in advance; how it is registered is model-specific and not in the specification. With notifications on,
+      the core listens on UDP 4352 (shared by every PJLink device it has open) and applies %2ERST and %2INPT
+      at once; %2POWR (0 standby or cooling, 1 on or warm-up) and %2LKUP (PJLink ready, with the MAC address)
+      start a poll. Notifications are UDP and may be lost (§6), so polling continues. If UDP 4352 is in use by
+      other software the core logs a warning and polls only.
+  - models: [class-2]
+    severity: info
+    text: >
+      Discovery by %2SRCH broadcast to UDP 4352 (§3.2, answered by %2ACKN=<MAC> from each projector within
+      0-10 s, to UDP 4352 of the controller) is not part of this device module; the device is added by
+      address.
+
+state:
+  power: { type: string, description: "'off' (standby), 'on' (lamp on), 'cooling' or 'warming' (POWR ?, §4.2)" }
+  input.code: { type: string, description: "Current input number, such as '31' (INPT ?, §4.4)" }
+  input.source: { type: string, description: "'rgb', 'video', 'digital', 'storage', 'network' or 'internal'" }
+  input.terminal: { type: string, description: "Terminal within the source, '1'-'9' or 'A'-'Z'" }
+  inputs.*.source: { type: string, description: "Source type of each input the projector lists (INST ?), keyed by input number" }
+  inputs.*.terminal: { type: string, description: "Terminal of each listed input" }
+  inputs.*.name: { type: string, description: "Name of each listed input (Class 2 INNM ?)" }
+  mute.video: { type: bool, description: "Video muted (AVMT ?)" }
+  mute.audio: { type: bool, description: "Audio muted (AVMT ?)" }
+  errors.fan: { type: string, description: "'ok', 'warning' or 'error' (ERST ?, §4.7)" }
+  errors.lamp: { type: string, description: "'ok', 'warning' or 'error'" }
+  errors.temperature: { type: string, description: "'ok', 'warning' or 'error'" }
+  errors.cover_open: { type: string, description: "'ok', 'warning' or 'error'" }
+  errors.filter: { type: string, description: "'ok', 'warning' or 'error'" }
+  errors.other: { type: string, description: "'ok', 'warning' or 'error'" }
+  lamp_count: { type: int, description: "Number of lamps; 0 when the projector has none (LAMP ERR1)" }
+  lamps.*.hours: { type: int, unit: h, description: "Lamp usage hours, lamps numbered from 1; 0 when not counted (§4.8)" }
+  lamps.*.on: { type: bool, description: "Lamp lit" }
+  filter.hours: { type: int, unit: h, description: "Filter usage hours (Class 2 FILT ?); 0 when not counted" }
+  filter.installed: { type: bool, description: "False when the projector has no filter (FILT ERR1)" }
+  freeze: { type: bool, description: "Picture frozen (Class 2 FREZ ?)" }
+  signal.status: { type: string, description: "'present', 'none' or 'unknown' (Class 2 IRES ?)" }
+  signal.horizontal: { type: int, description: "Input signal horizontal resolution" }
+  signal.vertical: { type: int, description: "Input signal vertical resolution" }
+  recommended_resolution.horizontal: { type: int, description: "Recommended horizontal resolution (Class 2 RRES ?)" }
+  recommended_resolution.vertical: { type: int, description: "Recommended vertical resolution" }
+  replacement_models.lamp: { type: array, description: "Lamp replacement model numbers (Class 2 RLMP ?)" }
+  replacement_models.filter: { type: array, description: "Filter replacement model numbers (Class 2 RFIL ?)" }
+  name: { type: string, description: "Projector name (NAME ?)" }
+  info.manufacturer: { type: string, description: "Manufacturer name (INF1 ?)" }
+  info.product: { type: string, description: "Product name (INF2 ?)" }
+  info.other: { type: string, description: "Other information (INFO ?)" }
+  info.class: { type: int, description: "PJLink class the projector reports (CLSS ?)" }
+  info.serial_number: { type: string, description: "Serial number (Class 2 SNUM ?)" }
+  info.software_version: { type: string, description: "Software version (Class 2 SVER ?)" }
+  mac_address: { type: string, description: "MAC address from a Class 2 link-up notification (%2LKUP)" }
