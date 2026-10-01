@@ -5,8 +5,63 @@ vendor: AJA Video Systems
 category: recorder
 
 source:
-  - title: AJA REST automation guide
-    note: Manufacturer-documented
+  - title: AJA REST API (gitlab.aja.com/pub/rest_api, master at commit 13c25d14, April 2026)
+    author: AJA Video Systems
+    url: https://gitlab.aja.com/pub/rest_api
+    note: >
+      Manufacturer-documented, Apache-2.0; www.aja.com/support/rest-api
+      redirects here. Chapter 1 (01_Generic_AJA_REST_API_Control_Framework.md):
+      /config with action=get|set|connect|wait_for_config_events, paramid and
+      value; the JSON reply {paramid, name, value, value_name}; desc.json and
+      descriptors.html. Chapter 2 (02_Using_the_REST_Interface_Developer_Page.md):
+      /descriptors?paramid=, descriptor types, Events, Presets
+      (eParamID_RegisterSave / eParamID_RegisterRecall, 1 to 20). Chapter 4
+      (KiPro-GO/04_Ki-Pro-GO_Commands.md): eParamID_TransportCommand 0-18,
+      eParamID_HeadphoneMonitorChannel, eParamID_HDMIMonitorChannel,
+      eParamID_SDIMonitorChannel, eParamID_VideoInput_1, eParamID_AudioInput_1,
+      eParamID_MediaState, eParamID_StoragePath. Chapter 5
+      (KiProUltra/05_Ki-Pro-Ultra_Commands.md): transport, set playback speed
+      (eParamID_TransportRequestedSpeed, v3.1.1 and above), format media
+      (eParamID_FileSystemFormat, eParamID_StorageCommand), sub-clips over
+      /mediaedit (v2.0 and above), media state and storage path. Chapter 6
+      (KiProUltraPlus_KiProUltra12G/06_KPUP_KPU12G_Commands.md): as chapter 5
+      plus eParamID_AudioChannelsFocus, eParamID_AudioEncodeChannelFocus,
+      eParamID_SDIMonitorChannel and eParamID_HDMIOutChannel. Chapter 7: the
+      WebSocket confidence monitor. Chapter 8: protobuf-encoded alarm
+      parameters.
+  - title: AJA REST API Control Framework and Examples, Developer Guide v1.0 (January 29, 2021)
+    author: AJA Video Systems
+    url: https://gitlab.aja.com/pub/rest_api/-/blob/master/00_AJA_REST_API_Developer_Guide_v1.0.pdf
+    note: >
+      The PDF edition of chapters 1-6 above (also aja.com support item 4184).
+      Query parameters p.8-9, JSON reply p.9, presets p.22, HELO authentication
+      p.30-32, Ki Pro GO p.35-46, Ki Pro Ultra and Ultra Plus / 12G from p.47.
+  - title: Ki Pro AJA REST Automation 4.1.0 (kipro_automation_4.1.0.zip)
+    author: AJA Video Systems
+    url: https://www.aja.com/support/item-download/400/kipro_automation_4.1.0.zip
+    note: >
+      Manufacturer package for Ki Pro, Ki Pro Mini and Ki Pro Rack (aja.com
+      support item 400; files dated 2012). examples/api.txt marks its own
+      /options, /values and form-POST interfaces as deprecated in favour of
+      the /config REST API, but is AJA's only document for: the event
+      connection (/json?action=connect&configid=0 and
+      /json?action=wait_for_config_events), eParamID_CueToTimecode with
+      transport command 14, the /clips listing and clip delete, next_slot,
+      and the TransportState, DisplayTimecode and VideoInSelect/AudioInSelect
+      examples. examples/python: kipro.py (transport command numbers, with
+      notes that 2 is not implemented and 15 must not be used), record.py,
+      record_with_clipname.py, go_to_clipname.py, cue.py, reverse.py,
+      playlist.py, polling_for_clips.py (reads /config?action=get), events.py
+      and timecode.py.
+  - title: Bitfocus Companion module aja-kipro (MIT)
+    url: https://github.com/bitfocus/companion-module-aja-kipro
+    note: >
+      Read for corroboration only; nothing here is sourced from it. It
+      targets "Ki Pro and Ki Pro Ultra series" and uses
+      eParamID_TransportState, eParamID_DisplayTimecode, eParamID_CurrentClip,
+      eParamID_MediaState, eParamID_GoToClip, eParamID_CustomClipName and
+      eParamID_UseCustomClipName, which AJA documents in the 4.1.0 package
+      above; that is the basis for offering those on the current models.
 
 transport:
   type: http
@@ -21,24 +76,486 @@ transport:
 
 models:
   - id: kipro
-    name: AJA Ki Pro
-    supports: [record, stop, play, set_clip_name, get_transport_state]
+    name: AJA Ki Pro (original)
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors_legacy
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - cue_to_timecode
+      - set_playback_speed
+      - play_at_speed
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - set_use_custom_clip_take
+      - record_named
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_clips
+      - delete_clip
+      - select_next_slot
+      - select_playlist
+      - set_video_input_sdi
+      - set_video_input_hdmi
+      - set_video_input_component
+      - set_audio_input_sdi
+      - set_audio_input_rca
+      - set_audio_input_xlr
+      - set_audio_input_hdmi
     verification: none
+    notes: >
+      Documented by the Ki Pro REST Automation 4.1.0 package. The video and
+      audio input commands come from that document's example descriptors for
+      eParamID_VideoInSelect (SDI 0, HDMI 1, Component 2) and
+      eParamID_AudioInSelect (SDI 0, RCA 1, XLR 2, HDMI 3); AJA does not say
+      which Ki Pro produced them, so they are offered on the original Ki Pro
+      only, the unit with all of those connectors.
+  - id: kipro-mini
+    name: AJA Ki Pro Mini
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors_legacy
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - cue_to_timecode
+      - set_playback_speed
+      - play_at_speed
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - set_use_custom_clip_take
+      - record_named
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_clips
+      - delete_clip
+      - select_next_slot
+      - select_playlist
+    verification: none
+    notes: Documented by the Ki Pro REST Automation 4.1.0 package (Ki Pro Mini and Ki Pro Rack).
+  - id: kipro-rack
+    name: AJA Ki Pro Rack
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors_legacy
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - cue_to_timecode
+      - set_playback_speed
+      - play_at_speed
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - set_use_custom_clip_take
+      - record_named
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_clips
+      - delete_clip
+      - select_next_slot
+      - select_playlist
+    verification: none
+    notes: Documented by the Ki Pro REST Automation 4.1.0 package (Ki Pro Mini and Ki Pro Rack).
   - id: kipro-go
     name: AJA Ki Pro GO
-    supports: [record, stop, play, set_clip_name, get_transport_state]
+    channels: 4
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - play_at_system_time
+      - record_at_system_time
+      - go_to_idle
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_storage_path
+      - set_headphone_monitor_channel
+      - set_hdmi_monitor_channel
+      - set_hdmi_monitor_all
+      - set_sdi_monitor_channel
+      - set_sdi_monitor_all
+      - set_video_input_1_sdi
+      - set_video_input_1_hdmi
+      - set_audio_input_1_follow_video
+      - set_audio_input_1_analog
     verification: none
+    notes: >
+      Four-channel recorder. AJA's chapter 4 documents eParamID_VideoInput_1
+      and eParamID_AudioInput_1 only; channels 2 to 4 are reached with
+      set_parameter once their ids are read from the unit's desc.json.
+  - id: kipro-go2
+    name: AJA Ki Pro GO2
+    channels: 4
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - play_at_system_time
+      - record_at_system_time
+      - go_to_idle
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_storage_path
+      - set_headphone_monitor_channel
+      - set_hdmi_monitor_channel
+      - set_hdmi_monitor_all
+      - set_sdi_monitor_channel
+      - set_sdi_monitor_all
+      - set_video_input_1_sdi
+      - set_video_input_1_hdmi
+      - set_audio_input_1_follow_video
+      - set_audio_input_1_analog
+    verification: none
+    notes: >
+      The Ki Pro GO2 manual (v5.0r1, p.8) points to the AJA REST API
+      documentation, whose product chapter is written for the Ki Pro GO; the
+      GO2 is given the same command set on that basis.
+  - id: kipro-ultra
+    name: AJA Ki Pro Ultra
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - play_at_system_time
+      - record_at_system_time
+      - go_to_idle
+      - set_playback_speed
+      - play_at_speed
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_storage_path
+      - set_file_system_format_hfs
+      - set_file_system_format_exfat
+      - format_media
+      - subclip_start
+      - subclip_status
+      - subclip_kill
+    verification: none
+  - id: kipro-ultra-plus
+    name: AJA Ki Pro Ultra Plus
+    channels: 4
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - play_at_system_time
+      - record_at_system_time
+      - go_to_idle
+      - set_playback_speed
+      - play_at_speed
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_storage_path
+      - set_file_system_format_hfs
+      - set_file_system_format_exfat
+      - format_media
+      - subclip_start
+      - subclip_status
+      - subclip_kill
+      - set_headphone_channels
+      - set_headphone_encode_channel
+      - set_sdi_monitor_channel
+      - set_sdi_monitor_all
+      - set_hdmi_out_channel
+      - set_hdmi_out_all
+    verification: none
+    notes: Four channels in Multi Channel mode (eParamID_EncodeChannels).
+  - id: kipro-ultra-12g
+    name: AJA Ki Pro Ultra 12G
+    channels: 4
+    supports:
+      - get_parameter
+      - set_parameter
+      - get_descriptor
+      - get_all_descriptors
+      - save_preset
+      - recall_preset
+      - transport_command
+      - play
+      - record
+      - stop
+      - fast_forward
+      - fast_reverse
+      - step_forward
+      - step_reverse
+      - next_clip
+      - previous_clip
+      - variable_speed_play
+      - preroll
+      - assemble_edit
+      - cue
+      - play_at_system_time
+      - record_at_system_time
+      - go_to_idle
+      - set_playback_speed
+      - play_at_speed
+      - get_transport_state
+      - get_display_timecode
+      - get_current_clip
+      - go_to_clip
+      - set_clip_name
+      - set_use_custom_clip_name
+      - enter_data_lan_mode
+      - enter_record_play_mode
+      - get_media_state
+      - get_storage_path
+      - set_file_system_format_hfs
+      - set_file_system_format_exfat
+      - format_media
+      - subclip_start
+      - subclip_status
+      - subclip_kill
+      - set_headphone_channels
+      - set_headphone_encode_channel
+      - set_sdi_monitor_channel
+      - set_sdi_monitor_all
+      - set_hdmi_out_channel
+      - set_hdmi_out_all
+    verification: none
+    notes: Four channels in Multi Channel mode (eParamID_EncodeChannels).
 
 commands:
-  record:
+  # ── Generic parameter access (chapter 1-2) ──────────────────────────────
+  get_parameter:
+    summary: >
+      Read any parameter by id. Returns the device's JSON reply, {paramid,
+      name, value, value_name}; ids and values are listed in the unit's
+      desc.json
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true }
     send:
       method: GET
       path: /config
-      query: { action: set, paramid: eParamID_TransportCommand, value: "3" }
+      query: { action: get, paramid: "{paramid}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  set_parameter:
+    summary: >
+      Set any parameter by id. Enum parameters take the enum's numeric value,
+      strings are sent as they are (chapter 2, Type)
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true }
+      value: { type: string, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: "{paramid}", value: "{value}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_descriptor:
+    summary: Read one parameter's descriptor (type, enum values, range, persistence) as a JSON array
+    params:
+      paramid: { type: string, pattern: "^eParamID_[A-Za-z0-9_]+$", required: true }
+    send:
+      method: GET
+      path: /descriptors
+      query: { paramid: "{paramid}" }
+    expect: { json_path: "$" }
+    returns: value
+
+  get_all_descriptors:
+    summary: Read every parameter descriptor on the unit (desc.json)
+    send: { method: GET, path: /desc.json }
+    expect: { json_path: "$" }
+    returns: value
+
+  get_all_descriptors_legacy:
+    summary: Read every parameter descriptor on a Ki Pro, Mini or Rack (/descriptors?paramid=*)
+    send: { method: GET, path: /descriptors, raw_query: "paramid=*" }
+    expect: { json_path: "$" }
+    returns: value
+
+  save_preset:
+    summary: Save the current configuration into a preset (eParamID_RegisterSave)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RegisterSave, value: "{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset:
+    summary: Recall a saved preset (eParamID_RegisterRecall)
+    params:
+      preset: { type: int, min: 1, max: 20, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_RegisterRecall, value: "{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Transport (eParamID_TransportCommand) ───────────────────────────────
+  transport_command:
+    summary: >
+      Send any eParamID_TransportCommand value (0 No Command to 18 Go To
+      Idle), for values without a named command below
+    params:
+      command: { type: int, min: 0, max: 18, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "{command}" }
     expect: { status: 200 }
     returns: ack
 
   play:
+    summary: Play (transport command 1)
     send:
       method: GET
       path: /config
@@ -46,7 +563,17 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  record:
+    summary: Record (transport command 3)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "3" }
+    expect: { status: 200 }
+    returns: ack
+
   stop:
+    summary: Stop (transport command 4); the first stop pauses, a second one stops to idle
     send:
       method: GET
       path: /config
@@ -54,17 +581,167 @@ commands:
     expect: { status: 200 }
     returns: ack
 
-  set_clip_name:
-    params:
-      name: { type: string, max_length: 64, required: true }
+  fast_forward:
+    summary: Fast forward (transport command 5)
     send:
       method: GET
       path: /config
-      query: { action: set, paramid: eParamID_CustomClipName, value: "{name}" }
+      query: { action: set, paramid: eParamID_TransportCommand, value: "5" }
+    expect: { status: 200 }
+    returns: ack
+
+  fast_reverse:
+    summary: Fast reverse (transport command 6)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "6" }
+    expect: { status: 200 }
+    returns: ack
+
+  step_forward:
+    summary: Single step forward (transport command 7)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "7" }
+    expect: { status: 200 }
+    returns: ack
+
+  step_reverse:
+    summary: Single step reverse (transport command 8)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "8" }
+    expect: { status: 200 }
+    returns: ack
+
+  next_clip:
+    summary: Next clip (transport command 9)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "9" }
+    expect: { status: 200 }
+    returns: ack
+
+  previous_clip:
+    summary: Previous clip (transport command 10)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "10" }
+    expect: { status: 200 }
+    returns: ack
+
+  variable_speed_play:
+    summary: Variable speed play at eParamID_TransportRequestedSpeed (transport command 11)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "11" }
+    expect: { status: 200 }
+    returns: ack
+
+  preroll:
+    summary: Preroll (transport command 12; AJA lists the value without describing it)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "12" }
+    expect: { status: 200 }
+    returns: ack
+
+  assemble_edit:
+    summary: Assemble edit (transport command 13; AJA lists the value without describing it)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "13" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue:
+    summary: Cue (transport command 14), to the timecode in eParamID_CueToTimecode
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "14" }
+    expect: { status: 200 }
+    returns: ack
+
+  play_at_system_time:
+    summary: Play at system time (transport command 16; the time it uses is not named in AJA's documents)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "16" }
+    expect: { status: 200 }
+    returns: ack
+
+  record_at_system_time:
+    summary: Record at system time (transport command 17; the time it uses is not named in AJA's documents)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "17" }
+    expect: { status: 200 }
+    returns: ack
+
+  go_to_idle:
+    summary: Go to idle (transport command 18)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportCommand, value: "18" }
+    expect: { status: 200 }
+    returns: ack
+
+  cue_to_timecode:
+    summary: Cue to a timecode in the current clip (eParamID_CueToTimecode, then transport command 14)
+    params:
+      timecode: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}[:;][0-9]{2}$", required: true }
+    send:
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_CueToTimecode, value: "{timecode}" }
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_TransportCommand, value: "14" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_playback_speed:
+    summary: >
+      Set eParamID_TransportRequestedSpeed, a multiple of normal speed:
+      1 normal, 16 sixteen times, -1.5 reverse, 0 pause, 0.5 half speed. It
+      applies to variable speed play (transport command 11)
+    params:
+      speed: { type: float, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_TransportRequestedSpeed, value: "{speed:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  play_at_speed:
+    summary: Variable speed play (transport command 11) at a requested speed, as AJA's reverse.py does
+    params:
+      speed: { type: float, required: true }
+    send:
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_TransportCommand, value: "11" }
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_TransportRequestedSpeed, value: "{speed:.3f}" }
     expect: { status: 200 }
     returns: ack
 
   get_transport_state:
+    summary: Read the transport state by name, such as Idle, Recording or Playing Forward (eParamID_TransportState)
     send:
       method: GET
       path: /config
@@ -72,43 +749,631 @@ commands:
     expect: { json_path: "$.value_name" }
     returns: value
 
+  get_display_timecode:
+    summary: Read the displayed timecode (eParamID_DisplayTimecode)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_DisplayTimecode }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  # ── Clips ───────────────────────────────────────────────────────────────
+  get_current_clip:
+    summary: Read the current clip's name (eParamID_CurrentClip)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_CurrentClip }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  go_to_clip:
+    summary: Load a clip by file name, extension included, such as Clip1ATK2.mov (eParamID_GoToClip)
+    params:
+      clip: { type: string, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_GoToClip, value: "{clip}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_clip_name:
+    summary: Set the custom clip name (eParamID_CustomClipName; used when eParamID_UseCustomClipName is on)
+    params:
+      name: { type: string, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_CustomClipName, value: "{name}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_use_custom_clip_name:
+    summary: Turn custom clip naming on or off (eParamID_UseCustomClipName, menu 19.1)
+    params:
+      enabled: { type: bool, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_UseCustomClipName, value: "{enabled:bool01}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_use_custom_clip_take:
+    summary: >
+      Turn the take number on custom clip names on or off
+      (eParamID_UseCustomClipTake). Setting it on restores normal operation
+      after record_named
+    params:
+      enabled: { type: bool, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_UseCustomClipTake, value: "{enabled:bool01}" }
+    expect: { status: 200 }
+    returns: ack
+
+  record_named:
+    summary: >
+      Record a clip with exactly this name, overwriting a clip of that name
+      (AJA's record_with_clipname.py: take numbering off, custom name on, the
+      name, then record)
+    params:
+      name: { type: string, required: true }
+    send:
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_UseCustomClipTake, value: "0" }
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_UseCustomClipName, value: "1" }
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_CustomClipName, value: "{name}" }
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_TransportCommand, value: "3" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_clips:
+    summary: >
+      List the clips in the AJA folder of the current media (/clips): name,
+      timestamp, fourcc, width, height, frame count, frame rate, interlace
+    send: { method: GET, path: /clips }
+    # The whole body: AJA's example is not strict JSON (unquoted keys).
+    expect: { status: 200, matches: "(?s)^(.*\\S)\\s*$" }
+    returns: value
+
+  delete_clip:
+    summary: Delete a clip in the AJA folder of the current media by file name (/clips?action=delete)
+    params:
+      clip: { type: string, required: true }
+    send:
+      method: POST
+      path: /clips
+      query: { action: delete, clipname: "{clip}" }
+    expect: { status: 200 }
+    returns: ack
+
+  select_next_slot:
+    summary: Select the next available media slot (deprecated /options interface)
+    send:
+      method: POST
+      path: /options
+      query: { transport_command: next_slot }
+    expect: { status: 200 }
+    returns: ack
+
+  select_playlist:
+    summary: >
+      Make a playlist current (eParamID_CurrentPlaylist), then set
+      eParamID_MediaUpdated to a fresh Unix time so the unit reloads, as
+      AJA's playlist.py does
+    params:
+      playlist: { type: string, required: true }
+      updated: { type: int, min: 0, required: true }
+    send:
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_CurrentPlaylist, value: "{playlist}" }
+      - method: GET
+        path: /config
+        query: { action: set, paramid: eParamID_MediaUpdated, value: "{updated}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Media ───────────────────────────────────────────────────────────────
+  enter_data_lan_mode:
+    summary: Put the unit in Data - LAN mode for clip transfer (eParamID_MediaState 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_MediaState, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  enter_record_play_mode:
+    summary: Return the unit to Record-Play mode (eParamID_MediaState 0); a transfer in progress is aborted
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_MediaState, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_media_state:
+    summary: Read the media state by name, Record-Play or Data - LAN (eParamID_MediaState)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_MediaState }
+    expect: { json_path: "$.value_name" }
+    returns: value
+
+  get_storage_path:
+    summary: Read the path clips are recorded to and played from, such as /mnt/S1/AJA (eParamID_StoragePath)
+    send:
+      method: GET
+      path: /config
+      query: { action: get, paramid: eParamID_StoragePath }
+    expect: { json_path: "$.value" }
+    returns: value
+
+  set_file_system_format_hfs:
+    summary: Format media as HFS+ when format_media runs (eParamID_FileSystemFormat 0)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_FileSystemFormat, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_file_system_format_exfat:
+    summary: Format media as ExFAT when format_media runs (eParamID_FileSystemFormat 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_FileSystemFormat, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  format_media:
+    summary: Erase and format the current media (eParamID_StorageCommand 4, Erase)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_StorageCommand, value: "4" }
+    expect: { status: 200 }
+    returns: ack
+
+  subclip_start:
+    summary: >
+      Start a job making a sub-clip of a MOV clip on the same drive (/mediaedit
+      action=subclip). Succeeds when the reply says error: none, and returns
+      the job id
+    params:
+      source: { type: string, pattern: "^/mnt/S[12]/AJA/[A-Za-z0-9_-][A-Za-z0-9_.-]*\\.(mov|MOV)$", required: true }
+      destination: { type: string, pattern: "^/mnt/S[12]/AJA/[A-Za-z0-9_-][A-Za-z0-9_.-]*\\.(mov|MOV)$", required: true }
+      start: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+      duration: { type: string, pattern: "^[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{2}$", required: true }
+    send:
+      method: GET
+      path: /mediaedit
+      raw_query: "action=subclip&arg1={source}&arg2={destination}&arg3={start}&arg4={duration}"
+    expect: { contains: "error: none" }
+    returns: fields
+
+  subclip_status:
+    summary: Read a sub-clip job's status (such as 44.75% complete), running (yes or no), time_now, time_start and time_stop, Unix times; fails when the job reports an error
+    params:
+      id: { type: int, min: 0, required: true }
+    send:
+      method: GET
+      path: /mediaedit
+      query: { action: status, id: "{id}" }
+    expect: { contains: "error: none" }
+    returns: fields
+
+  subclip_kill:
+    summary: Kill a running sub-clip job
+    params:
+      id: { type: int, min: 0, required: true }
+    send:
+      method: GET
+      path: /mediaedit
+      query: { action: kill, id: "{id}" }
+    expect: { contains: "error: none" }
+    returns: fields
+
+  # ── Inputs and monitoring ───────────────────────────────────────────────
+  set_video_input_sdi:
+    summary: Select the SDI video input (eParamID_VideoInSelect 0)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_VideoInSelect, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_video_input_hdmi:
+    summary: Select the HDMI video input (eParamID_VideoInSelect 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_VideoInSelect, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_video_input_component:
+    summary: Select the component video input (eParamID_VideoInSelect 2)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_VideoInSelect, value: "2" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_audio_input_sdi:
+    summary: Select embedded SDI audio (eParamID_AudioInSelect 0)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioInSelect, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_audio_input_rca:
+    summary: Select the RCA audio input (eParamID_AudioInSelect 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioInSelect, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_audio_input_xlr:
+    summary: Select the XLR audio input (eParamID_AudioInSelect 2)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioInSelect, value: "2" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_audio_input_hdmi:
+    summary: Select embedded HDMI audio (eParamID_AudioInSelect 3)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioInSelect, value: "3" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_video_input_1_sdi:
+    summary: Use an SDI input for channel 1 record and idle (eParamID_VideoInput_1, SDI 1-4 are 0-3)
+    params:
+      sdi: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_VideoInput_1, value: "{sdi:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_video_input_1_hdmi:
+    summary: Use an HDMI input for channel 1 record and idle (eParamID_VideoInput_1, HDMI 1-4 are 4-7)
+    params:
+      hdmi: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_VideoInput_1, value: "{hdmi:+3}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_audio_input_1_follow_video:
+    summary: Channel 1 audio follows its video input's embedded audio (eParamID_AudioInput_1 0)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioInput_1, value: "0" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_audio_input_1_analog:
+    summary: Channel 1 audio from the analog input (eParamID_AudioInput_1 1)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioInput_1, value: "1" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_headphone_monitor_channel:
+    summary: Select the channel heard on the headphones (eParamID_HeadphoneMonitorChannel, channels 1-4 are 0-3)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_HeadphoneMonitorChannel, value: "{channel:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_hdmi_monitor_channel:
+    summary: Show one channel on the HDMI monitor output (eParamID_HDMIMonitorChannel, channels 1-4 are 0-3)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_HDMIMonitorChannel, value: "{channel:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_hdmi_monitor_all:
+    summary: Show all channels on the HDMI monitor output (eParamID_HDMIMonitorChannel 4)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_HDMIMonitorChannel, value: "4" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_sdi_monitor_channel:
+    summary: Show one channel on the SDI monitor output (eParamID_SDIMonitorChannel, channels 1-4 are 0-3)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_SDIMonitorChannel, value: "{channel:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_sdi_monitor_all:
+    summary: Show all four channels in quadrants on the SDI monitor output (eParamID_SDIMonitorChannel 4)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_SDIMonitorChannel, value: "4" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_hdmi_out_channel:
+    summary: Show one channel on the HDMI monitor output (eParamID_HDMIOutChannel, channels 1-4 are 0-3)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_HDMIOutChannel, value: "{channel:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_hdmi_out_all:
+    summary: Show all channels on the HDMI monitor output (eParamID_HDMIOutChannel 4)
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_HDMIOutChannel, value: "4" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_headphone_channels:
+    summary: >
+      Select the audio pair on the headphones, rear RCA monitor jacks and
+      front VU meters (eParamID_AudioChannelsFocus; pairs 1-2 to 15-16 are
+      numbered 1 to 8 here, 0 to 7 on the wire)
+    params:
+      pair: { type: int, min: 1, max: 8, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioChannelsFocus, value: "{pair:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_headphone_encode_channel:
+    summary: In Multi Channel mode, select the encode channel feeding the headphones and VU meters (eParamID_AudioEncodeChannelFocus, channels 1-4 are 0-3)
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      method: GET
+      path: /config
+      query: { action: set, paramid: eParamID_AudioEncodeChannelFocus, value: "{channel:-1}" }
+    expect: { status: 200 }
+    returns: ack
+
 telemetry:
-  # The transport state, asked once a second; get_transport_state's reply
-  # updates it too.
+  # The unit pushes parameter changes over a long-poll event connection
+  # (connect, then wait_for_config_events with the returned connection id),
+  # which the format cannot express; see the quirk. Until a native extension
+  # exists, the parameters operators watch are asked once a second.
   poll:
     every_ms: 1000
     send:
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_TransportState } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_DisplayTimecode } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_CurrentClip } }
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_MediaState } }
   updates:
+    # Every get or set reply carries {paramid, name, value, value_name}.
+    - path: "^/config\\?action=(get|set)&paramid="
+      json: { name: "$.name", value: "$.value", value_name: "$.value_name" }
+      state:
+        "params.{name}.value": "{value}"
+        "params.{name}.value_name": "{value_name}"
     - path: "^/config\\?action=get&paramid=eParamID_TransportState$"
-      json: { state: "$.value_name" }
-      state: { transport.state: "{state}" }
+      json: { state: "$.value_name", code: "$.value" }
+      state:
+        transport.state: "{state}"
+        transport.state_code: "{code}"
+    - path: "^/config\\?action=get&paramid=eParamID_DisplayTimecode$"
+      json: { tc: "$.value" }
+      state: { timecode.display: "{tc}" }
+    - path: "^/config\\?action=get&paramid=eParamID_CurrentClip$"
+      json: { clip: "$.value" }
+      state: { clip.current: "{clip}" }
+    - path: "^/config\\?action=get&paramid=eParamID_MediaState$"
+      json: { name: "$.value_name", code: "$.value" }
+      state:
+        media.state: "{name}"
+        media.data_lan: { value: "{code}", map: { "0": false, "1": true } }
+    - path: "^/config\\?action=get&paramid=eParamID_StoragePath$"
+      json: { path: "$.value" }
+      state: { media.storage_path: "{path}" }
 
 state:
-  transport.state: { type: string, description: "Transport state as the recorder names it, such as Recording, Playing Forward or Idle" }
+  params.*.value: { type: string, description: "A parameter's last value read or set, keyed by its eParamID name: the enum's number, an integer, or a string" }
+  params.*.value_name: { type: string, description: "A parameter's value as text: the enum's name, or the integer repeated; empty for strings and protobuf data" }
+  transport.state: { type: string, description: "Transport state as the recorder names it, such as Idle, Recording or Playing Forward" }
+  transport.state_code: { type: int, description: "eParamID_TransportState's numeric value (AJA's api.txt: 3 is Playing Forward)" }
+  timecode.display: { type: string, description: "Displayed timecode, HH:MM:SS:FF" }
+  clip.current: { type: string, description: "Current clip's name" }
+  media.state: { type: string, description: "Media state as the recorder names it: Record-Play or Data - LAN" }
+  media.data_lan: { type: bool, description: "True in Data - LAN (transfer) mode, false in Record-Play mode" }
+  media.storage_path: { type: string, description: "Path clips are recorded to and played from, such as /mnt/S1/AJA" }
 
 quirks:
   - models: [all]
     severity: critical
     text: >
-      Transport commands are numeric parameter values, not names: 1 is play, 3
-      is record, 4 is stop. The numbers are not sequential or mnemonic and a
-      wrong value is accepted with a 200 response.
+      Transport commands are numbers set on eParamID_TransportCommand: 1 play,
+      3 record, 4 stop, 5 fast forward, 6 fast reverse, 7 and 8 single step
+      forward and reverse, 9 next clip, 10 previous clip, 11 variable speed
+      play, 12 preroll, 13 assemble edit, 14 cue, 16 play at system time, 17
+      record at system time, 18 go to idle. 2 (play reverse) is not
+      implemented; AJA's kipro.py says to use fast reverse, or variable speed
+      play at -1, instead. 15 (Shutdown) is deliberately not offered as a
+      named command: kipro.py says not to use it, as it stops only the
+      transport subsystem.
 
   - models: [all]
     severity: warning
     text: >
-      Everything is a GET against /config with action=set. A URL logged or
-      replayed from a proxy will re-trigger the transport command.
+      Stop is two-stage: the first stop pauses, the second stops to idle (AJA
+      chapters 4-6). AJA's go_to_clipname.py sends stop twice, a quarter of a
+      second apart, before loading a clip.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Every action, including transport commands and media erase, is an HTTP
+      GET against /config with action=set. A logged, cached or replayed URL
+      repeats the action.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The unit pushes parameter changes over an event connection: GET
+      /json?action=connect&configid=0 returns {"connectionid":"20"}, then
+      GET /json?action=wait_for_config_events&configid=0&connectionid=20
+      blocks until changes arrive and returns
+      [{"param_id","param_type","int_value","str_value","last_config_update"}],
+      usually including eParamID_DisplayTimecode. The client must wait at
+      least once a minute or the server expires the connection id (AJA
+      api.txt, events.py). The format cannot carry a reply value into a later
+      request, so this spec polls instead; push needs a native extension.
+      AJA's 2021 guide lists connect and wait_for_config_events among the
+      /config actions, while every AJA example uses /json; /json is the
+      documented URL.
 
   - models: [all]
     severity: info
     text: >
-      get_transport_state returns both value and value_name; value_name is the
-      human-readable form and is preferred where present.
+      AJA documents only common parameters. Each unit lists every parameter it
+      has, with type, enum values, range and persistence, at /desc.json
+      (/descriptors?paramid=* on Ki Pro, Mini and Rack) and per parameter at
+      /descriptors?paramid=; ids vary by product and firmware.
+      get_parameter and set_parameter reach any of them.
+
+  - models: [all]
+    severity: info
+    text: >
+      eParamID_TransportState, eParamID_DisplayTimecode, eParamID_CurrentClip,
+      eParamID_GoToClip, eParamID_CustomClipName and eParamID_UseCustomClipName
+      are documented by AJA in the Ki Pro (Mini, Rack) automation package, not
+      in the current products' chapters. They are offered on the GO and Ultra
+      models because the same /config framework serves every AJA product and
+      their use there is corroborated; a unit without one answers the request
+      with an error.
 
   - models: [all]
     severity: warning
     text: >
-      A clip name is applied to the next recording, not the current one.
-      Setting it mid-record has no effect on the take in progress.
+      With User Authentication (menu 50.9) set to Login, REST requests need a
+      session cookie from a password POST to the web server; AJA documents
+      this for HELO, where unauthenticated requests get an HTML 404. The
+      format has no cookie login, so the unit must have User Authentication
+      set to Disabled.
+
+  - models: [kipro, kipro-mini, kipro-rack]
+    severity: critical
+    text: >
+      record_named leaves the recorder in an unusual state (AJA
+      record_with_clipname.py): take numbers stop incrementing, and recording
+      from the front panel or web interface overwrites the current clip. To
+      restore normal operation set eParamID_UseCustomClipTake back on
+      (set_use_custom_clip_take true), which is otherwise only possible by a
+      power cycle or a factory reset.
+
+  - models: [kipro, kipro-mini, kipro-rack]
+    severity: info
+    text: >
+      get_clips, delete_clip and select_next_slot use interfaces AJA's
+      api.txt marks deprecated ("will continue to operate in support of
+      existing clients"). Its /clips example uses unquoted JSON keys, so the
+      listing is returned as the reply text, not parsed. AJA's playlist.py and play_with_clipname.py
+      send their sets as form POSTs to /config; this spec uses the current
+      GET form, and play_with_clipname.py's eParamID_GotToClip is a typo for
+      eParamID_GoToClip (go_to_clipname.py).
+
+  - models: [kipro-ultra, kipro-ultra-plus, kipro-ultra-12g]
+    severity: info
+    text: >
+      Set playback speed needs firmware v3.1.1 or above and sub-clips v2.0 or
+      above. eParamID_TransportRequestedSpeed is a string parameter of up to
+      20 characters, used only with variable speed play (transport command
+      11); AJA gives no range. The speed is sent with three decimals, such as
+      -1.500; AJA's own examples send both -1.5 and -1.0.
+
+  - models: [kipro-ultra, kipro-ultra-plus, kipro-ultra-12g]
+    severity: warning
+    text: >
+      Sub-clips: source and destination must be on the same drive or the job
+      hangs, the drive must have room, the start and duration must lie within
+      one clip, and only MOV files are supported. Paths are /mnt/S1/AJA or
+      /mnt/S2/AJA for slots 1 and 2. The arguments are sent unencoded as in
+      AJA's example, so file names are limited to letters, digits, _, - and .
+      here.
+
+  - models: [kipro-ultra, kipro-ultra-plus, kipro-ultra-12g]
+    severity: critical
+    text: >
+      format_media erases the current media at once, with no confirmation.
+      The file system used is the one last set with
+      set_file_system_format_hfs or set_file_system_format_exfat.
+
+  - models: [kipro-ultra-plus, kipro-ultra-12g]
+    severity: info
+    text: >
+      set_headphone_encode_channel, set_sdi_monitor_channel and
+      set_hdmi_out_channel apply in Multi Channel mode only; their descriptors
+      are disabled when eParamID_EncodeChannels is 1. AJA's chapter 6 SDI
+      monitor URLs omit "paramid=" (action=set&eParamID_SDIMonitorChannel&value=0),
+      a documentation error; this spec sends paramid= as everywhere else.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clip download (GET /media/<file>) and upload (PUT /media with
+      X-File-Name and X-File-Size headers, Ultra models) need Data - LAN mode
+      and carry whole video files, and the Ultra Plus and 12G confidence
+      monitor is a WebSocket stream (ws://<unit>/stream); neither is a command
+      this format carries. Protobuf alarm parameters such as
+      eParamID_Dropped_Frames_Alarm read through get_parameter as base64 that
+      the format cannot decode.

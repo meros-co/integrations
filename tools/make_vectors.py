@@ -75,16 +75,6 @@ def http(spec, command, input, method, target, **extra):
     })
 
 
-# RossTalk: payload + CRLF, never acknowledged.
-R = "rosstalk"
-text(R, "select_program", {"source": 4}, "XPT ME:1:PGM:IN:4\r\n", expect_result={"ok": {"kind": "unverified"}})
-text(R, "select_preset", {"source": 12, "me": 2}, "XPT ME:2:PST:IN:12\r\n")
-text(R, "cut", {}, "MECUT ME:1\r\n")
-text(R, "auto_transition", {"me": 3}, "MEAUTO ME:3\r\n")
-text(R, "fade_to_black", {}, "FTB\r\n")
-text(R, "custom_control", {"bank": 1, "cc": 12}, "CC 1:12\r\n")
-text(R, "gpi", {"number": 5}, "GPI 5\r\n")
-
 # grandMA2 telnet: payload + CRLF, never acknowledged.
 G = "grandma2"
 text(G, "go", {}, "Go\r\n", expect_result={"ok": {"kind": "unverified"}})
@@ -104,19 +94,6 @@ binary(E, "go", {}, [length_prefixed(osc("/eos/key/go_0", ("f", 1.0))),
 binary(E, "fire_cue", {"cue": "1.5"}, length_prefixed(osc("/eos/cue/1/1.5/fire")))
 binary(E, "set_submaster", {"submaster": 3, "level": 0.5}, length_prefixed(osc("/eos/sub/3", ("f", 0.5))))
 binary(E, "fire_macro", {"macro": 101}, length_prefixed(osc("/eos/macro/fire", ("i", 101))))
-
-# PTZOptics: positional CGI arguments, sent verbatim.
-P = "ptzoptics"
-http(P, "move", {"direction": "left", "pan_speed": 12}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&left&12&10",
-     http_reply={"status": 200}, expect_result={"ok": {"kind": "ack"}})
-http(P, "stop_move", {}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&ptzstop&1&1")
-http(P, "zoom_in", {}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&zoomin&5")
-http(P, "zoom_out", {"speed": 7}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&zoomout&7")
-http(P, "stop_zoom", {}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&zoomstop&0")
-http(P, "recall_preset", {"preset": 3}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&poscall&3",
-     http_reply={"status": 404}, expect_result={"error": {"error": "device_error", "code": "404"}})
-http(P, "save_preset", {"preset": 89}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&posset&89")
-http(P, "home", {}, "GET", "/cgi-bin/ptzctrl.cgi?ptzcmd&home")
 
 # TriCaster: GET /v1/shortcut?name=NAME&value=VALUE (Automation and
 # Integration Guide p.63).
@@ -150,17 +127,6 @@ telemetry(T, "shortcut-states", inbound_http={
     "body": '<shortcut_states><shortcut_state name="record_toggle" value="1" type="bool" sender="unknown"/>'
             '<shortcut_state name="input1_long_name" value="Camera 1" type="" sender="unknown"/></shortcut_states>'},
     expect_state={"shortcuts": {"record_toggle": "1", "input1_long_name": "Camera 1"}})
-
-# AJA Ki Pro: key/value query.
-A = "aja-kipro"
-http(A, "record", {}, "GET", "/config?action=set&paramid=eParamID_TransportCommand&value=3")
-http(A, "play", {}, "GET", "/config?action=set&paramid=eParamID_TransportCommand&value=1")
-http(A, "stop", {}, "GET", "/config?action=set&paramid=eParamID_TransportCommand&value=4")
-http(A, "set_clip_name", {"name": "Show 1"}, "GET",
-     "/config?action=set&paramid=eParamID_CustomClipName&value=Show%201")
-http(A, "get_transport_state", {}, "GET", "/config?action=get&paramid=eParamID_TransportState",
-     http_reply={"status": 200, "body": '{"value":"1","value_name":"Playing"}'},
-     expect_result={"ok": {"kind": "value", "value": "Playing"}})
 
 # ProPresenter 7 HTTP API.
 # ProPresenter: HTTP API.
@@ -227,14 +193,6 @@ telemetry("newtek-tricaster", "tally", inbound_http={
             '<column name="ddr1" index="16" on_pgm="false" on_prev="true"/></tally>'},
     expect_state={"tally": {"input1": {"program": True, "preview": False},
                             "ddr1": {"program": False, "preview": True}}})
-
-# AJA Ki Pro: the transport state parameter's JSON (AJA REST automation guide).
-telemetry("aja-kipro", "transport", inbound_http={
-    "path": "/config?action=get&paramid=eParamID_TransportState",
-    "body": '{"paramid":"eParamID_TransportState","value":"2","value_name":"Recording"}'},
-    expect_state={"transport": {"state": "Recording"}})
-
-
 
 # Large per-device sets, one file each, written in this file's helpers.
 for extra in sorted((ROOT / "tools" / "vectors").glob("*.py")):
