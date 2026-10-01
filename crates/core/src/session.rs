@@ -73,6 +73,12 @@ pub(crate) enum Inbound {
         generation: u64,
         input: WsInput,
     },
+    /// A file this session writes was closed, or failed.
+    File {
+        file: Key,
+        generation: u64,
+        input: crate::module::FileInput,
+    },
     /// A connection the device opened to a port this session listens on.
     Accepted {
         socket: Key,
@@ -132,6 +138,8 @@ pub(crate) struct Session {
     tcp: HashMap<Key, crate::tcp::Connection>,
     /// SSH sessions shared by this device's tunnelled streams.
     ssh: crate::ssh::Sessions,
+    /// Files being written, by key.
+    files: HashMap<Key, crate::files::Writer>,
     ws: HashMap<Key, crate::ws::Connection>,
     /// TCP ports this session listens on, by key.
     listening: HashMap<Key, u16>,
@@ -164,6 +172,7 @@ impl Session {
             streams: HashMap::new(),
             tcp: HashMap::new(),
             ssh: crate::ssh::Sessions::default(),
+            files: HashMap::new(),
             ws: HashMap::new(),
             listening: HashMap::new(),
             next_generation: 1,
@@ -245,6 +254,13 @@ impl Session {
                                 self.tcp.remove(socket);
                             }
                             self.module.tcp(&mut cx, socket, input);
+                        }
+                        Inbound::File { file, generation, input } => {
+                            if self.files.get(file).map(|w| w.generation) != Some(generation) {
+                                continue;
+                            }
+                            self.files.remove(file);
+                            self.module.file(&mut cx, file, input);
                         }
                         Inbound::Accepted { socket, stream } => {
                             // The newest connection from the device replaces
@@ -358,6 +374,25 @@ impl Session {
                     self.tcp.insert(socket, connection);
                 }
                 Action::TcpClose { socket } => self.close_tcp(socket),
+                Action::FileOpen { file, path } => {
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let writer =
+                        crate::files::open(file, generation, path.into(), self.inbound_tx.clone());
+                    // A file reopened under the same key replaces the old one;
+                    // the old writer stops when its queue is dropped.
+                    self.files.insert(file, writer);
+                }
+                Action::FileWrite { file, data } => {
+                    if let Some(w) = self.files.get(file) {
+                        w.write(data);
+                    }
+                }
+                Action::FileClose { file } => {
+                    if let Some(w) = self.files.get(file) {
+                        w.close();
+                    }
+                }
                 Action::TcpListen { socket, port } => {
                     let result = self.services.shared_tcp.register(
                         self.services.bind_address,

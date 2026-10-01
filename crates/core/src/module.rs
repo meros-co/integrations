@@ -149,6 +149,16 @@ pub enum SseInput {
     },
 }
 
+/// What happens to a file a module writes on the host.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FileInput {
+    /// Every chunk was written and the file closed.
+    Closed { bytes: u64 },
+    /// The file could not be created or written. Reported once; later writes
+    /// are dropped.
+    Failed { message: String },
+}
+
 /// What happens on a TCP connection.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TcpInput {
@@ -253,6 +263,21 @@ pub enum Action {
         socket: Key,
         data: Vec<u8>,
     },
+    /// Create (or truncate) a file on the host, for a download too large to
+    /// return as a value. The path is the consumer's, passed through.
+    FileOpen {
+        file: Key,
+        path: String,
+    },
+    /// Append to an open file.
+    FileWrite {
+        file: Key,
+        data: Vec<u8>,
+    },
+    /// Close the file; reported as `FileInput::Closed` once written.
+    FileClose {
+        file: Key,
+    },
     TcpClose {
         socket: Key,
     },
@@ -356,6 +381,25 @@ impl Cx {
 
     pub fn tcp_open(&mut self, socket: Key, to: SocketAddr) {
         self.push(Action::TcpOpen { socket, to });
+    }
+
+    /// Create a file on the host; see [`Action::FileOpen`].
+    pub fn file_open(&mut self, file: Key, path: impl Into<String>) {
+        self.push(Action::FileOpen {
+            file,
+            path: path.into(),
+        });
+    }
+
+    pub fn file_write(&mut self, file: Key, data: impl Into<Vec<u8>>) {
+        self.push(Action::FileWrite {
+            file,
+            data: data.into(),
+        });
+    }
+
+    pub fn file_close(&mut self, file: Key) {
+        self.push(Action::FileClose { file });
     }
 
     /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].
@@ -474,6 +518,11 @@ pub trait Module: Send + 'static {
 
     fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
         let _ = (cx, stream, input);
+    }
+
+    /// A file this module writes was closed, or failed.
+    fn file(&mut self, cx: &mut Cx, file: Key, input: FileInput) {
+        let _ = (cx, file, input);
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key);

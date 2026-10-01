@@ -25,6 +25,7 @@ mod digest;
 mod discovery;
 mod engine;
 pub mod events;
+mod files;
 mod http;
 pub mod json;
 pub mod module;
