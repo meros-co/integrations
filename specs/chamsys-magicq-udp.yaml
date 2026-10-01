@@ -1,0 +1,853 @@
+spec: 1
+id: chamsys-magicq-udp
+name: ChamSys MagicQ / QuickQ Remote Ethernet Protocol
+vendor: ChamSys
+category: lighting
+
+source:
+  - title: MagicQ Manual 1.9.9.x, ChamSys Remote Protocol Commands
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/remote_control_commands.html
+    note: >
+      MagicQ Manual 1.9.9.x, "Latest Update, 2026-09-23" (PDF
+      https://docs.chamsys.co.uk/magicq/1.9.9.x/_exports/magicq-1.9.9.x.pdf, pp. 471-474;
+      retrieved 2026-10-01). Commands are comma-separated values ending in a letter A-Z (or a-z);
+      spaces, tabs and carriage returns are ignored; commands can be sent back to back
+      ("1A2A1S2G3,4I"). Remote playback commands A, R, T, U, G, S, B, F, L, J, P, I, H, X with
+      their parameter ranges (<playback number> "1 and 10 (202 on MagicQ consoles)", <level>
+      0-100, <page number> 0-100, <channel number> 1-32769, <cue id> 1-65536, <cue id dec> 0-99
+      "for Cue ID 1.5 use 50", <button id> 1-10, <zone id> 1-20, <state> 1 pressed, 2 activate, 3
+      release, 4 toggle, 7 cycle, 9 increase, 10 decrease); examples "4,50I" and "8,2,50J". Remote
+      programming commands 01-13, 19-23, 30-32, 40-43, 71, 80-83, 90-94, 112, 911 and 999 ending
+      in H, with <palette id> 1-1024, <Q id> 1-10000, <16 bit> 0/1, <time> seconds, <group number>
+      1-200, heads 1-6145, <show file id> 0000-9999, <state> 0/1 or 2 toggle, and the attribute
+      number list.
+  - title: MagicQ Manual 1.9.9.x, Controlling MagicQ Using UDP/IP
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/remote_control_network.html
+    note: >
+      PDF pp. 475-480. ChamSys Remote Ethernet Protocol (CREP): "a UDP/IP based protocol using port
+      6553 in broadcast mode", port changeable in Setup, View Settings, Network; the optional CREP
+      header (long32 "CREP", little-endian so "PERC" on the wire, word16 version 0, byte seq_fwd,
+      byte seq_bkwd, word16 length); "ChamSys Remote Ethernet Protocol Messages are also supported
+      without the ChamSys CREP header"; receiving needs Ethernet Remote Protocol set to "ChamSys
+      Rem rx" (or a no-header rx variant); "not supported when net session mode is in use"; on
+      MagicQ PC/Mac "only enabled when it is connected to a MagicQ Wing or Interface (not
+      MagicDMX)". Q-Sys plugins use "ChamSys Rem (tx + rx no header)" on port 6553.
+  - title: MagicQ Manual 1.9.9.x, Settings > Network Settings; MIDI; MagicQ Software and Consoles
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/magicq/1.9.9.x/manual/settings.html
+    note: >
+      Network Settings, PDF pp. 633-634: Ethernet Remote Protocol "options to enable tx, rx and both
+      tx and rx" and no-header variants; "on receive (rx) MagicQ auto detects whether a header is
+      present"; "When set to rx echo then any received data is processed and then transmitted back
+      out (echoed)"; default None. Ethernet Remote Port default 6553. MIDI, p. 496: "MagicQ limits
+      the number of playbacks that can be controlled using MIDI and the remote protocols. On
+      MagicQ consoles PB1 to PB34 ... On MagicQ PC, playbacks PB1 to PB10". MagicQ Software and
+      Consoles, pp. 4-10: MQ500M+, MQ500M, MQ500, MQ250M, Compact MQ50/MQ70/MQ80 (previous MQ40N,
+      MQ60, original MQ70), MagicQ Rack and DIN ("OSC, UDP, and MIDI control"), PC/Mac with Wings.
+  - title: QuickQ Manual 12.0, Ethernet Remote Control
+    author: ChamSys Ltd
+    url: https://docs.chamsys.co.uk/quickq/12.0/manual/ethernetremote.html
+    note: >
+      QuickQ Manual 12.0, "Latest Update, 2026-09-23" (PDF
+      https://docs.chamsys.co.uk/quickq/12.0/_exports/quickq-12.0.pdf, p. 74): with Ethernet Remote
+      Control on, "the console will listen for UDP messages on port 6553. The port number is fixed
+      and cannot be changed. The Ethernet Remote Control messages do not require any heading."
+      Commands A, R, T, U, G, S, J ("<playback number>,<cue number>J"), L ("4,50L"), X
+      ("<button ID>,<state>" and "<zone>,<button ID>,<state>", state 2 activate, 3 release, 4
+      toggle, zone 0 all zones); "sending 10A will activate Playback 10"; on a QuickQ 10 the CUE
+      STACK playback is Playback 1 and the chase playbacks, left to right, are 3 and 2; enable in
+      Settings > Network > Protocols. QuickQ Range (introduction.html): QuickQ 10, 20, 30, Rack,
+      DIN; the QuickQ 20 and 30 have 10 playbacks (p. 40).
+
+# Headerless remote commands, one per UDP datagram, to port 6553 (MagicQ default, QuickQ fixed).
+# MagicQ auto-detects the absence of the CREP header on receive; QuickQ takes no header. Commands
+# end in their letter, so nothing is appended. The console does not acknowledge.
+transport:
+  type: line-udp
+  port: 6553
+  terminator: none
+  encoding: ascii
+  reply: none
+
+models:
+  - id: magicq-mq500m-plus
+    name: MagicQ MQ500M+ Stadium
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq500m
+    name: MagicQ MQ500M Stadium
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq500
+    name: MagicQ MQ500 Stadium
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq250m
+    name: MagicQ MQ250M
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq80
+    name: MagicQ MQ80
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq70
+    name: MagicQ MQ70
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq60
+    name: MagicQ MQ60
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq50
+    name: MagicQ MQ50
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq40n
+    name: MagicQ MQ40N
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-mq40
+    name: MagicQ MQ40
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-rack
+    name: MagicQ Rack
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-din
+    name: MagicQ DIN
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: magicq-pc
+    name: MagicQ PC / Mac (with a MagicQ Wing or Interface)
+    supports: [
+      command, activate, release, test, untest, go, stop, fast_back, fast_forward, level, jump_cue,
+      page, channel_intensity, tenscene_button, tenscene_button_state, tenscene_zone_button_state,
+      select_head, select_head_range, deselect_head, deselect_head_range, deselect_all,
+      select_group, set_intensity, set_intensity_timed, set_attribute, set_attribute_timed,
+      increase_attribute, increase_attribute_res, decrease_attribute, decrease_attribute_res,
+      clear_programmer, include_position_palette, include_colour_palette, include_beam_palette,
+      include_cue, update, record_position_palette, record_colour_palette, record_beam_palette,
+      record_cue, next_head, previous_head, all_heads, locate, lamp_on, lamp_off, reset_heads,
+      remote_trigger, test_cue, untest_cue, test_cue_stack, test_cue_stack_level,
+      test_cue_stack_level_cue, untest_cue_stack, save_show, load_show, load_import, load_grid,
+      shutdown, emergency_hot_takeover
+    ]
+    verification: none
+  - id: quickq-10
+    name: QuickQ 10
+    supports: [
+      command, activate, release, test, untest, go, stop, level, quickq_jump_cue,
+      quickq_tenscene_button_state, quickq_tenscene_zone_button_state
+    ]
+    verification: none
+  - id: quickq-20
+    name: QuickQ 20
+    supports: [
+      command, activate, release, test, untest, go, stop, level, quickq_jump_cue,
+      quickq_tenscene_button_state, quickq_tenscene_zone_button_state
+    ]
+    verification: none
+  - id: quickq-30
+    name: QuickQ 30
+    supports: [
+      command, activate, release, test, untest, go, stop, level, quickq_jump_cue,
+      quickq_tenscene_button_state, quickq_tenscene_zone_button_state
+    ]
+    verification: none
+  - id: quickq-rack
+    name: QuickQ Rack
+    supports: [
+      command, activate, release, test, untest, go, stop, level, quickq_jump_cue,
+      quickq_tenscene_button_state, quickq_tenscene_zone_button_state
+    ]
+    verification: none
+  - id: quickq-din
+    name: QuickQ DIN
+    supports: [
+      command, activate, release, test, untest, go, stop, level, quickq_jump_cue,
+      quickq_tenscene_button_state, quickq_tenscene_zone_button_state
+    ]
+    verification: none
+
+commands:
+  command:
+    summary: "Send ChamSys Remote Protocol commands as text, e.g. \"1A2A1S2G3,4I\": comma-separated values each ended by a letter A-Z (QuickQ accepts only A R T U G S J L X)"
+    params:
+      commands: { type: string, pattern: '^[0-9A-Za-z, ]{1,256}$', required: true }
+    send: "{commands}"
+    returns: none
+
+  activate:
+    summary: "Activate playback (\"<playback>A\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}A"
+    returns: none
+
+  release:
+    summary: "Release playback (\"<playback>R\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}R"
+    returns: none
+
+  test:
+    summary: "Test playback (activate with level 100%) (\"<playback>T\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}T"
+    returns: none
+
+  untest:
+    summary: "Un-test playback (release with level 0%) (\"<playback>U\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}U"
+    returns: none
+
+  go:
+    summary: "Go on playback (\"<playback>G\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}G"
+    returns: none
+
+  stop:
+    summary: "Stop (go back) on playback (\"<playback>S\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}S"
+    returns: none
+
+  fast_back:
+    summary: "Fast back on playback (no fade) (\"<playback>B\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}B"
+    returns: none
+
+  fast_forward:
+    summary: "Fast forward on playback (no fade) (\"<playback>F\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+    send: "{playback}F"
+    returns: none
+
+  level:
+    summary: "set playback fader level in percent (\"<playback>,<level>L\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+      level:    { type: int, min: 0, max: 100, required: true }
+    send: "{playback},{level}L"
+    returns: none
+
+  jump_cue:
+    summary: "jump to cue id <cue>.<cue_dec> on a playback (cue 2.5 is cue 2, cue_dec 50) (\"<playback>,<cue>,<cue_dec>J\")"
+    params:
+      playback: { type: int, min: 1, max: 202, required: true }
+      cue:      { type: int, min: 1, max: 65536, required: true }
+      cue_dec:  { type: int, min: 0, max: 99, default: 0 }
+    send: "{playback},{cue},{cue_dec}J"
+    returns: none
+
+  page:
+    summary: "change playback page (\"<page>P\")"
+    params:
+      page: { type: int, min: 0, max: 100, required: true }
+    send: "{page}P"
+    returns: none
+
+  channel_intensity:
+    summary: "set a DMX intensity channel to a level in percent (\"<channel>,<level>I\")"
+    params:
+      channel: { type: int, min: 1, max: 32769, required: true }
+      level:   { type: int, min: 0, max: 100, required: true }
+    send: "{channel},{level}I"
+    returns: none
+
+  tenscene_button:
+    summary: "10Scene zone 1 button 1-10 (\"<button>X\")"
+    params:
+      button: { type: int, min: 1, max: 10, required: true }
+    send: "{button}X"
+    returns: none
+
+  tenscene_button_state:
+    summary: "10Scene zone 1 button press or release; state 1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease (\"<button>,<state>X\")"
+    params:
+      button: { type: int, min: 1, max: 10, required: true }
+      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true }
+    send: "{button},{state}X"
+    returns: none
+
+  tenscene_zone_button_state:
+    summary: "10Scene button press or release in zone 1-20; state 1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease (\"<zone>,<button>,<state>X\")"
+    params:
+      zone:   { type: int, min: 1, max: 20, required: true }
+      button: { type: int, min: 1, max: 10, required: true }
+      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true }
+    send: "{zone},{button},{state}X"
+    returns: none
+
+  select_head:
+    summary: "Programming 01: select a head (\"01,<head>H\")"
+    params:
+      head: { type: int, min: 1, max: 6145, required: true }
+    send: "01,{head}H"
+    returns: none
+
+  select_head_range:
+    summary: "Programming 01: select a range of heads (\"01,<start>,<end>H\")"
+    params:
+      start: { type: int, min: 1, max: 6145, required: true }
+      end:   { type: int, min: 1, max: 6145, required: true }
+    send: "01,{start},{end}H"
+    returns: none
+
+  deselect_head:
+    summary: "Programming 02: deselect a head (\"02,<head>H\")"
+    params:
+      head: { type: int, min: 1, max: 6145, required: true }
+    send: "02,{head}H"
+    returns: none
+
+  deselect_head_range:
+    summary: "Programming 02: deselect a range of heads (\"02,<start>,<end>H\")"
+    params:
+      start: { type: int, min: 1, max: 6145, required: true }
+      end:   { type: int, min: 1, max: 6145, required: true }
+    send: "02,{start},{end}H"
+    returns: none
+
+  deselect_all:
+    summary: "Programming 03: deselect all heads (\"03H\")"
+    send: "03H"
+    returns: none
+
+  select_group:
+    summary: "Programming 04: select group 1-200 (\"04,<group>H\")"
+    params:
+      group: { type: int, min: 1, max: 200, required: true }
+    send: "04,{group}H"
+    returns: none
+
+  set_intensity:
+    summary: "Programming 05: set the intensity of the selected heads, in percent (\"05,<level>H\")"
+    params:
+      level: { type: int, min: 0, max: 100, required: true }
+    send: "05,{level}H"
+    returns: none
+
+  set_intensity_timed:
+    summary: "Programming 05: set the intensity of the selected heads, in percent, over a time in seconds (\"05,<level>,<time>H\")"
+    params:
+      level: { type: int, min: 0, max: 100, required: true }
+      time:  { type: int, min: 0, max: 3600, required: true }
+    send: "05,{level},{time}H"
+    returns: none
+
+  set_attribute:
+    summary: "Programming 06: set an attribute value of the selected heads (\"06,<attribute>,<value>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+    send: "06,{attribute},{value}H"
+    returns: none
+
+  set_attribute_timed:
+    summary: "Programming 06: set an attribute value of the selected heads over a time in seconds (\"06,<attribute>,<value>,<time>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+      time:      { type: int, min: 0, max: 3600, required: true }
+    send: "06,{attribute},{value},{time}H"
+    returns: none
+
+  increase_attribute:
+    summary: "Programming 07: increase an attribute of the selected heads (\"07,<attribute>,<value>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+    send: "07,{attribute},{value}H"
+    returns: none
+
+  increase_attribute_res:
+    summary: "Programming 07: increase an attribute of the selected heads; high_res true changes in 16-bit resolution (1), false in 8-bit (0) (\"07,<attribute>,<value>,<high_res>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+      high_res:  { type: bool, required: true }
+    send: "07,{attribute},{value},{high_res:bool01}H"
+    returns: none
+
+  decrease_attribute:
+    summary: "Programming 08: decrease an attribute of the selected heads (\"08,<attribute>,<value>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+    send: "08,{attribute},{value}H"
+    returns: none
+
+  decrease_attribute_res:
+    summary: "Programming 08: decrease an attribute of the selected heads; high_res true changes in 16-bit resolution (1), false in 8-bit (0) (\"08,<attribute>,<value>,<high_res>H\")"
+    params:
+      attribute: { type: int, min: 0, max: 51, required: true }
+      value:     { type: int, min: 0, max: 65535, required: true }
+      high_res:  { type: bool, required: true }
+    send: "08,{attribute},{value},{high_res:bool01}H"
+    returns: none
+
+  clear_programmer:
+    summary: "Programming 09: clear the programmer (\"09H\")"
+    send: "09H"
+    returns: none
+
+  include_position_palette:
+    summary: "Programming 10: include a position palette (\"10,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: "10,{palette}H"
+    returns: none
+
+  include_colour_palette:
+    summary: "Programming 11: include a colour palette (\"11,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: "11,{palette}H"
+    returns: none
+
+  include_beam_palette:
+    summary: "Programming 12: include a beam palette (\"12,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: "12,{palette}H"
+    returns: none
+
+  include_cue:
+    summary: "Programming 13: include a cue (\"13,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 65536, required: true }
+    send: "13,{cue}H"
+    returns: none
+
+  update:
+    summary: "Programming 19: update (\"19H\")"
+    send: "19H"
+    returns: none
+
+  record_position_palette:
+    summary: "Programming 20: record a position palette (\"20,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: "20,{palette}H"
+    returns: none
+
+  record_colour_palette:
+    summary: "Programming 21: record a colour palette (\"21,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: "21,{palette}H"
+    returns: none
+
+  record_beam_palette:
+    summary: "Programming 22: record a beam palette (\"22,<palette>H\")"
+    params:
+      palette: { type: int, min: 1, max: 1024, required: true }
+    send: "22,{palette}H"
+    returns: none
+
+  record_cue:
+    summary: "Programming 23: record a cue (\"23,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 65536, required: true }
+    send: "23,{cue}H"
+    returns: none
+
+  next_head:
+    summary: "Programming 30: next head (\"30H\")"
+    send: "30H"
+    returns: none
+
+  previous_head:
+    summary: "Programming 31: previous head (\"31H\")"
+    send: "31H"
+    returns: none
+
+  all_heads:
+    summary: "Programming 32: all heads (\"32H\")"
+    send: "32H"
+    returns: none
+
+  locate:
+    summary: "Programming 40: locate (\"40H\")"
+    send: "40H"
+    returns: none
+
+  lamp_on:
+    summary: "Programming 41: lamp on (\"41H\")"
+    send: "41H"
+    returns: none
+
+  lamp_off:
+    summary: "Programming 42: lamp off (\"42H\")"
+    send: "42H"
+    returns: none
+
+  reset_heads:
+    summary: "Programming 43: reset (\"43H\")"
+    send: "43H"
+    returns: none
+
+  remote_trigger:
+    summary: "Programming 71: remote trigger; state 0 off, 1 on, 2 toggle (\"71,<state>H\")"
+    params:
+      state: { type: enum, values: ["0", "1", "2"], required: true }
+    send: "71,{state}H"
+    returns: none
+
+  test_cue:
+    summary: "Programming 80: test cue Q 1-10000 in the Cue Store (\"80,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 10000, required: true }
+    send: "80,{cue}H"
+    returns: none
+
+  untest_cue:
+    summary: "Programming 81: untest cue Q 1-10000 in the Cue Store (\"81,<cue>H\")"
+    params:
+      cue: { type: int, min: 1, max: 10000, required: true }
+    send: "81,{cue}H"
+    returns: none
+
+  test_cue_stack:
+    summary: "Programming 82: test a cue stack at 100% from its first cue (\"82,<stack>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+    send: "82,{stack}H"
+    returns: none
+
+  test_cue_stack_level:
+    summary: "Programming 82: test a cue stack at a level in percent from its first cue (\"82,<stack>,<level>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+      level: { type: int, min: 0, max: 100, required: true }
+    send: "82,{stack},{level}H"
+    returns: none
+
+  test_cue_stack_level_cue:
+    summary: "Programming 82: test a cue stack at a level in percent from a cue id (\"82,<stack>,<level>,<cue>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+      level: { type: int, min: 0, max: 100, required: true }
+      cue:   { type: int, min: 1, max: 65536, required: true }
+    send: "82,{stack},{level},{cue}H"
+    returns: none
+
+  untest_cue_stack:
+    summary: "Programming 83: untest a cue stack (\"83,<stack>H\")"
+    params:
+      stack: { type: int, min: 1, max: 10000, required: true }
+    send: "83,{stack}H"
+    returns: none
+
+  save_show:
+    summary: "Programming 90: save the show as showXXXX.shw (four-digit id 0000-9999) (\"90,<show>H\")"
+    params:
+      show: { type: int, min: 0, max: 9999, required: true }
+    send: "90,{show:04d}H"
+    returns: none
+
+  load_show:
+    summary: "Programming 91: load show showXXXX.shw (four-digit id 0000-9999) (\"91,<show>H\")"
+    params:
+      show: { type: int, min: 0, max: 9999, required: true }
+    send: "91,{show:04d}H"
+    returns: none
+
+  load_import:
+    summary: "Programming 92: load show importXXXX.csv (four-digit id 0000-9999) (\"92,<file>H\")"
+    params:
+      file: { type: int, min: 0, max: 9999, required: true }
+    send: "92,{file:04d}H"
+    returns: none
+
+  load_grid:
+    summary: "Programming 93: load grid gridXXXX.csv (four-digit id 0000-9999) (\"93,<grid>H\")"
+    params:
+      grid: { type: int, min: 0, max: 9999, required: true }
+    send: "93,{grid:04d}H"
+    returns: none
+
+  shutdown:
+    summary: "Programming 94: shutdown; mode 1 normal (close the MagicQ application on PC, power off on a console), 2 power off, 3 reboot. The confirmation bytes 81,117,105,116 (\"Quit\") are part of the command (\"94,<mode>,81,117,105,116H\")"
+    params:
+      mode: { type: enum, values: ["1", "2", "3"], required: true }
+    send: "94,{mode},81,117,105,116H"
+    returns: none
+
+  emergency_hot_takeover:
+    summary: "Programming 112: emergency hot takeover on (1) or off (0); 911 and 999 are documented aliases (\"112,<enabled>H\")"
+    params:
+      enabled: { type: bool, required: true }
+    send: "112,{enabled:bool01}H"
+    returns: none
+
+  quickq_jump_cue:
+    summary: "QuickQ: jump to a cue number on a playback (\"<playback>,<cue>J\")"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      cue:      { type: int, min: 1, max: 65536, required: true }
+    send: "{playback},{cue}J"
+    returns: none
+
+  quickq_tenscene_button_state:
+    summary: "QuickQ: 10Scene button 1-10 in all zones; state 2 activate, 3 release, 4 toggle (\"<button>,<state>X\")"
+    params:
+      button: { type: int, min: 1, max: 10, required: true }
+      state:  { type: enum, values: ["2", "3", "4"], required: true }
+    send: "{button},{state}X"
+    returns: none
+
+  quickq_tenscene_zone_button_state:
+    summary: "QuickQ: 10Scene button 1-10 in a zone (0 = all zones); state 2 activate, 3 release, 4 toggle (\"<zone>,<button>,<state>X\")"
+    params:
+      zone:   { type: int, min: 0, max: 10, required: true }
+      button: { type: int, min: 1, max: 10, required: true }
+      state:  { type: enum, values: ["2", "3", "4"], required: true }
+    send: "{zone},{button},{state}X"
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Received commands are ignored by default. On MagicQ set Setup, View Settings, Network,
+      Ethernet Remote Protocol to "ChamSys Rem rx", "ChamSys Rem (rx no header)" or a tx + rx
+      variant (default None), and Ethernet Remote Port to the device's port (default 6553). On
+      QuickQ switch on Ethernet Remote Control in Settings > Network > Protocols; the port is fixed
+      at 6553.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Nothing is acknowledged, so every command reports unverified. With Ethernet Remote Protocol
+      set to "rx echo", MagicQ processes received data and then transmits it back out (echoed);
+      the manual does not say to which address or port, or whether a header is added, so the echo
+      is not used as a reply here. Commands are sent without the optional CREP header, which
+      MagicQ detects automatically ("MagicQ auto detects whether a header is present").
+
+  - models: [all]
+    severity: info
+    text: >
+      Commands are text, values separated by commas and ended by a letter; spaces, tabs and
+      carriage returns are ignored, and several commands can share one datagram ("1A2A1S2G3,4I",
+      sent with `command`). The manual describes CREP as using port 6553 "in broadcast mode"; it
+      is sent here to the console's address, which MagicQ's own sample code receives on any
+      address (INADDR_ANY).
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-mq40n, magicq-mq40, magicq-rack, magicq-din, magicq-pc]
+    severity: warning
+    text: >
+      "ChamSys Remote Ethernet Protocol is not supported when net session mode is in use." Remote
+      programming commands (H) act on the console's programmer and include record, save, load,
+      shutdown (94) and emergency hot takeover (112, aliases 911 and 999); intent cannot be
+      validated.
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-mq40n, magicq-mq40, magicq-rack, magicq-din, magicq-pc]
+    severity: warning
+    text: >
+      Playback numbers are taken as 1-202 ("a number between 1 and 10 (202 on MagicQ consoles)").
+      The MIDI chapter says MagicQ limits playbacks controlled by "MIDI and the remote protocols"
+      to PB1-PB34 on consoles and PB1-PB10 on MagicQ PC. The two pages disagree; numbers above 34
+      may be ignored on consoles, and above 10 on PC.
+
+  - models: [magicq-mq500m-plus, magicq-mq500m, magicq-mq500, magicq-mq250m, magicq-mq80, magicq-mq70, magicq-mq60, magicq-mq50, magicq-mq40n, magicq-mq40, magicq-rack, magicq-din, magicq-pc]
+    severity: info
+    text: >
+      Ranges the manual leaves open are bounded here, not documented: attribute values 0-65535
+      (8-bit or 16-bit), times 0-3600 s, cue stack ids 1-10000, and the cue id of programming
+      commands 13, 23 and 82 as the playback table's 1-65536. Programming numbers are sent as the
+      table writes them ("01" to "09"). Attribute numbers are the table's 0-51 (Intensity 0, Pan
+      4, Tilt 5, Cyan 16, ...). Command names match the chamsys-magicq spec's /rpc commands
+      without the rpc_ prefix.
+
+  - models: [magicq-pc]
+    severity: critical
+    text: >
+      On MagicQ PC/Mac the Remote Ethernet Protocol is "only enabled when it is connected to a
+      MagicQ Wing or Interface (not MagicDMX)", and only playbacks PB1-PB10 can be controlled.
+
+  - models: [magicq-mq40n, magicq-mq40]
+    severity: info
+    text: >
+      MQ40 and MQ40N do not support OSC, so this protocol is their network control route. The
+      manual lists them only as previous Compact models and names no CREP restriction for them.
+
+  - models: [quickq-10, quickq-20, quickq-30, quickq-rack, quickq-din]
+    severity: warning
+    text: >
+      QuickQ accepts only A, R, T, U, G, S, J, L and X. Its jump is "<playback number>,<cue
+      number>J" (quickq_jump_cue; the manual gives no cue range or decimal form, so whole numbers
+      are taken) and its 10Scene states are 2 activate, 3 release and 4 toggle, with zone 0 for
+      all zones (quickq_tenscene_*). The shared playback commands accept 1-202 for MagicQ; QuickQ
+      has at most 10 playbacks. The manual names no zone limit for X; zones 0-10 follow the Q-Sys
+      section's "10Scene Zone (1..10)" for QuickQ.
+
+  - models: [quickq-10]
+    severity: info
+    text: >
+      On the QuickQ 10 the CUE STACK playback is Playback 1 and the two chase playbacks, from left
+      to right as seen at the console, are Playbacks 3 and 2.
+
+  - models: [quickq-din]
+    severity: info
+    text: >
+      The QuickQ manual's external control list names "The QuickQ Rack and Consoles"; the QuickQ
+      DIN runs the same software but is not named there.
