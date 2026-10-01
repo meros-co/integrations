@@ -58,6 +58,9 @@ enum Transport {
     OscUdp {
         port: u16,
         replies: bool,
+        /// A fixed local port to receive on, for devices that send to a
+        /// configured destination rather than back to the sender.
+        listen: Option<u16>,
     },
     OscTcp {
         port: u16,
@@ -223,6 +226,7 @@ impl SpecEngine {
             "osc-udp" => Transport::OscUdp {
                 port,
                 replies: str_field(&t, "reply") == Some("to-source"),
+                listen: listen_port(t.get("listen_port"), &ctx.settings)?,
             },
             "osc-tcp" => Transport::OscTcp {
                 port,
@@ -661,8 +665,8 @@ impl SpecEngine {
                 self.packets = Some(PacketReader::new(*framing));
                 cx.tcp_open(SOCKET, SocketAddr::new(self.host, self.port()));
             }
-            Transport::OscUdp { .. } => {
-                cx.udp_open(SOCKET, Bind::Ephemeral);
+            Transport::OscUdp { listen, .. } => {
+                cx.udp_open(SOCKET, listen.map_or(Bind::Ephemeral, Bind::Shared));
                 self.send_on_connect(cx, 0, false);
                 self.start_telemetry(cx);
                 if replies && self.probe.is_some() {
@@ -1159,6 +1163,30 @@ impl Module for SpecEngine {
     }
 }
 
+/// `transport.listen_port`: a port, or `{setting: name}` naming an integer
+/// setting; a setting left empty means no fixed port.
+fn listen_port(v: Option<&Value>, settings: &Params) -> Result<Option<u16>, String> {
+    let port = match v {
+        None => return Ok(None),
+        Some(Value::Number(n)) => n.as_u64(),
+        Some(Value::Object(o)) => {
+            let name = o
+                .get("setting")
+                .and_then(Value::as_str)
+                .ok_or("listen_port needs a port or {setting: name}")?;
+            match settings.get(name) {
+                None | Some(Value::Null) => return Ok(None),
+                Some(v) => v.as_u64(),
+            }
+        }
+        Some(_) => None,
+    };
+    match port {
+        Some(p @ 1..=65535) => Ok(Some(p as u16)),
+        _ => Err("listen_port must be a port number, 1 to 65535".into()),
+    }
+}
+
 /// Where `needle` first occurs in `haystack`.
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() {
@@ -1234,6 +1262,38 @@ mod tests {
         actions
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Connected)))
+    }
+
+    #[test]
+    fn osc_udp_can_listen_on_a_fixed_port() {
+        let open = |listen: Value, settings: Value| {
+            let mut spec = Catalog::embedded().device("behringer-x32").unwrap().clone();
+            spec.transport.as_mut().unwrap()["listen_port"] = listen;
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    port: None,
+                    model: "x32".into(),
+                    channels: Some(32),
+                    settings: settings.as_object().unwrap().clone(),
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            cx.take().into_iter().find_map(|a| match a {
+                Action::UdpOpen { bind, .. } => Some(bind),
+                _ => None,
+            })
+        };
+        assert_eq!(open(json!(8001), json!({})), Some(Bind::Shared(8001)));
+        let by_setting = json!({"setting": "feedback_port"});
+        assert_eq!(
+            open(by_setting.clone(), json!({"feedback_port": 9000})),
+            Some(Bind::Shared(9000))
+        );
+        assert_eq!(open(by_setting, json!({})), Some(Bind::Ephemeral));
     }
 
     #[test]

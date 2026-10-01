@@ -225,6 +225,10 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             errors += check_template("osc-address", expect["address"], params, settings,
                                      f"commands.{name}.expect")
 
+    listen = (doc.get("transport") or {}).get("listen_port")
+    if isinstance(listen, dict) and listen.get("setting") not in settings:
+        errors.append(f"transport.listen_port names unknown setting '{listen.get('setting')}'")
+
     for i, step in enumerate(doc.get("on_connect", [])):
         conditional = None
         if isinstance(step, dict) and "send" in step:

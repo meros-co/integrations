@@ -125,6 +125,23 @@ transport:
 `reply: none` marks a device that never acknowledges (QLab, Resolume).
 The core reports `unverified` for writes to such devices rather than success.
 
+Some devices send their feedback to a destination configured on the device,
+not back to the sender (grandMA3). `listen_port` receives on a fixed local
+port instead of an ephemeral one; the port is shared by every device that
+uses it, and each datagram goes to the device it came from:
+
+```yaml
+transport:
+  type: osc-udp
+  port: 8000
+  reply: none
+  listen_port: { setting: feedback_port }   # or a number
+settings:
+  feedback_port: { type: int, min: 1, max: 65535 }
+```
+
+A setting left empty means no fixed port, and no feedback.
+
 ### `osc-tcp`
 
 OSC over TCP, used by ETC Eos.
