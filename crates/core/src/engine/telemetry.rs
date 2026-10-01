@@ -39,6 +39,18 @@ enum Matcher {
     },
     /// An OSC message whose address matches; arguments are `{arg0}`, `{arg1}`.
     Osc(Regex),
+    /// The JSON reply to an HTTP request whose path matches; `json` names the
+    /// values to take, by JSON path.
+    HttpJson {
+        path: Regex,
+        json: BTreeMap<String, String>,
+        /// A JSON path to an array: the rule matches once per element, and
+        /// `json` paths are taken from the element.
+        each: Option<String>,
+    },
+    /// The XML reply to an HTTP request whose path matches; every element
+    /// named `element` is one match, its attributes the captures.
+    HttpXml { path: Regex, element: String },
 }
 
 #[derive(Debug)]
@@ -50,7 +62,15 @@ struct Rule {
 /// An inbound message, as the rules see it.
 pub(crate) enum Inbound<'a> {
     Text(&'a str),
-    Osc { address: &'a str, args: &'a [Value] },
+    Osc {
+        address: &'a str,
+        args: &'a [Value],
+    },
+    /// An HTTP reply, with the path and query it answered.
+    Http {
+        path: &'a str,
+        body: &'a [u8],
+    },
 }
 
 #[derive(Debug, Default)]
@@ -147,6 +167,30 @@ impl Telemetry {
                 Matcher::Message(regex(m, "match")?)
             } else if let Some(a) = rule.get("address") {
                 Matcher::Osc(regex(a, "address")?)
+            } else if let Some(p) = rule.get("path") {
+                let path = regex(p, "path")?;
+                if let Some(json) = rule.get("json").and_then(Value::as_object) {
+                    let json = json
+                        .iter()
+                        .map(|(k, v)| {
+                            v.as_str()
+                                .map(|s| (k.clone(), s.to_string()))
+                                .ok_or(format!("telemetry: json '{k}' must be a JSON path"))
+                        })
+                        .collect::<Result<_, _>>()?;
+                    let each = rule
+                        .get("json_each")
+                        .and_then(Value::as_str)
+                        .map(str::to_string);
+                    Matcher::HttpJson { path, json, each }
+                } else if let Some(e) = rule.get("xml_each").and_then(Value::as_str) {
+                    Matcher::HttpXml {
+                        path,
+                        element: e.to_string(),
+                    }
+                } else {
+                    return Err("telemetry: a path rule needs json or xml_each".into());
+                }
             } else if let Some(h) = rule.get("header") {
                 let header = regex(h, "header")?;
                 if let Some(line) = rule.get("each_line") {
@@ -184,7 +228,7 @@ impl Telemetry {
                     return Err("telemetry: a header rule needs each_line or fields".into());
                 }
             } else {
-                return Err("telemetry: a rule needs match, address or header".into());
+                return Err("telemetry: a rule needs match, address, header or path".into());
             };
             t.rules.push(Rule {
                 matcher,
@@ -267,6 +311,60 @@ impl Telemetry {
                         let values =
                             vec![("value".to_string(), Value::String(value.trim().into()))];
                         any |= self.assign_all(std::slice::from_ref(a), &values, &mut patch);
+                    }
+                }
+                (
+                    Matcher::HttpJson {
+                        path: re,
+                        json,
+                        each,
+                    },
+                    Inbound::Http { path, body },
+                ) => {
+                    let Some(caps) = re.captures(path) else {
+                        continue;
+                    };
+                    let Ok(doc) = serde_json::from_slice::<Value>(body) else {
+                        continue;
+                    };
+                    let items: Vec<&Value> = match each {
+                        Some(each) => super::expect::json_path(&doc, each)
+                            .and_then(Value::as_array)
+                            .map(|a| a.iter().collect())
+                            .unwrap_or_default(),
+                        None => vec![&doc],
+                    };
+                    for item in items {
+                        let mut values = captures(&caps);
+                        for (name, json_path) in json {
+                            if let Some(v) = super::expect::json_path(item, json_path) {
+                                values.push((name.clone(), v.clone()));
+                            }
+                        }
+                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                    }
+                }
+                (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body }) => {
+                    let Some(caps) = re.captures(path) else {
+                        continue;
+                    };
+                    let Ok(text) = std::str::from_utf8(body) else {
+                        continue;
+                    };
+                    let Ok(doc) = roxmltree::Document::parse(text.trim_start_matches('\u{feff}'))
+                    else {
+                        continue;
+                    };
+                    let base = captures(&caps);
+                    for node in doc
+                        .descendants()
+                        .filter(|n| n.has_tag_name(element.as_str()))
+                    {
+                        let mut values = base.clone();
+                        for a in node.attributes() {
+                            values.push((a.name().to_string(), Value::String(a.value().into())));
+                        }
+                        any |= self.assign_all(&rule.assign, &values, &mut patch);
                     }
                 }
                 (Matcher::Osc(re), Inbound::Osc { address, args }) => {

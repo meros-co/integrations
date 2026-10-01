@@ -153,7 +153,7 @@ fn fields(text: &str) -> Value {
 }
 
 /// `$` or `$.a.b`: the subset of JSONPath the specs use.
-fn json_path<'a>(json: &'a Value, path: &str) -> Option<&'a Value> {
+pub(crate) fn json_path<'a>(json: &'a Value, path: &str) -> Option<&'a Value> {
     let rest = path.strip_prefix('$')?;
     if rest.is_empty() {
         return Some(json);

@@ -72,6 +72,21 @@ commands:
     expect: { json_path: "$.value_name" }
     returns: value
 
+telemetry:
+  # The transport state, asked once a second; get_transport_state's reply
+  # updates it too.
+  poll:
+    every_ms: 1000
+    send:
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_TransportState } }
+  updates:
+    - path: "^/config\\?action=get&paramid=eParamID_TransportState$"
+      json: { state: "$.value_name" }
+      state: { transport.state: "{state}" }
+
+state:
+  transport.state: { type: string, description: "Transport state as the recorder names it, such as Recording, Playing Forward or Idle" }
+
 quirks:
   - models: [all]
     severity: critical

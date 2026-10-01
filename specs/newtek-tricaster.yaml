@@ -176,6 +176,25 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+telemetry:
+  # The tally dictionary (Automation and Integration Guide p.67-68): one
+  # <column> per source, with on_pgm and on_prev as "true" or "false". Asked
+  # twice a second.
+  poll:
+    every_ms: 500
+    send:
+      - { method: GET, path: /v1/dictionary, query: { key: tally } }
+  updates:
+    - path: "^/v1/dictionary\\?key=tally$"
+      xml_each: column
+      state:
+        "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
+        "tally.{name}.preview": { value: "{on_prev}", map: { "true": true, "false": false } }
+
+state:
+  tally.*.program: { type: bool, description: "Source visible on program (through any layer), keyed by internal source name such as input1 or ddr1" }
+  tally.*.preview: { type: bool, description: "Source on preview" }
+
 quirks:
   - models: [all]
     severity: warning
@@ -203,5 +222,5 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Tally and other live state (the tally dictionary and the change
-      notification WebSocket) are not implemented yet.
+      Tally is polled twice a second from the tally dictionary. The change
+      notification WebSocket, which would push it instead, is not used yet.

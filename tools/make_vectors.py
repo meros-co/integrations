@@ -13,6 +13,7 @@ promotes a model's verification status.
 """
 from __future__ import annotations
 
+import json
 import struct
 from pathlib import Path
 
@@ -270,15 +271,57 @@ http(A, "get_transport_state", {}, "GET", "/config?action=get&paramid=eParamID_T
      expect_result={"ok": {"kind": "value", "value": "Playing"}})
 
 # ProPresenter 7 HTTP API.
+# ProPresenter: HTTP API.
 PP = "propresenter"
-http(PP, "next_slide", {}, "GET", "/v1/trigger/next", http_reply={"status": 200},
-     expect_result={"ok": {"kind": "ack"}})
-http(PP, "previous_slide", {}, "GET", "/v1/trigger/previous")
-http(PP, "clear_layer", {"layer": "video_input"}, "GET", "/v1/clear/layer/video_input")
-http(PP, "get_version", {}, "GET", "/version",
+
+
+def _pp_vectors() -> None:
+    """One vector per ProPresenter command. The command list comes from the
+    spec (itself generated from Renewed Vision's OpenAPI document); the
+    expected request is computed here independently: example values put into
+    the path with RFC 3986 encoding, and the JSON body written by json.dumps."""
+    from urllib.parse import quote
+
+    doc = yaml.safe_load((ROOT / "specs" / "propresenter.yaml").read_text(encoding="utf-8"))
+    examples = {"int": 2, "float": 15.5, "bool": True, "string": "Song 1"}
+    for name, command in doc["commands"].items():
+        params = command.get("params") or {}
+        values = {}
+        for pname, p in params.items():
+            values[pname] = p["values"][0] if p["type"] == "enum" else examples[p["type"]]
+        send = command["send"]
+        target = send["path"]
+        for pname, v in values.items():
+            target = target.replace("{" + pname + "}", quote(str(v), safe=""))
+        if send.get("query"):
+            target += "?" + "&".join(f"{k}={quote(str(values[k]), safe='')}" for k in send["query"])
+        request = {"method": send["method"], "target": target}
+        if "body" in send:
+            v = values[next(iter(k for k in params if k in ("value", "enabled")))]
+            if isinstance(v, bool):
+                request["body"] = "true" if v else "false"
+            elif isinstance(v, float):
+                request["body"] = f"{v:.3f}"
+            else:
+                request["body"] = json.dumps(v)
+        V.append({"spec": PP, "command": name, "input": values, "expect_request": request})
+
+
+_pp_vectors()
+# Replies, from the document's own examples.
+http(PP, "version_get", {}, "GET", "/version",
      http_reply={"status": 200, "body": '{"name":"ProPresenter","major_version":7}'},
      expect_result={"ok": {"kind": "value", "value": {"name": "ProPresenter", "major_version": 7}}})
-http(PP, "get_active_presentation", {}, "GET", "/v1/presentation/active")
+telemetry(PP, "slide", inbound_http={"path": "/v1/status/slide", "body": json.dumps({
+    "current": {"text": "Amazing Grace, how sweet the sound", "notes": "", "uuid": "1"},
+    "next": {"text": "That saved a wretch like me", "notes": "Start quiet", "uuid": "2"}})},
+    expect_state={"slide": {"current": {"text": "Amazing Grace, how sweet the sound", "notes": ""},
+                            "next": {"text": "That saved a wretch like me", "notes": "Start quiet"}}})
+telemetry(PP, "timers", inbound_http={"path": "/v1/timers/current", "body": json.dumps([
+    {"id": {"uuid": "a1", "name": "Countdown", "index": 0}, "time": "00:00:01", "state": "stopped"},
+    {"id": {"uuid": "b2", "name": "Elapsed", "index": 1}, "time": "00:21:43", "state": "running"}])},
+    expect_state={"timers": {"a1": {"name": "Countdown", "time": "00:00:01", "state": "stopped"},
+                             "b2": {"name": "Elapsed", "time": "00:21:43", "state": "running"}}})
 
 
 # ── Telemetry ─────────────────────────────────────────────────────────────
@@ -302,6 +345,20 @@ telemetry(H, "transport", expect_connect_wire=["notify: transport: true\r\n"],
           "single clip: false\r\nloop: true\r\ntimecode: 00:00:10:00\r\n\r\n",
           expect_state={"transport": {"status": "play", "speed": 100, "slot": 1, "clip": 3,
                                       "single_clip": False, "loop": True, "timecode": "00:00:10:00"}})
+
+# TriCaster: the tally dictionary (Automation and Integration Guide p.67-68).
+telemetry("newtek-tricaster", "tally", inbound_http={
+    "path": "/v1/dictionary?key=tally",
+    "body": '<tally><column name="input1" index="0" on_pgm="true" on_prev="false" ndi_id="0"/>'
+            '<column name="ddr1" index="16" on_pgm="false" on_prev="true"/></tally>'},
+    expect_state={"tally": {"input1": {"program": True, "preview": False},
+                            "ddr1": {"program": False, "preview": True}}})
+
+# AJA Ki Pro: the transport state parameter's JSON (AJA REST automation guide).
+telemetry("aja-kipro", "transport", inbound_http={
+    "path": "/config?action=get&paramid=eParamID_TransportState",
+    "body": '{"paramid":"eParamID_TransportState","value":"2","value_name":"Recording"}'},
+    expect_state={"transport": {"state": "Recording"}})
 
 # X32: /xremote on connect; pushed changes arrive on the same addresses as sets.
 # The /info liveness probe follows the subscription.

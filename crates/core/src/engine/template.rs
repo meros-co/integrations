@@ -168,6 +168,8 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                 s = match *d {
                     "upper" => s.to_uppercase(),
                     "lower" => s.to_lowercase(),
+                    // A JSON string literal, quotes included, for request bodies.
+                    "json" => Value::String(s).to_string(),
                     _ => return Err(format!("directive ':{d}' does not apply to a string")),
                 };
             }

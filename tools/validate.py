@@ -32,7 +32,7 @@ DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^signed$"), {"int"}),                 # explicit sign
     (re.compile(r"^\.\d+f$"), {"float"}),               # fixed decimals
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
-    (re.compile(r"^(upper|lower)$"), {"string", "enum"}),
+    (re.compile(r"^(upper|lower|json)$"), {"string", "enum"}),
 ]
 
 # Types that cannot carry characters needing escaping, so they are safe in a
@@ -259,7 +259,7 @@ def telemetry_checks(doc: dict) -> list[str]:
 
     for i, rule in enumerate(telemetry.get("updates", [])):
         where = f"telemetry.updates[{i}]"
-        for key in ("match", "header", "each_line", "address"):
+        for key in ("match", "header", "each_line", "address", "path"):
             if key in rule:
                 try:
                     re.compile(rule[key])

@@ -308,6 +308,7 @@ The directive set is closed.
 | `bool01` | Boolean → `1` / `0` |
 | `bool10` | Boolean → `0` / `1`, inverted |
 | `upper`, `lower` | String case |
+| `json` | String as a JSON string literal, quotes and escapes included: `{text:json}` → `"Say \"hi\""`. For JSON request bodies |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Integer with an explicit leading sign: `7` → `+7`, `-7` → `-7` |
 | `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75` |
@@ -544,7 +545,28 @@ and a wire value the map does not list is not assigned:
         single clip: { path: transport.single_clip, map: { "true": true, "false": false } }
 ```
 
-Telemetry over HTTP (polling JSON) is not yet part of the format.
+Over HTTP, `poll` requests and command requests alike have their replies
+offered to `path` rules, which match the request's path and query:
+
+| Rule | Matches | Captures |
+|---|---|---|
+| `path` + `json` | A JSON reply | `json` names values by JSON path (`$`, `$.a.b`) |
+| `path` + `json` + `json_each` | A JSON reply holding an array at `json_each` | once per element; `json` paths relative to it |
+| `path` + `xml_each` | An XML reply | once per element of that name; its attributes |
+
+```yaml
+    - path: "^/v1/timers/current$"
+      json_each: "$"
+      json: { uuid: "$.id.uuid", time: "$.time" }
+      state: { "timers.{uuid}.time": "{time}" }
+    - path: "^/v1/dictionary\\?key=tally$"
+      xml_each: column
+      state:
+        "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
+```
+
+A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
+`inbound`.
 
 ## Native modules
 

@@ -175,6 +175,16 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
         engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &unhex(h));
+    } else if let Some(r) = v.get("inbound_http") {
+        // The reply to a request for this path, as the engine offers it.
+        let path = r["path"].as_str().ok_or("inbound_http needs a path")?;
+        let body = r["body"].as_str().unwrap_or("").as_bytes();
+        if let Some(patch) = engine
+            .telemetry
+            .apply(&super::telemetry::Inbound::Http { path, body })
+        {
+            cx.state(patch);
+        }
     }
     let mut state = json!({});
     for a in cx.take() {
@@ -196,7 +206,10 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let text = std::fs::read_to_string(path).unwrap();
     let v: Value = serde_yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
-    if v.get("inbound").is_some() || v.get("inbound_hex").is_some() {
+    if ["inbound", "inbound_hex", "inbound_http"]
+        .iter()
+        .any(|k| v.get(k).is_some())
+    {
         return run_telemetry(&v, catalog);
     }
     let spec_id = v["spec"].as_str().ok_or("no spec")?;
@@ -422,7 +435,10 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
         let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
-        if v.get("inbound").is_some() || v.get("inbound_hex").is_some() {
+        if ["inbound", "inbound_hex", "inbound_http"]
+            .iter()
+            .any(|k| v.get(k).is_some())
+        {
             covered.insert(v["spec"].as_str().unwrap().to_string());
         }
     }

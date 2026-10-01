@@ -133,6 +133,9 @@ pub(crate) struct SpecEngine {
     packets: Option<PacketReader>,
     next_request: RequestId,
     telemetry: telemetry::Telemetry,
+    /// The path and query of each HTTP request in flight, so its reply can be
+    /// offered to the telemetry rules for that path.
+    request_paths: std::collections::HashMap<RequestId, String>,
     /// Set when the device refuses the configured credential. Terminal: the
     /// credential is never presented again, since repeated failures can lock
     /// a device out. The host re-opens the device with corrected settings.
@@ -250,6 +253,7 @@ impl SpecEngine {
             packets: None,
             next_request: 1,
             telemetry,
+            request_paths: Default::default(),
             refused: None,
         })
     }
@@ -496,6 +500,8 @@ impl SpecEngine {
                 Outgoing::Http(request) => {
                     let id = self.next_request;
                     self.next_request += 1;
+                    let target = request.url.splitn(4, '/').nth(3).unwrap_or("");
+                    self.request_paths.insert(id, format!("/{target}"));
                     cx.http(id, request);
                     Await::Http(id)
                 }
@@ -706,7 +712,11 @@ impl SpecEngine {
     /// goes through the command queue so its reply is not mistaken for a
     /// command's; otherwise it is sent straight away, like `on_connect`.
     fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>) {
-        let queued = matches!(self.transport, Transport::LineTcp { replies: true, .. });
+        // HTTP requests are always queued: each reply is matched to its request.
+        let queued = matches!(
+            self.transport,
+            Transport::LineTcp { replies: true, .. } | Transport::Http { .. }
+        );
         for item in items {
             if queued {
                 self.queue.push_back(Job {
@@ -901,6 +911,17 @@ impl Module for SpecEngine {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        if let (Some(path), Ok(response)) = (self.request_paths.remove(&id), &result) {
+            if (200..300).contains(&response.status) {
+                let inbound = telemetry::Inbound::Http {
+                    path: &path,
+                    body: &response.body,
+                };
+                if let Some(patch) = self.telemetry.apply(&inbound) {
+                    cx.state(patch);
+                }
+            }
+        }
         let ours = matches!(
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Http(r)) if *r == id
