@@ -4,11 +4,34 @@ name: PTZOptics cameras
 vendor: PTZOptics
 category: camera
 
-# HTTP-CGI device with positional rather than key/value query arguments.
-
+# HTTP-CGI with positional, '&'-separated arguments rather than key/value
+# query strings: /cgi-bin/ptzctrl.cgi (motion, presets and, on current models,
+# picture settings) and /cgi-bin/param.cgi (configuration and queries). Each
+# command's wire form is the endpoint's own example request in the HTTP API
+# document; page numbers below refer to that document's PDF.
+#
+# VISCA over IP (TCP 5678 / UDP 1259), which PTZOptics also documents, is a
+# binary protocol on another transport and is not part of this spec.
 source:
-  - title: PTZOptics HTTP-CGI command sheet
-    note: Manufacturer-published
+  - title: "PTZOptics HTTP API, Developer Documentation (API version 1.0, 2026-09-29)"
+    author: PTZOptics
+    url: https://docs.ptzoptics.com/dev/http-api/
+    note: >
+      Manufacturer document; the PDF is https://downloads.ptzoptics.com/docs/http-api
+      (http-api-developer-documentation.pdf, 277 pages). Endpoints by section: Audio p.4-17, Color p.18-36,
+      Exposure p.37-64, Focus p.65-76, Image p.77-88, Mode p.89-118, Movement p.119-138, Network p.139-158,
+      OSD p.159-162, Ports p.163-168, Query p.169-198, Stream p.199-238, System p.239-248, Video p.249-277.
+      Value ranges from each endpoint's parameter table; per-model support from each endpoint's
+      "Camera Compatibility" list; reply shape {"Response":{"Result":"Success"}} from each endpoint's 200
+      response schema and the Device ID example (p.147); authentication from p.2.
+  - title: "PTZOptics HTTP-CGI Control Sheet (2021-10-15)"
+    author: PTZOptics
+    url: "https://f.hubspotusercontent20.net/hubfs/418770/PTZOptics%20Documentation/Misc/PTZOptics%20HTTP-CGI%20Commands.pdf"
+    note: >
+      Manufacturer document (2 pages) for the 12X/20X/30X G2 generation: pan/tilt, zoom, focus, focus lock,
+      home, PT reset, presets, direct position and zoom recall (p.1); OSD access and navigation, image
+      settings, exposure and white balance, JPEG snapshot, photobooth, inquiries (p.1-2). Supersedes
+      Rev 1.4 (2020-08-10).
 
 transport:
   type: http
@@ -22,86 +45,1621 @@ transport:
     raw_query: "ptzcmd&ptzstop&1&1"
 
 models:
-  - id: ptzoptics-generic
-    name: PTZOptics (HTTP-CGI generation)
-    supports: [move, stop_move, zoom_in, zoom_out, stop_zoom, recall_preset, save_preset, home]
+  - id: move-4k
+    name: PTZOptics Move 4K (PT12X/20X/30X-4K, G3)
+    supports:
+      [move, stop_move, zoom_in, zoom_out, stop_zoom, zoom_to, focus_in, focus_out, stop_focus, home, pan_tilt_reset,
+      position_absolute, position_relative, recall_preset, save_preset, recall_preset_extended, save_preset_extended,
+      recall_preset_with_speed, recall_preset_with_speed_extended, snap_focus, focus_lock, focus_mode, af_zone,
+      af_sensitivity, focus_limit, time_of_flight, exposure_mode, exposure_compensation, exposure_compensation_level,
+      backlight, anti_flicker, gain_limit, gain, iris, shutter, meter_region, dynamic_range, white_balance_mode,
+      white_balance_one_push, color_temperature, red_gain, blue_gain, red_gain_tuning, blue_gain_tuning, contrast,
+      hue, luminance, saturation, sharpness, noise_reduction_3d, auto_inversion, auto_tracking, bw_mode,
+      bounding_boxes, display_info, image_orientation, motion_sync, patrol_mode, preset_freeze, tally_mode,
+      tracking_start_location, zoom_mode, osd_menu, osd_ptz_mode, osd_confirm, osd_back, osd_navigate,
+      audio_encoding, audio_adts, audio_bitrate, audio_sample_rate, audio_input_volume, audio_line_out_volume,
+      usb_audio, video_template, video_outputs, video_advanced, encoding_profile, hdmi_sdi_output, refresh_rate,
+      stream_protocol, stream_resolution, stream_bitrate, stream_frame_rate, stream_keyframe_interval,
+      stream_rate_control, stream_qfactor, rtmp, rtmp_url, rtmp_key, srt, srt_mode, srt_server, srt_port,
+      srt_latency, srt_bandwidth_overhead, srt_encryption, srt_password, srt_stream_id, rtsp_port, rtsp_auth,
+      rtp_multicast, rtp_multicast_address, rtp_multicast_port, rtp_multicast_ttl, onvif, onvif_auth, ndi_name,
+      ndi_group, ndi_discovery, ndi_multicast, device_name, dhcp, ip_address, netmask, gateway, dns, http_port,
+      visca_tcp_port, visca_udp_port, reboot, factory_reset, osd_reset, network_reset, ir_channel, get_device_config,
+      get_serial_number, get_tally_status, get_language_config, get_ndi_config, get_login_status, get_system_config,
+      get_advanced_image_config, get_image_config, get_audio_config, get_video_config, get_ir_channel]
     verification: none
+  - id: link-4k
+    name: PTZOptics Link 4K (PT12X/20X/30X-LINK-4K)
+    supports:
+      [move, stop_move, zoom_in, zoom_out, stop_zoom, zoom_to, focus_in, focus_out, stop_focus, home, pan_tilt_reset,
+      position_absolute, position_relative, recall_preset, save_preset, recall_preset_extended, save_preset_extended,
+      recall_preset_with_speed, recall_preset_with_speed_extended, snap_focus, focus_lock, focus_mode, af_zone,
+      af_sensitivity, focus_limit, time_of_flight, exposure_mode, exposure_compensation, exposure_compensation_level,
+      backlight, anti_flicker, gain_limit, gain, iris, shutter, meter_region, dynamic_range, white_balance_mode,
+      white_balance_one_push, color_temperature, red_gain, blue_gain, red_gain_tuning, blue_gain_tuning, contrast,
+      hue, luminance, saturation, sharpness, noise_reduction_3d, auto_inversion, auto_tracking, bw_mode,
+      bounding_boxes, display_info, image_orientation, motion_sync, patrol_mode, preset_freeze, tally_mode,
+      tracking_start_location, zoom_mode, osd_menu, osd_ptz_mode, osd_confirm, osd_back, osd_navigate,
+      audio_encoding, audio_adts, audio_bitrate, audio_sample_rate, audio_input_volume, audio_line_out_volume,
+      usb_audio, video_template, video_outputs, video_advanced, encoding_profile, hdmi_sdi_output, refresh_rate,
+      stream_protocol, stream_resolution, stream_bitrate, stream_frame_rate, stream_keyframe_interval,
+      stream_rate_control, stream_qfactor, rtmp, rtmp_url, rtmp_key, srt, srt_mode, srt_server, srt_port,
+      srt_latency, srt_bandwidth_overhead, srt_encryption, srt_password, srt_stream_id, rtsp_port, rtsp_auth,
+      rtp_multicast, rtp_multicast_address, rtp_multicast_port, rtp_multicast_ttl, onvif, onvif_auth, ndi_name,
+      ndi_group, ndi_discovery, ndi_multicast, device_name, dhcp, ip_address, netmask, gateway, dns, http_port,
+      visca_tcp_port, visca_udp_port, reboot, factory_reset, osd_reset, network_reset, ir_channel, get_device_config,
+      get_serial_number, get_tally_status, get_language_config, get_ndi_config, get_login_status, get_system_config,
+      get_advanced_image_config, get_image_config, get_audio_config, get_video_config, get_ir_channel]
+    verification: none
+  - id: move-se
+    name: PTZOptics Move SE (PT12X/20X/30X-SE)
+    supports:
+      [move, stop_move, zoom_in, zoom_out, stop_zoom, zoom_to, focus_in, focus_out, stop_focus, home, pan_tilt_reset,
+      recall_preset, save_preset, recall_preset_extended, save_preset_extended, recall_preset_with_speed,
+      recall_preset_with_speed_extended, snap_focus, focus_lock, focus_mode, af_zone, af_sensitivity, focus_limit,
+      exposure_mode, exposure_compensation, exposure_compensation_level, backlight, anti_flicker, gain_limit, gain,
+      iris_se, shutter, meter_region, dynamic_range, white_balance_mode, white_balance_one_push, color_temperature,
+      red_gain, blue_gain, red_gain_tuning, blue_gain_tuning, contrast, hue, luminance, saturation, sharpness_se,
+      noise_reduction_2d, noise_reduction_3d, auto_inversion, auto_tracking, bw_mode, display_info,
+      image_orientation, motion_sync, patrol_mode, preset_freeze, tracking_overlay, tracking_start_location,
+      zoom_mode, osd_menu, osd_ptz_mode, osd_confirm, osd_back, osd_navigate, audio_encoding, audio_adts,
+      audio_bitrate, audio_sample_rate, audio_input_volume, audio_line_out_volume, usb_audio, video_template,
+      video_outputs, encoding_profile, refresh_rate, stream_protocol, stream_resolution, stream_bitrate,
+      stream_frame_rate, stream_keyframe_interval, rtmp, rtmp_url, rtmp_key, srt, srt_mode, srt_server, srt_port,
+      srt_latency, srt_bandwidth_overhead, srt_encryption, srt_password, srt_stream_id, rtsp_port, rtsp_auth,
+      rtp_multicast, rtp_multicast_address, rtp_multicast_port, rtp_multicast_ttl, onvif, onvif_auth, ndi_name,
+      ndi_group, ndi_discovery, ndi_multicast, device_name, dhcp, ip_address, netmask, gateway, dns, http_port,
+      visca_tcp_port, visca_udp_port, reboot, factory_reset, osd_reset, network_reset, ir_channel]
+    verification: none
+  - id: studio-pro
+    name: PTZOptics Studio Pro
+    supports:
+      [zoom_in, zoom_out, stop_zoom, zoom_to, focus_in, focus_out, stop_focus, home, recall_preset, save_preset,
+      recall_preset_extended, save_preset_extended, recall_preset_with_speed, recall_preset_with_speed_extended,
+      snap_focus, focus_lock, focus_mode, af_zone, af_sensitivity, focus_limit, exposure_mode, exposure_compensation,
+      exposure_compensation_level, backlight, anti_flicker, gain_limit, gain, iris_se, shutter, meter_region,
+      dynamic_range, white_balance_mode, white_balance_one_push, color_temperature, red_gain, blue_gain,
+      red_gain_tuning, blue_gain_tuning, contrast, hue, luminance, saturation, sharpness_se, noise_reduction_2d,
+      noise_reduction_3d, bw_mode, image_orientation, zoom_mode, osd_menu, osd_ptz_mode, osd_confirm, osd_back,
+      osd_navigate, audio_encoding, audio_adts, audio_bitrate, audio_sample_rate, audio_input_volume,
+      audio_line_out_volume, usb_audio, video_template, video_outputs, encoding_profile, refresh_rate,
+      studio_pro_hdmi_format, stream_resolution, stream_bitrate, stream_frame_rate, stream_keyframe_interval, rtmp,
+      rtmp_url, rtmp_key, srt, srt_mode, srt_server, srt_port, srt_latency, srt_bandwidth_overhead, srt_encryption,
+      srt_password, srt_stream_id, rtsp_port, rtsp_auth, rtp_multicast, rtp_multicast_address, rtp_multicast_port,
+      rtp_multicast_ttl, onvif, onvif_auth, ndi_name, ndi_group, ndi_discovery, ndi_multicast, device_name, dhcp,
+      ip_address, netmask, gateway, dns, http_port, visca_tcp_port, visca_udp_port, reboot, factory_reset, osd_reset,
+      network_reset, ir_channel]
+    verification: none
+  - id: studio-4k
+    name: PTZOptics Studio 4K
+    supports:
+      [zoom_in, zoom_out, stop_zoom, focus_in, focus_out, stop_focus, recall_preset, save_preset,
+      recall_preset_extended, save_preset_extended, recall_preset_with_speed, recall_preset_with_speed_extended,
+      snap_focus, focus_lock, focus_mode, af_zone, af_sensitivity, focus_limit, exposure_mode, exposure_compensation,
+      exposure_compensation_level, backlight, anti_flicker, gain_limit, gain, iris_se, shutter, meter_region,
+      dynamic_range, white_balance_mode, white_balance_one_push, color_temperature, red_gain, blue_gain,
+      red_gain_tuning, blue_gain_tuning, contrast, hue, luminance, saturation, sharpness_se, noise_reduction_2d,
+      noise_reduction_3d, bw_mode, image_orientation, zoom_mode, osd_menu, osd_ptz_mode, osd_confirm, osd_back,
+      osd_navigate, http_port, visca_tcp_port, visca_udp_port]
+    verification: none
+    notes: >
+      Named in the HTTP API's per-endpoint compatibility lists, but absent from the four-model list on many endpoints (audio, network, streaming, system); supports follows each endpoint's own list.
+  - id: ptz-g2
+    name: PTZOptics 12X/20X/30X G2 (SDI, USB, NDI)
+    supports:
+      [move, stop_move, zoom_in, zoom_out, stop_zoom, zoom_to, focus_in, focus_out, stop_focus, home, pan_tilt_reset,
+      position_absolute, position_relative, recall_preset, save_preset, recall_preset_extended, save_preset_extended,
+      focus_lock, osd_menu, osd_ptz_mode, osd_confirm, osd_back, brightness_g2, saturation_g2, contrast_g2,
+      sharpness_g2, hue_g2, flip_g2, mirror_g2, image_defaults_g2, exposure_mode_g2, white_balance_mode_g2,
+      white_balance_one_push_g2, osd_navigate_g2, snapshot_resolution_g2, photobooth_photos_g2, photobooth_videos_g2,
+      get_video_config_g2, get_audio_config_g2, get_network_config_g2, get_device_config_g2, get_serial_number_g2]
+    verification: none
+    notes: >
+      Commands from the 2021 HTTP-CGI Control Sheet, which predates the HTTP API and puts image settings on param.cgi with named values. Pan/tilt/zoom/focus speed minimums are 1 on this sheet (see quirks).
+  - id: ptzoptics-generic
+    name: PTZOptics (model not identified)
+    supports:
+      [move, stop_move, zoom_in, zoom_out, stop_zoom, focus_in, focus_out, stop_focus, home, pan_tilt_reset,
+      recall_preset, save_preset, recall_preset_extended, save_preset_extended, focus_lock, osd_menu, osd_ptz_mode,
+      osd_confirm, osd_back]
+    verification: none
+    notes: >
+      Commands documented identically in both documents for every pan/tilt model, for a camera whose model is not known. Kept as the original model id.
 
 commands:
+  # Movement (HTTP API: Movement, p.119-138; 2021 sheet p.1)
   move:
-    summary: Begin a continuous pan/tilt move; runs until stop_move
+    summary: "Begin a continuous pan/tilt move; runs until stop_move"
     params:
-      direction:  { type: enum, values: [up, down, left, right, leftup, rightup, leftdown, rightdown], required: true }
-      pan_speed:  { type: int, min: 1, max: 24, default: 10 }
-      tilt_speed: { type: int, min: 1, max: 20, default: 10 }
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&{direction}&{pan_speed}&{tilt_speed}"
+      direction: { type: "enum", values: ["up", "down", "left", "right", "leftup", "rightup", "leftdown", "rightdown"], required: true }
+      pan_speed: { type: "int", min: 1, max: 24, default: 10 }
+      tilt_speed: { type: "int", min: 1, max: 20, default: 10 }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&{direction}&{pan_speed}&{tilt_speed}" }
     expect: { status: 200 }
     returns: ack
-
   stop_move:
-    summary: Stop pan/tilt motion
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&ptzstop&1&1"
+    summary: "Stop pan/tilt motion"
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&ptzstop&1&1" }
     expect: { status: 200 }
     returns: ack
-
   zoom_in:
-    params: { speed: { type: int, min: 1, max: 7, default: 5 } }
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&zoomin&{speed}"
+    summary: "Zoom in (tele) continuously until stop_zoom; speed 0 slowest, 7 fastest"
+    params:
+      speed: { type: "int", min: 0, max: 7, default: 5 }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomin&{speed}" }
     expect: { status: 200 }
     returns: ack
-
   zoom_out:
-    params: { speed: { type: int, min: 1, max: 7, default: 5 } }
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&zoomout&{speed}"
+    summary: "Zoom out (wide) continuously until stop_zoom; speed 0 slowest, 7 fastest"
+    params:
+      speed: { type: "int", min: 0, max: 7, default: 5 }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomout&{speed}" }
     expect: { status: 200 }
     returns: ack
-
   stop_zoom:
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&zoomstop&0"
+    summary: "Stop zooming"
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomstop&0" }
     expect: { status: 200 }
     returns: ack
-
-  recall_preset:
-    params: { preset: { type: int, min: 0, max: 89, required: true } }
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&poscall&{preset}"
+  zoom_to:
+    summary: "Drive the zoom to a direct position, 4-digit hex 0000 (full wide) to 4000 (full tele)"
+    params:
+      speed: { type: "int", min: 1, max: 7, required: true }
+      position: { type: "string", pattern: "^(?:[0-3][0-9A-Fa-f]{3}|4000)$", required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomto&{speed}&{position}" }
     expect: { status: 200 }
     returns: ack
-
-  save_preset:
-    summary: Overwrite a preset with the current position
-    params: { preset: { type: int, min: 0, max: 89, required: true } }
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&posset&{preset}"
+  focus_in:
+    summary: "Focus nearer continuously until stop_focus; speed 0 slowest, 7 fastest"
+    params:
+      speed: { type: "int", min: 0, max: 7, default: 5 }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&focusin&{speed}" }
     expect: { status: 200 }
     returns: ack
-
+  focus_out:
+    summary: "Focus farther continuously until stop_focus; speed 0 slowest, 7 fastest"
+    params:
+      speed: { type: "int", min: 0, max: 7, default: 5 }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&focusout&{speed}" }
+    expect: { status: 200 }
+    returns: ack
+  stop_focus:
+    summary: "Stop focusing"
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&focusstop&0" }
+    expect: { status: 200 }
+    returns: ack
   home:
-    send:
-      method: GET
-      path: /cgi-bin/ptzctrl.cgi
-      raw_query: "ptzcmd&home"
+    summary: "Move the camera to its home position"
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&home" }
     expect: { status: 200 }
     returns: ack
+  pan_tilt_reset:
+    summary: "Recalibrate pan/tilt (the camera runs its reset sweep)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "pan_tiltdrive_reset" }
+    expect: { status: 200 }
+    returns: ack
+  position_absolute:
+    summary: "Move to an absolute pan/tilt position. pan: 4-digit hex, 0000/FFFF home, 0001-0990 right, FFFE-F670 left; tilt: 0000/FFFF home, 0001-0510 up, FFFE-FE51 down"
+    params:
+      pan_speed: { type: "int", min: 1, max: 24, required: true }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true }
+      pan: { type: "string", pattern: "^(?:0[0-8][0-9A-Fa-f]{2}|09[0-8][0-9A-Fa-f]|0990|F6[7-9A-Fa-f][0-9A-Fa-f]|F[7-9A-Fa-f][0-9A-Fa-f]{2})$", required: true }
+      tilt: { type: "string", pattern: "^(?:0[0-4][0-9A-Fa-f]{2}|050[0-9A-Fa-f]|0510|FE5[1-9A-Fa-f]|FE[6-9A-Fa-f][0-9A-Fa-f]|FF[0-9A-Fa-f]{2})$", required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&abs&{pan_speed}&{tilt_speed}&{pan}&{tilt}" }
+    expect: { status: 200 }
+    returns: ack
+  position_relative:
+    summary: "Move by a pan/tilt offset from the current position, in the same 4-digit hex steps as position_absolute"
+    params:
+      pan_speed: { type: "int", min: 1, max: 24, required: true }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true }
+      pan: { type: "string", pattern: "^(?:0[0-8][0-9A-Fa-f]{2}|09[0-8][0-9A-Fa-f]|0990|F6[7-9A-Fa-f][0-9A-Fa-f]|F[7-9A-Fa-f][0-9A-Fa-f]{2})$", required: true }
+      tilt: { type: "string", pattern: "^(?:0[0-4][0-9A-Fa-f]{2}|050[0-9A-Fa-f]|0510|FE5[1-9A-Fa-f]|FE[6-9A-Fa-f][0-9A-Fa-f]|FF[0-9A-Fa-f]{2})$", required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&rel&{pan_speed}&{tilt_speed}&{pan}&{tilt}" }
+    expect: { status: 200 }
+    returns: ack
+  recall_preset:
+    summary: "Recall preset 0-89 (100-254: recall_preset_extended)"
+    params:
+      preset: { type: "int", min: 0, max: 89, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&poscall&{preset}" }
+    expect: { status: 200 }
+    returns: ack
+  save_preset:
+    summary: "Overwrite preset 0-89 with the current position and settings"
+    params:
+      preset: { type: "int", min: 0, max: 89, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&posset&{preset}" }
+    expect: { status: 200 }
+    returns: ack
+  recall_preset_extended:
+    summary: "Recall preset 100-254"
+    params:
+      preset: { type: "int", min: 100, max: 254, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&poscall&{preset}" }
+    expect: { status: 200 }
+    returns: ack
+  save_preset_extended:
+    summary: "Overwrite preset 100-254 with the current position and settings"
+    params:
+      preset: { type: "int", min: 100, max: 254, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&posset&{preset}" }
+    expect: { status: 200 }
+    returns: ack
+  recall_preset_with_speed:
+    summary: "Recall preset 0-89 at the given pan, tilt and zoom speeds"
+    params:
+      preset: { type: "int", min: 0, max: 89, required: true }
+      pan_speed: { type: "int", min: 1, max: 24, required: true }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true }
+      zoom_speed: { type: "int", min: 1, max: 7, required: true }
+    send: { method: POST, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_preset&poscallwithspeed={preset}&panspeed={pan_speed}&tiltspeed={tilt_speed}&zoomspeed={zoom_speed}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  recall_preset_with_speed_extended:
+    summary: "Recall preset 100-254 at the given pan, tilt and zoom speeds"
+    params:
+      preset: { type: "int", min: 100, max: 254, required: true }
+      pan_speed: { type: "int", min: 1, max: 24, required: true }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true }
+      zoom_speed: { type: "int", min: 1, max: 7, required: true }
+    send: { method: POST, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_preset&poscallwithspeed={preset}&panspeed={pan_speed}&tiltspeed={tilt_speed}&zoomspeed={zoom_speed}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  snap_focus:
+    summary: "Run a one-shot autofocus"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "set_focus&one_shot_focus" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Focus (HTTP API: Focus, p.65-76; 2021 sheet p.1 Focus Lock)
+  focus_lock:
+    summary: "Lock or unlock focus"
+    params:
+      action: { type: "enum", values: ["lock", "unlock"], required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "ptzcmd&{action}_mfocus" }
+    expect: { status: 200 }
+    returns: ack
+  focus_mode:
+    summary: "Focus mode: 1 auto, 2 one-shot AF, 3 manual (see quirks: the document also lists 2 as auto)"
+    params:
+      mode: { type: "enum", values: ["1", "2", "3"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&focusmode&{mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  af_zone:
+    summary: "Autofocus zone: 0 top, 1 center, 2 bottom, 3 front"
+    params:
+      zone: { type: "int", min: 0, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&focusregion&{zone}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  af_sensitivity:
+    summary: "Autofocus sensitivity: 1 high, 2 normal, 3 low"
+    params:
+      sensitivity: { type: "int", min: 1, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&focussense&{sensitivity}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  focus_limit:
+    summary: "Limit the focus range; near and far in metres (0-11), near no greater than far"
+    params:
+      enabled: { type: "bool", required: true }
+      near: { type: "int", min: 0, max: 11, required: true }
+      far: { type: "int", min: 0, max: 11, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_zoomfocus&type=focusrange&enable={enabled:bool01}&near={near}&far={far}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  time_of_flight:
+    summary: "Time-of-flight focus assist: 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&tof&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Exposure (HTTP API: Exposure, p.37-64)
+  exposure_mode:
+    summary: "Exposure mode: 0 auto, 3 manual, 10 shutter priority (SAE), 11 iris priority (AAE), 13 bright (not on Move 4K or Link 4K)"
+    params:
+      mode: { type: "enum", values: ["0", "3", "10", "11", "13"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&aemode&{mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  exposure_compensation:
+    summary: "Exposure compensation (auto exposure): 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&expcomp_mode&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  exposure_compensation_level:
+    summary: "Exposure compensation level 0-14 for -7 to +7 (7 is 0)"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&expcomp_level&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  backlight:
+    summary: "Backlight compensation: 2 on, 3 off (see quirks)"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&backlight&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  anti_flicker:
+    summary: "Anti-flicker: 0 off, 1 50 Hz, 2 60 Hz (auto, AAE)"
+    params:
+      mode: { type: "int", min: 0, max: 2, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&antiflicker&{mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  gain_limit:
+    summary: "Gain limit 0-15 (auto, SAE, AAE)"
+    params:
+      level: { type: "int", min: 0, max: 15, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&gainLimit&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  gain:
+    summary: "Gain 0-7 (manual exposure)"
+    params:
+      level: { type: "int", min: 0, max: 7, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&gain&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  iris:
+    summary: "Iris (manual, AAE): 0 close, 1 F11 ... 12 F1.8 (Move 4K, Link 4K table)"
+    params:
+      value: { type: "int", min: 0, max: 12, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&iris&{value}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  iris_se:
+    summary: "Iris (manual, AAE): 0 close, 6 F11 ... 17 F1.8 (Move SE, Studio Pro, Studio 4K table)"
+    params:
+      value: { type: "enum", values: ["0", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&iris&{value}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  shutter:
+    summary: "Shutter speed index 1-17 (manual, AAE); the speed for each index differs by model (see quirks)"
+    params:
+      value: { type: "int", min: 1, max: 17, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&shutter&{value}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  meter_region:
+    summary: "Metering region: 0 average, 1 center, 2 smart, 3 top (auto, SAE, AAE)"
+    params:
+      region: { type: "int", min: 0, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&meter&{region}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  dynamic_range:
+    summary: "Dynamic range control 0-8"
+    params:
+      level: { type: "int", min: 0, max: 8, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&drc&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Colour (HTTP API: Color, p.18-36)
+  white_balance_mode:
+    summary: "White balance: 0 auto, 1 indoor, 2 outdoor, 3 one-push, 5 manual, 32 VAR (colour temperature)"
+    params:
+      mode: { type: "enum", values: ["0", "1", "2", "3", "5", "32"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&wbmode&{mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  white_balance_one_push:
+    summary: "Trigger a one-push white balance (one-push mode)"
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&onepush&0" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  color_temperature:
+    summary: "VAR colour temperature index 0-55: 2500 K + 100 K per step (31 is 5600 K)"
+    params:
+      index: { type: "int", min: 0, max: 55, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&colortemp&{index}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  red_gain:
+    summary: "Red gain 0-255 (manual white balance)"
+    params:
+      level: { type: "int", min: 0, max: 255, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&rgain&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  blue_gain:
+    summary: "Blue gain 0-255 (manual white balance)"
+    params:
+      level: { type: "int", min: 0, max: 255, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&bgain&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  red_gain_tuning:
+    summary: "Red gain tuning 0-20 for -10 to +10 (auto, one-push, VAR)"
+    params:
+      level: { type: "int", min: 0, max: 20, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&rgaintuning&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  blue_gain_tuning:
+    summary: "Blue gain tuning 0-20 for -10 to +10 (auto, one-push, VAR)"
+    params:
+      level: { type: "int", min: 0, max: 20, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&bgaintuning&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Image (HTTP API: Image, p.77-88)
+  contrast:
+    summary: "Contrast 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&contrast&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  hue:
+    summary: "Hue 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&hue&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  luminance:
+    summary: "Luminance 0 (darker) to 14 (brighter)"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&luminance&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  saturation:
+    summary: "Saturation 0-14 for 60% to 200% in 10% steps"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&saturation&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  sharpness:
+    summary: "Sharpness 0-11 (Move 4K, Link 4K)"
+    params:
+      level: { type: "int", min: 0, max: 11, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&sharpness&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  sharpness_se:
+    summary: "Sharpness 0-16 (Move SE, Studio Pro, Studio 4K)"
+    params:
+      level: { type: "int", min: 0, max: 16, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&sharpness&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Mode (HTTP API: Mode, p.89-118)
+  noise_reduction_2d:
+    summary: "2D noise reduction level 0-6 (6 auto in the document's example)"
+    params:
+      level: { type: "int", min: 0, max: 6, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&noise2d&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  noise_reduction_3d:
+    summary: "3D noise reduction level 0-9 (9 auto in the document's example)"
+    params:
+      level: { type: "int", min: 0, max: 9, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&noise3d&{level}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  auto_inversion:
+    summary: "Auto inversion (ceiling mount): 2 on, 0 off"
+    params:
+      state: { type: "enum", values: ["0", "2"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&inversionmode&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  auto_tracking:
+    summary: "Turn auto tracking on or off"
+    params:
+      state: { type: "enum", values: ["on", "off"], required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "set_overlay&autotracking&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  bw_mode:
+    summary: "Black and white picture (true) or colour (false)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&bwmode&{enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  bounding_boxes:
+    summary: "Tracking bounding boxes: 2 debug, 3 off, 4 select target"
+    params:
+      mode: { type: "int", min: 2, max: 4, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&trackbox&{mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  display_info:
+    summary: "On-screen display info: 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&displayinfo&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  image_orientation:
+    summary: "Image orientation: 0 normal, 1 flip, 2 mirror, 3 flip and mirror"
+    params:
+      orientation: { type: "int", min: 0, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&imageorientation&{orientation}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  motion_sync:
+    summary: "Motion sync: 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&motionsync&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  patrol_mode:
+    summary: "Patrol (preset inspection) mode: 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&presetinspection&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  preset_freeze:
+    summary: "Freeze the picture during preset recall: 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&presetfreeze&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  tally_mode:
+    summary: "Tally mode: 2 on, 3 off"
+    params:
+      state: { type: "int", min: 2, max: 3, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&tallymode&{state}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  tracking_overlay:
+    summary: "Tracking overlay on (true) or off (false)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&trackingoverlay&{enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  tracking_start_location:
+    summary: "Where auto tracking starts: live, home, or a preset number 0-254"
+    params:
+      location: { type: "string", pattern: "^(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4]|live|home)$", required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&trackpreset&{location}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  zoom_mode:
+    summary: "Zoom mode: 0 optical, 1 digital 2x, 2 digital 4x, 3 digital 8x, 4 digital 16x"
+    params:
+      mode: { type: "int", min: 0, max: 4, required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&digitalzoom&{mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # OSD (HTTP API: OSD, p.159-162; 2021 sheet p.1-2 Navigation)
+  osd_menu:
+    summary: "Open or close the OSD menu"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "navigate_mode&OSD" }
+    expect: { status: 200 }
+    returns: ack
+  osd_ptz_mode:
+    summary: "Open or close the OSD panel (the 2021 sheet: return to pan/tilt/zoom control mode)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "navigate_mode&PTZ" }
+    expect: { status: 200 }
+    returns: ack
+  osd_confirm:
+    summary: "Confirm the OSD selection or enter the next panel"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "navigate_mode&CONFIRM" }
+    expect: { status: 200 }
+    returns: ack
+  osd_back:
+    summary: "Return to the previous OSD panel"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "navigate_mode&OSD_BACK" }
+    expect: { status: 200 }
+    returns: ack
+  osd_navigate:
+    summary: "Move the OSD selection up or down, or adjust the option left or right"
+    params:
+      direction: { type: "enum", values: ["up", "down", "left", "right"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&osd={direction}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Audio (HTTP API: Audio, p.4-17)
+  audio_encoding:
+    summary: "Audio encoding: 0 off, 1 on, 2 Dante AV-H (Link 4K only)"
+    params:
+      mode: { type: "int", min: 0, max: 2, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&audio_switch={mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  audio_adts:
+    summary: "ADTS headers on the AAC stream on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&adts_flag={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  audio_bitrate:
+    summary: "Audio bitrate in kbps"
+    params:
+      kbps: { type: "enum", values: ["96", "128"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&streamrate={kbps}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  audio_sample_rate:
+    summary: "Audio sample rate in kHz (32 on Move SE and Studio Pro only; 44.1 and 48 on Move 4K, Link 4K)"
+    params:
+      khz: { type: "enum", values: ["32", "44.1", "48"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&samplerate={khz}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  audio_input_volume:
+    summary: "Audio input volume 0-59 (Move SE and Studio Pro accept 0-30)"
+    params:
+      volume: { type: "int", min: 0, max: 59, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&volume_value={volume}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  audio_line_out_volume:
+    summary: "Line out volume 0-59 (Move SE and Studio Pro accept 0-30)"
+    params:
+      volume: { type: "int", min: 0, max: 59, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&lineout_volume={volume}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  usb_audio:
+    summary: "USB audio on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&usbaudio_switch={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Video (HTTP API: Video, p.249-277). Wire form from each endpoint's example (key=value); see quirks
+  video_template:
+    summary: "Apply a video template: off (IP video off), ultra, high, medium, low, 264P50, 264P60, 265P50, 265P60 (not Link 4K or Move SE), dante, dante4K (Link 4K only)"
+    params:
+      template: { type: "enum", values: ["off", "ultra", "high", "medium", "low", "264P50", "264P60", "265P50", "265P60", "dante", "dante4K"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&ndi_mode={template}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  video_outputs:
+    summary: "Choose the active outputs: all-30fps, USB_IP, USB_HDMI-SDI or HDMI-SDI_IP"
+    params:
+      outputs: { type: "enum", values: ["all-30fps", "USB_IP", "USB_HDMI-SDI", "HDMI-SDI_IP"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&video_ability={outputs}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  video_advanced:
+    summary: "Advanced (hybrid) video mode off or hybrid"
+    params:
+      mode: { type: "enum", values: ["off", "hybrid"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&advanced={mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  encoding_profile:
+    summary: "Encoding profile"
+    params:
+      profile: { type: "enum", values: ["mainprofile", "highprofile", "baseline"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&profile={profile}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  hdmi_sdi_output:
+    summary: "Baseband output: 0 SDI, 1 HDMI"
+    params:
+      output: { type: "enum", values: ["0", "1"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&hdmi_sdi={output}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  refresh_rate:
+    summary: "Video refresh rate: 50 Hz, 60 Hz, or dial (the camera's rotary switch)"
+    params:
+      rate: { type: "enum", values: ["50", "60", "dial"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&vinorm={rate}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  studio_pro_hdmi_format:
+    summary: "Studio Pro HDMI output format"
+    params:
+      format: { type: "enum", values: ["1080P30", "1080P50", "1080P60", "720P50", "720P60"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&hdmivideoformat={format}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_protocol:
+    summary: "Encoding of IP stream 1 or 2 (MJPEG not on Move SE)"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      protocol: { type: "enum", values: ["H264", "H265", "MJPEG"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&protocol_{stream}={protocol}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_resolution:
+    summary: "Resolution of IP stream 1 or 2 (stream 2: PIC_HD720 and smaller; PIC_UHD4K Move/Link 4K only; PIC_960_540 Move SE and Studio Pro only)"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      resolution: { type: "enum", values: ["PIC_UHD4K", "PIC_HD1080", "PIC_HD720", "PIC_HD576", "PIC_960_540", "PIC_D1", "PIC_720_408", "PIC_VGA", "PIC_640_360", "PIC_480_320", "PIC_QVGA"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&size_{stream}={resolution}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_bitrate:
+    summary: "Bitrate of IP stream 1 or 2 in kbps (32-102400)"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      kbps: { type: "int", min: 32, max: 102400, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&bps_{stream}={kbps}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_frame_rate:
+    summary: "Frame rate of IP stream 1 or 2 (1-60 fps)"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      fps: { type: "int", min: 1, max: 60, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&fps_{stream}={fps}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_keyframe_interval:
+    summary: "I-frame interval of IP stream 1 or 2 in frames (1-1200)"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      frames: { type: "int", min: 1, max: 1200, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&gop_{stream}={frames}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_rate_control:
+    summary: "Bitrate control of IP stream 1 or 2: CBR or VBR"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      mode: { type: "enum", values: ["CBR", "VBR"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&rcmode_{stream}={mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  stream_qfactor:
+    summary: "MJPEG quality factor of IP stream 1 or 2 (1-99, lower is better quality)"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      qfactor: { type: "int", min: 1, max: 99, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&qfactor_{stream}={qfactor}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Streaming (HTTP API: Stream, p.199-238)
+  rtmp:
+    summary: "RTMP publishing of stream 1 or 2 on or off"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtmp_url:
+    summary: "RTMP server URL (MRL) for stream 1 or 2"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      url: { type: "string", pattern: "^[A-Za-z0-9._~:/@!$'()*+,;=%-]+$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_mrl={url}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtmp_key:
+    summary: "RTMP stream key for stream 1 or 2"
+    params:
+      stream: { type: "int", min: 1, max: 2, required: true }
+      key: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_key={key}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt:
+    summary: "SRT on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_mode:
+    summary: "SRT mode"
+    params:
+      mode: { type: "enum", values: ["caller", "listener"], required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_mode={mode}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_server:
+    summary: "SRT server address (caller mode)"
+    params:
+      server: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_server={server}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_port:
+    summary: "SRT port (default 6516)"
+    params:
+      port: { type: "int", min: 1025, max: 65535, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_port={port}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_latency:
+    summary: "SRT latency in ms (20-8000)"
+    params:
+      ms: { type: "int", min: 20, max: 8000, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_latency={ms}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_bandwidth_overhead:
+    summary: "SRT bandwidth overhead in percent (5-100)"
+    params:
+      percent: { type: "int", min: 5, max: 100, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_bw_precent={percent}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_encryption:
+    summary: "SRT encryption: 0 off, 1 AES-128, 2 AES-192, 3 AES-256"
+    params:
+      encryption: { type: "int", min: 0, max: 3, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_passsid={encryption}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_password:
+    summary: "SRT passphrase for encrypted streams"
+    params:
+      password: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_passtr={password}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  srt_stream_id:
+    summary: "SRT stream ID"
+    params:
+      stream_id: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_streamid_str={stream_id}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtsp_port:
+    summary: "RTSP port (default 554)"
+    params:
+      port: { type: "int", min: 1025, max: 65535, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtsp_port={port}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtsp_auth:
+    summary: "RTSP authentication on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtsp_auth_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtp_multicast:
+    summary: "RTP multicast streaming on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multicast_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtp_multicast_address:
+    summary: "RTP multicast IPv4 address"
+    params:
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multi_rtp_addr={address}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtp_multicast_port:
+    summary: "RTP multicast port"
+    params:
+      port: { type: "int", min: 1025, max: 65535, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multi_rtp_port={port}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  rtp_multicast_ttl:
+    summary: "RTP multicast TTL (1-255)"
+    params:
+      ttl: { type: "int", min: 1, max: 255, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multi_ttl={ttl}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  onvif:
+    summary: "ONVIF on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&onvif_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  onvif_auth:
+    summary: "ONVIF authentication on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&onvif_auth_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Network (HTTP API: Network, p.139-158) and Ports (p.163-168)
+  ndi_name:
+    summary: "NDI channel name"
+    params:
+      name: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&channelName={name}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  ndi_group:
+    summary: "NDI receive group"
+    params:
+      group: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&group={group}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  ndi_discovery:
+    summary: "NDI discovery server on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&discovery_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  ndi_multicast:
+    summary: "NDI multicast on or off"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&multicast_en={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  device_name:
+    summary: "Set the camera's device name"
+    params:
+      name: { type: "string", pattern: "^[A-Za-z0-9._~-]+$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_devinfo_conf&devname={name}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  dhcp:
+    summary: "IP configuration: DHCP (true) or static (false)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&dhcp={enabled:bool01}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  ip_address:
+    summary: "Static IPv4 address"
+    params:
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&ipaddr={address}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  netmask:
+    summary: "Subnet mask"
+    params:
+      mask: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&netmask={mask}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  gateway:
+    summary: "Default gateway"
+    params:
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&gateway={address}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  dns:
+    summary: "DNS server"
+    params:
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&fdns={address}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  http_port:
+    summary: "HTTP port (default 80)"
+    params:
+      port: { type: "int", min: 1025, max: 65535, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&httpport={port}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  visca_tcp_port:
+    summary: "VISCA-over-IP TCP port (default 5678)"
+    params:
+      port: { type: "int", min: 1025, max: 65535, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&ptzport={port}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  visca_udp_port:
+    summary: "VISCA-over-IP UDP port (default 1259)"
+    params:
+      port: { type: "int", min: 1025, max: 65535, required: true }
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&udpport={port}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # System (HTTP API: System, p.239-248)
+  reboot:
+    summary: "Reboot the camera"
+    send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_reboot" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  factory_reset:
+    summary: "Reset every setting to factory defaults"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "set_overlay&fullreset&trigger" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  osd_reset:
+    summary: "Reset the OSD menu settings to defaults"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "set_overlay&osdreset&trigger" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  network_reset:
+    summary: "Reset the network settings to defaults"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "set_overlay&networkreset&trigger" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+  ir_channel:
+    summary: "IR remote channel 1-4"
+    params:
+      channel: { type: "int", min: 1, max: 4, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ir_info=&ir_id={channel}" }
+    expect: { status: 200, contains: "Success" }
+    returns: ack
+
+  # Queries (HTTP API: Query, p.169-198). The document lists them for Move 4K and Link 4K only
+  get_device_config:
+    summary: "Device name, type, firmware, serial number and model (the reply's data object)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_device_conf" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_serial_number:
+    summary: "Serial number"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_serial_number" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_tally_status:
+    summary: "Tally, standby and privacy status and tracked objects (the reply's data object)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_tally_status" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_language_config:
+    summary: "Language, focus lock, NDI/Dante capability, streaming and standby flags"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_language_conf" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_ndi_config:
+    summary: "NDI settings (the reply's data object)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_ndi_info" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_login_status:
+    summary: "Login status (data.is_login)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_login_info" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_system_config:
+    summary: "System settings, including user names, password hashes and whether HTTP authentication is on"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_system_conf" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+  get_advanced_image_config:
+    summary: "Every focus, exposure, colour, image and mode setting, as the reply text"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_advance_image_conf" }
+    expect: { status: 200 }
+    returns: text
+  get_image_config:
+    summary: "Image and tracking settings, as the reply text"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_image_conf" }
+    expect: { status: 200 }
+    returns: text
+  get_audio_config:
+    summary: "Audio settings, as the reply text"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_media_audio" }
+    expect: { status: 200 }
+    returns: text
+  get_video_config:
+    summary: "Video output and stream settings, as the reply text"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_media_video" }
+    expect: { status: 200 }
+    returns: text
+  get_ir_channel:
+    summary: "IR remote channel"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "query_ir_info" }
+    expect: { status: 200, matches: "IR_Channel\"?\\s*[:=]\\s*\"([1-4])\"" }
+    returns: value
+
+  # G2 cameras: commands only in the 2021 HTTP-CGI Control Sheet (image settings on param.cgi, named values)
+  brightness_g2:
+    summary: "Brightness 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&bright&{level}" }
+    expect: { status: 200 }
+    returns: ack
+  saturation_g2:
+    summary: "Saturation 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&saturation&{level}" }
+    expect: { status: 200 }
+    returns: ack
+  contrast_g2:
+    summary: "Contrast 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&contrast&{level}" }
+    expect: { status: 200 }
+    returns: ack
+  sharpness_g2:
+    summary: "Sharpness 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&sharpness&{level}" }
+    expect: { status: 200 }
+    returns: ack
+  hue_g2:
+    summary: "Hue 0-14"
+    params:
+      level: { type: "int", min: 0, max: 14, required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&hue&{level}" }
+    expect: { status: 200 }
+    returns: ack
+  flip_g2:
+    summary: "Flip the picture vertically (true) or not (false)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&flip&{enabled:bool01}" }
+    expect: { status: 200 }
+    returns: ack
+  mirror_g2:
+    summary: "Mirror the picture (true) or not (false)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&mirror&{enabled:bool01}" }
+    expect: { status: 200 }
+    returns: ack
+  image_defaults_g2:
+    summary: "Restore the image settings above to defaults"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_image_default_conf" }
+    expect: { status: 200 }
+    returns: ack
+  exposure_mode_g2:
+    summary: "Exposure mode: auto, manual, shutter (SAE), iris (AAE) or bright"
+    params:
+      mode: { type: "enum", values: ["auto", "manual", "shutter", "iris", "bright"], required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&aemode&{mode}" }
+    expect: { status: 200 }
+    returns: ack
+  white_balance_mode_g2:
+    summary: "White balance mode"
+    params:
+      mode: { type: "enum", values: ["auto", "indoor", "outdoor", "onepush", "manual", "var"], required: true }
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&wbmode&{mode}" }
+    expect: { status: 200 }
+    returns: ack
+  white_balance_one_push_g2:
+    summary: "Calculate white balance (one-push mode)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&wbmode&trigger" }
+    expect: { status: 200 }
+    returns: ack
+  osd_navigate_g2:
+    summary: "With the OSD open, move the selection up or down, or adjust the option left or right"
+    params:
+      direction: { type: "enum", values: ["up", "down", "left", "right"], required: true }
+    send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&{direction}" }
+    expect: { status: 200 }
+    returns: ack
+  snapshot_resolution_g2:
+    summary: "JPEG snapshot resolution"
+    params:
+      size: { type: "enum", values: ["1920x1080", "960x600", "480x300"], required: true }
+    send: { method: GET, path: /cgi-bin/snapshot.cgi, raw_query: "post_snapshot_conf&resolution={size}" }
+    expect: { status: 200 }
+    returns: ack
+  photobooth_photos_g2:
+    summary: "Take four photobooth pictures after a delay of 1-99 s (photo1.jpg to photo4.jpg)"
+    params:
+      delay: { type: "int", min: 1, max: 99, required: true }
+    send: { method: GET, path: /cgi-bin/booth.cgi, raw_query: "0&4&{delay}&photo&0" }
+    expect: { status: 200 }
+    returns: ack
+  photobooth_videos_g2:
+    summary: "Record four photobooth videos of 1-10 s after a delay of 1-99 s (video1.mp4 to video4.mp4)"
+    params:
+      delay: { type: "int", min: 1, max: 99, required: true }
+      length: { type: "int", min: 1, max: 10, required: true }
+    send: { method: GET, path: /cgi-bin/booth.cgi, raw_query: "0&4&{delay}&video&{length}" }
+    expect: { status: 200 }
+    returns: ack
+  get_video_config_g2:
+    summary: "Network video configuration, as the reply text (format not documented)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_media_video" }
+    expect: { status: 200 }
+    returns: text
+  get_audio_config_g2:
+    summary: "Network audio configuration, as the reply text (format not documented)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_media_audio" }
+    expect: { status: 200 }
+    returns: text
+  get_network_config_g2:
+    summary: "Network configuration, as the reply text (format not documented)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_network_conf" }
+    expect: { status: 200 }
+    returns: text
+  get_device_config_g2:
+    summary: "Camera information, as the reply text (format not documented)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_device_conf" }
+    expect: { status: 200 }
+    returns: text
+  get_serial_number_g2:
+    summary: "Serial number (the sheet: not always accurate), as the reply text (format not documented)"
+    send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_serial_number" }
+    expect: { status: 200 }
+    returns: text
+
+state:
+  focus.mode: { type: int, description: "Focus mode as reported (see focus_mode command and quirks)" }
+  focus.zone: { type: string, description: "Autofocus zone" }
+  focus.sensitivity: { type: string, description: "Autofocus sensitivity" }
+  focus.limit.enabled: { type: bool, description: "Focus limit is on" }
+  focus.limit.near: { type: int, description: "Focus limit near distance, metres" }
+  focus.limit.far: { type: int, description: "Focus limit far distance, metres" }
+  focus.locked: { type: bool, description: "Focus is locked" }
+  exposure.mode: { type: string, description: "Exposure mode: auto, manual, sae (shutter priority), aae (iris priority), bright" }
+  exposure.compensation: { type: bool, description: "Exposure compensation is on" }
+  exposure.compensation_level: { type: int, description: "Exposure compensation level 0-14 (-7 to +7)" }
+  exposure.backlight: { type: int, description: "Backlight setting as reported (2 on, 3 off; see quirks)" }
+  exposure.anti_flicker: { type: string, description: "Anti-flicker" }
+  exposure.bright: { type: int, description: "Bright level as reported" }
+  exposure.gain_limit: { type: int, description: "Gain limit 0-15" }
+  exposure.gain: { type: int, description: "Manual gain 0-7" }
+  exposure.meter_region: { type: string, description: "Metering region" }
+  exposure.dynamic_range: { type: int, description: "Dynamic range control 0-8" }
+  exposure.shutter: { type: int, description: "Shutter index 1-17; the speed per index depends on the model" }
+  exposure.iris: { type: int, description: "Iris index; the F-number per index depends on the model" }
+  white_balance.mode: { type: string, description: "White balance mode" }
+  white_balance.red_gain_tuning: { type: int, description: "Red gain tuning 0-20 (-10 to +10)" }
+  white_balance.blue_gain_tuning: { type: int, description: "Blue gain tuning 0-20 (-10 to +10)" }
+  white_balance.red_gain: { type: int, description: "Red gain 0-255" }
+  white_balance.blue_gain: { type: int, description: "Blue gain 0-255" }
+  white_balance.color_temperature: { type: int, description: "VAR colour temperature index 0-55 (2500 K + 100 K per step)" }
+  image.saturation: { type: int, description: "Saturation 0-14 (60% to 200%)" }
+  image.hue: { type: int, description: "Hue 0-14" }
+  image.luminance: { type: int, description: "Luminance 0-14" }
+  image.sharpness: { type: int, description: "Sharpness" }
+  image.contrast: { type: int, description: "Contrast 0-14" }
+  image.style: { type: int, description: "Picture style as reported (no command sets it)" }
+  image.black_and_white: { type: bool, description: "Black and white picture is on" }
+  image.orientation: { type: string, description: "Image orientation" }
+  image.noise_reduction_3d: { type: int, description: "3D noise reduction level" }
+  image.noise_reduction_2d: { type: int, description: "2D noise reduction level" }
+  preset.auto_scan: { type: int, description: "Preset auto scan as reported (no command sets it)" }
+  preset.freeze: { type: bool, description: "Picture freezes during preset recall" }
+  preset.patrol: { type: bool, description: "Patrol (preset inspection) mode is on" }
+  tally.mode: { type: int, description: "Tally mode as reported (see quirks: set as 2/3, reported as 1 in the example)" }
+  tracking.bounding_boxes: { type: string, description: "Tracking bounding boxes" }
+  tracking.auto: { type: int, description: "Auto tracking as reported" }
+  zoom.mode_reported: { type: int, description: "zoommode as reported" }
+  zoom.mode: { type: string, description: "Zoom mode" }
+  motion_sync: { type: bool, description: "Motion sync is on" }
+  auto_inversion: { type: bool, description: "Auto inversion is on" }
+  tracking.switch: { type: int, description: "trackswitch as reported" }
+  tracking.mode: { type: string, description: "Tracking mode as reported (example: tracking)" }
+  tracking.composition: { type: string, description: "Tracking composition (example: median)" }
+  tracking.sensitivity: { type: string, description: "Tracking sensitivity (example: median)" }
+  tracking.zoom: { type: int, description: "Tracking zoom as reported" }
+  tracking.delay: { type: int, description: "Tracking delay as reported" }
+  tracking.delay_time: { type: int, description: "Tracking delay time as reported" }
+  tracking.start: { type: int, description: "Tracking start as reported" }
+  tracking.stop: { type: int, description: "Tracking stop as reported (-1 in the example)" }
+  tracking.loss_timeout: { type: int, description: "Target-loss timeout as reported" }
+  tracking.loss_preset: { type: int, description: "Preset recalled on target loss" }
+  image.lens_distortion_correction: { type: int, description: "Lens distortion correction as reported" }
+  image.flip: { type: bool, description: "Picture is flipped" }
+  image.mirror: { type: bool, description: "Picture is mirrored" }
+  audio.encoding: { type: string, description: "Audio encoding" }
+  audio.format: { type: string, description: "Audio codec (example: AAC)" }
+  audio.adts: { type: bool, description: "ADTS headers are on" }
+  audio.sample_rate: { type: string, description: "Sample rate, kHz" }
+  audio.bitrate: { type: int, description: "Audio bitrate, kbps" }
+  audio.input: { type: string, description: "Audio input (example: linein)" }
+  audio.volume_left: { type: int, description: "Left input volume as reported" }
+  audio.volume_right: { type: int, description: "Right input volume as reported" }
+  audio.input_volume: { type: int, description: "Input volume" }
+  audio.line_out_volume: { type: int, description: "Line out volume" }
+  audio.line_out: { type: bool, description: "Line out is on" }
+  audio.usb: { type: bool, description: "USB audio is on" }
+  video.baseband_output: { type: string, description: "Baseband output" }
+  video.refresh_rate: { type: string, description: "Refresh rate: 50, 60 or dial" }
+  video.template: { type: string, description: "Video template (ultra, high, 265P60, ...)" }
+  video.advanced: { type: string, description: "Advanced video mode: off or hybrid" }
+  video.profile: { type: string, description: "Encoding profile" }
+  video.usb.protocol: { type: string, description: "USB video encoding" }
+  video.usb.width: { type: int, description: "USB video width" }
+  video.usb.height: { type: int, description: "USB video height" }
+  video.usb.frame_rate: { type: int, description: "USB video frame rate" }
+  video.frame_rate: { type: int, description: "Sensor frame rate" }
+  video.uhd: { type: bool, description: "4K output is on" }
+  ir_channel: { type: int, description: "IR remote channel 1-4" }
+  video.streams.*.protocol: { type: string, description: "IP stream 1 or 2: Encoding (H264, H265, MJPEG)" }
+  video.streams.*.resolution: { type: string, description: "IP stream 1 or 2: Resolution (PIC_HD1080, ...)" }
+  video.streams.*.bitrate: { type: int, description: "IP stream 1 or 2: Bitrate, kbps" }
+  video.streams.*.qfactor: { type: int, description: "IP stream 1 or 2: MJPEG quality factor" }
+  video.streams.*.frame_rate: { type: int, description: "IP stream 1 or 2: Frame rate" }
+  video.streams.*.keyframe_interval: { type: int, description: "IP stream 1 or 2: I-frame interval, frames" }
+  video.streams.*.rate_control: { type: string, description: "IP stream 1 or 2: Bitrate control: CBR or VBR" }
+  device.name: { type: string, description: "Device name" }
+  device.type: { type: string, description: "Device type (example: VX60AS)" }
+  device.firmware: { type: string, description: "Firmware version text" }
+  device.serial: { type: string, description: "Serial number" }
+  device.model: { type: string, description: "Device model code" }
+  system.language: { type: string, description: "OSD language" }
+  system.ndi_capable: { type: bool, description: "The camera has NDI" }
+  system.dante_capable: { type: bool, description: "The camera has Dante" }
+  system.streaming: { type: string, description: "streaming flag as reported (values not documented)" }
+  system.standby: { type: string, description: "standby flag as reported in get_language_conf (values not documented)" }
+  focus.mode_name: { type: string, description: "Focus mode name as reported (example: afocus)" }
+  tally.state: { type: string, description: "Tally state as reported (example: Off)" }
+  tally.standby: { type: string, description: "standby flag as reported in get_tally_status (values not documented)" }
+  tally.privacy: { type: string, description: "privacy flag as reported (values not documented)" }
+  tracking.target: { type: string, description: "Tracking target as reported" }
+  ndi.name: { type: string, description: "NDI channel name" }
+  ndi.group: { type: string, description: "NDI group" }
+  ndi.discovery: { type: bool, description: "NDI discovery server is on" }
+  ndi.discovery_server: { type: string, description: "NDI discovery server address" }
+  ndi.multicast: { type: bool, description: "NDI multicast is on" }
+  ndi.multicast_ip: { type: string, description: "NDI multicast address" }
+  ndi.multicast_mask: { type: string, description: "NDI multicast mask" }
+  ndi.multicast_ttl: { type: int, description: "NDI multicast TTL" }
+  ndi.full_ndi: { type: bool, description: "Full NDI is on" }
+  ndi.version: { type: string, description: "NDI version (example: PT5.1.1)" }
+
+telemetry:
+  # The camera pushes nothing over HTTP, so its settings are asked for on a
+  # schedule: changes made from the IR remote, the OSD, the web UI or another
+  # controller only appear this way. Commands go ahead of queued polls.
+  poll:
+    every_ms: 5000
+    send:
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_device_conf" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_language_conf" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_tally_status" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_advance_image_conf" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_image_conf" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_media_audio" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_media_video" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "get_ndi_info" }
+      - { method: GET, path: /cgi-bin/param.cgi, raw_query: "query_ir_info" }
+  updates:
+    # Text replies (get_advance_image_conf, get_image_conf, get_media_audio,
+    # get_media_video, query_ir_info): one rule per field. Each pattern accepts
+    # the name="value" lines of the examples and the "name": "value" members of
+    # the response schema, since the document shows both (see quirks).
+    - match: '(?:^|[\s{,])"?focus_mode"?\s*[:=]\s*"(\d+)"'
+      state: { "focus.mode": "{1}" }
+    - match: '(?:^|[\s{,])"?focus_zone"?\s*[:=]\s*"(\d+)"'
+      state: { "focus.zone": { value: "{1}", map: { "0": "top", "1": "center", "2": "bottom", "3": "front" } } }
+    - match: '(?:^|[\s{,])"?focus_sens"?\s*[:=]\s*"(\d+)"'
+      state: { "focus.sensitivity": { value: "{1}", map: { "1": "high", "2": "normal", "3": "low" } } }
+    - match: '(?:^|[\s{,])"?focuslimit"?\s*[:=]\s*"(\d+)"'
+      state: { "focus.limit.enabled": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?nearestpos"?\s*[:=]\s*"(\d+)"'
+      state: { "focus.limit.near": "{1}" }
+    - match: '(?:^|[\s{,])"?furthestpos"?\s*[:=]\s*"(\d+)"'
+      state: { "focus.limit.far": "{1}" }
+    - match: '(?:^|[\s{,])"?focus_mode_status"?\s*[:=]\s*"([a-z]+)"'
+      state: { "focus.locked": { value: "{1}", map: { "lock": true, "unlock": false } } }
+    - match: '(?:^|[\s{,])"?exposure_mode"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.mode": { value: "{1}", map: { "0": "auto", "3": "manual", "10": "sae", "11": "aae", "13": "bright" } } }
+    - match: '(?:^|[\s{,])"?expcomp_mode"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.compensation": { value: "{1}", map: { "2": true, "3": false } } }
+    - match: '(?:^|[\s{,])"?expcomp_level"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.compensation_level": "{1}" }
+    - match: '(?:^|[\s{,])"?backlight"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.backlight": "{1}" }
+    - match: '(?:^|[\s{,])"?antiflicker"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.anti_flicker": { value: "{1}", map: { "0": "off", "1": "50Hz", "2": "60Hz" } } }
+    - match: '(?:^|[\s{,])"?bright"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.bright": "{1}" }
+    - match: '(?:^|[\s{,])"?gain_limit"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.gain_limit": "{1}" }
+    - match: '(?:^|[\s{,])"?manual_gain"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.gain": "{1}" }
+    - match: '(?:^|[\s{,])"?meter"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.meter_region": { value: "{1}", map: { "0": "average", "1": "center", "2": "smart", "3": "top" } } }
+    - match: '(?:^|[\s{,])"?drc"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.dynamic_range": "{1}" }
+    - match: '(?:^|[\s{,])"?shutter"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.shutter": "{1}" }
+    - match: '(?:^|[\s{,])"?iris"?\s*[:=]\s*"(\d+)"'
+      state: { "exposure.iris": "{1}" }
+    - match: '(?:^|[\s{,])"?wb_mode"?\s*[:=]\s*"(\d+)"'
+      state: { "white_balance.mode": { value: "{1}", map: { "0": "auto", "1": "indoor", "2": "outdoor", "3": "onepush", "5": "manual", "32": "var" } } }
+    - match: '(?:^|[\s{,])"?rgain_tuning"?\s*[:=]\s*"(\d+)"'
+      state: { "white_balance.red_gain_tuning": "{1}" }
+    - match: '(?:^|[\s{,])"?bgain_tuning"?\s*[:=]\s*"(\d+)"'
+      state: { "white_balance.blue_gain_tuning": "{1}" }
+    - match: '(?:^|[\s{,])"?rgain"?\s*[:=]\s*"(\d+)"'
+      state: { "white_balance.red_gain": "{1}" }
+    - match: '(?:^|[\s{,])"?bgain"?\s*[:=]\s*"(\d+)"'
+      state: { "white_balance.blue_gain": "{1}" }
+    - match: '(?:^|[\s{,])"?temperature"?\s*[:=]\s*"(\d+)"'
+      state: { "white_balance.color_temperature": "{1}" }
+    - match: '(?:^|[\s{,])"?saturation"?\s*[:=]\s*"(\d+)"'
+      state: { "image.saturation": "{1}" }
+    - match: '(?:^|[\s{,])"?hue"?\s*[:=]\s*"(\d+)"'
+      state: { "image.hue": "{1}" }
+    - match: '(?:^|[\s{,])"?luminance"?\s*[:=]\s*"(\d+)"'
+      state: { "image.luminance": "{1}" }
+    - match: '(?:^|[\s{,])"?sharpness"?\s*[:=]\s*"(\d+)"'
+      state: { "image.sharpness": "{1}" }
+    - match: '(?:^|[\s{,])"?contrast"?\s*[:=]\s*"(\d+)"'
+      state: { "image.contrast": "{1}" }
+    - match: '(?:^|[\s{,])"?style"?\s*[:=]\s*"(\d+)"'
+      state: { "image.style": "{1}" }
+    - match: '(?:^|[\s{,])"?blackwhite_mode"?\s*[:=]\s*"(\d+)"'
+      state: { "image.black_and_white": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?imageOrientation"?\s*[:=]\s*"(\d+)"'
+      state: { "image.orientation": { value: "{1}", map: { "0": "normal", "1": "flip", "2": "mirror", "3": "flip_mirror" } } }
+    - match: '(?:^|[\s{,])"?nr3d"?\s*[:=]\s*"(\d+)"'
+      state: { "image.noise_reduction_3d": "{1}" }
+    - match: '(?:^|[\s{,])"?nr2d"?\s*[:=]\s*"(\d+)"'
+      state: { "image.noise_reduction_2d": "{1}" }
+    - match: '(?:^|[\s{,])"?presetautoscan"?\s*[:=]\s*"(\d+)"'
+      state: { "preset.auto_scan": "{1}" }
+    - match: '(?:^|[\s{,])"?presetfreeze"?\s*[:=]\s*"(\d+)"'
+      state: { "preset.freeze": { value: "{1}", map: { "2": true, "3": false } } }
+    - match: '(?:^|[\s{,])"?presetinspection"?\s*[:=]\s*"(\d+)"'
+      state: { "preset.patrol": { value: "{1}", map: { "2": true, "3": false } } }
+    - match: '(?:^|[\s{,])"?tallymode"?\s*[:=]\s*"(\d+)"'
+      state: { "tally.mode": "{1}" }
+    - match: '(?:^|[\s{,])"?trackbox"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.bounding_boxes": { value: "{1}", map: { "2": "debug", "3": "off", "4": "select_target" } } }
+    - match: '(?:^|[\s{,])"?autotrack"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.auto": "{1}" }
+    - match: '(?:^|[\s{,])"?zoommode"?\s*[:=]\s*"(\d+)"'
+      state: { "zoom.mode_reported": "{1}" }
+    - match: '(?:^|[\s{,])"?digitalzoom"?\s*[:=]\s*"(\d+)"'
+      state: { "zoom.mode": { value: "{1}", map: { "0": "optical", "1": "digital_2x", "2": "digital_4x", "3": "digital_8x", "4": "digital_16x" } } }
+    - match: '(?:^|[\s{,])"?motionsync"?\s*[:=]\s*"(\d+)"'
+      state: { "motion_sync": { value: "{1}", map: { "2": true, "3": false } } }
+    - match: '(?:^|[\s{,])"?inversionMode"?\s*[:=]\s*"(\d+)"'
+      state: { "auto_inversion": { value: "{1}", map: { "2": true, "0": false } } }
+    - match: '(?:^|[\s{,])"?trackswitch"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.switch": "{1}" }
+    - match: '(?:^|[\s{,])"?trackmode"?\s*[:=]\s*"([A-Za-z]+)"'
+      state: { "tracking.mode": "{1}" }
+    - match: '(?:^|[\s{,])"?trackcomposition"?\s*[:=]\s*"([A-Za-z]+)"'
+      state: { "tracking.composition": "{1}" }
+    - match: '(?:^|[\s{,])"?tracksens"?\s*[:=]\s*"([A-Za-z]+)"'
+      state: { "tracking.sensitivity": "{1}" }
+    - match: '(?:^|[\s{,])"?trackzoom"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.zoom": "{1}" }
+    - match: '(?:^|[\s{,])"?trackdelay"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.delay": "{1}" }
+    - match: '(?:^|[\s{,])"?trackdelaytime"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.delay_time": "{1}" }
+    - match: '(?:^|[\s{,])"?trackstart"?\s*[:=]\s*"(-?\d+)"'
+      state: { "tracking.start": "{1}" }
+    - match: '(?:^|[\s{,])"?trackstop"?\s*[:=]\s*"(-?\d+)"'
+      state: { "tracking.stop": "{1}" }
+    - match: '(?:^|[\s{,])"?losstimeout"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.loss_timeout": "{1}" }
+    - match: '(?:^|[\s{,])"?losspreset"?\s*[:=]\s*"(\d+)"'
+      state: { "tracking.loss_preset": "{1}" }
+    - match: '(?:^|[\s{,])"?ldc"?\s*[:=]\s*"(\d+)"'
+      state: { "image.lens_distortion_correction": "{1}" }
+    - match: '(?:^|[\s{,])"?flip"?\s*[:=]\s*"(\d+)"'
+      state: { "image.flip": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?mirror"?\s*[:=]\s*"(\d+)"'
+      state: { "image.mirror": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?audio_switch"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.encoding": { value: "{1}", map: { "0": "off", "1": "on", "2": "dante" } } }
+    - match: '(?:^|[\s{,])"?aeformat"?\s*[:=]\s*"([A-Za-z0-9]+)"'
+      state: { "audio.format": "{1}" }
+    - match: '(?:^|[\s{,])"?adts_flag"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.adts": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?samplerate"?\s*[:=]\s*"([0-9.]+)"'
+      state: { "audio.sample_rate": "{1}" }
+    - match: '(?:^|[\s{,])"?streamrate"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.bitrate": "{1}" }
+    - match: '(?:^|[\s{,])"?audioinput"?\s*[:=]\s*"([A-Za-z]+)"'
+      state: { "audio.input": "{1}" }
+    - match: '(?:^|[\s{,])"?vol_left_in"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.volume_left": "{1}" }
+    - match: '(?:^|[\s{,])"?vol_right_in"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.volume_right": "{1}" }
+    - match: '(?:^|[\s{,])"?volume_value"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.input_volume": "{1}" }
+    - match: '(?:^|[\s{,])"?lineout_volume"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.line_out_volume": "{1}" }
+    - match: '(?:^|[\s{,])"?lineout_switch"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.line_out": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?usbaudio_switch"?\s*[:=]\s*"(\d+)"'
+      state: { "audio.usb": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?hdmi_sdi"?\s*[:=]\s*"(\d+)"'
+      state: { "video.baseband_output": { value: "{1}", map: { "0": "sdi", "1": "hdmi" } } }
+    - match: '(?:^|[\s{,])"?vinorm"?\s*[:=]\s*"([A-Za-z0-9]+)"'
+      state: { "video.refresh_rate": "{1}" }
+    - match: '(?:^|[\s{,])"?ndi_mode"?\s*[:=]\s*"([A-Za-z0-9]+)"'
+      state: { "video.template": "{1}" }
+    - match: '(?:^|[\s{,])"?advanced"?\s*[:=]\s*"([a-z]+)"'
+      state: { "video.advanced": "{1}" }
+    - match: '(?:^|[\s{,])"?profile"?\s*[:=]\s*"([a-z]+)"'
+      state: { "video.profile": "{1}" }
+    - match: '(?:^|[\s{,])"?usbprotocol"?\s*[:=]\s*"([A-Za-z0-9]+)"'
+      state: { "video.usb.protocol": "{1}" }
+    - match: '(?:^|[\s{,])"?usbwidth"?\s*[:=]\s*"(\d+)"'
+      state: { "video.usb.width": "{1}" }
+    - match: '(?:^|[\s{,])"?usbheight"?\s*[:=]\s*"(\d+)"'
+      state: { "video.usb.height": "{1}" }
+    - match: '(?:^|[\s{,])"?usbframerate"?\s*[:=]\s*"(\d+)"'
+      state: { "video.usb.frame_rate": "{1}" }
+    - match: '(?:^|[\s{,])"?vi_framerate"?\s*[:=]\s*"(\d+)"'
+      state: { "video.frame_rate": "{1}" }
+    - match: '(?:^|[\s{,])"?uhd4k"?\s*[:=]\s*"(\d+)"'
+      state: { "video.uhd": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '(?:^|[\s{,])"?IR_Channel"?\s*[:=]\s*"([1-4])"'
+      state: { "ir_channel": "{1}" }
+    # One rule per stream: a rule takes only its first match in a message.
+    - match: '(?:^|[\s{,])"?protocol_1"?\s*[:=]\s*"([A-Za-z0-9]+)"'
+      state: { "video.streams.1.protocol": "{1}" }
+    - match: '(?:^|[\s{,])"?size_1"?\s*[:=]\s*"([A-Za-z0-9_]+)"'
+      state: { "video.streams.1.resolution": "{1}" }
+    - match: '(?:^|[\s{,])"?bps_1"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.1.bitrate": "{1}" }
+    - match: '(?:^|[\s{,])"?qfactor_1"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.1.qfactor": "{1}" }
+    - match: '(?:^|[\s{,])"?fps_1"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.1.frame_rate": "{1}" }
+    - match: '(?:^|[\s{,])"?gop_1"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.1.keyframe_interval": "{1}" }
+    - match: '(?:^|[\s{,])"?rcmode_1"?\s*[:=]\s*"([A-Z]+)"'
+      state: { "video.streams.1.rate_control": "{1}" }
+    - match: '(?:^|[\s{,])"?protocol_2"?\s*[:=]\s*"([A-Za-z0-9]+)"'
+      state: { "video.streams.2.protocol": "{1}" }
+    - match: '(?:^|[\s{,])"?size_2"?\s*[:=]\s*"([A-Za-z0-9_]+)"'
+      state: { "video.streams.2.resolution": "{1}" }
+    - match: '(?:^|[\s{,])"?bps_2"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.2.bitrate": "{1}" }
+    - match: '(?:^|[\s{,])"?qfactor_2"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.2.qfactor": "{1}" }
+    - match: '(?:^|[\s{,])"?fps_2"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.2.frame_rate": "{1}" }
+    - match: '(?:^|[\s{,])"?gop_2"?\s*[:=]\s*"(\d+)"'
+      state: { "video.streams.2.keyframe_interval": "{1}" }
+    - match: '(?:^|[\s{,])"?rcmode_2"?\s*[:=]\s*"([A-Z]+)"'
+      state: { "video.streams.2.rate_control": "{1}" }
+    # JSON replies.
+    - path: '^/cgi-bin/param\.cgi\?get_device_conf$'
+      json: { devname: "$.data.devname", devtype: "$.data.devtype", versioninfo: "$.data.versioninfo", serial_num: "$.data.serial_num", device_model: "$.data.device_model" }
+      state:
+        "device.name": "{devname}"
+        "device.type": "{devtype}"
+        "device.firmware": "{versioninfo}"
+        "device.serial": "{serial_num}"
+        "device.model": "{device_model}"
+    - path: '^/cgi-bin/param\.cgi\?get_language_conf$'
+      json: { default_language: "$.data.default_language", isndi: "$.data.isndi", isdante: "$.data.isdante", streaming: "$.data.streaming", standby: "$.data.standby", focusmode: "$.data.focusmode" }
+      state:
+        "system.language": "{default_language}"
+        "system.ndi_capable": { value: "{isndi}", map: { "0": false, "1": true } }
+        "system.dante_capable": { value: "{isdante}", map: { "0": false, "1": true } }
+        "system.streaming": "{streaming}"
+        "system.standby": "{standby}"
+        "focus.mode_name": "{focusmode}"
+    - path: '^/cgi-bin/param\.cgi\?get_tally_status$'
+      json: { tally: "$.data.tally", standby: "$.data.standby", privacy: "$.data.privacy", target: "$.data.target" }
+      state:
+        "tally.state": "{tally}"
+        "tally.standby": "{standby}"
+        "tally.privacy": "{privacy}"
+        "tracking.target": "{target}"
+    - path: '^/cgi-bin/param\.cgi\?get_ndi_info$'
+      json: { channelName: "$.data.channelName", group: "$.data.group", discovery_en: "$.data.discovery_en", discovery_server: "$.data.discovery_server", multicast_en: "$.data.multicast_en", multicast_ip: "$.data.multicast_ip", multicast_mask: "$.data.multicast_mask", multicast_ttl: "$.data.multicast_ttl", fullndi_en: "$.data.fullndi_en", ndi: "$.data.ndi" }
+      state:
+        "ndi.name": "{channelName}"
+        "ndi.group": "{group}"
+        "ndi.discovery": { value: "{discovery_en}", map: { "0": false, "1": true } }
+        "ndi.discovery_server": "{discovery_server}"
+        "ndi.multicast": { value: "{multicast_en}", map: { "0": false, "1": true } }
+        "ndi.multicast_ip": "{multicast_ip}"
+        "ndi.multicast_mask": "{multicast_mask}"
+        "ndi.multicast_ttl": "{multicast_ttl}"
+        "ndi.full_ndi": { value: "{fullndi_en}", map: { "0": false, "1": true } }
+        "ndi.version": "{ndi}"
 
 quirks:
   - models: [all]
@@ -112,13 +1670,145 @@ quirks:
       it will corrupt the command. Transmitted via raw_query, unmodified.
 
   - models: [all]
-    severity: warning
+    severity: critical
     text: >
-      move starts continuous motion that runs until stop_move. A caller that
-      issues move without a paired stop leaves the camera panning to its limit.
+      The HTTP API document states that all endpoints use digest authentication
+      (p.2), while its examples send no credentials and get_system_conf reports an
+      "httpauth" setting ("0" in the example, p.169). The spec declares auth: none
+      because the core does not implement digest authentication; a camera with HTTP
+      authentication enabled will refuse every command until it does.
 
   - models: [all]
     severity: warning
     text: >
-      A 200 response indicates the request was accepted, not that the camera
-      executed it. The protocol has no execution acknowledgement.
+      move, zoom_in, zoom_out, focus_in and focus_out start continuous motion that
+      runs until the matching stop command. A caller that issues one without the
+      stop leaves the camera moving to its limit.
+
+  - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
+    severity: warning
+    text: >
+      Every endpoint's documented 200 reply is the JSON object
+      {"Response":{"Result":"Success"}} (shown in full in the Device ID example,
+      p.147; the other endpoints give it as an auto-generated schema). Commands only
+      current models have check for "Success"; commands G2 cameras share (motion,
+      presets, focus lock, OSD) check only for HTTP 200, since the 2021 sheet
+      documents no reply. Either way it means the request was accepted; there is
+      no execution acknowledgement for motion.
+
+  - models: [ptz-g2]
+    severity: info
+    text: >
+      The 2021 HTTP-CGI Control Sheet documents no reply bodies, so commands for
+      G2 cameras check only for HTTP 200, and the G2 query commands return the
+      reply text as received.
+
+  - models: [ptz-g2]
+    severity: info
+    text: >
+      The 2021 sheet gives zoom and focus speeds 1-7 and a direct-zoom speed of
+      0-7; the HTTP API gives 0-7 and 1-7. The parameters follow the HTTP API, so
+      speed 0 on zoom_in, zoom_out, focus_in and focus_out is not documented for
+      G2 cameras.
+
+  - models: [ptz-g2]
+    severity: info
+    text: >
+      On G2 cameras picture settings go to param.cgi with named values
+      (post_image_value&aemode&manual); current models take them on ptzctrl.cgi
+      with numeric codes (post_image_value&aemode&3). The two sets are separate
+      commands (the _g2 suffix) because the wire forms differ.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Presets are documented as 0-89 and 100-254; 90-99 are not presets. Commands
+      for the low and high ranges are separate (recall_preset and
+      recall_preset_extended, and likewise for save and recall with speed) so that
+      90-99 are refused before transmission.
+
+  - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
+    severity: warning
+    text: >
+      Many picture settings apply only in a particular mode, as each endpoint notes:
+      gain in manual exposure; iris and shutter in manual or AAE; gain limit, meter
+      region and backlight in auto, SAE or AAE; exposure compensation in auto;
+      red/blue gain in manual white balance; gain tuning in auto, one-push or VAR;
+      colour temperature in VAR; one-push trigger in one-push. Outside that mode the
+      camera may accept and ignore the value.
+
+  - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
+    severity: warning
+    text: >
+      The HTTP API contradicts itself on several values; the spec takes the
+      parameter table or the endpoint's example, and reports raw numbers in state
+      where the meaning is uncertain. backlight: the function text lists 1 off, 2
+      on, 3 enhanced while the parameter table allows 2-3 as on/off (p.37-38).
+      focus_mode: the function text lists 1 auto, 2 one-shot AF, 3 manual while the
+      parameter table lists 2 auto, 3 manual (p.71); all three values are allowed.
+      iris (Move 4K, Link 4K): the table says 0-8 while the list and the example run
+      to 12 (p.51). tally_mode is set as 2/3 but reported as "1" in the
+      get_advance_image_conf example. Audio sample rates are labelled kbps but are
+      kHz.
+
+  - models: [move-4k, link-4k, move-se, studio-pro]
+    severity: info
+    text: >
+      Video endpoints are headed post_media_video&profile&:profile but every example
+      sends post_media_video&profile=highprofile (p.249-277), as the audio and
+      network endpoints do; the spec sends the example's key=value form. Focus Limit
+      is headed GET while its JavaScript example uses POST (p.67); GET is sent.
+
+  - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
+    severity: info
+    text: >
+      Shutter index meanings differ by model. Move 4K, Link 4K: 1 1/30, 2 1/60, 3
+      1/90, 4 1/100, 5 1/125, 6 1/180, 7 1/250, 8 1/350, 9 1/500, 10 1/725, 11 1/1000,
+      12 1/1500, 13 1/2000, 14 1/3000, 15 1/4000, 16 1/6000, 17 1/10000. Move SE,
+      Studio 4K: as above but 2 1/50, 3 1/60, 6 1/200. Studio Pro: 1 1/30, 2 1/40,
+      3 1/50, 4 1/60, then 1/70 to 1/190 in 1/10 steps for 5-17. Iris and sharpness
+      also differ, as separate commands (iris/iris_se, sharpness/sharpness_se).
+
+  - models: [move-se, studio-pro]
+    severity: info
+    text: >
+      Audio input and line out volume accept 0-30 on Move SE and Studio Pro, 0-59 on
+      Move 4K and Link 4K; the sample rate is 32 kHz only on Move SE and Studio Pro.
+      Stream encoding on Move SE is H264 or H265 only.
+
+  - models: [move-4k, link-4k]
+    severity: warning
+    text: >
+      The query endpoints are documented for Move 4K and Link 4K only, and the
+      telemetry polls them on every model; on other models those polls may fail and
+      state stays empty. The examples for get_advance_image_conf, get_image_conf,
+      get_media_audio, get_media_video and query_ir_info show name="value" lines
+      while their schemas describe a JSON {"status":200,"data":{...}} object; the
+      telemetry patterns accept both, and those queries return the reply text.
+      get_system_conf returns password hashes and is not polled.
+
+  - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
+    severity: info
+    text: >
+      Text values (names, addresses, stream keys, SRT settings, RTMP URLs) are sent
+      unencoded in the positional query, so they are limited to characters that need
+      no percent-encoding: letters, digits and . _ ~ - (RTMP URLs also : / @ and the
+      RFC 3986 sub-delimiters other than &, and % for a value the caller has already
+      percent-encoded). Names with spaces cannot be sent.
+
+  - models: [move-4k, link-4k, move-se, studio-pro, studio-4k]
+    severity: warning
+    text: >
+      ip_address, netmask, gateway, dhcp and http_port change how the camera is
+      reached, and reboot, factory_reset and network_reset restart it; the
+      connection drops and the device must be re-registered at its new address or
+      port. focus_limit needs near no greater than far (p.67).
+
+  - models: [all]
+    severity: info
+    text: >
+      Power (standby) on/off, pan/tilt/zoom/focus position inquiries and the other
+      VISCA functions are documented only in the VISCA API (VISCA over IP on TCP
+      5678 or UDP 1259), which this HTTP spec does not carry. The snapshot image
+      (/snapshot.jpg) and photobooth downloads (/photoN.jpg, /videoN.mp4) are files,
+      not commands, and are not modelled.
