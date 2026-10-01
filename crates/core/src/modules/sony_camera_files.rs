@@ -214,7 +214,7 @@ fn embedded_file(data: &[u8], header_words: usize) -> Result<&[u8], String> {
 impl SonyCamera {
     /// Refused unless the camera reports `code` as enabled (value 1), or does
     /// not report it at all.
-    fn require_enabled(&self, code: u16, what: &str) -> Result<(), CommandError> {
+    pub(super) fn require_enabled(&self, code: u16, what: &str) -> Result<(), CommandError> {
         match self.props.get(&code) {
             Some(info) if info.current != ENABLED || info.enabled == Enabled::No => Err(refused(
                 "not_available",

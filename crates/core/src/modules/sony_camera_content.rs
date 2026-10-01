@@ -137,6 +137,9 @@ fn utf8_trimmed(b: &[u8]) -> String {
 pub(crate) struct ListedFile {
     pub id: String,
     pub size: u64,
+    /// The file's UMID in hex, which stays the same when the camera
+    /// regenerates its content list and renumbers the contents.
+    pub umid: String,
 }
 
 /// A content list (SDIO_GetContentInfoList) as the command's value, and the
@@ -232,7 +235,11 @@ pub(crate) fn parse_content_info_list(data: &[u8]) -> Result<(Value, Vec<ListedF
                         "channels": a[3] >> 4,
                     });
                 }
-                files_out.push(ListedFile { id, size });
+                files_out.push(ListedFile {
+                    id,
+                    size,
+                    umid: hex_bytes(&umid),
+                });
                 files.push(file);
             }
             if content_type == 0 {
@@ -549,13 +556,9 @@ mod tests {
         assert_eq!(file["path"], "DCIM/100MSDCF/DSC00001.JPG");
         assert_eq!(file["format"], "jpeg");
         assert_eq!(file["width"], 6000);
-        assert_eq!(
-            files,
-            [ListedFile {
-                id: "c:1:42:1".into(),
-                size: 123_456
-            }]
-        );
+        assert_eq!(files.len(), 1);
+        assert_eq!((files[0].id.as_str(), files[0].size), ("c:1:42:1", 123_456));
+        assert_eq!(files[0].umid, file["umid"]);
     }
 
     #[test]

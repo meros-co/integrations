@@ -1218,6 +1218,134 @@ pub(crate) const PROPS: &[Prop] = &[
     p(0xE081, "files.general_settings_available", Flag, None),
     p(0xE0F3, "content.slot1.delete_available", Flag, None),
     p(0xE0F4, "content.slot2.delete_available", Flag, None),
+    // Eframing
+    p(
+        0xD0CF,
+        "eframing.enabled",
+        OnOff,
+        Some("set_camera_eframing"),
+    ),
+    p(0xD122, "eframing.type", Labels(EFRAMING_TYPE), None),
+    p(0xD123, "eframing.command_version", Raw, None),
+    p(
+        0xD124,
+        "eframing.mode",
+        Labels(EFRAMING_MODE),
+        Some("set_eframing_mode"),
+    ),
+    p(
+        0xD0CD,
+        "eframing.scale",
+        Labels(EFRAMING_SCALE),
+        Some("set_eframing_scale"),
+    ),
+    p(0xD0CE, "eframing.speed", Raw, Some("set_eframing_speed")),
+    p(
+        0xD127,
+        "eframing.ptz_speed",
+        Raw,
+        Some("set_eframing_ptz_speed"),
+    ),
+    p(
+        0xE0F0,
+        "eframing.tracking_start",
+        Labels(AUTO_MANUAL),
+        Some("set_eframing_tracking_start"),
+    ),
+    p(
+        0xE0F1,
+        "eframing.effect",
+        Labels(EFRAMING_EFFECT),
+        Some("set_eframing_effect"),
+    ),
+    p(
+        0xE0F8,
+        "eframing.auto_framing",
+        OnOff,
+        Some("set_eframing_auto_framing"),
+    ),
+    // Camera information
+    p(0xE086, "lens.information_available", Flag, None),
+    p(
+        0xD207,
+        "live_view.osd_image_mode",
+        Flag,
+        Some("set_osd_image_mode"),
+    ),
+    p(0xD1CC, "streaming.settings_editable", Flag, None),
+    p(
+        0xD20C,
+        "camera_controls.status",
+        Labels(BUTTON_STATUS),
+        None,
+    ),
+    // Pixel shift
+    p(0xD239, "pixel_shift.mode", Labels(PIXEL_SHIFT_MODE), None),
+    p(
+        0xD23A,
+        "pixel_shift.shots",
+        Raw,
+        Some("set_pixel_shift_shots"),
+    ),
+    p(
+        0xD23B,
+        "pixel_shift.interval",
+        Raw,
+        Some("set_pixel_shift_interval"),
+    ),
+    p(0xD23C, "pixel_shift.shooting", Flag, None),
+    p(0xD23D, "pixel_shift.progress", Raw, None),
+    // User base looks
+    p(0xD0C8, "base_look.editing", Raw, None),
+    p(
+        0xD0C9,
+        "base_look.input",
+        Labels(BASE_LOOK_INPUT),
+        Some("set_user_base_look_input"),
+    ),
+    p(
+        0xD2B1,
+        "base_look.output",
+        Labels(BASE_LOOK_OUTPUT),
+        Some("set_user_base_look_output"),
+    ),
+    p(
+        0xD0CA,
+        "base_look.ae_level_offset",
+        Raw,
+        Some("set_user_base_look_ae_offset"),
+    ),
+    p(0xD0CC, "base_look.pplut", Raw, None),
+];
+
+const EFRAMING_TYPE: &[(i128, &str)] = &[
+    (1, "none"),
+    (2, "auto"),
+    (3, "single"),
+    (5, "ptz"),
+    (8, "hold"),
+    (9, "zoom_out"),
+];
+const EFRAMING_MODE: &[(i128, &str)] = &[
+    (1, "auto"),
+    (2, "touch_kick"),
+    (3, "time_sequence_a"),
+    (4, "time_sequence_b"),
+];
+const EFRAMING_SCALE: &[(i128, &str)] = &[(1, "low"), (2, "mid"), (3, "high")];
+const EFRAMING_EFFECT: &[(i128, &str)] = &[
+    (1, "off"),
+    (2, "interval_zoom_15s"),
+    (3, "interval_zoom_30s"),
+];
+const BUTTON_STATUS: &[(i128, &str)] = &[(1, "idle"), (2, "key_on")];
+const PIXEL_SHIFT_MODE: &[(i128, &str)] = &[(0, "off"), (1, "burst")];
+const BASE_LOOK_INPUT: &[(i128, &str)] = &[(1, "s_gamut3_slog3"), (2, "s_gamut3_cine_slog3")];
+const BASE_LOOK_OUTPUT: &[(i128, &str)] = &[
+    (0x0001, "bt709"),
+    (0x0002, "bt709_legal"),
+    (0x0101, "hlg"),
+    (0x0102, "hlg_legal"),
 ];
 
 /// Properties read by code that has its own commands: tally lamps by colour,
