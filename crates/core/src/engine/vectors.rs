@@ -153,6 +153,10 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     {
         let mut cx = Cx::new(1);
         engine.tcp(&mut cx, "device", TcpInput::Connected);
+        // A login that waits for the device's prompt is given it.
+        if let Some((_, prompt, _)) = engine.prompt_wait.clone() {
+            engine.tcp(&mut cx, "device", TcpInput::Data(prompt.into_bytes()));
+        }
         connected = cx.take();
     }
     let expect_connect = if let Some(w) = v.get("expect_connect_wire") {
@@ -205,6 +209,19 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// Answer the internal job in flight (probe, subscription or telemetry
+/// query) with a plain success: on its OSC address, or as a text line.
+fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
+    let awaiting = engine.current.as_ref().and_then(|f| f.awaiting.as_ref());
+    match awaiting {
+        Some(super::Await::Osc(address)) => {
+            let reply = super::osc::encode(address.as_deref().unwrap_or("/probe-reply"), &[]);
+            engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &reply);
+        }
+        _ => engine.tcp(cx, "device", TcpInput::Data(success.to_vec())),
+    }
 }
 
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
@@ -267,6 +284,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let mut cx = Cx::new(1);
     if started.iter().any(|a| matches!(a, Action::TcpOpen { .. })) {
         engine.tcp(&mut cx, "device", TcpInput::Connected);
+        // A login that waits for the device's prompt is given it.
+        if let Some((_, prompt, _)) = engine.prompt_wait.clone() {
+            engine.tcp(&mut cx, "device", TcpInput::Data(prompt.into_bytes()));
+        }
     }
     for id in http_ids(&started) {
         engine.http_response(
@@ -284,29 +305,55 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     }
     // Telemetry subscriptions and queries are queued ahead of commands.
     // Complete them with a plain success reply, so the vector sees only its
-    // command: "200 ok" (HyperDeck), or a Protocol 3000 device line where the
-    // transport takes only lines matching its reply_match as replies. OSC
-    // telemetry queries are answered on their own address.
-    let success: &[u8] = match &engine.transport {
+    // command: the first of these that the transport takes as a reply (its
+    // reply_match, where it has one). OSC queries are answered on their own
+    // address.
+    const SUCCESS: [&str; 6] = ["200 ok", "~01@ok", "ACK;", "ACK", "ack,ok", "OK ok"];
+    let line = match &engine.transport {
         super::Transport::LineTcp {
             reply_match: Some(re),
             ..
-        } if !re.is_match("200 ok") => b"~01@ok\r\n",
-        _ => b"200 ok\r\n",
+        } => SUCCESS
+            .iter()
+            .find(|s| re.is_match(s))
+            .copied()
+            .unwrap_or(SUCCESS[0]),
+        _ => SUCCESS[0],
     };
+    // A block transport's reply ends at a blank line.
+    let end = match &engine.transport {
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::Block,
+            ..
+        } => "\r\n\r\n",
+        _ => "\r\n",
+    };
+    let success = format!("{line}{end}").into_bytes();
+    let success = success.as_slice();
+    let internal = |e: &SpecEngine| e.current.as_ref().is_some_and(|f| f.id.is_none());
     let mut guard = 0;
-    while engine.current.as_ref().is_some_and(|f| f.id.is_none()) && guard < 65536 {
-        let awaiting = engine.current.as_ref().and_then(|f| f.awaiting.as_ref());
-        match awaiting {
-            Some(super::Await::Osc(address)) => {
-                let reply = super::osc::encode(address.as_deref().unwrap_or("/probe-reply"), &[]);
-                engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &reply);
-            }
-            _ => engine.tcp(&mut cx, "device", TcpInput::Data(success.to_vec())),
+    while internal(&engine) && guard < 65536 {
+        // Once only telemetry queries are queued, they have nothing to do with
+        // the command (which would go ahead of them anyway), so they are
+        // dropped: a long poll list, such as WING's 5,344 values, is not
+        // answered for every vector.
+        if !matches!(engine.transport, super::Transport::Http { .. })
+            && engine
+                .queue
+                .iter()
+                .all(|j| j.id.is_none() && j.item.is_some())
+        {
+            engine.queue.clear();
+        }
+        let before = engine.queue.len();
+        answer_internal(&mut engine, &mut cx, success);
+        // An answer that moved nothing on will not move it on later either.
+        if internal(&engine) && engine.queue.len() == before {
+            break;
         }
         guard += 1;
     }
-    if engine.current.as_ref().is_some_and(|f| f.id.is_none()) {
+    if internal(&engine) {
         return Err("the connection sequence did not complete".into());
     }
     cx.take();
