@@ -307,7 +307,8 @@ different device state than the caller requested.
 
 Every string in `send`, `on_connect` and `probe` is a template. Substitution is
 `{param}` for a command parameter or `{settings.name}` for a setting, optionally
-followed by directives after `:`.
+followed by directives after `:`. A name is made of letters, digits, `_` and
+`.`, so any other brace is literal: `{"status":"toggle"}` is sent as written.
 
 **Every substituted value is always present.** A parameter used in a template
 must be `required` or have a `default`. A protocol clause that exists only when

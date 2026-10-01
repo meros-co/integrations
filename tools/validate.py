@@ -23,7 +23,7 @@ except ImportError as exc:  # pragma: no cover
 ROOT = Path(__file__).resolve().parent.parent
 
 # {name} or {name:directive:directive...}; SPEC.md §4, "Templates".
-PLACEHOLDER = re.compile(r"\{([^{}:]+)((?::[^{}:]+)*)\}")
+PLACEHOLDER = re.compile(r"""\{([A-Za-z0-9_][A-Za-z0-9_.]*)((?::[^{}:"\s]+)*)\}""")
 
 # The closed directive set, keyed by the parameter types each one accepts.
 DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
