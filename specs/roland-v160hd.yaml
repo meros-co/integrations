@@ -1,0 +1,2908 @@
+spec: 1
+id: roland-v160hd
+name: Roland V-160HD / V-80HD / VR-120HD / VR-6HD / V-1-4K (LAN control)
+vendor: Roland
+category: switcher
+
+# Roland's current switchers share one LAN command language. Two command sets
+# run on the same connection (Basic Control Commands p.2: "You can use the
+# basic control commands at the same time as the regular commands"):
+#
+#   - the Basic Control Commands, mnemonics such as PGM:INPUT2; with ACK;
+#     replies, one document for all five models;
+#   - the regular commands of each model's Remote Control Guide: DTH (write)
+#     and RQH (read) by SysEx address into the model's MIDI Implementation
+#     address map, plus VER.
+#
+# Every Basic command is a command here. The regular commands are offered as
+# set_parameter/get_parameter over raw addresses: the address maps run to
+# thousands of entries, differ per model, and duplicate most of what the Basic
+# set already names. Roland's older LAN command sets (V-60HD, XS-62S, P-20HD,
+# XS-82H/83H/84H) answer with a bare ACK byte or a ";" that no line ending
+# follows, which the line-tcp framings cannot delimit; they are not here.
+# V-600UHD, VR-400UHD and XS-42H/VP-42H have their own specs.
+source:
+  - title: "LAN/RS-232 Basic Control Commands, edition 02 (© 2025, PDF dated 2026-04-09)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/LAN_RS-232_Basic_Control_Commands_eng02_W.pdf
+    note: >
+      Manufacturer document covering V-160HD, V-80HD, VR-120HD, VR-6HD and
+      V-1-4K; the cover lists minimum versions 3.5, 2.2, 1.3, 2.2 and 1.0
+      without naming which model each belongs to. Command format and LF after
+      replies p.2; VIDEO p.3-19 (QVISRC/QVIST p.3, VFL/PGM p.4, PST p.5,
+      AUX/ATO p.6, ATO/CUT/QATG/FRZ p.7, FTB/VIS p.8, QVIS/VOS p.9, TRS/TIM
+      p.10, PIS/PPS p.11, PPW p.12, PIP/DSK p.13, DVW p.14, DSS p.15, KYL/KYG
+      p.16, SPS/SPT p.17, SPT/STO p.18, ROI p.19); AUDIO p.20-27 (AOS p.20,
+      IAL p.21, IAM/IAS p.22, ADT p.23, HPF/GATE p.24, STLK/VOCH p.25,
+      OAL/OAM p.26, RVB/ATM p.27); METER p.28-31; CONTROL p.32-38 (MEM/GPO/TLY
+      p.32-33, ASW/INSC/MEMSC/PPSC p.33, DSKSC/STRTY/STROA/SRTOSS/QSTRST/QSTRTM
+      p.34, SFIM/EXRC/APL p.35, Audio Player p.36-37, Video Player p.37,
+      SRT In and readiness checks p.38); CAMERA p.39-41; Macro, Sequencer,
+      Graphics Presenter p.42-43; SYSTEM and error replies p.44-45.
+  - title: "V-160HD Remote Control Guide, edition 06 (MIDI Implementation version 3.30, Apr. 11, 2025)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/V-160HD_Control_eng06_W.pdf
+    note: >
+      LAN interface (Telnet, TCP 8023, four-character network password) p.37;
+      command format (stx optional over LAN, ack, xon/xoff) p.37-38; DTH,
+      RQH, VER and ERR codes 0, 4, 5, 6 p.38; address map p.3-34 (Tally
+      Info 0C 00 00-33 and TALLY AUTO SEND 0C 01 00 p.32-33).
+  - title: "V-80HD Remote Control Guide, edition 01 (MIDI Implementation version 1.03, August 28, 2024)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/V-80HD_Control_eng01_W.pdf
+    note: >
+      LAN interface (TCP 8023, eight-character network password) p.35;
+      command list p.36: DTH answered stxACK;, RQH answered stxDTH:a,c;, VER,
+      ERR codes 0, 4, 5.
+  - title: "VR-120HD Remote Control Guide, edition 04 (MIDI Implementation version 2.00, September 4, 2024)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/VR-120HD_Control_eng04_W.pdf
+    note: LAN/RS-232 Command Reference p.46-47; four-character network password.
+  - title: "VR-6HD Remote Control Guide, edition 03 (MIDI Implementation version 2.00, Sep 27, 2024)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/VR-6HD_Control_eng03_W.pdf
+    note: LAN/RS-232 Command Reference p.34-35; four-character network password.
+  - title: "V-1-4K Remote Control Guide, edition 01 (MIDI Implementation version 1.00, April 9, 2026)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/V-1-4K_Remote_Control_eng01_W.pdf
+    note: LAN only (TCP 8023, eight-character network password), command list p.21-22.
+  - title: Roland V-80HD LAN Control Protocol (PROTOCOL.md, Bitfocus Companion module roland-v80hd, MIT)
+    author: Purple Badger Solutions
+    url: https://github.com/bitfocus/companion-module-roland-v80hd/blob/main/PROTOCOL.md
+    note: >
+      Community document, used for corroboration only and labelled as such in
+      the quirks: the unterminated "Enter password:" prompt and the effect of
+      answering it early, frames prefixed with STX/XON/XOFF, a query answered
+      as a value frame then ACK;, one command per TCP write, and no pushes to
+      a second control session. Bitfocus companion-module-roland-v160hd (MIT)
+      corroborates the prompt and the password line ending.
+
+transport:
+  type: line-tcp
+  port: 8023
+  framing: terminated
+  # Roland documents Telnet; a Telnet client ends each line with CR LF, which
+  # the V-80HD community document also uses. Commands carry their own ";".
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # A command's reply ends with ACK; or ERR:n; (p.2, p.45). The value frame a
+  # query returns before its ACK; is offered to the telemetry rules only, so
+  # it is never taken as the reply to the next command. GRCH, AMCH, SPCH,
+  # AUXCH, QSRTIST and QBSY are documented without an ACK (p.29-31, p.38,
+  # p.44): their frames are replies.
+  reply_match: 'ACK;|ERR:[0-9]+;|^[\x02\x11\x13]*(GRCH|AMCH|SPCH|QAUXCH|SRTIST|BSY):'
+  probe: "ACS;"
+
+settings:
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 8
+    pattern: '^([\x21-\x7e]{4,8})?$'
+
+# The network password answers the switcher's "Enter password:" prompt. See
+# the critical quirk: it is sent on connecting, without waiting for the
+# prompt. LAN control needs one set on the switcher, so in practice the
+# setting is never empty; it is optional here only so that a configuration
+# without it fails at the device (ERR:0) rather than in the catalogue.
+on_connect:
+  - when_set: password
+    after_prompt: "Enter password:"
+    send: "{settings.password}"
+    refused: "^(Authentication error|Wait a moment)"
+
+models:
+  - id: v-160hd
+    name: Roland V-160HD Streaming Video Switcher
+    supports:
+      - get_video_input_source
+      - get_video_input_status
+      - set_video_fader_level
+      - get_video_fader_level
+      - select_pgm
+      - get_pgm
+      - select_pst
+      - get_pst
+      - select_aux
+      - get_aux
+      - auto
+      - auto_to
+      - auto_to_with_time
+      - cut
+      - cut_to
+      - get_auto_transition
+      - toggle_freeze
+      - set_freeze
+      - get_freeze
+      - toggle_output_fade
+      - set_output_fade
+      - get_output_fade
+      - set_input_assign
+      - get_input_assign
+      - set_output_assign
+      - get_output_assign
+      - set_transition_type
+      - get_transition_type
+      - set_transition_time
+      - get_transition_time
+      - set_pinp_source
+      - get_pinp_source
+      - toggle_pinp_pgm
+      - set_pinp_pgm
+      - get_pinp_pgm
+      - toggle_pinp_pvw
+      - set_pinp_pvw
+      - get_pinp_pvw
+      - set_pinp_position
+      - get_pinp_position
+      - toggle_dsk_pgm
+      - set_dsk_pgm
+      - get_dsk_pgm
+      - toggle_dsk_pvw
+      - set_dsk_pvw
+      - get_dsk_pvw
+      - set_dsk_source
+      - get_dsk_source
+      - set_dsk_level
+      - get_dsk_level
+      - set_dsk_gain
+      - get_dsk_gain
+      - toggle_split
+      - set_split
+      - get_split
+      - set_split_centers
+      - set_split_positions
+      - get_split_positions
+      - set_still_output
+      - get_still_output
+      - set_audio_output_assign
+      - get_audio_output_assign
+      - set_input_level
+      - set_input_level_inf
+      - get_input_level
+      - toggle_input_mute
+      - set_input_mute
+      - get_input_mute
+      - toggle_input_solo
+      - set_input_solo
+      - get_input_solo
+      - set_input_delay
+      - get_input_delay
+      - set_high_pass_filter
+      - get_high_pass_filter
+      - set_gate
+      - get_gate
+      - toggle_stereo_link
+      - set_stereo_link
+      - get_stereo_link
+      - toggle_voice_changer
+      - set_voice_changer
+      - get_voice_changer
+      - set_output_level
+      - set_output_level_inf
+      - get_output_level
+      - set_output_mute
+      - get_output_mute
+      - toggle_reverb
+      - set_reverb
+      - get_reverb
+      - toggle_auto_mixing
+      - set_auto_mixing
+      - get_auto_mixing
+      - get_meter_levels
+      - get_meter_channel
+      - get_comp_gr_levels
+      - get_comp_gr_channel
+      - get_auto_mixing_levels
+      - get_auto_mixing_channel
+      - get_sig_peak_levels
+      - get_sig_peak_channel
+      - get_aux_levels
+      - get_aux_channel
+      - recall_memory
+      - get_memory
+      - pulse_gpo
+      - set_gpo
+      - get_gpo
+      - get_tally
+      - toggle_auto_switching
+      - set_auto_switching
+      - get_auto_switching
+      - input_scan
+      - memory_scan
+      - pinp_source_scan
+      - dsk_source_scan
+      - camera_pan_tilt
+      - set_camera_pan_tilt_speed
+      - get_camera_pan_tilt_speed
+      - camera_zoom
+      - camera_zoom_reset
+      - camera_focus
+      - set_camera_auto_focus
+      - get_camera_auto_focus
+      - set_camera_auto_exposure
+      - get_camera_auto_exposure
+      - camera_preset_recall
+      - get_camera_preset
+      - execute_macro
+      - get_macro_running
+      - set_sequencer
+      - get_sequencer
+      - set_auto_sequence
+      - get_auto_sequence
+      - sequencer_previous
+      - sequencer_back
+      - sequencer_next
+      - sequencer_jump
+      - sequencer_jump_start
+      - graphics_next
+      - graphics_select
+      - graphics_hide_front
+      - graphics_hide_background
+      - graphics_toggle_on_air
+      - active_sense
+      - get_version
+      - get_busy
+      - set_hdcp
+      - get_hdcp
+      - set_test_pattern
+      - get_test_pattern
+      - set_test_tone
+      - set_test_tone_frequency
+      - get_test_tone
+      - set_parameter
+      - get_parameter
+    verification: none
+    notes: >
+      Sources HDMI1-8, SDI1-8, STILL1-16, INPUT1-20; AUX1-3; PinP1-4; DSK1-2;
+      SPLIT1-2; MEMORY1-30; CAMERA1-16; network password of four characters.
+      Basic control commands from version 3.5 (see the version quirk). No Stream
+      & Record, Audio Player, Video Player or SRT commands, and no ROI.
+  - id: v-80hd
+    name: Roland V-80HD Streaming Video Switcher
+    supports:
+      - get_video_input_source
+      - get_video_input_status
+      - set_video_fader_level
+      - get_video_fader_level
+      - select_pgm
+      - get_pgm
+      - select_pst
+      - get_pst
+      - select_aux
+      - get_aux
+      - auto
+      - auto_to
+      - auto_to_with_time
+      - cut
+      - cut_to
+      - get_auto_transition
+      - toggle_freeze
+      - set_freeze
+      - get_freeze
+      - toggle_output_fade
+      - set_output_fade
+      - get_output_fade
+      - set_input_assign
+      - get_input_assign
+      - set_output_assign
+      - get_output_assign
+      - set_transition_type
+      - get_transition_type
+      - set_transition_time
+      - get_transition_time
+      - set_pinp_source
+      - get_pinp_source
+      - toggle_pinp_pgm
+      - set_pinp_pgm
+      - get_pinp_pgm
+      - toggle_pinp_pvw
+      - set_pinp_pvw
+      - get_pinp_pvw
+      - set_pinp_position
+      - get_pinp_position
+      - toggle_dsk_pgm
+      - set_dsk_pgm
+      - get_dsk_pgm
+      - toggle_dsk_pvw
+      - set_dsk_pvw
+      - get_dsk_pvw
+      - set_dsk_source
+      - get_dsk_source
+      - set_dsk_level
+      - get_dsk_level
+      - set_dsk_gain
+      - get_dsk_gain
+      - toggle_split
+      - set_split
+      - get_split
+      - set_split_centers
+      - set_split_positions
+      - get_split_positions
+      - set_still_output
+      - get_still_output
+      - set_audio_output_assign
+      - get_audio_output_assign
+      - set_input_level
+      - set_input_level_inf
+      - get_input_level
+      - toggle_input_mute
+      - set_input_mute
+      - get_input_mute
+      - toggle_input_solo
+      - set_input_solo
+      - get_input_solo
+      - set_input_delay
+      - get_input_delay
+      - set_high_pass_filter
+      - get_high_pass_filter
+      - set_gate
+      - get_gate
+      - toggle_stereo_link
+      - set_stereo_link
+      - get_stereo_link
+      - toggle_voice_changer
+      - set_voice_changer
+      - get_voice_changer
+      - set_output_level
+      - set_output_level_inf
+      - get_output_level
+      - set_output_mute
+      - get_output_mute
+      - toggle_reverb
+      - set_reverb
+      - get_reverb
+      - toggle_auto_mixing
+      - set_auto_mixing
+      - get_auto_mixing
+      - get_meter_levels
+      - get_meter_channel
+      - get_comp_gr_levels
+      - get_comp_gr_channel
+      - get_auto_mixing_levels
+      - get_auto_mixing_channel
+      - get_sig_peak_levels
+      - get_sig_peak_channel
+      - get_aux_levels
+      - get_aux_channel
+      - recall_memory
+      - get_memory
+      - pulse_gpo
+      - set_gpo
+      - get_gpo
+      - get_tally
+      - toggle_auto_switching
+      - set_auto_switching
+      - get_auto_switching
+      - input_scan
+      - memory_scan
+      - pinp_source_scan
+      - dsk_source_scan
+      - set_stream_record_type
+      - get_stream_record_type
+      - stream_record
+      - srt_out
+      - get_stream_record_status
+      - get_stream_record_time
+      - set_safety_image
+      - get_safety_image
+      - set_external_rec_control
+      - get_external_rec_control
+      - audio_player
+      - get_audio_player_status
+      - get_audio_player_import
+      - get_audio_player_length
+      - get_audio_player_time
+      - set_audio_player_repeat
+      - get_audio_player_repeat
+      - set_playback_type
+      - get_playback_type
+      - video_player
+      - get_video_player_status
+      - get_video_player_import
+      - get_video_player_length
+      - get_video_player_time
+      - srt_in
+      - get_srt_in_status
+      - check_stream_record_ready
+      - check_video_player_ready
+      - check_srt_in_ready
+      - camera_pan_tilt
+      - set_camera_pan_tilt_speed
+      - get_camera_pan_tilt_speed
+      - camera_zoom
+      - camera_zoom_reset
+      - camera_focus
+      - set_camera_auto_focus
+      - get_camera_auto_focus
+      - set_camera_auto_exposure
+      - get_camera_auto_exposure
+      - camera_preset_recall
+      - get_camera_preset
+      - execute_macro
+      - get_macro_running
+      - set_sequencer
+      - get_sequencer
+      - set_auto_sequence
+      - get_auto_sequence
+      - sequencer_previous
+      - sequencer_back
+      - sequencer_next
+      - sequencer_jump
+      - sequencer_jump_start
+      - graphics_next
+      - graphics_select
+      - graphics_hide_front
+      - graphics_hide_background
+      - graphics_toggle_on_air
+      - active_sense
+      - get_version
+      - get_busy
+      - set_hdcp
+      - get_hdcp
+      - set_test_pattern
+      - get_test_pattern
+      - set_test_tone
+      - set_test_tone_frequency
+      - get_test_tone
+      - set_parameter
+      - get_parameter
+    verification: none
+    notes: >
+      Sources HDMI1-4, SDI1-4, STILL1-32, V.PLAYER, SRT, INPUT1-16; AUX1-2;
+      PinP1-2; DSK1; SPLIT1-2; MEMORY1-32; CAMERA1-8; Audio Player pads A-1 to
+      H-8; network password of eight characters (Remote Control Guide p.35).
+  - id: vr-120hd
+    name: Roland VR-120HD Direct Streaming AV Mixer
+    supports:
+      - get_video_input_source
+      - get_video_input_status
+      - set_video_fader_level
+      - get_video_fader_level
+      - select_pgm
+      - get_pgm
+      - select_pst
+      - get_pst
+      - select_aux
+      - get_aux
+      - auto
+      - auto_to
+      - auto_to_with_time
+      - cut
+      - cut_to
+      - get_auto_transition
+      - toggle_freeze
+      - set_freeze
+      - get_freeze
+      - toggle_output_fade
+      - set_output_fade
+      - get_output_fade
+      - set_input_assign
+      - get_input_assign
+      - set_output_assign
+      - get_output_assign
+      - set_transition_type
+      - get_transition_type
+      - set_transition_time
+      - get_transition_time
+      - set_pinp_source
+      - get_pinp_source
+      - toggle_pinp_pgm
+      - set_pinp_pgm
+      - get_pinp_pgm
+      - toggle_pinp_pvw
+      - set_pinp_pvw
+      - get_pinp_pvw
+      - set_pinp_position
+      - get_pinp_position
+      - toggle_dsk_pgm
+      - set_dsk_pgm
+      - get_dsk_pgm
+      - toggle_dsk_pvw
+      - set_dsk_pvw
+      - get_dsk_pvw
+      - set_dsk_source
+      - get_dsk_source
+      - set_dsk_level
+      - get_dsk_level
+      - set_dsk_gain
+      - get_dsk_gain
+      - toggle_split
+      - set_split
+      - get_split
+      - set_split_centers
+      - set_split_positions
+      - get_split_positions
+      - set_still_output
+      - get_still_output
+      - set_audio_output_assign
+      - get_audio_output_assign
+      - set_input_level
+      - set_input_level_inf
+      - get_input_level
+      - toggle_input_mute
+      - set_input_mute
+      - get_input_mute
+      - toggle_input_solo
+      - set_input_solo
+      - get_input_solo
+      - set_input_delay
+      - get_input_delay
+      - set_high_pass_filter
+      - get_high_pass_filter
+      - set_gate
+      - get_gate
+      - toggle_stereo_link
+      - set_stereo_link
+      - get_stereo_link
+      - toggle_voice_changer
+      - set_voice_changer
+      - get_voice_changer
+      - set_output_level
+      - set_output_level_inf
+      - get_output_level
+      - set_output_mute
+      - get_output_mute
+      - toggle_reverb
+      - set_reverb
+      - get_reverb
+      - toggle_auto_mixing
+      - set_auto_mixing
+      - get_auto_mixing
+      - get_meter_levels
+      - get_meter_channel
+      - get_comp_gr_levels
+      - get_comp_gr_channel
+      - get_auto_mixing_levels
+      - get_auto_mixing_channel
+      - get_sig_peak_levels
+      - get_sig_peak_channel
+      - get_aux_levels
+      - get_aux_channel
+      - recall_memory
+      - get_memory
+      - pulse_gpo
+      - set_gpo
+      - get_gpo
+      - get_tally
+      - toggle_auto_switching
+      - set_auto_switching
+      - get_auto_switching
+      - input_scan
+      - memory_scan
+      - pinp_source_scan
+      - dsk_source_scan
+      - set_stream_record_type
+      - get_stream_record_type
+      - stream_record
+      - srt_out
+      - get_stream_record_status
+      - get_stream_record_time
+      - set_safety_image
+      - get_safety_image
+      - set_external_rec_control
+      - get_external_rec_control
+      - audio_player
+      - get_audio_player_status
+      - get_audio_player_import
+      - get_audio_player_length
+      - get_audio_player_time
+      - set_audio_player_repeat
+      - get_audio_player_repeat
+      - set_playback_type
+      - get_playback_type
+      - video_player
+      - get_video_player_status
+      - get_video_player_import
+      - get_video_player_length
+      - get_video_player_time
+      - srt_in
+      - get_srt_in_status
+      - check_stream_record_ready
+      - check_video_player_ready
+      - check_srt_in_ready
+      - camera_pan_tilt
+      - set_camera_pan_tilt_speed
+      - get_camera_pan_tilt_speed
+      - camera_zoom
+      - camera_zoom_reset
+      - camera_focus
+      - set_camera_auto_focus
+      - get_camera_auto_focus
+      - set_camera_auto_exposure
+      - get_camera_auto_exposure
+      - camera_preset_recall
+      - get_camera_preset
+      - execute_macro
+      - get_macro_running
+      - set_sequencer
+      - get_sequencer
+      - set_auto_sequence
+      - get_auto_sequence
+      - sequencer_previous
+      - sequencer_back
+      - sequencer_next
+      - sequencer_jump
+      - sequencer_jump_start
+      - graphics_next
+      - graphics_select
+      - graphics_hide_front
+      - graphics_hide_background
+      - graphics_toggle_on_air
+      - active_sense
+      - get_version
+      - get_busy
+      - set_hdcp
+      - get_hdcp
+      - set_test_pattern
+      - get_test_pattern
+      - set_test_tone
+      - set_test_tone_frequency
+      - get_test_tone
+      - set_parameter
+      - get_parameter
+    verification: none
+    notes: >
+      Sources HDMI1-6, SDI1-6, STILL1-16, V.PLAYER, SRT, INPUT1-8; AUX1-3;
+      PinP1-4; DSK1-2; SPLIT1-2; MEMORY1-32; CAMERA1-12; XLR1-6; Audio Player
+      pads A-1 to B-8; network password of four characters.
+  - id: vr-6hd
+    name: Roland VR-6HD Direct Streaming AV Mixer
+    supports:
+      - get_video_input_source
+      - get_video_input_status
+      - set_video_fader_level
+      - get_video_fader_level
+      - select_pgm
+      - get_pgm
+      - select_pst
+      - get_pst
+      - select_aux
+      - get_aux
+      - auto
+      - auto_to
+      - auto_to_with_time
+      - cut
+      - cut_to
+      - get_auto_transition
+      - toggle_freeze
+      - set_freeze
+      - get_freeze
+      - toggle_output_fade
+      - set_output_fade
+      - get_output_fade
+      - set_input_assign
+      - get_input_assign
+      - set_output_assign
+      - get_output_assign
+      - set_transition_type
+      - get_transition_type
+      - set_transition_time
+      - get_transition_time
+      - set_pinp_source
+      - get_pinp_source
+      - toggle_pinp_pgm
+      - set_pinp_pgm
+      - get_pinp_pgm
+      - toggle_pinp_pvw
+      - set_pinp_pvw
+      - get_pinp_pvw
+      - set_pinp_position
+      - get_pinp_position
+      - toggle_dsk_pgm
+      - set_dsk_pgm
+      - get_dsk_pgm
+      - toggle_dsk_pvw
+      - set_dsk_pvw
+      - get_dsk_pvw
+      - set_dsk_source
+      - get_dsk_source
+      - set_dsk_level
+      - get_dsk_level
+      - set_dsk_gain
+      - get_dsk_gain
+      - toggle_split
+      - set_split
+      - get_split
+      - set_split_centers
+      - set_split_positions
+      - get_split_positions
+      - set_still_output
+      - get_still_output
+      - set_audio_output_assign
+      - get_audio_output_assign
+      - set_input_level
+      - set_input_level_inf
+      - get_input_level
+      - toggle_input_mute
+      - set_input_mute
+      - get_input_mute
+      - toggle_input_solo
+      - set_input_solo
+      - get_input_solo
+      - set_input_delay
+      - get_input_delay
+      - set_high_pass_filter
+      - get_high_pass_filter
+      - set_gate
+      - get_gate
+      - toggle_stereo_link
+      - set_stereo_link
+      - get_stereo_link
+      - toggle_voice_changer
+      - set_voice_changer
+      - get_voice_changer
+      - set_output_level
+      - set_output_level_inf
+      - get_output_level
+      - set_output_mute
+      - get_output_mute
+      - toggle_reverb
+      - set_reverb
+      - get_reverb
+      - toggle_auto_mixing
+      - set_auto_mixing
+      - get_auto_mixing
+      - get_meter_levels
+      - get_meter_channel
+      - get_comp_gr_levels
+      - get_comp_gr_channel
+      - get_auto_mixing_levels
+      - get_auto_mixing_channel
+      - get_sig_peak_levels
+      - get_sig_peak_channel
+      - get_aux_levels
+      - get_aux_channel
+      - recall_memory
+      - get_memory
+      - pulse_gpo
+      - set_gpo
+      - get_gpo
+      - get_tally
+      - toggle_auto_switching
+      - set_auto_switching
+      - get_auto_switching
+      - input_scan
+      - memory_scan
+      - pinp_source_scan
+      - dsk_source_scan
+      - set_stream_record_type
+      - get_stream_record_type
+      - stream_record
+      - srt_out
+      - get_stream_record_status
+      - get_stream_record_time
+      - set_safety_image
+      - get_safety_image
+      - set_external_rec_control
+      - get_external_rec_control
+      - audio_player
+      - get_audio_player_status
+      - get_audio_player_import
+      - get_audio_player_length
+      - get_audio_player_time
+      - set_audio_player_repeat
+      - get_audio_player_repeat
+      - set_playback_type
+      - get_playback_type
+      - video_player
+      - get_video_player_status
+      - get_video_player_import
+      - get_video_player_length
+      - get_video_player_time
+      - srt_in
+      - get_srt_in_status
+      - check_stream_record_ready
+      - check_video_player_ready
+      - check_srt_in_ready
+      - camera_pan_tilt
+      - set_camera_pan_tilt_speed
+      - get_camera_pan_tilt_speed
+      - camera_zoom
+      - camera_zoom_reset
+      - camera_focus
+      - set_camera_auto_focus
+      - get_camera_auto_focus
+      - set_camera_auto_exposure
+      - get_camera_auto_exposure
+      - camera_preset_recall
+      - get_camera_preset
+      - execute_macro
+      - get_macro_running
+      - set_sequencer
+      - get_sequencer
+      - set_auto_sequence
+      - get_auto_sequence
+      - sequencer_previous
+      - sequencer_back
+      - sequencer_next
+      - sequencer_jump
+      - sequencer_jump_start
+      - graphics_next
+      - graphics_select
+      - graphics_hide_front
+      - graphics_hide_background
+      - graphics_toggle_on_air
+      - active_sense
+      - get_version
+      - get_busy
+      - set_hdcp
+      - get_hdcp
+      - set_test_pattern
+      - get_test_pattern
+      - set_test_tone
+      - set_test_tone_frequency
+      - get_test_tone
+      - set_parameter
+      - get_parameter
+    verification: none
+    notes: >
+      Sources HDMI1-6, STILL1-16, V.PLAYER, SRT, INPUT1-6; AUX1; PinP1-2; DSK1;
+      SPLIT1; MEMORY1-32; CAMERA1-6; XLR1-6; Audio Player pads A-1 to B-6;
+      network password of four characters. No SDI.
+  - id: v-1-4k
+    name: Roland V-1-4K 4K Video Switcher
+    supports:
+      - get_video_input_source
+      - get_video_input_status
+      - set_video_fader_level
+      - get_video_fader_level
+      - select_pgm
+      - get_pgm
+      - select_pst
+      - get_pst
+      - auto
+      - auto_to
+      - auto_to_with_time
+      - cut
+      - cut_to
+      - get_auto_transition
+      - toggle_output_fade
+      - set_output_fade
+      - get_output_fade
+      - set_input_assign
+      - get_input_assign
+      - set_output_assign
+      - get_output_assign
+      - set_transition_type
+      - get_transition_type
+      - set_transition_time
+      - get_transition_time
+      - toggle_pinp_pgm
+      - set_pinp_pgm
+      - get_pinp_pgm
+      - toggle_pinp_pvw
+      - set_pinp_pvw
+      - get_pinp_pvw
+      - set_pinp_position
+      - get_pinp_position
+      - toggle_dsk_pgm
+      - set_dsk_pgm
+      - get_dsk_pgm
+      - toggle_dsk_pvw
+      - set_dsk_pvw
+      - get_dsk_pvw
+      - set_dsk_source
+      - get_dsk_source
+      - set_dsk_level
+      - get_dsk_level
+      - set_dsk_gain
+      - get_dsk_gain
+      - toggle_split
+      - set_split
+      - get_split
+      - set_split_centers
+      - set_split_positions
+      - get_split_positions
+      - set_roi_mode
+      - get_roi_mode
+      - set_roi_zoom
+      - get_roi_zoom
+      - set_roi_position
+      - get_roi_position
+      - set_audio_output_assign
+      - get_audio_output_assign
+      - set_input_level
+      - set_input_level_inf
+      - get_input_level
+      - toggle_input_mute
+      - set_input_mute
+      - get_input_mute
+      - toggle_input_solo
+      - set_input_solo
+      - get_input_solo
+      - set_input_delay
+      - get_input_delay
+      - set_high_pass_filter
+      - get_high_pass_filter
+      - set_gate
+      - get_gate
+      - set_output_level
+      - set_output_level_inf
+      - get_output_level
+      - set_output_mute
+      - get_output_mute
+      - toggle_auto_mixing
+      - set_auto_mixing
+      - get_auto_mixing
+      - get_meter_levels
+      - get_meter_channel
+      - get_comp_gr_levels
+      - get_comp_gr_channel
+      - get_auto_mixing_levels
+      - get_auto_mixing_channel
+      - get_sig_peak_levels
+      - get_sig_peak_channel
+      - get_aux_levels
+      - get_aux_channel
+      - recall_memory
+      - get_memory
+      - get_tally
+      - toggle_auto_switching
+      - set_auto_switching
+      - get_auto_switching
+      - input_scan
+      - camera_pan_tilt
+      - set_camera_pan_tilt_speed
+      - get_camera_pan_tilt_speed
+      - camera_zoom
+      - camera_zoom_reset
+      - camera_focus
+      - set_camera_auto_focus
+      - get_camera_auto_focus
+      - set_camera_auto_exposure
+      - get_camera_auto_exposure
+      - camera_preset_recall
+      - get_camera_preset
+      - graphics_next
+      - graphics_select
+      - graphics_hide_front
+      - graphics_hide_background
+      - graphics_toggle_on_air
+      - active_sense
+      - get_version
+      - get_busy
+      - set_hdcp
+      - get_hdcp
+      - set_test_pattern
+      - get_test_pattern
+      - set_test_tone
+      - set_test_tone_frequency
+      - get_test_tone
+      - set_parameter
+      - get_parameter
+    verification: none
+    notes: >
+      Sources HDMI1-5, STILL1-2, INPUT1-8; PinP1; DSK1; SPLIT1; MEMORY1-8;
+      CAMERA1-5; ROI1-4. LAN only (no RS-232 on this model, Remote Control
+      Guide p.21); network password of eight characters. No AUX, freeze, still
+      output, stereo link, voice changer, reverb, GPO, macro or sequencer
+      commands.
+
+commands:
+  # ── VIDEO (Basic Control Commands p.3-19)
+  get_video_input_source:
+    summary: "Name of the source at a video input index (QVISRC); index ranges: V-160HD 0-51, V-80HD 0-56, VR-120HD 0-36, VR-6HD 0-28, V-1-4K 0-15"
+    params:
+      index: { type: "int", min: 0, max: 56, required: true }
+    send: "QVISRC:{index};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_video_input_status:
+    summary: "Signal status of a physical video input: NOSIGNAL, DETECTED or UNSUPPORTED (QVIST)"
+    params:
+      input: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8"], required: true }
+    send: "QVIST:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_video_fader_level:
+    summary: "Set the video fader (A/B) level: 0-2047 (V-160HD, V-80HD, VR-120HD, VR-6HD), 0-4095 (V-1-4K) (VFL)"
+    params:
+      level: { type: "int", min: 0, max: 4095, required: true }
+    send: "VFL:{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_video_fader_level:
+    summary: "Video fader level (QVFL)"
+    send: "QVFL;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  select_pgm:
+    summary: "Select the PGM (program) video channel (PGM)"
+    params:
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+    send: "PGM:{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_pgm:
+    summary: "PGM channel, and the INPUT it is selected as when it is one (QPGM)"
+    send: "QPGM;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  select_pst:
+    summary: "Select the PST (preset/preview) video channel (PST)"
+    params:
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+    send: "PST:{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_pst:
+    summary: "PST channel, and the INPUT it is selected as when it is one (QPST)"
+    send: "QPST;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  select_aux:
+    summary: "Select the channel sent to an AUX bus; PGMLINK only with AUX Linked PGM enabled (AUX)"
+    params:
+      aux: { type: "int", min: 1, max: 3, required: true }
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20", "PGMLINK"], required: true }
+    send: "AUX:AUX{aux},{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_aux:
+    summary: "Channel sent to an AUX bus (QAUX)"
+    params:
+      aux: { type: "int", min: 1, max: 3, required: true }
+    send: "QAUX:AUX{aux};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  auto:
+    summary: "Auto-switch PST to PGM with the set transition time; only while SPLIT is off (ATO)"
+    send: "ATO;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  auto_to:
+    summary: "Auto-switch to the given channel; only while SPLIT is off (ATO:a)"
+    params:
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+    send: "ATO:{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  auto_to_with_time:
+    summary: "Auto-switch to the given channel over 0.0-4.0 s in tenths, or -1 for the set Transition Time (ATO:a,b)"
+    params:
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+      time: { type: "int", min: -1, max: 40, required: true }
+    send: "ATO:{source},{time};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  cut:
+    summary: "Cut PST to PGM; only while SPLIT is off (CUT)"
+    send: "CUT;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  cut_to:
+    summary: "Cut to the given channel; only while SPLIT is off (CUT:a)"
+    params:
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+    send: "CUT:{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_auto_transition:
+    summary: "Whether an auto transition is in progress (QATG)"
+    send: "QATG;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_freeze:
+    summary: "Toggle freeze (FRZ)"
+    send: "FRZ;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_freeze:
+    summary: "Set freeze on or off (FRZ:a)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "FRZ:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_freeze:
+    summary: "Freeze status (QFRZ)"
+    send: "QFRZ;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_output_fade:
+    summary: "Toggle output fade (fade to black) (FTB)"
+    send: "FTB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_fade:
+    summary: "Set output fade on or off (FTB:a)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "FTB:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_output_fade:
+    summary: "Output fade status: OFF, ON, FADEIN or FADEOUT (QFTB)"
+    send: "QFTB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_assign:
+    summary: "Assign a source to an INPUT channel; N/A clears it (VIS)"
+    params:
+      input: { type: "int", min: 1, max: 20, required: true }
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "STATUS1", "STATUS2", "TIME", "HDMI", "BLACK", "N/A"], required: true }
+    send: "VIS:INPUT{input},{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_input_assign:
+    summary: "Source assigned to an INPUT channel (QVIS)"
+    params:
+      input: { type: "int", min: 1, max: 20, required: true }
+    send: "QVIS:INPUT{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_assign:
+    summary: "Assign a video bus or view to a video output (VOS)"
+    params:
+      output: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "SDI1", "SDI2", "SDI3", "USB", "STREAM", "LCD"], required: true }
+      bus: { type: "enum", values: ["PGM", "SUB", "PVW", "AUX1", "AUX2", "AUX3", "DSK1", "DSK2", "MULTIVIEW", "INPUTVIEW1", "INPUTVIEW2", "STILLVIEW", "QUADVIEW", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8"], required: true }
+    send: "VOS:{output},{bus};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_output_assign:
+    summary: "Video bus assigned to a video output (QVOS)"
+    params:
+      output: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "SDI1", "SDI2", "SDI3", "USB", "STREAM", "LCD"], required: true }
+    send: "QVOS:{output};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_transition_type:
+    summary: "Set the transition type, MIX or WIPE (TRS)"
+    params:
+      type: { type: "enum", values: ["MIX", "WIPE"], required: true }
+    send: "TRS:{type};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_transition_type:
+    summary: "Transition type (QTRS)"
+    send: "QTRS;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set a transition time, 0-40 tenths of a second (TIM)"
+    params:
+      target: { type: "enum", values: ["MIX", "WIPE", "PinP1", "PinP2", "PinP3", "PinP4", "DSK1", "DSK2", "DSK", "OUTPUTFADE"], required: true }
+      time: { type: "int", min: 0, max: 40, required: true }
+    send: "TIM:{target},{time};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_transition_time:
+    summary: "A transition time in tenths of a second (QTIM)"
+    params:
+      target: { type: "enum", values: ["MIX", "WIPE", "PinP1", "PinP2", "PinP3", "PinP4", "DSK1", "DSK2", "DSK", "OUTPUTFADE"], required: true }
+    send: "QTIM:{target};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_pinp_source:
+    summary: "Set the source of a PinP & KEY layer (PIS)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+    send: "PIS:PinP{pinp},{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_pinp_source:
+    summary: "Source of a PinP & KEY layer (QPIS)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+    send: "QPIS:PinP{pinp};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_pinp_pgm:
+    summary: "Toggle a PinP & KEY layer on PGM (PPS:a)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+    send: "PPS:PinP{pinp};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_pinp_pgm:
+    summary: "Set a PinP & KEY layer on PGM on or off (PPS:a,b)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+      enabled: { type: "bool", required: true }
+    send: "PPS:PinP{pinp},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_pinp_pgm:
+    summary: "Whether a PinP & KEY layer is on PGM (QPPS)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+    send: "QPPS:PinP{pinp};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_pinp_pvw:
+    summary: "Toggle a PinP & KEY layer on PVW (PPW:a)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+    send: "PPW:PinP{pinp};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_pinp_pvw:
+    summary: "Set a PinP & KEY layer on PVW on or off (PPW:a,b)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+      enabled: { type: "bool", required: true }
+    send: "PPW:PinP{pinp},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_pinp_pvw:
+    summary: "Whether a PinP & KEY layer is on PVW (QPPW)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+    send: "QPPW:PinP{pinp};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_pinp_position:
+    summary: "Set a PinP window position, H and V -500 to 500 (-50.0 to 50.0 %) (PIP)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+      h: { type: "int", min: -500, max: 500, required: true }
+      v: { type: "int", min: -500, max: 500, required: true }
+    send: "PIP:PinP{pinp},{h},{v};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_pinp_position:
+    summary: "PinP window position H/V (QPIP)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+    send: "QPIP:PinP{pinp};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_dsk_pgm:
+    summary: "Toggle a DSK on PGM (DSK:a)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "DSK:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_dsk_pgm:
+    summary: "Set a DSK on PGM on or off (DSK:a,b)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+      enabled: { type: "bool", required: true }
+    send: "DSK:DSK{dsk},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_dsk_pgm:
+    summary: "Whether a DSK is on PGM (QDSK)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "QDSK:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_dsk_pvw:
+    summary: "Toggle a DSK on PVW (DVW:a)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "DVW:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_dsk_pvw:
+    summary: "Set a DSK on PVW on or off (DVW:a,b)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+      enabled: { type: "bool", required: true }
+    send: "DVW:DSK{dsk},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_dsk_pvw:
+    summary: "Whether a DSK is on PVW (QDVW)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "QDVW:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_dsk_source:
+    summary: "Set a DSK fill source (DSS)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+      source: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT", "INPUT1", "INPUT2", "INPUT3", "INPUT4", "INPUT5", "INPUT6", "INPUT7", "INPUT8", "INPUT9", "INPUT10", "INPUT11", "INPUT12", "INPUT13", "INPUT14", "INPUT15", "INPUT16", "INPUT17", "INPUT18", "INPUT19", "INPUT20"], required: true }
+    send: "DSS:DSK{dsk},{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_dsk_source:
+    summary: "DSK fill source, and the INPUT it is selected as (QDSS)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "QDSS:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_dsk_level:
+    summary: "Set a DSK key level, 0-255 (KYL)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+      level: { type: "int", min: 0, max: 255, required: true }
+    send: "KYL:DSK{dsk},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_dsk_level:
+    summary: "DSK key level (QKYL)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "QKYL:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_dsk_gain:
+    summary: "Set a DSK key gain, 0-255 (KYG)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+      gain: { type: "int", min: 0, max: 255, required: true }
+    send: "KYG:DSK{dsk},{gain};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_dsk_gain:
+    summary: "DSK key gain (QKYG)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+    send: "QKYG:DSK{dsk};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_split:
+    summary: "Toggle a SPLIT (SPS:a)"
+    params:
+      split: { type: "int", min: 1, max: 2, required: true }
+    send: "SPS:SPLIT{split};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_split:
+    summary: "Set a SPLIT on or off (SPS:a,b)"
+    params:
+      split: { type: "int", min: 1, max: 2, required: true }
+      enabled: { type: "bool", required: true }
+    send: "SPS:SPLIT{split},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_split:
+    summary: "Whether a SPLIT is on (QSPS)"
+    params:
+      split: { type: "int", min: 1, max: 2, required: true }
+    send: "QSPS:SPLIT{split};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_split_centers:
+    summary: "Set SPLIT PGM/A-Center and PST/B-Center, -500 to 500 (-50.0 to 50.0 %) (SPT:a,b,c)"
+    params:
+      split: { type: "int", min: 1, max: 2, required: true }
+      a_center: { type: "int", min: -500, max: 500, required: true }
+      b_center: { type: "int", min: -500, max: 500, required: true }
+    send: "SPT:SPLIT{split},{a_center},{b_center};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_split_positions:
+    summary: "Set SPLIT PGM/A-Center, PST/B-Center and Center Position, -500 to 500 (SPT:a,b,c,d)"
+    params:
+      split: { type: "int", min: 1, max: 2, required: true }
+      a_center: { type: "int", min: -500, max: 500, required: true }
+      b_center: { type: "int", min: -500, max: 500, required: true }
+      center: { type: "int", min: -500, max: 500, required: true }
+    send: "SPT:SPLIT{split},{a_center},{b_center},{center};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_split_positions:
+    summary: "SPLIT centers and center position (QSPT)"
+    params:
+      split: { type: "int", min: 1, max: 2, required: true }
+    send: "QSPT:SPLIT{split};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_still_output:
+    summary: "Set the STILL IMAGE OUTPUT source, or OFF (STO)"
+    params:
+      source: { type: "enum", values: ["OFF", "STILL1", "STILL2", "STILL3", "STILL4", "STILL5", "STILL6", "STILL7", "STILL8", "STILL9", "STILL10", "STILL11", "STILL12", "STILL13", "STILL14", "STILL15", "STILL16", "STILL17", "STILL18", "STILL19", "STILL20", "STILL21", "STILL22", "STILL23", "STILL24", "STILL25", "STILL26", "STILL27", "STILL28", "STILL29", "STILL30", "STILL31", "STILL32", "V.PLAYER", "SRT"], required: true }
+    send: "STO:{source};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_still_output:
+    summary: "STILL IMAGE OUTPUT source (QSTO)"
+    send: "QSTO;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_roi_mode:
+    summary: "Set ROI mode on or off (ROISW)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "ROISW:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_roi_mode:
+    summary: "ROI mode status (QROISW)"
+    send: "QROISW;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_roi_zoom:
+    summary: "Set an ROI zoom, 1000-4000 (100.0-400.0 %) (ROIZM)"
+    params:
+      roi: { type: "int", min: 1, max: 4, required: true }
+      zoom: { type: "int", min: 1000, max: 4000, required: true }
+    send: "ROIZM:ROI{roi},{zoom};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_roi_zoom:
+    summary: "ROI zoom (QROIZM)"
+    params:
+      roi: { type: "int", min: 1, max: 4, required: true }
+    send: "QROIZM:ROI{roi};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_roi_position:
+    summary: "Set an ROI position, H -1920 to 1920 and V -1080 to 1080 (ROIPT)"
+    params:
+      roi: { type: "int", min: 1, max: 4, required: true }
+      h: { type: "int", min: -1920, max: 1920, required: true }
+      v: { type: "int", min: -1080, max: 1080, required: true }
+    send: "ROIPT:ROI{roi},{h},{v};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_roi_position:
+    summary: "ROI position H/V (QROIPT)"
+    params:
+      roi: { type: "int", min: 1, max: 4, required: true }
+    send: "QROIPT:ROI{roi};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  # ── AUDIO (Basic Control Commands p.20-27)
+  set_audio_output_assign:
+    summary: "Assign an audio bus to an audio output (AOS); which buses an output takes depends on the model (p.20)"
+    params:
+      output: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "SDI1", "SDI2", "SDI3", "XLR1", "XLR2", "RCA1", "USB", "STREAM", "REC", "PHONES"], required: true }
+      bus: { type: "enum", values: ["AUTO", "MAIN", "AUX1", "AUX2", "AUX3", "MONITOR"], required: true }
+    send: "AOS:{output},{bus};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_audio_output_assign:
+    summary: "Audio bus assigned to an audio output (QAOS)"
+    params:
+      output: { type: "enum", values: ["HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "SDI1", "SDI2", "SDI3", "XLR1", "XLR2", "RCA1", "USB", "STREAM", "REC", "PHONES"], required: true }
+    send: "QAOS:{output};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_level:
+    summary: "Set an audio input level, -800 to 100 (-80.0 to 10.0 dB) (IAL)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+      level: { type: "int", min: -800, max: 100, required: true }
+    send: "IAL:{input},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_level_inf:
+    summary: "Set an audio input level to -INF (IAL:a,-INF)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "IAL:{input},-INF;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_input_level:
+    summary: "Audio input level (QIAL)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "QIAL:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_input_mute:
+    summary: "Toggle an audio input mute (IAM:a)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "IAM:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_mute:
+    summary: "Set an audio input mute on or off (IAM:a,b)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+      enabled: { type: "bool", required: true }
+    send: "IAM:{input},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_input_mute:
+    summary: "Audio input mute status (QIAM)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "QIAM:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_input_solo:
+    summary: "Toggle an audio input solo (IAS:a)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "IAS:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_solo:
+    summary: "Set an audio input solo on or off (IAS:a,b)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+      enabled: { type: "bool", required: true }
+    send: "IAS:{input},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_input_solo:
+    summary: "Audio input solo status (QIAS)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "QIAS:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_input_delay:
+    summary: "Set an audio input delay, 0-5000 (0.0-500.0 ms) (ADT)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+      delay: { type: "int", min: 0, max: 5000, required: true }
+    send: "ADT:{input},{delay};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_input_delay:
+    summary: "Audio input delay (QADT)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "QADT:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_high_pass_filter:
+    summary: "Set an audio input high-pass filter on or off (HPF)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+      enabled: { type: "bool", required: true }
+    send: "HPF:{input},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_high_pass_filter:
+    summary: "Audio input high-pass filter status (QHPF)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "QHPF:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_gate:
+    summary: "Set an audio input noise gate on or off (GATE)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+      enabled: { type: "bool", required: true }
+    send: "GATE:{input},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_gate:
+    summary: "Audio input noise gate status (QGATE)"
+    params:
+      input: { type: "enum", values: ["XLR1", "XLR2", "XLR3", "XLR4", "XLR5", "XLR6", "RCA1", "RCA2", "USB", "BLUETOOTH", "A.PLAYER", "HDMI1", "HDMI2", "HDMI3", "HDMI4", "HDMI5", "HDMI6", "HDMI7", "HDMI8", "SDI1", "SDI2", "SDI3", "SDI4", "SDI5", "SDI6", "SDI7", "SDI8", "V.PLAYER", "SRT"], required: true }
+    send: "QGATE:{input};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_stereo_link:
+    summary: "Toggle stereo link of an XLR input (STLK:a)"
+    params:
+      xlr: { type: "int", min: 1, max: 6, required: true }
+    send: "STLK:XLR{xlr};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_stereo_link:
+    summary: "Set stereo link of an XLR input on or off (STLK:a,b)"
+    params:
+      xlr: { type: "int", min: 1, max: 6, required: true }
+      enabled: { type: "bool", required: true }
+    send: "STLK:XLR{xlr},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_stereo_link:
+    summary: "Stereo link status of an XLR input (QSTLK)"
+    params:
+      xlr: { type: "int", min: 1, max: 6, required: true }
+    send: "QSTLK:XLR{xlr};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_voice_changer:
+    summary: "Toggle the voice changer of XLR1 or XLR2 (VOCH:a)"
+    params:
+      xlr: { type: "int", min: 1, max: 2, required: true }
+    send: "VOCH:XLR{xlr};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_voice_changer:
+    summary: "Set the voice changer of XLR1 or XLR2 on or off (VOCH:a,b)"
+    params:
+      xlr: { type: "int", min: 1, max: 2, required: true }
+      enabled: { type: "bool", required: true }
+    send: "VOCH:XLR{xlr},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_voice_changer:
+    summary: "Voice changer status (QVOCH)"
+    params:
+      xlr: { type: "int", min: 1, max: 2, required: true }
+    send: "QVOCH:XLR{xlr};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_level:
+    summary: "Set an audio output level, -800 to 100 (-80.0 to 10.0 dB) (OAL)"
+    params:
+      output: { type: "enum", values: ["MAIN", "AUX1", "AUX2", "AUX3", "USB", "STREAM", "REC"], required: true }
+      level: { type: "int", min: -800, max: 100, required: true }
+    send: "OAL:{output},{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_level_inf:
+    summary: "Set an audio output level to -INF (OAL:a,-INF)"
+    params:
+      output: { type: "enum", values: ["MAIN", "AUX1", "AUX2", "AUX3", "USB", "STREAM", "REC"], required: true }
+    send: "OAL:{output},-INF;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_output_level:
+    summary: "Audio output level (QOAL)"
+    params:
+      output: { type: "enum", values: ["MAIN", "AUX1", "AUX2", "AUX3", "USB", "STREAM", "REC"], required: true }
+    send: "QOAL:{output};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_output_mute:
+    summary: "Set an audio output mute on or off (OAM)"
+    params:
+      output: { type: "enum", values: ["MAIN", "AUX1", "AUX2", "AUX3", "USB", "STREAM", "REC"], required: true }
+      enabled: { type: "bool", required: true }
+    send: "OAM:{output},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_output_mute:
+    summary: "Audio output mute status (QOAM)"
+    params:
+      output: { type: "enum", values: ["MAIN", "AUX1", "AUX2", "AUX3", "USB", "STREAM", "REC"], required: true }
+    send: "QOAM:{output};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_reverb:
+    summary: "Toggle reverb (RVB)"
+    send: "RVB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_reverb:
+    summary: "Set reverb on or off (RVB:a)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "RVB:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_reverb:
+    summary: "Reverb status (QRVB)"
+    send: "QRVB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_auto_mixing:
+    summary: "Toggle audio auto mixing (ATM)"
+    send: "ATM;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_auto_mixing:
+    summary: "Set audio auto mixing on or off (ATM:a)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "ATM:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_auto_mixing:
+    summary: "Audio auto mixing status (QATM)"
+    send: "QATM;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  # ── METER (Basic Control Commands p.28-31)
+  get_meter_levels:
+    summary: "Every audio level meter value, PFL or AFL, in dB or -INF (MTRLV)"
+    params:
+      point: { type: "enum", values: ["PFL", "AFL"], required: true }
+    send: "MTRLV:{point};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_meter_channel:
+    summary: "Name of the meter channel at an index of the MTRLV list (MTRCH)"
+    params:
+      index: { type: "int", min: 0, max: 55, required: true }
+    send: "MTRCH:{index};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_comp_gr_levels:
+    summary: "Every compressor gain-reduction level (GRLV)"
+    send: "GRLV;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_comp_gr_channel:
+    summary: "Name of the channel at an index of the GRLV list (GRCH); the reply carries no ACK (p.29)"
+    params:
+      index: { type: "int", min: 0, max: 29, required: true }
+    send: "GRCH:{index};"
+    expect: { matches: '^[\x02\x11\x13]*GRCH:\d+,([^;]+);' }
+    returns: value
+
+  get_auto_mixing_levels:
+    summary: "Every auto-mixing level (AMLV)"
+    send: "AMLV;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_auto_mixing_channel:
+    summary: "Name of the channel at an index of the AMLV list (AMCH); the reply carries no ACK (p.30)"
+    params:
+      index: { type: "int", min: 0, max: 23, required: true }
+    send: "AMCH:{index};"
+    expect: { matches: '^[\x02\x11\x13]*AMCH:\d+,([^;]+);' }
+    returns: value
+
+  get_sig_peak_levels:
+    summary: "Every Sig/Peak level (SPLV)"
+    send: "SPLV;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_sig_peak_channel:
+    summary: "Name of the channel at an index of the SPLV list (SPCH); the reply carries no ACK (p.30)"
+    params:
+      index: { type: "int", min: 0, max: 30, required: true }
+    send: "SPCH:{index};"
+    expect: { matches: '^[\x02\x11\x13]*SPCH:\d+,([^;]+);' }
+    returns: value
+
+  get_aux_levels:
+    summary: "Every level sent to an AUX bus (AUXLV)"
+    params:
+      aux: { type: "int", min: 1, max: 3, required: true }
+    send: "AUXLV:AUX{aux};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_aux_channel:
+    summary: "Name of the channel at an index of the AUXLV list (AUXCH); the reply, QAUXCH, carries no ACK (p.31)"
+    params:
+      index: { type: "int", min: 0, max: 41, required: true }
+    send: "AUXCH:{index};"
+    expect: { matches: '^[\x02\x11\x13]*QAUXCH:\d+,([^;]+);' }
+    returns: value
+
+  # ── CONTROL (Basic Control Commands p.32-38)
+  recall_memory:
+    summary: "Recall a scene memory: V-160HD 1-30, V-80HD/VR-120HD/VR-6HD 1-32, V-1-4K 1-8 (MEM)"
+    params:
+      memory: { type: "int", min: 1, max: 32, required: true }
+    send: "MEM:MEMORY{memory};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_memory:
+    summary: "Selected scene memory, or N/A (QMEM)"
+    send: "QMEM;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  pulse_gpo:
+    summary: "Output a GPO one-shot (GPO:a)"
+    params:
+      gpo: { type: "int", min: 1, max: 16, required: true }
+    send: "GPO:GPO{gpo};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_gpo:
+    summary: "Set a GPO on or off, alternate mode (GPO:a,b)"
+    params:
+      gpo: { type: "int", min: 1, max: 16, required: true }
+      enabled: { type: "bool", required: true }
+    send: "GPO:GPO{gpo},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_gpo:
+    summary: "GPO status (QGPO)"
+    params:
+      gpo: { type: "int", min: 1, max: 16, required: true }
+    send: "QGPO:GPO{gpo};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_tally:
+    summary: "Tally of every channel, 0 off, 1 PGM, 2 PST, 3 PGM and PST (TLY)"
+    send: "TLY;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  toggle_auto_switching:
+    summary: "Toggle auto switching (ASW)"
+    send: "ASW;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_auto_switching:
+    summary: "Set auto switching on or off (ASW:a)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "ASW:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_auto_switching:
+    summary: "Auto switching status (QASW)"
+    send: "QASW;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  input_scan:
+    summary: "Execute input scan (INSC)"
+    params:
+      mode: { type: "enum", values: ["NORMAL", "REVERSE", "RANDOM"], required: true }
+    send: "INSC:{mode};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  memory_scan:
+    summary: "Execute scene memory scan (MEMSC)"
+    params:
+      mode: { type: "enum", values: ["NORMAL", "REVERSE", "RANDOM"], required: true }
+    send: "MEMSC:{mode};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  pinp_source_scan:
+    summary: "Execute PinP source scan (PPSC)"
+    params:
+      pinp: { type: "int", min: 1, max: 4, required: true }
+      mode: { type: "enum", values: ["NORMAL", "REVERSE", "RANDOM"], required: true }
+    send: "PPSC:PinP{pinp},{mode};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  dsk_source_scan:
+    summary: "Execute DSK source scan (DSKSC)"
+    params:
+      dsk: { type: "int", min: 1, max: 2, required: true }
+      mode: { type: "enum", values: ["NORMAL", "REVERSE", "RANDOM"], required: true }
+    send: "DSKSC:DSK{dsk},{mode};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_stream_record_type:
+    summary: "Set the Stream & Record type, RTMP or SRT (STRTY)"
+    params:
+      type: { type: "enum", values: ["RTMP", "SRT"], required: true }
+    send: "STRTY:{type};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_stream_record_type:
+    summary: "Stream & Record type (QSTRTY)"
+    send: "QSTRTY;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  stream_record:
+    summary: "Start or stop Stream & Record; only with type RTMP (STROA)"
+    params:
+      action: { type: "enum", values: ["STOP", "START"], required: true }
+    send: "STROA:{action};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  srt_out:
+    summary: "Start or stop SRT Out; only with type SRT (SRTOSS)"
+    params:
+      action: { type: "enum", values: ["STOP", "START"], required: true }
+    send: "SRTOSS:{action};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_stream_record_status:
+    summary: "Stream & Record status: STOP, STOPPING, STARTING or ONAIR (QSTRST)"
+    send: "QSTRST;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_stream_record_time:
+    summary: "Stream & Record elapsed time in seconds (QSTRTM)"
+    send: "QSTRTM;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_safety_image:
+    summary: "Set Safety Image on or off; only while on air (SFIM)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "SFIM:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_safety_image:
+    summary: "Safety Image status: OFF, ON or DELAYED (QSFIM)"
+    send: "QSFIM;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_external_rec_control:
+    summary: "Set External Rec Control on or off (EXRC)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "EXRC:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_external_rec_control:
+    summary: "External Rec Control status (QEXRC)"
+    send: "QEXRC;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  audio_player:
+    summary: "Play, stop, pause or resume an Audio Player pad: V-80HD A-1..H-8, VR-120HD A-1..B-8, VR-6HD A-1..B-6 (APL)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+      action: { type: "enum", values: ["STOP", "PLAY", "PAUSE", "RESUME"], required: true }
+    send: "APL:{pad},{action};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_audio_player_status:
+    summary: "Audio Player pad status: STOP, PLAY, PAUSE, FADEIN or FADEOUT (QAPS)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+    send: "QAPS:{pad};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_audio_player_import:
+    summary: "Whether a file is imported to an Audio Player pad (QAPE)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+    send: "QAPE:{pad};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_audio_player_length:
+    summary: "Audio Player pad file length in ms (QAPD)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+    send: "QAPD:{pad};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_audio_player_time:
+    summary: "Audio Player pad playback time in ms (QAPC)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+    send: "QAPC:{pad};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_audio_player_repeat:
+    summary: "Set repeat for an Audio Player pad (APR)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+      enabled: { type: "bool", required: true }
+    send: "APR:{pad},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_audio_player_repeat:
+    summary: "Audio Player pad repeat status (QAPR)"
+    params:
+      pad: { type: "string", required: true, pattern: '^[A-H]-[1-8]$' }
+    send: "QAPR:{pad};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_playback_type:
+    summary: "Set the Video Player/SRT In type (PBTY)"
+    params:
+      type: { type: "enum", values: ["V.PLAYER", "SRT"], required: true }
+    send: "PBTY:{type};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_playback_type:
+    summary: "Video Player/SRT In type (QPBTY)"
+    send: "QPBTY;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  video_player:
+    summary: "Play, stop, pause or resume the Video Player; only with type V.PLAYER (VPL)"
+    params:
+      action: { type: "enum", values: ["STOP", "PLAY", "PAUSE", "RESUME"], required: true }
+    send: "VPL:{action};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_video_player_status:
+    summary: "Video Player status: STOP, PLAY, PAUSE, STARTING or STOPPING (QVPS)"
+    send: "QVPS;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_video_player_import:
+    summary: "Video Player import source: N/A, INTERNAL, SDCARD or USB (QVPE)"
+    send: "QVPE;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_video_player_length:
+    summary: "Video Player file length in ms (QVPD)"
+    send: "QVPD;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_video_player_time:
+    summary: "Video Player playback time in ms (QVPC)"
+    send: "QVPC;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  srt_in:
+    summary: "Start or stop SRT In; only with type SRT (SRTISS)"
+    params:
+      action: { type: "enum", values: ["STOP", "START"], required: true }
+    send: "SRTISS:{action};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_srt_in_status:
+    summary: "SRT In status: STOPPED, STOPPING, STARTING or STARTED (QSRTIST); the reply carries no ACK (p.38)"
+    send: "QSRTIST;"
+    expect: { matches: '^[\x02\x11\x13]*SRTIST:([A-Z]+);' }
+    returns: value
+
+  check_stream_record_ready:
+    summary: "Whether Stream & Record and SRT Out can go on air: OK or an ERROR_ reason (STRSTB)"
+    send: "STRSTB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  check_video_player_ready:
+    summary: "Whether the Video Player can play: OK, ERROR_RESOURCE or ERROR_NOT_FOUND (VPSTB)"
+    send: "VPSTB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  check_srt_in_ready:
+    summary: "Whether SRT In can start: OK or ERROR_RESOURCE (SRTISTB)"
+    send: "SRTISTB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  # ── CAMERA (Basic Control Commands p.39-41): PTZ cameras the switcher controls
+  camera_pan_tilt:
+    summary: "Pan and tilt a PTZ camera, or stop (CAMPT); cameras: V-160HD 1-16, V-80HD 1-8, VR-120HD 1-12, VR-6HD 1-6, V-1-4K 1-5"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      pan: { type: "enum", values: ["LEFT", "STOP", "RIGHT"], required: true }
+      tilt: { type: "enum", values: ["DOWN", "STOP", "UP"], required: true }
+    send: "CAMPT:CAMERA{camera},{pan},{tilt};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_camera_pan_tilt_speed:
+    summary: "Set a PTZ camera pan/tilt speed, 1-24 (CAMPTS)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      speed: { type: "int", min: 1, max: 24, required: true }
+    send: "CAMPTS:CAMERA{camera},{speed};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_camera_pan_tilt_speed:
+    summary: "PTZ camera pan/tilt speed (QCAMPTS)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+    send: "QCAMPTS:CAMERA{camera};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  camera_zoom:
+    summary: "Zoom a PTZ camera, or stop (CAMZM)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      zoom: { type: "enum", values: ["WIDE_FAST", "WIDE_SLOW", "STOP", "TELE_SLOW", "TELE_FAST"], required: true }
+    send: "CAMZM:CAMERA{camera},{zoom};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  camera_zoom_reset:
+    summary: "Reset a PTZ camera zoom (CAMZMR)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+    send: "CAMZMR:CAMERA{camera};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  camera_focus:
+    summary: "Focus a PTZ camera near or far, or stop (CAMFC)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      focus: { type: "enum", values: ["NEAR", "STOP", "FAR"], required: true }
+    send: "CAMFC:CAMERA{camera},{focus};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_camera_auto_focus:
+    summary: "Set a PTZ camera auto focus on or off (CAMAFC)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      enabled: { type: "bool", required: true }
+    send: "CAMAFC:CAMERA{camera},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_camera_auto_focus:
+    summary: "PTZ camera auto focus status (QCAMAFC)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+    send: "QCAMAFC:CAMERA{camera};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_camera_auto_exposure:
+    summary: "Set a PTZ camera auto exposure on or off (CAMAEP)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      enabled: { type: "bool", required: true }
+    send: "CAMAEP:CAMERA{camera},{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_camera_auto_exposure:
+    summary: "PTZ camera auto exposure status (QCAMAEP)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+    send: "QCAMAEP:CAMERA{camera};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  camera_preset_recall:
+    summary: "Recall a PTZ camera preset, 1-100 (CAMPR)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+      preset: { type: "int", min: 1, max: 100, required: true }
+    send: "CAMPR:CAMERA{camera},PRESET{preset};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_camera_preset:
+    summary: "Current PTZ camera preset, or N/A (QCAMPR)"
+    params:
+      camera: { type: "int", min: 1, max: 16, required: true }
+    send: "QCAMPR:CAMERA{camera};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  # ── Macro, Sequencer, Graphics Presenter (Basic Control Commands p.42-43)
+  execute_macro:
+    summary: "Execute a macro, 1-100 (MCREX)"
+    params:
+      macro: { type: "int", min: 1, max: 100, required: true }
+    send: "MCREX:MACRO{macro};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_macro_running:
+    summary: "Whether a macro is executing (QMCRST)"
+    params:
+      macro: { type: "int", min: 1, max: 100, required: true }
+    send: "QMCRST:MACRO{macro};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_sequencer:
+    summary: "Set the SEQUENCER on or off (SEQSW)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "SEQSW:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_sequencer:
+    summary: "SEQUENCER status (QSEQSW)"
+    send: "QSEQSW;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_auto_sequence:
+    summary: "Set SEQUENCER Auto Sequence on or off (SEQAS)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "SEQAS:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_auto_sequence:
+    summary: "SEQUENCER Auto Sequence status (QSEQAS)"
+    send: "QSEQAS;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  sequencer_previous:
+    summary: "Set the SEQUENCER back one step (SEQPV)"
+    send: "SEQPV;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  sequencer_back:
+    summary: "Set the SEQUENCER back one step (false) or to the beginning (true) (SEQPV:a)"
+    params:
+      to_start: { type: "bool", required: true }
+    send: "SEQPV:{to_start:bool01};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  sequencer_next:
+    summary: "Advance the SEQUENCER one step (SEQNX)"
+    send: "SEQNX;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  sequencer_jump:
+    summary: "Set the SEQUENCER to a sequence number, 1-1000 (SEQJP)"
+    params:
+      sequence: { type: "int", min: 1, max: 1000, required: true }
+    send: "SEQJP:SEQ{sequence};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  sequencer_jump_start:
+    summary: "Set the SEQUENCER to START (SEQJP:START)"
+    send: "SEQJP:START;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  graphics_next:
+    summary: "Graphics Presenter: select the next contents (GPNC)"
+    send: "GPNC;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  graphics_select:
+    summary: "Graphics Presenter: select contents 1-124 (GPSC)"
+    params:
+      content: { type: "int", min: 1, max: 124, required: true }
+    send: "GPSC:CONTENT{content};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  graphics_hide_front:
+    summary: "Graphics Presenter: hide front contents (GPHF)"
+    send: "GPHF;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  graphics_hide_background:
+    summary: "Graphics Presenter: hide background contents (GPHB)"
+    send: "GPHB;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  graphics_toggle_on_air:
+    summary: "Graphics Presenter: toggle ON AIR (GPOA)"
+    send: "GPOA;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  # ── SYSTEM (Basic Control Commands p.44-45)
+  active_sense:
+    summary: "Ask for an ACK (ACS)"
+    send: "ACS;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version (VER)"
+    send: "VER;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_busy:
+    summary: "Whether the unit is busy (QBSY); the reply carries no ACK (p.44)"
+    send: "QBSY;"
+    expect: { matches: '^[\x02\x11\x13]*BSY:(OFF|ON);' }
+    returns: value
+
+  set_hdcp:
+    summary: "Set HDCP on or off (HDCP)"
+    params:
+      enabled: { type: "bool", required: true }
+    send: "HDCP:{enabled:on_off};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_hdcp:
+    summary: "HDCP status (QHDCP)"
+    send: "QHDCP;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_test_pattern:
+    summary: "Set the test pattern; V-1-4K takes OFF or COLORBAR only (TPT)"
+    params:
+      pattern: { type: "enum", values: ["OFF", "COLORBAR75", "COLORBAR100", "RAMP", "STEP", "HATCH", "DIAMOND", "CIRCLE", "COLORBAR75-SP", "COLORBAR100-SP", "RAMP-SP", "STEP-SP", "HATCH-SP", "COLORBAR"], required: true }
+    send: "TPT:{pattern};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_test_pattern:
+    summary: "Test pattern (QTPT)"
+    send: "QTPT;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_test_tone:
+    summary: "Set the test tone level, OFF, -20, -10 or 0 dB (TTN:a)"
+    params:
+      level: { type: "enum", values: ["OFF", "-20", "-10", "0"], required: true }
+    send: "TTN:{level};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  set_test_tone_frequency:
+    summary: "Set the test tone level and the L and R frequencies, 500 Hz, 1 kHz or 2 kHz (TTN:a,b,c)"
+    params:
+      level: { type: "enum", values: ["OFF", "-20", "-10", "0"], required: true }
+      left: { type: "enum", values: ["500", "1k", "2k"], required: true }
+      right: { type: "enum", values: ["500", "1k", "2k"], required: true }
+    send: "TTN:{level},{left},{right};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_test_tone:
+    summary: "Test tone level and frequencies (QTTN)"
+    send: "QTTN;"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  # ── Regular commands: parameter access by SysEx address (each model's Remote Control Guide, LAN/RS-232 Command Reference). Addresses and values are the model's own MIDI Implementation address map
+  set_parameter:
+    summary: "Write a parameter at a SysEx address (six hex digits) with a hex value of whole bytes (DTH)"
+    params:
+      address: { type: "string", required: true, pattern: '^[0-7][0-9A-F]{5}$' }
+      value: { type: "string", max_length: 256, required: true, pattern: '^([0-7][0-9A-F])+$' }
+    send: "DTH:{address},{value};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+  get_parameter:
+    summary: "Read a parameter by SysEx address and size, both six hex digits; the value arrives as a DTH frame (RQH)"
+    params:
+      address: { type: "string", required: true, pattern: '^[0-7][0-9A-F]{5}$' }
+      size: { type: "string", default: "000001", pattern: '^[0-7][0-9A-F]{5}$' }
+    send: "RQH:{address},{size};"
+    expect: { contains: "ACK;" }
+    returns: ack
+
+telemetry:
+  # Nothing in Roland's documents is pushed for the Basic commands, and the
+  # V-80HD community document measured no pushes at all to a control session
+  # other than Roland's own RCS. State therefore comes from the replies to
+  # queries: the version once on connecting, and the on-air essentials on a
+  # one-second schedule (the same community document found 500 ms polling of
+  # 65 reads to be the device's limit). Every other query's reply also lands
+  # in state when it is asked.
+  subscribe:
+    send: ["VER;"]
+  poll:
+    send: ["TLY;", "QPGM;", "QPST;", "QFTB;", "QATG;"]
+    every_ms: 1000
+  updates:
+    # VIDEO
+    - match: '^[\x02\x11\x13]*VISRC:(\d+),([^;]+);'
+      state: { "video_sources.{1}.name": "{2}" }
+    - match: '^[\x02\x11\x13]*VIST:([A-Z0-9]+),([A-Z]+);'
+      state: { "video_inputs.{1}.status": "{2}" }
+    - match: '^[\x02\x11\x13]*VFL:(\d+);'
+      state: { "fader.level": "{1}" }
+    - match: '^[\x02\x11\x13]*PGM:([^,;]+);'
+      state: { "program.source": "{1}", "program.input": "" }
+    - match: '^[\x02\x11\x13]*PGM:([^,;]+),([^;]+);'
+      state: { "program.source": "{1}", "program.input": "{2}" }
+    - match: '^[\x02\x11\x13]*PST:([^,;]+);'
+      state: { "preview.source": "{1}", "preview.input": "" }
+    - match: '^[\x02\x11\x13]*PST:([^,;]+),([^;]+);'
+      state: { "preview.source": "{1}", "preview.input": "{2}" }
+    - match: '^[\x02\x11\x13]*AUX:AUX(\d+),([^,;]+);'
+      state: { "aux.{1}.source": "{2}", "aux.{1}.input": "" }
+    - match: '^[\x02\x11\x13]*AUX:AUX(\d+),([^,;]+),([^;]+);'
+      state: { "aux.{1}.source": "{2}", "aux.{1}.input": "{3}" }
+    - match: '^[\x02\x11\x13]*ATG:(OFF|ON);'
+      state: { "transition.auto_in_progress": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*FRZ:(OFF|ON);'
+      state: { "freeze": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*FTB:([A-Z]+);'
+      state: { "output_fade": "{1}" }
+    - match: '^[\x02\x11\x13]*VIS:INPUT(\d+),([^;]+);'
+      state: { "input_assign.{1}": "{2}" }
+    - match: '^[\x02\x11\x13]*VOS:([A-Z0-9]+),([^;]+);'
+      state: { "video_outputs.{1}.bus": "{2}" }
+    - match: '^[\x02\x11\x13]*TRS:(MIX|WIPE);'
+      state: { "transition.type": "{1}" }
+    - match: '^[\x02\x11\x13]*TIM:([A-Za-z0-9]+),(\d+);'
+      state: { "transition_time.{1}": "{2}" }
+    - match: '^[\x02\x11\x13]*PIS:PinP(\d+),([^;]+);'
+      state: { "pinp.{1}.source": "{2}" }
+    - match: '^[\x02\x11\x13]*PPS:PinP(\d+),(OFF|ON);'
+      state: { "pinp.{1}.pgm": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*PPW:PinP(\d+),(OFF|ON);'
+      state: { "pinp.{1}.pvw": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*PIP:PinP(\d+),(-?\d+),(-?\d+);'
+      state: { "pinp.{1}.position_h": "{2}", "pinp.{1}.position_v": "{3}" }
+    - match: '^[\x02\x11\x13]*DSK:DSK(\d+),(OFF|ON);'
+      state: { "dsk.{1}.pgm": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*DVW:DSK(\d+),(OFF|ON);'
+      state: { "dsk.{1}.pvw": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*DSS:DSK(\d+),([^,;]+),([^;]+);'
+      state: { "dsk.{1}.source": "{2}", "dsk.{1}.input": "{3}" }
+    - match: '^[\x02\x11\x13]*DSS:DSK(\d+),([^,;]+);'
+      state: { "dsk.{1}.source": "{2}", "dsk.{1}.input": "" }
+    - match: '^[\x02\x11\x13]*KYL:DSK(\d+),(\d+);'
+      state: { "dsk.{1}.level": "{2}" }
+    - match: '^[\x02\x11\x13]*KYG:DSK(\d+),(\d+);'
+      state: { "dsk.{1}.gain": "{2}" }
+    - match: '^[\x02\x11\x13]*SPS:SPLIT(\d+),(OFF|ON);'
+      state: { "split.{1}.on": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*SPT:SPLIT(\d+),(-?\d+),(-?\d+),(-?\d+);'
+      state: { "split.{1}.a_center": "{2}", "split.{1}.b_center": "{3}", "split.{1}.center": "{4}" }
+    - match: '^[\x02\x11\x13]*STO:([^;]+);'
+      state: { "still_output": "{1}" }
+    - match: '^[\x02\x11\x13]*ROISW:(OFF|ON);'
+      state: { "roi.mode": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*ROIZM:ROI(\d+),(\d+);'
+      state: { "roi.{1}.zoom": "{2}" }
+    - match: '^[\x02\x11\x13]*ROIPT:ROI(\d+),(-?\d+),(-?\d+);'
+      state: { "roi.{1}.position_h": "{2}", "roi.{1}.position_v": "{3}" }
+    # AUDIO
+    - match: '^[\x02\x11\x13]*AOS:([A-Z0-9]+),([A-Z0-9]+);'
+      state: { "audio_outputs.{1}.bus": "{2}" }
+    - match: '^[\x02\x11\x13]*IAL:([A-Z0-9]+),(-INF|-?\d+);'
+      state: { "audio_inputs.{1}.level": "{2}" }
+    - match: '^[\x02\x11\x13]*IAM:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_inputs.{1}.mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*IAS:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_inputs.{1}.solo": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*ADT:([A-Z0-9]+),(\d+);'
+      state: { "audio_inputs.{1}.delay": "{2}" }
+    - match: '^[\x02\x11\x13]*HPF:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_inputs.{1}.high_pass_filter": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*GATE:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_inputs.{1}.gate": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*STLK:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_inputs.{1}.stereo_link": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*VOCH:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_inputs.{1}.voice_changer": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*OAL:([A-Z0-9]+),(-INF|-?\d+);'
+      state: { "audio_buses.{1}.level": "{2}" }
+    - match: '^[\x02\x11\x13]*OAM:([A-Z0-9]+),(OFF|ON);'
+      state: { "audio_buses.{1}.mute": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*RVB:(OFF|ON);'
+      state: { "reverb": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*ATM:(OFF|ON);'
+      state: { "auto_mixing": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    # METER
+    - match: '^[\x02\x11\x13]*MTRLV:([^;]*);'
+      state: { "meters.levels": "{1}" }
+    - match: '^[\x02\x11\x13]*MTRCH:(\d+),([^;]+);'
+      state: { "meters.channels.{1}": "{2}" }
+    - match: '^[\x02\x11\x13]*GRLV:([^;]*);'
+      state: { "meters.comp_gr_levels": "{1}" }
+    - match: '^[\x02\x11\x13]*GRCH:(\d+),([^;]+);'
+      state: { "meters.comp_gr_channels.{1}": "{2}" }
+    - match: '^[\x02\x11\x13]*AMLV:([^;]*);'
+      state: { "meters.auto_mixing_levels": "{1}" }
+    - match: '^[\x02\x11\x13]*AMCH:(\d+),([^;]+);'
+      state: { "meters.auto_mixing_channels.{1}": "{2}" }
+    - match: '^[\x02\x11\x13]*SPLV:([^;]*);'
+      state: { "meters.sig_peak_levels": "{1}" }
+    - match: '^[\x02\x11\x13]*SPCH:(\d+),([^;]+);'
+      state: { "meters.sig_peak_channels.{1}": "{2}" }
+    - match: '^[\x02\x11\x13]*QAUXLV:([^;]*);'
+      state: { "meters.aux_levels": "{1}" }
+    - match: '^[\x02\x11\x13]*QAUXCH:(\d+),([^;]+);'
+      state: { "meters.aux_channels.{1}": "{2}" }
+    # CONTROL
+    - match: '^[\x02\x11\x13]*MEM:([^;]+);'
+      state: { "memory": "{1}" }
+    - match: '^[\x02\x11\x13]*GPO:GPO(\d+),(OFF|ON);'
+      state: { "gpo.{1}": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*TLY:([0-9,]*);'
+      state: { "tally": "{1}" }
+    - match: '^[\x02\x11\x13]*ASW:(OFF|ON);'
+      state: { "auto_switching": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*STRTY:([A-Z]+);'
+      state: { "stream.type": "{1}" }
+    - match: '^[\x02\x11\x13]*STRST:([A-Z]+);'
+      state: { "stream.status": "{1}" }
+    - match: '^[\x02\x11\x13]*STRTM:(\d+);'
+      state: { "stream.elapsed": "{1}" }
+    - match: '^[\x02\x11\x13]*SFIM:([A-Z]+);'
+      state: { "stream.safety_image": "{1}" }
+    - match: '^[\x02\x11\x13]*EXRC:(OFF|ON);'
+      state: { "stream.external_rec_control": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*STRSTB:([A-Z_]+);'
+      state: { "stream.ready": "{1}" }
+    - match: '^[\x02\x11\x13]*APS:([A-H]-[1-8]),([A-Z]+);'
+      state: { "audio_player.{1}.status": "{2}" }
+    - match: '^[\x02\x11\x13]*APE:([A-H]-[1-8]),(OFF|ON);'
+      state: { "audio_player.{1}.imported": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*APD:([A-H]-[1-8]),(\d+);'
+      state: { "audio_player.{1}.length": "{2}" }
+    - match: '^[\x02\x11\x13]*APC:([A-H]-[1-8]),(\d+);'
+      state: { "audio_player.{1}.position": "{2}" }
+    - match: '^[\x02\x11\x13]*APR:([A-H]-[1-8]),(OFF|ON);'
+      state: { "audio_player.{1}.repeat": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*PBTY:([A-Z.]+);'
+      state: { "video_player.type": "{1}" }
+    - match: '^[\x02\x11\x13]*VPS:([A-Z]+);'
+      state: { "video_player.status": "{1}" }
+    - match: '^[\x02\x11\x13]*VPE:([A-Z/]+);'
+      state: { "video_player.import": "{1}" }
+    - match: '^[\x02\x11\x13]*VPD:(\d+);'
+      state: { "video_player.length": "{1}" }
+    - match: '^[\x02\x11\x13]*VPC:(\d+);'
+      state: { "video_player.position": "{1}" }
+    - match: '^[\x02\x11\x13]*VPSTB:([A-Z_]+);'
+      state: { "video_player.ready": "{1}" }
+    - match: '^[\x02\x11\x13]*SRTIST:([A-Z]+);'
+      state: { "srt_in.status": "{1}" }
+    - match: '^[\x02\x11\x13]*SRTISTB:([A-Z_]+);'
+      state: { "srt_in.ready": "{1}" }
+    # CAMERA
+    - match: '^[\x02\x11\x13]*CPTS:CAMERA(\d+),(\d+);'
+      state: { "cameras.{1}.pan_tilt_speed": "{2}" }
+    - match: '^[\x02\x11\x13]*CAFC:CAMERA(\d+),(OFF|ON);'
+      state: { "cameras.{1}.auto_focus": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*CAEP:CAMERA(\d+),(OFF|ON);'
+      state: { "cameras.{1}.auto_exposure": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*CPR:CAMERA(\d+),([^;]+);'
+      state: { "cameras.{1}.preset": "{2}" }
+    # Macro, Sequencer
+    - match: '^[\x02\x11\x13]*MCRST:MACRO(\d+),(OFF|ON);'
+      state: { "macros.{1}.running": { value: "{2}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*SQS:(OFF|ON);'
+      state: { "sequencer.on": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*SQA:(OFF|ON);'
+      state: { "sequencer.auto_sequence": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    # SYSTEM
+    - match: '^[\x02\x11\x13]*VER:([^,;]+),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+    - match: '^[\x02\x11\x13]*BSY:(OFF|ON);'
+      state: { "busy": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*HCP:(OFF|ON);'
+      state: { "hdcp": { value: "{1}", map: { "ON": true, "OFF": false } } }
+    - match: '^[\x02\x11\x13]*TPT:([^;]+);'
+      state: { "test_pattern": "{1}" }
+    - match: '^[\x02\x11\x13]*TTN:([^,;]+),([^,;]+),([^;]+);'
+      state: { "test_tone.level": "{1}", "test_tone.frequency_l": "{2}", "test_tone.frequency_r": "{3}" }
+    # Regular commands: a DTH frame answering RQH, or any other DTH the
+    # switcher sends, kept by address as raw hex.
+    - match: '^[\x02\x11\x13]*DTH:([0-9A-F]{6}),([0-9A-F]+);'
+      state: { "parameters.{1}": "{2}" }
+
+state:
+  video_sources.*.name:        { type: string, description: "Source at a QVISRC video input index, such as HDMI1 or INPUT3" }
+  video_inputs.*.status:       { type: string, description: "Signal status of a physical input (HDMI1, SDI2, ...): NOSIGNAL, DETECTED or UNSUPPORTED" }
+  fader.level:                 { type: int, description: "Video fader level, 0-2047 (0-4095 on V-1-4K)" }
+  program.source:              { type: string, description: "PGM channel: HDMIn, SDIn, STILLn, V.PLAYER or SRT" }
+  program.input:               { type: string, description: "INPUT channel the PGM source is selected as, INPUTn; empty when it was selected directly" }
+  preview.source:              { type: string, description: "PST channel" }
+  preview.input:               { type: string, description: "INPUT channel the PST source is selected as; empty when selected directly" }
+  aux.*.source:                { type: string, description: "Channel on an AUX bus, numbered from 1" }
+  aux.*.input:                 { type: string, description: "INPUT channel the AUX source is selected as; empty when selected directly" }
+  transition.auto_in_progress: { type: bool, description: "An auto transition is in progress (QATG)" }
+  transition.type:             { type: string, description: "MIX or WIPE" }
+  transition_time.*:           { type: int, unit: "0.1 s", description: "Transition time by target: MIX, WIPE, PinPn, DSKn, OUTPUTFADE" }
+  freeze:                      { type: bool, description: "Freeze on" }
+  output_fade:                 { type: string, description: "Output fade: OFF, ON, FADEIN or FADEOUT" }
+  input_assign.*:              { type: string, description: "Source assigned to INPUT n, or N/A" }
+  video_outputs.*.bus:         { type: string, description: "Bus or view on a video output (HDMI1, SDI1, USB, STREAM, LCD)" }
+  pinp.*.source:               { type: string, description: "Source of PinP & KEY n" }
+  pinp.*.pgm:                  { type: bool, description: "PinP & KEY n on PGM" }
+  pinp.*.pvw:                  { type: bool, description: "PinP & KEY n on PVW" }
+  pinp.*.position_h:           { type: int, unit: "0.1 %", description: "PinP window horizontal position, -500 to 500" }
+  pinp.*.position_v:           { type: int, unit: "0.1 %", description: "PinP window vertical position, -500 to 500" }
+  dsk.*.pgm:                   { type: bool, description: "DSK n on PGM" }
+  dsk.*.pvw:                   { type: bool, description: "DSK n on PVW" }
+  dsk.*.source:                { type: string, description: "DSK n fill source" }
+  dsk.*.input:                 { type: string, description: "INPUT channel the DSK fill source is selected as; empty when selected directly" }
+  dsk.*.level:                 { type: int, description: "DSK key level, 0-255" }
+  dsk.*.gain:                  { type: int, description: "DSK key gain, 0-255" }
+  split.*.on:                  { type: bool, description: "SPLIT n on" }
+  split.*.a_center:            { type: int, unit: "0.1 %", description: "SPLIT PGM/A-Center, -500 to 500" }
+  split.*.b_center:            { type: int, unit: "0.1 %", description: "SPLIT PST/B-Center, -500 to 500" }
+  split.*.center:              { type: int, unit: "0.1 %", description: "SPLIT center position, -500 to 500" }
+  still_output:                { type: string, description: "STILL IMAGE OUTPUT source, or OFF" }
+  roi.mode:                    { type: bool, description: "ROI mode on (V-1-4K)" }
+  roi.*.zoom:                  { type: int, unit: "0.1 %", description: "ROI zoom, 1000-4000" }
+  roi.*.position_h:            { type: int, description: "ROI horizontal position, -1920 to 1920" }
+  roi.*.position_v:            { type: int, description: "ROI vertical position, -1080 to 1080" }
+  audio_outputs.*.bus:         { type: string, description: "Audio bus on an audio output: AUTO, MAIN, AUXn or MONITOR" }
+  audio_inputs.*.level:        { type: string, unit: "0.1 dB", description: "Audio input level, -800 to 100, or -INF" }
+  audio_inputs.*.mute:         { type: bool, description: "Audio input muted" }
+  audio_inputs.*.solo:         { type: bool, description: "Audio input soloed" }
+  audio_inputs.*.delay:        { type: int, unit: "0.1 ms", description: "Audio input delay, 0-5000" }
+  audio_inputs.*.high_pass_filter: { type: bool, description: "High-pass filter on" }
+  audio_inputs.*.gate:         { type: bool, description: "Noise gate on" }
+  audio_inputs.*.stereo_link:  { type: bool, description: "Stereo link on (XLR inputs)" }
+  audio_inputs.*.voice_changer: { type: bool, description: "Voice changer on (XLR1, XLR2)" }
+  audio_buses.*.level:         { type: string, unit: "0.1 dB", description: "Audio output level of MAIN, AUXn, USB, STREAM or REC, -800 to 100, or -INF" }
+  audio_buses.*.mute:          { type: bool, description: "Audio output muted" }
+  reverb:                      { type: bool, description: "Reverb on" }
+  auto_mixing:                 { type: bool, description: "Audio auto mixing on" }
+  meters.levels:               { type: string, unit: dB, description: "Last MTRLV reply: comma-separated levels in MTRCH order, -INF or -80 to 10" }
+  meters.channels.*:           { type: string, description: "Meter channel name at an MTRLV index" }
+  meters.comp_gr_levels:       { type: string, unit: dB, description: "Last GRLV reply, comma-separated in GRCH order" }
+  meters.comp_gr_channels.*:   { type: string, description: "Channel name at a GRLV index" }
+  meters.auto_mixing_levels:   { type: string, unit: dB, description: "Last AMLV reply, comma-separated in AMCH order" }
+  meters.auto_mixing_channels.*: { type: string, description: "Channel name at an AMLV index" }
+  meters.sig_peak_levels:      { type: string, unit: dB, description: "Last SPLV reply, comma-separated in SPCH order" }
+  meters.sig_peak_channels.*:  { type: string, description: "Channel name at an SPLV index" }
+  meters.aux_levels:           { type: string, unit: dB, description: "Last AUXLV reply, comma-separated in AUXCH order (the reply does not name the AUX bus)" }
+  meters.aux_channels.*:       { type: string, description: "Channel name at an AUXLV index" }
+  memory:                      { type: string, description: "Selected scene memory, MEMORYn, or N/A" }
+  gpo.*:                       { type: bool, description: "GPO n on" }
+  tally:                       { type: string, description: "Comma-separated tally per channel in the order HDMI, SDI, STILL, V.PLAYER or SRT, INPUT (p.33): 0 off, 1 PGM, 2 PST, 3 PGM and PST" }
+  auto_switching:              { type: bool, description: "Auto switching on" }
+  stream.type:                 { type: string, description: "Stream & Record type: RTMP or SRT" }
+  stream.status:               { type: string, description: "Stream & Record status: STOP, STOPPING, STARTING or ONAIR" }
+  stream.elapsed:              { type: int, unit: s, description: "Stream & Record elapsed time" }
+  stream.safety_image:         { type: string, description: "Safety Image: OFF, ON or DELAYED" }
+  stream.external_rec_control: { type: bool, description: "External Rec Control on" }
+  stream.ready:                { type: string, description: "Whether Stream & Record and SRT Out can go on air: OK or ERROR_HDCP, ERROR_NO_SDCARD, ERROR_WRITE_PROTECTED, ERROR_SDXC_REQUIRED, ERROR_RESOURCE" }
+  audio_player.*.status:       { type: string, description: "Audio Player pad (A-1 ...) status: STOP, PLAY, PAUSE, FADEIN or FADEOUT" }
+  audio_player.*.imported:     { type: bool, description: "A file is imported to the pad" }
+  audio_player.*.length:       { type: int, unit: ms, description: "File length" }
+  audio_player.*.position:     { type: int, unit: ms, description: "Playback time" }
+  audio_player.*.repeat:       { type: bool, description: "Repeat on" }
+  video_player.type:           { type: string, description: "Video Player/SRT In type: V.PLAYER or SRT" }
+  video_player.status:         { type: string, description: "STOP, PLAY, PAUSE, STARTING or STOPPING" }
+  video_player.import:         { type: string, description: "N/A, INTERNAL, SDCARD or USB" }
+  video_player.length:         { type: int, unit: ms, description: "File length" }
+  video_player.position:       { type: int, unit: ms, description: "Playback time" }
+  video_player.ready:          { type: string, description: "OK, ERROR_RESOURCE or ERROR_NOT_FOUND" }
+  srt_in.status:               { type: string, description: "STOPPED, STOPPING, STARTING or STARTED" }
+  srt_in.ready:                { type: string, description: "OK or ERROR_RESOURCE" }
+  cameras.*.pan_tilt_speed:    { type: int, description: "PTZ camera pan/tilt speed, 1-24" }
+  cameras.*.auto_focus:        { type: bool, description: "PTZ camera auto focus on" }
+  cameras.*.auto_exposure:     { type: bool, description: "PTZ camera auto exposure on" }
+  cameras.*.preset:            { type: string, description: "Current PTZ camera preset, PRESETn, or N/A" }
+  macros.*.running:            { type: bool, description: "Macro n executing" }
+  sequencer.on:                { type: bool, description: "SEQUENCER on" }
+  sequencer.auto_sequence:     { type: bool, description: "SEQUENCER Auto Sequence on" }
+  device.model:                { type: string, description: "Model name from VER" }
+  device.version:              { type: string, description: "Version from VER" }
+  busy:                        { type: bool, description: "Unit busy (QBSY)" }
+  hdcp:                        { type: bool, description: "HDCP on" }
+  test_pattern:                { type: string, description: "Test pattern, or OFF" }
+  test_tone.level:             { type: string, description: "Test tone level: OFF, -20, -10 or 0" }
+  test_tone.frequency_l:       { type: string, description: "Test tone frequency L" }
+  test_tone.frequency_r:       { type: string, description: "Test tone frequency R" }
+  parameters.*:                { type: string, description: "Raw hex value last seen in a DTH frame, keyed by its six-digit SysEx address" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      LAN control needs a network password set on the switcher (menu, LAN
+      CONTROL or Network, Network Password: four characters on V-160HD,
+      VR-120HD and VR-6HD, eight on V-80HD and V-1-4K). The documents say only
+      that it is "input when connecting". Community evidence (V-80HD
+      PROTOCOL.md, Bitfocus companion-module-roland-v160hd) shows the
+      switcher sends "Enter password:" with no line ending about 10 ms after
+      the socket opens, then "Welcome to ..." on success or "Authentication
+      error..." on failure, and that a password sent before the prompt is
+      parsed as a command (ERR:0). The password is sent once the prompt has
+      arrived, and nothing is sent before it. "Authentication error" or "Wait
+      a moment" (the lockout that repeated wrong passwords trip, during which
+      the correct password is also refused) marks the device unauthorized,
+      and the password is not sent again until it is opened with corrected
+      settings. These prompt and reply texts are community-sourced.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A query is answered by its value frame and then ACK; (p.2-45, "VFL:a;ACK;").
+      Queries here complete on the ACK; and return ack; the value is in state,
+      assigned by the telemetry rules from the value frame, which arrives
+      first. The document says an LF follows the semicolon of each response;
+      whether the value frame and ACK; share a line is not stated, and both
+      forms are handled. GRCH, AMCH, SPCH, AUXCH, QSRTIST and QBSY are
+      documented with no ACK; and return their value directly; if a unit
+      does send ACK; after them, that ACK; would be taken as the next
+      command's reply.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Responses may start with STX (02H), and the switcher sends XON (11H) and
+      XOFF (13H) flow control (Remote Control Guides; V-80HD and V-1-4K print
+      replies as stxACK;). STX on commands is optional over LAN (V-160HD,
+      VR-120HD, VR-6HD guides) and absent from the V-80HD and V-1-4K command
+      lists, so commands are sent without it. Error replies: ERR:0 syntax
+      error, ERR:4 invalid (controlled by another setting), ERR:5 out of
+      range; ERR:6 (no stx) is RS-232 only.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Send one command at a time and wait for its reply; the queue does this.
+      The V-80HD community document measured that several commands in one TCP
+      write go unanswered, and that polling faster than every 500 ms locked
+      the panel. The telemetry poll here is five queries a second.
+
+  - models: [all]
+    severity: info
+    text: >
+      Parameter ranges differ by model and the commands accept the union of
+      them; the switcher answers a value outside its own range with ERR:5.
+      Per model (p.3-45): sources V-160HD HDMI1-8, SDI1-8, STILL1-16,
+      INPUT1-20; V-80HD HDMI1-4, SDI1-4, STILL1-32, V.PLAYER, SRT, INPUT1-16;
+      VR-120HD HDMI1-6, SDI1-6, STILL1-16, V.PLAYER, SRT, INPUT1-8; VR-6HD
+      HDMI1-6, STILL1-16, V.PLAYER, SRT, INPUT1-6; V-1-4K HDMI1-5, STILL1-2,
+      INPUT1-8. Input Assign also takes STATUS1-2 and TIME (V-80HD, VR-120HD),
+      HDMI and BLACK (V-1-4K). Video outputs: V-160HD HDMI1-3, SDI1-3, USB;
+      V-80HD HDMI1-3, SDI1-2, USB, STREAM, LCD; VR-120HD HDMI1-3, SDI1-3, USB,
+      STREAM, LCD; VR-6HD HDMI1-3, USB, STREAM, LCD; V-1-4K HDMI3-4. Audio
+      inputs: V-160HD XLR1-2, RCA1, USB, BLUETOOTH, HDMI1-8, SDI1-8; V-80HD
+      adds A.PLAYER, V.PLAYER, SRT with HDMI1-4, SDI1-4; VR-120HD XLR1-6,
+      RCA1-2 and HDMI1-6, SDI1-6; VR-6HD XLR1-6, RCA1, HDMI1-6; V-1-4K XLR1,
+      USB, HDMI1-5. The meter index ranges are in each command's summary.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire spellings the document leaves open: test tone levels are printed
+      "OFF, -20, -10, 0dB" and frequencies "500, 1k, 2kHz"; the unit is taken
+      to apply to the list, so the spec sends OFF, -20, -10, 0 and 500, 1k, 2k.
+      Several values are printed with a space before the comma ("RTMP , SRT",
+      "STOP , START"); the space is taken as typesetting. The VER example
+      prints "V-160HD,2 .00". QTIM on V-1-4K names the DSK as DSK rather than
+      DSK1. The AUXLV reply is printed QAUXLV and the AUXCH reply QAUXCH;
+      both are taken as printed. Test pattern COLORBAR is the V-1-4K value.
+
+  - models: [all]
+    severity: info
+    text: >
+      The cover of the Basic Control Commands lists minimum versions 3.5, 2.2,
+      1.3, 2.2 and 1.0 without model names; in the document's model order
+      that is V-160HD 3.5, V-80HD 2.2, VR-120HD 1.3, VR-6HD 2.2 and V-1-4K
+      1.0, but the pairing is an inference. Older firmware answers the Basic
+      commands with ERR:0.
+
+  - models: [all]
+    severity: info
+    text: >
+      The regular commands address each model's own MIDI Implementation map
+      (different on every model) and take hex values in 7-bit bytes;
+      multi-byte values follow that map's encoding. The V-80HD community
+      document found RQH sizes other than 000001 unanswered. The V-160HD map
+      has TALLY AUTO SEND at 0C 01 00 (set_parameter 0C0100 01); the switcher
+      then sends tally frames, which land in parameters.0C00xx, but whether a
+      second control session receives them is not documented.
+
+  - models: [v-80hd, v-160hd]
+    severity: info
+    text: >
+      Only one control session is served. The V-80HD community document found
+      a second connection accepted and then sent nothing, not even the
+      password prompt.

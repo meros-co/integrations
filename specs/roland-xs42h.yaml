@@ -1,0 +1,364 @@
+spec: 1
+id: roland-xs42h
+name: Roland XS-42H / VP-42H (LAN control)
+vendor: Roland
+category: switcher
+
+# The XS-42H matrix switcher and the VP-42H video processor share one
+# Reference Manual and one LAN/RS-232 command format: comma-separated lines,
+# "set,category,ID,sub-ID,value", "get,category,ID,sub-ID" and "ver", each
+# ended by LF, answered "ack,..." or "err,...". The same grammar as the
+# VR-400UHD (roland-vr400uhd), with different parameters.
+source:
+  - title: "XS-42H/VP-42H Reference Manual, Version 1.3 and later, edition 03 (© 2019, PDF dated 2024-05-28)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/XS-42H_VP-42H_reference_v13_eng03_W.pdf
+    note: >
+      Manufacturer document. Network connections and the eight-character
+      password used for WebRCS and Telnet p.15; LAN interface (Telnet, TCP
+      8023) and command format (ver, set, get, lf, ack and err responses)
+      p.28; list of commands for the XS-42H and the VP-42H, with the rule to
+      wait for ack, p.29.
+
+transport:
+  type: line-tcp
+  port: 8023
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Commands are answered "ack,..." or "err,<transmitted command>" (p.28); a
+  # get is answered "ack,..." and then the value as a "set,..." line (p.29).
+  reply_match: "^(ack|err),"
+  probe: "ver"
+
+settings:
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 8
+    pattern: '^([0-9A-Za-z]{8})?$'
+
+on_connect:
+  - when_set: password
+    send: "{settings.password}"
+
+models:
+  - id: xs-42h
+    name: Roland XS-42H Multi-Format AV Matrix Switcher
+    supports:
+      - set_transition_time
+      - recall_scene
+      - select_output_input
+      - get_scene
+      - get_output_input
+      - set_mixer1_input_level
+      - set_mixer1_input_level_current
+      - set_mixer1_level
+      - set_mixer1_level_current
+      - set_mixer2_input_level
+      - set_mixer2_input_level_current
+      - set_mixer2_level
+      - set_mixer2_level_current
+      - set_parameter
+      - get_parameter
+      - get_version
+    verification: none
+    notes: >
+      Four HDMI inputs plus Input Black, two outputs, two audio mixers, ten
+      scenes.
+  - id: vp-42h
+    name: Roland VP-42H Video Processor
+    supports:
+      - set_transition_time
+      - recall_scene
+      - get_scene
+      - set_layer_visible
+      - set_layer_visible_current
+      - set_layer_input
+      - set_layer_input_current
+      - set_input_level
+      - set_input_level_current
+      - set_master_level
+      - set_master_level_current
+      - set_parameter
+      - get_parameter
+      - get_version
+    verification: none
+    notes: >
+      Four HDMI inputs, four layers, one audio mixer, ten scenes. No output
+      routing commands (p.29).
+
+commands:
+  set_transition_time:
+    summary: "Set the video/scene transition time, 0-4000 ms (set,10,19,0)"
+    params:
+      time: { type: int, min: 0, max: 4000, required: true }
+    send: "set,10,19,0,{time}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  recall_scene:
+    summary: "Switch to a scene, 1-10 (set,11,11,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+    send: "set,11,11,0,{scene:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  select_output_input:
+    summary: "Select the input for OUTPUT 1 or 2: inputs 1-4, or 5 for Input Black (set,11,10)"
+    params:
+      output: { type: int, min: 1, max: 2, required: true }
+      input: { type: int, min: 1, max: 5, required: true }
+    send: "set,11,10,{output:-1},{input:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  get_scene:
+    summary: "Current scene number (get,10,20,0); the value arrives as a set line"
+    send: "get,10,20,0"
+    expect: { contains: "ack," }
+    returns: ack
+
+  get_output_input:
+    summary: "Input selected for OUTPUT 1 or 2 in a scene (get,scene,0,output); the value arrives as a set line"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      output: { type: int, min: 1, max: 2, required: true }
+    send: "get,{scene:-1},0,{output:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_input_level:
+    summary: "Adjust an input channel volume of Audio Mixer 1, 0-127, in a scene 1-10 (set,scene,1,input)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      input: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,{scene:-1},1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_input_level_current:
+    summary: "Adjust an input channel volume of Audio Mixer 1, 0-127, in the current scene (set,15,1,input)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,15,1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_level:
+    summary: "Adjust the overall volume of Audio Mixer 1, 0-127, in a scene 1-10 (set,scene,2,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,{scene:-1},2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer1_level_current:
+    summary: "Adjust the overall volume of Audio Mixer 1, 0-127, in the current scene (set,15,2,0)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,15,2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_input_level:
+    summary: "Adjust an input channel volume of Audio Mixer 2, 0-127, in a scene 1-10 (set,scene,6,input)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      input: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,{scene:-1},6,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_input_level_current:
+    summary: "Adjust an input channel volume of Audio Mixer 2, 0-127, in the current scene (set,15,6,input)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,15,6,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_level:
+    summary: "Adjust the overall volume of Audio Mixer 2, 0-127, in a scene 1-10 (set,scene,7,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,{scene:-1},7,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mixer2_level_current:
+    summary: "Adjust the overall volume of Audio Mixer 2, 0-127, in the current scene (set,15,7,0)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,15,7,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_layer_visible:
+    summary: "Show or hide a layer 1-4 in a scene 1-10 (set,scene,41,layer)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      layer: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,{scene:-1},41,{layer:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_layer_visible_current:
+    summary: "Show or hide a layer 1-4 in the current scene (set,15,41,layer)"
+    params:
+      layer: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,15,41,{layer:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_layer_input:
+    summary: "Assign an input to a layer 1-4 in a scene 1-10: inputs 1-4, or 5 for Input Black (set,scene,42,layer)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      layer: { type: int, min: 1, max: 4, required: true }
+      input: { type: int, min: 1, max: 5, required: true }
+    send: "set,{scene:-1},42,{layer:-1},{input:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_layer_input_current:
+    summary: "Assign an input to a layer 1-4 in the current scene: inputs 1-4, or 5 for Input Black (set,15,42,layer)"
+    params:
+      layer: { type: int, min: 1, max: 4, required: true }
+      input: { type: int, min: 1, max: 5, required: true }
+    send: "set,15,42,{layer:-1},{input:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_input_level:
+    summary: "Adjust an input channel volume, 0-127, in a scene 1-10 (set,scene,1,input)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      input: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,{scene:-1},1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_input_level_current:
+    summary: "Adjust an input channel volume, 0-127, in the current scene (set,15,1,input)"
+    params:
+      input: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,15,1,{input:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_master_level:
+    summary: "Adjust the overall volume, 0-127, in a scene 1-10 (set,scene,2,0)"
+    params:
+      scene: { type: int, min: 1, max: 10, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,{scene:-1},2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_master_level_current:
+    summary: "Adjust the overall volume, 0-127, in the current scene (set,15,2,0)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,15,2,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_parameter:
+    summary: "Set any parameter by category, ID and sub-ID (set)"
+    params:
+      category: { type: int, min: 0, max: 999, required: true }
+      id: { type: int, min: 0, max: 999, required: true }
+      sub_id: { type: int, min: 0, max: 999, required: true }
+      value: { type: int, min: -9999, max: 9999, required: true }
+    send: "set,{category},{id},{sub_id},{value}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  get_parameter:
+    summary: "Read any parameter by category, ID and sub-ID; the value arrives as a set line (get)"
+    params:
+      category: { type: int, min: 0, max: 999, required: true }
+      id: { type: int, min: 0, max: 999, required: true }
+      sub_id: { type: int, min: 0, max: 999, required: true }
+    send: "get,{category},{id},{sub_id}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version (ver)"
+    send: "ver"
+    expect: { contains: "ack," }
+    returns: ack
+
+telemetry:
+  # No pushes are documented. The current scene is asked every second; every
+  # ack and set line also lands in state.
+  subscribe:
+    send: ["ver"]
+  poll:
+    send: ["get,10,20,0"]
+    every_ms: 1000
+  updates:
+    - match: '^(?:ack|set),10,20,0,(\d+)$'
+      state: { "scene": "{1:+1}" }
+    - match: '^ack,11,11,0,(\d+)$'
+      state: { "scene": "{1:+1}" }
+    - match: '^ack,11,10,([01]),(\d+)$'
+      state: { "outputs.{1:+1}.input": "{2:+1}" }
+    - match: '^(?:ack|set),(\d+),(\d+),(\d+),(-?\d+)$'
+      state: { "parameters.{1}-{2}-{3}": "{4}" }
+    - match: '^ver,([^,]+),(.+)$'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  scene:              { type: int, description: "Current scene, 1-10" }
+  outputs.*.input:    { type: int, description: "Input last selected for OUTPUT 1 or 2 with select_output_input: 1-4, or 5 for Input Black (XS-42H)" }
+  parameters.*:       { type: int, description: "Last value seen for a parameter, keyed category-ID-sub-ID as on the wire (0-based values)" }
+  device.model:       { type: string, description: "Model name from ver" }
+  device.version:     { type: string, description: "Version from ver; ---- while the unit starts up (p.29)" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      A password set on the unit (p.15: eight characters; the manual says
+      "single-byte alphanumeric characters (a-f, 0-9)") is required for Telnet
+      as well as WebRCS. The manual does not describe the login exchange.
+      This spec sends the password on connecting; if the unit prompts first,
+      as Roland's other LAN switchers do, the password can arrive early and
+      the login fail, which the format cannot detect. With no password set,
+      leave the setting empty.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for ack before sending the next command (p.29); the queue does
+      this. A get completes on its ack line, and the value follows as a set
+      line, which lands in state just after the command returns. A failed
+      command is answered "err," followed by the command as sent.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire values are 0-based; scenes, outputs, inputs and layers here are
+      1-based and converted, and input 5 is Input Black. Scene-scoped audio
+      and layer commands take scene 1-10, or the _current variant for the
+      currently selected scene (wire scene 15). Levels are 0-127 with no dB
+      scale given. The output-input query reads a stored scene, not the live
+      output; outputs.*.input follows select_output_input acknowledgements
+      only.

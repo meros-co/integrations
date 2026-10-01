@@ -1,0 +1,282 @@
+spec: 1
+id: roland-v600uhd
+name: Roland V-600UHD (LAN control)
+vendor: Roland
+category: switcher
+
+# The V-600UHD's LAN/RS-232 command set: three-letter mnemonics with numeric
+# arguments. Over LAN the stx prefix is omitted from commands and replies, and
+# ACK is sent as the text "ACK" and LF (Reference Manual p.59), so the replies
+# are lines. This is a different, smaller command set from the V-160HD family
+# (roland-v160hd); it has no queries other than VER.
+source:
+  - title: "V-600UHD Reference Manual, edition 07 (PDF dated 2024-02-20), LAN/RS-232 Command Reference"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/V-600UHD_reference_eng07_W.pdf
+    note: >
+      Manufacturer document. LAN interface (Telnet, TCP 8023) and the
+      four-character network password p.57; command format p.58; list of
+      commands, LAN differences (no stx; ACK sent as "ACK" LF) and ERR codes
+      p.59; Remote Control menu, Password ("using four characters", Reset to
+      unset) p.50-51; Ver.3.00 notes "Added Password for LAN command control
+      and WebRCS function" p.3.
+  - title: Bitfocus companion-module-roland-v600uhd (MIT), src/utils.js
+    url: https://github.com/bitfocus/companion-module-roland-v600uhd
+    note: >
+      Open code read for corroboration only: the switcher prompts "Enter
+      password:", is answered with the password and LF, and greets with
+      "Welcome to Roland V-600UHD."; commands are sent without stx.
+
+transport:
+  type: line-tcp
+  port: 8023
+  framing: terminated
+  # Roland documents Telnet, whose client ends each line with CR LF; the
+  # command's own ";" ends the command (p.58).
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Replies are ACK, ERR:n; or the VER line (p.59). The password prompt and
+  # greeting are not replies.
+  reply_match: '^[\x02\x11\x13]*(ACK|ERR:[0-9]+;|VER:)'
+  probe: "ACS;"
+
+settings:
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 4
+    pattern: '^([\x21-\x7e]{4})?$'
+
+# Firmware 3.00 and later ask for the network password when one is set. See
+# the critical quirk: it is sent on connecting, not in answer to the prompt.
+on_connect:
+  - when_set: password
+    after_prompt: "Enter password:"
+    send: "{settings.password}"
+
+models:
+  - id: v-600uhd
+    name: Roland V-600UHD 4K HDR Multi-Format Video Switcher
+    supports:
+      - select_pgm
+      - select_pst
+      - select_aux
+      - set_transition_pattern
+      - set_transition_time
+      - auto
+      - cut
+      - set_composition_type
+      - set_dsk_type
+      - toggle_composition
+      - toggle_dsk
+      - set_output_fade
+      - set_output_fade_time
+      - set_input_level
+      - set_master_level
+      - set_aux_level
+      - set_hdcp
+      - recall_memory
+      - active_sense
+      - get_version
+    verification: none
+    notes: >
+      Eight cross-points (XPT 1-8), 64 scene memories (1-1 to 8-8).
+
+commands:
+  # ── Video (p.59)
+  select_pgm:
+    summary: "Select the PGM channel, cross-point 1-8 (PGM)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "PGM:{xpt:-1};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  select_pst:
+    summary: "Select the PST channel, cross-point 1-8 (PST)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "PST:{xpt:-1};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  select_aux:
+    summary: "Select the channel sent to the AUX bus, cross-point 1-8 (AUX)"
+    params:
+      xpt: { type: int, min: 1, max: 8, required: true }
+    send: "AUX:{xpt:-1};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_transition_pattern:
+    summary: "Select the transition pattern: 0 WIPE 1, 1 WIPE 2, 2 WIPE 3, 3 MIX (TRS)"
+    params:
+      pattern: { type: int, min: 0, max: 3, required: true }
+    send: "TRS:{pattern};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set the video transition time, 0-40 tenths of a second (TIM)"
+    params:
+      time: { type: int, min: 0, max: 40, required: true }
+    send: "TIM:{time};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  auto:
+    summary: "Press the [AUTO] button (ATO)"
+    send: "ATO;"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  cut:
+    summary: "Press the [CUT] button (CUT)"
+    send: "CUT;"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_composition_type:
+    summary: "Select the COMPOSITION type: 0 None, 1 PinP1-1, 2 PinP1-2, 3 Key1, 4 PinP1-1+Key1, 5 PinP1-2+Key1 (CTY)"
+    params:
+      type: { type: int, min: 0, max: 5, required: true }
+    send: "CTY:{type};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_dsk_type:
+    summary: "Select the DSK type: 0 None, 1 PinP2-1, 2 PinP2-2, 3 DSK, 4 PinP2-1+Key2, 5 PinP2-2+Key2 (DTY)"
+    params:
+      type: { type: int, min: 0, max: 5, required: true }
+    send: "DTY:{type};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  toggle_composition:
+    summary: "Press the [COMPOSITION] button (CMP)"
+    send: "CMP;"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  toggle_dsk:
+    summary: "Press the [DSK] button (DSK)"
+    send: "DSK;"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_output_fade:
+    summary: "Set output fade on or off (FDE)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "FDE:{enabled:bool01};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_output_fade_time:
+    summary: "Set the output fade time, 0-100 tenths of a second (FDT)"
+    params:
+      time: { type: int, min: 0, max: 100, required: true }
+    send: "FDT:{time};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  # ── Audio (p.59)
+  set_input_level:
+    summary: "Set an input audio level, -800 to 100 (-80.0 to 10.0 dB) or -801 for -INF; inputs 0 (HDMI IN1) to 7 (TEST TONE) (IAL)"
+    params:
+      input: { type: int, min: 0, max: 7, required: true }
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "IAL:{input},{level};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_master_level:
+    summary: "Set the master out level, -800 to 100 (-80.0 to 10.0 dB) or -801 for -INF (OAL)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OAL:{level};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  set_aux_level:
+    summary: "Set the AUX bus audio level, -800 to 100 (-80.0 to 10.0 dB) or -801 for -INF (OAX)"
+    params:
+      level: { type: int, min: -801, max: 100, required: true }
+    send: "OAX:{level};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  # ── System (p.59)
+  set_hdcp:
+    summary: "Set HDCP on or off (HCP)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "HCP:{enabled:bool01};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  recall_memory:
+    summary: "Recall a scene memory, 1-64 for 1-1 to 8-8 (bank b, number n is (b-1)*8+n) (MEM)"
+    params:
+      memory: { type: int, min: 1, max: 64, required: true }
+    send: "MEM:{memory:-1};"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  active_sense:
+    summary: "Check the switcher is responding (ACS)"
+    send: "ACS;"
+    expect: { contains: "ACK" }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version (VER)"
+    send: "VER;"
+    expect: { matches: '^[\x02\x11\x13]*VER:[^,;]+,([^;]+);' }
+    returns: value
+
+telemetry:
+  # The switcher has no status queries and documents no pushes; only the
+  # version is reported.
+  subscribe:
+    send: ["VER;"]
+  updates:
+    - match: '^[\x02\x11\x13]*VER:([^,;]+),([^;]+);'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  device.model:   { type: string, description: "Model name from VER" }
+  device.version: { type: string, description: "Version from VER" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      From firmware 3.00 a network password (four characters, menu Remote
+      Control, LAN Control, Password) protects LAN control once set (p.3,
+      p.57). The switcher asks for it with "Enter password:" and greets with
+      "Welcome to Roland V-600UHD." (Bitfocus companion-module-roland-v600uhd;
+      the manual describes neither). The password is sent once the prompt
+      has arrived. No refusal text is documented, so a wrong password is not
+      detected: commands are then refused with ERR:0;. With no password set,
+      leave the setting empty.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Send one command at a time and wait for ACK before the next (p.59); the
+      queue does this. Over LAN, ACK has no semicolon and no stx ("A C K LF"),
+      while ERR:n; and VER:V-600UHD,a; keep their semicolons. Error codes:
+      ERR:0 syntax error, ERR:5 out of range.
+
+  - models: [all]
+    severity: info
+    text: >
+      The set has no status queries, so the core cannot read back the
+      cross-points, fade or levels; only the version is reported. The manual
+      names input audio 0 as HDMI IN1 and 7 as TEST TONE and does not list the
+      inputs between them. Tally is available as open-collector outputs on the
+      TALLY/GPI connector (p.60), not over LAN.

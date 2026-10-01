@@ -1,0 +1,467 @@
+spec: 1
+id: roland-vr400uhd
+name: Roland VR-400UHD (LAN control)
+vendor: Roland
+category: switcher
+
+# The VR-400UHD's LAN/RS-232 command set: comma-separated lines,
+# "set,category,ID,sub-ID,value", "get,category,ID,sub-ID" and "ver", each
+# ended by LF, answered "ack,..." or "err,...". The Remote Control Guide lists
+# only set commands; get is documented in the command format for any
+# parameter, so it is offered as get_parameter.
+source:
+  - title: "VR-400UHD Remote Control Guide, edition 01 (© 2023, PDF dated 2023-06-20)"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/VR-400UHD_Control_eng01_W.pdf
+    note: >
+      Manufacturer document. LAN interface (Telnet, TCP 8023) and command
+      format (ver, set, get, lf terminator, ack and err responses) p.2; list
+      of commands, the rule to wait for ack before the next command and the
+      password note p.3.
+  - title: "VR-400UHD Reference Manual, edition 03, Version 1.20 and later"
+    author: Roland Corporation
+    url: https://static.roland.com/assets/media/pdf/VR-400UHD_Reference_eng03_W.pdf
+    note: Network settings and the eight-character password (Setup, System, Password) p.29.
+  - title: Bitfocus companion-module-roland-vr400uhd (MIT), src/utils.js
+    url: https://github.com/bitfocus/companion-module-roland-vr400uhd
+    note: >
+      Open code read for corroboration only: the mixer prompts with a line
+      containing "Enter", is answered with the password and LF, and greets
+      with a line containing "Welcome".
+
+transport:
+  type: line-tcp
+  port: 8023
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # A command is answered "ack,..." or "err,<transmitted command>" (p.2). The
+  # "set,..." line carrying a value is not the reply.
+  reply_match: "^(ack|err),"
+  probe: "ver"
+
+settings:
+  password:
+    type: string
+    secret: true
+    default: ""
+    max_length: 8
+    pattern: '^([\x21-\x7e]{8})?$'
+
+on_connect:
+  - when_set: password
+    after_prompt: "Enter"
+    send: "{settings.password}"
+
+models:
+  - id: vr-400uhd
+    name: Roland VR-400UHD 4K Streaming AV Mixer
+    supports:
+      - select_program_scene
+      - select_preset_scene
+      - cut
+      - auto
+      - set_output_fade
+      - set_dsk
+      - set_logo
+      - set_transition_type
+      - set_wipe_pattern
+      - set_transition_time
+      - set_auto_transition
+      - set_mic_level
+      - set_mic_solo
+      - set_mic_mute
+      - set_mic_aux_send
+      - set_mic_pan
+      - set_mic_reverb_send
+      - set_mic_usb_send
+      - set_mic_aux_post
+      - set_line_level
+      - set_line_solo
+      - set_line_mute
+      - set_line_aux_send
+      - set_line_pan
+      - set_line_reverb_send
+      - set_line_usb_send
+      - set_line_aux_post
+      - set_output_level
+      - set_output_solo
+      - set_output_mute
+      - set_auto_mixing
+      - set_audio_follow_video
+      - set_reverb
+      - set_parameter
+      - get_parameter
+      - get_version
+    verification: none
+    notes: >
+      Remote Control Guide p.3 lists the commands here; any other parameter
+      is reachable through set_parameter and get_parameter by its category,
+      ID and sub-ID, for which Roland publishes no table.
+
+commands:
+  select_program_scene:
+    summary: "Select the program scene (PGM1 in DUAL mode), 1-64 for 1-1 to 8-8 (set,97,46,0)"
+    params:
+      scene: { type: int, min: 1, max: 64, required: true }
+    send: "set,97,46,0,{scene:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  select_preset_scene:
+    summary: "Select the preset scene (PGM2 in DUAL mode), 1-64 for 1-1 to 8-8 (set,97,46,1)"
+    params:
+      scene: { type: int, min: 1, max: 64, required: true }
+    send: "set,97,46,1,{scene:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  cut:
+    summary: "Press the [CUT] button (set,98,43,0,1)"
+    send: "set,98,43,0,1"
+    expect: { contains: "ack," }
+    returns: ack
+
+  auto:
+    summary: "Press the [AUTO] button (set,98,42,0,1)"
+    send: "set,98,42,0,1"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_output_fade:
+    summary: "Set [OUTPUT FADE] on or off for PGM (1; PGM1 in DUAL mode) or PGM2 in DUAL mode (2) (set,97,25)"
+    params:
+      program: { type: int, min: 1, max: 2, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,25,{program:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_dsk:
+    summary: "Set the [DSK] button on or off (set,97,79,0)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "set,97,79,0,{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_logo:
+    summary: "Set the [LOGO] button on or off (set,97,63,0)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "set,97,63,0,{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_transition_type:
+    summary: "Switch between MIX (0) and WIPE (1) (set,97,48,0)"
+    params:
+      type: { type: int, min: 0, max: 1, required: true }
+    send: "set,97,48,0,{type}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_wipe_pattern:
+    summary: "Change the WIPE pattern, 1-4 (set,97,49,0)"
+    params:
+      pattern: { type: int, min: 1, max: 4, required: true }
+    send: "set,97,49,0,{pattern:-1}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_transition_time:
+    summary: "Set the transition time, 0-20 tenths of a second (set,97,18,0)"
+    params:
+      time: { type: int, min: 0, max: 20, required: true }
+    send: "set,97,18,0,{time}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_auto_transition:
+    summary: "Set the [AUTO TRANSITION] button on or off (set,97,19,0)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "set,97,19,0,{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_level:
+    summary: "Adjust a MIC channel volume, 0-127; MIC1-MIC6 (set,97,139)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,139,{channel:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_solo:
+    summary: "Turn a MIC channel solo on or off; MIC1-MIC6 (set,97,138)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,138,{channel:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_mute:
+    summary: "Turn a MIC channel mute on or off; MIC1-MIC6 (set,97,137)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,137,{channel:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_aux_send:
+    summary: "Adjust a MIC channel AUX send level, 0-127; MIC1-MIC6 (set,97,144)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,144,{channel:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_pan:
+    summary: "Adjust a MIC channel pan, -50 (L) to 0 (C) to 50 (R); MIC1-MIC6 (set,97,140)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      pan: { type: int, min: -50, max: 50, required: true }
+    send: "set,97,140,{channel:-1},{pan}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_reverb_send:
+    summary: "Adjust a MIC channel reverb send level, 0-127; MIC1-MIC6 (set,97,141)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,141,{channel:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_usb_send:
+    summary: "Turn a MIC channel USB send on or off; MIC1-MIC6 (set,97,143)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,143,{channel:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_mic_aux_post:
+    summary: "Set a MIC channel AUX send PRE (false) or POST (true); MIC1-MIC6 (set,97,145)"
+    params:
+      channel: { type: int, min: 1, max: 6, required: true }
+      post: { type: bool, required: true }
+    send: "set,97,145,{channel:-1},{post:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_level:
+    summary: "Adjust a channel volume, 0-127; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,173)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,173,{channel:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_solo:
+    summary: "Turn a channel solo on or off; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,172)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,172,{channel:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_mute:
+    summary: "Turn a channel mute on or off; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,171)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,171,{channel:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_aux_send:
+    summary: "Adjust a channel AUX send level, 0-127; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,178)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,178,{channel:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_pan:
+    summary: "Adjust a channel pan, -50 (L) to 0 (C) to 50 (R); channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,174)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      pan: { type: int, min: -50, max: 50, required: true }
+    send: "set,97,174,{channel:-1},{pan}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_reverb_send:
+    summary: "Adjust a channel reverb send level, 0-127; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,175)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,175,{channel:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_usb_send:
+    summary: "Turn a channel USB send on or off; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,177)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,177,{channel:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_line_aux_post:
+    summary: "Set a channel AUX send PRE (false) or POST (true); channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,179)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+      post: { type: bool, required: true }
+    send: "set,97,179,{channel:-1},{post:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_output_level:
+    summary: "Adjust an output volume, 0-127; outputs 1 MAIN, 2 AUX, 3 USB, 4 HDMI (set,97,182)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,182,{output:-1},{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_output_solo:
+    summary: "Turn an output solo on or off; outputs 1 MAIN, 2 AUX, 3 USB, 4 HDMI (set,97,181)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,181,{output:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_output_mute:
+    summary: "Turn an output mute on or off; outputs 1 MAIN, 2 AUX, 3 USB, 4 HDMI (set,97,180)"
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: "set,97,180,{output:-1},{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_auto_mixing:
+    summary: "Turn the auto mixing function on or off (set,97,265,0)"
+    params:
+      enabled: { type: bool, required: true }
+    send: "set,97,265,0,{enabled:bool01}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_audio_follow_video:
+    summary: "Audio follow video: 0 OFF, 1 VFA, 2 AFV (set,97,217,0)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "set,97,217,0,{mode}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_reverb:
+    summary: "Adjust the reverb, 0-127 (set,97,216,0)"
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "set,97,216,0,{level}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  set_parameter:
+    summary: "Set any parameter by category, ID and sub-ID (set)"
+    params:
+      category: { type: int, min: 0, max: 999, required: true }
+      id: { type: int, min: 0, max: 999, required: true }
+      sub_id: { type: int, min: 0, max: 999, required: true }
+      value: { type: int, min: -9999, max: 9999, required: true }
+    send: "set,{category},{id},{sub_id},{value}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  get_parameter:
+    summary: "Read any parameter by category, ID and sub-ID; the value arrives as a set line (get)"
+    params:
+      category: { type: int, min: 0, max: 999, required: true }
+      id: { type: int, min: 0, max: 999, required: true }
+      sub_id: { type: int, min: 0, max: 999, required: true }
+    send: "get,{category},{id},{sub_id}"
+    expect: { contains: "ack," }
+    returns: ack
+
+  get_version:
+    summary: "Model name and version (ver)"
+    send: "ver"
+    expect: { contains: "ack," }
+    returns: ack
+
+telemetry:
+  # No pushes are documented. The program and preset scenes are asked every
+  # second; every ack and set line also lands in state.
+  subscribe:
+    send: ["ver"]
+  poll:
+    send: ["get,97,46,0", "get,97,46,1"]
+    every_ms: 1000
+  updates:
+    - match: '^(?:ack|set),97,46,0,(\d+)$'
+      state: { "program.scene": "{1:+1}" }
+    - match: '^(?:ack|set),97,46,1,(\d+)$'
+      state: { "preset.scene": "{1:+1}" }
+    - match: '^(?:ack|set),(\d+),(\d+),(\d+),(-?\d+)$'
+      state: { "parameters.{1}-{2}-{3}": "{4}" }
+    - match: '^ver,([^,]+),(.+)$'
+      state: { "device.model": "{1}", "device.version": "{2}" }
+
+state:
+  program.scene:  { type: int, description: "Program scene (PGM1 in DUAL mode), 1-64 for 1-1 to 8-8" }
+  preset.scene:   { type: int, description: "Preset scene (PGM2 in DUAL mode), 1-64 for 1-1 to 8-8" }
+  parameters.*:   { type: int, description: "Last value seen for a parameter, keyed category-ID-sub-ID as on the wire (97-46-0 is the program scene, 0-based)" }
+  device.model:   { type: string, description: "Model name from ver" }
+  device.version: { type: string, description: "Version from ver" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      "The network and password settings must be configured beforehand. When
+      connecting, enter the password you already set" (p.3); the password has
+      eight characters (Reference Manual p.29). The mixer prompts for it with
+      a line containing "Enter" and greets with "Welcome" (Bitfocus
+      companion-module-roland-vr400uhd, which waits 150 ms after the prompt).
+      The password is sent once text containing "Enter" has arrived. No
+      refusal text is documented, so a wrong password is not detected.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Wait for ack before sending the next command (p.3); the queue does this.
+      A failed command is answered "err," followed by the command as sent.
+      get is answered with the value as "set,category,ID,sub-ID,value" (p.2);
+      the guide does not say whether an ack line accompanies it, and this
+      spec completes a get on its ack. If the mixer sends only the set line,
+      get_parameter and the scene poll time out, though the value still lands
+      in state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Wire values are 0-based; the scene, wipe pattern, channel and output
+      parameters here are 1-based and converted. Scenes 1-64 stand for 1-1 to
+      8-8 (bank b, number n is (b-1)*8+n). Levels are 0-127 with no dB scale
+      given. LINE channels are 1 LINE1, 2 LINE2, 3 HDMI, 4 USB; outputs 1
+      MAIN, 2 AUX, 3 USB, 4 HDMI.
