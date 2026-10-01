@@ -1,0 +1,417 @@
+spec: 1
+id: h2r-graphics
+name: H2R Graphics (HTTP API)
+vendor: Here to Record (Barker Technologies AB)
+category: other
+
+# H2R Graphics 2 and 3 take commands as HTTP POSTs to
+# http://<host>:4001/api/<project-id>/... The project id is a setting, because
+# one installation can hold several projects (Pro) and every command names one.
+# The application reports its state (rundown, graphic status, variables, timers)
+# only over a socket.io websocket on the same port, which the format has no
+# transport for and H2R does not document, so this spec has no telemetry.
+
+source:
+  - title: H2R Graphics docs, API > HTTP (current, for H2R Graphics 3.4)
+    author: Here to Record / Barker Technologies AB
+    url: https://h2r.graphics/docs/api/http/
+    note: >
+      Manufacturer document, retrieved 2026-10-01. Base URL
+      http://<host>:4001/api/<project-id>/ ("Base URL"); every POST endpoint
+      used here: run, clear, graphic/<id>/show, /hide, /update with a body
+      object copied from the Rundown, graphic/<id>/updateScore/<team>/<level>/<type>/<amount>,
+      updateVariableText/<variable-text-id> with body text,
+      updateVariableList/1/selectRow/next|previous|<number>,
+      output/<output_number>/open (1-4), graphic/<id>/timer/run|pause|reset,
+      timer/jump/<seconds> (10 or -10), timer/duration/<seconds>, and
+      graphic/<id>/lyric/next|previous|start. The "Errors" section: an error
+      response for an unknown project, an unknown graphic id or an update verb
+      the graphic does not understand.
+  - title: H2R Graphics docs, API > HTTP (snapshot of 2024-06-22, H2R Graphics 2.2x)
+    author: Here to Record
+    url: https://web.archive.org/web/20240622185322/https://h2r.graphics/docs/api/http/
+    note: >
+      Manufacturer document, as archived. The same endpoints as the current
+      page without the Lyrics section and without the Errors section; used to
+      limit the lyric commands to version 3.
+  - title: H2R Graphics v2 docs, API > HTTP (GitBook, snapshot of 2022-01-29)
+    author: Here to Record
+    url: https://web.archive.org/web/20220129102851/https://heretorecord.gitbook.io/h2r-graphics-v2/api/http
+    note: >
+      Manufacturer document, as archived. The original version 2 set: run,
+      clear, show, hide, update, updateScore, updateVariableText and
+      updateVariableList selectRow. The companion OSC page of the same date
+      says only "The OSC API is still being worked on".
+  - title: H2R Graphics docs, Data source > HTTP Listener
+    author: Here to Record
+    url: https://h2r.graphics/docs/http-listener/
+    note: >
+      Manufacturer document. POST http://<host>:4001/data/<source-id> with a
+      body {"messages": [...]}, each message carrying id, timestamp,
+      snippet.displayMessage, authorDetails.displayName and .profileImageUrl,
+      platform.name and .logoUrl; timestamp and platform from v2.13.
+  - title: H2R Graphics docs, Control > Variables; Control > Rundown; API > Companion module; Pro > Multiple outputs and Multiple projects
+    author: Here to Record
+    url: https://h2r.graphics/docs/control/variables/
+    note: >
+      Manufacturer documents. Text variables are used as [text.1]; graphic
+      status (cued, coming/going, on air, cued off) and the Run button
+      (Rundown); the default project id ABCD and port 4001 (Companion module
+      page); outputs 2-4 and extra projects need a Pro licence.
+  - title: H2R Graphics release notes, v2.8 to v3.4
+    author: Here to Record
+    url: https://h2r.graphics/blog/
+    note: >
+      Manufacturer documents, used for version minimums: v2.8 "Open an output
+      with a HTTP request"; v2.11 the HTTP Listener and "'Toggle' show/hide
+      graphic option for API & Companion"; v2.15 the Lyrics graphic; v2.16 the
+      Speaker timer with add/remove time "via the HTTP API"; v2.17 the timer
+      control API overhaul and text variables 4-6; v3.0 unlimited text
+      variables (Pro); v3.4 "External API: Unknown projects, graphics and
+      update verbs now return proper errors instead of silently doing nothing".
+  - title: companion-module-h2r-graphics (H2R's own Companion module, v3.10.0, MIT licence)
+    author: John Barker, Here to Record (maintainer)
+    url: https://github.com/bitfocus/companion-module-h2r-graphics
+    note: >
+      Manufacturer-maintained code, read for corroboration only (src/actions.js,
+      src/tcp.js). It confirms every documented path, that a text variable's
+      id is text.N, and supplies the one wire detail the documents leave out:
+      the API's toggle is the update body {"status": "toggle"}
+      (toggle_graphic). It also shows that state comes over socket.io
+      (event updateFrontend), not HTTP.
+
+transport:
+  type: http
+  port: 4001
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  # The project's Rundown page (http://<host>:4001/rundown/<project-id>/,
+  # HTTP API page "Base URL"). The API itself documents no GET endpoint.
+  probe: { method: GET, path: "/rundown/{settings.project}/" }
+
+settings:
+  # The project id shown in the Launcher; ABCD in a new installation
+  # (Companion module page). Pro installations can hold several projects.
+  project: { type: string, default: ABCD, max_length: 32 }
+
+models:
+  - id: h2r-graphics-v2
+    name: H2R Graphics 2 (2.x)
+    supports: [run, clear, show_graphic, hide_graphic, toggle_graphic, update_graphic,
+               update_score, set_text_variable, select_list_row_next,
+               select_list_row_previous, select_list_row, open_output, timer_run,
+               timer_pause, timer_reset, timer_jump, timer_set_duration,
+               post_social_messages]
+    verification: none
+    notes: >
+      Several commands arrived during version 2; see the quirks for each
+      minimum (open_output 2.8, toggle_graphic and post_social_messages 2.11,
+      timers 2.16). The lyric endpoints are documented only for version 3.
+  - id: h2r-graphics-v3
+    name: H2R Graphics 3 (3.x)
+    supports: [run, clear, show_graphic, hide_graphic, toggle_graphic, update_graphic,
+               update_score, set_text_variable, select_list_row_next,
+               select_list_row_previous, select_list_row, open_output, timer_run,
+               timer_pause, timer_reset, timer_jump, timer_set_duration, lyric_next,
+               lyric_previous, lyric_start, post_social_messages]
+    verification: none
+
+commands:
+  # ── Rundown ──────────────────────────────────────────────────────────────
+  run:
+    summary: Press the Rundown's Run button, taking cued graphics on and off air (POST run)
+    send: { method: POST, path: "/api/{settings.project}/run" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear:
+    summary: Clear all graphics, taking every on-air graphic off air (POST clear)
+    send: { method: POST, path: "/api/{settings.project}/clear" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Graphics ─────────────────────────────────────────────────────────────
+  show_graphic:
+    summary: Show a graphic, by its id from the Rundown's Copy "Show" URI (POST graphic/<id>/show)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/show" }
+    expect: { status: 200 }
+    returns: ack
+
+  hide_graphic:
+    summary: Hide a graphic (POST graphic/<id>/hide)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/hide" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_graphic:
+    summary: >
+      Toggle a graphic on or off air (v2.11 release notes; sent as the update
+      body {"status":"toggle"}, the wire form from H2R's Companion module)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+      # A single-valued parameter: the template engine would read a flat
+      # literal {"status":"toggle"} as a placeholder.
+      status:  { type: enum, values: [toggle], default: toggle }
+    send:
+      method: POST
+      path: "/api/{settings.project}/graphic/{graphic}/update"
+      body: '{"status":{status:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  update_graphic:
+    summary: >
+      Update a graphic's contents (POST graphic/<id>/update). The body is the
+      graphic's own JSON object, as the Rundown's right-click Copy body JSON
+      gives it; its fields depend on the graphic type, and v3.4 and later
+      refuse an update verb the graphic does not understand.
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+      body: { type: json, required: true }
+    send:
+      method: POST
+      path: "/api/{settings.project}/graphic/{graphic}/update"
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  update_score:
+    summary: >
+      Set, raise or lower one score of a Score graphic
+      (POST graphic/<id>/updateScore/<team>/<level>/<type>/<amount>)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+      team:    { type: int, min: 1, required: true }
+      level:   { type: int, min: 1, required: true }
+      type:    { type: enum, values: [set, up, down], required: true }
+      amount:  { type: int, required: true }
+    send:
+      method: POST
+      path: "/api/{settings.project}/graphic/{graphic}/updateScore/{team}/{level}/{type}/{amount}"
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Variables ────────────────────────────────────────────────────────────
+  set_text_variable:
+    summary: "Set text variable [text.N] (POST updateVariableText/text.N with body {\"text\": ...})"
+    params:
+      variable: { type: int, min: 1, required: true }
+      text:     { type: string, max_length: 4096, required: true }
+    send:
+      method: POST
+      path: "/api/{settings.project}/updateVariableText/text.{variable}"
+      body: '{"text":{text:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+  select_list_row_next:
+    summary: Select the next row of a variable list (POST updateVariableList/<list>/selectRow/next)
+    params:
+      list: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/{settings.project}/updateVariableList/{list}/selectRow/next" }
+    expect: { status: 200 }
+    returns: ack
+
+  select_list_row_previous:
+    summary: Select the previous row of a variable list (POST updateVariableList/<list>/selectRow/previous)
+    params:
+      list: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/{settings.project}/updateVariableList/{list}/selectRow/previous" }
+    expect: { status: 200 }
+    returns: ack
+
+  select_list_row:
+    summary: Select a specific row of a variable list by number (POST updateVariableList/<list>/selectRow/<number>)
+    params:
+      list: { type: int, min: 1, required: true }
+      row:  { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/{settings.project}/updateVariableList/{list}/selectRow/{row}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Outputs ──────────────────────────────────────────────────────────────
+  open_output:
+    summary: Open an output window, 1 to 4 (POST output/<output_number>/open); outputs 2-4 need Pro
+    params:
+      output: { type: int, min: 1, max: 4, required: true }
+    send: { method: POST, path: "/api/{settings.project}/output/{output}/open" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Speaker Timer ────────────────────────────────────────────────────────
+  timer_run:
+    summary: Run or resume a Speaker Timer (POST graphic/<id>/timer/run)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/run" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_pause:
+    summary: Pause a Speaker Timer (POST graphic/<id>/timer/pause)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/pause" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_reset:
+    summary: Reset a Speaker Timer to its original duration (POST graphic/<id>/timer/reset)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/reset" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_jump:
+    summary: >
+      Add (positive) or remove (negative) seconds: from the time left while
+      running, from the duration while paused (POST graphic/<id>/timer/jump/<seconds>)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+      seconds: { type: int, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/jump/{seconds}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timer_set_duration:
+    summary: Set a Speaker Timer's duration in seconds and reset it (POST graphic/<id>/timer/duration/<seconds>)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+      seconds: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/duration/{seconds}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Lyrics (version 3 documentation) ─────────────────────────────────────
+  lyric_next:
+    summary: Go to the next line of a Lyrics graphic (POST graphic/<id>/lyric/next)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/lyric/next" }
+    expect: { status: 200 }
+    returns: ack
+
+  lyric_previous:
+    summary: Go to the previous line of a Lyrics graphic (POST graphic/<id>/lyric/previous)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/lyric/previous" }
+    expect: { status: 200 }
+    returns: ack
+
+  lyric_start:
+    summary: Go back to the start of a Lyrics graphic (POST graphic/<id>/lyric/start)
+    params:
+      graphic: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/lyric/start" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── HTTP Listener data source ────────────────────────────────────────────
+  post_social_messages:
+    summary: >
+      Send messages to an HTTP Listener data source, which shows them on the
+      Social tab (POST /data/<source-id>). The body is the documented
+      {"messages": [{"id", "timestamp", "snippet": {"displayMessage"},
+      "authorDetails": {"displayName", "profileImageUrl"}, "platform":
+      {"name", "logoUrl"}}]} object; id must be unique and displayMessage
+      carries no HTML.
+    params:
+      source: { type: string, max_length: 64, required: true }
+      body:   { type: json, required: true }
+    send:
+      method: POST
+      path: "/data/{source}"
+      body: "{body}"
+      content_type: application/json
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Every API path carries the project id (the project setting, ABCD in a
+      new installation, shown in the Launcher). A Pro installation can hold
+      several projects; commands reach only the configured one. Graphic ids
+      are the ids in the project, as the Rundown's right-click Copy "Show" URI
+      gives them, not the graphic's label; they differ between projects.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The documents do not give the HTTP status of a successful request; the
+      spec takes 200 as success. From v3.4 the API answers an unknown project,
+      an unknown graphic id or an update verb the graphic does not
+      understand with an error response (status not documented), which fails
+      the command. Before v3.4 those requests answered as if they had
+      succeeded and did nothing.
+
+  - models: [all]
+    severity: info
+    text: >
+      The HTTP API has no authentication and no read endpoints. The
+      application pushes its state (each graphic's status, contents, text and
+      list variables, timer times) only over a socket.io websocket on port
+      4001, which H2R does not document and this spec does not use, so no
+      state is reported.
+
+  - models: [all]
+    severity: info
+    text: >
+      show_graphic, hide_graphic, toggle_graphic and run act on the graphic's
+      outputs as set in the graphic's "Show on Outputs" (Multiple outputs
+      page). A graphic's status passes through coming and going transitions
+      before it is on or off air (Rundown page), so an ack means the request
+      was accepted, not that the graphic is on air.
+
+  - models: [h2r-graphics-v2]
+    severity: warning
+    text: >
+      Version 2 minimums from H2R's release notes: open_output 2.8;
+      toggle_graphic and post_social_messages 2.11 (timestamp and platform
+      fields from 2.13); the Speaker Timer and its HTTP control 2.16, with the
+      timer API reworked in 2.17. The documents do not say how an older
+      version answers them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Text variables: [text.1] to [text.3] before v2.17, [text.1] to [text.6]
+      from v2.17, and as many as the project defines in version 3 (more than
+      six need Pro). The documents write the path as
+      updateVariableText/<variable-text-id>; the id form text.N is that of
+      the [text.N] variable syntax and of H2R's Companion module.
+
+  - models: [all]
+    severity: info
+    text: >
+      update_score: the document says team is "likely 1 or 2" and level
+      "likely 1, 2, 3 or 4", and gives no limit for either (version 3 allows
+      more teams); amount is the value to set, or to add or subtract for up
+      and down. select_list_row: the document does not say whether a row
+      number counts from 1 or 0; the list number counts from 1.
+
+  - models: [all]
+    severity: info
+    text: >
+      The timer commands are documented for the Speaker Timer (a Pro Utility
+      graphic). timer_jump takes whole seconds as documented (10 adds ten
+      seconds, -10 removes ten). Outputs 2 to 4, the Speaker Timer, the
+      Lyrics graphic and extra projects need a Pro licence.
+
+  - models: [h2r-graphics-v2]
+    severity: info
+    text: >
+      The Lyrics graphic arrived in v2.15, but the lyric endpoints appear only
+      in the version 3 documentation (absent from the 2024 page), so this
+      model does not list them.
