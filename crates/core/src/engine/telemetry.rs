@@ -145,6 +145,43 @@ fn items(v: Option<&Value>) -> Vec<Value> {
 }
 
 impl Telemetry {
+    /// `parse`, shared: rules compile to many regexes (a Yamaha console spec
+    /// has about 250), so every device opened with the same telemetry and
+    /// state declarations uses one compiled copy.
+    pub(crate) fn shared(
+        spec: Option<&Value>,
+        state: &BTreeMap<String, StateField>,
+    ) -> Result<std::sync::Arc<Telemetry>, String> {
+        use std::collections::HashMap;
+        use std::sync::{Arc, Mutex};
+        type Cache = Mutex<Option<HashMap<String, Arc<Telemetry>>>>;
+        static CACHE: Cache = Mutex::new(None);
+        let key = format!(
+            "{}\u{0}{}",
+            spec.map(Value::to_string).unwrap_or_default(),
+            state
+                .iter()
+                .map(|(path, field)| format!("{path}={}", field.kind))
+                .collect::<Vec<_>>()
+                .join("\u{0}")
+        );
+        if let Some(hit) = CACHE
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .get(&key)
+        {
+            return Ok(hit.clone());
+        }
+        let parsed = Arc::new(Telemetry::parse(spec, state)?);
+        CACHE
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .insert(key, parsed.clone());
+        Ok(parsed)
+    }
+
     pub(crate) fn parse(
         spec: Option<&Value>,
         state: &BTreeMap<String, StateField>,

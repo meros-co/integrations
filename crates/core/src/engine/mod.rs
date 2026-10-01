@@ -160,7 +160,7 @@ pub(crate) struct SpecEngine {
     framer: Option<Framer>,
     packets: Option<PacketReader>,
     next_request: RequestId,
-    telemetry: telemetry::Telemetry,
+    telemetry: Arc<telemetry::Telemetry>,
     /// The path and query of each HTTP request in flight, so its reply can be
     /// offered to the telemetry rules for that path.
     request_paths: std::collections::HashMap<RequestId, String>,
@@ -331,7 +331,7 @@ impl SpecEngine {
         };
 
         let probe = t.get("probe").cloned();
-        let telemetry = telemetry::Telemetry::parse(spec.telemetry.as_ref(), &spec.state)?;
+        let telemetry = telemetry::Telemetry::shared(spec.telemetry.as_ref(), &spec.state)?;
         Ok(SpecEngine {
             spec,
             host: ctx.host,
