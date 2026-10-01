@@ -56,7 +56,9 @@ _pv("mute_workspace", {}, "POST", _P + "/mute/workspace")
 _pv("mute_layer", {"layer": "0"}, "POST", _P + "/mute/layer/0", **_OK)
 _pv("unmute_workspace", {}, "POST", _P + "/unmute/workspace")
 _pv("unmute_layer", {"layer": "Layer 2"}, "POST", _P + "/unmute/layer/Layer%202")
-_pv("hide_workspace", {}, "POST", _P + "/hide/workspace", **_err(401))
+# A 401 is the token refused: terminal, reported as auth (auth: bearer).
+_pv("hide_workspace", {}, "POST", _P + "/hide/workspace",
+    http_reply={"status": 401}, expect_result={"error": {"error": "auth"}})
 _pv("hide_layer", {"layer": "0"}, "POST", _P + "/hide/layer/0")
 _pv("unhide_workspace", {}, "POST", _P + "/unhide/workspace")
 _pv("unhide_layer", {"layer": "394B7D0F-050E-4590-98B9-B30A8823488D"}, "POST",

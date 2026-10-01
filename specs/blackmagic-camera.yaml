@@ -42,10 +42,20 @@ source:
 transport:
   type: http
   port: 80
-  scheme: http
-  auth: none
+  # "Enabled with security" serves HTTPS with the camera's own certificate
+  # (or an imported one) and asks for a login.
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  auth: basic
+  # 403 means a setting cannot be changed in the current state (p.50-62).
+  refusal_status: [401]
   timeout_ms: 4000
   probe: { method: GET, path: /control/api/v1/system/product }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http }
+  username: { type: string, default: "" }
+  password: { type: string, secret: true, default: "" }
 
 models:
   - id: ursa-cine-12k-lf
@@ -2759,13 +2769,15 @@ quirks:
       The REST API is served by the camera's web media manager, which is off
       until it is enabled in Blackmagic Camera Setup, Network Access (REST API
       document p.2; camera manual, Network Access settings). Enabling the web
-      media manager also enables the REST API. This spec uses the plain HTTP
-      setting on port 80 with no login. With "enabled with security" the camera
-      serves HTTPS with its own or an imported certificate and asks for the
-      username and password set there; the document's examples use that form
-      (https://<camera-name>.local/control/api/v1/), and the format fixes
-      the scheme in the spec, so a secured camera cannot be reached through
-      this spec as written.
+      media manager also enables the REST API. Plain "enabled" serves HTTP on
+      port 80 with no login. "Enabled with security" serves HTTPS with the
+      camera's own or an imported certificate and asks for the username and
+      password set there, as in the document's examples
+      (https://<camera-name>.local/control/api/v1/): set the scheme setting to
+      https, the username and password settings, and open the device on port
+      443. The certificate is accepted without verifying who presents it. The
+      login scheme is not documented; the core sends Basic and answers a
+      Digest challenge if the camera sends one instead.
 
   - models: [all]
     severity: warning
