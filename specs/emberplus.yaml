@@ -1,0 +1,269 @@
+spec: 1
+id: emberplus
+name: Ember+ provider (generic consumer)
+vendor: Lawo (Ember+ protocol)
+category: other
+implementation: native
+reason: >
+  Ember+ is a binary protocol: BER-encoded (ASN.1) Glow objects inside S101 frames with byte escaping, a
+  CRC-CCITT and multi-packet messages. The device's control surface is not fixed but discovered: the consumer
+  walks the provider's tree with GetDirectory requests, element numbers are valid for one session only, value
+  changes, matrix connections and stream subscriptions are answered asynchronously by the provider's reports,
+  and functions are invoked by invocation id. None of this is expressible as data.
+
+source:
+  - title: "Ember+ Specification, version 2.50 revision 15 (2017-11-09)"
+    author: Lawo GmbH (Marius Keuck, Philip Boger)
+    url: "https://github.com/Lawo/ember-plus/blob/master/documentation/Ember%2B%20Documentation.pdf"
+    note: >
+      Published in the Lawo/ember-plus repository, whose top-level LICENSE.TXT is the Boost Software License 1.0
+      (checked 2026-10-01); only the documentation was read, no library code. Chapters used: "EmBER" (BER subset,
+      the Integer encoding table, Real binary base 2, definite and indefinite lengths, Set/Sequence), "Glow
+      specification" (types, properties and their context tags, GetDirectory 32 with dirFieldMask, Subscribe 30,
+      Unsubscribe 31, the empty-node rule, nullable values), "Ember+ 1.1: Matrix Extensions" (Matrix, targets,
+      sources, connections, operations absolute/connect/disconnect, dispositions tally/modified/pending/locked,
+      parametersLocation, labels), "Ember+ 1.2: Function Extensions" (Function, Invocation, InvocationResult),
+      "Ember+ 1.4: Templates" (consumer migration: always ask All, discard templates), "Ember+ usage",
+      "Behaviour rules" (1024-byte packet payload, identifier rules, keep-alive about 5 s, notifications, value
+      change requests always answered, sub-tree removal by isOnline false, numbers session-based), "Message
+      Framing" (S101 variant 1 escaping with its encoding example, CRC with initial 0xFFFF and residue 0xF0B8,
+      variant 2, message header, flags, keep-alive), "Glow DTD ASN.1 Notation" (Glow DTD 2.50) and the appendix
+      CRC table.
+
+settings:
+  # Levels of the tree requested automatically on connecting: 1 asks only for
+  # the root's elements (lazy: deeper levels by get_directory); 255 walks
+  # everything.
+  walk_depth: { type: int, min: 1, max: 255, default: 255 }
+  # Ask each discovered matrix for its targets, sources and connections (this
+  # also subscribes to connection changes).
+  walk_matrices: { type: bool, default: true }
+  # Address requests with QualifiedNode/QualifiedParameter/... and the full
+  # path; false spells the path out as nested elements, for providers that do
+  # not accept the qualified types in requests.
+  qualified_requests: { type: bool, default: true }
+  # GetDirectory requests in flight at once during the walk.
+  directory_concurrency: { type: int, min: 1, max: 256, default: 8 }
+  # Send an S101 keep-alive request after this long without hearing from the
+  # provider, and drop the connection if it is not answered within the timeout.
+  keepalive_interval_ms: { type: int, min: 500, max: 600000, default: 5000 }
+  keepalive_timeout_ms: { type: int, min: 500, max: 600000, default: 5000 }
+  # How long a GetDirectory, value change, matrix operation or invocation
+  # waits for the provider's answer.
+  request_timeout_ms: { type: int, min: 500, max: 600000, default: 10000 }
+
+models:
+  - id: provider
+    name: "Any Ember+ provider over TCP (S101 framing): give the device's Ember+ port, commonly 9000"
+    supports:
+      [get_directory, refresh, set_parameter, set_parameter_null, subscribe, unsubscribe, matrix_connect,
+      matrix_disconnect, matrix_absolute, invoke_function]
+    verification: none
+    notes: >
+      One model for every provider: what a device offers is discovered from its tree, not declared here. Ember+
+      is implemented by Lawo, Riedel, DHD, Wisycom, Stagetec, Evertz and others; the specification assigns no
+      TCP port, so the device's own documentation gives it.
+
+commands:
+  get_directory:
+    summary: >
+      GetDirectory on an element (the root when path is empty): its children and their properties become state,
+      and the provider then reports changes below it. Acknowledged when the provider answers
+    params:
+      path: &path { type: string, default: "", max_length: 4096 }
+      field_mask:
+        type: enum
+        values: [all, default, sparse, identifier, description, tree, value, connections]
+        default: all
+    returns: ack
+  refresh:
+    summary: "Forget the tree and walk it again from the root; acknowledged when the root has answered"
+    returns: ack
+  set_parameter:
+    summary: >
+      Set a parameter's value, typed by the parameter: integer, real (also "inf", "-inf", "nan"), string,
+      boolean, octets as a hex string, and an enum by entry number or entry name. Refused when the parameter
+      reports access none or read, or the value is outside its minimum/maximum. Returns the value the provider
+      reports back, which is its current value if it refused the change
+    params:
+      path: { type: string, required: true, max_length: 4096 }
+      value: { type: json, required: true }
+    returns: value
+  set_parameter_null:
+    summary: "Set a nullable parameter (one whose default is null) to null; returns the value the provider reports back"
+    params:
+      path: { type: string, required: true, max_length: 4096 }
+    returns: value
+  subscribe:
+    summary: >
+      Subscribe to an element, needed for a parameter with a stream identifier before the provider streams its
+      value. Kept across reconnections by identifier path. The protocol has no acknowledgement
+    params:
+      path: { type: string, required: true, max_length: 4096 }
+    returns: ack
+  unsubscribe:
+    summary: "Unsubscribe from an element; on a node, from every parameter below it. The protocol has no acknowledgement"
+    params:
+      path: { type: string, required: true, max_length: 4096 }
+    returns: ack
+  matrix_connect:
+    summary: >
+      Connect sources (array of source numbers) to a matrix target (operation connect). Returns the
+      connection the provider reports for the target: {target, sources, disposition}; a locked target fails
+    params:
+      path: &matrix_path { type: string, required: true, max_length: 4096 }
+      target: &target { type: int, min: 0, max: 4294967295, required: true }
+      sources: &sources { type: json, required: true }
+    returns: value
+  matrix_disconnect:
+    summary: "Disconnect sources (array of source numbers) from a matrix target (operation disconnect); returns the reported connection"
+    params: { path: *matrix_path, target: *target, sources: *sources }
+    returns: value
+  matrix_absolute:
+    summary: >
+      Set the complete set of sources of a matrix target (operation absolute; an empty array disconnects
+      everything); returns the reported connection
+    params: { path: *matrix_path, target: *target, sources: *sources }
+    returns: value
+  invoke_function:
+    summary: >
+      Invoke a function with its arguments (array, typed by the function's argument description). Returns the
+      result tuple as an array; an InvocationResult with success false fails
+    params:
+      path: { type: string, required: true, max_length: 4096 }
+      arguments: { type: json, default: [] }
+    returns: value
+
+state:
+  walk.complete:                          { type: bool, description: "Every GetDirectory of the automatic walk has been answered or has timed out" }
+  identifiers.*:                          { type: string, description: "Numeric path of the element with this identifier path, its identifiers from the root joined by '/' (identifiers cannot contain '/'), e.g. identifiers.\"Device/Audio/Gain\" = \"1.2.3\"" }
+  elements.*.type:                        { type: string, description: "node, parameter, matrix or function. Elements are keyed by numeric path such as \"1.2.3\" (a single key containing dots); numbers are valid for one session only" }
+  elements.*.path:                        { type: string, description: "The numeric path, as the key" }
+  elements.*.number:                      { type: int, description: "The element's number under its parent" }
+  elements.*.identifier:                  { type: string, description: "The element's identifier, stable across sessions" }
+  elements.*.identifier_path:             { type: string, description: "Identifiers from the root joined by '/'; commands accept it in place of the numeric path" }
+  elements.*.description:                 { type: string, description: "Display name; shown instead of the identifier when present" }
+  elements.*.is_online:                   { type: bool, description: "Online state of a node or parameter; an offline node's children are offline too" }
+  elements.*.is_root:                     { type: bool, description: "Node: marked as a root (providers merging several devices' trees)" }
+  elements.*.schema_identifiers:          { type: array, description: "Schema identifiers the element complies with" }
+  elements.*.template_reference:          { type: string, description: "Path of the template the element refers to (templates themselves are discarded)" }
+  elements.*.value:                       { type: float, description: "Parameter value as the provider reports it (the device value: apply factor or formula for display). Integer, real, string, boolean, or octets as hex; a real that is infinite or NaN is \"inf\", \"-inf\" or \"nan\"; a null value removes the key. A consumer must accept every type" }
+  elements.*.minimum:                     { type: float, description: "Parameter minimum (integer or real)" }
+  elements.*.maximum:                     { type: float, description: "Parameter maximum (integer or real)" }
+  elements.*.default:                     { type: float, description: "Parameter default value, any value type" }
+  elements.*.nullable:                    { type: bool, description: "The parameter's default is null: it may report no value" }
+  elements.*.access:                      { type: string, description: "none, read, write or read_write; absent means read" }
+  elements.*.format:                      { type: string, description: "C-style format string; the text after U+00B0 is the unit" }
+  elements.*.enumeration:                 { type: array, description: "Enumeration entries, the value being the index; an entry starting with '~' is not to be displayed" }
+  elements.*.enum_map:                    { type: array, description: "Enumeration as [{name, value}] for non-consecutive values" }
+  elements.*.factor:                      { type: int, description: "Divide the value (and minimum, maximum, default) by this for display" }
+  elements.*.formula:                     { type: array, description: "Two formulas: device to display, display to device (Ember+ Formulas syntax), not evaluated by the core" }
+  elements.*.step:                        { type: int, description: "Increment step (deprecated by the specification)" }
+  elements.*.parameter_type:              { type: string, description: "Declared type: null, integer, real, string, boolean, trigger, enum or octets" }
+  elements.*.stream_identifier:           { type: int, description: "Stream identifier: the value is streamed only after subscribe" }
+  elements.*.stream_descriptor.format:    { type: string, description: "Format of this parameter's value within the stream's octets, e.g. ieee_float32_little_endian" }
+  elements.*.stream_descriptor.offset:    { type: int, unit: bytes, description: "Byte offset of the value within the stream's octets" }
+  elements.*.matrix_type:                 { type: string, description: "one_to_n (default), one_to_one or n_to_n" }
+  elements.*.addressing_mode:             { type: string, description: "linear (signal numbers are indices) or non_linear (signals listed in targets and sources)" }
+  elements.*.target_count:                { type: int, description: "Matrix targets (columns)" }
+  elements.*.source_count:                { type: int, description: "Matrix sources (rows)" }
+  elements.*.maximum_total_connects:      { type: int, description: "N:N matrix: connections allowed in total" }
+  elements.*.maximum_connects_per_target: { type: int, description: "N:N matrix: sources allowed per target" }
+  elements.*.parameters_location:         { type: string, description: "Numeric path of the node holding the matrix's target, source and connection parameters" }
+  elements.*.gain_parameter_number:       { type: int, description: "N:N matrix: number of the connection gain parameter under parameters_location" }
+  elements.*.labels:                      { type: array, description: "[{base_path, description}]: nodes holding signal label parameters" }
+  elements.*.targets:                     { type: array, description: "Non-linear matrix: target numbers" }
+  elements.*.sources:                     { type: array, description: "Non-linear matrix: source numbers" }
+  elements.*.connections.*.sources:       { type: array, description: "Sources connected to the target, keyed by target number" }
+  elements.*.connections.*.disposition:   { type: string, description: "tally, modified, pending (sources are the future state) or locked" }
+  elements.*.arguments:                   { type: array, description: "Function arguments as [{type, name}]" }
+  elements.*.result:                      { type: array, description: "Function result tuple as [{type, name}]" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The specification assigns no TCP port to Ember+. The module defaults to 9000, a common choice; give the
+      device's own Ember+ port.
+  - models: [all]
+    severity: warning
+    text: >
+      Element numbers are valid for one session only ("Why are the node and parameter numbers session based?").
+      On every (re)connection the module clears elements and identifiers and walks the tree again; store
+      identifier paths, not numeric paths. Subscriptions are restored by identifier path when known.
+  - models: [all]
+    severity: warning
+    text: >
+      The specification's prose and its DTD disagree on three tags: StreamCollection and StreamEntry are
+      APPLICATION 5 and 6 in "Application defined types" but 6 and 5 in the DTD (the module sends the DTD's and
+      accepts either under Root); Parameter templateReference is Context 8 in the prose and 18 in the DTD (the
+      DTD is used, since 8 is factor); schemaIdentifiers is typed Boolean in the prose and EmberString in the DTD
+      (EmberString is used).
+  - models: [all]
+    severity: info
+    text: >
+      The S101 application bytes carry "the version number of the Glow DTD"; the only example is DTD 2.5 sent as
+      0x05 0x02 (minor, major). The module sends DTD 2.50 as 50 (0x32) and 2, by the same rule; a provider "may
+      assume this version to be constant". Whether each packet of a multi-packet message repeats the DTD and
+      application bytes is not stated: the module sends the full header in every packet and reads the
+      application byte count of each. The empty-packet flag (0x20) is named but not described; such a packet
+      with no payload is ignored.
+  - models: [all]
+    severity: info
+    text: >
+      Payloads are limited to 1024 bytes per packet; longer requests (a matrix operation with many sources) are
+      split into first, middle and last packets. Larger packets from a provider are accepted. Variant 2
+      (non-escaping) framing is decoded but never sent, since a provider uses it only after a consumer probes
+      for it.
+  - models: [all]
+    severity: info
+    text: >
+      How a consumer knows a GetDirectory has been answered is not stated. The module takes the queried element
+      reported with its children (or, for a node with none, "without any properties set", as the specification
+      requires), a matrix with its connections, targets or sources, or a parameter or function with its contents.
+      An unanswered request times out after request_timeout_ms and the walk continues. Providers that send their
+      whole tree unasked (allowed for very small embedded providers) are taken as they are.
+  - models: [all]
+    severity: info
+    text: >
+      Directory requests always use dirFieldMask All (-1), as the Templates chapter tells consumers that do not
+      support templates; templates and template references are discarded. The DTD's FieldFlags table is garbled
+      in the PDF; the values used are those of the prose (sparse -2, all -1, default 0, identifier 1,
+      description 2, tree 3, value 4) and connections 5, the next entry of the DTD's list.
+  - models: [all]
+    severity: info
+    text: >
+      ParameterAccess defaults to read when absent. The module refuses set_parameter only when a provider
+      reports access none or read explicitly, and otherwise sends the value; the provider answers with its
+      current value if it refuses.
+  - models: [all]
+    severity: info
+    text: >
+      What a trigger parameter (type trigger) should be sent is not documented. The module sends the value given,
+      typed by its JSON type (number, string or boolean).
+  - models: [all]
+    severity: info
+    text: >
+      The DTD comments mark matrix operations connect and disconnect "nToN only", while the use cases show them
+      generally and say nothing for 1:N. The module sends what is asked, refuses more than one source per target
+      on a 1:N or 1:1 matrix (absent type means 1:N), and returns what the provider reports. The use cases'
+      disposition "taken" is not in the DTD's ConnectionDisposition; an unknown disposition is reported as its
+      number.
+  - models: [all]
+    severity: info
+    text: >
+      Factor and formula describe how to display the device value; state holds the device value and
+      set_parameter takes one. Formulas (the separate "Ember+ Formulas" document) are not evaluated.
+  - models: [all]
+    severity: info
+    text: >
+      A node reported offline keeps its sub-tree in state with is_online false (the provider stops reporting a
+      removed sub-tree; the consumer cannot tell removal from offline). When it comes back online the module asks
+      for its directory again.
+  - models: [all]
+    severity: info
+    text: >
+      The specification's library example prints an explicit Application-1 tag around an integer as 0x41, with
+      the constructed bit clear, where X.690 makes an explicit tag constructed (0x61). The module sends 0x61 (and
+      0xA0-0xBF for context fields) and also reads an application or context tag sent with the bit clear as the
+      wrapper it stands for, since Glow has no primitive application or context values.

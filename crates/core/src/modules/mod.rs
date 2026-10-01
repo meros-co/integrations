@@ -8,6 +8,7 @@ mod allenheath_midi;
 mod allenheath_qu;
 mod allenheath_sq;
 mod atem;
+mod emberplus;
 mod generic_http;
 mod generic_osc;
 mod generic_tcp_udp;
@@ -64,6 +65,7 @@ pub(crate) fn construct(
         "vmix" => Ok(Box::new(vmix::Vmix::new(context))),
         "visca" => Ok(Box::new(visca::Visca::new(context))),
         "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
+        "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
