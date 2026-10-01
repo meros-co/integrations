@@ -1,0 +1,106 @@
+spec: 1
+id: generic-tcp-udp
+name: Generic TCP or UDP device
+vendor: Generic (any device taking text or binary commands over TCP or UDP)
+category: other
+implementation: native
+reason: >
+  A generic client rather than one device's protocol: what is sent is chosen by the operator at run time,
+  as text with escapes for bytes a parameter cannot hold, or as hex. Received data is split into messages at
+  a terminator chosen in the settings, kept in state as the last message and a bounded recent list, and a
+  request waits for the next received message, optionally one matching a regex, within a timeout of the
+  operator's choosing. A TCP connection is kept open and reconnected with backoff.
+
+source:
+  - title: "RFC 9293: Transmission Control Protocol (TCP)"
+    author: "W. Eddy, Ed. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9293"
+    note: >
+      TCP is a byte stream: the boundaries of the sender's writes are not preserved (§2.2, §3.8.4), so
+      messages over TCP are delimited by a terminator, or are whatever one read returns when there is none.
+  - title: "RFC 768: User Datagram Protocol"
+    author: "J. Postel (1980)"
+    url: "https://www.rfc-editor.org/rfc/rfc768"
+    note: "Datagrams are delivered whole or not at all, without acknowledgement, so a datagram always ends a message."
+
+settings:
+  # tcp: a persistent connection, reconnected 1 s after a failure, doubling to 30 s. udp: datagrams.
+  protocol: { type: enum, values: [tcp, udp], default: tcp }
+  # Where received data is split into messages; the terminator is removed and empty messages are dropped.
+  # any: CR, LF or CRLF, whichever the device uses. none: one datagram, or one TCP read, is one message.
+  terminator: { type: enum, values: [any, cr, lf, crlf, custom, none], default: any }
+  # Appended to text sent by send_text and request (not to hex).
+  send_terminator: { type: enum, values: [none, cr, lf, crlf, custom], default: none }
+  # The bytes for 'custom', in either setting, written with the escapes of send_text, such as "\x03" or ";".
+  custom_terminator: { type: string, max_length: 64, default: "" }
+  # UDP only. Receive on, and send from, this fixed local port instead of an ephemeral one, for a device that
+  # sends to a destination configured on it. Shared with other devices using the same port; each datagram
+  # goes to the device it came from.
+  listen_port: { type: int, min: 1, max: 65535 }
+  # How many received messages 'recent' keeps.
+  recent_size: { type: int, min: 1, max: 1000, default: 20 }
+
+models:
+  - id: generic
+    name: "Any device taking commands over TCP or UDP (give the device's port)"
+    supports: [send_text, send_hex, request]
+    verification: none
+
+commands:
+  send_text:
+    summary: >
+      Send text, then the send terminator. Escapes: \r CR, \n LF, \t TAB, \0 NUL, \\ a backslash, \xNN the
+      byte with hex value NN (two digits, such as \x03; a byte, not a character). Any other backslash
+      sequence is refused. The rest is sent as UTF-8. Returns unverified: neither TCP nor UDP says whether the
+      device acted on it
+    params:
+      text: { type: string, max_length: 65536, required: true }
+    returns: none
+  send_hex:
+    summary: >
+      Send bytes given as hex digit pairs, optionally separated by spaces, ':', ',' or '-', each group
+      optionally prefixed 0x (so "81 01 04 00 02 FF", "810104" and "0x81,0x1" all work). Returns unverified
+    params:
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 131072, required: true }
+    returns: none
+  request:
+    summary: >
+      Send text (as send_text) or hex (as send_hex), give exactly one, then return the next message received,
+      or the next one whose text matches the regex 'match', within timeout_ms, as {text, hex}. Fails with
+      timeout otherwise. Requests waiting together are answered in the order they were sent
+    params:
+      text: { type: string, max_length: 65536 }
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 131072 }
+      match: { type: string, max_length: 1024 }
+      timeout_ms: { type: int, min: 1, max: 25000, default: 2000 }
+    returns: value
+
+state:
+  last_message.text: { type: string, description: "The last message received, terminator removed, as UTF-8 (invalid bytes shown as U+FFFD)" }
+  last_message.hex:  { type: string, description: "The same message's bytes as lowercase hex, for binary protocols" }
+  recent:            { type: array, description: "The last recent_size messages, oldest first, each {text, hex}" }
+  received_count:    { type: int, description: "Messages received since the device was opened" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Over UDP the device is reported unmonitored: UDP has no connection, so whether the device is there is
+      not known. It is reported alive whenever it sends something. Over TCP the connection state is reported.
+  - models: [all]
+    severity: info
+    text: >
+      Over TCP with terminator none, a message is whatever one read returns: TCP does not keep the device's
+      message boundaries, so one reply can arrive as two messages or two as one. Set a terminator when the
+      device uses one. Text with no terminator yet is held until one arrives, 64 KiB gather, or the
+      connection closes, when it is taken as a message, so a device that answers and then closes is heard.
+  - models: [all]
+    severity: info
+    text: >
+      A request is answered by the next message received after it is sent. A device that also sends
+      unsolicited messages can answer it with one of those: give 'match' to say what the reply looks like.
+  - models: [all]
+    severity: info
+    text: >
+      Control characters cannot be given directly in text (the core refuses them in every string
+      parameter); use the escapes.

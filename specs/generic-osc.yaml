@@ -1,0 +1,122 @@
+spec: 1
+id: generic-osc
+name: Generic OSC device
+vendor: Generic (any device or software speaking Open Sound Control)
+category: other
+implementation: native
+reason: >
+  A generic sender and listener rather than one device's protocol: the address, the argument types and the
+  reply address are chosen by the operator at run time, not declared in the spec, so the commands carry them
+  as parameters. Received messages are kept in state under an address only known when it arrives, bounded by
+  evicting the least recently heard address, and a query waits for the first reply on an address of the
+  operator's choosing within a timeout of their choosing.
+
+source:
+  - title: "The Open Sound Control 1.0 Specification"
+    author: "Matt Wright, CNMAT, UC Berkeley (2002-03-26)"
+    url: "https://opensoundcontrol.stanford.edu/spec-1_0.html"
+    note: >
+      Atomic data types: int32 and float32 big-endian, OSC-string (NUL-terminated, padded with NULs to a
+      multiple of 4 bytes), OSC-blob (int32 size, bytes, padding). Packets: over a stream such as TCP, an
+      int32 size before each packet; over UDP, one packet per datagram. A message is an address pattern
+      beginning with '/', a type tag string beginning with ',', then the arguments; an application receiving
+      a message without a type tag string may discard it. Standard tags i, f, s, b; nonstandard h (int64),
+      t (time tag), d (float64), S (symbol), c (char), r (RGBA), m (MIDI), T, F, N (nil), I (Infinitum),
+      [ and ] (arrays). Bundles: "#bundle", an 8-byte time tag, then elements each an int32 size and a
+      message or bundle. Examples "/oscillator/4/frequency" with float 440.0 and "/foo" with 1000, -1,
+      "hello", 1.234, 5.678, whose bytes the unit tests check.
+  - title: "Features and Future of Open Sound Control version 1.1 for NIME"
+    author: "Adrian Freed and Andy Schmeder, CNMAT (NIME 2009)"
+    url: "https://opensoundcontrol.stanford.edu/files/2009-NIME-OSC-1.1.pdf"
+    note: >
+      OSC 1.1: T, F, N and I (renamed Impulse) become required types alongside i, f, s, b and t; stream
+      transports such as TCP and serial frame packets with SLIP (RFC 1055) using a double END character,
+      at the start and the end of each packet.
+  - title: "RFC 1055: A Nonstandard for Transmission of IP Datagrams over Serial Lines: SLIP"
+    author: "J. Romkey (1988)"
+    url: "https://www.rfc-editor.org/rfc/rfc1055"
+    note: "END 0xC0, ESC 0xDB, ESC_END 0xDC, ESC_ESC 0xDD."
+
+settings:
+  # udp: one datagram per packet. tcp: a persistent connection, reconnected with backoff.
+  transport: { type: enum, values: [udp, tcp], default: udp }
+  # TCP only. slip: OSC 1.1 (double-ended SLIP). length-prefixed: OSC 1.0 (int32 size before each packet).
+  tcp_framing: { type: enum, values: [slip, length-prefixed], default: slip }
+  # UDP only. Receive on, and send from, this fixed local port instead of an ephemeral one, for a device that
+  # sends to a destination configured on it. Shared with other devices using the same port; each datagram
+  # goes to the device it came from. Empty: an ephemeral port, hearing only replies sent to the sender.
+  listen_port: { type: int, min: 1, max: 65535 }
+  # Keep received messages in state. Off, queries still see their replies.
+  record_messages: { type: bool, default: true }
+  # The most addresses kept under 'messages'; the least recently received is dropped first.
+  max_addresses: { type: int, min: 1, max: 10000, default: 256 }
+
+models:
+  - id: generic
+    name: "Any OSC 1.0/1.1 device, over UDP or TCP (give the device's OSC port)"
+    supports: [send, query, clear_messages]
+    verification: none
+
+commands:
+  send:
+    summary: >
+      Send one OSC message. args is a list; each item is a bare value (an integer is sent as int32 'i', any
+      other number as float32 'f', a string as 's', true/false as 'T'/'F', null as nil 'N') or an object
+      {type, value} with type int, float, string, blob (value as hex, such as "01 ff"), true, false, nil,
+      impulse, int64 or double. Returns unverified: OSC has no acknowledgement
+    params:
+      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true }
+      args: { type: json, default: [] }
+    returns: none
+  query:
+    summary: >
+      Send one OSC message as for send, then return the first message received on reply_address (the same
+      address when not given) within timeout_ms, as {address, types, args}; fails with timeout otherwise.
+      The address is compared exactly, without pattern matching
+    params:
+      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true }
+      args: { type: json, default: [] }
+      reply_address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024 }
+      timeout_ms: { type: int, min: 1, max: 25000, default: 1000 }
+    returns: value
+  clear_messages:
+    summary: "Forget the received messages kept in state"
+    returns: ack
+
+state:
+  messages.*.args:  { type: array, description: "Arguments of the last message received on an address, keyed by the address (one key, slashes and dots included). int32/int64 as integers, float32 as its shortest decimal, strings and symbols as strings, blob, RGBA and MIDI as lowercase hex, T/F as booleans, nil and impulse as null, time tags as integers, arrays as arrays" }
+  messages.*.types: { type: string, description: "The message's type tags without the leading comma, such as \"ifs\"; tells a blob's hex from a string, and nil from impulse" }
+  messages.*.count: { type: int, description: "Messages received on the address since it entered state" }
+  last_message.address: { type: string, description: "Address of the last message received" }
+  last_message.types: { type: string, description: "Its type tags" }
+  last_message.args: { type: array, description: "Its arguments, as under messages" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Over UDP the device is reported unmonitored: OSC has no handshake or acknowledgement, so whether it is
+      there is not known. It is reported alive whenever it sends something. Over TCP the connection state is
+      reported, and it reconnects 1 s after a failure, doubling to 30 s.
+  - models: [all]
+    severity: info
+    text: >
+      The module does not subscribe or poll: many devices only send after a device-specific request (such as
+      the X32's /xremote, renewed every 10 s). Send that request with send, on whatever schedule the device
+      needs.
+  - models: [all]
+    severity: info
+    text: >
+      Received bundles are unpacked and their messages handled at once; time tags are not acted on. Sent
+      messages are never bundled. A received type the module does not know ends that message's arguments,
+      since its size cannot be known; the types field still lists it.
+  - models: [all]
+    severity: info
+    text: >
+      Without listen_port, replies arrive only when the device answers the address and port the message came
+      from. Many devices instead send to a destination configured on them: set listen_port to that port.
+  - models: [all]
+    severity: info
+    text: >
+      String arguments are sent as UTF-8. OSC 1.0 specifies ASCII; a device expecting it may misread other
+      characters.

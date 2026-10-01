@@ -1,0 +1,119 @@
+spec: 1
+id: generic-http
+name: Generic HTTP device
+vendor: Generic (any device or service with an HTTP API)
+category: other
+implementation: native
+reason: >
+  A generic client rather than one device's API: the method, path, headers and body are chosen by the
+  operator at run time rather than declared per command, and the whole response (status, body and the body
+  parsed as JSON) is returned. An optional poll of one URL keeps its latest response in state, never
+  overlapping requests, and stops when credentials are refused rather than retrying them on a schedule.
+
+source:
+  - title: "RFC 9110: HTTP Semantics"
+    author: "R. Fielding, M. Nottingham, J. Reschke, Eds. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9110"
+    note: >
+      Field names are tokens, case-insensitive (§5.1, tchar §5.6.2); field values must not contain CR, LF or
+      NUL and exclude leading and trailing whitespace (§5.5). Methods GET, HEAD, POST, PUT, DELETE, OPTIONS
+      (§9.3); content in a GET request has no generally defined semantics (§9.3.1). Content-Type (§8.3).
+      Status code classes (§15): 2xx successful, 4xx client error, 5xx server error; 401 Unauthorized
+      (§15.5.2), 403 Forbidden (§15.5.4). Authorization (§11.6.2).
+  - title: "RFC 5789: PATCH Method for HTTP"
+    author: "L. Dusseault, J. Snell (IETF, 2010)"
+    url: "https://www.rfc-editor.org/rfc/rfc5789"
+  - title: "RFC 7617: The 'Basic' HTTP Authentication Scheme"
+    author: "J. Reschke (IETF, 2015)"
+    url: "https://www.rfc-editor.org/rfc/rfc7617"
+    note: "Credentials are base64 of user-id ':' password (§2)."
+  - title: "RFC 7616: HTTP Digest Access Authentication"
+    author: "R. Shekh-Yusef, D. Ahrens, S. Bremer (IETF, 2015)"
+    url: "https://www.rfc-editor.org/rfc/rfc7616"
+    note: "Answered by the core's HTTP client, as for spec-driven devices (SPEC.md §2, http)."
+  - title: "RFC 6750: The OAuth 2.0 Authorization Framework: Bearer Token Usage"
+    author: "M. Jones, D. Hardt (IETF, 2012)"
+    url: "https://www.rfc-editor.org/rfc/rfc6750"
+    note: "Authorization: Bearer <token> (§2.1)."
+  - title: "RFC 3986: Uniform Resource Identifier (URI): Generic Syntax"
+    author: "T. Berners-Lee, R. Fielding, L. Masinter (IETF, 2005)"
+    url: "https://www.rfc-editor.org/rfc/rfc3986"
+    note: "Percent-encoding (§2.1); a path and query are sent as given, already encoded."
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http }
+  # For a device serving HTTPS with a self-signed certificate: still encrypted, the device's identity not checked.
+  accept_invalid_certs: { type: bool, default: false }
+  # basic: Authorization: Basic on every request, and a Digest challenge answered. digest: a Digest challenge
+  # answered. bearer: Authorization: Bearer <token> (none while the token is empty).
+  auth: { type: enum, values: [none, basic, digest, bearer], default: none }
+  username: { type: string, default: "" }
+  password: { type: string, secret: true, default: "" }
+  token: { type: string, secret: true, default: "" }
+  # Headers sent with every request, as an object of name to value, such as {"X-Api-Key": "..."}.
+  headers: { type: json, default: {} }
+  timeout_ms: { type: int, min: 100, max: 25000, default: 5000 }
+  # A path (and query) to GET on connecting and then every poll_interval_ms, into 'poll'. Empty: no polling.
+  poll_path: { type: string, max_length: 2048, default: "" }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 5000 }
+
+models:
+  - id: generic
+    name: "Any HTTP or HTTPS API (port defaults to 80, or 443 for https)"
+    supports: [request, poll_now]
+    verification: none
+
+commands:
+  request:
+    summary: >
+      Make a request and return {status, ok (2xx), body (as text), json (the body parsed, when it is JSON)}.
+      path is sent as given, query string included, so it must be percent-encoded (visible ASCII only).
+      headers is an object of name to value, replacing same-named configured headers; an Authorization header
+      here replaces the configured credentials. body is sent as text when it is a string, otherwise as
+      compact JSON; Content-Type is content_type when given, else a Content-Type header given, else
+      text/plain; charset=utf-8 for a string and application/json otherwise. With fail_on_status (default),
+      401 and 403 fail with auth and other 4xx and 5xx with device_error carrying the status as its code and
+      the start of the body; without it every status is returned. timeout_ms defaults to the setting
+    params:
+      method: { type: enum, values: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS], default: GET }
+      path: { type: string, pattern: "^/[!-~]*$", max_length: 8192, required: true }
+      headers: { type: json }
+      body: { type: json }
+      content_type: { type: string, max_length: 256 }
+      timeout_ms: { type: int, min: 100, max: 25000 }
+      fail_on_status: { type: bool, default: true }
+    returns: value
+  poll_now:
+    summary: "GET poll_path now, outside the schedule; the result goes into 'poll' and is returned as for request, whatever its status"
+    returns: value
+
+state:
+  poll.status: { type: int, description: "HTTP status of the last poll" }
+  poll.ok:     { type: bool, description: "The last poll's status was 2xx" }
+  poll.body:   { type: string, description: "The last poll's body as text, at most 64 KiB" }
+  poll.json:   { type: object, description: "The last poll's body parsed as JSON, when it is JSON (any JSON value); absent otherwise" }
+  poll.error:  { type: string, description: "Why the last poll got no response (connection refused, timed out); absent after one that did" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Without poll_path the device is reported unmonitored until a request is made; after that, connected
+      when a response arrives (whatever its status) and disconnected when none does.
+  - models: [all]
+    severity: warning
+    text: >
+      With credentials configured, a poll answered 401 or 403 stops polling and reports the device
+      unauthorized until it is opened again, since retrying credentials on a schedule can lock a device out.
+      Requests the operator makes are still sent.
+  - models: [all]
+    severity: info
+    text: >
+      The body is parsed as JSON whenever it parses, whatever its Content-Type, since the core's HTTP action
+      does not report response headers. A text body that happens to be valid JSON (such as "42") is also
+      returned as json. State follows JSON merge patch (RFC 7386), so a member of poll.json whose value is
+      null is absent.
+  - models: [all]
+    severity: info
+    text: >
+      Redirects are followed, up to ten, by the core's HTTP client. Response headers are not returned.

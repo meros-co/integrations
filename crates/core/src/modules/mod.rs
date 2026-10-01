@@ -8,6 +8,9 @@ mod allenheath_midi;
 mod allenheath_qu;
 mod allenheath_sq;
 mod atem;
+mod generic_http;
+mod generic_osc;
+mod generic_tcp_udp;
 mod obs;
 mod panasonic_notify;
 mod pjlink;
@@ -62,6 +65,9 @@ pub(crate) fn construct(
         "visca" => Ok(Box::new(visca::Visca::new(context))),
         "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
+        "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
+        "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
+        "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         "allenheath-dlive" | "allenheath-ahm" | "allenheath-qu" | "allenheath-sq"
         | "allenheath-cq" => Ok(Box::new(allenheath::AllenHeath::new(&spec.id, context)?)),
