@@ -30,11 +30,14 @@ impl Reply {
 }
 
 /// Evaluate `expect` against a reply and produce the command's result.
+/// `headed` is true for `headed-block` replies, whose first line is a header
+/// rather than part of the body.
 pub(crate) fn evaluate(
     expect: &Map<String, Value>,
     returns: &str,
     codes: &BTreeMap<String, String>,
     reply: &Reply,
+    headed: bool,
 ) -> CommandResult {
     let text = reply.text();
     let leading_code = text
@@ -119,10 +122,10 @@ pub(crate) fn evaluate(
             value: value.unwrap_or(Value::Null),
         }),
         "fields" => Ok(Outcome::Value {
-            value: fields(&text),
+            value: fields(&body(&text, headed)),
         }),
         "text" => Ok(Outcome::Value {
-            value: json!(body(&text)),
+            value: json!(body(&text, headed)),
         }),
         other => Err(CommandError::DeviceError {
             code: None,
@@ -135,18 +138,21 @@ fn first_line(text: &str) -> &str {
     text.lines().next().unwrap_or("")
 }
 
-/// The body of a headed block: the lines after the first. A single-line reply
-/// has no body.
-fn body(text: &str) -> String {
+/// The reply body (SPEC.md §5): for a headed block, the lines after the
+/// first, so a single-line reply has no body; otherwise the whole reply.
+fn body(text: &str, headed: bool) -> String {
+    if !headed {
+        return text.to_string();
+    }
     text.split_once('\n')
         .map(|(_, rest)| rest.to_string())
         .unwrap_or_default()
 }
 
 /// `key: value` lines of the body, split at the first ": ".
-fn fields(text: &str) -> Value {
+fn fields(body: &str) -> Value {
     let mut map = Map::new();
-    for line in body(text).lines() {
+    for line in body.lines() {
         if let Some((k, v)) = line.split_once(": ") {
             map.insert(k.trim().to_string(), json!(v.trim()));
         } else if let Some(k) = line.strip_suffix(':') {
@@ -183,7 +189,7 @@ mod tests {
     fn code_ranges_and_code_messages() {
         let e = expect(json!({"code_range": [200, 299]}));
         assert_eq!(
-            evaluate(&e, "ack", &codes(), &Reply::Text("200 ok".into())),
+            evaluate(&e, "ack", &codes(), &Reply::Text("200 ok".into()), false),
             Ok(Outcome::Ack)
         );
         assert_eq!(
@@ -191,7 +197,8 @@ mod tests {
                 &e,
                 "ack",
                 &codes(),
-                &Reply::Text("111 remote control disabled".into())
+                &Reply::Text("111 remote control disabled".into()),
+                false
             ),
             Err(CommandError::DeviceError {
                 code: Some("111".into()),
@@ -205,9 +212,30 @@ mod tests {
         let e = expect(json!({"code_range": [200, 299]}));
         let r = Reply::Text("208 transport info:\nstatus: play\nspeed: 100".into());
         assert_eq!(
-            evaluate(&e, "fields", &codes(), &r),
+            evaluate(&e, "fields", &codes(), &r, true),
             Ok(Outcome::Value {
                 value: json!({"status": "play", "speed": "100"})
+            })
+        );
+    }
+
+    #[test]
+    fn only_a_headed_block_drops_its_first_line() {
+        let r = Reply::Http {
+            status: 200,
+            body: b"focus_mode=\"1\"\nfocus_zone=\"1\"\n".to_vec(),
+        };
+        assert_eq!(
+            evaluate(&Map::new(), "text", &codes(), &r, false),
+            Ok(Outcome::Value {
+                value: json!("focus_mode=\"1\"\nfocus_zone=\"1\"")
+            })
+        );
+        let r = Reply::Text("error: none\nstatus: done".into());
+        assert_eq!(
+            evaluate(&Map::new(), "fields", &codes(), &r, false),
+            Ok(Outcome::Value {
+                value: json!({"error": "none", "status": "done"})
             })
         );
     }
@@ -217,7 +245,7 @@ mod tests {
         let e = expect(json!({"matches": "BATT_BARS (\\d+)"}));
         let r = Reply::Text("< REP 1 BATT_BARS 004 >".into());
         assert_eq!(
-            evaluate(&e, "value", &codes(), &r),
+            evaluate(&e, "value", &codes(), &r, false),
             Ok(Outcome::Value {
                 value: json!("004")
             })
@@ -231,7 +259,8 @@ mod tests {
             &e,
             "ack",
             &codes(),
-            &Reply::Text("~01@ROUTE 1,2,3 ERR 003".into())
+            &Reply::Text("~01@ROUTE 1,2,3 ERR 003".into()),
+            false
         )
         .is_err());
         let e = expect(json!({"status": 200, "json_path": "$.value_name"}));
@@ -240,7 +269,7 @@ mod tests {
             body: br#"{"value":"1","value_name":"Playing"}"#.to_vec(),
         };
         assert_eq!(
-            evaluate(&e, "value", &codes(), &r),
+            evaluate(&e, "value", &codes(), &r, false),
             Ok(Outcome::Value {
                 value: json!("Playing")
             })

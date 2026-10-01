@@ -546,7 +546,20 @@ impl SpecEngine {
             return;
         }
 
-        let result = expect::evaluate(&flight.expect, &flight.returns, &self.spec.codes, &reply);
+        let headed = matches!(
+            self.transport,
+            Transport::LineTcp {
+                reply: ReplyFraming::HeadedBlock,
+                ..
+            }
+        );
+        let result = expect::evaluate(
+            &flight.expect,
+            &flight.returns,
+            &self.spec.codes,
+            &reply,
+            headed,
+        );
         let done = result.is_err() || flight.messages.is_empty();
         if done {
             let flight = self.current.take().unwrap();
