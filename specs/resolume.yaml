@@ -1,80 +1,931 @@
 spec: 1
 id: resolume
-name: Resolume Arena / Avenue
+name: Resolume Arena / Avenue (REST API)
 vendor: Resolume
 category: playback
 
+# Written over the REST API rather than OSC. The REST API acknowledges every
+# request with a status code, reads back the whole composition in one request,
+# and is described by Resolume's own OpenAPI document. Resolume's OSC input is
+# never acknowledged and its OSC output goes to a destination configured in
+# Resolume, not to the sender. The four command names of the earlier OSC spec
+# are kept, with the same effect.
+
 source:
-  - title: Resolume OSC reference
-    note: Manufacturer-documented
+  - title: Arena & Avenue REST API (OpenAPI 3.1.0 document, info.version 0.0.1)
+    author: Resolume
+    url: https://resolume.com/docs/restapi/swagger.yaml
+    note: >
+      Manufacturer document, retrieved 2026-09-30 (served with Last-Modified
+      2026-09-30). Rendered at https://resolume.com/docs/restapi/. Every command
+      here is an operation in it: paths under the server URL /api/v1, request
+      bodies as the operation's requestBody, success and failure statuses as its
+      responses. Parameter value shapes from components.schemas (BooleanParameter,
+      RangeParameter, StringParameter, ChoiceParameter, EventParameter), object
+      shapes from Composition, Layer, LayerGroup, Clip, Column, Deck, CrossFader
+      and TempoController. Arena-only layer groups from the 'layergroup' tag
+      description and the ArenaOnly (402) response.
+  - title: REST API & Webserver (support article, v7.8)
+    author: Resolume
+    url: https://resolume.com/support/en/restapi
+    note: >
+      Manufacturer document. Enabling the webserver in Preferences > Webserver,
+      default listen port 8080 for Arena and Avenue, configurable listen port and
+      address, and that each installation serves the reference for its own
+      version.
+  - title: Websocket API (support article, v7.8)
+    author: Resolume
+    url: https://resolume.com/support/en/websocket-api
+    note: >
+      Manufacturer document. The only channel on which Resolume pushes parameter
+      changes; not used here (see quirks).
+  - title: OSC (support article, v7.18)
+    author: Resolume
+    url: https://resolume.com/support/en/osc
+    note: >
+      Manufacturer document. Used only for the opacity scale: "set the opacity of
+      layer 1 to 25%, you send ... 0.25".
+  - title: arena-rest-example (Resolume's example application, MIT licence)
+    author: Resolume
+    url: https://github.com/resolume/arena-rest-example
+    note: >
+      Manufacturer code, not reference documentation. src/clip.js lists the five
+      states of a clip's 'connected' parameter; used only for the state
+      description below.
 
 transport:
-  type: osc-udp
-  port: 7000
-  timeout_ms: 500
-  reply: none
+  type: http
+  port: 8080
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/v1/product }
 
 models:
   - id: arena
-    name: Resolume Arena
-    supports: [trigger_clip, trigger_column, clear_layer, set_layer_opacity]
+    name: Resolume Arena 7.8 and later
+    supports: [get_product, get_composition, disconnect_all, set_composition_master,
+               set_composition_opacity, set_composition_speed, set_composition_bypassed,
+               set_crossfader, set_tempo, trigger_parameter, get_parameter, set_parameter,
+               reset_parameter, undo, redo, save_composition, open_composition,
+               new_composition, add_layer, add_column, add_deck,
+               trigger_column, press_column, select_column, get_column, get_column_name,
+               set_column_name,
+               clear_layer, clear_selected_layer, clear_layer_clips, select_layer,
+               set_layer_opacity, set_layer_master, set_layer_bypassed, set_layer_solo,
+               set_layer_name, get_layer, get_layer_name, get_active_clip,
+               get_active_clip_name,
+               trigger_clip, press_clip, trigger_selected_clip, select_clip, get_clip,
+               get_clip_name, get_clip_connected, set_clip_name, open_clip, clear_clip,
+               select_deck, get_deck, get_deck_name, set_deck_name, open_deck, close_deck,
+               clear_group, select_group, trigger_group_column, set_group_master,
+               set_group_opacity, set_group_speed, set_group_bypassed, set_group_solo,
+               set_group_name, get_group]
     verification: none
   - id: avenue
-    name: Resolume Avenue
-    supports: [trigger_clip, trigger_column, clear_layer, set_layer_opacity]
+    name: Resolume Avenue 7.8 and later
+    supports: [get_product, get_composition, disconnect_all, set_composition_master,
+               set_composition_opacity, set_composition_speed, set_composition_bypassed,
+               set_crossfader, set_tempo, trigger_parameter, get_parameter, set_parameter,
+               reset_parameter, undo, redo, save_composition, open_composition,
+               new_composition, add_layer, add_column, add_deck,
+               trigger_column, press_column, select_column, get_column, get_column_name,
+               set_column_name,
+               clear_layer, clear_selected_layer, clear_layer_clips, select_layer,
+               set_layer_opacity, set_layer_master, set_layer_bypassed, set_layer_solo,
+               set_layer_name, get_layer, get_layer_name, get_active_clip,
+               get_active_clip_name,
+               trigger_clip, press_clip, trigger_selected_clip, select_clip, get_clip,
+               get_clip_name, get_clip_connected, set_clip_name, open_clip, clear_clip,
+               select_deck, get_deck, get_deck_name, set_deck_name, open_deck, close_deck]
     verification: none
+    notes: >
+      No layer groups: the document's layergroup tag says Avenue returns 402 for
+      every layer group endpoint.
 
 commands:
-  trigger_clip:
-    summary: Connect a clip in a layer
-    params:
-      layer: { type: int, min: 1, max: 99, required: true }
-      clip:  { type: int, min: 1, max: 99, required: true }
-    send:
-      address: /composition/layers/{layer}/clips/{clip}/connect
-      args: [ { value: "1", type: int } ]
-    returns: none
+  # ── Product and composition ──────────────────────────────────────────────
+  get_product:
+    summary: Product name (Arena or Avenue) and version (operationId get_product)
+    send: { method: GET, path: /api/v1/product }
+    expect: { status: 200, json_path: "$" }
+    returns: value
 
+  get_composition:
+    summary: The complete composition with its decks, layers, columns, clips and layer groups (list_composition)
+    send: { method: GET, path: /api/v1/composition }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  disconnect_all:
+    summary: Disconnect every connected clip in the composition (composition_disconnect_all)
+    send: { method: POST, path: /api/v1/composition/disconnect-all }
+    expect: { status: 204 }
+    returns: ack
+
+  set_composition_master:
+    summary: Set the composition master level, 0.0 to 1.0 (replace_composition, master RangeParameter)
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: PUT, path: /api/v1/composition, body: '{"master":{"value":{level:.3f}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_composition_opacity:
+    summary: Set the composition video opacity, 0.0 to 1.0 (replace_composition, video.opacity RangeParameter)
+    params:
+      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: PUT, path: /api/v1/composition, body: '{"video":{"opacity":{"value":{opacity:.3f}}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_composition_speed:
+    summary: Set the composition speed RangeParameter value (replace_composition, speed); the document gives no range, see quirks
+    params:
+      speed: { type: float, required: true }
+    send: { method: PUT, path: /api/v1/composition, body: '{"speed":{"value":{speed:.3f}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_composition_bypassed:
+    summary: Bypass or un-bypass the composition (replace_composition, bypassed BooleanParameter)
+    params:
+      bypassed: { type: bool, default: true }
+    send: { method: PUT, path: /api/v1/composition, body: '{"bypassed":{"value":{bypassed}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_crossfader:
+    summary: Set the crossfader phase RangeParameter value (replace_composition, crossfader.phase); the document gives no range, see quirks
+    params:
+      phase: { type: float, required: true }
+    send: { method: PUT, path: /api/v1/composition, body: '{"crossfader":{"phase":{"value":{phase:.3f}}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_tempo:
+    summary: Set the composition tempo in BPM (replace_composition, tempocontroller.tempo RangeParameter); the document gives no range, see quirks
+    params:
+      bpm: { type: float, required: true }
+    send: { method: PUT, path: /api/v1/composition, body: '{"tempocontroller":{"tempo":{"value":{bpm:.2f}}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Parameters by unique id ──────────────────────────────────────────────
+  trigger_parameter:
+    summary: >
+      Trigger a button-type parameter by its unique id (trigger_parameter_by_id).
+      This is how tempo tap, resync, tempo push and pull, and crossfader side A
+      and B are pressed; their ids are in the state under tempo.* and crossfader.*.
+    params:
+      parameter_id: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/parameter/by-id/{parameter_id}/trigger" }
+    expect: { status: 204 }
+    returns: ack
+
+  get_parameter:
+    summary: The value of any parameter, by its unique id (get_parameter_by_id)
+    params:
+      parameter_id: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/parameter/by-id/{parameter_id}" }
+    expect: { status: 200, json_path: "$.value" }
+    returns: value
+
+  set_parameter:
+    summary: >
+      Update any parameter by its unique id (set_parameter_by_id). The body is
+      JSON in the shape of the document's parameter schema for that parameter's
+      type, such as {"value": 0.5} for a RangeParameter.
+    params:
+      parameter_id: { type: int, min: 1, required: true }
+      body: { type: json, required: true }
+    send: { method: PUT, path: "/api/v1/parameter/by-id/{parameter_id}", body: "{body}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  reset_parameter:
+    summary: Reset a parameter to its default value, by its unique id (reset_parameter_by_id)
+    params:
+      parameter_id: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/parameter/by-id/{parameter_id}/reset" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Composition file and structure ───────────────────────────────────────
+  undo:
+    summary: Undo the last action (composition_action, body 'undo'); fails with 412 when there is nothing to undo
+    send: { method: POST, path: /api/v1/composition/action, body: "undo", content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+
+  redo:
+    summary: Redo the last undone action (composition_action, body 'redo'); fails with 412 when there is nothing to redo
+    send: { method: POST, path: /api/v1/composition/action, body: "redo", content_type: text/plain }
+    expect: { status: 200 }
+    returns: ack
+
+  save_composition:
+    summary: Save the composition to its current file (save_composition, no body)
+    send: { method: POST, path: /api/v1/composition/save }
+    expect: { status: 204 }
+    returns: ack
+
+  open_composition:
+    summary: >
+      Open a composition file (open_composition). The file is a percent-encoded
+      file:/// URL, such as file:///C:/Shows/Main%20Show.avc.
+    params:
+      file_url: { type: string, pattern: "^file:///", required: true }
+    send: { method: POST, path: /api/v1/composition/open, body: "{file_url}", content_type: text/plain }
+    expect: { status: 204 }
+    returns: ack
+
+  new_composition:
+    summary: Discard the composition and any unsaved changes, and start the default composition (new_composition)
+    send: { method: POST, path: /api/v1/composition/new }
+    expect: { status: 204 }
+    returns: ack
+
+  add_layer:
+    summary: Add a layer at the end of the composition (composition_add_layer, no body)
+    send: { method: POST, path: /api/v1/composition/layers/add }
+    expect: { status: 204 }
+    returns: ack
+
+  add_column:
+    summary: Add a column at the end of the composition (composition_add_column, no body)
+    send: { method: POST, path: /api/v1/composition/columns/add }
+    expect: { status: 204 }
+    returns: ack
+
+  add_deck:
+    summary: Add a deck at the end of the composition (composition_add_deck, no body)
+    send: { method: POST, path: /api/v1/composition/decks/add }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Columns ──────────────────────────────────────────────────────────────
   trigger_column:
-    summary: Connect a whole column
+    summary: Connect a column, as a short click (column_connect with no body sends press and release)
     params:
-      column: { type: int, min: 1, max: 99, required: true }
-    send:
-      address: /composition/columns/{column}/connect
-      args: [ { value: "1", type: int } ]
-    returns: none
+      column: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/columns/{column}/connect" }
+    expect: { status: 204 }
+    returns: ack
 
-  clear_layer:
+  press_column:
+    summary: Press (true) or release (false) a column's connect button, as the mouse would (column_connect with a boolean body)
     params:
-      layer: { type: int, min: 1, max: 99, required: true }
-    send:
-      address: /composition/layers/{layer}/clear
-      args: [ { value: "1", type: int } ]
-    returns: none
+      column:  { type: int, min: 1, required: true }
+      pressed: { type: bool, default: true }
+    send: { method: POST, path: "/api/v1/composition/columns/{column}/connect", body: "{pressed}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  select_column:
+    summary: Select a column (column_select)
+    params:
+      column: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/columns/{column}/select" }
+    expect: { status: 204 }
+    returns: ack
+
+  get_column:
+    summary: A column's properties (get_column)
+    params:
+      column: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/columns/{column}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_column_name:
+    summary: A column's name (get_column, name.value)
+    params:
+      column: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/columns/{column}" }
+    expect: { status: 200, json_path: "$.name.value" }
+    returns: value
+
+  set_column_name:
+    summary: Rename a column (replace_column, name StringParameter)
+    params:
+      column: { type: int, min: 1, required: true }
+      name:   { type: string, required: true }
+    send: { method: PUT, path: "/api/v1/composition/columns/{column}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Layers ───────────────────────────────────────────────────────────────
+  clear_layer:
+    summary: Disconnect the playing clip in a layer (layer_clear); the clip itself is kept
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clear" }
+    expect: { status: 204 }
+    returns: ack
+
+  clear_selected_layer:
+    summary: Disconnect the playing clip in the selected layer (selected_layer_clear)
+    send: { method: POST, path: /api/v1/composition/layers/selected/clear }
+    expect: { status: 204 }
+    returns: ack
+
+  clear_layer_clips:
+    summary: Remove every clip's tracks and settings from a layer (layer_clear_clips); this empties the clip slots
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clearclips" }
+    expect: { status: 204 }
+    returns: ack
+
+  select_layer:
+    summary: Select a layer (layer_select)
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/select" }
+    expect: { status: 204 }
+    returns: ack
 
   set_layer_opacity:
+    summary: Set a layer's video opacity, 0.0 to 1.0 (replace_layer, video.opacity RangeParameter)
     params:
-      layer:   { type: int, min: 1, max: 99, required: true }
+      layer:   { type: int, min: 1, required: true }
       opacity: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"video":{"opacity":{"value":{opacity:.3f}}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_layer_master:
+    summary: Set a layer's master level, 0.0 to 1.0 (replace_layer, master RangeParameter)
+    params:
+      layer: { type: int, min: 1, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"master":{"value":{level:.3f}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_layer_bypassed:
+    summary: Bypass or un-bypass a layer (replace_layer, bypassed BooleanParameter)
+    params:
+      layer:    { type: int, min: 1, required: true }
+      bypassed: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"bypassed":{"value":{bypassed}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_layer_solo:
+    summary: Solo or un-solo a layer (replace_layer, solo BooleanParameter)
+    params:
+      layer: { type: int, min: 1, required: true }
+      solo:  { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"solo":{"value":{solo}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_layer_name:
+    summary: Rename a layer (replace_layer, name StringParameter)
+    params:
+      layer: { type: int, min: 1, required: true }
+      name:  { type: string, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  get_layer:
+    summary: A layer's properties and all of its clips (get_layer)
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_layer_name:
+    summary: A layer's name (get_layer, name.value)
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}" }
+    expect: { status: 200, json_path: "$.name.value" }
+    returns: value
+
+  get_active_clip:
+    summary: The clip playing in a layer (get_layer_active_clip)
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/active" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_active_clip_name:
+    summary: The name of the clip playing in a layer (get_layer_active_clip, name.value)
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/active" }
+    expect: { status: 200, json_path: "$.name.value" }
+    returns: value
+
+  # ── Clips ────────────────────────────────────────────────────────────────
+  trigger_clip:
+    summary: Connect a clip, as a short click (clip_connect with no body sends press and release)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/connect" }
+    expect: { status: 204 }
+    returns: ack
+
+  press_clip:
+    summary: Press (true) or release (false) a clip, as the mouse would (clip_connect with a boolean body)
+    params:
+      layer:   { type: int, min: 1, required: true }
+      clip:    { type: int, min: 1, required: true }
+      pressed: { type: bool, default: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/connect", body: "{pressed}", content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  trigger_selected_clip:
+    summary: Connect the selected clip, as a short click (selected_clip_connect, no body)
+    send: { method: POST, path: /api/v1/composition/clips/selected/connect }
+    expect: { status: 204 }
+    returns: ack
+
+  select_clip:
+    summary: Select a clip (clip_select)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/select" }
+    expect: { status: 204 }
+    returns: ack
+
+  get_clip:
+    summary: A clip's properties and effects (get_clip_by_position)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/{clip}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_clip_name:
+    summary: A clip's name (get_clip_by_position, name.value)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/{clip}" }
+    expect: { status: 200, json_path: "$.name.value" }
+    returns: value
+
+  get_clip_connected:
+    summary: A clip's connection state, such as Connected or Empty (get_clip_by_position, connected.value)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/{clip}" }
+    expect: { status: 200, json_path: "$.connected.value" }
+    returns: value
+
+  set_clip_name:
+    summary: Rename a clip (replace_clip_by_position, name StringParameter)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+      name:  { type: string, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layers/{layer}/clips/{clip}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  open_clip:
+    summary: >
+      Load a file or source into a clip slot (clip_open). The body is a
+      percent-encoded file:/// URL, or source:///video/<source name>.
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+      url:   { type: string, pattern: "^(file|source):///", required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/open", body: "{url}", content_type: text/plain }
+    expect: { status: 204 }
+    returns: ack
+
+  clear_clip:
+    summary: Empty a clip slot, removing its tracks and settings (clip_clear)
+    params:
+      layer: { type: int, min: 1, required: true }
+      clip:  { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/clear" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Decks ────────────────────────────────────────────────────────────────
+  select_deck:
+    summary: Select a deck (deck_select)
+    params:
+      deck: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/decks/{deck}/select" }
+    expect: { status: 204 }
+    returns: ack
+
+  get_deck:
+    summary: A deck's properties (get_deck)
+    params:
+      deck: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/decks/{deck}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_deck_name:
+    summary: A deck's name (get_deck, name.value)
+    params:
+      deck: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/decks/{deck}" }
+    expect: { status: 200, json_path: "$.name.value" }
+    returns: value
+
+  set_deck_name:
+    summary: Rename a deck (replace_deck, name StringParameter)
+    params:
+      deck: { type: int, min: 1, required: true }
+      name: { type: string, required: true }
+    send: { method: PUT, path: "/api/v1/composition/decks/{deck}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  open_deck:
+    summary: Re-open a closed deck (composition_open_deck)
+    params:
+      deck: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/decks/{deck}/open" }
+    expect: { status: 204 }
+    returns: ack
+
+  close_deck:
+    summary: Close a deck (composition_close_deck)
+    params:
+      deck: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/decks/{deck}/close" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Layer groups (Arena only) ────────────────────────────────────────────
+  clear_group:
+    summary: Disconnect the playing clips in a layer group, as a short click (layer_group_clear, no body)
+    params:
+      group: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layergroups/{group}/clear" }
+    expect: { status: 204 }
+    returns: ack
+
+  select_group:
+    summary: Select a layer group (layergroup_select)
+    params:
+      group: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layergroups/{group}/select" }
+    expect: { status: 204 }
+    returns: ack
+
+  trigger_group_column:
+    summary: Connect a column within a layer group, as a short click (layer_group_column_connect, no body)
+    params:
+      group:  { type: int, min: 1, required: true }
+      column: { type: int, min: 1, required: true }
+    send: { method: POST, path: "/api/v1/composition/layergroups/{group}/columns/{column}/connect" }
+    expect: { status: 204 }
+    returns: ack
+
+  set_group_master:
+    summary: Set a layer group's master level, 0.0 to 1.0 (replace_layergroup, master RangeParameter)
+    params:
+      group: { type: int, min: 1, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"master":{"value":{level:.3f}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_group_opacity:
+    summary: Set a layer group's video opacity, 0.0 to 1.0 (replace_layergroup, video.opacity RangeParameter)
+    params:
+      group:   { type: int, min: 1, required: true }
+      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"video":{"opacity":{"value":{opacity:.3f}}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_group_speed:
+    summary: Set a layer group's speed RangeParameter value (replace_layergroup, speed); the document gives no range, see quirks
+    params:
+      group: { type: int, min: 1, required: true }
+      speed: { type: float, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"speed":{"value":{speed:.3f}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_group_bypassed:
+    summary: Bypass or un-bypass a layer group (replace_layergroup, bypassed BooleanParameter)
+    params:
+      group:    { type: int, min: 1, required: true }
+      bypassed: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"bypassed":{"value":{bypassed}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_group_solo:
+    summary: Solo or un-solo a layer group (replace_layergroup, solo BooleanParameter)
+    params:
+      group: { type: int, min: 1, required: true }
+      solo:  { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"solo":{"value":{solo}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_group_name:
+    summary: Rename a layer group (replace_layergroup, name StringParameter)
+    params:
+      group: { type: int, min: 1, required: true }
+      name:  { type: string, required: true }
+    send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  get_group:
+    summary: A layer group's properties and its layers (get_layergroup)
+    params:
+      group: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/api/v1/composition/layergroups/{group}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+telemetry:
+  # Resolume pushes changes only over its websocket API, which the format has
+  # no transport for, so the product and the whole composition are asked for
+  # every second. get_product's and get_composition's replies update the state
+  # too.
+  poll:
+    every_ms: 1000
     send:
-      address: /composition/layers/{layer}/video/opacity/values
-      args: [ { value: "{opacity}", type: float } ]
-    returns: none
+      - { method: GET, path: /api/v1/product }
+      - { method: GET, path: /api/v1/composition }
+  updates:
+    - path: "^/api/v1/product$"
+      json: { name: "$.name", major: "$.major", minor: "$.minor", micro: "$.micro", revision: "$.revision" }
+      state:
+        product.name: "{name}"
+        product.major: "{major}"
+        product.minor: "{minor}"
+        product.micro: "{micro}"
+        product.revision: "{revision}"
+
+    - path: "^/api/v1/composition$"
+      json:
+        name: "$.name.value"
+        master: "$.master.value"
+        opacity: "$.video.opacity.value"
+        speed: "$.speed.value"
+        bypassed: "$.bypassed.value"
+        phase: "$.crossfader.phase.value"
+        behaviour: "$.crossfader.behaviour.value"
+        curve: "$.crossfader.curve.value"
+        side_a: "$.crossfader.sidea.id"
+        side_b: "$.crossfader.sideb.id"
+        bpm: "$.tempocontroller.tempo.value"
+        play_state: "$.tempocontroller.play_state.value"
+        tap: "$.tempocontroller.tempo_tap.id"
+        resync: "$.tempocontroller.resync.id"
+        push: "$.tempocontroller.tempo_push.id"
+        pull: "$.tempocontroller.tempo_pull.id"
+      state:
+        composition.name: "{name}"
+        composition.master: "{master}"
+        composition.opacity: "{opacity}"
+        composition.speed: "{speed}"
+        composition.bypassed: "{bypassed}"
+        crossfader.phase: "{phase}"
+        crossfader.behaviour: "{behaviour}"
+        crossfader.curve: "{curve}"
+        crossfader.side_a_parameter: "{side_a}"
+        crossfader.side_b_parameter: "{side_b}"
+        tempo.bpm: "{bpm}"
+        tempo.play_state: "{play_state}"
+        tempo.tap_parameter: "{tap}"
+        tempo.resync_parameter: "{resync}"
+        tempo.push_parameter: "{push}"
+        tempo.pull_parameter: "{pull}"
+
+    - path: "^/api/v1/composition$"
+      json_each: "$.layers"
+      json:
+        id: "$.id"
+        name: "$.name.value"
+        opacity: "$.video.opacity.value"
+        master: "$.master.value"
+        bypassed: "$.bypassed.value"
+        solo: "$.solo.value"
+        selected: "$.selected.value"
+        crossfader_group: "$.crossfadergroup.value"
+        active_clip: "$.active_clip.id"
+        active_clip_name: "$.active_clip.name.value"
+      state:
+        "layers.{id}.name": "{name}"
+        "layers.{id}.opacity": "{opacity}"
+        "layers.{id}.master": "{master}"
+        "layers.{id}.bypassed": "{bypassed}"
+        "layers.{id}.solo": "{solo}"
+        "layers.{id}.selected": "{selected}"
+        "layers.{id}.crossfader_group": "{crossfader_group}"
+        "layers.{id}.active_clip": "{active_clip}"
+        "layers.{id}.active_clip_name": "{active_clip_name}"
+
+    - path: "^/api/v1/composition$"
+      json_each: "$.columns"
+      json: { id: "$.id", name: "$.name.value", connected: "$.connected.value", selected: "$.selected.value" }
+      state:
+        "columns.{id}.name": "{name}"
+        "columns.{id}.connected": "{connected}"
+        "columns.{id}.selected": "{selected}"
+
+    - path: "^/api/v1/composition$"
+      json_each: "$.decks"
+      json: { id: "$.id", name: "$.name.value", selected: "$.selected.value", closed: "$.closed" }
+      state:
+        "decks.{id}.name": "{name}"
+        "decks.{id}.selected": "{selected}"
+        "decks.{id}.closed": "{closed}"
+
+    - path: "^/api/v1/composition$"
+      json_each: "$.layergroups"
+      json:
+        id: "$.id"
+        name: "$.name.value"
+        opacity: "$.video.opacity.value"
+        master: "$.master.value"
+        bypassed: "$.bypassed.value"
+        solo: "$.solo.value"
+        selected: "$.selected.value"
+      state:
+        "groups.{id}.name": "{name}"
+        "groups.{id}.opacity": "{opacity}"
+        "groups.{id}.master": "{master}"
+        "groups.{id}.bypassed": "{bypassed}"
+        "groups.{id}.solo": "{solo}"
+        "groups.{id}.selected": "{selected}"
+
+state:
+  product.name: { type: string, description: "Product serving the API: Arena or Avenue" }
+  product.major: { type: int, description: "Major version number" }
+  product.minor: { type: int, description: "Minor version number" }
+  product.micro: { type: int, description: "Micro version number" }
+  product.revision: { type: int, description: "Revision number" }
+  composition.name: { type: string, description: "Composition name" }
+  composition.master: { type: float, description: "Composition master level, 0.0 to 1.0" }
+  composition.opacity: { type: float, description: "Composition video opacity, 0.0 to 1.0" }
+  composition.speed: { type: float, description: "Composition speed parameter value, in Resolume's own scale" }
+  composition.bypassed: { type: bool, description: "Composition bypassed" }
+  crossfader.phase: { type: float, description: "Crossfader phase parameter value, in Resolume's own scale" }
+  crossfader.behaviour: { type: string, description: "Crossfader behaviour, the selected option's name" }
+  crossfader.curve: { type: string, description: "Crossfader curve, the selected option's name" }
+  crossfader.side_a_parameter: { type: int, description: "Unique id of the crossfader's side A button, for trigger_parameter" }
+  crossfader.side_b_parameter: { type: int, description: "Unique id of the crossfader's side B button, for trigger_parameter" }
+  tempo.bpm: { type: float, unit: BPM, description: "Composition tempo" }
+  tempo.play_state: { type: string, description: "Tempo controller play state, the selected option's name" }
+  tempo.tap_parameter: { type: int, description: "Unique id of the tempo tap button, for trigger_parameter" }
+  tempo.resync_parameter: { type: int, description: "Unique id of the tempo resync button, for trigger_parameter" }
+  tempo.push_parameter: { type: int, description: "Unique id of the tempo push button, for trigger_parameter" }
+  tempo.pull_parameter: { type: int, description: "Unique id of the tempo pull button, for trigger_parameter" }
+  layers.*.name: { type: string, description: "Layer name, keyed by the layer's unique id" }
+  layers.*.opacity: { type: float, description: "Layer video opacity, 0.0 to 1.0" }
+  layers.*.master: { type: float, description: "Layer master level, 0.0 to 1.0" }
+  layers.*.bypassed: { type: bool, description: "Layer bypassed" }
+  layers.*.solo: { type: bool, description: "Layer soloed" }
+  layers.*.selected: { type: bool, description: "Layer is the selected layer" }
+  layers.*.crossfader_group: { type: string, description: "Crossfader side the layer is assigned to, the selected option's name" }
+  layers.*.active_clip: { type: int, description: "Unique id of the clip playing in the layer" }
+  layers.*.active_clip_name: { type: string, description: "Name of the clip playing in the layer" }
+  columns.*.name: { type: string, description: "Column name, keyed by the column's unique id" }
+  columns.*.connected: { type: string, description: "Column connection state, the selected option's name" }
+  columns.*.selected: { type: bool, description: "Column is the selected column" }
+  decks.*.name: { type: string, description: "Deck name, keyed by the deck's unique id" }
+  decks.*.selected: { type: bool, description: "Deck is the selected (active) deck" }
+  decks.*.closed: { type: bool, description: "Deck is closed" }
+  groups.*.name: { type: string, description: "Layer group name, keyed by the group's unique id (Arena)" }
+  groups.*.opacity: { type: float, description: "Layer group video opacity, 0.0 to 1.0" }
+  groups.*.master: { type: float, description: "Layer group master level, 0.0 to 1.0" }
+  groups.*.bypassed: { type: bool, description: "Layer group bypassed" }
+  groups.*.solo: { type: bool, description: "Layer group soloed" }
+  groups.*.selected: { type: bool, description: "Layer group is the selected group" }
 
 quirks:
   - models: [all]
+    severity: critical
+    text: >
+      The webserver is off by default. It is enabled under Preferences >
+      Webserver ("Enable Webserver & REST API"). Arena and Avenue listen on port
+      8080 by default; the listen port and address can be changed there. The API
+      has no authentication: anyone who can reach the port can control the
+      composition.
+
+  - models: [all]
     severity: warning
     text: >
-      Resolume never replies to OSC input. No command can be confirmed, and a
-      wrong layer or clip index fails silently rather than erroring.
+      The REST API arrived with Arena and Avenue 7.8 (Resolume's support article
+      is written for 7.8). The OpenAPI document is the current one and carries no
+      per-endpoint version; each installation serves the reference for its own
+      version under Preferences > Webserver. An endpoint an older version lacks
+      answers 404, the same as a missing layer or clip.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Layer, column, clip, deck and group numbers are 1-based positions and
+      change when items are reordered, added or removed. The document gives no
+      maximum; a position that does not exist answers 404. The state is keyed by
+      each item's unique id instead, which the document says stays constant
+      across sessions and reordering, because the composition reply carries no
+      position for an item.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Only the layers and clips of the active deck can be read or changed (Deck
+      schema). After select_deck, layer and clip positions refer to the newly
+      selected deck.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Connect endpoints model a mouse button. With no body (trigger_clip,
+      trigger_column) Resolume sends a press and a release, as a short click.
+      press_clip and press_column send only the press (true) or only the
+      release (false); a press must be followed by a release. What a click does
+      depends on the clip's trigger style set in Resolume.
 
   - models: [all]
     severity: info
     text: >
-      Layers and clips are 1-based, matching the Resolume interface.
+      clear_layer disconnects the playing clip and keeps the clip, which is what
+      the OSC /clear address did. clear_layer_clips and clear_clip are
+      different: they remove the clips' content from the slots.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Setters send a PUT whose body holds only the property being changed, such
+      as {"video":{"opacity":{"value":0.250}}}. The document's schemas mark no
+      property as required, and the operations are described as updating "the
+      layer and/or clips", but the document does not state in words that
+      properties left out are unchanged.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The document gives no value range for any individual RangeParameter; each
+      one reports its own min and max in the composition reply. Opacity and
+      master levels are taken as 0.0 to 1.0, the scale Resolume's OSC article
+      gives for opacity. Composition and group speed, crossfader phase and tempo
+      are sent unbounded, and what Resolume does with a value outside the
+      parameter's min and max is not documented.
 
   - models: [all]
     severity: info
     text: >
-      Trigger addresses take a value of 1. Sending the address with no argument
-      does not connect the clip.
+      Tempo tap, resync, tempo push and pull, and crossfader side A and B are
+      event parameters with no fixed REST path. They are pressed with
+      trigger_parameter using the id the composition reply gives, which the
+      state holds under tempo.*_parameter and crossfader.side_*_parameter.
+
+  - models: [all]
+    severity: warning
+    text: >
+      There is no push over HTTP. Resolume pushes parameter changes only over
+      its websocket API (ws://host:port/api/v1), so the composition is asked
+      for once a second. The reply contains every deck, layer, column, clip and
+      effect, and grows with the composition.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A layer's active_clip is null when nothing plays in it. A null is not
+      assigned, so layers.*.active_clip and active_clip_name keep the last clip
+      that played after the layer is cleared. Each clip's own connection state
+      (Empty, Disconnected, Previewing, Connected, Connected & previewing, per
+      Resolume's example application) is read with get_clip_connected.
+
+  - models: [all]
+    severity: info
+    text: >
+      Clip and composition file paths are percent-encoded file:/// URLs with
+      forward slashes, even on Windows (file:///C:/Shows/Main%20Show.avc). The
+      body is sent as given; the caller encodes spaces and #, %, & and ?.
+
+  - models: [all]
+    severity: info
+    text: >
+      undo and redo answer 412 when there is nothing to undo or redo. open,
+      new, save and structural changes answer 412 when the composition is
+      locked.
+
+  - models: [avenue]
+    severity: info
+    text: >
+      Avenue answers 402 to every layer group endpoint. The document also lists
+      the same 402 response on get_deck, replace_deck and the deck
+      delete and duplicate operations, while describing it as applying to layer
+      groups only; whether Avenue refuses those deck operations is ambiguous.
