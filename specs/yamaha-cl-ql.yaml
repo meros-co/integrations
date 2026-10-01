@@ -1,0 +1,724 @@
+# Yamaha CL/QL consoles over Yamaha's Remote Control Protocol (RCP): text lines on TCP 49280.
+#
+# One of five console specs sharing command and state naming: yamaha-cl-ql, yamaha-tf,
+# yamaha-rivage, yamaha-dm7, yamaha-dm3. They are separate because the address sets, channel
+# counts and scene commands differ by family.
+#
+# For CL/QL, Yamaha documents only scene recall and the input channel fader level, ON key and pan
+# over this protocol (QLab Setup Guide and its Python Script Template). Those are the typed
+# commands here. Every other console parameter is reachable through set_parameter,
+# set_parameter_text and get_parameter, which take an RCP address such as
+# MIXER:Current/Mix/Fader/Level; Yamaha publishes no CL/QL address list, so none is typed.
+
+spec: 1
+id: yamaha-cl-ql
+name: Yamaha CL and QL series digital mixing consoles (Remote Control Protocol, TCP 49280)
+vendor: Yamaha
+category: mixer
+
+source:
+  - title: QLab Setup Guide for CL/QL/TF Series, v1.0 (August 2019)
+    author: Yamaha Corporation
+    url: https://download.yamaha.com/files/tcm:39-1286035
+    note: >-
+      Manufacturer document. Console IP set in NETWORK > FOR MIXER CONTROL on CL/QL, static IP on TF,
+      LAN port not Dante port (p.6-7); scene recall and input channel ON, pan and fader commands (p.12-15,
+      p.17-19); fader value table (p.15). Its p.19 prints the address as "Inch"; the command list and
+      the scripts spell it "InCh".
+  - title: Python Script Template V1.00 for CL/QL/TF (command_list.pdf, Readme_EN.pdf, command.py, recall.py,
+      recall_a.py, TFxQLab/MultiCh.py)
+    author: Yamaha Corporation
+    url: https://usa.yamaha.com/files/download/other_assets/0/1266290/Python_Script_Template_V100.zip
+    note: >-
+      Manufacturer files linked from the QLab guide (p.5). command_list.pdf: "List of available commands"
+      (ssrecall_ex MIXER:Lib/Scene 0-300 for CL/QL, ssrecall_ex scene_a / scene_b 0-99 for TF, set MIXER:Current/InCh/Fader/Level,
+      Fader/On and ToSt/Pan with X 0 = input channel 1 and the per-model channel ranges). command.py:
+      TCP port 49280, each command followed by LF. Readme_EN.pdf: CL/QL V3.11 or later, TF V2.00 or later.
+  - title: DME7 Remote Control Protocol Specifications, Version 1.1.0 rev2 (V1.1.0 of Jan. 25, 2024; applies
+      to DME7 V1.1.0 and later)
+    author: Yamaha Corporation
+    url: https://usa.yamaha.com/files/download/other_assets/4/2230684/DME7-remote-V110_en.pdf
+    note: >-
+      Manufacturer document for the RCP grammar, written for the DME7 processor, not for the consoles.
+      Used here for what Yamaha's console documents leave out: 3.1 basic syntax p.8 (each command ends
+      with LF; a lone LF is a heartbeat; options separated by at least one space; text options in double
+      quotes with \\ and \" escapes; ASCII only); 3.2.1 NOTIFY devstatus p.9; 3.2.2 NOTIFY set p.10; 3.3.1
+      devstatus runmode/error p.13; 3.3.3 scpmode keepalive p.15; 3.3.4 get / OK get p.16; 3.3.5 set /
+      OK set / OKm (value clamped) p.18; 3.4.1 devinfo productname/devicename p.25-26; 3.5.1 ERROR <command>
+      <code> and the error codes p.38.
+  - title: RM Series (RM-CR/RM-CG/RM-TT/RM-WAP) Remote Control Protocol Specifications, Version 3.0.0
+      (Oct. 1, 2025)
+    author: Yamaha Corporation
+    url: https://download.yamaha.com/files/tcm:39-1525882
+    note: >-
+      Manufacturer document; the same RCP grammar as the DME7 document (3.1 p.7, NOTIFY set p.8), cited
+      as a second Yamaha statement of it. It describes the RM series, not the consoles.
+  - title: companion-module-yamaha-rcp, v3.6.0 (Bitfocus Companion module; MIT licence)
+    author: Andrew Broughton (community, not Yamaha)
+    url: https://github.com/bitfocus/companion-module-yamaha-rcp
+    note: >-
+      Community code, read for corroboration only (top-level LICENSE is MIT). It confirms that the consoles
+      answer RCP on TCP 49280 with LF-terminated lines, accept get and set with X and Y numbered from
+      0 (paramFuncs.js parseOptions subtracts 1), reply OK/OKm and push NOTIFY set, answer devinfo productname/devicename
+      and devstatus runmode (variables.js), and push NOTIFY sscurrent_ex (index.js). Nothing in this spec
+      rests on it alone except where a quirk says so.
+
+transport:
+  type: line-tcp
+  port: 49280
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  reply_match: '^(OK|OKm|ERROR) '
+  probe: devstatus runmode
+
+models:
+  - id: cl5
+    name: Yamaha CL5
+    channels: 72
+    supports:
+      - set_input_fader_level
+      - get_input_fader_level
+      - set_input_on
+      - get_input_on
+      - set_input_stereo_pan
+      - get_input_stereo_pan
+      - recall_scene
+      - get_current_scene
+      - set_parameter
+      - set_parameter_text
+      - get_parameter
+      - get_product_name
+      - get_device_name
+      - get_run_mode
+      - get_error_status
+      - set_keepalive
+    verification: none
+    notes: 'Input channels 1-72 (command list: 0-71).'
+  - id: cl3
+    name: Yamaha CL3
+    channels: 64
+    supports:
+      - set_input_fader_level
+      - get_input_fader_level
+      - set_input_on
+      - get_input_on
+      - set_input_stereo_pan
+      - get_input_stereo_pan
+      - recall_scene
+      - get_current_scene
+      - set_parameter
+      - set_parameter_text
+      - get_parameter
+      - get_product_name
+      - get_device_name
+      - get_run_mode
+      - get_error_status
+      - set_keepalive
+    verification: none
+    notes: 'Input channels 1-64 (command list: 0-63).'
+  - id: cl1
+    name: Yamaha CL1
+    channels: 48
+    supports:
+      - set_input_fader_level
+      - get_input_fader_level
+      - set_input_on
+      - get_input_on
+      - set_input_stereo_pan
+      - get_input_stereo_pan
+      - recall_scene
+      - get_current_scene
+      - set_parameter
+      - set_parameter_text
+      - get_parameter
+      - get_product_name
+      - get_device_name
+      - get_run_mode
+      - get_error_status
+      - set_keepalive
+    verification: none
+    notes: 'Input channels 1-48 (command list: 0-47).'
+  - id: ql5
+    name: Yamaha QL5
+    channels: 64
+    supports:
+      - set_input_fader_level
+      - get_input_fader_level
+      - set_input_on
+      - get_input_on
+      - set_input_stereo_pan
+      - get_input_stereo_pan
+      - recall_scene
+      - get_current_scene
+      - set_parameter
+      - set_parameter_text
+      - get_parameter
+      - get_product_name
+      - get_device_name
+      - get_run_mode
+      - get_error_status
+      - set_keepalive
+    verification: none
+    notes: 'Input channels 1-64 (command list: 0-63).'
+  - id: ql1
+    name: Yamaha QL1
+    channels: 32
+    supports:
+      - set_input_fader_level
+      - get_input_fader_level
+      - set_input_on
+      - get_input_on
+      - set_input_stereo_pan
+      - get_input_stereo_pan
+      - recall_scene
+      - get_current_scene
+      - set_parameter
+      - set_parameter_text
+      - get_parameter
+      - get_product_name
+      - get_device_name
+      - get_run_mode
+      - get_error_status
+      - set_keepalive
+    verification: none
+    notes: 'Input channels 1-32 (command list: 0-31).'
+
+commands:
+  set_input_fader_level:
+    summary: 'Set the input channel fader level (MIXER:Current/InCh/Fader/Level; channel = input channel
+      from 1; level: hundredths of a dB, -32768 (-inf) to 1000 (+10 dB))'
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 72
+        required: true
+      level:
+        type: int
+        min: -32768
+        max: 1000
+        required: true
+    send: set MIXER:Current/InCh/Fader/Level {channel:-1} 0 {level}
+    expect:
+      matches: '^OKm? set MIXER:Current/InCh/Fader/Level \d+ \d+ '
+    returns: ack
+  get_input_fader_level:
+    summary: Read the input channel fader level (MIXER:Current/InCh/Fader/Level); returns the raw value
+      (hundredths of a dB, -32768 (-inf) to 1000 (+10 dB))
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 72
+        required: true
+    send: get MIXER:Current/InCh/Fader/Level {channel:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/InCh/Fader/Level \d+ \d+ (-?\d+)
+    returns: value
+  set_input_on:
+    summary: 'Set the input channel ON key (0 OFF, the channel is muted; 1 ON) (MIXER:Current/InCh/Fader/On;
+      channel = input channel from 1; enabled: true = 1 (ON), false = 0 (OFF))'
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 72
+        required: true
+      enabled:
+        type: bool
+        required: true
+    send: set MIXER:Current/InCh/Fader/On {channel:-1} 0 {enabled:bool01}
+    expect:
+      matches: '^OKm? set MIXER:Current/InCh/Fader/On \d+ \d+ '
+    returns: ack
+  get_input_on:
+    summary: Read the input channel ON key (0 OFF, the channel is muted; 1 ON) (MIXER:Current/InCh/Fader/On);
+      returns the raw value (true = 1 (ON), false = 0 (OFF))
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 72
+        required: true
+    send: get MIXER:Current/InCh/Fader/On {channel:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/InCh/Fader/On \d+ \d+ (-?\d+)
+    returns: value
+  set_input_stereo_pan:
+    summary: 'Set the input channel pan to stereo (MIXER:Current/InCh/ToSt/Pan; channel = input channel
+      from 1; pan: -63 (L63) to 63 (R63), 0 centre)'
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 72
+        required: true
+      pan:
+        type: int
+        min: -63
+        max: 63
+        required: true
+    send: set MIXER:Current/InCh/ToSt/Pan {channel:-1} 0 {pan}
+    expect:
+      matches: '^OKm? set MIXER:Current/InCh/ToSt/Pan \d+ \d+ '
+    returns: ack
+  get_input_stereo_pan:
+    summary: Read the input channel pan to stereo (MIXER:Current/InCh/ToSt/Pan); returns the raw value
+      (-63 (L63) to 63 (R63), 0 centre)
+    params:
+      channel:
+        type: int
+        min: 1
+        max: 72
+        required: true
+    send: get MIXER:Current/InCh/ToSt/Pan {channel:-1} 0
+    expect:
+      matches: ^OK get MIXER:Current/InCh/ToSt/Pan \d+ \d+ (-?\d+)
+    returns: value
+  recall_scene:
+    summary: 'Recall a scene, 0-300 (scene #000-#300) (ssrecall_ex MIXER:Lib/Scene)'
+    params:
+      scene:
+        type: int
+        min: 0
+        max: 300
+        required: true
+    send: ssrecall_ex MIXER:Lib/Scene {scene}
+    expect:
+      matches: ^OK ssrecall_ex MIXER:Lib/Scene
+    returns: ack
+  get_current_scene:
+    summary: Read the number of the last recalled scene (sscurrent_ex MIXER:Lib/Scene)
+    send: sscurrent_ex MIXER:Lib/Scene
+    expect:
+      matches: ^OK sscurrent_ex MIXER:Lib/Scene (\d+)
+    returns: value
+  set_parameter:
+    summary: Set any numeric parameter by its RCP address (raw value, as the console's parameter list
+      gives it); x and y are sent as given, numbered from 0, and 0 where the address has no X or Y
+    params:
+      address:
+        type: string
+        max_length: 128
+        pattern: ^[A-Za-z]+:[A-Za-z0-9/]+$
+        required: true
+      x:
+        type: int
+        min: 0
+        required: true
+      y:
+        type: int
+        min: 0
+        required: true
+      value:
+        type: int
+        required: true
+    send: set {address} {x} {y} {value}
+    expect:
+      matches: '^OKm? set \S+ \d+ \d+ '
+    returns: ack
+  set_parameter_text:
+    summary: Set any text parameter (name, colour, type) by its RCP address; the value is sent double-quoted
+    params:
+      address:
+        type: string
+        max_length: 128
+        pattern: ^[A-Za-z]+:[A-Za-z0-9/]+$
+        required: true
+      x:
+        type: int
+        min: 0
+        required: true
+      y:
+        type: int
+        min: 0
+        required: true
+      value:
+        type: string
+        pattern: ^[ -~]*$
+        required: true
+    send: set {address} {x} {y} {value:json}
+    expect:
+      matches: '^OKm? set \S+ \d+ \d+ '
+    returns: ack
+  get_parameter:
+    summary: Read any parameter by its RCP address; returns the value as sent, a text value with its quotes
+    params:
+      address:
+        type: string
+        max_length: 128
+        pattern: ^[A-Za-z]+:[A-Za-z0-9/]+$
+        required: true
+      x:
+        type: int
+        min: 0
+        required: true
+      y:
+        type: int
+        min: 0
+        required: true
+    send: get {address} {x} {y}
+    expect:
+      matches: ^OK get \S+ \d+ \d+ (.*?)\s*$
+    returns: value
+  get_product_name:
+    summary: Read the product name (devinfo productname)
+    send: devinfo productname
+    expect:
+      matches: ^OK devinfo productname "?([^"]*?)"?\s*$
+    returns: value
+  get_device_name:
+    summary: Read the device name the user assigned (devinfo devicename)
+    send: devinfo devicename
+    expect:
+      matches: ^OK devinfo devicename "?([^"]*?)"?\s*$
+    returns: value
+  get_run_mode:
+    summary: 'Read the run mode (devstatus runmode): normal, emergency, booting or update'
+    send: devstatus runmode
+    expect:
+      matches: ^OK devstatus runmode "?([a-z]+)"?
+    returns: value
+  get_error_status:
+    summary: 'Read the alert status (devstatus error): none, or the active fault/error/warning alert text'
+    send: devstatus error
+    expect:
+      matches: ^OK devstatus error "?(.*?)"?\s*$
+    returns: value
+  set_keepalive:
+    summary: Ask the console to close the connection if nothing (a command or a lone LF) arrives for interval_ms
+      milliseconds (scpmode keepalive; more than 1000)
+    params:
+      interval_ms:
+        type: int
+        min: 1001
+        required: true
+    send: scpmode keepalive {interval_ms}
+    expect:
+      matches: ^OK scpmode keepalive
+    returns: ack
+
+quirks:
+  - models:
+      - all
+    severity: critical
+    text: >-
+      Yamaha publishes no remote control protocol specification for its mixing consoles. For CL and QL,
+      Yamaha's QLab Setup Guide and Python Script Template document TCP port 49280, LF-terminated commands,
+      scene recall (ssrecall_ex MIXER:Lib/Scene) and set of the input channel fader level, ON key and
+      pan to stereo. The rest of the protocol is taken from Yamaha's RCP specifications for the DME7 and
+      the RM series, which describe the same text protocol on TCP 49280 for other products: get and its
+      "OK get <address> <x> <y> <value>" reply, "OK set ..." and "OKm set ..." (the value was clamped
+      into range) acknowledgements, "ERROR <command> <code>" failures, "NOTIFY set" pushes, devinfo, devstatus
+      and scpmode keepalive. That the consoles behave this way is corroborated by the MIT-licensed Bitfocus
+      Companion module, not by Yamaha; treat those parts as unconfirmed until bench-tested.
+  - models:
+      - all
+    severity: warning
+    text: >-
+      X and Y are numbered from 0 on the wire (Yamaha's command list: X 0 = input channel 1), while Yamaha's
+      OSC documents number them from 1. Typed commands take channel, mix, band and other numbers from
+      1 and subtract one; set_parameter, set_parameter_text and get_parameter send x and y exactly as
+      given. A parameter without an X or Y dimension still takes both, sent as 0.
+  - models:
+      - all
+    severity: warning
+    text: >-
+      Every line ends with LF (0x0A); a lone LF is accepted as a heartbeat. Text values travel in double
+      quotes with \" and \\ escapes (DME7 spec 3.1 p.8) and must be ASCII. Names and other text telemetry
+      are stored as received, inside the quotes, so an escaped quote stays escaped. A set outside the
+      parameter's range is clamped by the device and acknowledged "OKm"; typed commands range-check first,
+      but set_parameter does not. Failures arrive as "ERROR <command> <code>" with codes UnknownCommand,
+      WrongFormat, InvalidArgument, UnknownAddress, TooLongCommand, AccessDenied, Busy, ReadOnly, NoPermission,
+      Overload, Overflow, InternalError and others (DME7 spec 3.5.1 p.38).
+  - models:
+      - all
+    severity: info
+    text: >-
+      Values are raw integers, not dB: fader and send levels are hundredths of a dB from -32768 (-inf)
+      to 1000 (+10.00 dB), pans -63 (L63) to 63 (R63), frequencies tenths of a Hz, Q thousandths. Yamaha's
+      fader table lists the values the console steps through; the console accepts any value in range.
+  - models:
+      - all
+    severity: info
+    text: >-
+      Parameter changes made on the console or by another controller are pushed as "NOTIFY set <address>
+      <x> <y> <value> ..." lines (DME7 spec 3.2.2 p.10, 4.8 p.49), which the telemetry rules apply. The
+      DME7 specification says parameters changed by a snapshot recall are not individually notified (p.10);
+      whether a console scene recall pushes every changed parameter is not documented. State read on connecting
+      can therefore be stale after a scene recall until the values are read again.
+  - models:
+      - all
+    severity: info
+    text: >-
+      On connecting, the telemetry poll reads every fader level, ON key and name of the largest model
+      in the family, one query at a time. A smaller model answers the queries for channels it lacks with
+      ERROR, which leaves no state. Channel limits in typed commands are likewise the family's largest;
+      a channel the model lacks is refused by the console with ERROR.
+  - models:
+      - all
+    severity: info
+    text: >-
+      scpmode keepalive makes the console close the connection itself when it hears nothing for the given
+      time (the DME7 document adds one second), freeing the slot after a controller vanishes; without
+      it a half-open connection can block new ones (DME7 spec 2-8 p.15). After it is set the controller
+      must send something, a command or a lone LF, within the interval, which this spec cannot schedule;
+      use it only where the host sends traffic regularly. Meter data (mtrstart and NOTIFY mtr) is not
+      covered: Yamaha documents no console meter addresses and the format cannot map a variable-length
+      meter list to per-channel state.
+  - models:
+      - all
+    severity: warning
+    text: >-
+      Requires CL/QL firmware V3.11 or later (Readme_EN.pdf). The controller connects to the console's
+      FOR MIXER CONTROL IP address, set in the NETWORK screen, through the console's network (LAN) port,
+      not the Dante port (QLab guide p.6-7).
+  - models:
+      - all
+    severity: warning
+    text: >-
+      get_current_scene, the sscurrent_ex replies and pushes, and every get, rest on the RCP grammar and
+      the Companion module, not on Yamaha's CL/QL documents, which show set and ssrecall_ex only. The
+      reply to sscurrent_ex is taken as "OK sscurrent_ex MIXER:Lib/Scene <number> [modified|unmodified]"
+      by analogy with the DME7 (p.23).
+  - models:
+      - all
+    severity: critical
+    text: >-
+      A scene recall changes the live mix at once, subject to the recall safe and focus settings made
+      on the console. Yamaha's command list numbers scenes 0-300 (#000-#300).
+  - models:
+      - all
+    severity: info
+    text: >-
+      Yamaha's guide warns that several commands sent with no wait between them were not all executed
+      from QLab and recommends a pre-wait (Readme_EN.pdf p.3); each script opens a new connection per
+      command. This spec keeps one connection and waits for each reply before the next command.
+
+state:
+  inputs.*.fader_level:
+    type: int
+    description: 'Input channel fader level (MIXER:Current/InCh/Fader/Level): hundredths of a dB, -32768
+      (-inf) to 1000 (+10 dB)'
+  inputs.*.on:
+    type: bool
+    description: 'Input channel ON key (0 OFF, the channel is muted; 1 ON) (MIXER:Current/InCh/Fader/On):
+      true = 1 (ON), false = 0 (OFF)'
+  inputs.*.stereo_pan:
+    type: int
+    description: 'Input channel pan to stereo (MIXER:Current/InCh/ToSt/Pan): -63 (L63) to 63 (R63), 0
+      centre'
+  scene.current:
+    type: int
+    description: Number of the current (last recalled) scene
+  scene.modified:
+    type: bool
+    description: A parameter changed since the scene was recalled (sscurrent_ex status modified/unmodified)
+  device.product_name:
+    type: string
+    description: Product name (devinfo productname)
+  device.name:
+    type: string
+    description: Device name assigned by the user (devinfo devicename)
+  device.run_mode:
+    type: string
+    description: 'Run mode: normal, emergency, booting or update (devstatus runmode)'
+  device.error:
+    type: string
+    description: 'Alert status: none, or flt/err/wrn alert text (devstatus error)'
+
+telemetry:
+  poll:
+    send:
+      - devinfo productname
+      - devinfo devicename
+      - devstatus runmode
+      - devstatus error
+      - sscurrent_ex MIXER:Lib/Scene
+      - get MIXER:Current/InCh/Fader/Level 0 0
+      - get MIXER:Current/InCh/Fader/Level 1 0
+      - get MIXER:Current/InCh/Fader/Level 2 0
+      - get MIXER:Current/InCh/Fader/Level 3 0
+      - get MIXER:Current/InCh/Fader/Level 4 0
+      - get MIXER:Current/InCh/Fader/Level 5 0
+      - get MIXER:Current/InCh/Fader/Level 6 0
+      - get MIXER:Current/InCh/Fader/Level 7 0
+      - get MIXER:Current/InCh/Fader/Level 8 0
+      - get MIXER:Current/InCh/Fader/Level 9 0
+      - get MIXER:Current/InCh/Fader/Level 10 0
+      - get MIXER:Current/InCh/Fader/Level 11 0
+      - get MIXER:Current/InCh/Fader/Level 12 0
+      - get MIXER:Current/InCh/Fader/Level 13 0
+      - get MIXER:Current/InCh/Fader/Level 14 0
+      - get MIXER:Current/InCh/Fader/Level 15 0
+      - get MIXER:Current/InCh/Fader/Level 16 0
+      - get MIXER:Current/InCh/Fader/Level 17 0
+      - get MIXER:Current/InCh/Fader/Level 18 0
+      - get MIXER:Current/InCh/Fader/Level 19 0
+      - get MIXER:Current/InCh/Fader/Level 20 0
+      - get MIXER:Current/InCh/Fader/Level 21 0
+      - get MIXER:Current/InCh/Fader/Level 22 0
+      - get MIXER:Current/InCh/Fader/Level 23 0
+      - get MIXER:Current/InCh/Fader/Level 24 0
+      - get MIXER:Current/InCh/Fader/Level 25 0
+      - get MIXER:Current/InCh/Fader/Level 26 0
+      - get MIXER:Current/InCh/Fader/Level 27 0
+      - get MIXER:Current/InCh/Fader/Level 28 0
+      - get MIXER:Current/InCh/Fader/Level 29 0
+      - get MIXER:Current/InCh/Fader/Level 30 0
+      - get MIXER:Current/InCh/Fader/Level 31 0
+      - get MIXER:Current/InCh/Fader/Level 32 0
+      - get MIXER:Current/InCh/Fader/Level 33 0
+      - get MIXER:Current/InCh/Fader/Level 34 0
+      - get MIXER:Current/InCh/Fader/Level 35 0
+      - get MIXER:Current/InCh/Fader/Level 36 0
+      - get MIXER:Current/InCh/Fader/Level 37 0
+      - get MIXER:Current/InCh/Fader/Level 38 0
+      - get MIXER:Current/InCh/Fader/Level 39 0
+      - get MIXER:Current/InCh/Fader/Level 40 0
+      - get MIXER:Current/InCh/Fader/Level 41 0
+      - get MIXER:Current/InCh/Fader/Level 42 0
+      - get MIXER:Current/InCh/Fader/Level 43 0
+      - get MIXER:Current/InCh/Fader/Level 44 0
+      - get MIXER:Current/InCh/Fader/Level 45 0
+      - get MIXER:Current/InCh/Fader/Level 46 0
+      - get MIXER:Current/InCh/Fader/Level 47 0
+      - get MIXER:Current/InCh/Fader/Level 48 0
+      - get MIXER:Current/InCh/Fader/Level 49 0
+      - get MIXER:Current/InCh/Fader/Level 50 0
+      - get MIXER:Current/InCh/Fader/Level 51 0
+      - get MIXER:Current/InCh/Fader/Level 52 0
+      - get MIXER:Current/InCh/Fader/Level 53 0
+      - get MIXER:Current/InCh/Fader/Level 54 0
+      - get MIXER:Current/InCh/Fader/Level 55 0
+      - get MIXER:Current/InCh/Fader/Level 56 0
+      - get MIXER:Current/InCh/Fader/Level 57 0
+      - get MIXER:Current/InCh/Fader/Level 58 0
+      - get MIXER:Current/InCh/Fader/Level 59 0
+      - get MIXER:Current/InCh/Fader/Level 60 0
+      - get MIXER:Current/InCh/Fader/Level 61 0
+      - get MIXER:Current/InCh/Fader/Level 62 0
+      - get MIXER:Current/InCh/Fader/Level 63 0
+      - get MIXER:Current/InCh/Fader/Level 64 0
+      - get MIXER:Current/InCh/Fader/Level 65 0
+      - get MIXER:Current/InCh/Fader/Level 66 0
+      - get MIXER:Current/InCh/Fader/Level 67 0
+      - get MIXER:Current/InCh/Fader/Level 68 0
+      - get MIXER:Current/InCh/Fader/Level 69 0
+      - get MIXER:Current/InCh/Fader/Level 70 0
+      - get MIXER:Current/InCh/Fader/Level 71 0
+      - get MIXER:Current/InCh/Fader/On 0 0
+      - get MIXER:Current/InCh/Fader/On 1 0
+      - get MIXER:Current/InCh/Fader/On 2 0
+      - get MIXER:Current/InCh/Fader/On 3 0
+      - get MIXER:Current/InCh/Fader/On 4 0
+      - get MIXER:Current/InCh/Fader/On 5 0
+      - get MIXER:Current/InCh/Fader/On 6 0
+      - get MIXER:Current/InCh/Fader/On 7 0
+      - get MIXER:Current/InCh/Fader/On 8 0
+      - get MIXER:Current/InCh/Fader/On 9 0
+      - get MIXER:Current/InCh/Fader/On 10 0
+      - get MIXER:Current/InCh/Fader/On 11 0
+      - get MIXER:Current/InCh/Fader/On 12 0
+      - get MIXER:Current/InCh/Fader/On 13 0
+      - get MIXER:Current/InCh/Fader/On 14 0
+      - get MIXER:Current/InCh/Fader/On 15 0
+      - get MIXER:Current/InCh/Fader/On 16 0
+      - get MIXER:Current/InCh/Fader/On 17 0
+      - get MIXER:Current/InCh/Fader/On 18 0
+      - get MIXER:Current/InCh/Fader/On 19 0
+      - get MIXER:Current/InCh/Fader/On 20 0
+      - get MIXER:Current/InCh/Fader/On 21 0
+      - get MIXER:Current/InCh/Fader/On 22 0
+      - get MIXER:Current/InCh/Fader/On 23 0
+      - get MIXER:Current/InCh/Fader/On 24 0
+      - get MIXER:Current/InCh/Fader/On 25 0
+      - get MIXER:Current/InCh/Fader/On 26 0
+      - get MIXER:Current/InCh/Fader/On 27 0
+      - get MIXER:Current/InCh/Fader/On 28 0
+      - get MIXER:Current/InCh/Fader/On 29 0
+      - get MIXER:Current/InCh/Fader/On 30 0
+      - get MIXER:Current/InCh/Fader/On 31 0
+      - get MIXER:Current/InCh/Fader/On 32 0
+      - get MIXER:Current/InCh/Fader/On 33 0
+      - get MIXER:Current/InCh/Fader/On 34 0
+      - get MIXER:Current/InCh/Fader/On 35 0
+      - get MIXER:Current/InCh/Fader/On 36 0
+      - get MIXER:Current/InCh/Fader/On 37 0
+      - get MIXER:Current/InCh/Fader/On 38 0
+      - get MIXER:Current/InCh/Fader/On 39 0
+      - get MIXER:Current/InCh/Fader/On 40 0
+      - get MIXER:Current/InCh/Fader/On 41 0
+      - get MIXER:Current/InCh/Fader/On 42 0
+      - get MIXER:Current/InCh/Fader/On 43 0
+      - get MIXER:Current/InCh/Fader/On 44 0
+      - get MIXER:Current/InCh/Fader/On 45 0
+      - get MIXER:Current/InCh/Fader/On 46 0
+      - get MIXER:Current/InCh/Fader/On 47 0
+      - get MIXER:Current/InCh/Fader/On 48 0
+      - get MIXER:Current/InCh/Fader/On 49 0
+      - get MIXER:Current/InCh/Fader/On 50 0
+      - get MIXER:Current/InCh/Fader/On 51 0
+      - get MIXER:Current/InCh/Fader/On 52 0
+      - get MIXER:Current/InCh/Fader/On 53 0
+      - get MIXER:Current/InCh/Fader/On 54 0
+      - get MIXER:Current/InCh/Fader/On 55 0
+      - get MIXER:Current/InCh/Fader/On 56 0
+      - get MIXER:Current/InCh/Fader/On 57 0
+      - get MIXER:Current/InCh/Fader/On 58 0
+      - get MIXER:Current/InCh/Fader/On 59 0
+      - get MIXER:Current/InCh/Fader/On 60 0
+      - get MIXER:Current/InCh/Fader/On 61 0
+      - get MIXER:Current/InCh/Fader/On 62 0
+      - get MIXER:Current/InCh/Fader/On 63 0
+      - get MIXER:Current/InCh/Fader/On 64 0
+      - get MIXER:Current/InCh/Fader/On 65 0
+      - get MIXER:Current/InCh/Fader/On 66 0
+      - get MIXER:Current/InCh/Fader/On 67 0
+      - get MIXER:Current/InCh/Fader/On 68 0
+      - get MIXER:Current/InCh/Fader/On 69 0
+      - get MIXER:Current/InCh/Fader/On 70 0
+      - get MIXER:Current/InCh/Fader/On 71 0
+  updates:
+    - match: ^OK devinfo productname "?([^"]*?)"?\s*$
+      state:
+        device.product_name: '{1}'
+    - match: ^OK devinfo devicename "?([^"]*?)"?\s*$
+      state:
+        device.name: '{1}'
+    - match: ^(?:OK|NOTIFY) devstatus runmode "?([a-z]+)"?\s*$
+      state:
+        device.run_mode: '{1}'
+    - match: ^(?:OK|NOTIFY) devstatus error "?(.*?)"?\s*$
+      state:
+        device.error: '{1}'
+    - match: '^(?:OK|NOTIFY) sscurrent_ex MIXER:Lib/Scene (\d+)(?: .*)?$'
+      state:
+        scene.current: '{1}'
+    - match: ^(?:OK|NOTIFY) sscurrent_ex MIXER:Lib/Scene \d+ (modified|unmodified)\s*$
+      state:
+        scene.modified:
+          value: '{1}'
+          map:
+            modified: true
+            unmodified: false
+    - match: ^(?:OK|NOTIFY) ssrecall_ex MIXER:Lib/Scene (\d+)\s*$
+      state:
+        scene.current: '{1}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/InCh/Fader/Level (\d+) (\d+) "?(-?\d+)"?(?:
+        .*)?$'
+      state:
+        inputs.{1:+1}.fader_level: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/InCh/Fader/On (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        inputs.{1:+1}.on:
+          value: '{3}'
+          map:
+            '0': false
+            '1': true
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) MIXER:Current/InCh/ToSt/Pan (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        inputs.{1:+1}.stereo_pan: '{3}'

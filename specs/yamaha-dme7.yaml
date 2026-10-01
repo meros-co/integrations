@@ -1,0 +1,962 @@
+spec: 1
+id: yamaha-dme7
+name: Yamaha DME7 digital signal processor
+vendor: Yamaha
+category: mixer
+
+# Yamaha Remote Control Protocol (RCP) as the DME7 implements it. Page numbers
+# are the document's printed page numbers, which equal the PDF page numbers.
+#
+# The DME7 has no fixed parameter addresses: the designer builds a Remote
+# Control Setup List in ProVisionaire Design, and each parameter or meter on it
+# is addressed as PROC:Remote/<IndexNo> (1.3, p.5). The parameter and meter
+# types a list can hold, their value scaling and their display strings are
+# reference material (sections 5-8, p.50-72) for interpreting values, not
+# addresses, so this spec has generic parameter commands rather than typed ones.
+# X and Y are the sub-addresses as sent on the wire, numbered from 0.
+source:
+  - title: "DME7 Remote Control Protocol Specifications, Version 1.1.0 rev2 (V1.1.0, Jan. 25, 2024)"
+    author: Yamaha Corporation
+    url: https://usa.yamaha.com/files/download/other_assets/4/2230684/DME7-remote-V110_en.pdf
+    note: >
+      Manufacturer document; applies to DME7 V1.1.0 and later. Setup, TCP port
+      49280, up to eight controllers, Remote Control Setup List p.5; command
+      lists p.6-7; syntax (LF-terminated ASCII lines, quoted strings with \"
+      and \\ escapes, value forms) p.8; notifications p.9-12 (devstatus, set,
+      setn, mtr, sscurrent_ex, ssrecall_ex, event); devstatus p.13-14; devmode
+      p.14; scpmode p.14-15; get/getn/gett p.16-17; set/setn/sett/setr
+      p.18-21; mtrstart/mtrstop p.22; sscurrent_ex/ssrecall_ex p.23; devinfo
+      p.24-28; prmnum/prminfo p.28-29; mtrnum/mtrinfo p.30;
+      ssnum_ex/ssinfo_ex p.31; identify p.32; Audio Player, display font and
+      Scheduler events p.32-36; listitemnum/listitem p.37-38; error codes
+      3.5.1 p.38; command sequences p.39-49; meter values p.50; fader and other
+      value tables p.51-61; parameter list p.62-69; meter list p.70-72.
+
+transport:
+  type: line-tcp
+  port: 49280
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Replies begin "OK", "OKm" (value adjusted into range) or "ERROR"; NOTIFY
+  # pushes can arrive at any time and are never a reply.
+  reply_match: '^(OK|OKm|ERROR) '
+  probe: devstatus runmode
+
+models:
+  - id: dme7
+    name: Yamaha DME7
+    supports:
+      - get_run_mode
+      - get_error_status
+      - get_power_supply_status
+      - set_run_mode
+      - set_encoding
+      - set_value_type
+      - set_normalized_resolution
+      - set_keepalive
+      - get_protocol_version
+      - get_parameter_set_version
+      - get_firmware_version
+      - get_product_name
+      - get_manufacturer
+      - get_serial_number
+      - get_category
+      - get_device_id
+      - get_device_name
+      - get_input_port_count
+      - get_output_port_count
+      - get_gpi_count
+      - get_gpo_count
+      - get_parameter_count
+      - get_parameter_info
+      - get_meter_count
+      - get_meter_info
+      - identify
+      - set_parameter
+      - set_parameter_normalized
+      - set_parameter_text
+      - set_parameter_relative
+      - get_parameter
+      - get_parameter_normalized
+      - get_parameter_text
+      - get_parameter_all_x
+      - get_parameter_all_y
+      - get_parameter_normalized_all_x
+      - get_parameter_normalized_all_y
+      - get_parameter_text_all_x
+      - get_parameter_text_all_y
+      - start_meter
+      - start_meter_peak_hold
+      - stop_meter
+      - stop_meter_peak_hold
+      - get_current_parameter_set
+      - get_current_snapshot
+      - recall_snapshot
+      - get_snapshot_count
+      - get_snapshot_info
+      - set_audio_player_type
+      - set_audio_player_path
+      - set_audio_player_play_mode
+      - set_audio_player_go_to_top
+      - set_audio_player_interval
+      - get_audio_player_status
+      - audio_player_play
+      - audio_player_stop
+      - audio_player_previous
+      - audio_player_next
+      - get_audio_player_current_song
+      - set_audio_player_current_song
+      - get_audio_player_item_count
+      - get_audio_player_item
+      - set_display_font
+      - set_scheduler_event_enabled
+      - set_scheduler_event_time
+      - get_scheduler_event_count
+      - get_scheduler_event
+    verification: none
+    notes: >
+      Firmware V1.1.0 or later (Audio Player, Scheduler and display font
+      events were added in V1.1.0). Which parameters and meters are reachable
+      is set by the Remote Control Setup List uploaded from ProVisionaire
+      Design.
+
+commands:
+  # ── Device status and run mode (2-1 .. 2-4, p.13-14) ─────────────────────
+  get_run_mode:
+    summary: 'Get the run mode: normal or emergency (commands accepted), booting or update (not accepted) (devstatus runmode, 2-1, p.13)'
+    send: devstatus runmode
+    expect: { matches: '^OK devstatus runmode "(\w+)"' }
+    returns: value
+
+  get_error_status:
+    summary: 'Get the alert status: "none", or "flt/", "err/" or "wrn/" followed by "message// xNNN on|off (count) ID-xxx date time" (devstatus error, 2-2, p.13)'
+    send: devstatus error
+    expect: { matches: '^OK devstatus error "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_power_supply_status:
+    summary: 'Get the status of power supply unit A (power1) or B (power2): fine or down (devstatus power1/power2, 2-3, p.14)'
+    params:
+      unit: { type: enum, values: [power1, power2], required: true }
+    send: "devstatus {unit}"
+    expect: { matches: '^OK devstatus (?i:power)[12] "(\w+)"' }
+    returns: value
+
+  set_run_mode:
+    summary: 'Change the run mode to normal or emergency (devmode, 2-4, p.14)'
+    params:
+      mode: { type: enum, values: [normal, emergency], required: true }
+    send: "devmode {mode}"
+    expect: { matches: '^OK devmode ' }
+    returns: ack
+
+  # ── Protocol mode (2-5 .. 2-8, p.14-15) ──────────────────────────────────
+  set_encoding:
+    summary: 'Set the character encoding of replies and notifications, ascii (default) or utf8; in ascii, characters out of range are sent as "?" (scpmode encoding, 2-5, p.14)'
+    params:
+      encoding: { type: enum, values: [ascii, utf8], required: true }
+    send: "scpmode encoding {encoding}"
+    expect: { matches: '^OK scpmode encoding ' }
+    returns: ack
+
+  set_value_type:
+    summary: 'Set whether parameter change notifications carry raw values (NOTIFY set, default) or normalized values (NOTIFY setn) (scpmode valuetype, 2-6, p.15)'
+    params:
+      value_type: { type: enum, values: [raw, normalized], required: true }
+    send: "scpmode valuetype {value_type}"
+    expect: { matches: '^OK scpmode valuetype ' }
+    returns: ack
+
+  set_normalized_resolution:
+    summary: 'Set the resolution of normalized values, default 1000; "should be more than 100", no maximum given; 1023 gives fader raw-value resolution (scpmode resolution, 2-7, p.15)'
+    params:
+      resolution: { type: int, min: 101, required: true }
+    send: "scpmode resolution {resolution}"
+    expect: { matches: '^OK scpmode resolution ' }
+    returns: ack
+
+  set_keepalive:
+    summary: 'Enable the keepalive: the device closes the connection when nothing (a command or a bare LF) arrives within interval_ms plus 1 s; "should be more than 1000" ms; disabled by default (scpmode keepalive, 2-8, p.15)'
+    params:
+      interval_ms: { type: int, min: 1001, required: true }
+    send: "scpmode keepalive {interval_ms}"
+    expect: { matches: '^OK scpmode keepalive ' }
+    returns: ack
+
+  # ── Product information (3-1 .. 3-13, p.24-28) ───────────────────────────
+  get_protocol_version:
+    summary: 'Get the external control protocol version (devinfo protocolver, 3-1, p.24)'
+    send: devinfo protocolver
+    expect: { matches: '^OK devinfo protocolver "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_parameter_set_version:
+    summary: 'Get the parameter set version, such as "PROC:1.0.0" (devinfo paramsetver, 3-2, p.24)'
+    send: devinfo paramsetver
+    expect: { matches: '^OK devinfo paramsetver "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_firmware_version:
+    summary: 'Get the firmware version (devinfo version, 3-3, p.24)'
+    send: devinfo version
+    expect: { matches: '^OK devinfo version "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_product_name:
+    summary: 'Get the product name, "DME7" (devinfo productname, 3-4, p.25)'
+    send: devinfo productname
+    expect: { matches: '^OK devinfo productname "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_manufacturer:
+    summary: 'Get the manufacturer name, "Yamaha Corporation" (devinfo manufacturer, 3-5, p.25)'
+    send: devinfo manufacturer
+    expect: { matches: '^OK devinfo manufacturer "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_serial_number:
+    summary: 'Get the serial number (devinfo serialno, 3-6, p.25)'
+    send: devinfo serialno
+    expect: { matches: '^OK devinfo serialno "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_category:
+    summary: 'Get the device category, "processor" (devinfo category, 3-7, p.26)'
+    send: devinfo category
+    expect: { matches: '^OK devinfo category "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_device_id:
+    summary: 'Get the device (UNIT) ID, 3 hexadecimal digits (devinfo deviceid, 3-8, p.26)'
+    send: devinfo deviceid
+    expect: { matches: '^OK devinfo deviceid "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_device_name:
+    summary: 'Get the device name assigned by the user, in the encoding set by set_encoding (devinfo devicename, 3-9, p.26)'
+    send: devinfo devicename
+    expect: { matches: '^OK devinfo devicename "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_input_port_count:
+    summary: 'Get the number of audio input ports (devinfo inputport, 3-10, p.27; the example quotes the number)'
+    send: devinfo inputport
+    expect: { matches: '^OK devinfo inputport "?(\d+)' }
+    returns: value
+
+  get_output_port_count:
+    summary: 'Get the number of audio output ports (devinfo outputport, 3-11, p.27)'
+    send: devinfo outputport
+    expect: { matches: '^OK devinfo outputport "?(\d+)' }
+    returns: value
+
+  get_gpi_count:
+    summary: 'Get the number of GPI IN ports (devinfo gpi, 3-12, p.27)'
+    send: devinfo gpi
+    expect: { matches: '^OK devinfo gpi "?(\d+)' }
+    returns: value
+
+  get_gpo_count:
+    summary: 'Get the number of GPI OUT ports (devinfo gpo, 3-13, p.28)'
+    send: devinfo gpo
+    expect: { matches: '^OK devinfo gpo "?(\d+)' }
+    returns: value
+
+  # ── Remote Control Setup List information (3-14 .. 3-17, p.28-30) ────────
+  get_parameter_count:
+    summary: 'Get the maximum number of entries in the Remote Control Setup List; the DME7 always answers 1000 (prmnum, 3-14, p.28)'
+    send: prmnum
+    expect: { matches: '^OK prmnum (\d+)' }
+    returns: value
+
+  get_parameter_info:
+    summary: 'Get the parameter at a Remote Control Setup List index as the device''s text: "address" xnum ynum min max default "unit" type ui rw scaling; an error when a meter is at the index (prminfo, 3-15, p.28-29)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+    send: "prminfo {index}"
+    expect: { matches: '^OK prminfo ' }
+    returns: text
+
+  get_meter_count:
+    summary: 'Get the maximum number of meters in the Remote Control Setup List; the DME7 always answers 1000 (mtrnum, 3-16, p.30)'
+    send: mtrnum
+    expect: { matches: '^OK mtrnum (\d+)' }
+    returns: value
+
+  get_meter_info:
+    summary: 'Get the meter at a Remote Control Setup List index as the device''s text: "address" count type (level, hold, gr, vu, raw or gr+100); an error when a parameter is at the index (mtrinfo, 3-17, p.30)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+    send: "mtrinfo {index}"
+    expect: { matches: '^OK (?:mtrinfo|prminfo) ?\d' }
+    returns: text
+
+  identify:
+    summary: 'Enter identify display mode for 1-60 seconds, or 0 to stop (identify, 3-20, p.32)'
+    params:
+      seconds: { type: int, min: 0, max: 60, required: true }
+    send: "identify {seconds}"
+    expect: { matches: '^OKm? identify ' }
+    returns: ack
+
+  # ── Parameters (2-9 .. 2-15, p.16-21) ────────────────────────────────────
+  set_parameter:
+    summary: 'Set the parameter at a Remote Control Setup List index to a raw value (scaling per section 7, p.62-69); x and y are the sub-addresses as sent on the wire, numbered from 0, "0" for a parameter registered with fixed X/Y (set, 2-12, p.18). An out-of-range value is adjusted and answered OKm'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+      value: { type: int, required: true }
+    send: "set PROC:Remote/{index} {x} {y} {value}"
+    expect: { matches: '^OKm? set PROC:Remote/\d+ ' }
+    returns: ack
+
+  set_parameter_normalized:
+    summary: 'Set a parameter to a normalized value, 0 to the resolution (default 1000); x and y numbered from 0 (setn, 2-13, p.19)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+      value: { type: int, min: 0, required: true }
+    send: "setn PROC:Remote/{index} {x} {y} {value}"
+    expect: { matches: '^OKm? setn PROC:Remote/\d+ ' }
+    returns: ack
+
+  set_parameter_text:
+    summary: 'Set a parameter from its display string, printable ASCII, sent quoted with \" and \\ escapes ("Inf" is read as -inf); x and y numbered from 0 (sett, 2-14, p.20)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+      text: { type: string, pattern: '^[ -~]*$', required: true }
+    send: "sett PROC:Remote/{index} {x} {y} {text:json}"
+    expect: { matches: '^OKm? sett PROC:Remote/\d+ ' }
+    returns: ack
+
+  set_parameter_relative:
+    summary: 'Move a fader-type parameter by a number of steps, negative to decrease (section 7 "setr" column); x and y numbered from 0 (setr, 2-15, p.21)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+      steps: { type: int, required: true }
+    send: "setr PROC:Remote/{index} {x} {y} {steps}"
+    expect: { matches: '^OKm? (?:setr ?)?PROC:Remote/\d+ ' }
+    returns: ack
+
+  get_parameter:
+    summary: 'Get a parameter''s raw value; x and y numbered from 0 (get, 2-9, p.16)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+    send: "get PROC:Remote/{index} {x} {y}"
+    expect: { matches: '^OK get PROC:Remote/\d+ \d+ \d+ (-?\d+)' }
+    returns: value
+
+  get_parameter_normalized:
+    summary: 'Get a parameter''s normalized value; x and y numbered from 0 (getn, 2-10, p.17)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+    send: "getn PROC:Remote/{index} {x} {y}"
+    expect: { matches: '^OK getn PROC:Remote/\d+ \d+ \d+ (-?\d+)' }
+    returns: value
+
+  get_parameter_text:
+    summary: 'Get a parameter''s display string; x and y numbered from 0 (gett, 2-11, p.17)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+      y: { type: int, min: 0, default: 0 }
+    send: "gett PROC:Remote/{index} {x} {y}"
+    expect: { matches: '^OK gett PROC:Remote/\d+ \d+ \d+ "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  get_parameter_all_x:
+    summary: 'Get the raw values of every X for one Y (X sent as "all"), as the space-separated list the device returns; y numbered from 0 (get, 2-9, p.16)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      y: { type: int, min: 0, default: 0 }
+    send: "get PROC:Remote/{index} all {y}"
+    expect: { matches: '^OK get PROC:Remote/\d+ all \d+ (.+)$' }
+    returns: value
+
+  get_parameter_all_y:
+    summary: 'Get the raw values of every Y for one X (Y sent as "all"), as the space-separated list the device returns; x numbered from 0 (get, 2-9, p.16)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+    send: "get PROC:Remote/{index} {x} all"
+    expect: { matches: '^OK get PROC:Remote/\d+ \d+ all (.+)$' }
+    returns: value
+
+  get_parameter_normalized_all_x:
+    summary: 'Get the normalized values of every X for one Y, as the list the device returns (getn with X "all", 2-10, p.17)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      y: { type: int, min: 0, default: 0 }
+    send: "getn PROC:Remote/{index} all {y}"
+    expect: { matches: '^OK getn PROC:Remote/\d+ all \d+ (.+)$' }
+    returns: value
+
+  get_parameter_normalized_all_y:
+    summary: 'Get the normalized values of every Y for one X, as the list the device returns (getn with Y "all", 2-10, p.17)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+    send: "getn PROC:Remote/{index} {x} all"
+    expect: { matches: '^OK getn PROC:Remote/\d+ \d+ all (.+)$' }
+    returns: value
+
+  get_parameter_text_all_x:
+    summary: 'Get the display strings of every X for one Y, as the quoted list the device returns (gett with X "all", 2-11, p.17)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      y: { type: int, min: 0, default: 0 }
+    send: "gett PROC:Remote/{index} all {y}"
+    expect: { matches: '^OK gett PROC:Remote/\d+ all \d+ (.+)$' }
+    returns: value
+
+  get_parameter_text_all_y:
+    summary: 'Get the display strings of every Y for one X, as the quoted list the device returns (gett with Y "all", 2-11, p.17)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      x: { type: int, min: 0, default: 0 }
+    send: "gett PROC:Remote/{index} {x} all"
+    expect: { matches: '^OK gett PROC:Remote/\d+ \d+ all (.+)$' }
+    returns: value
+
+  # ── Meters (2-16, 2-17, p.22) ────────────────────────────────────────────
+  start_meter:
+    summary: 'Start level notifications (NOTIFY mtr) for the meter at a Remote Control Setup List index at a minimum interval in ms; they stop after 10 s unless requested again (mtrstart, 2-16, p.22, 4.6 p.48)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      interval_ms: { type: int, min: 1, required: true }
+    send: "mtrstart PROC:Remote/{index} {interval_ms}"
+    expect: { matches: '^OK mtrstart PROC:Remote/\d+' }
+    returns: ack
+
+  start_meter_peak_hold:
+    summary: 'Start peak-hold notifications (NOTIFY mtr ...>PeakHold) for a meter at a minimum interval in ms; they stop after 10 s unless requested again (mtrstart >PeakHold, 2-16, p.22)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+      interval_ms: { type: int, min: 1, required: true }
+    send: "mtrstart PROC:Remote/{index}>PeakHold {interval_ms}"
+    expect: { matches: '^OK mtrstart PROC:Remote/\d+>PeakHold' }
+    returns: ack
+
+  stop_meter:
+    summary: 'Stop level notifications for a meter (mtrstop, 2-17, p.22)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+    send: "mtrstop PROC:Remote/{index}"
+    expect: { matches: '^OK mtrstop PROC:Remote/\d+' }
+    returns: ack
+
+  stop_meter_peak_hold:
+    summary: 'Stop peak-hold notifications for a meter (mtrstop >PeakHold, 2-17, p.22)'
+    params:
+      index: { type: int, min: 0, max: 1000, required: true }
+    send: "mtrstop PROC:Remote/{index}>PeakHold"
+    expect: { matches: '^OK mtrstop PROC:Remote/\d+>PeakHold' }
+    returns: ack
+
+  # ── Snapshots (2-18, 2-19, 3-18, 3-19, p.23, p.31) ───────────────────────
+  get_current_parameter_set:
+    summary: 'Get the ID of the parameter set last recalled (sscurrent_ex parameter_set, 2-18, p.23)'
+    send: sscurrent_ex parameter_set
+    expect: { matches: '^OK sscurrent_ex (?:parameter_set )?(\d+) (?:un)?modified' }
+    returns: value
+
+  get_current_snapshot:
+    summary: 'Get the current snapshot number (1-100) of a parameter set; the reply also says modified or unmodified (sscurrent_ex <id>, 2-18, p.23)'
+    params:
+      parameter_set: { type: int, min: 0, required: true }
+    send: "sscurrent_ex {parameter_set}"
+    expect: { matches: '^OK sscurrent(?:_ex)? \d+ (\d+)' }
+    returns: value
+
+  recall_snapshot:
+    summary: 'Recall snapshot 1-100 of a parameter set (ssrecall_ex, 2-19, p.23); parameters changed by the recall are not notified, so query them again'
+    params:
+      parameter_set: { type: int, min: 0, required: true }
+      snapshot: { type: int, min: 1, max: 100, required: true }
+    send: "ssrecall_ex {parameter_set} {snapshot}"
+    expect: { matches: '^OK ssrecall(?:_ex)? ' }
+    returns: ack
+
+  get_snapshot_count:
+    summary: 'Get the number of snapshots in a parameter set (ssnum_ex, 3-18, p.31; replies are shown both with and without the ID)'
+    params:
+      parameter_set: { type: int, min: 0, required: true }
+    send: "ssnum_ex {parameter_set}"
+    expect: { matches: '^OK ssnum_ex (?:\d+ )?(\d+)\s*$' }
+    returns: value
+
+  get_snapshot_info:
+    summary: 'Get snapshot 1-100 of a parameter set as the device''s text: id index "numtext" "title" "comment" attribute (preinst, reserve, user or empty) (ssinfo_ex, 3-19, p.31)'
+    params:
+      parameter_set: { type: int, min: 0, required: true }
+      snapshot: { type: int, min: 1, max: 100, required: true }
+    send: "ssinfo_ex {parameter_set} {snapshot}"
+    expect: { matches: '^OK ssinfo(?:_ex)? ' }
+    returns: text
+
+  # ── Audio Player (3-21 .. 3-29, 3-33, 3-34, p.32-37) ─────────────────────
+  set_audio_player_type:
+    summary: 'Set the playback type of an Audio Player item: noAssign, 1song or folder (event PROC:AudioPlayerSetType, 3-21, p.32); item indexes from listitemnum'
+    params:
+      index: { type: int, min: 0, required: true }
+      type: { type: enum, values: [noAssign, 1song, folder], required: true }
+    send: 'event PROC:AudioPlayerSetType "index={index}" "type={type}"'
+    expect: { matches: '^OK event PROC:AudioPlayerSetType ' }
+    returns: ack
+
+  set_audio_player_path:
+    summary: 'Set the song or folder path of an Audio Player item; printable ASCII without quotes or backslashes (event PROC:AudioPlayerSetPath, 3-22, p.32)'
+    params:
+      index: { type: int, min: 0, required: true }
+      path: { type: string, pattern: '^[ !#-\[\]-~]*$', required: true }
+    send: 'event PROC:AudioPlayerSetPath "index={index}" "path={path}"'
+    expect: { matches: '^OK event PROC:AudioPlayerSetPath ' }
+    returns: ack
+
+  set_audio_player_play_mode:
+    summary: 'Set the playback mode of an Audio Player item: normal, repeat or shuffleRepeat (event PROC:AudioPlayerSetPlayMode, 3-23, p.33)'
+    params:
+      index: { type: int, min: 0, required: true }
+      mode: { type: enum, values: [normal, repeat, shuffleRepeat], required: true }
+    send: 'event PROC:AudioPlayerSetPlayMode "index={index}" "mode={mode}"'
+    expect: { matches: '^OK event PROC:AudioPlayerSetPlayMode ' }
+    returns: ack
+
+  set_audio_player_go_to_top:
+    summary: 'Set Go To The Top of an Audio Player item, on or off (event PROC:AudioPlayerSetGoToTheTop, 3-24, p.33)'
+    params:
+      index: { type: int, min: 0, required: true }
+      go_to_top: { type: enum, values: ['on', 'off'], required: true }
+    send: 'event PROC:AudioPlayerSetGoToTheTop "index={index}" "goToTheTop={go_to_top}"'
+    expect: { matches: '^OK event PROC:AudioPlayerSetGoToTheTop ' }
+    returns: ack
+
+  set_audio_player_interval:
+    summary: 'Set the song interval of an Audio Player item in seconds, 0.0-10.0 (event PROC:AudioPlayerSetInterval, 3-25, p.33; range from listitem, p.37)'
+    params:
+      index: { type: int, min: 0, required: true }
+      interval: { type: float, min: 0.0, max: 10.0, required: true }
+    send: 'event PROC:AudioPlayerSetInterval "index={index}" "interval={interval:.1f}"'
+    expect: { matches: '^OK event PROC:AudioPlayerSetInterval ' }
+    returns: ack
+
+  get_audio_player_status:
+    summary: 'Get the playback status: stop, play or pause; fails (OKm) when no SD card is inserted (event PROC:AudioPlayerGetStatus, 3-26, p.34)'
+    send: 'event PROC:AudioPlayerGetStatus ""'
+    expect: { matches: '^OK event PROC:AudioPlayerGetStatus "status=(\w+)"' }
+    returns: value
+
+  audio_player_play:
+    summary: 'Play; fails (OKm) with no SD card or no song set up (event PROC:AudioPlayerTransport "operation=play", 3-27, p.34)'
+    send: 'event PROC:AudioPlayerTransport "operation=play"'
+    expect: { matches: '^OK event PROC:AudioPlayerTransport "operation=' }
+    returns: ack
+
+  audio_player_stop:
+    summary: 'Stop playback (event PROC:AudioPlayerTransport "operation=stop", 3-27, p.34)'
+    send: 'event PROC:AudioPlayerTransport "operation=stop"'
+    expect: { matches: '^OK event PROC:AudioPlayerTransport "operation=' }
+    returns: ack
+
+  audio_player_previous:
+    summary: 'Go to the previous song (event PROC:AudioPlayerTransport "operation=prev", 3-27, p.34)'
+    send: 'event PROC:AudioPlayerTransport "operation=prev"'
+    expect: { matches: '^OK event PROC:AudioPlayerTransport "operation=' }
+    returns: ack
+
+  audio_player_next:
+    summary: 'Go to the next song (event PROC:AudioPlayerTransport "operation=next", 3-27, p.34)'
+    send: 'event PROC:AudioPlayerTransport "operation=next"'
+    expect: { matches: '^OK event PROC:AudioPlayerTransport "operation=' }
+    returns: ack
+
+  get_audio_player_current_song:
+    summary: 'Get the item index of the song playing or selected; fails (OKm) with no SD card or no song set up (event PROC:AudioPlayerGetCurrentSong, 3-28, p.35)'
+    send: 'event PROC:AudioPlayerGetCurrentSong ""'
+    expect: { matches: '^OK event PROC:AudioPlayer(?:Get|Set)CurrentSong "index=(\d+)"' }
+    returns: value
+
+  set_audio_player_current_song:
+    summary: 'Select the Audio Player item to play (event PROC:AudioPlayerSetCurrentSong, 3-29, p.35)'
+    params:
+      index: { type: int, min: 0, required: true }
+    send: 'event PROC:AudioPlayerSetCurrentSong "index={index}"'
+    expect: { matches: '^OK event PROC:AudioPlayerSetCurrentSong "index=' }
+    returns: ack
+
+  get_audio_player_item_count:
+    summary: 'Get the number of Audio Player items; the reply also gives the first and last index (listitemnum PROC:AudioPlayer, 3-33, p.37)'
+    send: 'listitemnum PROC:AudioPlayer ""'
+    expect: { matches: '^OK listitemnum PROC:AudioPlayer (\d+)' }
+    returns: value
+
+  get_audio_player_item:
+    summary: 'Get an Audio Player item as "Type PlayMode GoToTheTop Interval Name", such as "1Song Normal On 1.0 xxx.wav" (listitem PROC:AudioPlayer, 3-34, p.37)'
+    params:
+      index: { type: int, min: 0, required: true }
+    send: "listitem PROC:AudioPlayer {index}"
+    expect: { matches: '^OK listitem PROC:AudioPlayer \d+ "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+  # ── Display font and Scheduler (3-30 .. 3-32, 3-35, 3-36, p.35-38) ───────
+  set_display_font:
+    summary: 'Set the display font: type1 (M Plus: Japanese kana and kanji, English, European languages) or type2 (Dyna Chinese characters and kana, M Plus English and European) (event PROC:Language, 3-30, p.35)'
+    params:
+      font: { type: enum, values: [type1, type2], required: true }
+    send: 'event PROC:Language "{font}"'
+    expect: { matches: '^OK event PROC:Language ' }
+    returns: ack
+
+  set_scheduler_event_enabled:
+    summary: 'Enable or disable a public Scheduler event by index; fails (OKm) when no Scheduler component is placed or the index is invalid (event PROC:SchedulerSetEnable, 3-31, p.36)'
+    params:
+      index: { type: int, min: 0, required: true }
+      enabled: { type: bool, required: true }
+    send: 'event PROC:SchedulerSetEnable "index={index}" "enable={enabled}"'
+    expect: { matches: '^OK event PROC:SchedulerSetEnable "index=' }
+    returns: ack
+
+  set_scheduler_event_time:
+    summary: 'Set the time of a public Scheduler event, such as 9:00; fails (OKm) when the time is invalid (event PROC:SchedulerSetTime, 3-32, p.36)'
+    params:
+      index: { type: int, min: 0, required: true }
+      time: { type: string, pattern: '^[0-9]{1,2}:[0-9]{2}$', required: true }
+    send: 'event PROC:SchedulerSetTime "index={index}" "time={time}"'
+    expect: { matches: '^OK event PROC:SchedulerSetTime "index=' }
+    returns: ack
+
+  get_scheduler_event_count:
+    summary: 'Get the number of public Scheduler events; the reply also gives the first and last index (listitemnum PROC:Scheduler, 3-35, p.37)'
+    send: 'listitemnum PROC:Scheduler ""'
+    expect: { matches: '^OK listitemnum PROC:Scheduler (\d+)' }
+    returns: value
+
+  get_scheduler_event:
+    summary: 'Get a public Scheduler event as "enable|disable time name", such as "enable 9:00 MorningChime" (listitem PROC:Scheduler, 3-36, p.38)'
+    params:
+      index: { type: int, min: 0, required: true }
+    send: "listitem PROC:Scheduler {index}"
+    expect: { matches: '^OK listitem PROC:Scheduler \d+ "((?:[^"\\]|\\.)*)"' }
+    returns: value
+
+state:
+  device.run_mode:              { type: string, description: "Run mode: normal, emergency, booting or update (devstatus runmode, devmode)" }
+  device.error:                 { type: string, description: "Alert status as sent: none, or flt/err/wrn followed by message, alert number, on/off, count, unit ID, date and time (devstatus error)" }
+  power_supplies.*.ok:          { type: bool, description: "Power supply unit running normally (fine) or down, by unit 1 (A) and 2 (B) (devstatus power1/power2)" }
+  device.protocol_version:      { type: string, description: "External control protocol version (devinfo protocolver)" }
+  device.parameter_set_version: { type: string, description: "Parameter set version (devinfo paramsetver)" }
+  device.firmware:              { type: string, description: "Firmware version (devinfo version)" }
+  device.product_name:          { type: string, description: "Product name (devinfo productname)" }
+  device.manufacturer:          { type: string, description: "Manufacturer name (devinfo manufacturer)" }
+  device.serial:                { type: string, description: "Serial number (devinfo serialno)" }
+  device.category:              { type: string, description: "Device category (devinfo category)" }
+  device.device_id:             { type: string, description: "Device (UNIT) ID, 3 hexadecimal digits (devinfo deviceid)" }
+  device.name:                  { type: string, description: "Device name assigned by the user (devinfo devicename)" }
+  device.inputs:                { type: int, description: "Number of audio input ports (devinfo inputport)" }
+  device.outputs:               { type: int, description: "Number of audio output ports (devinfo outputport)" }
+  device.gpi:                   { type: int, description: "Number of GPI IN ports (devinfo gpi)" }
+  device.gpo:                   { type: int, description: "Number of GPI OUT ports (devinfo gpo)" }
+  device.parameter_count:       { type: int, description: "Maximum Remote Control Setup List parameter entries (prmnum)" }
+  device.meter_count:           { type: int, description: "Maximum Remote Control Setup List meter entries (mtrnum)" }
+  device.synchronizing:         { type: bool, description: "ProVisionaire Design synchronisation in progress (NOTIFY event PROC:SynchronizationSetStatus)" }
+  device.display_font:          { type: string, description: "Display font, type1 or type2 (event PROC:Language)" }
+  parameters.*.*.*.raw:         { type: int, description: "Raw value by Remote Control Setup List index, X and Y as sent on the wire (numbered from 0); scaling per section 7 (set, get, setr, NOTIFY set)" }
+  parameters.*.*.*.normalized:  { type: int, description: "Normalized value by index, X and Y (setn, getn, NOTIFY setn)" }
+  parameters.*.*.*.text:        { type: string, description: "Display string by index, X and Y, as sent with its escapes (set, setn, sett, gett and their notifications)" }
+  meters.*.type:                { type: string, description: "Meter type by index: level, hold, gr, vu, raw or gr+100 (NOTIFY mtr)" }
+  meters.*.values:              { type: string, description: "Last meter data by index, 2-digit hexadecimal values separated by spaces as sent (section 5: bit 7 is the clip flag, bits 0-6 the level, 0x7E = 0 dBFS)" }
+  meters.*.peak_hold_values:    { type: string, description: "Last peak-hold meter data by index, as sent (NOTIFY mtr ...>PeakHold)" }
+  snapshots.current_parameter_set:           { type: int, description: "ID of the parameter set last recalled (sscurrent_ex)" }
+  snapshots.last_recalled_parameter_set:     { type: int, description: "Parameter set of the last recall started (ssrecall_ex)" }
+  snapshots.last_recalled:                   { type: int, description: "Snapshot number of the last recall started (ssrecall_ex)" }
+  parameter_sets.*.current_snapshot:         { type: int, description: "Current snapshot number 1-100, by parameter set ID (sscurrent_ex)" }
+  parameter_sets.*.modified:                 { type: bool, description: "Parameters changed since the snapshot was recalled, by parameter set ID (sscurrent_ex)" }
+  parameter_sets.*.snapshot_count:           { type: int, description: "Number of snapshots, by parameter set ID, from a reply that carries the ID (ssnum_ex)" }
+  parameter_sets.*.snapshots.*.number_text:  { type: string, description: "Display number of a snapshot (ssinfo_ex)" }
+  parameter_sets.*.snapshots.*.title:        { type: string, description: "Title of a snapshot, as sent with escapes (ssinfo_ex)" }
+  parameter_sets.*.snapshots.*.attribute:    { type: string, description: "Snapshot attribute: preinst, reserve, user or empty (ssinfo_ex)" }
+  media.sd_card_inserted:       { type: bool, description: "An SD memory card is inserted (NOTIFY event PROC:Media; an OKm \"sdcard is not inserted\" reply sets false)" }
+  audio_player.status:          { type: string, description: "Playback status: stop, play or pause" }
+  audio_player.current_song:    { type: int, description: "Item index of the song playing or selected" }
+  audio_player.item_count:      { type: int, description: "Number of Audio Player items (listitemnum)" }
+  audio_player.first_index:     { type: int, description: "First Audio Player item index (listitemnum)" }
+  audio_player.last_index:      { type: int, description: "Last Audio Player item index (listitemnum)" }
+  audio_player.items.*.type:      { type: string, description: "Playback type by item: noAssign, 1song, folder (events) or NoAssign, 1Song, Folder (listitem)" }
+  audio_player.items.*.path:      { type: string, description: "Song or folder path by item (AudioPlayerSetPath)" }
+  audio_player.items.*.name:      { type: string, description: "File or directory name by item (listitem)" }
+  audio_player.items.*.play_mode: { type: string, description: "Playback mode by item: normal, repeat, shuffleRepeat (events) or Normal, Repeat, ShuffleRepeat (listitem)" }
+  audio_player.items.*.go_to_top: { type: bool, description: "Go To The Top on, by item" }
+  audio_player.items.*.interval:  { type: float, unit: s, description: "Song interval by item, 0.0-10.0 s" }
+  scheduler.event_count:          { type: int, description: "Number of public Scheduler events (listitemnum)" }
+  scheduler.first_index:          { type: int, description: "First public Scheduler event index" }
+  scheduler.last_index:           { type: int, description: "Last public Scheduler event index" }
+  scheduler.events.*.enabled:     { type: bool, description: "Scheduler event enabled, by index" }
+  scheduler.events.*.time:        { type: string, description: "Scheduler event execution time, such as 9:00, by index" }
+  scheduler.events.*.name:        { type: string, description: "Scheduler event name, by index (listitem)" }
+
+telemetry:
+  # Status, identity and the Audio Player, Scheduler and snapshot state are
+  # asked once on connecting; everything else arrives as replies and NOTIFY
+  # pushes. Parameter values are not polled: which indexes exist depends on the
+  # Remote Control Setup List uploaded to the unit.
+  poll:
+    send:
+      - devstatus runmode
+      - devstatus error
+      - devstatus power1
+      - devstatus power2
+      - devinfo protocolver
+      - devinfo paramsetver
+      - devinfo version
+      - devinfo productname
+      - devinfo manufacturer
+      - devinfo serialno
+      - devinfo category
+      - devinfo deviceid
+      - devinfo devicename
+      - devinfo inputport
+      - devinfo outputport
+      - devinfo gpi
+      - devinfo gpo
+      - sscurrent_ex parameter_set
+      - 'event PROC:AudioPlayerGetStatus ""'
+      - 'event PROC:AudioPlayerGetCurrentSong ""'
+      - 'listitemnum PROC:AudioPlayer ""'
+      - 'listitemnum PROC:Scheduler ""'
+  updates:
+    - match: '^(?:OK|NOTIFY) devstatus runmode "(\w+)"$'
+      state: { "device.run_mode": "{1}" }
+    - match: '^OK devmode (normal|emergency)$'
+      state: { "device.run_mode": "{1}" }
+    - match: '^(?:OK|NOTIFY) devstatus error "((?:[^"\\]|\\.)*)"$'
+      state: { "device.error": "{1}" }
+    - match: '^(?:OK|NOTIFY) devstatus [Pp]ower([12]) "(fine|down)"$'
+      state: { "power_supplies.{1}.ok": { value: "{2}", map: { "fine": true, "down": false } } }
+    - match: '^OK devinfo protocolver "((?:[^"\\]|\\.)*)"$'
+      state: { "device.protocol_version": "{1}" }
+    - match: '^OK devinfo paramsetver "((?:[^"\\]|\\.)*)"$'
+      state: { "device.parameter_set_version": "{1}" }
+    - match: '^OK devinfo version "((?:[^"\\]|\\.)*)"$'
+      state: { "device.firmware": "{1}" }
+    - match: '^OK devinfo productname "((?:[^"\\]|\\.)*)"$'
+      state: { "device.product_name": "{1}" }
+    - match: '^OK devinfo manufacturer "((?:[^"\\]|\\.)*)"$'
+      state: { "device.manufacturer": "{1}" }
+    - match: '^OK devinfo serialno "((?:[^"\\]|\\.)*)"$'
+      state: { "device.serial": "{1}" }
+    - match: '^OK devinfo category "((?:[^"\\]|\\.)*)"$'
+      state: { "device.category": "{1}" }
+    - match: '^OK devinfo deviceid "((?:[^"\\]|\\.)*)"$'
+      state: { "device.device_id": "{1}" }
+    - match: '^OK devinfo devicename "((?:[^"\\]|\\.)*)"$'
+      state: { "device.name": "{1}" }
+    - match: '^OK devinfo inputport "?(\d+)"?$'
+      state: { "device.inputs": "{1}" }
+    - match: '^OK devinfo outputport "?(\d+)"?$'
+      state: { "device.outputs": "{1}" }
+    - match: '^OK devinfo gpi "?(\d+)"?$'
+      state: { "device.gpi": "{1}" }
+    - match: '^OK devinfo gpo "?(\d+)"?$'
+      state: { "device.gpo": "{1}" }
+    - match: '^OK prmnum (\d+)$'
+      state: { "device.parameter_count": "{1}" }
+    - match: '^OK mtrnum (\d+)$'
+      state: { "device.meter_count": "{1}" }
+    # Parameters, keyed by index, X and Y as on the wire. A set is answered and
+    # pushed with its display string; get, getn and setr replies carry the
+    # value alone.
+    - match: '^(?:OK|OKm|NOTIFY) set PROC:Remote/(\d+) (\d+) (\d+) (-?\d+) "((?:[^"\\]|\\.)*)"$'
+      state: { "parameters.{1}.{2}.{3}.raw": "{4}", "parameters.{1}.{2}.{3}.text": "{5}" }
+    - match: '^OK get PROC:Remote/(\d+) (\d+) (\d+) (-?\d+)$'
+      state: { "parameters.{1}.{2}.{3}.raw": "{4}" }
+    - match: '^(?:OK|OKm) (?:setr ?)?PROC:Remote/(\d+) (\d+) (\d+) (-?\d+)$'
+      state: { "parameters.{1}.{2}.{3}.raw": "{4}" }
+    - match: '^(?:OK|OKm|NOTIFY) setn PROC:Remote/(\d+) (\d+) (\d+) (-?\d+) "((?:[^"\\]|\\.)*)"$'
+      state: { "parameters.{1}.{2}.{3}.normalized": "{4}", "parameters.{1}.{2}.{3}.text": "{5}" }
+    - match: '^OK getn PROC:Remote/(\d+) (\d+) (\d+) (-?\d+)$'
+      state: { "parameters.{1}.{2}.{3}.normalized": "{4}" }
+    - match: '^(?:OK|OKm) (?:sett|gett) PROC:Remote/(\d+) (\d+) (\d+) "((?:[^"\\]|\\.)*)"$'
+      state: { "parameters.{1}.{2}.{3}.text": "{4}" }
+    # Meters (3.2.3, p.10): the hexadecimal data are kept as sent.
+    - match: '^NOTIFY mtr PROC:Remote/(\d+) (\S+) ([0-9A-Fa-f ]*)$'
+      state: { "meters.{1}.type": "{2}", "meters.{1}.values": "{3}" }
+    - match: '^NOTIFY mtr PROC:Remote/(\d+)>PeakHold \S+ ([0-9A-Fa-f ]*)$'
+      state: { "meters.{1}.peak_hold_values": "{2}" }
+    # Snapshots (p.10-11, p.23, p.31).
+    - match: '^OK sscurrent_ex (?:parameter_set )?(\d+) (?:un)?modified$'
+      state: { "snapshots.current_parameter_set": "{1}" }
+    - match: '^(?:OK|NOTIFY) sscurrent(?:_ex)? (\d+) (\d+)(?: (?:un)?modified)?$'
+      state: { "snapshots.current_parameter_set": "{1}", "parameter_sets.{1}.current_snapshot": "{2}" }
+    - match: '^OK sscurrent(?:_ex)? (\d+) \d+ ((?:un)?modified)$'
+      state: { "parameter_sets.{1}.modified": { value: "{2}", map: { "modified": true, "unmodified": false } } }
+    - match: '^(?:OK|NOTIFY) ssrecall(?:_ex)? (\d+) (\d+)$'
+      state: { "snapshots.last_recalled_parameter_set": "{1}", "snapshots.last_recalled": "{2}" }
+    - match: '^OK ssnum_ex (\d+) (\d+)$'
+      state: { "parameter_sets.{1}.snapshot_count": "{2}" }
+    - match: '^OK ssinfo(?:_ex)? (\d+) (\d+) "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" "(?:[^"\\]|\\.)*" (\w+)$'
+      state: { "parameter_sets.{1}.snapshots.{2}.number_text": "{3}", "parameter_sets.{1}.snapshots.{2}.title": "{4}", "parameter_sets.{1}.snapshots.{2}.attribute": "{5}" }
+    # Events (3.2.5, p.11-12; 3.4.6, p.32-36; 3.4.7, p.37-38).
+    - match: '^NOTIFY event PROC:SynchronizationSetStatus "(active|inactive)"$'
+      state: { "device.synchronizing": { value: "{1}", map: { "active": true, "inactive": false } } }
+    - match: '^NOTIFY event PROC:Media "sdcard=(inserted|extracted)"$'
+      state: { "media.sd_card_inserted": { value: "{1}", map: { "inserted": true, "extracted": false } } }
+    - match: '^OKm event PROC:AudioPlayer\w+ "sdcard (is not) inserted"$'
+      state: { "media.sd_card_inserted": { value: "{1}", map: { "is not": false } } }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayerSetType "index=(\d+)" "type=(\w+)"$'
+      state: { "audio_player.items.{1}.type": "{2}" }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayerSetPath "index=(\d+)" "path=([^"]*)"$'
+      state: { "audio_player.items.{1}.path": "{2}" }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayerSetPlayMode "index=(\d+)" "mode=(\w+)"$'
+      state: { "audio_player.items.{1}.play_mode": "{2}" }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayerSetGoToTheTop "index=(\d+)" "goToTheTop=(on|off)"$'
+      state: { "audio_player.items.{1}.go_to_top": { value: "{2}", map: { "on": true, "off": false } } }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayerSetInterval "index=(\d+)" "interval=(\d+(?:\.\d+)?)"$'
+      state: { "audio_player.items.{1}.interval": "{2}" }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayerTransport "operation=(stop|play|pause)"$'
+      state: { "audio_player.status": "{1}" }
+    - match: '^OK event PROC:AudioPlayerGetStatus "status=(stop|play|pause)"$'
+      state: { "audio_player.status": "{1}" }
+    - match: '^(?:OK|NOTIFY) event PROC:AudioPlayer(?:Get|Set)CurrentSong "index=(\d+)"$'
+      state: { "audio_player.current_song": "{1}" }
+    - match: '^OK listitemnum PROC:AudioPlayer (\d+) (\d+) (\d+)$'
+      state: { "audio_player.item_count": "{1}", "audio_player.first_index": "{2}", "audio_player.last_index": "{3}" }
+    - match: '^OK listitem PROC:AudioPlayer (\d+) "(\S+) (\S+) (On|Off) (\d+(?:\.\d+)?) (.*)"$'
+      state:
+        "audio_player.items.{1}.type": "{2}"
+        "audio_player.items.{1}.play_mode": "{3}"
+        "audio_player.items.{1}.go_to_top": { value: "{4}", map: { "On": true, "Off": false } }
+        "audio_player.items.{1}.interval": "{5}"
+        "audio_player.items.{1}.name": "{6}"
+    - match: '^OK event PROC:Language "(type1|type2)"$'
+      state: { "device.display_font": "{1}" }
+    - match: '^OK event PROC:SchedulerSetEnable "index=(\d+)" "enable=(true|false)"$'
+      state: { "scheduler.events.{1}.enabled": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^OK event PROC:SchedulerSetTime "index=(\d+)" "time=([^"]*)"$'
+      state: { "scheduler.events.{1}.time": "{2}" }
+    - match: '^OK listitemnum PROC:Scheduler (\d+) (\d+) (\d+)$'
+      state: { "scheduler.event_count": "{1}", "scheduler.first_index": "{2}", "scheduler.last_index": "{3}" }
+    - match: '^OK listitem PROC:Scheduler (\d+) "(enable|disable) (\S+) (.*)"$'
+      state:
+        "scheduler.events.{1}.enabled": { value: "{2}", map: { "enable": true, "disable": false } }
+        "scheduler.events.{1}.time": "{3}"
+        "scheduler.events.{1}.name": "{4}"
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Communication start (4.1, p.39-41): after connecting, the controller
+      must send "devstatus runmode" at intervals of 1 second or more until it
+      is answered (or pushed) runmode "normal", and send nothing else before
+      that; "booting" and "update" do not accept commands. The core's fixed
+      connection sequence cannot wait for a reply, so a host must hold its
+      commands until device.run_mode is "normal" (or "emergency", which accepts
+      commands but answers ssrecall with AccessDenied).
+
+  - models: [all]
+    severity: critical
+    text: >
+      Only what the Remote Control Setup List exposes can be controlled
+      (1.3, p.5): it is built in ProVisionaire Design and uploaded to the DME7
+      during synchronisation, and every parameter and meter is addressed by
+      its index on that list (PROC:Remote/<IndexNo>). After a NOTIFY event
+      PROC:SynchronizationSetStatus the list and settings may have changed and
+      the controller should query again (p.11). Index numbering is not stated:
+      the examples start at 1 and prmnum/mtrnum always answer 1000, so indexes
+      0-1000 are accepted here and the device answers an error for an unused
+      one.
+
+  - models: [all]
+    severity: warning
+    text: >
+      X and Y (p.16) are sent as numbered from 0. A parameter registered with a
+      fixed channel ignores them ("0" is recommended); one registered as "any"
+      needs them. get, getn and gett accept "all" for X or Y, not both, and
+      answer every value on one line (get_parameter_*_all_x/_y); set commands do
+      not accept "all" (p.45).
+
+  - models: [all]
+    severity: warning
+    text: >
+      Change notifications (NOTIFY set in raw mode, the default, or NOTIFY setn
+      in normalized mode) are sampled, not sent for every step (4.8, p.49), and
+      only for the lowest index when one parameter is on the list more than
+      once (p.10). A snapshot recall does not notify the parameters it changes
+      (p.10-11): query them again after OK/NOTIFY sscurrent_ex or ssrecall_ex
+      (4.7, p.49). A value set out of range is adjusted and answered OKm with
+      the value actually applied.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Meter notifications stop 10 seconds after mtrstart unless it is sent
+      again (4.6, p.48). Meter data are 2-digit hexadecimal values separated by
+      spaces; bit 7 flags a sigma clip and bits 0-6 give the level from
+      0x00 = -126 dBFS or less to 0x7E = 0 dBFS, 0x7F = over (5.1, p.50). Data
+      cut short are valid up to the cut.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Up to eight controllers can connect at once (p.5). Without a keepalive a
+      connection broken without a close stays "connected" on the device and can
+      block new connections; set_keepalive makes the device drop a client that
+      sends nothing (a command or a bare LF) for the interval plus 1 second
+      (p.15).
+
+  - models: [all]
+    severity: info
+    text: >
+      Errors (3.5.1, p.38) are answered "ERROR <command> <code>" in place of
+      OK and fail the command: UnknownCommand, WrongFormat, InvalidArgument,
+      UnknownAddress, UnknownEventID, TooLongCommand, AccessDenied (not in
+      normal run mode), Busy, ReadOnly, NoPermission, Overload (reduce
+      traffic), Overflow, TooManyFilters, InternalError, Clipped (a reply over
+      1000 characters). Event commands report their own failures as OKm with a
+      message, such as "sdcard is not inserted", "song is not set up",
+      "scheduler is not placed", "invalid index" or "invalid time"; those fail
+      the command here too.
+
+  - models: [all]
+    severity: info
+    text: >
+      Strings are double-quoted with \" and \\ escapes and commands are ASCII
+      only (p.8). set_parameter_text quotes and escapes its text. Event
+      options are quoted "key=value" strings with no documented escaping inside
+      them, so set_audio_player_path refuses quotes and backslashes. Text state
+      keeps the escapes as sent. Value scaling for each component parameter is
+      in section 7 (for example dB x 100 with -13801 for -infinity) and the
+      prminfo reply gives min, max, default, unit and scaling for each index.
+
+  - models: [all]
+    severity: info
+    text: >
+      Documentation inconsistencies taken as written. devstatus power1/power2
+      are lowercase in the command lists (p.6, p.9) but "Power1"/"Power2" in
+      the query section (p.14); lowercase is sent and both are matched. Several
+      replies are shown in two forms: setr as "OK setr PROC:..." and "OK
+      PROC:..." (p.21); sscurrent_ex as "OK sscurrent_ex 2 unmodified" and "OK
+      sscurrent 2 10 modified" (p.23); ssnum_ex with and without the ID (p.31,
+      p.44); ssinfo_ex as "OK ssinfo" (p.31); mtrinfo as "OK prminfo" in its
+      table (p.30); devinfo inputport quoted but outputport, gpi and gpo not
+      (p.27-28). The ssrecall_ex notification example shows sscurrent_ex
+      (p.11). setr's table shows a quoted value but its examples do not; it is
+      sent unquoted. Formal syntax tables give a trailing "" on
+      AudioPlayerGetStatus and listitemnum where examples omit it; the tables
+      are followed. The Audio Player list reply spells types and modes with
+      capitals (1Song, Normal, On) where the events use 1song, normal, on.
+      Transport notifications include pause, which the transport command does
+      not offer. Scheduler time format beyond the example "9:00" is not given.
