@@ -26,6 +26,9 @@
 //!   read from the telegrams (RF, RF1/RF2 and Bat are receiver-only; an IEM
 //!   transmitter reports Af). The name is operator-set, so it is weak
 //!   evidence of identity.
+//!
+//! Sony cameras (SSDP) are found by `crate::ssdp`, whose rules are there.
+//! Protocols are independent: each listens, scans and stops on its own.
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -41,6 +44,7 @@ use crate::events::Event;
 use crate::session::Services;
 
 pub const MCP_PORT: u16 = 53212;
+const PROTOCOLS: [&str; 2] = ["mcp", crate::ssdp::PROTOCOL];
 const MCP_PROBE: &str = "Push 5 500 3\r";
 const MCP_NAME: &str = "Name\r";
 const SWEEP_BATCH: usize = 32;
@@ -52,10 +56,13 @@ const SWEEP_MAX_SUBNETS: usize = 8;
 pub struct DiscoverRequest {
     /// `listen` (passively), `scan` (listen, and probe now) or `stop`.
     pub action: DiscoverAction,
-    /// Which discovery protocols; currently `mcp`. Empty means all.
+    /// Which discovery protocols: `mcp` (Sennheiser G3/G4) and `ssdp` (Sony
+    /// cameras). Empty means all of them.
     #[serde(default)]
     pub protocols: Vec<String>,
-    /// Addresses where devices were last seen, whose /24s a scan also sweeps.
+    /// Addresses where devices were last seen. An MCP scan also sweeps their
+    /// /24s; an SSDP scan also asks each by unicast M-SEARCH, which reaches
+    /// cameras multicast does not (across a router).
     #[serde(default)]
     pub hints: Vec<Ipv4Addr>,
 }
@@ -159,7 +166,7 @@ fn sweep_targets(
 
 /// The IPv4 interfaces to use: the one the core is bound to, or every
 /// non-loopback one.
-fn interfaces(bind: IpAddr) -> Vec<(Ipv4Addr, Ipv4Addr)> {
+pub(crate) fn interfaces(bind: IpAddr) -> Vec<(Ipv4Addr, Ipv4Addr)> {
     let Ok(all) = if_addrs::get_if_addrs() else {
         return Vec::new();
     };
@@ -182,6 +189,7 @@ struct State {
 #[derive(Default)]
 pub(crate) struct Discovery {
     state: Mutex<State>,
+    ssdp: crate::ssdp::Ssdp,
 }
 
 impl Discovery {
@@ -192,19 +200,41 @@ impl Discovery {
         request: DiscoverRequest,
     ) -> Result<(), String> {
         for p in &request.protocols {
-            if p != "mcp" {
+            if !PROTOCOLS.contains(&p.as_str()) {
                 return Err(format!("unknown discovery protocol '{p}'"));
             }
         }
+        let wants =
+            |p: &str| request.protocols.is_empty() || request.protocols.iter().any(|q| q == p);
+        let (mcp, ssdp) = (wants("mcp"), wants(crate::ssdp::PROTOCOL));
         match request.action {
             DiscoverAction::Stop => {
-                self.stop(services);
+                if mcp {
+                    self.stop(services);
+                }
+                if ssdp {
+                    self.ssdp.stop();
+                }
                 Ok(())
             }
-            DiscoverAction::Listen => self.listen(services),
+            DiscoverAction::Listen => {
+                if mcp {
+                    self.listen(services)?;
+                }
+                if ssdp {
+                    self.ssdp.listen(services)?;
+                }
+                Ok(())
+            }
             DiscoverAction::Scan => {
-                self.listen(services)?;
-                self.scan(services, request.hints);
+                if mcp {
+                    self.listen(services)?;
+                    self.scan(services, request.hints.clone());
+                }
+                if ssdp {
+                    self.ssdp.listen(services)?;
+                    self.ssdp.scan(services, &request.hints)?;
+                }
                 Ok(())
             }
         }
