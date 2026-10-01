@@ -30,14 +30,22 @@ source:
       BATT_RUN_TIME), AUDIO_GAIN 000-060 minus 18, CHAN_NAME 8 characters,
       FLASH ON / OFF, and < SAMPLE x ALL nn aaa eee > with RF level minus 128
       for dBm and an audio level of 000-050 with no units given.
+  - title: SLX-D Command Strings, Version 2 (2020-G)
+    author: Shure
+    url: https://pubs.shure.com/command-strings/SLXD/en-US
+    note: >
+      Manufacturer document, read from a dealer's copy
+      (shop.ccisolutions.com/StoreFront/jsp/pdf/SHU-SLXD_commandStrings.pdf)
+      because Shure's page needs a browser. FLASH per device and per channel
+      (p.3), CHAN_NAME set to 8 characters (p.6), AUDIO_GAIN 000-060 offset by
+      18 (p.6-7), and < SAMPLE ch ALL audPeak audRms rfRssi > with the 120
+      offset (p.10-11).
   - title: RFDeck docs/SHURE_PROTOCOL.md and hardware/shure/protocol.ts
     note: >
-      Meros. Framing on angle brackets, per-family names and offsets, the
-      SLX-D sample (< SAMPLE ch ALL audPeak audRms rfRssi >, offset 120, no
-      mute), and the PSM1000 dialect (REPORT, bare strings, CRLF, RF_MUTE 1/0,
-      no GET ALL), each cited there to Shure's SLX-D and PSM1000 documents,
-      which could not be retrieved for this spec. Not yet run against
-      hardware.
+      Meros. Framing on angle brackets, per-family names and offsets, and the
+      PSM1000 dialect (REPORT, bare strings, CRLF, RF_MUTE 1/0, no GET ALL),
+      cited there to Shure's PSM1000 document, which could not be retrieved
+      for this spec. Not yet run against hardware.
   - title: Imperio ShureWireless driver
     note: Meros. The earlier spec-driven version of this integration.
   - title: micboard, wirelessboard and Bitfocus Companion's Shure module
@@ -82,12 +90,12 @@ models:
   - id: slxd4
     name: Shure SLX-D SLXD4 (1 channel)
     channels: 1
-    supports: [set_frequency, set_channel_name]
+    supports: [set_gain, set_frequency, set_channel_name, flash]
     verification: none
   - id: slxd4d
     name: Shure SLX-D SLXD4D (2 channels)
     channels: 2
-    supports: [set_frequency, set_channel_name]
+    supports: [set_gain, set_frequency, set_channel_name, flash]
     verification: none
   - id: p10t
     name: Shure PSM1000 P10T IEM transmitter (2 channels)
@@ -125,7 +133,7 @@ commands:
     returns: ack
 
   set_channel_name:
-    summary: Name a channel. 31 characters on Axient Digital, 8 on ULX-D and QLX-D.
+    summary: Name a channel. 31 characters on Axient Digital, 8 on ULX-D, QLX-D and SLX-D.
     params:
       channel: { type: int, min: 1, max: 4, required: true }
       name:    { type: string, max_length: 31, pattern: "^[^{}<>]*$", required: true }
@@ -175,13 +183,6 @@ quirks:
       is enabled on the receiver it accepts the TCP connection and answers
       nothing; the core reports it as disconnected with that as the likely
       reason, rather than as connected and silent.
-
-  - models: [slxd4, slxd4d]
-    severity: info
-    text: >
-      Gain and flash are not offered on SLX-D: its command document could not
-      be retrieved to confirm their format. They are one line to add once it
-      is checked.
 
   - models: [all]
     severity: warning
