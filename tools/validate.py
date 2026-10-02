@@ -300,6 +300,13 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             errors.append(f"{where_}.scheme names unknown setting '{scheme.get('setting')}'")
         elif decl.get("type") != "enum" or set(decl.get("values", [])) - allowed:
             errors.append(f"{where_}.scheme's setting must be an enum of {' and '.join(sorted(allowed))}")
+    # accept_invalid_certs only means something over TLS.
+    for where_, obj, default in [
+            ("transport", transport, "ws" if transport_type == "ws" else "http"),
+            ("telemetry.websocket", websocket or {}, "ws")]:
+        scheme = obj.get("scheme", default)
+        if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http"):
+            errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https or a setting)")
     if websocket:
         for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):

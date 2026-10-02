@@ -3,7 +3,7 @@
 //! arrive and closes it; a writer thread per file keeps the writes in order
 //! and off the session's task.
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc as std_mpsc;
@@ -34,13 +34,24 @@ impl Writer {
     }
 }
 
-/// Create (or truncate) `path` and start its writer. The module hears
-/// `Closed { bytes }` after `close`, or `Failed` once, at the first error,
-/// after which later writes are dropped.
+/// How a file is opened for writing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    /// Create it, or truncate it if it exists.
+    Create,
+    /// Append to it; it must exist. Its length is reported as `Opened`.
+    Append,
+}
+
+/// Open `path` and start its writer. The module hears `Opened { bytes }`
+/// first when appending, then `Closed { bytes }` with the file's length after
+/// `close`, or `Failed` once, at the first error, after which later writes
+/// are dropped.
 pub(crate) fn open(
     file: Key,
     generation: u64,
     path: PathBuf,
+    mode: Mode,
     inbound: mpsc::Sender<Inbound>,
 ) -> Writer {
     let (ops, queue) = std_mpsc::channel::<Op>();
@@ -52,7 +63,14 @@ pub(crate) fn open(
                 input,
             });
         };
-        let mut out = match File::create(&path) {
+        let opened = match mode {
+            Mode::Create => File::create(&path).map(|f| (f, 0)),
+            Mode::Append => OpenOptions::new()
+                .append(true)
+                .open(&path)
+                .and_then(|f| f.metadata().map(|m| (f, m.len()))),
+        };
+        let (mut out, mut bytes) = match opened {
             Ok(f) => f,
             Err(e) => {
                 report(FileInput::Failed {
@@ -61,7 +79,9 @@ pub(crate) fn open(
                 return;
             }
         };
-        let mut bytes: u64 = 0;
+        if mode == Mode::Append {
+            report(FileInput::Opened { bytes });
+        }
         while let Ok(op) = queue.recv() {
             match op {
                 Op::Write(data) => {
@@ -131,7 +151,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("clip.bin");
         let (tx, mut rx) = mpsc::channel(8);
-        let w = open("clip", 1, path.clone(), tx);
+        let w = open("clip", 1, path.clone(), Mode::Create, tx);
         w.write(b"abc".to_vec());
         w.write(b"def".to_vec());
         w.close();
@@ -144,6 +164,47 @@ mod tests {
             _ => panic!("expected the file to close"),
         }
         assert_eq!(std::fs::read(&path).unwrap(), b"abcdef");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn appending_continues_an_existing_file_from_its_length() {
+        let dir = std::env::temp_dir().join(format!("meros-append-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("clip.bin");
+        std::fs::write(&path, b"0123").unwrap();
+        let (tx, mut rx) = mpsc::channel(8);
+        let w = open("clip", 1, path.clone(), Mode::Append, tx.clone());
+        w.write(b"456".to_vec());
+        w.close();
+        assert!(matches!(
+            rx.recv().await,
+            Some(Inbound::File {
+                input: FileInput::Opened { bytes: 4 },
+                ..
+            })
+        ));
+        assert!(matches!(
+            rx.recv().await,
+            Some(Inbound::File {
+                input: FileInput::Closed { bytes: 7 },
+                ..
+            })
+        ));
+        assert_eq!(std::fs::read(&path).unwrap(), b"0123456");
+
+        // A missing file is not created.
+        let missing = dir.join("none.bin");
+        let w = open("clip", 2, missing.clone(), Mode::Append, tx);
+        w.close();
+        assert!(matches!(
+            rx.recv().await,
+            Some(Inbound::File {
+                input: FileInput::Failed { .. },
+                ..
+            })
+        ));
+        assert!(!missing.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -180,7 +241,7 @@ mod tests {
             .join("meros-no-such-dir")
             .join("x")
             .join("clip.bin");
-        let w = open("clip", 1, missing, tx);
+        let w = open("clip", 1, missing, Mode::Create, tx);
         w.write(b"abc".to_vec());
         w.close();
         assert!(matches!(

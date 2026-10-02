@@ -26,6 +26,15 @@
 //! MIDI has no acknowledgement, so a write is reported `unverified`; where
 //! the family has a matching "get", it is sent after the write so the state
 //! shows what the console actually did.
+//!
+//! dLive also listens with TLS/SSL encryption (MixRack 51327, Surface 51329,
+//! dLive document p.1). There the first data sent is the login, "UserProfile,
+//! UserPassword" with UserProfile 00 to 1F, and the console answers the six
+//! characters "AuthOK" or drops the connection. The document gives no more
+//! than that: the login is sent as the profile byte followed by the
+//! password's bytes, with nothing between or after them. A connection dropped
+//! after the login is a refusal, terminal like the core's other credential
+//! refusals: repeated wrong logins are not sent on a schedule.
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
@@ -40,7 +49,7 @@ use super::allenheath_sq::Sq;
 use crate::catalog::Params;
 use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    TcpInput, TlsTarget,
 };
 
 pub(crate) const DEFAULT_PORT: u16 = 51325;
@@ -61,6 +70,11 @@ const RETRY_MAX: Millis = 30_000;
 const PACE_BATCH: usize = 10;
 const PACE_EVERY: Millis = 20;
 const KEEPALIVE_EVERY: Millis = 1_000;
+/// "AuthOK" arrives within this after the login, or the attempt is dropped
+/// and retried.
+const LOGIN_TIMEOUT: Millis = 5_000;
+/// The console's answer to an accepted login (dLive p.1).
+const AUTH_OK: &[u8] = b"AuthOK";
 
 const REPLY: Key = "reply";
 const QUIET_TIMER: Key = "quiet";
@@ -69,12 +83,18 @@ const RETRY: Key = "retry";
 const FIRST_WORD: Key = "first-word";
 const PACE: Key = "pace";
 const KEEPALIVE: Key = "keepalive";
+const LOGIN: Key = "login";
 
 /// One family's messages.
 pub(crate) trait Dialect: Send {
     /// The model's TCP port.
     fn port(&self) -> u16 {
         DEFAULT_PORT
+    }
+
+    /// The model's TLS port, where its document gives one.
+    fn tls_port(&self) -> Option<u16> {
+        None
     }
 
     /// A command to the bytes that carry it.
@@ -240,6 +260,50 @@ struct Pending {
     deadline: Millis,
 }
 
+/// The login a TLS connection starts with (dLive p.1).
+#[derive(Clone)]
+pub(crate) struct Login {
+    /// UserProfile, 00 to 1F.
+    pub profile: u8,
+    pub password: String,
+}
+
+impl Login {
+    /// The settings' login, when `tls` is on.
+    fn from_settings(settings: &Params) -> Result<Option<Login>, String> {
+        if !setting_flag(settings, "tls", false) {
+            return Ok(None);
+        }
+        let profile = match settings.get("user_profile").and_then(Value::as_i64) {
+            Some(n @ 0..=0x1F) => n as u8,
+            Some(n) => return Err(format!("user_profile {n} is outside 0 to 31 (00 to 1F)")),
+            None => return Err("tls needs the user_profile setting".into()),
+        };
+        let password = settings
+            .get("password")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        Ok(Some(Login { profile, password }))
+    }
+
+    /// "UserProfile, UserPassword": the profile byte, then the password.
+    fn message(&self) -> Vec<u8> {
+        let mut out = vec![self.profile];
+        out.extend_from_slice(self.password.as_bytes());
+        out
+    }
+}
+
+/// Where a TLS connection is in its login.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Auth {
+    /// Plain TCP, or the login has been accepted.
+    Done,
+    /// The login was sent; "AuthOK" has not arrived yet.
+    Waiting,
+}
+
 pub(crate) struct AllenHeath {
     device: SocketAddr,
     dialect: Box<dyn Dialect>,
@@ -250,6 +314,12 @@ pub(crate) struct AllenHeath {
     pending: VecDeque<Pending>,
     outbox: VecDeque<Vec<u8>>,
     retry_after: Millis,
+    login: Option<Login>,
+    auth: Auth,
+    /// Bytes of the console's answer to the login so far.
+    auth_reply: Vec<u8>,
+    /// The console refused the login: nothing more is attempted.
+    refused: Option<String>,
 }
 
 /// The dialect for a spec and model, or why there is none.
@@ -266,11 +336,20 @@ fn dialect(spec: &str, ctx: &OpenContext) -> Result<Box<dyn Dialect>, String> {
 impl AllenHeath {
     pub(crate) fn new(spec: &str, ctx: OpenContext) -> Result<AllenHeath, String> {
         let dialect = dialect(spec, &ctx)?;
-        let port = ctx.port.unwrap_or_else(|| dialect.port());
-        Ok(AllenHeath::with_dialect(
-            SocketAddr::new(ctx.host, port),
-            dialect,
-        ))
+        let login = Login::from_settings(&ctx.settings)?;
+        let port = match (ctx.port, &login) {
+            (Some(port), _) => port,
+            (None, None) => dialect.port(),
+            (None, Some(_)) => dialect.tls_port().ok_or_else(|| {
+                format!(
+                    "model '{}' has no documented TLS port: set the port to use tls",
+                    ctx.model
+                )
+            })?,
+        };
+        let mut m = AllenHeath::with_dialect(SocketAddr::new(ctx.host, port), dialect);
+        m.login = login;
+        Ok(m)
     }
 
     pub(crate) fn with_dialect(device: SocketAddr, dialect: Box<dyn Dialect>) -> AllenHeath {
@@ -284,7 +363,87 @@ impl AllenHeath {
             pending: VecDeque::new(),
             outbox: VecDeque::new(),
             retry_after: RETRY_MIN,
+            login: None,
+            auth: Auth::Done,
+            auth_reply: Vec::new(),
+            refused: None,
         }
+    }
+
+    /// The console refused the login: fail everything and stop. Only opening
+    /// the device again, with corrected settings, tries again.
+    fn refuse(&mut self, cx: &mut Cx, reason: String) {
+        for p in self.pending.drain(..) {
+            cx.complete(
+                p.id,
+                Err(CommandError::Auth {
+                    message: reason.clone(),
+                }),
+            );
+        }
+        for key in [
+            REPLY,
+            QUIET_TIMER,
+            DEAD,
+            FIRST_WORD,
+            PACE,
+            KEEPALIVE,
+            LOGIN,
+            RETRY,
+        ] {
+            cx.cancel_timer(key);
+        }
+        if self.socket_open {
+            cx.tcp_close(SOCKET);
+        }
+        self.socket_open = false;
+        self.connected = false;
+        self.outbox.clear();
+        cx.log(
+            Level::Warning,
+            format!("{reason}; no further attempts until the device is opened again"),
+        );
+        cx.connection(Connection::Unauthorized {
+            reason: reason.clone(),
+        });
+        self.refused = Some(reason);
+    }
+
+    /// The connection is up and, with TLS, logged in: read the console.
+    fn begin(&mut self, cx: &mut Cx) {
+        if let Some(bytes) = self.dialect.keepalive() {
+            cx.tcp_send(SOCKET, bytes);
+            cx.set_timer(KEEPALIVE, KEEPALIVE_EVERY);
+        }
+        self.queue_sync(cx);
+        cx.set_timer(QUIET_TIMER, QUIET);
+        cx.set_timer(FIRST_WORD, FIRST_WORD_WARNING);
+    }
+
+    /// The console's answer to the login, as it arrives.
+    fn login_reply(&mut self, cx: &mut Cx, data: &[u8]) {
+        self.auth_reply.extend_from_slice(data);
+        let n = self.auth_reply.len().min(AUTH_OK.len());
+        if self.auth_reply[..n] != AUTH_OK[..n] {
+            let got = String::from_utf8_lossy(&self.auth_reply).into_owned();
+            let reason = format!(
+                "the console answered the login with {got:?}, not \"AuthOK\" (user profile {})",
+                self.login.as_ref().map_or(0, |l| l.profile)
+            );
+            self.refuse(cx, reason);
+            return;
+        }
+        if self.auth_reply.len() < AUTH_OK.len() {
+            return;
+        }
+        cx.cancel_timer(LOGIN);
+        self.auth = Auth::Done;
+        let rest = self.auth_reply.split_off(AUTH_OK.len());
+        self.auth_reply.clear();
+        cx.log(Level::Info, "the console accepted the login");
+        self.begin(cx);
+        // AuthOK is the console's first word.
+        self.data(cx, &rest);
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -307,6 +466,9 @@ impl AllenHeath {
         self.outbox.clear();
         self.parser = Parser::default();
         self.assembler = Assembler::default();
+        self.auth = Auth::Done;
+        self.auth_reply.clear();
+        cx.cancel_timer(LOGIN);
         cx.connection(Connection::Disconnected { reason });
         cx.set_timer(RETRY, self.retry_after);
         self.retry_after = (self.retry_after * 2).min(RETRY_MAX);
@@ -402,8 +564,24 @@ impl AllenHeath {
     }
 
     fn open(&mut self, cx: &mut Cx) {
+        if self.refused.is_some() {
+            return;
+        }
         cx.connection(Connection::Connecting);
-        cx.tcp_open(SOCKET, self.device);
+        if self.login.is_some() {
+            // The document says nothing of the console's certificate; a
+            // console addressed by IP has none a public root vouches for.
+            cx.tcp_open_tls(
+                SOCKET,
+                TlsTarget {
+                    to: self.device,
+                    server_name: self.device.ip().to_string(),
+                    accept_invalid_certs: true,
+                },
+            );
+        } else {
+            cx.tcp_open(SOCKET, self.device);
+        }
     }
 }
 
@@ -413,6 +591,15 @@ impl Module for AllenHeath {
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
+        if let Some(reason) = &self.refused {
+            cx.complete(
+                id,
+                Err(CommandError::Auth {
+                    message: reason.clone(),
+                }),
+            );
+            return;
+        }
         if !self.connected {
             cx.complete(id, Err(CommandError::NotConnected));
             return;
@@ -462,17 +649,45 @@ impl Module for AllenHeath {
         match input {
             TcpInput::Connected => {
                 self.socket_open = true;
-                if let Some(bytes) = self.dialect.keepalive() {
-                    cx.tcp_send(SOCKET, bytes);
-                    cx.set_timer(KEEPALIVE, KEEPALIVE_EVERY);
+                match &self.login {
+                    // "the first data sent to the dLive should be" the login.
+                    Some(login) => {
+                        cx.tcp_send(SOCKET, login.message());
+                        self.auth = Auth::Waiting;
+                        self.auth_reply.clear();
+                        cx.set_timer(LOGIN, LOGIN_TIMEOUT);
+                    }
+                    None => self.begin(cx),
                 }
-                self.queue_sync(cx);
-                cx.set_timer(QUIET_TIMER, QUIET);
-                cx.set_timer(FIRST_WORD, FIRST_WORD_WARNING);
             }
-            TcpInput::Data(data) => self.data(cx, &data),
+            TcpInput::Data(data) => {
+                if self.refused.is_some() {
+                    return;
+                }
+                if self.auth == Auth::Waiting {
+                    self.login_reply(cx, &data);
+                } else {
+                    self.data(cx, &data);
+                }
+            }
             TcpInput::Closed { reason } => {
                 self.socket_open = false;
+                if self.refused.is_some() {
+                    return;
+                }
+                if self.auth == Auth::Waiting {
+                    // "otherwise the connection will be dropped" (p.1).
+                    let profile = self.login.as_ref().map_or(0, |l| l.profile);
+                    self.refuse(
+                        cx,
+                        format!(
+                            "the console dropped the connection after the login, without \
+                             \"AuthOK\": the user profile ({profile}) or password was refused \
+                             ({reason})"
+                        ),
+                    );
+                    return;
+                }
                 self.lost(cx, reason);
             }
         }
@@ -481,6 +696,14 @@ impl Module for AllenHeath {
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         match key {
             RETRY => self.open(cx),
+            LOGIN => {
+                if self.auth == Auth::Waiting {
+                    self.lost(
+                        cx,
+                        "the console did not answer the login within 5 s".to_string(),
+                    );
+                }
+            }
             PACE => {
                 if self.socket_open {
                     self.pace(cx);
@@ -774,6 +997,157 @@ mod tests {
             key: RETRY,
             after: RETRY_MIN
         }));
+    }
+
+    fn dlive_tls(model: &str, extra: Value) -> Result<AllenHeath, String> {
+        let mut settings = json!({"midi_channel": 1, "sync_preamps": false});
+        for (k, v) in extra.as_object().unwrap() {
+            settings[k] = v.clone();
+        }
+        AllenHeath::new(
+            "allenheath-dlive",
+            OpenContext {
+                host: "10.0.0.20".parse().unwrap(),
+                port: None,
+                model: model.into(),
+                channels: None,
+                settings: params(settings),
+            },
+        )
+    }
+
+    fn secure_mixrack() -> AllenHeath {
+        dlive_tls(
+            "dlive-mixrack",
+            json!({"tls": true, "user_profile": 3, "password": "pw"}),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn tls_logs_in_first_and_reads_the_console_after_auth_ok() {
+        let mut m = secure_mixrack();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert!(cx.take().contains(&Action::TcpOpenTls {
+            socket: SOCKET,
+            target: TlsTarget {
+                to: "10.0.0.20:51327".parse().unwrap(),
+                server_name: "10.0.0.20".into(),
+                accept_invalid_certs: true,
+            },
+        }));
+        let mut cx = Cx::new(10);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        // The login alone: the profile byte, then the password.
+        assert_eq!(sent(&a), [vec![0x03, b'p', b'w']]);
+        assert!(a.contains(&Action::SetTimer {
+            key: LOGIN,
+            after: LOGIN_TIMEOUT
+        }));
+        // Commands wait for the login.
+        let a = run(&mut m, 20, "refresh", json!({}));
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Err(CommandError::NotConnected)
+        }));
+        // "AuthOK" may arrive in pieces, with MIDI after it.
+        let a = feed(&mut m, 30, b"Auth");
+        assert!(sent(&a).is_empty());
+        let a = feed(&mut m, 40, b"OK\xFE");
+        assert!(a.contains(&Action::CancelTimer { key: LOGIN }));
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(!sent(&a).is_empty(), "the state is read");
+    }
+
+    #[test]
+    fn a_dropped_login_is_a_terminal_refusal() {
+        let mut m = secure_mixrack();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let mut cx = Cx::new(50);
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Closed {
+                reason: "closed by the device".into(),
+            },
+        );
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::Connection(Connection::Unauthorized { .. }))));
+        assert!(!a
+            .iter()
+            .any(|x| matches!(x, Action::SetTimer { key: RETRY, .. })));
+        let a = run(&mut m, 60, "refresh", json!({}));
+        assert!(a.iter().any(|x| matches!(
+            x,
+            Action::Complete {
+                result: Err(CommandError::Auth { .. }),
+                ..
+            }
+        )));
+        let mut cx = Cx::new(70);
+        m.timer(&mut cx, RETRY);
+        assert!(cx.take().is_empty(), "nothing is attempted again");
+
+        // An answer other than AuthOK is a refusal too.
+        let mut m = secure_mixrack();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = feed(&mut m, 10, b"Denied");
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::Connection(Connection::Unauthorized { .. }))));
+        assert!(a.contains(&Action::TcpClose { socket: SOCKET }));
+    }
+
+    #[test]
+    fn a_tls_handshake_failure_or_a_silent_login_is_retried() {
+        let mut m = secure_mixrack();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Closed {
+                reason: "tls: handshake failed".into(),
+            },
+        );
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: RETRY,
+            after: RETRY_MIN
+        }));
+        let mut cx = Cx::new(RETRY_MIN);
+        m.timer(&mut cx, RETRY);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let mut cx = Cx::new(RETRY_MIN + LOGIN_TIMEOUT);
+        m.timer(&mut cx, LOGIN);
+        let a = cx.take();
+        assert!(a.iter().any(|x| matches!(
+            x,
+            Action::Connection(Connection::Disconnected { reason }) if reason.contains("login")
+        )));
+        assert!(a
+            .iter()
+            .any(|x| matches!(x, Action::SetTimer { key: RETRY, .. })));
+    }
+
+    #[test]
+    fn tls_ports_and_settings() {
+        let surface = dlive_tls("dlive-surface", json!({"tls": true, "user_profile": 0})).unwrap();
+        assert_eq!(surface.device.port(), 51329);
+        let plain = dlive_tls("dlive-surface", json!({})).unwrap();
+        assert_eq!(plain.device.port(), 51328);
+        assert!(plain.login.is_none());
+        // The Avantis documents give no TLS port.
+        assert!(dlive_tls("avantis", json!({"tls": true, "user_profile": 0})).is_err());
+        assert!(dlive_tls("dlive-mixrack", json!({"tls": true, "user_profile": 32})).is_err());
+        assert!(dlive_tls("dlive-mixrack", json!({"tls": true})).is_err());
     }
 
     #[test]

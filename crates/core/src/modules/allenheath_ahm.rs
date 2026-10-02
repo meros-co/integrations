@@ -10,6 +10,8 @@
 //!   mutes, playback, source selectors, rooms, names and colours, and every
 //!   "get" (`0N 01 ...`) (p.2-6).
 //! - Presets are bank and Program Change on channel 0 (p.4).
+//! - With TLS/SSL encryption the processor listens on 51327, and the first
+//!   message is the login, as on dLive (p.1); see [`super::allenheath`].
 
 use serde_json::{json, Value};
 
@@ -193,6 +195,11 @@ const LEVEL_TYPES: &[&str] = &["input", "zone", "control_group"];
 const NAMED_TYPES: &[&str] = &["input", "zone", "control_group", "room"];
 
 impl Dialect for Ahm {
+    /// "With TLS/SSL encryption - Rendezvous port TCP 51327" (p.1).
+    fn tls_port(&self) -> Option<u16> {
+        Some(51327)
+    }
+
     fn command(&mut self, name: &str, a: &Args) -> Result<Plan, CommandError> {
         Ok(match name {
             "set_mute" => {
@@ -471,7 +478,7 @@ impl Dialect for Ahm {
 
     fn silence_hint(&self) -> &'static str {
         "check that external control is enabled in System Manager and that the port is the \
-         unencrypted one (51325)"
+         unencrypted one (51325), or the TLS one (51327) with the tls setting on"
     }
 }
 

@@ -3,7 +3,7 @@
 //! One task per connection, like TCP: it connects, reports the result,
 //! forwards every received message and writes whatever the session hands it.
 //! Pings are answered by the library; the module sees text and binary messages
-//! and the close.
+//! and the close. `wss` uses the same TLS as TCP streams (see `crate::tls`).
 
 use std::time::Duration;
 
@@ -73,28 +73,38 @@ pub(crate) fn spawn(
             http.headers_mut().insert(name, value);
         }
 
-        let stream =
-            match tokio::time::timeout(CONNECT_TIMEOUT, tokio_tungstenite::connect_async(http))
-                .await
-            {
-                Ok(Ok((stream, _))) => stream,
-                Ok(Err(Error::Http(response))) => {
-                    send(WsInput::Closed {
-                        code: None,
-                        reason: format!("connect: HTTP {}", response.status()),
-                    })
-                    .await;
-                    return;
-                }
-                Ok(Err(e)) => {
-                    send(closed(format!("connect: {e}"))).await;
-                    return;
-                }
-                Err(_) => {
-                    send(closed("connect: timed out".into())).await;
-                    return;
-                }
-            };
+        let connector = tokio_tungstenite::Connector::Rustls(crate::tls::client_config(
+            request.accept_invalid_certs,
+        ));
+        let connecting =
+            tokio_tungstenite::connect_async_tls_with_config(http, None, false, Some(connector));
+        let stream = match tokio::time::timeout(CONNECT_TIMEOUT, connecting).await {
+            Ok(Ok((stream, _))) => stream,
+            Ok(Err(Error::Http(response))) => {
+                send(WsInput::Closed {
+                    code: None,
+                    reason: format!("connect: HTTP {}", response.status()),
+                })
+                .await;
+                return;
+            }
+            Ok(Err(Error::Io(e))) if is_tls(&e) => {
+                send(closed(crate::tls::describe(&e))).await;
+                return;
+            }
+            Ok(Err(Error::Tls(e))) => {
+                send(closed(format!("{} {e}", crate::tls::PREFIX))).await;
+                return;
+            }
+            Ok(Err(e)) => {
+                send(closed(format!("connect: {e}"))).await;
+                return;
+            }
+            Err(_) => {
+                send(closed("connect: timed out".into())).await;
+                return;
+            }
+        };
         if !send(WsInput::Opened).await {
             return;
         }
@@ -155,5 +165,84 @@ pub(crate) fn spawn(
         generation,
         writer,
         task,
+    }
+}
+
+/// An I/O error that is a TLS failure, as tokio-rustls reports one.
+fn is_tls(e: &std::io::Error) -> bool {
+    e.get_ref()
+        .is_some_and(|inner| inner.is::<tokio_rustls::rustls::Error>())
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio::net::TcpListener;
+
+    use super::*;
+
+    /// A wss server with a self-signed certificate that echoes text.
+    async fn wss_echo() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let acceptor = tokio_rustls::TlsAcceptor::from(crate::tls::testing::server_config());
+        tokio::spawn(async move {
+            loop {
+                let (tcp, _) = listener.accept().await.unwrap();
+                let acceptor = acceptor.clone();
+                tokio::spawn(async move {
+                    let Ok(tls) = acceptor.accept(tcp).await else {
+                        return;
+                    };
+                    let Ok(mut ws) = tokio_tungstenite::accept_async(tls).await else {
+                        return;
+                    };
+                    while let Some(Ok(message)) = ws.next().await {
+                        if message.is_text() && ws.send(message).await.is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        port
+    }
+
+    async fn next(rx: &mut mpsc::Receiver<Inbound>) -> WsInput {
+        match tokio::time::timeout(Duration::from_secs(10), rx.recv()).await {
+            Ok(Some(Inbound::Ws { input, .. })) => input,
+            _ => panic!("expected a websocket event"),
+        }
+    }
+
+    fn request(port: u16, accept_invalid_certs: bool) -> WsRequest {
+        WsRequest {
+            url: format!("wss://127.0.0.1:{port}/"),
+            headers: Vec::new(),
+            accept_invalid_certs,
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn wss_to_a_self_signed_device_when_invalid_certs_are_accepted() {
+        let port = wss_echo().await;
+        let (tx, mut rx) = mpsc::channel(16);
+        let c = spawn("ws", 1, request(port, true), tx);
+        assert_eq!(next(&mut rx).await, WsInput::Opened);
+        c.writer.send(Outgoing::Text("hello".into())).unwrap();
+        assert_eq!(next(&mut rx).await, WsInput::Text("hello".into()));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn wss_refuses_a_self_signed_certificate_otherwise() {
+        let port = wss_echo().await;
+        let (tx, mut rx) = mpsc::channel(16);
+        let _c = spawn("ws", 1, request(port, false), tx);
+        match next(&mut rx).await {
+            WsInput::Closed { reason, .. } => {
+                assert!(reason.starts_with("tls:"), "{reason}");
+                assert!(reason.contains("accept_invalid_certs"), "{reason}");
+            }
+            other => panic!("expected a refusal, got {other:?}"),
+        }
     }
 }

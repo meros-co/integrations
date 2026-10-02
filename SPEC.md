@@ -224,6 +224,7 @@ transport:
   path: /api/v1               # the request path, from /
   scheme: ws                  # ws | wss | {setting: name}
   subprotocol: v1.control     # optional, sent as Sec-WebSocket-Protocol
+  accept_invalid_certs: false # over wss, accept a self-signed certificate
   auth: none                  # none | basic | bearer
   timeout_ms: 2000
   reply: expected             # expected | none
@@ -256,7 +257,10 @@ Every message, reply or not, is also offered to the telemetry rules (§8).
 `on_connect` steps are sent when the websocket opens; telemetry `subscribe` and
 `poll` messages are sent straight away rather than queued, because a websocket
 device pushes and what it sends back goes to the rules. Pings are answered by
-the core. `wss` needs the core's websocket client built with TLS support.
+the core. `wss` uses TLS 1.2 or later and checks the device's certificate
+against the same public roots as `https`; a device with a self-signed
+certificate declares `accept_invalid_certs: true`, as for `http`: the
+connection is encrypted, but the device's identity is not checked.
 
 ### Settings and connection setup
 
@@ -821,6 +825,7 @@ telemetry:
     port: 8080                # defaults to the transport's port
     scheme: ws                # ws | wss | {setting: name}
     subprotocol: v1           # optional
+    accept_invalid_certs: false # over wss; defaults to the http transport's
     send:                     # sent each time it opens: the subscriptions
       - '{"action":"subscribe","parameter":"/composition/master"}'
 ```

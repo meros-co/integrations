@@ -85,8 +85,6 @@ const EVT: Key = "event";
 /// camera's MediaProfile, through the SSH tunnel.
 const HTTP: Key = "http";
 const FILE: Key = "download";
-/// The partial file a resumed download continues.
-const RESUME: Key = "resume";
 
 const REPLY: Key = "reply";
 const INIT: Key = "init";
@@ -115,9 +113,6 @@ const LIVE_VIEW_ATTEMPTS: u32 = 15;
 const CHUNK: u32 = 4 * 1024 * 1024;
 /// A MediaProfile larger than this is not a MediaProfile.
 const MAX_PROFILE: usize = 16 * 1024 * 1024;
-/// The largest partial file a download resumes from. The host's file API
-/// has no append, so the part already on disk is read and written again.
-const MAX_RESUME: u64 = 1024 * 1024 * 1024;
 
 const OP_GET_DEVICE_INFO: u16 = 0x1001;
 const OP_OPEN_SESSION: u16 = 0x1002;
@@ -525,6 +520,8 @@ pub(crate) struct SonyCamera {
 
     live_view_enabled: bool,
     download: Option<Download>,
+    /// A resumed download's file is being opened for appending.
+    resume_opening: bool,
     listing: Option<Listing>,
     http: Option<HttpJob>,
     upload: Option<Upload>,
@@ -836,6 +833,7 @@ impl SonyCamera {
             reported_named: HashMap::new(),
             live_view_enabled: false,
             download: None,
+            resume_opening: false,
             listing: None,
             http: None,
             upload: None,
@@ -2733,15 +2731,16 @@ impl SonyCamera {
         Ok(id)
     }
 
-    /// The part of a resumed download already on the host arrived: write it
-    /// back and continue from where it ends.
-    fn resume_read(&mut self, cx: &mut Cx, data: Vec<u8>) {
+    /// A resumed download's file is open for appending, `have` bytes long:
+    /// continue from where it ends.
+    fn resume_opened(&mut self, cx: &mut Cx, have: u64) {
         let Some(d) = self.download.as_mut() else {
             return;
         };
-        let have = data.len() as u64;
         if d.total.is_some_and(|total| have > total) {
             let d = self.download.take().unwrap();
+            // Closed untouched; the close finds no download.
+            cx.file_close(FILE);
             cx.complete(
                 d.id,
                 Err(refused(
@@ -2750,10 +2749,6 @@ impl SonyCamera {
                 )),
             );
             return;
-        }
-        cx.file_open(FILE, d.path.clone());
-        if have > 0 {
-            cx.file_write(FILE, data);
         }
         d.offset = have;
         if d.total.is_some_and(|total| have >= total) {
@@ -3247,8 +3242,8 @@ impl Module for SonyCamera {
             }
             Ok(Plan::Upload(upload, path, max)) => self.begin_upload(cx, upload, path, max),
             Ok(Plan::Resume(d)) => {
-                let max = d.total.unwrap_or(MAX_RESUME).min(MAX_RESUME);
-                cx.file_read(RESUME, d.path.clone(), max);
+                cx.file_open_append(FILE, d.path.clone());
+                self.resume_opening = true;
                 self.download = Some(d);
             }
             Ok(Plan::Delete(deletion, op)) => {
@@ -3376,37 +3371,37 @@ impl Module for SonyCamera {
                         cx.complete(upload.id, Err(refused("file", message)));
                     }
                 }
-                FileInput::Closed { .. } => {}
-            }
-            return;
-        }
-        if file == RESUME {
-            match input {
-                FileInput::Read { data } => self.resume_read(cx, data),
-                FileInput::Failed { message } => {
-                    if let Some(d) = self.download.take() {
-                        cx.complete(
-                            d.id,
-                            Err(refused(
-                                "not_resumable",
-                                format!("the partial file could not be read ({message}); download without resume to start again"),
-                            )),
-                        );
-                    }
-                }
-                FileInput::Closed { .. } => {}
+                FileInput::Closed { .. } | FileInput::Opened { .. } => {}
             }
             return;
         }
         if file != FILE {
             return;
         }
+        if std::mem::take(&mut self.resume_opening) {
+            match input {
+                FileInput::Opened { bytes } => self.resume_opened(cx, bytes),
+                FileInput::Failed { message } => {
+                    if let Some(d) = self.download.take() {
+                        cx.complete(
+                            d.id,
+                            Err(refused(
+                                "not_resumable",
+                                format!("the partial file could not be opened ({message}); download without resume to start again"),
+                            )),
+                        );
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
         let Some(d) = self.download.take() else {
             return;
         };
         match input {
-            // Reads are reported on their own key.
-            FileInput::Read { .. } => self.download = Some(d),
+            // Reads are reported on their own key; Opened only on resuming.
+            FileInput::Read { .. } | FileInput::Opened { .. } => self.download = Some(d),
             FileInput::Closed { bytes } => {
                 let result = match d.error {
                     Some(e) => Err(refused("download_failed", e)),
@@ -5553,31 +5548,41 @@ mod tests {
             "download_content",
             json!({"umid": umid, "path": "/tmp/x.jpg", "resume": true}),
         );
-        assert!(a.contains(&Action::FileRead {
-            file: RESUME,
+        assert!(a.contains(&Action::FileAppend {
+            file: FILE,
             path: "/tmp/x.jpg".into(),
-            max_bytes: 10
         }));
         let mut cx = Cx::new(20);
-        m.file(
-            &mut cx,
-            RESUME,
-            FileInput::Read {
-                data: b"0123".to_vec(),
-            },
-        );
+        m.file(&mut cx, FILE, FileInput::Opened { bytes: 4 });
         let a = cx.take();
-        assert!(a.contains(&Action::FileOpen {
-            file: FILE,
-            path: "/tmp/x.jpg".into()
-        }));
-        assert!(a.contains(&Action::FileWrite {
-            file: FILE,
-            data: b"0123".to_vec()
-        }));
+        assert!(!a.iter().any(|x| matches!(x, Action::FileWrite { .. })));
         assert_eq!(last_request(&a).2, vec![42, (1 << 24) | 1, 4, 0, CHUNK]);
         let a = answer(&mut m, &a, b"456789".to_vec(), vec![]);
         assert!(a.contains(&Action::FileClose { file: FILE }));
+        let not_resumable = |a: &[Action], id| {
+            matches!(
+                completion(a, id),
+                Some(Err(CommandError::DeviceError { code: Some(c), .. })) if c == "not_resumable"
+            )
+        };
+        // The camera's file is 10 bytes: a longer one on the host is another
+        // file, closed untouched.
+        m.download = None;
+        let resume = json!({"umid": umid, "path": "/tmp/x.jpg", "resume": true});
+        run(&mut m, 12, "download_content", resume.clone());
+        let mut cx = Cx::new(30);
+        m.file(&mut cx, FILE, FileInput::Opened { bytes: 11 });
+        let a = cx.take();
+        assert!(a.contains(&Action::FileClose { file: FILE }));
+        assert!(not_resumable(&a, 12));
+        // A file that cannot be opened (missing) is not resumable either.
+        run(&mut m, 13, "download_content", resume);
+        let mut cx = Cx::new(40);
+        let missing = FileInput::Failed {
+            message: "/tmp/x.jpg: not found".into(),
+        };
+        m.file(&mut cx, FILE, missing);
+        assert!(not_resumable(&cx.take(), 13));
         // A list the camera has since regenerated is not trusted.
         let regenerated = build::prop_array(&[build::range_prop(
             0xD1D6,

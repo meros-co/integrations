@@ -20,6 +20,9 @@
 //!   MixRack and Avantis recall scenes 1-500 and send the same message when a
 //!   scene is recalled on the console; a dLive Surface recalls cues by
 //!   Recall Id 0-1999 instead (p.4-5).
+//! - With TLS/SSL encryption the MixRack listens on 51327 and the Surface on
+//!   51329, and the first message is the login (p.1); see
+//!   [`super::allenheath`]. The Avantis documents give no TLS port.
 
 use serde_json::Value;
 
@@ -32,6 +35,9 @@ const HEADER: [u8; 7] = [0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00];
 
 pub(crate) const MIXRACK_PORT: u16 = 51325;
 pub(crate) const SURFACE_PORT: u16 = 51328;
+/// "With TLS/SSL encryption - Rendezvous port" (p.1).
+pub(crate) const MIXRACK_TLS_PORT: u16 = 51327;
+pub(crate) const SURFACE_TLS_PORT: u16 = 51329;
 
 /// dLive p.9 and Avantis "Fader Level": LV = [(dB + 54) / 64] * 7F. The
 /// documents' tables agree with this rounded down (except dLive's "+5 74",
@@ -351,6 +357,14 @@ impl Dialect for Dlive {
         match self.console {
             Console::Surface => SURFACE_PORT,
             _ => MIXRACK_PORT,
+        }
+    }
+
+    fn tls_port(&self) -> Option<u16> {
+        match self.console {
+            Console::MixRack => Some(MIXRACK_TLS_PORT),
+            Console::Surface => Some(SURFACE_TLS_PORT),
+            Console::Avantis => None,
         }
     }
 
@@ -781,9 +795,10 @@ impl Dialect for Dlive {
     }
 
     fn silence_hint(&self) -> &'static str {
-        "check that MIDI/TCP is enabled on the console and not in secure (TLS) mode, that the \
-         midi_channel setting matches the console's base MIDI channel (Utility / Control / \
-         MIDI), and the port (MixRack 51325, Surface 51328)"
+        "check that MIDI/TCP is enabled on the console, in secure (TLS) mode only when the tls \
+         setting is on, that the midi_channel setting matches the console's base MIDI channel \
+         (Utility / Control / MIDI), and the port (MixRack 51325, Surface 51328; with TLS 51327 \
+         and 51329)"
     }
 }
 

@@ -143,6 +143,7 @@ impl Obs {
             WsRequest {
                 url: self.url.clone(),
                 headers: vec![("Sec-WebSocket-Protocol".into(), SUBPROTOCOL.into())],
+                accept_invalid_certs: false,
             },
         );
         cx.set_timer(HELLO, HELLO_TIMEOUT);
@@ -717,6 +718,7 @@ mod tests {
             request: WsRequest {
                 url: "ws://10.0.0.7:4455".into(),
                 headers: vec![("Sec-WebSocket-Protocol".into(), "obswebsocket.json".into())],
+                accept_invalid_certs: false,
             },
         }));
     }

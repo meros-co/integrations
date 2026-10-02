@@ -35,6 +35,14 @@ source:
       Manufacturer article. External control on TCP 51325 (unsecured) or TLS 51327, "TCP encapsulated MIDI";
       on AHM it can be disabled in System Manager, and the TLS port needs an SSL certificate and key uploaded.
 
+settings:
+  # Connect with TLS/SSL encryption (51327, p.1) and log in as user_profile
+  # with password.
+  tls: { type: bool, default: false }
+  # UserProfile, 00 to 1F (p.1), sent as that byte.
+  user_profile: { type: int, min: 0, max: 31, default: 0 }
+  password: { type: string, secret: true, default: "" }
+
 models:
   - id: ahm-16
     name: AHM-16
@@ -209,9 +217,21 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Plain TCP 51325 only. The TLS port 51327, whose first message is "UserProfile, UserPassword" answered by
-      "AuthOK" (p.1), is not supported: the core has no TLS socket for native modules. External control must
-      be enabled in System Manager (IT managers white paper).
+      Plain TCP 51325, or with tls on the TLS/SSL port 51327 (p.1). External control must be enabled in System
+      Manager (IT managers white paper). The processor's certificate is not checked: the document says nothing
+      of it, and a processor addressed by IP has none a public root vouches for. The connection is encrypted,
+      but the processor is not authenticated.
+  - models: [all]
+    severity: warning
+    text: >
+      With tls on, the first data sent is the login, "UserProfile, UserPassword" with UserProfile 00 to 1F,
+      answered by the six characters "AuthOK"; otherwise the processor drops the connection (p.1). That is all
+      the document says. It does not say how the two values are encoded or separated (whether the ", " is
+      sent, whether the profile is a byte or text, the password's character set, any terminator or length
+      limit). The core sends the profile as one byte (user_profile 0-31) followed by the password's UTF-8
+      bytes, with nothing between or after them. A connection dropped after the login, or any answer other
+      than AuthOK, is a refusal: terminal (unauthorized, commands fail with auth, nothing retried until the
+      device is opened again). No answer within 5 s is retried as an ordinary loss.
   - models: [all]
     severity: info
     text: >

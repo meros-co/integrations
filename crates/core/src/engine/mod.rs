@@ -341,6 +341,10 @@ fn ws_request(
     Ok(WsRequest {
         url: format!("{scheme}://{}:{port}{path}", host_text(host)),
         headers,
+        accept_invalid_certs: t
+            .get("accept_invalid_certs")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     })
 }
 
@@ -517,8 +521,21 @@ impl SpecEngine {
                     Transport::Http { auth, .. } | Transport::Ws { auth, .. } => *auth,
                     _ => HttpAuth::None,
                 };
+                let mut request = ws_request(w, ctx.host, push_port, &ctx.settings, auth)?;
+                // A device serving HTTPS with a self-signed certificate
+                // serves wss with it too, unless the websocket says otherwise.
+                if let (
+                    None,
+                    Transport::Http {
+                        accept_invalid_certs: true,
+                        ..
+                    },
+                ) = (w.get("accept_invalid_certs"), &transport)
+                {
+                    request.accept_invalid_certs = true;
+                }
                 Some(Push {
-                    request: ws_request(w, ctx.host, push_port, &ctx.settings, auth)?,
+                    request,
                     send: match w.get("send") {
                         Some(Value::Array(items)) => items.clone(),
                         Some(one) => vec![one.clone()],
@@ -2214,6 +2231,7 @@ mod tests {
             })
             .expect("the websocket opens");
         assert_eq!(request.url, "ws://127.0.0.1:9000/api/v1");
+        assert!(!request.accept_invalid_certs);
         assert!(request
             .headers
             .contains(&("Sec-WebSocket-Protocol".into(), "v1.ctl".into())));
@@ -2326,6 +2344,39 @@ mod tests {
     }
 
     #[test]
+    fn a_secure_websocket_may_accept_a_self_signed_certificate() {
+        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        spec.transport = Some(json!({
+            "type": "ws", "port": 9443, "path": "/", "scheme": "wss",
+            "accept_invalid_certs": true,
+        }));
+        let mut e = open_spec(spec, "p3000-generic", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let request = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::WsOpen { request, .. } => Some(request),
+                _ => None,
+            })
+            .expect("the websocket opens");
+        assert_eq!(request.url, "wss://127.0.0.1:9443/");
+        assert!(request.accept_invalid_certs);
+
+        // A push websocket inherits it from an HTTPS transport.
+        let mut spec = Catalog::embedded().device("resolume").unwrap().clone();
+        spec.transport.as_mut().unwrap()["accept_invalid_certs"] = json!(true);
+        let mut e = open_spec(spec, "arena", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        assert!(cx.take().iter().any(|a| matches!(
+            a,
+            Action::WsOpen { socket: PUSH, request } if request.accept_invalid_certs
+        )));
+    }
+
+    #[test]
     fn a_push_websocket_beside_http() {
         let mut spec = Catalog::embedded().device("resolume").unwrap().clone();
         spec.transport.as_mut().unwrap()["port"] = json!(8080);
@@ -2344,6 +2395,7 @@ mod tests {
             })
             .expect("the push channel opens");
         assert_eq!(request.url, "ws://127.0.0.1:8080/api/v1");
+        assert!(!request.accept_invalid_certs);
 
         let mut cx = Cx::new(1);
         e.ws(&mut cx, PUSH, WsInput::Opened);

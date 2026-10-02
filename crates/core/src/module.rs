@@ -120,6 +120,19 @@ impl std::fmt::Debug for SshTunnel {
     }
 }
 
+/// A TLS stream a module asks the session to open.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TlsTarget {
+    pub to: SocketAddr,
+    /// The name the certificate is checked against: the device's host name,
+    /// or its address as text.
+    pub server_name: String,
+    /// Accept a certificate that does not chain to a trusted root or does not
+    /// name the device, such as a device's self-signed one. The stream is
+    /// still encrypted; the device is not authenticated.
+    pub accept_invalid_certs: bool,
+}
+
 /// A username and password.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Credentials {
@@ -152,7 +165,11 @@ pub enum SseInput {
 /// What happens to a file a module writes on the host.
 #[derive(Debug, Clone, PartialEq)]
 pub enum FileInput {
-    /// Every chunk was written and the file closed.
+    /// A file opened with `file_open_append` is open; `bytes` is its length
+    /// before anything is appended.
+    Opened { bytes: u64 },
+    /// Every chunk was written and the file closed. `bytes` is the file's
+    /// length: what was written, plus, when appending, what was there before.
     Closed { bytes: u64 },
     /// The file could not be created, written or read. Reported once; later
     /// writes are dropped.
@@ -175,10 +192,13 @@ pub enum TcpInput {
 /// A WebSocket a module asks the session to open.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WsRequest {
-    /// `ws://host:port/path`.
+    /// `ws://host:port/path` or `wss://host:port/path`.
     pub url: String,
     /// Extra handshake headers, such as `Sec-WebSocket-Protocol`.
     pub headers: Vec<(String, String)>,
+    /// Over `wss`, accept a certificate that does not chain to a trusted
+    /// root, such as a device's self-signed one. Encrypted, not authenticated.
+    pub accept_invalid_certs: bool,
 }
 
 /// What happens on a WebSocket.
@@ -261,6 +281,14 @@ pub enum Action {
         socket: Key,
         tunnel: SshTunnel,
     },
+    /// Connect and negotiate TLS (1.2 or later), replacing any connection
+    /// open under this key. Reported like `TcpOpen` once the handshake is
+    /// done; a failed handshake, including a certificate that is not trusted,
+    /// closes it with a reason starting `tls:`.
+    TcpOpenTls {
+        socket: Key,
+        target: TlsTarget,
+    },
     TcpSend {
         socket: Key,
         data: Vec<u8>,
@@ -268,6 +296,13 @@ pub enum Action {
     /// Create (or truncate) a file on the host, for a download too large to
     /// return as a value. The path is the consumer's, passed through.
     FileOpen {
+        file: Key,
+        path: String,
+    },
+    /// Open an existing file on the host for appending, for a download that
+    /// resumes. Reported as `FileInput::Opened` with the file's length, then
+    /// as for `FileOpen`; a missing or unwritable file is `Failed`.
+    FileAppend {
         file: Key,
         path: String,
     },
@@ -409,6 +444,14 @@ impl Cx {
         });
     }
 
+    /// Open an existing file for appending; see [`Action::FileAppend`].
+    pub fn file_open_append(&mut self, file: Key, path: impl Into<String>) {
+        self.push(Action::FileAppend {
+            file,
+            path: path.into(),
+        });
+    }
+
     pub fn file_write(&mut self, file: Key, data: impl Into<Vec<u8>>) {
         self.push(Action::FileWrite {
             file,
@@ -432,6 +475,11 @@ impl Cx {
     /// Open a TCP stream through an SSH tunnel; see [`Action::TcpOpenSsh`].
     pub fn tcp_open_ssh(&mut self, socket: Key, tunnel: SshTunnel) {
         self.push(Action::TcpOpenSsh { socket, tunnel });
+    }
+
+    /// Open a TLS stream; see [`Action::TcpOpenTls`].
+    pub fn tcp_open_tls(&mut self, socket: Key, target: TlsTarget) {
+        self.push(Action::TcpOpenTls { socket, target });
     }
 
     pub fn tcp_send(&mut self, socket: Key, data: impl Into<Vec<u8>>) {

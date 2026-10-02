@@ -64,6 +64,13 @@ settings:
   midi_channel: { type: int, min: 1, max: 12, required: true }
   # Read every preamp's gain, pad and 48V on connecting (MixRack only).
   sync_preamps: { type: bool, default: true }
+  # Connect with TLS/SSL encryption (MixRack 51327, Surface 51329, p.1) and
+  # log in as user_profile with password. MIDI/TCP must be in Secure mode on
+  # the console.
+  tls: { type: bool, default: false }
+  # UserProfile, 00 to 1F (p.1), sent as that byte.
+  user_profile: { type: int, min: 0, max: 31, default: 0 }
+  password: { type: string, secret: true, default: "" }
 
 models:
   - id: dlive-mixrack
@@ -355,11 +362,27 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Ports are from the dLive document (p.1): MixRack 51325, Surface 51328 (Avantis 51325). The encrypted
-      ports (MixRack 51327, Surface 51329), whose first message is "UserProfile, UserPassword" answered by
-      "AuthOK", are not supported: the core has no TLS socket for native modules. MIDI/TCP must be On (not
-      Secure) on the console (dLive V1.9 release notes); the console accepts the connection either way, and
-      the core logs a warning when it then never answers.
+      Ports are from the dLive document (p.1): MixRack 51325, Surface 51328 (Avantis 51325); with tls on,
+      the TLS/SSL ports MixRack 51327 and Surface 51329. The Avantis documents give no TLS port, so tls on
+      Avantis needs the port set. MIDI/TCP must be On for plain TCP and Secure for tls (dLive V1.9 release
+      notes "On / Off / Secure Modes"); the console accepts a plain connection in either mode, and the core
+      logs a warning when it then never answers. The console's certificate is not checked: the document says
+      nothing of it, and a console addressed by IP has none a public root vouches for. The connection is
+      encrypted, but the console is not authenticated.
+  - models: [dlive-mixrack, dlive-surface]
+    severity: warning
+    text: >
+      With tls on, the first data sent is the login, "UserProfile, UserPassword" with UserProfile 00 to 1F,
+      answered by the six characters "AuthOK"; otherwise the console drops the connection (p.1). That is all
+      the document says. It does not say how the two values are encoded or separated (whether the ", " is
+      sent, whether the profile is a byte or text, the password's character set, any terminator or length
+      limit), nor how a profile number relates to the console's user profiles. The core sends the profile
+      as one byte (user_profile 0-31) followed by the password's UTF-8 bytes, with nothing between or after
+      them. A connection dropped after the login, or any answer other than AuthOK, is taken as a refusal:
+      it is terminal (the device reports unauthorized, commands fail with auth, and nothing is retried until
+      the device is opened again), because repeated wrong logins are not sent on a schedule. If a console
+      that accepts the profile and password in its own UI refuses them here, the encoding is the likely
+      cause. No answer within 5 s is retried as an ordinary loss.
   - models: [all]
     severity: critical
     text: >

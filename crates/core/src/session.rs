@@ -272,7 +272,10 @@ impl Session {
                             if self.reads.get(file) == Some(&generation) {
                                 self.reads.remove(file);
                             } else if self.files.get(file).map(|w| w.generation) == Some(generation) {
-                                self.files.remove(file);
+                                // Opened is followed by Closed or Failed.
+                                if !matches!(input, crate::module::FileInput::Opened { .. }) {
+                                    self.files.remove(file);
+                                }
                             } else {
                                 continue;
                             }
@@ -404,6 +407,14 @@ impl Session {
                         let _ = c.writer.send(data);
                     }
                 }
+                Action::TcpOpenTls { socket, target } => {
+                    self.close_tcp(socket);
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let connection =
+                        crate::tcp::spawn_tls(socket, generation, target, self.inbound_tx.clone());
+                    self.tcp.insert(socket, connection);
+                }
                 Action::TcpOpenSsh { socket, tunnel } => {
                     self.close_tcp(socket);
                     let generation = self.next_generation;
@@ -421,10 +432,27 @@ impl Session {
                 Action::FileOpen { file, path } => {
                     let generation = self.next_generation;
                     self.next_generation += 1;
-                    let writer =
-                        crate::files::open(file, generation, path.into(), self.inbound_tx.clone());
+                    let writer = crate::files::open(
+                        file,
+                        generation,
+                        path.into(),
+                        crate::files::Mode::Create,
+                        self.inbound_tx.clone(),
+                    );
                     // A file reopened under the same key replaces the old one;
                     // the old writer stops when its queue is dropped.
+                    self.files.insert(file, writer);
+                }
+                Action::FileAppend { file, path } => {
+                    let generation = self.next_generation;
+                    self.next_generation += 1;
+                    let writer = crate::files::open(
+                        file,
+                        generation,
+                        path.into(),
+                        crate::files::Mode::Append,
+                        self.inbound_tx.clone(),
+                    );
                     self.files.insert(file, writer);
                 }
                 Action::FileWrite { file, data } => {
