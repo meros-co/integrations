@@ -9,6 +9,14 @@
 //! dataset or Access_Denied, which is how it says "too soon"). Frame requests
 //! are background work: an operator command always goes first.
 //!
+//! A download from the card uses the same PTP connection. With
+//! `live_view_during_transfers: keep` an image request may go between two
+//! download parts, at most one per part and no more than one every
+//! `live_view_transfer_interval_ms`, so the picture keeps moving (10 frames a
+//! second at the default) while the transfer slows a little; with `pause` the parts go back to
+//! back and the picture waits until the transfer ends. The spacing is the
+//! `live_view_transfer_interval_ms` setting (100 ms by default).
+//!
 //! Pan/tilt bodies serve live view over HTTP on their own localhost at the
 //! LiveViewURL, one live view dataset per HTTP chunk. The stream keeps that
 //! response open through the SSH tunnel, publishes each image as its chunk
@@ -35,6 +43,13 @@ const ERROR_BACKOFF: Millis = 1_000;
 const HTTP_STALL: Millis = 10_000;
 const RECONNECT_MIN: Millis = 1_000;
 const RECONNECT_MAX: Millis = 30_000;
+/// While a download runs with live view kept, image requests go no closer
+/// together than this by default: at most 10 frames a second between 4 MiB
+/// parts.
+pub(super) const DEFAULT_TRANSFER_INTERVAL: Millis = 100;
+/// The bounds of that spacing: 50 frames a second at most, one every 5 s at
+/// least.
+pub(super) const TRANSFER_INTERVAL_RANGE: (Millis, Millis) = (20, 5_000);
 /// The most one live view dataset may take before it is discarded.
 const MAX_DATASET: usize = 16 * 1024 * 1024;
 
@@ -60,12 +75,23 @@ pub(super) struct Live {
     http: Option<LiveHttp>,
     reconnect_after: Millis,
     status: &'static str,
+    /// Keep live view going between download parts (true) or let downloads
+    /// run alone (false).
+    pub(super) keep_during_transfers: bool,
+    /// The shortest time between two image requests during a transfer.
+    pub(super) transfer_interval: Millis,
+    /// When an image request last went between two download parts.
+    last_cut_in: Option<Millis>,
     /// Frames published since the stream last started.
     pub(super) published: u64,
 }
 
 impl Live {
-    pub(super) fn new(interval: Millis) -> Live {
+    pub(super) fn new(
+        interval: Millis,
+        keep_during_transfers: bool,
+        transfer_interval: Millis,
+    ) -> Live {
         Live {
             watched: false,
             interval,
@@ -76,6 +102,9 @@ impl Live {
             http: None,
             reconnect_after: RECONNECT_MIN,
             status: "stopped",
+            keep_during_transfers,
+            transfer_interval,
+            last_cut_in: None,
             published: 0,
         }
     }
@@ -88,7 +117,96 @@ fn jpeg_range(data: &[u8]) -> Option<(usize, usize)> {
     Some((start, start + jpeg.len()))
 }
 
+/// The operator's names for the transfer setting.
+pub(super) fn transfer_mode_name(keep: bool) -> &'static str {
+    if keep {
+        "keep"
+    } else {
+        "pause"
+    }
+}
+
 impl SonyCamera {
+    /// A download from the card is using the PTP connection.
+    pub(super) fn ptp_transfer_active(&self) -> bool {
+        self.download
+            .as_ref()
+            .is_some_and(|d| d.source != Source::Http && !d.closing)
+    }
+
+    /// The image request to send before the next download part, when live
+    /// view is kept during transfers and it is its turn.
+    pub(super) fn live_cut_in(&mut self, now: Millis) -> Option<Op> {
+        if !self.live.keep_during_transfers || !self.live.watched || !self.ptp_transfer_active() {
+            return None;
+        }
+        let part_next = self
+            .commands
+            .front()
+            .is_some_and(|op| matches!(op.step, Step::DownloadChunk | Step::DownloadWhole));
+        if !part_next {
+            return None;
+        }
+        if self
+            .live
+            .last_cut_in
+            .is_some_and(|at| now < at + self.live.transfer_interval)
+        {
+            return None;
+        }
+        let at = self
+            .background
+            .iter()
+            .position(|op| op.step == Step::LiveFrame)?;
+        self.live.last_cut_in = Some(now);
+        self.background.remove(at)
+    }
+
+    /// The transfer choices as a state patch.
+    pub(super) fn live_transfer_state(&self) -> Value {
+        json!({"live_view": {
+            "during_transfers": transfer_mode_name(self.live.keep_during_transfers),
+            "transfer_interval_ms": self.live.transfer_interval,
+        }})
+    }
+
+    /// Shows in the state whether a transfer is holding the picture.
+    pub(super) fn live_check_transfer(&mut self, cx: &mut Cx) {
+        if !self.live.watched
+            || self.live.http.is_some()
+            || !matches!(self.live.status, "running" | "paused_for_transfer")
+        {
+            return;
+        }
+        let paused = !self.live.keep_during_transfers && self.ptp_transfer_active();
+        self.live_status(
+            cx,
+            if paused {
+                "paused_for_transfer"
+            } else {
+                "running"
+            },
+        );
+    }
+
+    /// The operator chose whether live view keeps going during transfers.
+    pub(super) fn set_live_during_transfers(
+        &mut self,
+        cx: &mut Cx,
+        keep: Option<bool>,
+        interval: Option<Millis>,
+    ) {
+        if let Some(keep) = keep {
+            self.live.keep_during_transfers = keep;
+        }
+        if let Some(interval) = interval {
+            self.live.transfer_interval = interval;
+        }
+        cx.state(self.live_transfer_state());
+        self.live_check_transfer(cx);
+        self.pump(cx);
+    }
+
     fn live_status(&mut self, cx: &mut Cx, status: &'static str) {
         if self.live.status != status {
             self.live.status = status;
@@ -178,7 +296,6 @@ impl SonyCamera {
                 self.live.empties = 0;
                 self.live.published += 1;
                 cx.frame(LIVE, "jpeg", frame.jpeg);
-                self.live_status(cx, "running");
             }
             (RC_OK, Ok(None)) | (RC_ACCESS_DENIED, _) => {
                 // No new image yet.

@@ -479,6 +479,8 @@ enum Plan {
     Switch(Function),
     /// A download that continues the file already on the host.
     Resume(Download),
+    /// Keep live view going during transfers, or pause it.
+    LiveDuringTransfers(Option<bool>, Option<Millis>),
 }
 
 pub(crate) struct SonyCamera {
@@ -790,6 +792,18 @@ impl SonyCamera {
         if protocol == Protocol::Ptp2 && function != Function::Remote {
             return Err("Camera Control PTP 2 has only the remote control session mode".into());
         }
+        let keep_live = match text_setting(s, "live_view_during_transfers").as_str() {
+            "" | "keep" => true,
+            "pause" => false,
+            other => return Err(format!("unknown live_view_during_transfers '{other}'")),
+        };
+        let (lo, hi) = live::TRANSFER_INTERVAL_RANGE;
+        let transfer_interval = match s.get("live_view_transfer_interval_ms") {
+            None | Some(Value::Null) => live::DEFAULT_TRANSFER_INTERVAL,
+            Some(v) => v.as_u64().filter(|v| (lo..=hi).contains(v)).ok_or(format!(
+                "live_view_transfer_interval_ms must be {lo} to {hi}"
+            ))?,
+        };
         let live_interval = s
             .get("live_interval_ms")
             .and_then(Value::as_u64)
@@ -851,7 +865,7 @@ impl SonyCamera {
             stream_version: 100,
             captures: 0,
             cautions: 0,
-            live: live::Live::new(live_interval),
+            live: live::Live::new(live_interval, keep_live, transfer_interval),
         })
     }
 
@@ -1026,9 +1040,10 @@ impl SonyCamera {
         if self.phase != Phase::Session || self.current.is_some() || self.pausing.is_some() {
             return;
         }
+        self.live_check_transfer(cx);
         let Some(op) = self
-            .commands
-            .pop_front()
+            .live_cut_in(cx.now())
+            .or_else(|| self.commands.pop_front())
             .or_else(|| self.background.pop_front())
         else {
             return;
@@ -2982,6 +2997,29 @@ impl SonyCamera {
             "preset_clear" => ops(self.preset_ptzf(false, params)),
             // Live view
             "get_live_view_image" => self.get_live_view(),
+            "set_live_view_during_transfers" => {
+                let keep = match params.get("mode").and_then(Value::as_str) {
+                    None => None,
+                    Some("keep") => Some(true),
+                    Some("pause") => Some(false),
+                    Some(other) => return Err(invalid(format!("unknown mode '{other}'"))),
+                };
+                let interval = match params.get("interval_ms") {
+                    None | Some(Value::Null) => None,
+                    Some(_) => {
+                        let (lo, hi) = live::TRANSFER_INTERVAL_RANGE;
+                        let v = param_int(params, "interval_ms")?;
+                        if !(lo as i128..=hi as i128).contains(&v) {
+                            return Err(invalid(format!("'interval_ms' must be {lo} to {hi}")));
+                        }
+                        Some(v as Millis)
+                    }
+                };
+                if keep.is_none() && interval.is_none() {
+                    return Err(invalid("give mode, interval_ms or both"));
+                }
+                Ok(Plan::LiveDuringTransfers(keep, interval))
+            }
             // Content
             "list_content" => self.list_content(params),
             "download_content" => self.download_content(params, id),
@@ -3171,6 +3209,7 @@ impl Module for SonyCamera {
             session["pairing"] = Value::Null;
         }
         cx.state(json!({"session": session}));
+        cx.state(self.live_transfer_state());
         self.connect(cx);
     }
 
@@ -3241,6 +3280,10 @@ impl Module for SonyCamera {
                 self.pump(cx);
             }
             Ok(Plan::Upload(upload, path, max)) => self.begin_upload(cx, upload, path, max),
+            Ok(Plan::LiveDuringTransfers(keep, interval)) => {
+                self.set_live_during_transfers(cx, keep, interval);
+                cx.complete(id, Ok(Outcome::Ack));
+            }
             Ok(Plan::Resume(d)) => {
                 cx.file_open_append(FILE, d.path.clone());
                 self.resume_opening = true;
@@ -3427,6 +3470,9 @@ impl Module for SonyCamera {
                 }
             }
         }
+        // The transfer is over: a paused picture resumes.
+        self.live_check_transfer(cx);
+        self.pump(cx);
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key) {
@@ -5823,5 +5869,137 @@ mod tests {
         }));
         let a = tick(&mut m, 3_000, live::LIVE_HTTP_WAIT);
         assert!(a.is_empty());
+    }
+
+    /// A remote-with-transfer camera watching its live stream, with a listed
+    /// file of `total` bytes to download.
+    fn transfer_camera(settings: Value, total: u64) -> SonyCamera {
+        let mut s = settings;
+        s["session_mode"] = json!("remote_with_transfer");
+        let mut m = camera(s);
+        connected(&mut m, 300);
+        m.sizes.insert("c:1:42:1".into(), total);
+        m
+    }
+
+    fn download_part(m: &mut SonyCamera, now: Millis, sent: &[Action]) -> Vec<Action> {
+        let (code, t, _) = last_request(sent);
+        assert_eq!(code, OP_GET_CONTENT_DATA, "a download part");
+        let mut packets = data_in(t, vec![7; 10]);
+        packets.push(ok(t, vec![]));
+        at(m, now, CMD, &packets)
+    }
+
+    #[test]
+    fn kept_live_view_goes_between_download_parts_at_most_every_100_ms() {
+        let mut m = transfer_camera(json!({}), 100);
+        let a = watch(&mut m, 0, true);
+        let jpeg = content::build::jpeg(16, 9);
+        let d = run(
+            &mut m,
+            5,
+            "download_content",
+            json!({"id": "c:1:42:1", "path": "/tmp/x"}),
+        );
+        assert!(sent(&d, CMD).is_empty());
+        let a = live_answer(&mut m, 20, &a, &jpeg);
+        assert_eq!(frames(&a).len(), 1);
+        // The paced next image waits; the first part goes.
+        let _ = tick(&mut m, 40, live::LIVE_NEXT);
+        // After the part, the waiting image request goes before the next.
+        let a = download_part(&mut m, 50, &a);
+        assert_eq!(last_request(&a).0, OP_GET_OBJECT, "a frame between parts");
+        let a = live_answer(&mut m, 60, &a, &jpeg);
+        assert_eq!(frames(&a).len(), 1);
+        // Within 100 ms of the last one, parts go back to back.
+        let a = download_part(&mut m, 70, &a);
+        let a = download_part(&mut m, 80, &a);
+        let _ = tick(&mut m, 100, live::LIVE_NEXT);
+        // From 150 ms, the next frame cuts in again.
+        let a = download_part(&mut m, 150, &a);
+        assert_eq!(last_request(&a).0, OP_GET_OBJECT);
+        assert_eq!(
+            state(&a)["live_view"]["stream"],
+            Value::Null,
+            "still running"
+        );
+    }
+
+    #[test]
+    fn paused_live_view_waits_for_the_transfer_and_the_choice_changes_at_run_time() {
+        let mut m = transfer_camera(json!({}), 20);
+        let a = run(
+            &mut m,
+            1,
+            "set_live_view_during_transfers",
+            json!({"mode": "pause", "interval_ms": 250}),
+        );
+        assert_eq!(completion(&a, 1), Some(Ok(Outcome::Ack)));
+        assert_eq!(state(&a)["live_view"]["during_transfers"], "pause");
+        assert_eq!(state(&a)["live_view"]["transfer_interval_ms"], 250);
+        for bad in [
+            json!({}),
+            json!({"interval_ms": 10}),
+            json!({"interval_ms": 9000}),
+        ] {
+            assert!(m
+                .plan("set_live_view_during_transfers", &settings(bad), 2)
+                .is_err());
+        }
+        assert!(m
+            .plan(
+                "set_live_view_during_transfers",
+                &settings(json!({"mode": "sometimes"})),
+                2
+            )
+            .is_err());
+        let a = watch(&mut m, 0, true);
+        let jpeg = content::build::jpeg(16, 9);
+        let _ = run(
+            &mut m,
+            5,
+            "download_content",
+            json!({"id": "c:1:42:1", "path": "/tmp/x"}),
+        );
+        let a = live_answer(&mut m, 20, &a, &jpeg);
+        assert_eq!(state(&a)["live_view"]["stream"], "paused_for_transfer");
+        let _ = tick(&mut m, 40, live::LIVE_NEXT);
+        let a = download_part(&mut m, 200, &a);
+        // The image request waits behind the second part.
+        let a = download_part(&mut m, 400, &a);
+        // The last part is in: the picture resumes while the file closes.
+        assert!(a.contains(&Action::FileClose { file: FILE }));
+        assert_eq!(state(&a)["live_view"]["stream"], "running");
+        assert_eq!(last_request(&a).0, OP_GET_OBJECT, "the picture resumes");
+        let mut cx = Cx::new(410);
+        m.file(&mut cx, FILE, FileInput::Closed { bytes: 20 });
+        assert!(matches!(completion(&cx.take(), 5), Some(Ok(_))));
+    }
+
+    #[test]
+    fn the_transfer_frame_spacing_is_a_setting() {
+        let mut m = transfer_camera(json!({"live_view_transfer_interval_ms": 300}), 100);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        assert_eq!(state(&cx.take())["live_view"]["transfer_interval_ms"], 300);
+        assert_eq!(m.live.transfer_interval, 300);
+        let open = |v: Value| {
+            SonyCamera::new(OpenContext {
+                host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
+                port: None,
+                model: "ilce-7sm3".into(),
+                channels: None,
+                settings: settings(json!({"live_view_transfer_interval_ms": v})),
+            })
+            .map(|m| m.live.transfer_interval)
+        };
+        assert!(open(json!(10)).is_err());
+        assert!(open(json!(6000)).is_err());
+        assert_eq!(open(json!(20)), Ok(20));
+        assert_eq!(camera(json!({})).live.transfer_interval, 100);
+        assert!(
+            camera(json!({})).live.keep_during_transfers,
+            "keep by default"
+        );
     }
 }

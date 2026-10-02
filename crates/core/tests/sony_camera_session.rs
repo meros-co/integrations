@@ -13,7 +13,7 @@
 //! list and a file in parts, an FTP server list it updates on writes, and an
 //! FTP job list. One simulator speaks Camera Control PTP 3, another PTP 2.
 
-#![cfg(feature = "sony")]
+#![cfg(feature = "sony-camera")]
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -65,6 +65,8 @@ struct Camera {
     jobs: Vec<(u32, String)>,
     /// Parameters and bytes of every partial upload.
     parts: Vec<(Vec<u32>, Vec<u8>)>,
+    /// How long each content data part takes, as over a slow link.
+    part_delay_ms: u64,
 }
 
 /// The camera-setting file the simulated camera saves.
@@ -481,6 +483,10 @@ async fn command_connection(mut stream: TcpStream, camera: Shared, events: mpsc:
                         _ => response(0x2005, t, &[]),
                     }
                 };
+                let delay = camera.lock().unwrap().part_delay_ms;
+                if code == 0x923D && delay > 0 {
+                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                }
                 stream.write_all(&reply).await.unwrap();
             }
             // Start Data: the length is all we need to know.
@@ -1123,5 +1129,121 @@ async fn live_view_stream_while_watched() {
     let stopped_at = live_requests(&camera);
     tokio::time::sleep(Duration::from_millis(300)).await;
     assert!(live_requests(&camera) <= stopped_at + 1);
+    core.close(id).await;
+}
+
+/// The order of live view requests (L) and content data parts (P).
+fn transfer_order(camera: &Shared) -> String {
+    camera
+        .lock()
+        .unwrap()
+        .operations
+        .iter()
+        .filter_map(|(c, p)| match c {
+            0x1009 if p.first() == Some(&0xFFFF_C002) => Some('L'),
+            0x923D => Some('P'),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn live_view_during_downloads_is_the_operators_choice() {
+    let (port, camera, _events) = simulated_camera(|c| {
+        ptp3_body(c);
+        c.part_delay_ms = 120;
+    })
+    .await;
+    let core = Core::new().unwrap();
+    let id = connected(
+        &core,
+        "ilce-7sm3",
+        port,
+        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000, "live_interval_ms": 20}),
+    )
+    .await;
+    assert_eq!(
+        core.snapshot(id).unwrap().state["live_view"]["during_transfers"],
+        "keep"
+    );
+    let file = match core
+        .execute(id, "list_content", params(json!({"slot": 1})))
+        .await
+    {
+        Ok(Outcome::Value { value }) => value["items"][0]["files"][0].clone(),
+        other => panic!("expected a content list, got {other:?}"),
+    };
+    let live = core.open_stream(id, "live").unwrap();
+    tokio::time::timeout(Duration::from_secs(5), live.next_frame())
+        .await
+        .unwrap()
+        .unwrap();
+    let path = std::env::temp_dir().join(format!("meros-sony-live-{}.bin", std::process::id()));
+
+    // Kept: frames go between the parts, and both finish.
+    let mark = transfer_order(&camera).len();
+    let download = core.execute(
+        id,
+        "download_content",
+        params(json!({"id": file["id"], "path": path.to_string_lossy()})),
+    );
+    let (result, frames) = tokio::join!(download, async {
+        let mut n = 0;
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(400);
+        while tokio::time::Instant::now() < deadline {
+            if tokio::time::timeout(Duration::from_millis(50), live.next_frame())
+                .await
+                .is_ok()
+            {
+                n += 1;
+            }
+        }
+        n
+    });
+    assert!(matches!(result, Ok(Outcome::Value { .. })));
+    assert!(frames >= 1, "frames during the transfer");
+    let order = transfer_order(&camera)[mark..].to_string();
+    let first = order.find('P').unwrap();
+    let last = order.rfind('P').unwrap();
+    assert!(
+        order[first..last].contains('L'),
+        "a frame between two parts: {order}"
+    );
+
+    // Paused: the parts go back to back.
+    assert_eq!(
+        core.execute(
+            id,
+            "set_live_view_during_transfers",
+            params(json!({"mode": "pause"}))
+        )
+        .await,
+        Ok(Outcome::Ack)
+    );
+    let mark = transfer_order(&camera).len();
+    let result = core
+        .execute(
+            id,
+            "download_content",
+            params(json!({"id": file["id"], "path": path.to_string_lossy()})),
+        )
+        .await;
+    assert!(matches!(result, Ok(Outcome::Value { .. })));
+    let order = transfer_order(&camera)[mark..].to_string();
+    let first = order.find('P').unwrap();
+    let last = order.rfind('P').unwrap();
+    assert!(
+        !order[first..last].contains('L'),
+        "no frame between parts: {order}"
+    );
+    // And the picture comes back afterwards.
+    while live.try_frame().is_some() {}
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), live.next_frame())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    let _ = std::fs::remove_file(&path);
     core.close(id).await;
 }
