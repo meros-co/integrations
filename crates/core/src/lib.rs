@@ -34,6 +34,7 @@ mod session;
 mod ssdp;
 pub mod sse;
 mod ssh;
+pub mod streams;
 mod tcp;
 mod tcp_listen;
 mod udp;
@@ -52,6 +53,7 @@ pub use discovery::{DiscoverAction, DiscoverRequest};
 pub use events::Event;
 pub use module::{CommandError, CommandResult, Connection, Outcome};
 pub use session::{DeviceId, DeviceSnapshot};
+pub use streams::{Frame, StreamError, StreamHandle};
 
 use events::EventQueue;
 use session::{Services, Session, SessionMsg};
@@ -148,6 +150,7 @@ impl Core {
                 shared_udp: udp::SharedUdp::new(events),
                 shared_tcp: Default::default(),
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
+                streams: Default::default(),
             }),
         })
     }
@@ -293,6 +296,46 @@ impl Core {
     /// Wait for at least one event.
     pub async fn next_events(&self, max: usize) -> Vec<Event> {
         self.services.events.next(max).await
+    }
+
+    /// Watch one of the device's streams, such as a camera's live view. The
+    /// stream must be declared in the spec's `streams` for the device's
+    /// model. The device produces frames while at least one handle is open;
+    /// each handle receives the newest frame, never a backlog. Closing the
+    /// device ends every handle.
+    pub fn open_stream(&self, device: DeviceId, stream: &str) -> Result<StreamHandle, StreamError> {
+        let format = {
+            let devices = self.devices.lock().unwrap();
+            let entry = devices.get(&device).ok_or(StreamError::Closed)?;
+            let spec = self
+                .catalog
+                .device(&entry.spec)
+                .expect("open device has a spec");
+            let declared = spec
+                .streams
+                .get(stream)
+                .ok_or_else(|| StreamError::UnknownStream {
+                    stream: stream.into(),
+                })?;
+            if let Some(models) = &declared.models {
+                if !models.iter().any(|m| m == &entry.model) {
+                    return Err(StreamError::UnsupportedForModel {
+                        stream: stream.into(),
+                        model: entry.model.clone(),
+                    });
+                }
+            }
+            declared.format.clone()
+        };
+        self.services
+            .streams
+            .watch(device, stream, format)
+            .ok_or(StreamError::Closed)
+    }
+
+    /// Stop watching a stream; the same as dropping the handle.
+    pub fn close_stream(&self, handle: StreamHandle) {
+        handle.close();
     }
 
     /// End a session cleanly. Pending commands fail with `Closed`.

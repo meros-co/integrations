@@ -94,6 +94,8 @@ pub(crate) struct Services {
     pub(crate) shared_udp: SharedUdp,
     pub(crate) shared_tcp: crate::tcp_listen::SharedTcp,
     pub(crate) http: HttpClients,
+    /// Frames of every device's streams, outside the event queue.
+    pub(crate) streams: Arc<crate::streams::Streams>,
 }
 
 /// What any consumer can read about a device without asking it.
@@ -153,6 +155,11 @@ pub(crate) struct Session {
     services: Arc<Services>,
     snapshot: Arc<Mutex<DeviceSnapshot>>,
     last_alive: Option<Instant>,
+    /// Fires when one of this device's streams gains its first watcher or
+    /// loses its last.
+    stream_wake: Arc<tokio::sync::Notify>,
+    /// Streams the module has been told are watched.
+    watched: Vec<String>,
 }
 
 impl Session {
@@ -164,6 +171,7 @@ impl Session {
         snapshot: Arc<Mutex<DeviceSnapshot>>,
     ) -> Session {
         let (inbound_tx, inbound_rx) = mpsc::channel(4096);
+        let stream_wake = services.streams.add_device(device);
         Session {
             device,
             host,
@@ -186,6 +194,8 @@ impl Session {
             services,
             snapshot,
             last_alive: None,
+            stream_wake,
+            watched: Vec::new(),
         }
     }
 
@@ -296,7 +306,35 @@ impl Session {
                     self.apply(cx.take()).await;
                 }
                 _ = sleep_until(wake) => self.fire_due().await,
+                _ = self.stream_wake.notified() => self.sync_watched().await,
             }
+        }
+    }
+
+    /// Tell the module which streams gained their first watcher or lost
+    /// their last since it was last told.
+    async fn sync_watched(&mut self) {
+        let now = self.services.streams.watched(self.device);
+        let stopped: Vec<String> = self
+            .watched
+            .iter()
+            .filter(|s| !now.contains(s))
+            .cloned()
+            .collect();
+        let started: Vec<String> = now
+            .iter()
+            .filter(|s| !self.watched.contains(s))
+            .cloned()
+            .collect();
+        self.watched = now;
+        for (stream, watching) in stopped
+            .into_iter()
+            .map(|s| (s, false))
+            .chain(started.into_iter().map(|s| (s, true)))
+        {
+            let mut cx = self.cx();
+            self.module.stream_watch(&mut cx, &stream, watching);
+            self.apply(cx.take()).await;
         }
     }
 
@@ -518,6 +556,15 @@ impl Session {
                         message,
                     });
                 }
+                Action::Frame {
+                    stream,
+                    format,
+                    data,
+                } => {
+                    self.services
+                        .streams
+                        .publish(self.device, stream, format, data);
+                }
             }
         }
     }
@@ -678,6 +725,7 @@ impl Session {
         for (_, port) in self.listening.drain() {
             self.services.shared_tcp.unregister(port, self.host);
         }
+        self.services.streams.remove_device(self.device);
         self.services.events.push(Event::Closed {
             device: self.device,
         });

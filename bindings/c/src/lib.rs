@@ -220,3 +220,159 @@ pub unsafe extern "C" fn mi_close(core: *const MiCore, device: u64) {
         core.block_on(core.close(device));
     }));
 }
+
+/// One watcher of a device's stream. Opaque to C.
+pub struct MiStream {
+    handle: meros_integrations::StreamHandle,
+}
+
+/// One frame, owned by the caller until `mi_frame_free`. `data` points at
+/// `len` bytes; `format` is a NUL-terminated string such as `jpeg`.
+#[repr(C)]
+pub struct MiFrame {
+    pub data: *const u8,
+    pub len: usize,
+    pub format: *const c_char,
+    pub sequence: u64,
+    pub dropped: u64,
+}
+
+/// What `MiFrame` points into. `frame` comes first so a `*mut MiFrame` is
+/// also a pointer to this.
+#[repr(C)]
+struct OwnedFrame {
+    frame: MiFrame,
+    _data: std::sync::Arc<[u8]>,
+    _format: CString,
+}
+
+fn to_frame(frame: meros_integrations::Frame) -> *mut MiFrame {
+    let format = CString::new(frame.format).unwrap_or_default();
+    let owned = Box::new(OwnedFrame {
+        frame: MiFrame {
+            data: frame.data.as_ptr(),
+            len: frame.data.len(),
+            format: format.as_ptr(),
+            sequence: frame.sequence,
+            dropped: frame.dropped,
+        },
+        _data: frame.data,
+        _format: format,
+    });
+    Box::into_raw(owned).cast::<MiFrame>()
+}
+
+/// Watch a device's stream, such as a camera's `live` preview. On success
+/// returns `{"ok":true}` and sets `*out`; otherwise `{"error":{...}}` and sets
+/// `*out` to NULL. The device produces frames while any stream is open.
+///
+/// # Safety
+/// `core` must be a live core; `stream` a NUL-terminated string; `out` a
+/// valid pointer.
+#[no_mangle]
+pub unsafe extern "C" fn mi_stream_open(
+    core: *const MiCore,
+    device: u64,
+    stream: *const c_char,
+    out: *mut *mut MiStream,
+) -> *mut c_char {
+    if !out.is_null() {
+        *out = std::ptr::null_mut();
+    }
+    guard(|| {
+        if out.is_null() {
+            return internal("out is NULL");
+        }
+        let Ok(stream) = CStr::from_ptr(stream).to_str() else {
+            return internal("stream is not UTF-8");
+        };
+        match api::open_stream(&(*core).core, device, stream) {
+            Ok(handle) => {
+                *out = Box::into_raw(Box::new(MiStream { handle }));
+                to_c(json!({"ok": true}))
+            }
+            Err(e) => to_c(e),
+        }
+    })
+}
+
+/// The newest frame, without waiting; NULL if none is waiting.
+///
+/// # Safety
+/// `stream` must come from `mi_stream_open` and not be freed.
+#[no_mangle]
+pub unsafe extern "C" fn mi_stream_poll(stream: *const MiStream) -> *mut MiFrame {
+    catch_unwind(AssertUnwindSafe(|| match (*stream).handle.try_frame() {
+        Some(frame) => to_frame(frame),
+        None => std::ptr::null_mut(),
+    }))
+    .unwrap_or(std::ptr::null_mut())
+}
+
+/// Wait up to `timeout_ms` for the next frame. NULL on timeout, or once the
+/// stream is closed or its device's session has ended (`mi_stream_ended`
+/// tells which). Only the newest frame is kept: frames replaced before they
+/// were taken are counted in `dropped`.
+///
+/// # Safety
+/// `stream` must come from `mi_stream_open` and not be freed. Do not call
+/// from inside an async runtime.
+#[no_mangle]
+pub unsafe extern "C" fn mi_stream_wait(
+    core: *const MiCore,
+    stream: *const MiStream,
+    timeout_ms: u32,
+) -> *mut MiFrame {
+    catch_unwind(AssertUnwindSafe(|| {
+        let core = &(*core).core;
+        let handle = &(*stream).handle;
+        let wait = Duration::from_millis(timeout_ms as u64);
+        match core.block_on(async { tokio::time::timeout(wait, handle.next_frame()).await }) {
+            Ok(Some(frame)) => to_frame(frame),
+            _ => std::ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(std::ptr::null_mut())
+}
+
+/// 1 once the stream is closed or its device's session has ended and no
+/// frame is left, else 0.
+///
+/// # Safety
+/// `stream` must come from `mi_stream_open` and not be freed.
+#[no_mangle]
+pub unsafe extern "C" fn mi_stream_ended(stream: *const MiStream) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| (*stream).handle.is_closed() as i32)).unwrap_or(1)
+}
+
+/// Stop watching. A waiting `mi_stream_wait` returns NULL. Safe from any
+/// thread while another waits; the stream must still be freed.
+///
+/// # Safety
+/// `stream` must come from `mi_stream_open` and not be freed.
+#[no_mangle]
+pub unsafe extern "C" fn mi_stream_close(stream: *const MiStream) {
+    let _ = catch_unwind(AssertUnwindSafe(|| (*stream).handle.close()));
+}
+
+/// Free a stream, closing it if open. No other call may be using it.
+///
+/// # Safety
+/// `stream` must come from `mi_stream_open`, or be NULL, and not be used
+/// afterwards.
+#[no_mangle]
+pub unsafe extern "C" fn mi_stream_free(stream: *mut MiStream) {
+    if !stream.is_null() {
+        let _ = catch_unwind(AssertUnwindSafe(|| drop(Box::from_raw(stream))));
+    }
+}
+
+/// # Safety
+/// `frame` must come from `mi_stream_poll` or `mi_stream_wait`, or be NULL,
+/// and not be used afterwards.
+#[no_mangle]
+pub unsafe extern "C" fn mi_frame_free(frame: *mut MiFrame) {
+    if !frame.is_null() {
+        drop(Box::from_raw(frame.cast::<OwnedFrame>()));
+    }
+}

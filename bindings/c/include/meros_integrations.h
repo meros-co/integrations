@@ -10,6 +10,7 @@
 #ifndef MEROS_INTEGRATIONS_H
 #define MEROS_INTEGRATIONS_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -55,6 +56,41 @@ void mi_interrupt_events(const MiCore *core);
 
 /* End a device's session and wait until it has closed. */
 void mi_close(const MiCore *core, uint64_t device);
+
+/* Streams: continuous media such as a camera's live view, declared in the
+ * catalogue under a device's "streams". Frames do not come as events: each
+ * open stream holds only the newest frame, and frames replaced before they
+ * were taken are counted in `dropped`. The device produces frames only while
+ * at least one stream is open on it.
+ *
+ * Each frame is owned by the caller and freed with mi_frame_free; `data`
+ * stays valid until then. Free every stream with mi_stream_free before
+ * mi_core_free. */
+typedef struct MiStream MiStream;
+
+typedef struct MiFrame {
+    const uint8_t *data;   /* the encoded frame, len bytes */
+    size_t len;
+    const char *format;    /* "jpeg" */
+    uint64_t sequence;     /* rises by one per frame the device published */
+    uint64_t dropped;      /* frames replaced unseen since the last one taken */
+} MiFrame;
+
+/* Watch a stream. returns: {"ok":true} with *out set, or {"error":{...}}
+ * ("unknown_stream", "unsupported_for_model", "closed") with *out NULL. */
+char *mi_stream_open(const MiCore *core, uint64_t device, const char *stream, MiStream **out);
+/* The newest frame without waiting, or NULL. */
+MiFrame *mi_stream_poll(const MiStream *stream);
+/* Wait up to timeout_ms for a frame. NULL on timeout, or once the stream is
+ * closed or the device's session has ended (mi_stream_ended returns 1). */
+MiFrame *mi_stream_wait(const MiCore *core, const MiStream *stream, uint32_t timeout_ms);
+int mi_stream_ended(const MiStream *stream);
+/* Stop watching; a waiting mi_stream_wait returns NULL. Callable from any
+ * thread. The stream must still be freed. */
+void mi_stream_close(const MiStream *stream);
+/* Close if needed and free. No other call may be using the stream. */
+void mi_stream_free(MiStream *stream);
+void mi_frame_free(MiFrame *frame);
 
 #ifdef __cplusplus
 }

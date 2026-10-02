@@ -1,0 +1,76 @@
+spec: 1
+id: http-snapshot
+name: Camera snapshot over HTTP (live preview from a JPEG URL)
+vendor: Generic (any camera that serves its current picture as a JPEG over HTTP)
+category: camera
+implementation: native
+reason: >
+  A preview stream rather than control: the module fetches the camera's snapshot URL one request at a
+  time while the preview is watched, paced to an interval measured from each request, checks it rarely
+  while it is not, recognises a JPEG by its start-of-image marker, and stops when credentials are refused
+  rather than retrying them on a schedule. The format has no streams of its own.
+
+source:
+  - title: "RFC 9110: HTTP Semantics"
+    author: "R. Fielding, M. Nottingham, J. Reschke, Eds. (IETF, 2022)"
+    url: "https://www.rfc-editor.org/rfc/rfc9110"
+    note: "GET (§9.3.1); 2xx successful (§15.3); 401 Unauthorized (§15.5.2), 403 Forbidden (§15.5.4)."
+  - title: "RFC 7617: The 'Basic' HTTP Authentication Scheme"
+    author: "J. Reschke (IETF, 2015)"
+    url: "https://www.rfc-editor.org/rfc/rfc7617"
+  - title: "RFC 7616: HTTP Digest Access Authentication"
+    author: "R. Shekh-Yusef, D. Ahrens, S. Bremer (IETF, 2015)"
+    url: "https://www.rfc-editor.org/rfc/rfc7616"
+    note: "Answered by the core's HTTP client, as for spec-driven devices (SPEC.md §2, http)."
+  - title: "ITU-T T.81 (ISO/IEC 10918-1): Digital compression and coding of continuous-tone still images"
+    author: "ITU-T (1992)"
+    url: "https://www.w3.org/Graphics/JPEG/itu-t81.pdf"
+    note: "Every JPEG begins with the SOI marker X'FFD8' (Annex B.1.1.3, Table B.1)."
+
+settings:
+  # The snapshot URL's path and query, percent-encoded, as the camera's manual gives it.
+  path: { type: string, pattern: "^/[!-~]*$", max_length: 2048, required: true }
+  scheme: { type: enum, values: [http, https], default: http }
+  # For a camera serving HTTPS with a self-signed certificate: still encrypted, the camera's identity not checked.
+  accept_invalid_certs: { type: bool, default: false }
+  # basic: Authorization: Basic on every request, and a Digest challenge answered. digest: a Digest challenge answered.
+  auth: { type: enum, values: [none, basic, digest], default: none }
+  username: { type: string, default: "" }
+  password: { type: string, secret: true, default: "" }
+  # The shortest time between the starts of two fetches while the preview is watched: 200 ms is at most 5 fps.
+  interval_ms: { type: int, min: 33, max: 60000, default: 200 }
+  timeout_ms: { type: int, min: 100, max: 25000, default: 5000 }
+
+models:
+  - id: generic
+    name: "Any camera with an HTTP snapshot URL (port defaults to 80, or 443 for https)"
+    supports: []
+    verification: none
+    notes: "Snapshot paths vary by maker and firmware; take the path from the camera's manual."
+
+streams:
+  live:
+    format: jpeg
+    summary: "The camera's current picture, fetched while watched, at most one frame per interval_ms"
+
+state:
+  http.status: { type: int, description: "HTTP status of the last answered fetch" }
+  http.error:  { type: string, description: "Why the last fetch gave no picture (no answer, a status other than 2xx, or a body that is not a JPEG); absent after one that did" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Connected once the URL answers with a JPEG. While the preview is not watched the URL is fetched every
+      30 seconds, only to keep the connection status current.
+  - models: [all]
+    severity: warning
+    text: >
+      With credentials configured, a 401 or 403 stops all fetching and reports the camera unauthorized until
+      it is opened again, since retrying credentials on a schedule can lock a camera out.
+  - models: [all]
+    severity: info
+    text: >
+      A snapshot is usually encoded on demand, so the frame rate is bounded by the camera as well as by
+      interval_ms; many cameras manage 2 to 10 per second. Each frame is a whole JPEG, so a camera's own
+      MJPEG or RTSP stream, where it has one, costs it less.

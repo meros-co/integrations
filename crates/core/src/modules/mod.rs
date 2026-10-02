@@ -1,6 +1,7 @@
 //! Device modules: the spec engine for spec-driven devices, and a hand-written
 //! module for each native one.
 
+mod aja_config_events;
 mod allenheath;
 mod allenheath_ahm;
 mod allenheath_dlive;
@@ -13,6 +14,7 @@ mod emberplus;
 mod generic_http;
 mod generic_osc;
 mod generic_tcp_udp;
+mod http_snapshot;
 mod obs;
 mod panasonic_notify;
 mod pjlink;
@@ -52,6 +54,9 @@ pub(crate) fn construct(
             Some("panasonic-update-notification") => Ok(Box::new(
                 panasonic_notify::PanasonicNotify::new(engine, &context),
             )),
+            Some("aja-config-events") => Ok(Box::new(aja_config_events::AjaConfigEvents::new(
+                engine, spec, &context,
+            )?)),
             Some(other) => Err(format!("no native extension '{other}'")),
         };
     }
@@ -83,6 +88,7 @@ pub(crate) fn construct(
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
+        "http-snapshot" => Ok(Box::new(http_snapshot::HttpSnapshot::new(context)?)),
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
         "allenheath-dlive" | "allenheath-ahm" | "allenheath-qu" | "allenheath-sq"
         | "allenheath-cq" => Ok(Box::new(allenheath::AllenHeath::new(&spec.id, context)?)),

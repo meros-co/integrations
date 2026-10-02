@@ -115,6 +115,32 @@ async fn the_shared_binding_script() {
                 .await;
                 assert_eq!(strip_messages(&result), step["expect"], "{label}");
             }
+            "stream" => {
+                let stream = step["stream"].as_str().unwrap();
+                match api::open_stream(&core, device, stream) {
+                    Err(error) => {
+                        assert_eq!(Some(&strip_messages(&error)), step.get("expect"), "{label}")
+                    }
+                    Ok(handle) => {
+                        assert!(step.get("expect").is_none(), "{label}: opened");
+                        let mut last = 0;
+                        for _ in 0..step["frames"].as_u64().unwrap() {
+                            let frame =
+                                tokio::time::timeout(Duration::from_secs(5), handle.next_frame())
+                                    .await
+                                    .unwrap_or_else(|_| panic!("{label}: no frame"))
+                                    .unwrap_or_else(|| panic!("{label}: stream ended"));
+                            let meta = api::frame(&frame);
+                            assert_eq!(meta["format"], step["format"], "{label}");
+                            assert_eq!(meta["size"], frame.data.len(), "{label}");
+                            assert!(frame.data.starts_with(&[0xFF, 0xD8]), "{label}");
+                            assert!(frame.sequence > last, "{label}");
+                            last = frame.sequence;
+                        }
+                        core.close_stream(handle);
+                    }
+                }
+            }
             "close" => core.close(device).await,
             other => panic!("unknown op {other}"),
         }

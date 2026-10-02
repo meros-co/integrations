@@ -86,7 +86,8 @@ export type ErrorCode =
   | 'unknown_model'
   | 'invalid_settings'
   | 'unresolvable_host'
-  | 'not_implemented';
+  | 'not_implemented'
+  | 'unknown_stream';
 
 export class IntegrationsError extends Error {
   readonly code: ErrorCode;
@@ -98,6 +99,28 @@ export interface CoreOptions {
   bindAddress?: string;
 }
 
+export interface Frame {
+  /** The encoding the spec declares, e.g. 'jpeg'. */
+  format: string;
+  data: Buffer;
+  /** Rises by one per frame the device published; a gap is frames not seen. */
+  sequence: number;
+  /** Frames replaced before they were taken, since the last frame. */
+  dropped: number;
+}
+
+/**
+ * One watcher of a device's stream. Only the newest frame is kept for a slow
+ * listener. The device produces frames while any stream on it is open.
+ */
+export class Stream extends EventEmitter {
+  /** Stop watching; 'end' follows. */
+  close(): void;
+  on(event: 'frame', listener: (frame: Frame) => void): this;
+  /** Closed, or the device's session ended. */
+  on(event: 'end', listener: () => void): this;
+}
+
 export class Core extends EventEmitter {
   constructor(options?: CoreOptions);
   catalog(): { devices: Record<string, unknown> };
@@ -107,6 +130,12 @@ export class Core extends EventEmitter {
   execute(device: DeviceId, command: string, params?: Record<string, unknown>): Promise<Outcome>;
   snapshot(device: DeviceId): Snapshot | null;
   close(device: DeviceId): Promise<void>;
+  /**
+   * Watch a stream declared under the device's `streams` in the catalogue,
+   * such as a camera's 'live' preview. Throws an IntegrationsError
+   * ('unknown_stream', 'unsupported_for_model', 'closed').
+   */
+  openStream(device: DeviceId, stream: string): Stream;
   /** Stop delivering events so the process can exit. */
   dispose(): void;
 

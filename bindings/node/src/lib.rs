@@ -5,9 +5,11 @@
 //! idiomatic JavaScript surface (promises that reject, an EventEmitter) is in
 //! `index.js`.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
-use meros_integrations::{json, Core};
+use meros_integrations::{json, Core, StreamHandle};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::Value;
@@ -15,6 +17,21 @@ use serde_json::Value;
 #[napi(js_name = "NativeCore")]
 pub struct NativeCore {
     core: Arc<Core>,
+    /// Open streams, by the id handed to JavaScript.
+    streams: Arc<Mutex<HashMap<u32, Arc<StreamHandle>>>>,
+    next_stream: AtomicU32,
+}
+
+/// One frame of a stream: the encoded bytes and what the core says about them.
+#[napi(object)]
+pub struct NativeFrame {
+    /// `jpeg`.
+    pub format: String,
+    pub data: Buffer,
+    /// Rises by one per frame the device published.
+    pub sequence: i64,
+    /// Frames replaced unseen since the last one taken.
+    pub dropped: i64,
 }
 
 fn device_id(device: f64) -> Result<u64> {
@@ -38,6 +55,8 @@ impl NativeCore {
         let core = Core::with_options(options).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(NativeCore {
             core: Arc::new(core),
+            streams: Default::default(),
+            next_stream: AtomicU32::new(1),
         })
     }
 
@@ -92,6 +111,42 @@ impl NativeCore {
     #[napi]
     pub fn interrupt_events(&self) {
         self.core.interrupt_events();
+    }
+
+    /// `{stream: <id>}` or `{error}`. The device produces frames while the
+    /// stream is open.
+    #[napi]
+    pub fn open_stream(&self, device: f64, stream: String) -> Result<Value> {
+        match json::open_stream(&self.core, device_id(device)?, &stream) {
+            Ok(handle) => {
+                let id = self.next_stream.fetch_add(1, Ordering::Relaxed);
+                self.streams.lock().unwrap().insert(id, Arc::new(handle));
+                Ok(serde_json::json!({ "stream": id }))
+            }
+            Err(error) => Ok(error),
+        }
+    }
+
+    /// The next frame, waiting for it; `null` once the stream is closed or
+    /// its device's session has ended. Only the newest frame is kept.
+    #[napi]
+    pub async fn next_frame(&self, stream: u32) -> Option<NativeFrame> {
+        let handle = self.streams.lock().unwrap().get(&stream).cloned()?;
+        let frame = handle.next_frame().await?;
+        Some(NativeFrame {
+            format: frame.format.to_string(),
+            data: frame.data.to_vec().into(),
+            sequence: frame.sequence as i64,
+            dropped: frame.dropped as i64,
+        })
+    }
+
+    /// Stop watching; a pending `nextFrame` resolves `null`.
+    #[napi]
+    pub fn close_stream(&self, stream: u32) {
+        if let Some(handle) = self.streams.lock().unwrap().remove(&stream) {
+            handle.close();
+        }
     }
 
     #[napi]

@@ -19,10 +19,23 @@
 //! | GET  /v1/snapshot/{device}   |                                       | snapshot, or null          |
 //! | POST /v1/close               | {device}                              | {}                         |
 //! | GET  /v1/events              | ?max=256&wait_ms=25000                | [events], empty on timeout |
+//! | GET  /v1/devices/{device}/streams/{stream}.mjpg |                    | MJPEG, until closed        |
+//! | GET  /v1/devices/{device}/streams/{stream}.jpg  | ?wait_ms=5000      | the newest JPEG            |
 //!
 //! Every request needs `Authorization: Bearer <token>`. The token is read from
 //! the token file, which is created with a random token if absent. The service
 //! listens on loopback unless told otherwise.
+//!
+//! Streams (a camera's live view, declared under a device's `streams` in the
+//! catalogue) are served as images rather than JSON: `.mjpg` as
+//! `multipart/x-mixed-replace`, which a browser's `<img>` shows as live video,
+//! and `.jpg` as one JPEG. Since an `<img>` cannot send a header, these two
+//! also accept the token as `?access_token=<token>` (RFC 6750 §2.3); a URL
+//! holding the token can end up in logs and history, so prefer the header
+//! where the client can send one. The device produces frames only while a
+//! stream is being read, and a slow reader gets the newest frame, never a
+//! backlog. A refused stream is answered with a JSON error and status 404
+//! (unknown stream, or device not open) or 406 (not a JPEG stream).
 //!
 //! Events are one queue: run one event consumer per service.
 
@@ -31,8 +44,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, HeaderName, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -56,6 +70,10 @@ fn authorized(app: &App, headers: &HeaderMap) -> bool {
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "));
+    token_matches(app, given)
+}
+
+fn token_matches(app: &App, given: Option<&str>) -> bool {
     // Constant-time comparison: the token guards control of show equipment.
     given.is_some_and(|g| {
         g.len() == app.token.len()
@@ -64,6 +82,12 @@ fn authorized(app: &App, headers: &HeaderMap) -> bool {
                 .fold(0u8, |acc, (a, b)| acc | (a ^ b))
                 == 0
     })
+}
+
+/// The header, or for an image a client cannot add headers to, the
+/// `access_token` query parameter (RFC 6750 §2.3).
+fn authorized_or_query(app: &App, headers: &HeaderMap, token: Option<&str>) -> bool {
+    authorized(app, headers) || token_matches(app, token)
 }
 
 fn unauthorized() -> Response {
@@ -164,6 +188,125 @@ async fn events(
     Json(api::events(&events)).into_response()
 }
 
+#[derive(Deserialize)]
+struct StreamQuery {
+    access_token: Option<String>,
+    wait_ms: Option<u64>,
+}
+
+/// How long a single-frame request waits for the device's first frame.
+const DEFAULT_FRAME_WAIT: Duration = Duration::from_secs(5);
+const MJPEG_BOUNDARY: &str = "meros-frame";
+
+fn stream_refused(error: Value) -> Response {
+    let status = match error["error"]["error"].as_str() {
+        Some("not_acceptable") => StatusCode::NOT_ACCEPTABLE,
+        _ => StatusCode::NOT_FOUND,
+    };
+    (status, Json(error)).into_response()
+}
+
+/// One part of a `multipart/x-mixed-replace` body (RFC 2046 §5.1.1).
+fn mjpeg_part(frame: &meros_integrations::Frame) -> Vec<u8> {
+    let mut part = format!(
+        "--{MJPEG_BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\nX-Sequence: {}\r\nX-Dropped: {}\r\n\r\n",
+        frame.data.len(),
+        frame.sequence,
+        frame.dropped
+    )
+    .into_bytes();
+    part.extend_from_slice(&frame.data);
+    part.extend_from_slice(b"\r\n");
+    part
+}
+
+async fn device_stream(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Path((device, file)): Path<(u64, String)>,
+    Query(q): Query<StreamQuery>,
+) -> Response {
+    if !authorized_or_query(&app, &headers, q.access_token.as_deref()) {
+        return unauthorized();
+    }
+    let (name, mjpeg) = if let Some(name) = file.strip_suffix(".mjpg") {
+        (name, true)
+    } else if let Some(name) = file.strip_suffix(".jpg") {
+        (name, false)
+    } else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": {"error": "invalid_request",
+                "message": "ask for <stream>.mjpg or <stream>.jpg"}})),
+        )
+            .into_response();
+    };
+    let handle = match api::open_stream(&app.core, device, name) {
+        Ok(handle) => handle,
+        Err(error) => return stream_refused(error),
+    };
+    if handle.format() != "jpeg" {
+        return stream_refused(json!({"error": {"error": "not_acceptable",
+            "message": format!("stream '{name}' is {}, not jpeg", handle.format())}}));
+    }
+    if mjpeg {
+        use futures_util::StreamExt;
+        let frames = futures_util::stream::unfold(handle, |handle| async move {
+            let frame = handle.next_frame().await?;
+            Some((
+                Ok::<_, std::convert::Infallible>(mjpeg_part(&frame)),
+                handle,
+            ))
+        })
+        .chain(futures_util::stream::once(async {
+            Ok(format!("--{MJPEG_BOUNDARY}--\r\n").into_bytes())
+        }));
+        return (
+            [
+                (
+                    header::CONTENT_TYPE,
+                    format!("multipart/x-mixed-replace; boundary={MJPEG_BOUNDARY}"),
+                ),
+                (header::CACHE_CONTROL, "no-store".to_string()),
+            ],
+            Body::from_stream(frames),
+        )
+            .into_response();
+    }
+    let wait = q
+        .wait_ms
+        .map(Duration::from_millis)
+        .unwrap_or(DEFAULT_FRAME_WAIT)
+        .min(MAX_WAIT);
+    match tokio::time::timeout(wait, handle.next_frame()).await {
+        Ok(Some(frame)) => (
+            [
+                (header::CONTENT_TYPE, "image/jpeg".to_string()),
+                (header::CACHE_CONTROL, "no-store".to_string()),
+                (
+                    HeaderName::from_static("x-sequence"),
+                    frame.sequence.to_string(),
+                ),
+                (
+                    HeaderName::from_static("x-dropped"),
+                    frame.dropped.to_string(),
+                ),
+            ],
+            frame.data.to_vec(),
+        )
+            .into_response(),
+        Ok(None) => {
+            stream_refused(json!({"error": {"error": "closed", "message": "session closed"}}))
+        }
+        Err(_) => (
+            StatusCode::GATEWAY_TIMEOUT,
+            Json(json!({"error": {"error": "timeout",
+                "message": "the device sent no frame in time"}})),
+        )
+            .into_response(),
+    }
+}
+
 fn router(app: Shared) -> Router {
     Router::new()
         .route("/v1/catalog", get(catalog))
@@ -173,6 +316,7 @@ fn router(app: Shared) -> Router {
         .route("/v1/snapshot/{device}", get(snapshot))
         .route("/v1/close", post(close))
         .route("/v1/events", get(events))
+        .route("/v1/devices/{device}/streams/{file}", get(device_stream))
         .with_state(app)
 }
 

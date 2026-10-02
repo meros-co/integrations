@@ -10,6 +10,11 @@
 //!   ERR for input 9, and #MODEL? with a model name.
 //! - `d6000`: Sennheiser Digital 6000 SSC over UDP. Answers subscriptions with
 //!   the channel tree and echoes mute writes.
+//! - `snapshot`: a camera's HTTP/1.1 snapshot URL. GET /snapshot.jpg answers a
+//!   small JPEG whose third byte counts requests; anything else is a 404.
+
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
 
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -88,18 +93,69 @@ async fn d6000(socket: UdpSocket) {
     }
 }
 
+async fn snapshot(listener: TcpListener) {
+    let count = Arc::new(AtomicU8::new(0));
+    loop {
+        let Ok((stream, _)) = listener.accept().await else {
+            return;
+        };
+        let count = count.clone();
+        tokio::spawn(async move {
+            let (read, mut write) = stream.into_split();
+            let mut read = BufReader::new(read);
+            // Kept alive across requests.
+            loop {
+                let mut request_line = String::new();
+                match read.read_line(&mut request_line).await {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {}
+                }
+                loop {
+                    let mut header = String::new();
+                    match read.read_line(&mut header).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) if header == "\r\n" => break,
+                        Ok(_) => {}
+                    }
+                }
+                let reply = if request_line.starts_with("GET /snapshot.jpg ") {
+                    let n = count.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+                    let body = [0xFF, 0xD8, n, 0xFF, 0xD9];
+                    let mut reply = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
+                        body.len()
+                    )
+                    .into_bytes();
+                    reply.extend_from_slice(&body);
+                    reply
+                } else {
+                    b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".to_vec()
+                };
+                if write.write_all(&reply).await.is_err() {
+                    break;
+                }
+            }
+        });
+    }
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let kramer_listener = TcpListener::bind("127.0.0.1:0").await.expect("bind kramer");
     let d6000_socket = UdpSocket::bind("127.0.0.1:0").await.expect("bind d6000");
+    let snapshot_listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind snapshot");
     let ports = json!({
         "kramer": kramer_listener.local_addr().unwrap().port(),
         "d6000": d6000_socket.local_addr().unwrap().port(),
+        "snapshot": snapshot_listener.local_addr().unwrap().port(),
     });
     println!("{ports}");
 
     tokio::spawn(kramer(kramer_listener));
     tokio::spawn(d6000(d6000_socket));
+    tokio::spawn(snapshot(snapshot_listener));
 
     // Run until the test that started us closes our stdin.
     let mut stdin = tokio::io::stdin();

@@ -79,6 +79,33 @@ test('the shared binding script', async () => {
           assert.deepStrictEqual(stripMessages(result), step.expect, label);
           break;
         }
+        case 'stream': {
+          const opened = core.openStream(step.device, step.stream);
+          if (step.expect) {
+            assert.deepStrictEqual(stripMessages(opened), step.expect, label);
+            break;
+          }
+          assert.ok(opened.stream !== undefined, `${label}: ${JSON.stringify(opened)}`);
+          let last = 0;
+          for (let i = 0; i < step.frames; i++) {
+            const frame = await Promise.race([
+              core.nextFrame(opened.stream),
+              new Promise((_, reject) => setTimeout(() => reject(new Error(`${label}: no frame`)), 5000)),
+            ]);
+            assert.ok(frame, `${label}: stream ended`);
+            assert.strictEqual(frame.format, step.format, label);
+            assert.ok(Buffer.isBuffer(frame.data), label);
+            assert.deepStrictEqual([...frame.data.subarray(0, 2)], [0xff, 0xd8], label);
+            assert.ok(frame.sequence > last, label);
+            last = frame.sequence;
+          }
+          const pending = core.nextFrame(opened.stream);
+          core.closeStream(opened.stream);
+          // Closing ends a pending wait (or a frame already waiting is taken).
+          const after = await pending;
+          if (after !== null) assert.strictEqual(await core.nextFrame(opened.stream), null, label);
+          break;
+        }
         case 'close':
           await core.close(step.device);
           break;

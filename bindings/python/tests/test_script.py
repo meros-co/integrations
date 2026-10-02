@@ -78,6 +78,26 @@ class SharedScript(unittest.TestCase):
             elif op == "execute":
                 result = json.loads(native.execute(step["device"], step["command"], json.dumps(step["params"])))
                 self.assertEqual(strip_messages(result), step["expect"], label)
+            elif op == "stream":
+                opened = json.loads(native.open_stream(step["device"], step["stream"]))
+                if "expect" in step:
+                    self.assertEqual(strip_messages(opened), step["expect"], label)
+                    continue
+                stream_id = opened["stream"]
+                last = 0
+                for _ in range(step["frames"]):
+                    frame = native.wait_frame(stream_id, 5000)
+                    self.assertIsNotNone(frame, f"{label}: no frame")
+                    fmt, data, sequence, _dropped = frame
+                    self.assertEqual(fmt, step["format"], label)
+                    self.assertIsInstance(data, bytes, label)
+                    self.assertEqual(data[:2], bytes([0xFF, 0xD8]), label)
+                    self.assertGreater(sequence, last, label)
+                    last = sequence
+                self.assertFalse(native.stream_ended(stream_id))
+                native.close_stream(stream_id)
+                self.assertIsNone(native.wait_frame(stream_id, 100))
+                self.assertTrue(native.stream_ended(stream_id))
             elif op == "close":
                 native.close(step["device"])
             else:
@@ -98,6 +118,26 @@ class SharedScript(unittest.TestCase):
         with self.assertRaises(IntegrationsError) as caught:
             core.execute(device, "route_video", {"input": 300, "output": 1})
         self.assertEqual(caught.exception.code, "invalid_params")
+        core.close(device)
+
+    def test_streams(self):
+        core = Core()
+        device = core.open({"device": "http-snapshot", "model": "generic", "host": "127.0.0.1",
+                            "port": self.ports["snapshot"],
+                            "settings": {"path": "/snapshot.jpg", "interval_ms": 50}})
+        with self.assertRaises(IntegrationsError) as caught:
+            core.open_stream(device, "nope")
+        self.assertEqual(caught.exception.code, "unknown_stream")
+        with core.open_stream(device, "live") as stream:
+            frames = []
+            for frame in stream:
+                frames.append(frame)
+                if len(frames) == 2:
+                    break
+        self.assertEqual(frames[0].format, "jpeg")
+        self.assertTrue(frames[0].data.startswith(bytes([0xFF, 0xD8])))
+        self.assertGreater(frames[1].sequence, frames[0].sequence)
+        self.assertTrue(stream.ended)
         core.close(device)
 
 

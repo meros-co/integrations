@@ -4,11 +4,15 @@
 //! like every other delivery; `meros_integrations/__init__.py` turns them into
 //! dicts and exceptions. Every call that may wait releases the GIL.
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use meros_integrations::{json as api, Core};
+use meros_integrations::{json as api, Core, StreamHandle};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use serde_json::{json, Value};
 
 fn parse(text: &str) -> Result<Value, String> {
@@ -20,7 +24,13 @@ fn parse(text: &str) -> Result<Value, String> {
 #[pyclass(frozen, name = "NativeCore")]
 struct NativeCore {
     core: Core,
+    /// Open streams, by the id handed to Python.
+    streams: Mutex<HashMap<u64, Arc<StreamHandle>>>,
+    next_stream: AtomicU64,
 }
+
+/// A frame as Python receives it: (format, data, sequence, dropped).
+type PyFrame<'py> = (String, Bound<'py, PyBytes>, u64, u64);
 
 #[pymethods]
 impl NativeCore {
@@ -35,7 +45,11 @@ impl NativeCore {
             None => Default::default(),
         };
         Core::with_options(options)
-            .map(|core| NativeCore { core })
+            .map(|core| NativeCore {
+                core,
+                streams: Mutex::new(HashMap::new()),
+                next_stream: AtomicU64::new(1),
+            })
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
@@ -92,6 +106,58 @@ impl NativeCore {
 
     fn interrupt_events(&self) {
         self.core.interrupt_events();
+    }
+
+    /// `{"stream": id}` or `{"error": {...}}`.
+    fn open_stream(&self, device: u64, stream: &str) -> String {
+        match api::open_stream(&self.core, device, stream) {
+            Ok(handle) => {
+                let id = self.next_stream.fetch_add(1, Ordering::Relaxed);
+                self.streams.lock().unwrap().insert(id, Arc::new(handle));
+                json!({ "stream": id }).to_string()
+            }
+            Err(error) => error.to_string(),
+        }
+    }
+
+    /// The next frame within `timeout_ms`, or None on timeout or once the
+    /// stream has ended (see `stream_ended`).
+    fn wait_frame<'py>(
+        &self,
+        py: Python<'py>,
+        stream: u64,
+        timeout_ms: u64,
+    ) -> Option<PyFrame<'py>> {
+        let handle = self.streams.lock().unwrap().get(&stream).cloned()?;
+        let frame = py.detach(|| {
+            let wait = Duration::from_millis(timeout_ms);
+            self.core
+                .block_on(async { tokio::time::timeout(wait, handle.next_frame()).await })
+                .ok()
+                .flatten()
+        })?;
+        Some((
+            frame.format.to_string(),
+            PyBytes::new(py, &frame.data),
+            frame.sequence,
+            frame.dropped,
+        ))
+    }
+
+    /// True once the stream is closed or its device's session has ended.
+    fn stream_ended(&self, stream: u64) -> bool {
+        self.streams
+            .lock()
+            .unwrap()
+            .get(&stream)
+            .is_none_or(|h| h.is_closed())
+    }
+
+    /// Stop watching; a waiting `wait_frame` returns None.
+    fn close_stream(&self, stream: u64) {
+        if let Some(handle) = self.streams.lock().unwrap().remove(&stream) {
+            handle.close();
+        }
     }
 
     fn close(&self, py: Python<'_>, device: u64) {

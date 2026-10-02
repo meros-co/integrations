@@ -84,3 +84,49 @@ test('the catalogue lists every spec', () => {
     core.dispose();
   }
 });
+
+test('streams frames as Buffers while watched', async () => {
+  const http = require('node:http');
+  let served = 0;
+  const camera = http.createServer((req, res) => {
+    served += 1;
+    res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+    res.end(Buffer.from([0xff, 0xd8, served & 0xff, 0xff, 0xd9]));
+  });
+  await new Promise((resolve) => camera.listen(0, '127.0.0.1', resolve));
+  const core = new Core();
+  try {
+    const id = core.open({
+      device: 'http-snapshot',
+      model: 'generic',
+      host: '127.0.0.1',
+      port: camera.address().port,
+      settings: { path: '/snapshot.jpg', interval_ms: 50 },
+    });
+    assert.throws(() => core.openStream(id, 'nope'), (err) => err.code === 'unknown_stream');
+
+    const stream = core.openStream(id, 'live');
+    const frames = [];
+    const ended = new Promise((resolve) => stream.on('end', resolve));
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no frames')), 5000);
+      stream.on('frame', (frame) => {
+        frames.push(frame);
+        if (frames.length === 2) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    stream.close();
+    await ended;
+    assert.strictEqual(frames[0].format, 'jpeg');
+    assert.ok(Buffer.isBuffer(frames[0].data));
+    assert.strictEqual(frames[0].data[0], 0xff);
+    assert.ok(frames[1].sequence > frames[0].sequence);
+    await core.close(id);
+  } finally {
+    core.dispose();
+    camera.close();
+  }
+});

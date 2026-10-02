@@ -15,11 +15,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Optional
+from typing import Any, Iterator, NamedTuple, Optional
 
 from ._native import NativeCore
 
-__all__ = ["Core", "IntegrationsError"]
+__all__ = ["Core", "Frame", "IntegrationsError", "Stream"]
 
 
 class IntegrationsError(Exception):
@@ -30,6 +30,63 @@ class IntegrationsError(Exception):
         #: e.g. "device_error", "invalid_params", "not_connected"
         self.code: str = detail.get("error", "")
         self.detail = detail
+
+
+class Frame(NamedTuple):
+    """One frame of a stream."""
+
+    #: The encoding the spec declares, such as "jpeg".
+    format: str
+    data: bytes
+    #: Rises by one per frame the device published; a gap is frames not seen.
+    sequence: int
+    #: Frames replaced before they were taken, since the last frame.
+    dropped: int
+
+
+class Stream:
+    """One watcher of a device's stream, such as a camera's "live" preview.
+
+    Only the newest frame is kept for a slow reader; ``dropped`` counts the
+    frames it replaced. The device produces frames while a stream is open.
+    Iterating yields frames until the stream is closed or the device's
+    session ends. Usable as a context manager, which closes it.
+    """
+
+    def __init__(self, native: NativeCore, stream_id: int) -> None:
+        self._native = native
+        self._id = stream_id
+
+    def next_frame(self, timeout_ms: int = 5_000) -> Optional[Frame]:
+        """The next frame within timeout_ms; None on timeout or once ended."""
+        frame = self._native.wait_frame(self._id, timeout_ms)
+        return Frame(*frame) if frame is not None else None
+
+    async def next_frame_async(self, timeout_ms: int = 5_000) -> Optional[Frame]:
+        return await asyncio.to_thread(self.next_frame, timeout_ms)
+
+    @property
+    def ended(self) -> bool:
+        """Closed, or the device's session has ended."""
+        return self._native.stream_ended(self._id)
+
+    def close(self) -> None:
+        """Stop watching. A waiting next_frame returns None. Any thread."""
+        self._native.close_stream(self._id)
+
+    def __iter__(self) -> Iterator[Frame]:
+        while True:
+            frame = self.next_frame(1_000)
+            if frame is not None:
+                yield frame
+            elif self.ended:
+                return
+
+    def __enter__(self) -> "Stream":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
 
 class Core:
@@ -85,6 +142,15 @@ class Core:
 
     def interrupt_events(self) -> None:
         self._native.interrupt_events()
+
+    def open_stream(self, device: int, stream: str) -> Stream:
+        """Watch a stream declared under the device's "streams" in the
+        catalogue. Raises IntegrationsError ("unknown_stream",
+        "unsupported_for_model", "closed")."""
+        result = json.loads(self._native.open_stream(device, stream))
+        if "error" in result:
+            raise IntegrationsError(result["error"])
+        return Stream(self._native, result["stream"])
 
     def close(self, device: int) -> None:
         self._native.close(device)

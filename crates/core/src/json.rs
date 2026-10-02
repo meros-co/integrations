@@ -94,3 +94,32 @@ pub fn snapshot(core: &Core, device: DeviceId) -> Value {
 pub fn events(events: &[crate::Event]) -> Value {
     serde_json::to_value(events).expect("events serialise")
 }
+
+/// A stream that cannot be watched, as `{"error": {...}}` with a readable
+/// `message`, shaped like a command error.
+pub fn stream_error(e: &crate::StreamError) -> Value {
+    let mut v = serde_json::to_value(e).expect("StreamError serialises");
+    v["message"] = json!(e.to_string());
+    json!({ "error": v })
+}
+
+/// Watch a stream, or the `{"error": {...}}` a binding returns instead.
+pub fn open_stream(
+    core: &Core,
+    device: DeviceId,
+    stream: &str,
+) -> Result<crate::StreamHandle, Value> {
+    core.open_stream(device, stream)
+        .map_err(|e| stream_error(&e))
+}
+
+/// A frame's description without its bytes, which every binding hands over
+/// in its host's own byte type: `{"format", "sequence", "dropped", "size"}`.
+pub fn frame(frame: &crate::Frame) -> Value {
+    json!({
+        "format": frame.format,
+        "sequence": frame.sequence,
+        "dropped": frame.dropped,
+        "size": frame.data.len(),
+    })
+}

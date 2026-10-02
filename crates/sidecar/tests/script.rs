@@ -94,6 +94,63 @@ impl Client {
     }
 }
 
+fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+/// Read `count` parts of a `multipart/x-mixed-replace` JPEG stream, then
+/// hang up: `(X-Sequence, body)` for each.
+async fn read_mjpeg(client: &Client, path: &str, count: usize) -> Vec<(u64, Vec<u8>)> {
+    let mut response = client
+        .http
+        .get(format!("{}{path}", client.base))
+        .bearer_auth(&client.token)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let content_type = response.headers()["content-type"].to_str().unwrap();
+    let boundary = content_type
+        .strip_prefix("multipart/x-mixed-replace; boundary=")
+        .expect("multipart/x-mixed-replace")
+        .to_string();
+    let mut buf = Vec::new();
+    let mut parts = Vec::new();
+    while parts.len() < count {
+        let chunk = tokio::time::timeout(Duration::from_secs(5), response.chunk())
+            .await
+            .expect("a frame within 5 s")
+            .unwrap()
+            .expect("the stream stays open");
+        buf.extend_from_slice(&chunk);
+        while let Some(end) = find(&buf, b"\r\n\r\n") {
+            let head = String::from_utf8_lossy(&buf[..end]).to_string();
+            let mut lines = head.split("\r\n");
+            assert_eq!(lines.next(), Some(format!("--{boundary}").as_str()));
+            let mut length = 0;
+            let mut sequence = 0;
+            for line in lines {
+                let (name, value) = line.split_once(": ").unwrap();
+                match name.to_ascii_lowercase().as_str() {
+                    "content-length" => length = value.parse().unwrap(),
+                    "x-sequence" => sequence = value.parse().unwrap(),
+                    "content-type" => assert_eq!(value, "image/jpeg"),
+                    _ => {}
+                }
+            }
+            let body_start = end + 4;
+            if buf.len() < body_start + length + 2 {
+                break;
+            }
+            parts.push((sequence, buf[body_start..body_start + length].to_vec()));
+            assert_eq!(&buf[body_start + length..body_start + length + 2], b"\r\n");
+            buf.drain(..body_start + length + 2);
+        }
+    }
+    parts.truncate(count);
+    parts
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn the_shared_binding_script() {
     let status = Command::new(env!("CARGO"))
@@ -186,6 +243,43 @@ async fn the_shared_binding_script() {
                     json!({"device": device, "command": step["command"], "params": step["params"]});
                 let result = client.post("/v1/execute", body).await;
                 assert_eq!(strip_messages(&result), step["expect"], "{label}");
+            }
+            "stream" => {
+                let stream = step["stream"].as_str().unwrap();
+                let path = format!("/v1/devices/{device}/streams/{stream}");
+                if let Some(expect) = step.get("expect") {
+                    let refused = client
+                        .http
+                        .get(format!("{}{path}.jpg", client.base))
+                        .bearer_auth(&client.token)
+                        .send()
+                        .await
+                        .unwrap();
+                    assert_eq!(refused.status(), 404, "{label}");
+                    let body: Value = refused.json().await.unwrap();
+                    assert_eq!(&strip_messages(&body), expect, "{label}");
+                    continue;
+                }
+                assert_eq!(step["format"], "jpeg", "{label}: the sidecar serves JPEG");
+                let frames = step["frames"].as_u64().unwrap() as usize;
+                let parts = read_mjpeg(&client, &format!("{path}.mjpg"), frames).await;
+                let mut last = 0;
+                for (sequence, data) in parts {
+                    assert!(data.starts_with(&[0xFF, 0xD8]), "{label}");
+                    assert!(sequence > last, "{label}");
+                    last = sequence;
+                }
+
+                // One frame, with the token in the query as an <img> sends it.
+                let url = format!("{}{path}.jpg?access_token={}", client.base, client.token);
+                let one = client.http.get(&url).send().await.unwrap();
+                assert_eq!(one.status(), 200, "{label}");
+                assert_eq!(one.headers()["content-type"], "image/jpeg");
+                assert!(one.headers().contains_key("x-sequence"));
+                assert!(one.bytes().await.unwrap().starts_with(&[0xFF, 0xD8]));
+                // Without the token, nothing.
+                let url = format!("{}{path}.mjpg?access_token=wrong", client.base);
+                assert_eq!(client.http.get(&url).send().await.unwrap().status(), 401);
             }
             "close" => {
                 client.post("/v1/close", json!({"device": device})).await;

@@ -1,5 +1,5 @@
 {
-  "about": "Played through every delivery against integrations-sim. Each step's result, with every 'message' field removed, must equal 'expect' exactly. '$name' is replaced by a simulator port or a saved device id.",
+  "about": "Played through every delivery against integrations-sim. Each step's result, with every 'message' field removed, must equal 'expect' exactly. '$name' is replaced by a simulator port or a saved device id. A 'stream' step watches a stream: with 'expect', opening it must fail with that error; otherwise 'frames' frames must arrive within 5 s, each of 'format', starting with the JPEG marker FF D8, with rising sequence numbers, and the stream is then closed.",
   "steps": [
     { "op": "catalog", "path": "devices.kramer-p3000.vendor", "expect": "Kramer Electronics" },
 
@@ -32,6 +32,17 @@
     { "op": "wait", "device": "$d", "path": "state.channels.2.mute", "equals": true },
     { "op": "execute", "device": "$d", "command": "set_frequency", "params": { "channel": 1, "frequency_khz": 606000 },
       "expect": { "ok": { "kind": "unverified" } } },
+
+    { "op": "open", "save": "s",
+      "request": { "device": "http-snapshot", "model": "generic", "host": "127.0.0.1", "port": "$snapshot",
+                   "settings": { "path": "/snapshot.jpg", "interval_ms": 50 } } },
+    { "op": "wait", "device": "$s", "path": "connection.status", "equals": "connected" },
+    { "op": "stream", "device": "$s", "stream": "live", "frames": 3, "format": "jpeg" },
+    { "op": "stream", "device": "$s", "stream": "no_such_stream",
+      "expect": { "error": { "error": "unknown_stream", "stream": "no_such_stream" } } },
+    { "op": "close", "device": "$s" },
+    { "op": "stream", "device": "$s", "stream": "live",
+      "expect": { "error": { "error": "closed" } } },
 
     { "op": "close", "device": "$k" },
     { "op": "execute", "device": "$k", "command": "get_model", "params": {},

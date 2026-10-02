@@ -23,6 +23,47 @@ class IntegrationsError extends Error {
 }
 
 /**
+ * One watcher of a device's stream, such as a camera's 'live' preview.
+ * Emits 'frame' with { format, data: Buffer, sequence, dropped } for each
+ * frame, then 'end' once, when closed or when the device's session ends.
+ * Only the newest frame is kept for a slow listener; `dropped` counts the
+ * frames it replaced. The device produces frames while a stream is open.
+ */
+class Stream extends EventEmitter {
+  #native;
+  #id;
+  #closed = false;
+
+  constructor(native, id) {
+    super();
+    this.#native = native;
+    this.#id = id;
+    // Start delivering once the caller has had a chance to add listeners.
+    setImmediate(() => this.#pump());
+  }
+
+  /** Stop watching. Emits 'end'. */
+  close() {
+    if (this.#closed) return;
+    this.#closed = true;
+    this.#native.closeStream(this.#id);
+  }
+
+  async #pump() {
+    try {
+      for (;;) {
+        const frame = await this.#native.nextFrame(this.#id);
+        if (frame === null || frame === undefined) break;
+        this.emit('frame', frame);
+      }
+    } finally {
+      this.close();
+      this.emit('end');
+    }
+  }
+}
+
+/**
  * Emits 'event' for every core event, and also the event under its own name:
  * 'connection', 'state', 'alive', 'log', 'closed', 'dropped'.
  */
@@ -78,6 +119,17 @@ class Core extends EventEmitter {
     await this.#native.close(device);
   }
 
+  /**
+   * Watch a stream the catalogue declares under the device's `streams`.
+   * Returns a Stream emitting 'frame' and 'end'. Throws an IntegrationsError
+   * ('unknown_stream', 'unsupported_for_model', 'closed').
+   */
+  openStream(device, stream) {
+    const result = this.#native.openStream(device, stream);
+    if (result.error) throw new IntegrationsError(result.error);
+    return new Stream(this.#native, result.stream);
+  }
+
   /** Stop delivering events so the process can exit. */
   dispose() {
     this.#disposed = true;
@@ -101,4 +153,4 @@ class Core extends EventEmitter {
   }
 }
 
-module.exports = { Core, IntegrationsError };
+module.exports = { Core, IntegrationsError, Stream };

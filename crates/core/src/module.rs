@@ -344,6 +344,14 @@ pub enum Action {
         level: Level,
         message: String,
     },
+    /// Publish one frame of a stream the spec declares, such as a camera's
+    /// live view. Frames bypass the event queue: each watcher keeps only the
+    /// newest, and a frame nobody watches is discarded.
+    Frame {
+        stream: Key,
+        format: &'static str,
+        data: Vec<u8>,
+    },
 }
 
 /// Collects a module's actions for one callback.
@@ -498,6 +506,16 @@ impl Cx {
             message: message.into(),
         });
     }
+
+    /// Publish a frame on a stream; see [`Action::Frame`]. Publish only while
+    /// [`Module::stream_watch`] has said the stream is watched.
+    pub fn frame(&mut self, stream: Key, format: &'static str, data: impl Into<Vec<u8>>) {
+        self.push(Action::Frame {
+            stream,
+            format,
+            data: data.into(),
+        });
+    }
 }
 
 /// A device protocol implementation.
@@ -545,6 +563,14 @@ pub trait Module: Send + 'static {
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key);
+
+    /// A stream the spec declares gained its first watcher (`watching`) or
+    /// lost its last. Produce frames with [`Cx::frame`] only in between, so a
+    /// device is not asked for pictures nobody sees. Called again with the
+    /// same value never; a module that reconnects keeps its own flag.
+    fn stream_watch(&mut self, cx: &mut Cx, stream: &str, watching: bool) {
+        let _ = (cx, stream, watching);
+    }
 
     /// The session is closing: cancel subscriptions cleanly where the protocol
     /// allows it. Pending commands are failed with `Closed` by the session.

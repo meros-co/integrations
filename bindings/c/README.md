@@ -25,3 +25,11 @@ binding script through the same functions.
 Every call blocks, so make calls from worker threads. The library never calls
 back into the host: read events with `mi_wait_events` on a thread of your own,
 and wake it with `mi_interrupt_events` to stop.
+
+Streams (a camera's live view, listed under a device's `streams` in the
+catalogue) are read the same way: `mi_stream_open` a stream, then
+`mi_stream_wait` for frames on a thread of your own, freeing each with
+`mi_frame_free`. Each open stream keeps only the newest frame, so a reader that
+falls behind skips frames (counted in `dropped`) rather than queueing them.
+`mi_stream_close` wakes a waiting reader from another thread; free the stream
+with `mi_stream_free` once nothing uses it, and before `mi_core_free`.

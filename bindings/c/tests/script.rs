@@ -131,6 +131,39 @@ fn the_shared_binding_script() {
                     let result = take(mi_execute(core, device, command.as_ptr(), params.as_ptr()));
                     assert_eq!(strip_messages(&result), step["expect"], "{label}");
                 }
+                "stream" => {
+                    let name = cs(step["stream"].as_str().unwrap());
+                    let mut stream: *mut MiStream = std::ptr::null_mut();
+                    let result = take(mi_stream_open(core, device, name.as_ptr(), &mut stream));
+                    if let Some(expect) = step.get("expect") {
+                        assert_eq!(&strip_messages(&result), expect, "{label}");
+                        assert!(stream.is_null(), "{label}");
+                        continue;
+                    }
+                    assert_eq!(result, serde_json::json!({"ok": true}), "{label}");
+                    assert!(!stream.is_null());
+                    let mut last = 0;
+                    for _ in 0..step["frames"].as_u64().unwrap() {
+                        let frame = mi_stream_wait(core, stream, 5000);
+                        assert!(!frame.is_null(), "{label}: no frame");
+                        let f = &*frame;
+                        let data = std::slice::from_raw_parts(f.data, f.len);
+                        assert!(data.starts_with(&[0xFF, 0xD8]), "{label}");
+                        assert_eq!(
+                            CStr::from_ptr(f.format).to_str().unwrap(),
+                            step["format"],
+                            "{label}"
+                        );
+                        assert!(f.sequence > last, "{label}");
+                        last = f.sequence;
+                        mi_frame_free(frame);
+                    }
+                    assert_eq!(mi_stream_ended(stream), 0);
+                    mi_stream_close(stream);
+                    assert!(mi_stream_wait(core, stream, 1000).is_null());
+                    assert_eq!(mi_stream_ended(stream), 1);
+                    mi_stream_free(stream);
+                }
                 "close" => mi_close(core, device),
                 other => panic!("unknown op {other}"),
             }
