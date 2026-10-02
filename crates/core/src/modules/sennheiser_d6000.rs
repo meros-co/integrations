@@ -516,10 +516,12 @@ impl Module for D6000 {
             self.handle_errors(cx, &message);
             return;
         }
-        self.resolve_replies(cx, &message);
+        // State first, so a caller reading the snapshot after its command
+        // completes sees what the reply carried.
         if let Some(patch) = state_patch(&message, self.channels) {
             cx.state(patch);
         }
+        self.resolve_replies(cx, &message);
     }
 
     fn socket_error(&mut self, cx: &mut Cx, _socket: Key, message: &str) {
