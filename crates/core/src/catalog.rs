@@ -181,7 +181,7 @@ impl DeviceSpec {
     }
 }
 
-/// Every embedded spec, keyed by id.
+/// Specs keyed by id: every embedded one, or a core's selection of them.
 #[derive(Debug, Clone, Serialize)]
 pub struct Catalog {
     pub devices: BTreeMap<String, DeviceSpec>,
@@ -204,6 +204,62 @@ impl Catalog {
     pub fn device(&self, id: &str) -> Option<&DeviceSpec> {
         self.devices.get(id)
     }
+
+    /// Keep only the named specs, for a product that uses only some devices.
+    /// An id this build does not include is an error that says why: unknown,
+    /// or in a feature family the build left out.
+    pub fn select(mut self, ids: &[String]) -> Result<Catalog, String> {
+        if ids.is_empty() {
+            return Err(
+                "the device selection is empty: leave it out to include every device".into(),
+            );
+        }
+        for id in ids {
+            if self.devices.contains_key(id) {
+                continue;
+            }
+            return Err(match family(id) {
+                Some(feature) => format!(
+                    "device '{id}' is not in this build: it comes with the '{feature}' feature"
+                ),
+                None => format!("unknown device '{id}' in the selection"),
+            });
+        }
+        self.devices.retain(|id, _| ids.contains(id));
+        Ok(self)
+    }
+
+    /// Every spec in `specs/`, read from the source tree whatever the build's
+    /// features, for tests of the spec engine itself.
+    #[cfg(test)]
+    pub(crate) fn source_tree() -> Catalog {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../specs");
+        let mut devices = BTreeMap::new();
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "yaml") {
+                let spec: DeviceSpec =
+                    serde_yaml::from_str(&std::fs::read_to_string(&path).unwrap())
+                        .unwrap_or_else(|e| panic!("{} does not parse: {e}", path.display()));
+                devices.insert(spec.id.clone(), spec);
+            }
+        }
+        Catalog { devices }
+    }
+}
+
+/// The Cargo feature that builds a spec in, whether or not this build has it;
+/// `None` for an id no spec has.
+pub fn family(id: &str) -> Option<&'static str> {
+    ALL_SPECS
+        .iter()
+        .find(|(spec, _)| *spec == id)
+        .map(|(_, family)| *family)
+}
+
+/// Every feature family and whether this build includes it.
+pub fn families() -> &'static [(&'static str, bool)] {
+    FAMILIES
 }
 
 /// Validate `given` against `declared`, applying defaults.
@@ -319,7 +375,16 @@ mod tests {
     #[test]
     fn every_embedded_spec_parses() {
         let catalog = Catalog::embedded();
-        assert!(catalog.devices.len() >= 14);
+        assert_eq!(catalog.devices.len(), EMBEDDED_SPECS.len());
+        if cfg!(feature = "all") {
+            assert_eq!(catalog.devices.len(), ALL_SPECS.len());
+        }
+        for (file, _) in EMBEDDED_SPECS {
+            assert!(
+                catalog.devices.contains_key(*file),
+                "{file}.yaml's id is not {file}"
+            );
+        }
         for spec in catalog.devices.values() {
             for model in &spec.models {
                 for cmd in &model.supports {
@@ -331,6 +396,56 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn every_family_is_a_cargo_feature_in_all() {
+        let manifest = include_str!("../Cargo.toml");
+        let all = manifest
+            .split("\nall = [")
+            .nth(1)
+            .and_then(|rest| rest.split(']').next())
+            .expect("an `all` feature");
+        for (family, built) in FAMILIES {
+            assert!(
+                manifest.contains(&format!("\n{family} = [")),
+                "family '{family}' has no feature in Cargo.toml"
+            );
+            assert!(
+                all.contains(&format!("\"{family}\"")),
+                "'all' does not include '{family}'"
+            );
+            if cfg!(feature = "all") {
+                assert!(built, "'all' is on but '{family}' is not built");
+            }
+        }
+    }
+
+    #[test]
+    fn a_selection_keeps_only_its_devices_and_names_what_is_missing() {
+        let ids: Vec<String> = Catalog::embedded()
+            .devices
+            .keys()
+            .take(2)
+            .cloned()
+            .collect();
+        if let Some(first) = ids.first() {
+            let selected = Catalog::embedded().select(&ids).unwrap();
+            assert_eq!(selected.devices.keys().cloned().collect::<Vec<_>>(), ids);
+            assert!(selected.device(first).is_some());
+        }
+        let err = Catalog::embedded()
+            .select(&["no-such-device".into()])
+            .unwrap_err();
+        assert!(err.contains("unknown device 'no-such-device'"), "{err}");
+        assert!(Catalog::embedded().select(&[]).is_err());
+        if let Some((id, family)) = ALL_SPECS
+            .iter()
+            .find(|(id, _)| !Catalog::embedded().devices.contains_key(*id))
+        {
+            let err = Catalog::embedded().select(&[id.to_string()]).unwrap_err();
+            assert!(err.contains(&format!("the '{family}' feature")), "{err}");
         }
     }
 

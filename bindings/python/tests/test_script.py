@@ -140,6 +140,17 @@ class SharedScript(unittest.TestCase):
         self.assertTrue(stream.ended)
         core.close(device)
 
+    def test_a_core_started_for_some_devices(self):
+        core = Core(devices=["sennheiser-ew-g3-g4", "shure-wireless"])
+        self.assertEqual(list(core.catalog()["devices"]), ["sennheiser-ew-g3-g4", "shure-wireless"])
+        with self.assertRaises(IntegrationsError) as refused:
+            core.open({"device": "kramer-p3000", "model": "p3000-generic", "host": "127.0.0.1"})
+        self.assertEqual(refused.exception.code, "not_selected")
+        with self.assertRaises(IntegrationsError):
+            core.discover({"action": "scan", "protocols": ["ssdp"]})
+        with self.assertRaises(RuntimeError):
+            Core(devices=["no-such-device"])
+
 
 if __name__ == "__main__":
     unittest.main()

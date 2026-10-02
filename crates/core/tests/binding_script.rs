@@ -1,6 +1,8 @@
 //! Plays tests/bindings/script.json through the Rust delivery against
 //! integrations-sim, the same script every other delivery runs.
 
+#![cfg(all(feature = "kramer", feature = "sennheiser", feature = "generic"))]
+
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};

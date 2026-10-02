@@ -6,6 +6,8 @@
 //! Class 1 otherwise), answers the commands the core sends one at a time,
 //! and refuses a wrong password with "PJLINK ERRA".
 
+#![cfg(feature = "pjlink")]
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

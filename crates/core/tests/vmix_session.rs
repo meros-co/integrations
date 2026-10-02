@@ -4,6 +4,8 @@
 //! (with the byte count the TCP API specifies) and FUNCTION, and pushes a
 //! TALLY event after a cut, before the FUNCTION reply, as the API allows.
 
+#![cfg(feature = "vmix")]
+
 use std::net::SocketAddr;
 use std::time::Duration;
 

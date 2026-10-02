@@ -79,6 +79,45 @@ pub unsafe extern "C" fn mi_core_new_with_options(options: *const c_char) -> *mu
     .unwrap_or(std::ptr::null_mut())
 }
 
+/// Start a core with options, as `mi_core_new_with_options` does, and say why
+/// when it cannot: on failure returns NULL and, if `error` is not NULL, sets
+/// `*error` to `{"error":{"error":"invalid_options"|"internal","message":...}}`,
+/// which the caller frees with `mi_string_free`. An unknown id in `devices`
+/// is `invalid_options`.
+///
+/// # Safety
+/// `options` must be NULL or a NUL-terminated string; `error` must be NULL or
+/// point to writable storage for a pointer.
+#[no_mangle]
+pub unsafe extern "C" fn mi_core_create(
+    options: *const c_char,
+    error: *mut *mut c_char,
+) -> *mut MiCore {
+    let fail = |e: *mut c_char| {
+        if error.is_null() {
+            mi_string_free(e);
+        } else {
+            *error = e;
+        }
+        std::ptr::null_mut()
+    };
+    let invalid =
+        |message: String| to_c(json!({"error": {"error": "invalid_options", "message": message}}));
+    let started = catch_unwind(AssertUnwindSafe(|| {
+        let value = read_json(options).map_err(|_| invalid("options are not JSON".into()))?;
+        let options = api::core_options(&value).map_err(invalid)?;
+        Core::with_options(options).map_err(|e| match e.kind() {
+            std::io::ErrorKind::InvalidInput => invalid(e.to_string()),
+            _ => internal(&format!("cannot start: {e}")),
+        })
+    }));
+    match started {
+        Ok(Ok(core)) => Box::into_raw(Box::new(MiCore { core })),
+        Ok(Err(e)) => fail(e),
+        Err(_) => fail(internal("the core panicked")),
+    }
+}
+
 /// # Safety
 /// `core` must come from `mi_core_new` and not be used afterwards.
 #[no_mangle]

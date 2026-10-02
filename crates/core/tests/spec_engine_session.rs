@@ -1,5 +1,7 @@
 //! Spec-driven devices simulated on real sockets, driven through the public API.
 
+#![cfg(all(feature = "behringer", feature = "blackmagic", feature = "qlab"))]
+
 use std::time::Duration;
 
 use meros_integrations::{CommandError, Connection, Core, Event, OpenRequest, Outcome};

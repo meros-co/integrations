@@ -831,6 +831,11 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
+    #[test]
+    fn discovery_lists_what_this_protocol_reports() {
+        assert!(crate::discovery::PROTOCOLS.contains(&(PROTOCOL, &[SONY_SPEC][..])));
+    }
+
     const LOCAL: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
     fn notify(nts: &str, location: &str) -> String {

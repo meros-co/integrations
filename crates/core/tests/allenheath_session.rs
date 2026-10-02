@@ -6,6 +6,8 @@
 //! knows, records every byte, and pushes changes of its own as a console does
 //! when it is operated: a scene recall and a fader move, using running status.
 
+#![cfg(feature = "allenheath")]
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 

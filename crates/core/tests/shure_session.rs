@@ -5,6 +5,8 @@
 //! sends a SAMPLE once metering is on, and records what it received, so the
 //! test can check that metering is turned off again when the device closes.
 
+#![cfg(feature = "shure")]
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 

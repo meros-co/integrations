@@ -5,6 +5,8 @@
 //! consumer gets the newest frame with the rest counted as dropped, and that
 //! closing the device ends every watcher.
 
+#![cfg(feature = "generic")]
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;

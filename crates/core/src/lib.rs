@@ -19,6 +19,19 @@
 //!     .await?;
 //! # Ok(()) }
 //! ```
+//!
+//! A product that uses only some devices names them, at run time with
+//! [`CoreOptions::devices`], and at build time with the crate's feature
+//! families (`default-features = false, features = ["sennheiser", "shure"]`),
+//! which leave the other families' specs and native modules out of the binary.
+//! The spec engine is always built.
+
+// Which helpers a build uses depends on the families it includes; a build
+// without every family leaves some unused, which is not a defect.
+#![cfg_attr(
+    not(feature = "all"),
+    allow(dead_code, unused_imports, unused_variables)
+)]
 
 pub mod catalog;
 mod digest;
@@ -30,10 +43,16 @@ mod http;
 pub mod json;
 pub mod module;
 mod modules;
+#[cfg(feature = "pjlink")]
 mod pjlink_discovery;
 mod session;
+#[cfg(feature = "sony")]
 mod ssdp;
 pub mod sse;
+#[cfg(feature = "sony")]
+mod ssh;
+#[cfg(not(feature = "sony"))]
+#[path = "ssh_disabled.rs"]
 mod ssh;
 pub mod streams;
 mod tcp;
@@ -42,7 +61,7 @@ mod tls;
 mod udp;
 mod ws;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -51,7 +70,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
 pub use catalog::{Catalog, Params};
-pub use discovery::{DiscoverAction, DiscoverRequest};
+pub use discovery::{DiscoverAction, DiscoverRequest, PROTOCOLS as DISCOVERY_PROTOCOLS};
 pub use events::Event;
 pub use module::{CommandError, CommandResult, Connection, Outcome};
 pub use session::{DeviceId, DeviceSnapshot};
@@ -86,6 +105,13 @@ pub struct OpenRequest {
 pub enum OpenError {
     #[error("unknown device '{device}'")]
     UnknownDevice { device: String },
+    /// The device is in this build but not among the devices the core was
+    /// started with (`CoreOptions::devices`).
+    #[error("device '{device}' is not among the devices this core was started with")]
+    NotSelected { device: String },
+    /// The device's feature family was left out of this build.
+    #[error("device '{device}' is not in this build: it comes with the '{feature}' feature")]
+    NotBuilt { device: String, feature: String },
     #[error("device '{device}' has no model '{model}'")]
     UnknownModel { device: String, model: String },
     #[error("invalid settings: {message}")]
@@ -107,6 +133,8 @@ struct DeviceEntry {
 pub struct Core {
     runtime: Option<tokio::runtime::Runtime>,
     catalog: Catalog,
+    /// Specs this build has but the core was not started with.
+    excluded: BTreeSet<String>,
     devices: Mutex<HashMap<DeviceId, DeviceEntry>>,
     next_device: AtomicU64,
     services: Arc<Services>,
@@ -122,6 +150,13 @@ pub struct CoreOptions {
     /// devices that answer on both are only heard on one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bind_address: Option<IpAddr>,
+    /// The spec ids this core works with; absent means every device in the
+    /// build. With a list, the catalogue holds only those specs, opening any
+    /// other device fails with `not_selected`, discovery runs only the
+    /// protocols that find them, and only they are reported as discovered.
+    /// An id the build does not include fails construction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub devices: Option<Vec<String>>,
 }
 
 impl Core {
@@ -131,19 +166,38 @@ impl Core {
         Core::with_options(CoreOptions::default())
     }
 
+    /// Start the core with options. Fails with `InvalidInput` when
+    /// `devices` names a spec this build does not include, or is empty.
     pub fn with_options(options: CoreOptions) -> std::io::Result<Core> {
+        let embedded = Catalog::embedded();
+        let catalog = match &options.devices {
+            None => embedded.clone(),
+            Some(ids) => embedded
+                .clone()
+                .select(ids)
+                .map_err(|m| std::io::Error::new(std::io::ErrorKind::InvalidInput, m))?,
+        };
+        let excluded = embedded
+            .devices
+            .into_keys()
+            .filter(|id| catalog.device(id).is_none())
+            .collect();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .thread_name("meros-integrations")
             .enable_all()
             .build()?;
-        let events = Arc::new(EventQueue::new(EVENT_CAPACITY));
+        let events = Arc::new(
+            EventQueue::new(EVENT_CAPACITY)
+                .discovering_only(catalog.devices.keys().cloned().collect()),
+        );
         Ok(Core {
             runtime: Some(runtime),
-            catalog: Catalog::embedded(),
+            discovery: discovery::Discovery::new(&catalog),
+            catalog,
+            excluded,
             devices: Mutex::new(HashMap::new()),
             next_device: AtomicU64::new(1),
-            discovery: Default::default(),
             services: Arc::new(Services {
                 events: events.clone(),
                 bind_address: options
@@ -166,6 +220,14 @@ impl Core {
         self.discovery.handle(&self.services, request)
     }
 
+    /// The discovery protocols this core runs: those that find a device in
+    /// its catalogue ([`DISCOVERY_PROTOCOLS`] says which finds which).
+    pub fn discovery_protocols(&self) -> &[&'static str] {
+        self.discovery.protocols()
+    }
+
+    /// The devices this core works with: every spec in the build, or the
+    /// ones named in [`CoreOptions::devices`].
     pub fn catalog(&self) -> &Catalog {
         &self.catalog
     }
@@ -173,12 +235,19 @@ impl Core {
     /// Start a session. The connection is made in the background; watch
     /// `Connection` events or the snapshot for its progress.
     pub fn open(&self, request: OpenRequest) -> Result<DeviceId, OpenError> {
-        let spec =
-            self.catalog
-                .device(&request.device)
-                .ok_or_else(|| OpenError::UnknownDevice {
-                    device: request.device.clone(),
-                })?;
+        let spec = self.catalog.device(&request.device).ok_or_else(|| {
+            let device = request.device.clone();
+            if self.excluded.contains(&device) {
+                OpenError::NotSelected { device }
+            } else if let Some(feature) = catalog::family(&device) {
+                OpenError::NotBuilt {
+                    device,
+                    feature: feature.into(),
+                }
+            } else {
+                OpenError::UnknownDevice { device }
+            }
+        })?;
         let model = spec
             .model(&request.model)
             .ok_or_else(|| OpenError::UnknownModel {

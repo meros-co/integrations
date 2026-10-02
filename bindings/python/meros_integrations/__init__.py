@@ -92,11 +92,25 @@ class Stream:
 class Core:
     """Every open device, one runtime, one event queue. Thread-safe."""
 
-    def __init__(self, bind_address: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        bind_address: Optional[str] = None,
+        devices: Optional[list[str]] = None,
+    ) -> None:
         """bind_address: the local network interface for device traffic;
-        every interface when None."""
-        options = json.dumps({"bind_address": bind_address}) if bind_address else None
-        self._native = NativeCore(options)
+        every interface when None.
+
+        devices: the only devices (spec ids) this core works with; every
+        device in the build when None. The catalogue then lists only them,
+        opening any other raises IntegrationsError "not_selected", and
+        discovery runs only their protocols. Raises RuntimeError for an id
+        the build does not include."""
+        options: dict[str, Any] = {}
+        if bind_address:
+            options["bind_address"] = bind_address
+        if devices is not None:
+            options["devices"] = list(devices)
+        self._native = NativeCore(json.dumps(options) if options else None)
 
     def catalog(self) -> dict[str, Any]:
         return json.loads(self._native.catalog())

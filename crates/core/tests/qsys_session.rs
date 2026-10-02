@@ -8,6 +8,8 @@
 //! group's results when a control it holds changes. An unknown control is
 //! answered with error 8, a command before logon with error 10.
 
+#![cfg(feature = "qsys")]
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 

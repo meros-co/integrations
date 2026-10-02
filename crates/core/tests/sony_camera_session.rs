@@ -13,6 +13,8 @@
 //! list and a file in parts, an FTP server list it updates on writes, and an
 //! FTP job list. One simulator speaks Camera Control PTP 3, another PTP 2.
 
+#![cfg(feature = "sony")]
+
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};

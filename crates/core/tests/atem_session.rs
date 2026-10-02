@@ -6,6 +6,8 @@
 //! loses its first copy of one state packet, so the client has to leave the gap
 //! and accept the resend.
 
+#![cfg(feature = "blackmagic")]
+
 use std::net::SocketAddr;
 use std::time::Duration;
 

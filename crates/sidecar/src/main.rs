@@ -7,8 +7,14 @@
 //!
 //! ```text
 //! meros-integrations serve [--listen 127.0.0.1:47800] [--token-file PATH]
-//!                          [--bind-address ADDR]
+//!                          [--bind-address ADDR] [--devices ID,ID,...]
 //! ```
+//!
+//! `--devices` names the only devices (spec ids) the service works with, for a
+//! product that uses only some: the catalogue lists only them, opening any
+//! other is refused with `not_selected`, and discovery runs only the protocols
+//! that find them. An id the build does not include stops the service at
+//! startup.
 //!
 //! | Method and path              | Body / query                          | Returns                    |
 //! |------------------------------|---------------------------------------|----------------------------|
@@ -349,7 +355,7 @@ fn parse_args() -> Result<Args, String> {
         Some("serve") => {}
         _ => {
             return Err(
-                "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR]".into(),
+                "usage: meros-integrations serve [--listen ADDR:PORT] [--token-file PATH] [--bind-address ADDR] [--devices ID,ID,...]".into(),
             )
         }
     }
@@ -364,6 +370,18 @@ fn parse_args() -> Result<Args, String> {
             "--bind-address" => {
                 options.bind_address =
                     Some(value.parse().map_err(|e| format!("--bind-address: {e}"))?)
+            }
+            // The only devices this sidecar works with, by spec id; every
+            // device in the build when absent.
+            "--devices" => {
+                options.devices = Some(
+                    value
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|id| !id.is_empty())
+                        .map(String::from)
+                        .collect(),
+                )
             }
             other => return Err(format!("unknown flag {other}")),
         }
@@ -387,7 +405,10 @@ fn main() {
         eprintln!("cannot read or create {}: {e}", args.token_file.display());
         std::process::exit(1);
     });
-    let core = Core::with_options(args.options).expect("start core");
+    let core = Core::with_options(args.options).unwrap_or_else(|e| {
+        eprintln!("cannot start the core: {e}");
+        std::process::exit(2);
+    });
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

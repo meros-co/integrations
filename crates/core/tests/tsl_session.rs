@@ -1,6 +1,8 @@
 //! TSL UMD in both directions on real UDP, through the public API: one core
 //! sends V5.0 to a port on which another core listens, as a switcher would.
 
+#![cfg(feature = "tsl")]
+
 use std::time::Duration;
 
 use meros_integrations::{Core, Event, OpenRequest, Outcome};

@@ -10,6 +10,8 @@
 //! now holds, matrix connects with the connection's new state, Subscribe on
 //! the level with a StreamCollection, and Invoke with an InvocationResult.
 
+#![cfg(feature = "emberplus")]
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 

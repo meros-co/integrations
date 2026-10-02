@@ -7,6 +7,8 @@
 //! first copy of a preset recall so the client has to send it again with the
 //! same sequence number. It records every sequence number it receives.
 
+#![cfg(feature = "visca")]
+
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

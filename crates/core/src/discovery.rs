@@ -42,15 +42,22 @@ use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
+use crate::catalog::Catalog;
 use crate::events::Event;
 use crate::session::Services;
 
 pub const MCP_PORT: u16 = 53212;
-const PROTOCOLS: [&str; 3] = [
-    "mcp",
-    crate::ssdp::PROTOCOL,
-    crate::pjlink_discovery::PROTOCOL,
+
+/// Each discovery protocol and the specs whose devices it reports. A core
+/// runs a protocol only when its catalogue holds one of them: a build
+/// without the family, or a core started for other devices, has no use for
+/// the protocol's traffic, and asking for it by name is an error.
+pub const PROTOCOLS: &[(&str, &[&str])] = &[
+    ("mcp", &[MCP_SPEC]),
+    ("ssdp", &["sony-camera"]),
+    ("pjlink", &["pjlink"]),
 ];
+const MCP_SPEC: &str = "sennheiser-ew-g3-g4";
 const MCP_PROBE: &str = "Push 5 500 3\r";
 const MCP_NAME: &str = "Name\r";
 const SWEEP_BATCH: usize = 32;
@@ -63,8 +70,9 @@ pub struct DiscoverRequest {
     /// `listen` (passively), `scan` (listen, and probe now) or `stop`.
     pub action: DiscoverAction,
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
-    /// cameras) and `pjlink` (PJLink Class 2 projectors). Empty means all of
-    /// them.
+    /// cameras) and `pjlink` (PJLink Class 2 projectors). Empty means every
+    /// protocol that finds a device in this core's catalogue; naming one that
+    /// finds none of them is an error.
     #[serde(default)]
     pub protocols: Vec<String>,
     /// Addresses where devices were last seen. An MCP scan also sweeps their
@@ -194,40 +202,84 @@ struct State {
     scan: Option<JoinHandle<()>>,
 }
 
-#[derive(Default)]
 pub(crate) struct Discovery {
     state: Mutex<State>,
+    #[cfg(feature = "sony")]
     ssdp: crate::ssdp::Ssdp,
+    #[cfg(feature = "pjlink")]
     pjlink: crate::pjlink_discovery::PjLinkDiscovery,
+    /// The protocols that find a device in the core's catalogue.
+    available: Vec<&'static str>,
+}
+
+/// The protocols that find at least one device in `catalog`.
+pub(crate) fn protocols_for(catalog: &Catalog) -> Vec<&'static str> {
+    PROTOCOLS
+        .iter()
+        .filter(|(_, specs)| specs.iter().any(|s| catalog.device(s).is_some()))
+        .map(|(protocol, _)| *protocol)
+        .collect()
 }
 
 impl Discovery {
+    pub(crate) fn new(catalog: &Catalog) -> Discovery {
+        Discovery {
+            state: Default::default(),
+            #[cfg(feature = "sony")]
+            ssdp: Default::default(),
+            #[cfg(feature = "pjlink")]
+            pjlink: Default::default(),
+            available: protocols_for(catalog),
+        }
+    }
+
+    pub(crate) fn protocols(&self) -> &[&'static str] {
+        &self.available
+    }
+
+    /// Which protocols a request asks for, or why it cannot be met.
+    fn wanted(&self, request: &DiscoverRequest) -> Result<Vec<&'static str>, String> {
+        for p in &request.protocols {
+            let Some((_, specs)) = PROTOCOLS.iter().find(|(name, _)| name == p) else {
+                return Err(format!("unknown discovery protocol '{p}'"));
+            };
+            if !self.available.contains(&p.as_str()) {
+                return Err(format!(
+                    "discovery protocol '{p}' finds only {}, which this core does not include",
+                    specs.join(", ")
+                ));
+            }
+        }
+        Ok(self
+            .available
+            .iter()
+            .copied()
+            .filter(|p| request.protocols.is_empty() || request.protocols.iter().any(|q| q == p))
+            .collect())
+    }
+
     /// Must be called from within the runtime.
     pub(crate) fn handle(
         &self,
         services: &Arc<Services>,
         request: DiscoverRequest,
     ) -> Result<(), String> {
-        for p in &request.protocols {
-            if !PROTOCOLS.contains(&p.as_str()) {
-                return Err(format!("unknown discovery protocol '{p}'"));
-            }
-        }
-        let wants =
-            |p: &str| request.protocols.is_empty() || request.protocols.iter().any(|q| q == p);
-        let (mcp, ssdp, pjlink) = (
-            wants("mcp"),
-            wants(crate::ssdp::PROTOCOL),
-            wants(crate::pjlink_discovery::PROTOCOL),
-        );
+        let wanted = self.wanted(&request)?;
+        let wants = |p: &str| wanted.contains(&p);
+        // A protocol whose family is not built in is never available, so its
+        // branches below are compiled only with the family.
+        let (mcp, ssdp, pjlink) = (wants("mcp"), wants("ssdp"), wants("pjlink"));
+        let _ = (ssdp, pjlink);
         match request.action {
             DiscoverAction::Stop => {
                 if mcp {
                     self.stop(services);
                 }
+                #[cfg(feature = "sony")]
                 if ssdp {
                     self.ssdp.stop();
                 }
+                #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.stop(services);
                 }
@@ -237,9 +289,11 @@ impl Discovery {
                 if mcp {
                     self.listen(services)?;
                 }
+                #[cfg(feature = "sony")]
                 if ssdp {
                     self.ssdp.listen(services)?;
                 }
+                #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.listen(services)?;
                 }
@@ -250,10 +304,12 @@ impl Discovery {
                     self.listen(services)?;
                     self.scan(services, request.hints.clone());
                 }
+                #[cfg(feature = "sony")]
                 if ssdp {
                     self.ssdp.listen(services)?;
                     self.ssdp.scan(services, &request.hints)?;
                 }
+                #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.listen(services)?;
                     self.pjlink.scan(services, &request.hints);
@@ -382,7 +438,7 @@ fn discovered(address: IpAddr, name: &Option<String>, family: Option<Family>) ->
         protocol: "mcp".into(),
         address: address.to_string(),
         port: MCP_PORT,
-        device: "sennheiser-ew-g3-g4".into(),
+        device: MCP_SPEC.into(),
         models: models.into_iter().map(String::from).collect(),
         name: name.clone(),
         evidence: json!({
@@ -396,6 +452,60 @@ fn discovered(address: IpAddr, name: &Option<String>, family: Option<Family>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn catalog(ids: &[&str]) -> Catalog {
+        let all = Catalog::source_tree();
+        Catalog {
+            devices: ids
+                .iter()
+                .map(|id| (id.to_string(), all.device(id).unwrap().clone()))
+                .collect(),
+        }
+    }
+
+    fn request(protocols: &[&str]) -> DiscoverRequest {
+        DiscoverRequest {
+            action: DiscoverAction::Scan,
+            protocols: protocols.iter().map(|p| p.to_string()).collect(),
+            hints: vec![],
+        }
+    }
+
+    #[test]
+    fn a_core_runs_only_the_protocols_that_find_its_devices() {
+        let rfdeck = Discovery::new(&catalog(&[
+            "sennheiser-ew-g3-g4",
+            "sennheiser-ew-dx",
+            "shure-wireless",
+        ]));
+        assert_eq!(rfdeck.protocols(), ["mcp"]);
+        assert_eq!(rfdeck.wanted(&request(&[])).unwrap(), ["mcp"]);
+        assert_eq!(rfdeck.wanted(&request(&["mcp"])).unwrap(), ["mcp"]);
+        let err = rfdeck.wanted(&request(&["ssdp"])).unwrap_err();
+        assert!(err.contains("finds only sony-camera"), "{err}");
+        let err = rfdeck.wanted(&request(&["bonjour"])).unwrap_err();
+        assert!(err.contains("unknown discovery protocol"), "{err}");
+
+        let none = Discovery::new(&catalog(&["shure-wireless"]));
+        assert!(none.wanted(&request(&[])).unwrap().is_empty());
+        assert!(none.wanted(&request(&["mcp"])).is_err());
+
+        let projectors = Discovery::new(&catalog(&["pjlink", "kramer-p3000"]));
+        assert_eq!(projectors.wanted(&request(&[])).unwrap(), ["pjlink"]);
+
+        let every = Discovery::new(&Catalog::source_tree());
+        assert_eq!(every.protocols(), ["mcp", "ssdp", "pjlink"]);
+    }
+
+    #[test]
+    fn the_protocol_table_names_real_specs() {
+        let all = Catalog::source_tree();
+        for (protocol, specs) in PROTOCOLS {
+            for spec in *specs {
+                assert!(all.device(spec).is_some(), "{protocol}: {spec}");
+            }
+        }
+    }
 
     #[test]
     fn requests_are_not_devices_and_replies_identify_the_family() {

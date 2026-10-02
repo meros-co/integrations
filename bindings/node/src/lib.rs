@@ -47,7 +47,7 @@ fn device_id(device: f64) -> Result<u64> {
 
 #[napi]
 impl NativeCore {
-    /// `options`: `{bindAddress?}` as CoreOptions JSON (`bind_address`).
+    /// `options`: CoreOptions JSON (`bind_address`, `devices`), or null.
     #[napi(constructor)]
     pub fn new(options: Option<Value>) -> Result<Self> {
         let options =

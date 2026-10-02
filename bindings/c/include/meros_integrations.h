@@ -21,9 +21,18 @@ typedef struct MiCore MiCore;
 
 /* Start a core, with its own threads. NULL if it cannot start. */
 MiCore *mi_core_new(void);
-/* options: {"bind_address":"<local interface address>"}, or NULL for defaults.
- * NULL if the options are invalid or the core cannot start. */
+/* options: {"bind_address":"<local interface address>",
+ *           "devices":["<spec id>",...]}, or NULL for defaults.
+ * devices: the only devices this core works with; absent means every device
+ * in the build. The catalogue then lists only them, mi_open of any other
+ * fails with "not_selected", and discovery runs only their protocols.
+ * NULL if the options are invalid (including an unknown device id) or the
+ * core cannot start. */
 MiCore *mi_core_new_with_options(const char *options);
+/* As mi_core_new_with_options, and on failure, if error is not NULL, sets
+ * *error to {"error":{"error":"invalid_options"|"internal","message":"..."}}
+ * (free it with mi_string_free). */
+MiCore *mi_core_create(const char *options, char **error);
 void mi_core_free(MiCore *core);
 void mi_string_free(char *s);
 

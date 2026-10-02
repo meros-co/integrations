@@ -85,6 +85,21 @@ test('the catalogue lists every spec', () => {
   }
 });
 
+test('a core started for some devices knows only them', () => {
+  const core = new Core({ devices: ['sennheiser-ew-g3-g4', 'shure-wireless'] });
+  try {
+    assert.deepStrictEqual(Object.keys(core.catalog().devices), ['sennheiser-ew-g3-g4', 'shure-wireless']);
+    assert.throws(
+      () => core.open({ device: 'kramer-p3000', model: 'p3000-generic', host: '127.0.0.1' }),
+      (e) => e instanceof IntegrationsError && e.code === 'not_selected',
+    );
+    assert.throws(() => core.discover({ action: 'scan', protocols: ['ssdp'] }), IntegrationsError);
+  } finally {
+    core.dispose();
+  }
+  assert.throws(() => new Core({ devices: ['no-such-device'] }), /no-such-device/);
+});
+
 test('streams frames as Buffers while watched', async () => {
   const http = require('node:http');
   let served = 0;

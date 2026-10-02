@@ -523,7 +523,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
 
 #[test]
 fn every_vector_passes() {
-    let catalog = Catalog::embedded();
+    let catalog = Catalog::source_tree();
     let files = vector_files();
     assert!(!files.is_empty(), "no vectors found");
     let failures: Vec<String> = files
@@ -545,7 +545,7 @@ fn every_vector_passes() {
 
 #[test]
 fn every_spec_driven_command_has_a_vector() {
-    let catalog = Catalog::embedded();
+    let catalog = Catalog::source_tree();
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
         let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
@@ -570,7 +570,7 @@ fn every_spec_driven_command_has_a_vector() {
 
 #[test]
 fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
-    let catalog = Catalog::embedded();
+    let catalog = Catalog::source_tree();
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
         let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();

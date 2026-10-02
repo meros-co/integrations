@@ -1764,7 +1764,10 @@ mod tests {
 
     /// ProPresenter's HTTP spec, switched to basic auth.
     fn credentialed() -> SpecEngine {
-        let mut spec = Catalog::embedded().device("propresenter").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
         spec.transport.as_mut().unwrap()["auth"] = json!("basic");
         let settings = json!({"username": "u", "password": "wrong"})
             .as_object()
@@ -1785,7 +1788,10 @@ mod tests {
 
     /// Kramer's line spec, with a login that waits for a password prompt.
     fn prompted_login() -> SpecEngine {
-        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
         spec.on_connect = vec![json!({
             "after_prompt": "Enter password:",
             "send": "s3cret",
@@ -1822,7 +1828,10 @@ mod tests {
 
     #[test]
     fn bearer_tokens_and_a_chosen_scheme() {
-        let mut spec = Catalog::embedded().device("propresenter").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
         let t = spec.transport.as_mut().unwrap();
         t["auth"] = json!("bearer");
         t["scheme"] = json!({"setting": "scheme"});
@@ -1863,7 +1872,7 @@ mod tests {
 
     #[test]
     fn line_udp_sends_one_message_per_datagram() {
-        let mut spec = Catalog::embedded().device("rosstalk").unwrap().clone();
+        let mut spec = Catalog::source_tree().device("rosstalk").unwrap().clone();
         spec.transport = Some(json!({"type": "line-udp", "port": 6553, "terminator": "none"}));
         spec.telemetry = None;
         let mut e = SpecEngine::new(
@@ -1910,7 +1919,10 @@ mod tests {
     #[test]
     fn osc_udp_can_listen_on_a_fixed_port() {
         let open = |listen: Value, settings: Value| {
-            let mut spec = Catalog::embedded().device("behringer-x32").unwrap().clone();
+            let mut spec = Catalog::source_tree()
+                .device("behringer-x32")
+                .unwrap()
+                .clone();
             spec.transport.as_mut().unwrap()["listen_port"] = listen;
             let mut e = SpecEngine::new(
                 Arc::new(spec),
@@ -1981,7 +1993,10 @@ mod tests {
 
     #[test]
     fn a_login_step_can_wait_for_its_reply() {
-        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
         spec.on_connect = vec![json!({"send": "#LOGIN admin", "await_reply": true})];
         spec.telemetry = None;
         let mut e = SpecEngine::new(
@@ -2056,7 +2071,10 @@ mod tests {
 
     #[test]
     fn commands_go_ahead_of_queued_telemetry_queries() {
-        let spec = Catalog::embedded().device("behringer-x32").unwrap().clone();
+        let spec = Catalog::source_tree()
+            .device("behringer-x32")
+            .unwrap()
+            .clone();
         let mut e = SpecEngine::new(
             Arc::new(spec),
             OpenContext {
@@ -2177,7 +2195,10 @@ mod tests {
     /// A websocket device: JSON requests, replies matched by an id field or
     /// taken in order, pushed messages through the rules.
     fn ws_device(auth: &str) -> SpecEngine {
-        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
         spec.transport = Some(json!({
             "type": "ws", "port": 9000, "path": "/api/v1", "subprotocol": "v1.ctl",
             "auth": auth, "timeout_ms": 1000,
@@ -2345,7 +2366,10 @@ mod tests {
 
     #[test]
     fn a_secure_websocket_may_accept_a_self_signed_certificate() {
-        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
         spec.transport = Some(json!({
             "type": "ws", "port": 9443, "path": "/", "scheme": "wss",
             "accept_invalid_certs": true,
@@ -2365,7 +2389,7 @@ mod tests {
         assert!(request.accept_invalid_certs);
 
         // A push websocket inherits it from an HTTPS transport.
-        let mut spec = Catalog::embedded().device("resolume").unwrap().clone();
+        let mut spec = Catalog::source_tree().device("resolume").unwrap().clone();
         spec.transport.as_mut().unwrap()["accept_invalid_certs"] = json!(true);
         let mut e = open_spec(spec, "arena", json!({}));
         let mut cx = Cx::new(0);
@@ -2378,7 +2402,7 @@ mod tests {
 
     #[test]
     fn a_push_websocket_beside_http() {
-        let mut spec = Catalog::embedded().device("resolume").unwrap().clone();
+        let mut spec = Catalog::source_tree().device("resolume").unwrap().clone();
         spec.transport.as_mut().unwrap()["port"] = json!(8080);
         let mut e = open_spec(spec, "arena", json!({}));
         let mut cx = Cx::new(0);
@@ -2443,7 +2467,7 @@ mod tests {
 
     #[test]
     fn an_osc_poll_item_waits_for_its_reply_address() {
-        let spec = Catalog::embedded().device("etc-eos").unwrap().clone();
+        let spec = Catalog::source_tree().device("etc-eos").unwrap().clone();
         let mut e = open_spec(spec, "eos", json!({}));
         let mut cx = Cx::new(0);
         e.start(&mut cx);
@@ -2472,7 +2496,10 @@ mod tests {
 
     #[test]
     fn an_accepted_login_ends_the_refusal_watch() {
-        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
         spec.on_connect = vec![json!({
             "send": "login", "refused": "denied", "accepted": "^Welcome",
         })];
@@ -2499,7 +2526,10 @@ mod tests {
 
     #[test]
     fn a_converted_value_is_sent_as_an_osc_float() {
-        let spec = Catalog::embedded().device("behringer-x32").unwrap().clone();
+        let spec = Catalog::source_tree()
+            .device("behringer-x32")
+            .unwrap()
+            .clone();
         let mut e = open_spec(spec, "x32", json!({}));
         let mut cx = Cx::new(0);
         e.start(&mut cx);

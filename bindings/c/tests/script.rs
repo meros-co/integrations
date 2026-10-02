@@ -2,6 +2,9 @@
 //! integrations-sim: every call crosses the C ABI as NUL-terminated strings,
 //! exactly as a C or C++ host makes it.
 
+// The script drives devices from several families.
+#![cfg(feature = "all")]
+
 use std::ffi::{c_char, CStr, CString};
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -186,4 +189,37 @@ fn the_shared_binding_script() {
     }
     drop(sim.stdin.take());
     let _ = sim.wait();
+}
+
+/// A core started for some devices, through the C constructors.
+#[test]
+fn a_core_started_for_some_devices() {
+    unsafe {
+        let options = cs(r#"{"devices":["sennheiser-ew-g3-g4","shure-wireless"]}"#);
+        let core = mi_core_create(options.as_ptr(), std::ptr::null_mut());
+        assert!(!core.is_null());
+        let catalog = take(mi_catalog(core));
+        let ids: Vec<&String> = catalog["devices"].as_object().unwrap().keys().collect();
+        assert_eq!(ids, ["sennheiser-ew-g3-g4", "shure-wireless"]);
+
+        let request = cs(r#"{"device":"kramer-p3000","model":"p3000-generic","host":"127.0.0.1"}"#);
+        let refused = take(mi_open(core, request.as_ptr()));
+        assert_eq!(refused["error"]["error"], "not_selected");
+
+        let request = cs(r#"{"action":"scan","protocols":["ssdp"]}"#);
+        let refused = take(mi_discover(core, request.as_ptr()));
+        assert_eq!(refused["error"]["error"], "invalid_request");
+        mi_core_free(core);
+
+        let options = cs(r#"{"devices":["no-such-device"]}"#);
+        assert!(mi_core_new_with_options(options.as_ptr()).is_null());
+        let mut error: *mut c_char = std::ptr::null_mut();
+        assert!(mi_core_create(options.as_ptr(), &mut error).is_null());
+        let error = take(error);
+        assert_eq!(error["error"]["error"], "invalid_options");
+        assert!(error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("no-such-device"));
+    }
 }

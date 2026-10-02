@@ -3,7 +3,7 @@
 //! One model for every delivery: the core queues, each binding drains in its
 //! host's idiom. Nothing calls into a host from the core's threads.
 
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
@@ -64,6 +64,8 @@ pub struct EventQueue {
     dropped: AtomicU64,
     interrupted: AtomicBool,
     capacity: usize,
+    /// The specs `Discovered` events may name; every spec when absent.
+    discoverable: Option<BTreeSet<String>>,
 }
 
 impl EventQueue {
@@ -74,10 +76,23 @@ impl EventQueue {
             dropped: AtomicU64::new(0),
             interrupted: AtomicBool::new(false),
             capacity,
+            discoverable: None,
         }
     }
 
+    /// Drop `Discovered` events for any spec not in `devices`, so a core
+    /// started for some devices never reports others.
+    pub(crate) fn discovering_only(mut self, devices: BTreeSet<String>) -> EventQueue {
+        self.discoverable = Some(devices);
+        self
+    }
+
     pub(crate) fn push(&self, event: Event) {
+        if let (Event::Discovered { device, .. }, Some(allowed)) = (&event, &self.discoverable) {
+            if !allowed.contains(device) {
+                return;
+            }
+        }
         {
             let mut q = self.queue.lock().unwrap();
             if q.len() >= self.capacity {
@@ -129,6 +144,34 @@ impl EventQueue {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    fn discovered(device: &str) -> Event {
+        Event::Discovered {
+            protocol: "test".into(),
+            address: "192.0.2.1".into(),
+            port: 1,
+            device: device.into(),
+            models: vec![],
+            name: None,
+            evidence: json!({}),
+        }
+    }
+
+    #[test]
+    fn discovered_events_are_only_for_the_selected_devices() {
+        let q = EventQueue::new(10).discovering_only(["pjlink".to_string()].into());
+        q.push(discovered("sony-camera"));
+        q.push(discovered("pjlink"));
+        q.push(Event::Closed { device: 1 });
+        assert_eq!(
+            q.drain(10),
+            [discovered("pjlink"), Event::Closed { device: 1 }]
+        );
+
+        let unfiltered = EventQueue::new(10);
+        unfiltered.push(discovered("sony-camera"));
+        assert_eq!(unfiltered.drain(10).len(), 1);
+    }
 
     #[test]
     fn overflow_drops_state_patches_not_connection_changes() {

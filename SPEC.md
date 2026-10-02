@@ -879,6 +879,12 @@ A native spec's commands have no `send`, `expect` or `transport`; the module
 defines those. `reason` says why the protocol cannot be expressed as data.
 Vectors apply to native modules exactly as to spec-driven ones.
 
+Every spec, spec-driven or native, belongs to one device family, a Cargo
+feature of the core (`sennheiser`, `shure`, `sony`, ...). A build embeds the
+specs, and compiles the native modules, of the families it enables; the spec
+engine is always built. A core can further be started for named devices only
+(`devices` in its options), and then its catalogue lists only those.
+
 ### Streams
 
 A native module can publish continuous media, such as a camera's live view.

@@ -1,6 +1,9 @@
 //! Plays tests/bindings/script.json through the sidecar over HTTP against
 //! integrations-sim, the same script every other delivery runs.
 
+// The script drives devices from several families.
+#![cfg(feature = "all")]
+
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
@@ -299,5 +302,64 @@ async fn the_shared_binding_script() {
     drop(sidecar);
     drop(sim.stdin.take());
     let _ = sim.wait();
+    let _ = std::fs::remove_file(&token_file);
+}
+
+/// `--devices`: a sidecar for some devices only.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_sidecar_started_for_some_devices() {
+    let token_file = std::env::temp_dir().join(format!(
+        "meros-integrations-test-devices-{}.token",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_file(&token_file);
+    let mut sidecar = KillOnDrop(
+        Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
+            .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+            .arg(&token_file)
+            .args(["--devices", "sennheiser-ew-g3-g4,shure-wireless"])
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    let listening = first_line(&mut sidecar.0)["listening"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let client = Client {
+        base: format!("http://{listening}"),
+        token: std::fs::read_to_string(&token_file).unwrap(),
+        http: reqwest::Client::new(),
+    };
+    let catalog = client.get("/v1/catalog").await;
+    let ids: Vec<&String> = catalog["devices"].as_object().unwrap().keys().collect();
+    assert_eq!(ids, ["sennheiser-ew-g3-g4", "shure-wireless"]);
+    let refused = client
+        .post(
+            "/v1/open",
+            json!({"device": "kramer-p3000", "model": "p3000-generic", "host": "127.0.0.1"}),
+        )
+        .await;
+    assert_eq!(refused["error"]["error"], "not_selected");
+    let refused = client
+        .post(
+            "/v1/discover",
+            json!({"action": "scan", "protocols": ["ssdp"]}),
+        )
+        .await;
+    assert_eq!(refused["error"]["error"], "invalid_request");
+    drop(sidecar);
+    let _ = std::fs::remove_file(&token_file);
+
+    // An id the build does not have stops it at startup.
+    let status = Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
+        .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+        .arg(&token_file)
+        .args(["--devices", "no-such-device"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .unwrap();
+    assert_eq!(status.code(), Some(2));
     let _ = std::fs::remove_file(&token_file);
 }

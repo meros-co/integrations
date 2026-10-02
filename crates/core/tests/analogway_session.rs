@@ -13,6 +13,8 @@
 //! against a TPP device that answers each command line with its register,
 //! checking the full register sequences the vectors can only begin.
 
+#![cfg(feature = "analogway")]
+
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

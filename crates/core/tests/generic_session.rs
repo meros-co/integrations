@@ -6,6 +6,8 @@
 //! TCP), a line device answering `PWR?` and closing on `BYE`, and an HTTP/1.1
 //! server (RFC 9110) answering a status document, an echo and a 404.
 
+#![cfg(feature = "generic")]
+
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

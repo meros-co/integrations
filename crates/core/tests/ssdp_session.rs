@@ -4,6 +4,8 @@
 //! over HTTP. Multicast is not used: loopback multicast is unreliable across
 //! the platforms the tests run on.
 
+#![cfg(feature = "sony")]
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
@@ -113,6 +115,7 @@ async fn a_sony_camera_answers_a_search_and_is_described() {
 
     let core = Core::with_options(CoreOptions {
         bind_address: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        ..Default::default()
     })
     .unwrap();
     core.discover(DiscoverRequest {

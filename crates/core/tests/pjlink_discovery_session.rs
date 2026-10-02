@@ -9,6 +9,8 @@
 //! as a device with notifications on: its LKUP must reach its session, not
 //! discovery.
 
+#![cfg(feature = "pjlink")]
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
@@ -80,6 +82,7 @@ async fn discovered(
 async fn class_2_projectors_are_found_by_search_and_link_up() {
     let core = Core::with_options(CoreOptions {
         bind_address: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        ..Default::default()
     })
     .unwrap();
 

@@ -18,7 +18,11 @@ export interface OpenRequest {
 export interface DiscoverRequest {
   /** Listen passively, scan now (and listen), or stop. */
   action: 'listen' | 'scan' | 'stop';
-  /** Discovery protocols; currently 'mcp' (Sennheiser G3/G4). Empty means all. */
+  /**
+   * Discovery protocols: 'mcp' (Sennheiser G3/G4), 'ssdp' (Sony cameras),
+   * 'pjlink' (PJLink projectors). Empty means every protocol that finds a
+   * device in this core's catalogue; naming one that finds none is an error.
+   */
   protocols?: string[];
   /** Addresses where devices were last seen; a scan also sweeps their /24s. */
   hints?: string[];
@@ -83,6 +87,8 @@ export type ErrorCode =
   | 'auth'
   | 'closed'
   | 'unknown_device'
+  | 'not_selected'
+  | 'not_built'
   | 'unknown_model'
   | 'invalid_settings'
   | 'unresolvable_host'
@@ -97,6 +103,13 @@ export class IntegrationsError extends Error {
 export interface CoreOptions {
   /** The local network interface address for device traffic; every interface when absent. */
   bindAddress?: string;
+  /**
+   * The only devices (spec ids) this core works with; every device in the
+   * build when absent. The catalogue then lists only them, opening any other
+   * throws 'not_selected', and discovery runs only their protocols. An id the
+   * build does not include makes the constructor throw.
+   */
+  devices?: string[];
 }
 
 export interface Frame {

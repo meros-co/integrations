@@ -26,6 +26,19 @@ one you use.
 
 Pin an exact version. A new release can change what is sent to your hardware.
 
+If you only need some devices, you can leave the rest out:
+
+- **When starting the core**, pass the spec ids you use as `devices` in the
+  core options (`CoreOptions` in Rust, the options JSON in C,
+  `new Core({ devices })` in Node, `Core(devices=...)` in Python,
+  `--devices a,b,c` for the HTTP service). Only those devices are listed,
+  opened and discovered.
+- **When building**, enable only the device families you need. The other
+  families' specs and code are left out of the binary:
+  `meros-integrations = { version = "...", default-features = false, features = ["sennheiser", "shure"] }`.
+  The families are listed in `crates/core/Cargo.toml`. All of them are on by
+  default.
+
 ## How devices are described
 
 Most devices are described in a YAML file in `specs/`: their models, commands,
@@ -164,6 +177,13 @@ python tools/validate.py
 
 `cargo test` runs the library's tests, including every conformance vector.
 `validate.py` checks each spec against the schema and the format's rules.
+
+Builds with only some device families should also pass, for example:
+
+```
+cargo test -p meros-integrations --no-default-features --features sennheiser,shure
+cargo build -p meros-integrations --no-default-features
+```
 
 ## Contributing
 

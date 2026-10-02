@@ -95,7 +95,15 @@ python tools/validate.py
 python tools/make_vectors.py
 cargo test
 cargo clippy --workspace --all-targets -- -D warnings
+cargo test -p meros-integrations --no-default-features --features sennheiser,shure
+cargo build -p meros-integrations --no-default-features
 ```
+
+A new spec belongs to a device family, a Cargo feature of the core: add it to
+`FAMILIES` in `crates/core/build.rs` (the build fails until it is in one), and
+a new family to `[features]` and `all` in `crates/core/Cargo.toml`. A new
+native module is compiled under its family's feature (`#[cfg(feature = ...)]`
+in `crates/core/src/modules/mod.rs`).
 
 ## Review checklist
 

@@ -8,6 +8,8 @@
 //! TI 1254 describes: echoes set instructions, streams cyclic attributes while
 //! subscribed, and rejects out-of-range values with numbered errors.
 
+#![cfg(feature = "sennheiser")]
+
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
@@ -81,6 +83,7 @@ async fn g4_receiver_end_to_end() {
     let _device = simulated_g4().await;
     let core = Core::with_options(CoreOptions {
         bind_address: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        ..Default::default()
     })
     .unwrap();
 

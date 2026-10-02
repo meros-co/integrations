@@ -332,6 +332,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn discovery_lists_what_this_protocol_reports() {
+        assert!(crate::discovery::PROTOCOLS.contains(&(PROTOCOL, &[SPEC][..])));
+    }
+
+    #[test]
     fn ackn_and_lkup_are_devices_and_nothing_else_is() {
         assert_eq!(
             parse_datagram(b"%2ACKN=00:11:22:AA:bb:Cc\r"),

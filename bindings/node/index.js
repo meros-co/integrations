@@ -73,12 +73,18 @@ class Core extends EventEmitter {
   #disposed = false;
 
   /**
-   * @param {{ bindAddress?: string }} [options] bindAddress: the local network
-   *   interface for device traffic; every interface when absent.
+   * @param {{ bindAddress?: string, devices?: string[] }} [options]
+   *   bindAddress: the local network interface for device traffic; every
+   *   interface when absent. devices: the only devices (spec ids) this core
+   *   works with; every device in the build when absent. Throws for an id the
+   *   build does not include.
    */
   constructor(options = {}) {
     super();
-    this.#native = new NativeCore(options.bindAddress ? { bind_address: options.bindAddress } : null);
+    const native = {};
+    if (options.bindAddress) native.bind_address = options.bindAddress;
+    if (options.devices) native.devices = options.devices;
+    this.#native = new NativeCore(Object.keys(native).length ? native : null);
   }
 
   catalog() {
