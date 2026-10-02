@@ -500,7 +500,7 @@ impl Module for Mcp {
 
         // An error reply means the device is reachable but rejected something.
         // It carries no telemetry, so it does not count as connecting.
-        let mut telemetry = false;
+        let mut replies = Vec::new();
         let mut channel = Map::new();
         let mut device = Map::new();
         let mut tx = TxMute::default();
@@ -508,11 +508,10 @@ impl Module for Mcp {
             if self.complete_error(cx, line) {
                 continue;
             }
-            telemetry = true;
-            self.resolve(cx, line);
+            replies.push(*line);
             self.parse_line(line, &mut channel, &mut device, &mut tx);
         }
-        if !telemetry {
+        if replies.is_empty() {
             return;
         }
         self.heard(cx);
@@ -530,6 +529,11 @@ impl Module for Mcp {
         }
         if !patch.is_empty() {
             cx.state(Value::Object(patch));
+        }
+        // After the state, so a caller reading the snapshot after its command
+        // completes sees what the reply carried.
+        for line in replies {
+            self.resolve(cx, line);
         }
     }
 
@@ -716,6 +720,11 @@ mod tests {
         let ch = &state(&actions)["channels"]["1"];
         assert_eq!(ch["frequency_khz"], 822000);
         assert_eq!(ch["bank"], 2);
+        let at = |f: fn(&Action) -> bool| actions.iter().position(f).unwrap();
+        assert!(
+            at(|x| matches!(x, Action::State(_))) < at(|x| matches!(x, Action::Complete { .. })),
+            "the echo's state lands before the command completes"
+        );
     }
 
     #[test]

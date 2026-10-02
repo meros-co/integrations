@@ -35,8 +35,8 @@ use serde_json::{json, Map, Value};
 
 use crate::catalog::Params;
 use crate::module::{
-    CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
-    TcpInput,
+    Action, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext,
+    Outcome, TcpInput,
 };
 
 #[path = "emberplus_ber.rs"]
@@ -1408,7 +1408,23 @@ impl EmberPlus {
         }
     }
 
+    /// One Glow message. The state it carries is collected into one patch
+    /// while the commands it answers are found, so their completions are held
+    /// until after that patch: a caller reading the snapshot after its
+    /// command completes sees what the reply carried.
     fn ember(&mut self, cx: &mut Cx, payload: &[u8]) {
+        let mut inner = Cx::new(cx.now());
+        self.apply_ember(&mut inner, payload);
+        let (done, rest): (Vec<Action>, Vec<Action>) = inner
+            .take()
+            .into_iter()
+            .partition(|a| matches!(a, Action::Complete { .. }));
+        for action in rest.into_iter().chain(done) {
+            cx.push(action);
+        }
+    }
+
+    fn apply_ember(&mut self, cx: &mut Cx, payload: &[u8]) {
         let roots = match glow::decode(payload) {
             Ok(r) => r,
             Err(e) => {
@@ -2240,6 +2256,11 @@ mod tests {
         assert_eq!(
             completed(&a, 1),
             Some(Ok(Outcome::Value { value: json!(-6.5) }))
+        );
+        // The reported value is in the state before the command completes.
+        let at = |f: fn(&Action) -> bool| a.iter().position(f).unwrap();
+        assert!(
+            at(|x| matches!(x, Action::State(_))) < at(|x| matches!(x, Action::Complete { .. }))
         );
         // Out of range, of the wrong type, an enum by name, unknown.
         let a = run(

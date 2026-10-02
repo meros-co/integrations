@@ -511,20 +511,25 @@ impl AllenHeath {
         }
         cx.cancel_timer(DEAD);
         cx.set_timer(QUIET_TIMER, QUIET);
-        let mut updates: Vec<Update> = Vec::new();
+        let mut groups: Vec<Vec<Update>> = Vec::new();
         for msg in self.parser.feed(data) {
             let Some(event) = self.assembler.feed(msg) else {
                 continue;
             };
             let group = self.dialect.event(&event);
-            if group.is_empty() {
-                continue;
+            if !group.is_empty() {
+                groups.push(group);
             }
-            self.resolve(cx, &group);
-            updates.extend(group);
         }
-        if !updates.is_empty() {
-            cx.state(midi::patch(&updates));
+        if groups.is_empty() {
+            return;
+        }
+        // State first, so a caller reading the snapshot after its read
+        // completes sees what the reply carried.
+        let updates: Vec<Update> = groups.iter().flatten().cloned().collect();
+        cx.state(midi::patch(&updates));
+        for group in &groups {
+            self.resolve(cx, group);
         }
     }
 
@@ -940,6 +945,11 @@ mod tests {
             })
         }));
         assert_eq!(state(&a)["x"]["level_raw"], 5);
+        let at = |f: fn(&Action) -> bool| a.iter().position(f).unwrap();
+        assert!(
+            at(|x| matches!(x, Action::State(_))) < at(|x| matches!(x, Action::Complete { .. })),
+            "the reply's state lands before the read completes"
+        );
 
         let a = run(&mut m, 30, "set", json!({"n": 9}));
         assert_eq!(sent(&a), [vec![0x90, 9, 0x7F], vec![0xF0, 0x01, 0xF7]]);

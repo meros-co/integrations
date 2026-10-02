@@ -697,12 +697,9 @@ impl Atem {
         cx.set_timer(SILENCE, SILENCE_TIMEOUT);
         cx.alive();
 
-        if flags & FLAG_ACK != 0 {
-            self.acknowledged(cx, u16_at(data, 4));
-        }
-        if flags & FLAG_RETRANSMIT_REQUEST != 0 {
-            self.retransmit_from(cx, u16_at(data, 6));
-        }
+        // The packet's state is applied before the commands it acknowledges
+        // complete, so a caller reading the snapshot after its command
+        // completes sees what the packet carried.
         if flags & FLAG_RELIABLE != 0 {
             let expected = (self.last_received + 1) % ID_MODULO;
             if remote_id == expected {
@@ -714,6 +711,12 @@ impl Atem {
                 self.ack(cx, self.last_received);
             }
             // Ahead of a gap: dropped, and the switcher resends in order.
+        }
+        if flags & FLAG_ACK != 0 {
+            self.acknowledged(cx, u16_at(data, 4));
+        }
+        if flags & FLAG_RETRANSMIT_REQUEST != 0 {
+            self.retransmit_from(cx, u16_at(data, 6));
         }
     }
 
@@ -2765,6 +2768,25 @@ mod tests {
             id: 7,
             result: Ok(Outcome::Ack)
         }));
+    }
+
+    #[test]
+    fn a_packet_that_acknowledges_and_reports_applies_its_state_first() {
+        let (mut m, _) = ready();
+        let mut cx = Cx::new(100);
+        let params = json!({"me": 1, "source": 2}).as_object().unwrap().clone();
+        m.command(&mut cx, 7, "set_program", &params);
+        cx.take();
+        // One packet: the ack of our command and the new program.
+        let mut packet = reliable(0x8001, 2, &[cmd(b"PrgI", &[0, 0, 0, 2])]);
+        packet[0] |= FLAG_ACK << 3;
+        packet[4..6].copy_from_slice(&1u16.to_be_bytes());
+        let a = feed(&mut m, 110, packet);
+        let at = |f: fn(&Action) -> bool| a.iter().position(f).unwrap();
+        assert!(
+            at(|x| matches!(x, Action::State(_))) < at(|x| matches!(x, Action::Complete { .. }))
+        );
+        assert_eq!(state(&a)["mes"]["1"]["program"], 2);
     }
 
     #[test]

@@ -567,16 +567,18 @@ impl GenericOsc {
 
     fn received(&mut self, cx: &mut Cx, m: Received) {
         let record = json!({"address": m.address, "types": m.types, "args": m.args});
-        if let Some(at) = self.queries.iter().position(|q| q.address == m.address) {
+        let answered = self.queries.iter().position(|q| q.address == m.address);
+        // State first, so a caller reading the snapshot after its query
+        // completes sees the reply.
+        self.remember(cx, &m, &record);
+        if let Some(at) = answered {
             let query = self.queries.remove(at);
-            cx.complete(
-                query.id,
-                Ok(Outcome::Value {
-                    value: record.clone(),
-                }),
-            );
+            cx.complete(query.id, Ok(Outcome::Value { value: record }));
             self.arm(cx);
         }
+    }
+
+    fn remember(&mut self, cx: &mut Cx, m: &Received, record: &Value) {
         if !self.record {
             return;
         }
@@ -593,7 +595,7 @@ impl GenericOsc {
         let count = self.counts.entry(m.address.clone()).or_insert(0);
         *count += 1;
         messages.insert(
-            m.address,
+            m.address.clone(),
             json!({"args": m.args, "types": m.types, "count": *count}),
         );
         cx.state(json!({"messages": messages, "last_message": record}));
@@ -972,6 +974,11 @@ mod tests {
         );
         assert_eq!(s["messages"]["/ch/01/config/name"]["args"], json!(["Vox"]));
         assert_eq!(s["last_message"]["address"], "/ch/01/config/name");
+        let at = |f: fn(&Action) -> bool| a.iter().position(f).unwrap();
+        assert!(
+            at(|x| matches!(x, Action::State(_))) < at(|x| matches!(x, Action::Complete { .. })),
+            "the reply is recorded before the query completes"
+        );
 
         // A third address evicts the least recently received.
         let (_, s) = feed(&mut m, 40, encode("/other", &[Arg::Int(2)]));

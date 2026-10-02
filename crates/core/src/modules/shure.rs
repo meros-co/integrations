@@ -328,6 +328,11 @@ impl Shure {
         }
         match msg.kind.as_str() {
             "REP" | "REPORT" => {
+                // State first, so a caller reading the snapshot after its SET
+                // completes sees the reported value.
+                if let Some(patch) = self.report(&msg) {
+                    cx.state(patch);
+                }
                 if let Some(i) = self
                     .pending
                     .iter()
@@ -336,9 +341,6 @@ impl Shure {
                     let p = self.pending.remove(i).unwrap();
                     cx.complete(p.id, Ok(Outcome::Ack));
                     self.arm_reply_timer(cx);
-                }
-                if let Some(patch) = self.report(&msg) {
-                    cx.state(patch);
                 }
             }
             "SAMPLE" => {
@@ -890,6 +892,11 @@ mod tests {
             result: Ok(Outcome::Ack)
         }));
         assert_eq!(state(&a)["channels"]["2"]["gain_db"], -3);
+        // Each REP's state lands before the SET it answers completes.
+        let at = |f: fn(&Action) -> bool| a.iter().position(f).unwrap();
+        assert!(
+            at(|x| matches!(x, Action::State(_))) < at(|x| matches!(x, Action::Complete { .. }))
+        );
 
         let mut cx = Cx::new(2_100);
         m.timer(&mut cx, REPLY);
