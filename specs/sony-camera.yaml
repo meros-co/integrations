@@ -111,6 +111,10 @@ settings:
   # reaches the whole card) or camera (the operator picks on the camera and
   # only that reaches this side).
   content_selection: { type: enum, values: [remote, camera], default: remote }
+  # The shortest time between the starts of two live view image requests
+  # while the live stream is watched (PTP bodies). 33 ms is the 30 frames a
+  # second a camera serves at most; raise it to spare the network.
+  live_interval_ms: { type: int, min: 0, max: 10000, default: 33 }
 
 
 models:
@@ -1900,6 +1904,14 @@ commands:
       user: { type: int, min: 1, max: 16, required: true }
     returns: ack
 
+streams:
+  live:
+    format: jpeg
+    summary: "The camera's live view, one JPEG per frame, while watched: requested back to back from PTP bodies (at most one request in flight, no faster than live_interval_ms) and read from the HTTP live view stream of pan/tilt bodies through the SSH tunnel"
+    models: [ilce-1m2, ilce-1, ilce-9m3, ilce-9m2, ilce-7rm6, ilce-7rm5, ilce-7rm4a, ilce-7rm4, ilce-7m5, ilce-7m4,
+             ilce-7m3, ilce-7sm3, ilce-7cm2, ilce-7cr, ilce-7c, ilce-6700, ilx-lr1, ilme-fr7, ilme-fx3, ilme-fx2,
+             ilme-fx30, zv-e1, zv-e10m2, zv-e10, dsc-rx1rm3, brc-am7]
+
 state:
   session.mode: { type: string, description: "The connection setting in use: plain, pairing or ssh" }
   session.pairing: { type: string, description: "With connection: pairing, waiting_for_approval while the camera shows its prompt, then approved or refused" }
@@ -1961,6 +1973,7 @@ state:
   status.cautions: { type: int, description: "Cautions the camera has shown since the session opened" }
   status.last_caution_at: { type: int, description: "When the camera last reported showing a caution (host milliseconds)" }
   content.storages.*: { type: bool, description: "Storage N (eight hex digits) as the camera last reported it: true added, false removed" }
+  live_view.stream: { type: string, description: "The live stream: stopped (nobody watches), waiting (watched, camera not connected), running, reconnecting (pan/tilt HTTP stream), needs_ssh (pan/tilt body without connection ssh), refused (SSH login refused) or unavailable (content_transfer mode)" }
   exposure.mode: { type: string, description: "Sony Exposure Program Mode (0x500E) (a value the module has no name for reads as its hex code)" }
   exposure.control_type: { type: string, description: "Sony Exposure Ctrl Type (0xD099) (a value the module has no name for reads as its hex code)" }
   exposure.iris: { type: float, description: "Sony F-Number (0x5007) (the text \"closed\" when the iris is closed)" }
@@ -2336,8 +2349,7 @@ quirks:
     severity: info
     text: >
       Out of scope: firmware update (a 200 MB to 1.5 GB upload that reflashes and restarts the
-      camera), the shot image with its ObjectInfo in one object, and the continuous live view
-      stream (get_live_view_image returns single frames for polling).
+      camera), and the shot image with its ObjectInfo in one object.
       Bodies that are USB-only for remote control (ILCE-7RM3A, ILCE-7M2, ILCE-6600, ILCE-6400,
       ILCE-6100, the ZV-1 series and the RX models other than RX1R III) are not listed.
 
@@ -2383,6 +2395,20 @@ quirks:
       localhost, one live view dataset per HTTP chunk; the module reads one frame through the
       SSH tunnel, so those bodies need connection: ssh. At most five live view clients may be
       connected to a pan/tilt body at once.
+
+  - models: [all]
+    severity: info
+    text: >
+      The live stream runs only while watched. PTP bodies are asked for one image at a time, the
+      next as soon as the last arrives but no sooner than live_interval_ms after the previous
+      request, backing off from 40 to 320 ms while the camera has no new image. Image requests
+      are background work: commands go first, and while a PTP download is in progress its parts
+      go first too, so the picture pauses during a download from the card and resumes after it.
+      In remote_with_transfer mode the stream turns the camera's live view on and off again when
+      the last watcher leaves. Pan/tilt bodies stream over their own tunnelled HTTP connection,
+      unaffected by commands and downloads, opened again after 1 s (doubling to 30 s) if it
+      ends while watched; their stream needs connection ssh. get_live_view_image keeps working
+      beside the stream.
 
   - models: [all]
     severity: warning

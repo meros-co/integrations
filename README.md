@@ -55,7 +55,7 @@ device looks the same to whoever uses the library.
 
 | Spec | Devices | Transport | Models | Commands |
 |---|---|---|---|---|
-| `aja-kipro` | AJA Ki Pro recorders | HTTP 80 | 8 | 69 |
+| `aja-kipro` | AJA Ki Pro recorders | HTTP 80 | 8 | 71 |
 | `aja-kumo` | AJA KUMO SDI routers and control panels | HTTP 80 | 9 | 33 |
 | `allenheath-ahm` | Allen & Heath AHM | MIDI over TCP 51325, native | 3 | 28 |
 | `allenheath-cq` | Allen & Heath CQ (CQ-12T, CQ-18T, CQ-20B) | MIDI over TCP 51325, native | 3 | 19 |
@@ -70,8 +70,8 @@ device looks the same to whoever uses the library.
 | `analogway-picturall` | Analog Way Picturall media servers | Line/TCP 11000 | 9 | 15 |
 | `barco-eventmaster` | Barco Event Master (JSON-RPC API) | HTTP 9999 | 4 | 104 |
 | `behringer-wing` | Behringer WING | OSC/UDP 2223 | 3 | 242 |
-| `behringer-x32` | Behringer X32 / Midas M32 | OSC/UDP 10023 | 8 | 178 |
-| `behringer-xair` | Behringer X AIR / Midas M AIR | OSC/UDP 10024 | 6 | 241 |
+| `behringer-x32` | Behringer X32 / Midas M32 | OSC/UDP 10023 | 8 | 207 |
+| `behringer-xair` | Behringer X AIR / Midas M AIR | OSC/UDP 10024 | 6 | 261 |
 | `birddog` | BirdDog cameras (RESTful API) | HTTP 8080 | 19 | 334 |
 | `blackmagic-atem` | Blackmagic ATEM switchers | Proprietary UDP 9910, native | 26 | 56 |
 | `blackmagic-camera` | Blackmagic cameras (Camera Control REST API) | HTTP 80 | 12 | 223 |
@@ -113,7 +113,7 @@ device looks the same to whoever uses the library.
 | `sennheiser-ew-dx` | Sennheiser Evolution Wireless Digital EW-DX receivers (SSCv2) | HTTPS + SSE (SSCv2), native | 3 | 1 |
 | `sennheiser-ew-g3-g4` | Sennheiser evolution wireless G3 / G4 (Media Control Protocol) | MCP over UDP 53212, native | 3 | 11 |
 | `shure-wireless` | Shure networked wireless (command strings) | Command strings over TCP 2202, native | 9 | 6 |
-| `sony-camera` | Sony cameras over Camera Control PTP 3 and PTP 2 (Alpha, FX, ZV, cinema line, pan/tilt) | PTP-IP over TCP 15740, or through SSH, native | 31 | 173 |
+| `sony-camera` | Sony cameras over Camera Control PTP 3 and PTP 2 (Alpha, FX, ZV, cinema line, pan/tilt) | PTP-IP over TCP 15740, or through SSH, native | 31 | 209 |
 | `tsl-umd-display` | TSL UMD tally sent to displays and multiviewers | TSL UMD over UDP, or TCP for V5.0; sends, native | 4 | 1 |
 | `tsl-umd-listener` | TSL UMD tally received from a switcher | TSL UMD over UDP, or TCP for V5.0; receives, native | 2 | 0 |
 | `visca` | VISCA PTZ cameras (Sony VISCA over IP, and VISCA over TCP/UDP) | VISCA over IP (UDP 52381), raw VISCA over TCP or UDP, native | 9 | 142 |

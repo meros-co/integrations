@@ -1056,3 +1056,70 @@ async fn uploads_and_setting_files() {
     assert_eq!(camera.lock().unwrap().operations.len(), before);
     core.close(id).await;
 }
+
+fn live_requests(camera: &Shared) -> usize {
+    camera
+        .lock()
+        .unwrap()
+        .operations
+        .iter()
+        .filter(|(c, p)| *c == 0x1009 && p.first() == Some(&0xFFFF_C002))
+        .count()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn live_view_stream_while_watched() {
+    let (port, camera, _events) = simulated_camera(ptp3_body).await;
+    let core = Core::new().unwrap();
+    let id = connected(
+        &core,
+        "ilce-7sm3",
+        port,
+        json!({"friendly_name": "Imperio Cam Desk", "session_mode": "remote", "poll_ms": 60000, "live_interval_ms": 20}),
+    )
+    .await;
+    let streams = &meros_integrations::json::catalog(&core)["devices"]["sony-camera"]["streams"];
+    assert_eq!(streams["live"]["format"], "jpeg");
+
+    // Not watched: no live view requests.
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(live_requests(&camera), 0);
+
+    let live = core.open_stream(id, "live").unwrap();
+    for _ in 0..3 {
+        let frame = tokio::time::timeout(Duration::from_secs(5), live.next_frame())
+            .await
+            .expect("a frame within 5 s")
+            .unwrap();
+        assert_eq!(frame.format, "jpeg");
+        assert!(frame.data.starts_with(&[0xFF, 0xD8]));
+    }
+    // Commands still go through while frames flow.
+    assert_eq!(
+        core.execute(
+            id,
+            "set_property",
+            params(json!({"code": "0x5005", "value": 4}))
+        )
+        .await,
+        Ok(Outcome::Ack)
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_secs(5), live.next_frame())
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        core.snapshot(id).unwrap().state["live_view"]["stream"],
+        "running"
+    );
+
+    // Unwatched: requests stop, apart from one already in flight.
+    core.close_stream(live);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let stopped_at = live_requests(&camera);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(live_requests(&camera) <= stopped_at + 1);
+    core.close(id).await;
+}

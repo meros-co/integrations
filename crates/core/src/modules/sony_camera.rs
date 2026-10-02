@@ -73,6 +73,9 @@ mod info;
 
 use info::Info;
 
+#[path = "sony_camera_live.rs"]
+mod live;
+
 const PTP_IP_PORT: u16 = 15740;
 const SSH_PORT: u16 = 22;
 
@@ -348,6 +351,8 @@ enum Step {
     /// A read of what the camera reports about itself, or a write whose
     /// response carries a result.
     Info(Info),
+    /// One image for the `live` stream.
+    LiveFrame,
 }
 
 #[derive(Debug, Clone)]
@@ -542,6 +547,8 @@ pub(crate) struct SonyCamera {
     stream_version: u16,
     captures: u64,
     cautions: u64,
+    /// The `live` stream.
+    live: live::Live,
 }
 
 fn text_setting(settings: &Params, name: &str) -> String {
@@ -786,6 +793,11 @@ impl SonyCamera {
         if protocol == Protocol::Ptp2 && function != Function::Remote {
             return Err("Camera Control PTP 2 has only the remote control session mode".into());
         }
+        let live_interval = s
+            .get("live_interval_ms")
+            .and_then(Value::as_u64)
+            .unwrap_or(live::DEFAULT_INTERVAL)
+            .min(10_000);
         let select_on_camera = match text_setting(s, "content_selection").as_str() {
             "" | "remote" => false,
             "camera" => true,
@@ -841,6 +853,7 @@ impl SonyCamera {
             stream_version: 100,
             captures: 0,
             cautions: 0,
+            live: live::Live::new(live_interval),
         })
     }
 
@@ -919,6 +932,7 @@ impl SonyCamera {
         ] {
             cx.cancel_timer(key);
         }
+        self.live_session_lost(cx);
         self.cmd_framer = Framer::default();
         self.evt_framer = Framer::default();
         self.ready = false;
@@ -1265,6 +1279,7 @@ impl SonyCamera {
                         cx.connection(Connection::Connected);
                         cx.set_timer(POLL, self.poll_every);
                         self.queue_info_reads();
+                        self.live_start(cx);
                     }
                 } else if !self.ready {
                     self.lost(
@@ -1352,6 +1367,7 @@ impl SonyCamera {
             Step::DownloadDataset => self.download_dataset(cx, code, &data),
             Step::Delete => self.delete_step(cx, code),
             Step::Info(info) => self.info_done(cx, info, &op, code, params, &data),
+            Step::LiveFrame => self.live_frame_done(cx, code, &data),
         }
     }
 
@@ -3283,6 +3299,9 @@ impl Module for SonyCamera {
     }
 
     fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
+        if socket == live::LIVE_HTTP {
+            return self.live_http_input(cx, input);
+        }
         if socket == HTTP {
             return self.http_input(cx, input);
         }
@@ -3469,7 +3488,15 @@ impl Module for SonyCamera {
             }
             files::UPLOAD_WAIT => self.upload_timeout(cx),
             files::DELETE_WAIT => self.delete_timeout(cx),
+            live::LIVE_NEXT => self.live_request(cx),
+            live::LIVE_HTTP_WAIT => self.live_http_timer(cx),
             _ => {}
+        }
+    }
+
+    fn stream_watch(&mut self, cx: &mut Cx, stream: &str, watching: bool) {
+        if stream == live::LIVE {
+            self.live_watch(cx, watching);
         }
     }
 
@@ -3490,6 +3517,7 @@ impl Module for SonyCamera {
         if self.http.is_some() {
             cx.tcp_close(HTTP);
         }
+        cx.tcp_close(live::LIVE_HTTP);
         if self.download.is_some() {
             cx.file_close(FILE);
         }
@@ -5565,5 +5593,230 @@ mod tests {
             m.plan("download_content", &settings(json!({"umid": umid, "path": "/tmp/x.jpg"})), 11),
             Err(CommandError::DeviceError { code: Some(c), .. }) if c == "list_changed"
         ));
+    }
+
+    fn at(m: &mut SonyCamera, now: Millis, socket: Key, packets: &[Packet]) -> Vec<Action> {
+        let mut bytes = Vec::new();
+        for p in packets {
+            bytes.extend(p.encode());
+        }
+        let mut cx = Cx::new(now);
+        m.tcp(&mut cx, socket, TcpInput::Data(bytes));
+        cx.take()
+    }
+
+    fn watch(m: &mut SonyCamera, now: Millis, watching: bool) -> Vec<Action> {
+        let mut cx = Cx::new(now);
+        m.stream_watch(&mut cx, live::LIVE, watching);
+        cx.take()
+    }
+
+    fn tick(m: &mut SonyCamera, now: Millis, key: Key) -> Vec<Action> {
+        let mut cx = Cx::new(now);
+        m.timer(&mut cx, key);
+        cx.take()
+    }
+
+    fn frames(actions: &[Action]) -> Vec<Vec<u8>> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::Frame {
+                    stream: "live",
+                    format: "jpeg",
+                    data,
+                } => Some(data.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn timer_set(actions: &[Action], key: Key) -> Option<Millis> {
+        actions.iter().rev().find_map(|a| match a {
+            Action::SetTimer { key: k, after } if *k == key => Some(*after),
+            _ => None,
+        })
+    }
+
+    fn live_answer(m: &mut SonyCamera, now: Millis, sent: &[Action], jpeg: &[u8]) -> Vec<Action> {
+        let (code, t, params) = last_request(sent);
+        assert_eq!((code, params), (OP_GET_OBJECT, vec![LIVE_VIEW_HANDLE]));
+        let mut packets = data_in(t, content::build::live_view(jpeg, true));
+        packets.push(ok(t, vec![]));
+        at(m, now, CMD, &packets)
+    }
+
+    #[test]
+    fn the_live_stream_runs_only_while_watched_and_is_paced() {
+        let mut m = camera(json!({"live_interval_ms": 50}));
+        // Watched before the camera is connected: starts once it is.
+        let a = watch(&mut m, 0, true);
+        assert_eq!(state(&a)["live_view"]["stream"], "waiting");
+        let a = connected(&mut m, 300);
+        assert_eq!(
+            last_request(&a),
+            (OP_GET_OBJECT, last_request(&a).1, vec![LIVE_VIEW_HANDLE]),
+            "asked once the camera is connected"
+        );
+        assert_eq!(state(&a)["live_view"]["stream"], "running");
+        let jpeg = content::build::jpeg(16, 9);
+        let a = live_answer(&mut m, 10, &a, &jpeg);
+        assert_eq!(frames(&a), vec![jpeg.clone()]);
+        // The next request waits for the interval, measured from the last.
+        assert_eq!(timer_set(&a, live::LIVE_NEXT), Some(40));
+        assert!(sent(&a, CMD).is_empty());
+        let a = tick(&mut m, 1_050, live::LIVE_NEXT);
+        // "Too soon": no frame, a short back-off.
+        let (_, t, _) = last_request(&a);
+        let a = at(
+            &mut m,
+            1_060,
+            CMD,
+            &[Packet::OperationResponse {
+                code: RC_ACCESS_DENIED,
+                transaction: t,
+                params: vec![],
+            }],
+        );
+        assert!(frames(&a).is_empty());
+        assert_eq!(timer_set(&a, live::LIVE_NEXT), Some(40));
+        let a = tick(&mut m, 1_100, live::LIVE_NEXT);
+        // A slow answer is followed by the next request at once.
+        let a = live_answer(&mut m, 1_300, &a, &jpeg);
+        assert_eq!(frames(&a).len(), 1);
+        assert_eq!(last_request(&a).0, OP_GET_OBJECT);
+        // Unwatched while a request is in flight: its image is not published
+        // and nothing more is asked.
+        let w = watch(&mut m, 1_310, false);
+        assert_eq!(state(&w)["live_view"]["stream"], "stopped");
+        assert!(w.contains(&Action::CancelTimer {
+            key: live::LIVE_NEXT
+        }));
+        let a = live_answer(&mut m, 1_320, &a, &jpeg);
+        assert!(frames(&a).is_empty());
+        assert!(sent(&a, CMD).is_empty());
+        assert_eq!(timer_set(&a, live::LIVE_NEXT), None);
+    }
+
+    #[test]
+    fn live_frames_wait_behind_commands() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        let a = watch(&mut m, 0, true);
+        let jpeg = content::build::jpeg(16, 9);
+        let pending = a;
+        // A command arrives while an image request is in flight, and another
+        // while the first command is.
+        let c1 = run(&mut m, 1, "set_tally", json!({"lamp": "red", "lit": true}));
+        assert!(sent(&c1, CMD).is_empty(), "one request at a time");
+        let a = live_answer(&mut m, 100, &pending, &jpeg);
+        assert_eq!(frames(&a).len(), 1);
+        // The command goes before the next image.
+        assert_eq!(last_request(&a).0, OP_SET_PROPERTY);
+        let (_, t, _) = last_request(&a);
+        let _ = tick(&mut m, 200, live::LIVE_NEXT);
+        let c2 = run(&mut m, 2, "set_tally", json!({"lamp": "red", "lit": false}));
+        assert!(sent(&c2, CMD).is_empty());
+        let a = at(&mut m, 210, CMD, &[ok(t, vec![])]);
+        assert_eq!(completion(&a, 1), Some(Ok(Outcome::Ack)));
+        assert_eq!(
+            last_request(&a).0,
+            OP_SET_PROPERTY,
+            "the second command first"
+        );
+        // Then the image request queued behind them, and then a
+        // get_live_view_image command, which still answers on its own.
+        let (_, t, _) = last_request(&a);
+        let a = at(&mut m, 220, CMD, &[ok(t, vec![])]);
+        let one = run(&mut m, 3, "get_live_view_image", json!({}));
+        assert!(sent(&one, CMD).is_empty());
+        let a = live_answer(&mut m, 230, &a, &jpeg);
+        assert_eq!(frames(&a).len(), 1);
+        let a = live_answer(&mut m, 240, &a, &jpeg);
+        assert!(frames(&a).is_empty(), "the command's image is its value");
+        assert!(matches!(completion(&a, 3), Some(Ok(Outcome::Value { .. }))));
+    }
+
+    fn pan_tilt_camera(settings: Value) -> SonyCamera {
+        let mut m = camera_model("ilme-fr7", settings);
+        connected_with(
+            &mut m,
+            Sim {
+                props: build::prop_array(&[build::string_prop(
+                    0xD278,
+                    "http://localhost:8080/liveview",
+                )]),
+                ..Sim::default()
+            },
+        );
+        m
+    }
+
+    fn live_http(m: &mut SonyCamera, now: Millis, input: TcpInput) -> Vec<Action> {
+        let mut cx = Cx::new(now);
+        m.tcp(&mut cx, live::LIVE_HTTP, input);
+        cx.take()
+    }
+
+    #[test]
+    fn pan_tilt_bodies_stream_the_tunnelled_http_live_view() {
+        let mut m = pan_tilt_camera(json!({}));
+        let a = watch(&mut m, 0, true);
+        assert_eq!(state(&a)["live_view"]["stream"], "needs_ssh");
+
+        let mut m = pan_tilt_camera(json!({
+            "connection": "ssh", "ssh_username": "admin", "ssh_password": "pw"
+        }));
+        let a = watch(&mut m, 0, true);
+        let tunnel = a
+            .iter()
+            .find_map(|x| match x {
+                Action::TcpOpenSsh { socket, tunnel } if *socket == live::LIVE_HTTP => {
+                    Some(tunnel.clone())
+                }
+                _ => None,
+            })
+            .expect("the stream opens its own tunnel");
+        assert_eq!(
+            (tunnel.target_host.as_str(), tunnel.target_port),
+            ("localhost", 8080)
+        );
+        let a = live_http(&mut m, 10, TcpInput::Connected);
+        assert!(a.iter().any(|x| matches!(x,
+            Action::TcpSend { socket, data } if *socket == live::LIVE_HTTP && data.starts_with(b"GET /liveview "))));
+        // One live view dataset per chunk, published as each completes.
+        let jpeg = content::build::jpeg(32, 18);
+        let dataset = content::build::live_view(&jpeg, true);
+        let mut body = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n".to_vec();
+        for _ in 0..2 {
+            body.extend(format!("{:x}\r\n", dataset.len()).into_bytes());
+            body.extend(&dataset);
+            body.extend(b"\r\n");
+        }
+        let (first, rest) = body.split_at(body.len() - 7);
+        let a = live_http(&mut m, 20, TcpInput::Data(first.to_vec()));
+        assert_eq!(frames(&a), vec![jpeg.clone()]);
+        let a = live_http(&mut m, 30, TcpInput::Data(rest.to_vec()));
+        assert_eq!(frames(&a), vec![jpeg.clone()]);
+        // Closed while watched: opened again after a pause.
+        let a = live_http(
+            &mut m,
+            40,
+            TcpInput::Closed {
+                reason: "eof".into(),
+            },
+        );
+        assert_eq!(timer_set(&a, live::LIVE_HTTP_WAIT), Some(1_000));
+        assert_eq!(state(&a)["live_view"]["stream"], "reconnecting");
+        let a = tick(&mut m, 1_040, live::LIVE_HTTP_WAIT);
+        assert!(a.iter().any(|x| matches!(x,
+            Action::TcpOpenSsh { socket, .. } if *socket == live::LIVE_HTTP)));
+        // Unwatched: the connection closes and stays closed.
+        let a = watch(&mut m, 2_000, false);
+        assert!(a.contains(&Action::TcpClose {
+            socket: live::LIVE_HTTP
+        }));
+        let a = tick(&mut m, 3_000, live::LIVE_HTTP_WAIT);
+        assert!(a.is_empty());
     }
 }
