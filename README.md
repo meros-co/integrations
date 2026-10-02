@@ -88,6 +88,7 @@ device looks the same to whoever uses the library.
 | `grandma2` | MA Lighting grandMA2 | Line/TCP 30000 | 6 | 114 |
 | `grandma3` | MA Lighting grandMA3 | OSC/UDP 8000 | 7 | 165 |
 | `h2r-graphics` | H2R Graphics (HTTP API) | HTTP 4001 | 2 | 21 |
+| `http-snapshot` | Camera snapshot over HTTP (live preview from a JPEG URL) | HTTP JPEG snapshots, native | 1 | 0 |
 | `kramer-p3000` | Kramer Protocol 3000 matrices and switchers | Line/TCP 5000 | 2 | 86 |
 | `newtek-tricaster` | NewTek / Vizrt TriCaster | HTTP 80 | 2 | 20 |
 | `obs-studio` | OBS Studio (obs-websocket 5) | obs-websocket 5 over WebSocket 4455, native | 1 | 147 |
@@ -107,6 +108,7 @@ device looks the same to whoever uses the library.
 | `roland-xs42h` | Roland XS-42H / VP-42H (LAN control) | Line/TCP 8023 | 2 | 24 |
 | `roland-xs62s` | Roland XS-62S (LAN control) | Line/TCP 8023 | 1 | 53 |
 | `roland-xs80h` | Roland XS-82H / XS-83H / XS-84H (LAN control) | Line/TCP 8023 | 3 | 37 |
+| `ross-xpression-udp` | Ross XPression (RossTalk over UDP) | Line/UDP 7788 | 1 | 28 |
 | `ross-xpression` | Ross XPression (RossTalk) | Line/TCP 7788 | 1 | 28 |
 | `rosstalk` | Ross Video production switchers (RossTalk) | Line/TCP 7788 | 13 | 101 |
 | `sennheiser-digital-6000` | Sennheiser Digital 6000 receivers (SSC) | SSC over UDP 45, native | 2 | 5 |
