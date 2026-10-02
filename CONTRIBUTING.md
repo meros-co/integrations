@@ -113,7 +113,9 @@ core named after its spec id. Adding a spec means adding its feature:
 - compile its native module, native extension or discovery protocol under
   `#[cfg(feature = "<spec-id>")]` (`crates/core/src/modules/mod.rs`), and its
   tests under the same feature;
-- run `python tools/check_features.py <spec-id>` to check it builds alone.
+- run `python tools/check_features.py <spec-id>` to check it builds alone;
+- run `python tools/devices_table.py` to add it to [DEVICES.md](DEVICES.md)
+  (a native integration also needs its transport described in that script).
 
 ## Review checklist
 
