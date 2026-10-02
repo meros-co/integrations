@@ -31,12 +31,24 @@ source:
       CRC table.
 
 settings:
-  # Levels of the tree requested automatically on connecting: 1 asks only for
-  # the root's elements (lazy: deeper levels by get_directory); 255 walks
-  # everything.
-  walk_depth: { type: int, min: 1, max: 255, default: 255 }
-  # Ask each discovered matrix for its targets, sources and connections (this
-  # also subscribes to connection changes).
+  # How much of the tree is asked for on connecting. A GetDirectory also
+  # subscribes to changes below the element, so what is walked is also what
+  # is kept up to date.
+  #   full:  every node and matrix (the default when neither walk nor
+  #          walk_depth is given).
+  #   depth: nodes to walk_depth levels (the default when only walk_depth is
+  #          given, as before this setting existed).
+  #   lazy:  only the root's elements.
+  # In every mode a command naming an element that is not known yet, by
+  # identifier path or numeric path, asks for just the directories on the way
+  # to it, and runs when they have answered.
+  walk: { type: enum, values: [full, depth, lazy] }
+  # Levels walked in depth mode: 1 is the root's elements, 2 also their
+  # children, and so on. 2 when not given.
+  walk_depth: { type: int, min: 1, max: 255 }
+  # In full and depth modes, ask each matrix the walk finds for its targets,
+  # sources and connections (this also subscribes to connection changes). In
+  # lazy mode a matrix's connections come from get_directory on it.
   walk_matrices: { type: bool, default: true }
   # Address requests with QualifiedNode/QualifiedParameter/... and the full
   # path; false spells the path out as nested elements, for providers that do
@@ -135,7 +147,8 @@ commands:
     returns: value
 
 state:
-  walk.complete:                          { type: bool, description: "Every GetDirectory of the automatic walk has been answered or has timed out" }
+  walk.complete:                          { type: bool, description: "Every GetDirectory of the walk on connecting (or refresh) has been answered or has timed out: the whole tree in full mode, walk_depth levels in depth mode, the root in lazy mode. Directories asked for to find a command's element are not waited for" }
+  walk.mode:                              { type: string, description: "The walk mode in use: full, depth or lazy" }
   identifiers.*:                          { type: string, description: "Numeric path of the element with this identifier path, its identifiers from the root joined by '/' (identifiers cannot contain '/'), e.g. identifiers.\"Device/Audio/Gain\" = \"1.2.3\"" }
   elements.*.type:                        { type: string, description: "node, parameter, matrix or function. Elements are keyed by numeric path such as \"1.2.3\" (a single key containing dots); numbers are valid for one session only" }
   elements.*.path:                        { type: string, description: "The numeric path, as the key" }
@@ -189,8 +202,22 @@ quirks:
     severity: warning
     text: >
       Element numbers are valid for one session only ("Why are the node and parameter numbers session based?").
-      On every (re)connection the module clears elements and identifiers and walks the tree again; store
-      identifier paths, not numeric paths. Subscriptions are restored by identifier path when known.
+      On every (re)connection the module clears elements and identifiers and walks the tree again, as the walk
+      mode asks; store identifier paths, not numeric paths. Subscriptions are restored by identifier path when
+      known: in full mode when the walk finds the element, in depth and lazy modes by asking for the directories
+      on the way to it.
+  - models: [all]
+    severity: info
+    text: >
+      The walk mode (setting walk) trades completeness for traffic. full asks every node and matrix for its
+      directory on connecting, so state holds the whole tree and every identifier path resolves at once, but a
+      large provider (a console with tens of thousands of parameters) is slow to walk and then reports every
+      change. depth stops at walk_depth levels. lazy asks only for the root's elements; a command naming a
+      deeper element by identifier or numeric path asks for each directory on the way to it, one level per
+      round trip, and only that branch is then known and kept up to date. An element missing from a directory
+      the provider has answered is refused as unknown at once; a provider that reports one directory across
+      several messages can make that answer early, and the command can simply be sent again. A command waiting
+      for a directory that is not answered within request_timeout_ms fails with a timeout.
   - models: [all]
     severity: warning
     text: >

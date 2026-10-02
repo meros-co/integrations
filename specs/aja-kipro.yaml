@@ -61,7 +61,9 @@ source:
       eParamID_TransportState, eParamID_DisplayTimecode, eParamID_CurrentClip,
       eParamID_MediaState, eParamID_GoToClip, eParamID_CustomClipName and
       eParamID_UseCustomClipName, which AJA documents in the 4.1.0 package
-      above; that is the basis for offering those on the current models.
+      above. It opens the event connection at /json?action=connect&configid=0
+      and waits with /json?action=wait_for_config_events, reading str_value
+      for string parameters and int_value for numbers.
 
 transport:
   type: http
@@ -74,12 +76,22 @@ transport:
     path: /config
     query: { action: get, paramid: eParamID_TransportState }
 
+# The event connection (api.txt, events.py): connect, then hold a
+# wait_for_config_events request open, again and again, with the returned
+# connection id. The extension runs that loop beside the commands, using the
+# requests of open_event_connection and wait_for_events below, and offers
+# each change to the telemetry rules as "event <param_id> value=<value>" and
+# "event <param_id> value_name=<value_name>".
+extension: aja-config-events
+
 models:
   - id: kipro
     name: AJA Ki Pro (original)
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors_legacy
       - transport_command
@@ -134,6 +146,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors_legacy
       - transport_command
@@ -175,6 +189,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors_legacy
       - transport_command
@@ -217,6 +233,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors
       - save_preset
@@ -238,12 +256,6 @@ models:
       - play_at_system_time
       - record_at_system_time
       - go_to_idle
-      - get_transport_state
-      - get_display_timecode
-      - get_current_clip
-      - go_to_clip
-      - set_clip_name
-      - set_use_custom_clip_name
       - enter_data_lan_mode
       - enter_record_play_mode
       - get_media_state
@@ -268,6 +280,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors
       - save_preset
@@ -289,12 +303,6 @@ models:
       - play_at_system_time
       - record_at_system_time
       - go_to_idle
-      - get_transport_state
-      - get_display_timecode
-      - get_current_clip
-      - go_to_clip
-      - set_clip_name
-      - set_use_custom_clip_name
       - enter_data_lan_mode
       - enter_record_play_mode
       - get_media_state
@@ -318,6 +326,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors
       - save_preset
@@ -341,12 +351,6 @@ models:
       - go_to_idle
       - set_playback_speed
       - play_at_speed
-      - get_transport_state
-      - get_display_timecode
-      - get_current_clip
-      - go_to_clip
-      - set_clip_name
-      - set_use_custom_clip_name
       - enter_data_lan_mode
       - enter_record_play_mode
       - get_media_state
@@ -364,6 +368,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors
       - save_preset
@@ -387,12 +393,6 @@ models:
       - go_to_idle
       - set_playback_speed
       - play_at_speed
-      - get_transport_state
-      - get_display_timecode
-      - get_current_clip
-      - go_to_clip
-      - set_clip_name
-      - set_use_custom_clip_name
       - enter_data_lan_mode
       - enter_record_play_mode
       - get_media_state
@@ -417,6 +417,8 @@ models:
     supports:
       - get_parameter
       - set_parameter
+      - open_event_connection
+      - wait_for_events
       - get_descriptor
       - get_all_descriptors
       - save_preset
@@ -440,12 +442,6 @@ models:
       - go_to_idle
       - set_playback_speed
       - play_at_speed
-      - get_transport_state
-      - get_display_timecode
-      - get_current_clip
-      - go_to_clip
-      - set_clip_name
-      - set_use_custom_clip_name
       - enter_data_lan_mode
       - enter_record_play_mode
       - get_media_state
@@ -539,6 +535,31 @@ commands:
       query: { action: set, paramid: eParamID_RegisterRecall, value: "{preset}" }
     expect: { status: 200 }
     returns: ack
+
+  # ── Event connection (api.txt, events.py) ───────────────────────────────
+  open_event_connection:
+    summary: Open an event connection (action=connect); returns the connection id for wait_for_events
+    send:
+      method: GET
+      path: /json
+      query: { action: connect, configid: "0" }
+    expect: { json_path: "$.connectionid" }
+    returns: value
+
+  wait_for_events:
+    summary: >
+      Wait on an event connection for parameter changes
+      (action=wait_for_config_events). The reply, returned whole, is an array
+      of {param_id, param_type, int_value, str_value, last_config_update}; it
+      is held until a change arrives
+    params:
+      connection: { type: int, min: 0, required: true }
+    send:
+      method: GET
+      path: /json
+      query: { action: wait_for_config_events, configid: "0", connectionid: "{connection}" }
+    expect: { json_path: "$" }
+    returns: value
 
   # ── Transport (eParamID_TransportCommand) ───────────────────────────────
   transport_command:
@@ -1189,15 +1210,21 @@ commands:
     returns: ack
 
 telemetry:
-  # The unit pushes parameter changes over a long-poll event connection
-  # (connect, then wait_for_config_events with the returned connection id),
-  # which the format cannot express; see the quirk. Until a native extension
-  # exists, the parameters operators watch are asked once a second.
+  # Changes arrive over the event connection (the aja-config-events
+  # extension): each one is offered to the rules below as two lines,
+  # "event <param_id> value=<value>" and "event <param_id> value_name=<name>".
+  # Events report changes only, so the displayed timecode is read once on
+  # connecting, and the transport, clip and media state are also read every
+  # 30 seconds: that fills them in at the start, and keeps them right if the
+  # unit has no event connection or changes were missed while it was being
+  # reopened.
+  subscribe:
+    send:
+      - { method: GET, path: /config, query: { action: get, paramid: eParamID_DisplayTimecode } }
   poll:
-    every_ms: 1000
+    every_ms: 30000
     send:
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_TransportState } }
-      - { method: GET, path: /config, query: { action: get, paramid: eParamID_DisplayTimecode } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_CurrentClip } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_MediaState } }
   updates:
@@ -1226,6 +1253,28 @@ telemetry:
     - path: "^/config\\?action=get&paramid=eParamID_StoragePath$"
       json: { path: "$.value" }
       state: { media.storage_path: "{path}" }
+    # Events, as the aja-config-events extension offers them, with the value
+    # and name a get reply would carry: for a string parameter str_value and
+    # an empty name; otherwise int_value and str_value (or the value again).
+    - match: "^event (\\w+) value=(.*)$"
+      state: { "params.{1}.value": "{2}" }
+    - match: "^event (\\w+) value_name=(.*)$"
+      state: { "params.{1}.value_name": "{2}" }
+    - match: "^event eParamID_TransportState value=(-?\\d+)$"
+      state: { transport.state_code: "{1}" }
+    - match: "^event eParamID_TransportState value_name=(.+)$"
+      state: { transport.state: "{1}" }
+    - match: "^event eParamID_DisplayTimecode value=(.+)$"
+      state: { timecode.display: "{1}" }
+    - match: "^event eParamID_CurrentClip value=(.*)$"
+      state: { clip.current: "{1}" }
+    - match: "^event eParamID_MediaState value=(\\d+)$"
+      state:
+        media.data_lan: { value: "{1}", map: { "0": false, "1": true } }
+    - match: "^event eParamID_MediaState value_name=(.+)$"
+      state: { media.state: "{1}" }
+    - match: "^event eParamID_StoragePath value=(.*)$"
+      state: { media.storage_path: "{1}" }
 
 state:
   params.*.value: { type: string, description: "A parameter's last value read or set, keyed by its eParamID name: the enum's number, an integer, or a string" }
@@ -1276,11 +1325,21 @@ quirks:
       [{"param_id","param_type","int_value","str_value","last_config_update"}],
       usually including eParamID_DisplayTimecode. The client must wait at
       least once a minute or the server expires the connection id (AJA
-      api.txt, events.py). The format cannot carry a reply value into a later
-      request, so this spec polls instead; push needs a native extension.
-      AJA's 2021 guide lists connect and wait_for_config_events among the
-      /config actions, while every AJA example uses /json; /json is the
-      documented URL.
+      api.txt, events.py). The aja-config-events extension runs this loop
+      beside the commands: it waits again as soon as each reply arrives,
+      opens a new connection when the id has expired or a request fails
+      (after 1 s, doubling to 30 s while failures continue), and gives each
+      change to the telemetry rules, so state follows the unit as it
+      changes. Events carry changes only: the displayed timecode is read once
+      on connecting, and the transport, clip and media state every 30
+      seconds, which fills them in at the start and corrects them if the unit
+      has no event connection or changes were missed while it was reopened;
+      the storage path is read only by get_storage_path. AJA's 2021 guide
+      lists connect and wait_for_config_events among the /config actions,
+      while every AJA example uses /json; /json is the documented URL, and
+      the extension tries /config when /json does not give a connection id.
+      AJA does not document how an expired id is answered; the extension
+      reconnects on any reply that is not a 2xx JSON array.
 
   - models: [all]
     severity: info
@@ -1296,11 +1355,16 @@ quirks:
     text: >
       eParamID_TransportState, eParamID_DisplayTimecode, eParamID_CurrentClip,
       eParamID_GoToClip, eParamID_CustomClipName and eParamID_UseCustomClipName
-      are documented by AJA in the Ki Pro (Mini, Rack) automation package, not
-      in the current products' chapters. They are offered on the GO and Ultra
-      models because the same /config framework serves every AJA product and
-      their use there is corroborated; a unit without one answers the request
-      with an error.
+      are documented by AJA only in the Ki Pro (Mini, Rack) automation package,
+      not in the GO and Ultra chapters, so get_transport_state,
+      get_display_timecode, get_current_clip, go_to_clip, set_clip_name and
+      set_use_custom_clip_name are offered on the original Ki Pro, Mini and
+      Rack only. On a GO or Ultra, a unit whose desc.json lists one of these
+      ids reaches it with get_parameter and set_parameter, and the telemetry
+      rules still map it when it arrives as an event or a poll reply; a unit
+      without eParamID_TransportState, eParamID_CurrentClip or
+      eParamID_MediaState answers the 30-second poll with an error, which
+      changes nothing.
 
   - models: [all]
     severity: warning

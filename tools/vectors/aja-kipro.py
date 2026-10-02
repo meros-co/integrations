@@ -23,6 +23,20 @@ http(A, "get_descriptor", {"paramid": "eParamID_TransportCommand"}, "GET",
      "/descriptors?paramid=eParamID_TransportCommand")
 http(A, "get_all_descriptors", {}, "GET", "/desc.json")
 http(A, "get_all_descriptors_legacy", {}, "GET", "/descriptors?paramid=*")
+# The event connection (api.txt: connect returns {"connectionid":"20"}; the
+# wait returns [{param_id, param_type, int_value, str_value,
+# last_config_update}], the element values here placeholders).
+http(A, "open_event_connection", {}, "GET", "/json?action=connect&configid=0",
+     http_reply={"status": 200, "body": '{"connectionid":"20"}'},
+     expect_result={"ok": {"kind": "value", "value": "20"}})
+http(A, "wait_for_events", {"connection": 20}, "GET",
+     "/json?action=wait_for_config_events&configid=0&connectionid=20",
+     http_reply={"status": 200, "body":
+                 '[{"param_id":"eParamID_DisplayTimecode","param_type":"string","int_value":0,'
+                 '"str_value":"00:00:10:05","last_config_update":1}]'},
+     expect_result={"ok": {"kind": "value", "value": [
+         {"param_id": "eParamID_DisplayTimecode", "param_type": "string", "int_value": 0,
+          "str_value": "00:00:10:05", "last_config_update": 1}]}})
 http(A, "save_preset", {"preset": 4}, "GET", _CFG + "eParamID_RegisterSave&value=4")
 http(A, "recall_preset", {"preset": 2}, "GET", _CFG + "eParamID_RegisterRecall&value=2",
      http_reply={"status": 200, "body":

@@ -603,3 +603,68 @@ async fn ember_plus_end_to_end() {
     );
     core.close(id).await;
 }
+
+/// Lazy walk: only the root on connecting; a value change by identifier path
+/// asks for node 1's directory and nothing else, then goes out.
+#[tokio::test(flavor = "multi_thread")]
+async fn ember_plus_lazy_walk() {
+    let (port, log) = simulate().await;
+    let core = Core::new().unwrap();
+    let id = core
+        .open(OpenRequest {
+            device: "emberplus".into(),
+            model: "provider".into(),
+            host: "127.0.0.1".into(),
+            port: Some(port),
+            settings: params(json!({"walk": "lazy"})),
+        })
+        .unwrap();
+
+    wait_for_state(&core, id, |s| s["walk"]["complete"] == true).await;
+    let st = core.snapshot(id).unwrap().state;
+    assert_eq!(st["walk"]["mode"], "lazy");
+    assert_eq!(st["identifiers"]["Device"], "1");
+    assert_eq!(st["elements"]["1.1"], Value::Null);
+    assert_eq!(log.lock().unwrap().len(), 1, "only the root is asked for");
+
+    assert_eq!(
+        core.execute(
+            id,
+            "set_parameter",
+            params(json!({"path": "Device/gain", "value": -6.5}))
+        )
+        .await,
+        Ok(Outcome::Value { value: json!(-6.5) })
+    );
+    let st = core.snapshot(id).unwrap().state;
+    assert_eq!(st["identifiers"]["Device/router"], "1.4");
+    // The router was found but not walked: no connections asked for.
+    assert_eq!(st["elements"]["1.4"]["connections"], Value::Null);
+
+    // A matrix's connections come from get_directory on it.
+    assert_eq!(
+        core.execute(
+            id,
+            "get_directory",
+            params(json!({"path": "Device/router"}))
+        )
+        .await,
+        Ok(Outcome::Ack)
+    );
+    wait_for_state(&core, id, |s| {
+        s["elements"]["1.4"]["connections"]["0"]["sources"] == json!([1])
+    })
+    .await;
+
+    let seen = log.lock().unwrap().clone();
+    assert_eq!(
+        seen,
+        vec![
+            (0x62, vec![32], None),
+            (0x6A, vec![1], Some(32)),
+            (0x69, vec![1, 1], None),
+            (0x71, vec![1, 4], Some(32)),
+        ]
+    );
+    core.close(id).await;
+}

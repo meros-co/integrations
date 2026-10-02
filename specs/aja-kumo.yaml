@@ -78,6 +78,14 @@ transport:
     path: /config
     query: { action: get, paramid: eParamID_KumoProductID }
 
+# The event connection (AJA REST API chapter 1; python_examples): connect,
+# then hold a wait_for_config_events request open, again and again, with the
+# returned connection id. The extension runs that loop beside the commands,
+# using the requests of open_event_connection and wait_for_events below, and
+# offers each change to the telemetry rules as "event <param_id>
+# value=<value>" and "event <param_id> value_name=<value_name>".
+extension: aja-config-events
+
 models:
   - id: kumo-1604
     name: AJA KUMO 1604
@@ -774,12 +782,14 @@ commands:
     returns: value
 
 telemetry:
-  # The router pushes parameter changes over an event connection (connect,
-  # then wait_for_config_events with the returned id), which the format
-  # cannot drive: a reply value cannot be carried into a later request. So
-  # the whole routing map is asked for every two seconds, in one request,
-  # and names, locks, salvos and the product are asked once on connecting.
-  # Every command reply also goes through these rules, so this client's own
+  # Changes arrive over the event connection (the aja-config-events
+  # extension) as "event <param_id> value=<value>" and "event <param_id>
+  # value_name=<name>" lines, matched by the event rules below. Events carry
+  # changes only, so names, locks, salvos and the product are read once on
+  # connecting, and the whole routing map, in one request, every 30 seconds:
+  # that fills routing in at the start and corrects it if the router has no
+  # event connection or changes were missed while it was reopened. Every
+  # command reply also goes through these rules, so this client's own
   # changes appear at once.
   subscribe:
     send:
@@ -1116,7 +1126,7 @@ telemetry:
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo7 } }
       - { method: GET, path: /config, query: { action: get, paramid: eParamID_Salvo8 } }
   poll:
-    every_ms: 2000
+    every_ms: 30000
     send:
       - { method: GET, path: /options, query: { action: get, configid: "0", paramid: eParamID_XPT_DestinationAll_Status, alt: text-plain } }
   updates:
@@ -1161,6 +1171,34 @@ telemetry:
     - path: "^/config\\?action=get&paramid=eParamID_NumberOfDestinations$"
       json: { n: "$.value" }
       state: { device.destinations: "{n}" }
+    # Events, as the aja-config-events extension offers them, with the value
+    # and name a get reply would carry: for a string parameter str_value and
+    # an empty name; otherwise int_value and str_value (or the value again).
+    - match: "^event (\\w+) value=(.*)$"
+      state: { "params.{1}.value": "{2}" }
+    - match: "^event (\\w+) value_name=(.*)$"
+      state: { "params.{1}.value_name": "{2}" }
+    - match: "^event eParamID_XPT_Destination(\\d+)_Status value=(\\d+)$"
+      state: { "outputs.{1}.input": "{2}" }
+    - match: "^event eParamID_XPT_Destination(\\d+)_Line_1 value=(.*)$"
+      state: { "outputs.{1}.label_line_1": "{2}" }
+    - match: "^event eParamID_XPT_Destination(\\d+)_Line_2 value=(.*)$"
+      state: { "outputs.{1}.label_line_2": "{2}" }
+    - match: "^event eParamID_XPT_Source(\\d+)_Line_1 value=(.*)$"
+      state: { "inputs.{1}.label_line_1": "{2}" }
+    - match: "^event eParamID_XPT_Source(\\d+)_Line_2 value=(.*)$"
+      state: { "inputs.{1}.label_line_2": "{2}" }
+    - match: "^event eParamID_XPT_Destination(\\d+)_Locked value=(\\d+)$"
+      state:
+        "outputs.{1}.locked": { value: "{2}", map: { "0": false, "1": true } }
+    - match: "^event eParamID_KumoProductID value=(\\d+)$"
+      state: { device.product_id: "{1}" }
+    - match: "^event eParamID_KumoProductID value_name=(.+)$"
+      state: { device.product: "{1}" }
+    - match: "^event eParamID_NumberOfSources value=(\\d+)$"
+      state: { device.sources: "{1}" }
+    - match: "^event eParamID_NumberOfDestinations value=(\\d+)$"
+      state: { device.destinations: "{1}" }
     # eParamID_XPT_DestinationAll_Status from a router with 1 destination(s)
     - match: "^\\[(\\d+)\\]$"
       state:
@@ -1362,13 +1400,23 @@ quirks:
       /config?action=connect returns {"connectionid": N}, then GET
       /config?action=wait_for_config_events&configid=0&connectionid=N is
       held until changes arrive and returns [{param_id, int_value,
-      str_value}]. The format cannot carry the connection id into the next
-      request, so routing is polled every two seconds with
-      eParamID_XPT_DestinationAll_Status, and names, locks and salvos are
-      read once on connecting; changes to those by other controllers are
-      seen only after reconnecting or a get_* command. open_event_connection
-      and wait_for_events are offered for a host that drives the loop itself;
-      a wait may outlast the 4-second request timeout when nothing changes.
+      str_value}]. The aja-config-events extension runs this loop beside the
+      commands: it waits again as soon as each reply arrives, holding each
+      wait up to 30 seconds, opens a new connection when the id has expired
+      or a request fails (after 1 s, doubling to 30 s while failures
+      continue), and gives each change to the telemetry rules: crosspoints,
+      button names, locks, the product and the source and destination
+      counts. Events carry changes only, so names, locks and salvos are read
+      once on connecting and the routing map every 30 seconds, which also
+      corrects routing missed while the connection was down. Salvo changes
+      are kept only as params.eParamID_Salvo{n}, since AJA does not document
+      their event form; salvos.* come from the read on connecting and from
+      get_salvo. AJA does not document how an expired id is answered; the
+      extension reconnects on any reply that is not a 2xx JSON array, and
+      tries /json when /config does not give a connection id.
+      open_event_connection and wait_for_events remain for a host that
+      drives a loop itself; such a wait may outlast the 4-second request
+      timeout when nothing changes.
 
   - models: [all]
     severity: warning

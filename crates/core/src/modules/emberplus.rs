@@ -344,8 +344,30 @@ impl Patch {
     }
 }
 
+/// How much of the tree is asked for on connecting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Walk {
+    /// Everything.
+    Full,
+    /// Nodes to `walk_depth` levels.
+    Depth,
+    /// The root's elements only; deeper elements when a command names them.
+    Lazy,
+}
+
+impl Walk {
+    fn name(self) -> &'static str {
+        match self {
+            Walk::Full => "full",
+            Walk::Depth => "depth",
+            Walk::Lazy => "lazy",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct Settings {
+    walk: Walk,
     walk_depth: usize,
     walk_matrices: bool,
     qualified: bool,
@@ -362,7 +384,16 @@ fn int_setting(p: &Params, k: &str, default: i64) -> i64 {
 impl Settings {
     fn from(p: &Params) -> Settings {
         Settings {
-            walk_depth: int_setting(p, "walk_depth", 255).clamp(1, 255) as usize,
+            // Without `walk`, a walk_depth given alone means depth, as it did
+            // before the setting existed.
+            walk: match p.get("walk").and_then(Value::as_str) {
+                Some("depth") => Walk::Depth,
+                Some("lazy") => Walk::Lazy,
+                Some(_) => Walk::Full,
+                None if p.get("walk_depth").is_some() => Walk::Depth,
+                None => Walk::Full,
+            },
+            walk_depth: int_setting(p, "walk_depth", 2).clamp(1, 255) as usize,
             walk_matrices: p
                 .get("walk_matrices")
                 .and_then(Value::as_bool)
@@ -384,6 +415,21 @@ struct Waiting {
     id: CommandId,
     path: Vec<u32>,
     deadline: Millis,
+}
+
+/// A command waiting for the directories that lead to its element.
+#[derive(Debug)]
+struct Deferred {
+    id: CommandId,
+    name: String,
+    params: Params,
+}
+
+/// One step of a path a command gives: an element number or an identifier.
+#[derive(Debug, Clone, PartialEq)]
+enum Step {
+    Number(u32),
+    Identifier(String),
 }
 
 #[derive(Debug)]
@@ -408,6 +454,21 @@ pub(crate) struct EmberPlus {
     dir_requested: HashSet<Vec<u32>>,
     dir_outstanding: BTreeMap<Vec<u32>, Millis>,
     dir_waiters: Vec<(Vec<u32>, CommandId)>,
+    /// Directories the provider has answered this session: an element not
+    /// among their children does not exist.
+    dir_answered: HashSet<Vec<u32>>,
+    /// Directories that went unanswered; a command waiting on one fails.
+    dir_timed_out: HashSet<Vec<u32>>,
+    /// Directories asked for to find a command's element rather than by the
+    /// walk, which `walk.complete` does not wait for.
+    on_demand: HashSet<Vec<u32>>,
+    deferred: Vec<Deferred>,
+    /// Subscriptions of an earlier session still to be found, in the walk
+    /// modes that do not reach every element.
+    restore: Vec<String>,
+    /// Running deferred commands again: a directory that timed out fails
+    /// them rather than being asked for again.
+    retrying: bool,
     walk_complete: bool,
     sets: Vec<Waiting>,
     connects: Vec<ConnectWait>,
@@ -439,6 +500,12 @@ impl EmberPlus {
             dir_requested: HashSet::new(),
             dir_outstanding: BTreeMap::new(),
             dir_waiters: Vec::new(),
+            dir_answered: HashSet::new(),
+            dir_timed_out: HashSet::new(),
+            on_demand: HashSet::new(),
+            deferred: Vec::new(),
+            restore: Vec::new(),
+            retrying: false,
             walk_complete: false,
             sets: Vec::new(),
             connects: Vec::new(),
@@ -491,7 +558,12 @@ impl EmberPlus {
         for (_, (id, _)) in std::mem::take(&mut self.invocations) {
             cx.complete(id, Err(error.clone()));
         }
+        for d in self.deferred.drain(..) {
+            cx.complete(d.id, Err(error.clone()));
+        }
+        self.restore.clear();
         self.dir_outstanding.clear();
+        self.on_demand.clear();
         self.dir_queue.clear();
     }
 
@@ -546,7 +618,9 @@ impl EmberPlus {
         })
     }
 
-    fn resolve(&self, p: &Params) -> Result<Vec<u32>, CommandError> {
+    /// The steps of a command's `path`: a numeric path such as "1.2.3", or
+    /// identifiers from the root joined by '/'. Empty for the root.
+    fn steps(p: &Params) -> Result<Vec<Step>, CommandError> {
         let raw = p.get("path").and_then(Value::as_str).unwrap_or("").trim();
         let raw = raw.trim_start_matches('/');
         if raw.is_empty() {
@@ -555,15 +629,143 @@ impl EmberPlus {
         if raw.chars().all(|c| c.is_ascii_digit() || c == '.') {
             return raw
                 .split('.')
-                .map(|s| s.parse::<u32>())
+                .map(|s| s.parse::<u32>().map(Step::Number))
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|_| invalid(format!("'{raw}' is not a numeric path like 1.2.3")));
         }
-        self.ids.get(raw).cloned().ok_or_else(|| {
-            invalid(format!(
-                "no element with the identifier path '{raw}' is known; the tree may not have been walked that far (get_directory its parent)"
-            ))
-        })
+        Ok(raw
+            .split('/')
+            .map(|s| Step::Identifier(s.to_string()))
+            .collect())
+    }
+
+    /// The known child of `parent` that `step` names.
+    fn child(&self, parent: &[u32], step: &Step) -> Option<Vec<u32>> {
+        let mut path = parent.to_vec();
+        match step {
+            Step::Number(n) => {
+                path.push(*n);
+                self.tree.contains_key(&path).then_some(path)
+            }
+            Step::Identifier(id) => {
+                let numbers: Vec<u32> = if parent.is_empty() {
+                    self.tree
+                        .keys()
+                        .filter(|k| k.len() == 1)
+                        .map(|k| k[0])
+                        .collect()
+                } else {
+                    self.tree.get(parent)?.children.iter().copied().collect()
+                };
+                numbers.into_iter().find_map(|n| {
+                    let mut c = parent.to_vec();
+                    c.push(n);
+                    let found = self.tree.get(&c)?.identifier.as_deref() == Some(id.as_str());
+                    found.then_some(c)
+                })
+            }
+        }
+    }
+
+    /// The numeric path of a command's element, walking only the branch
+    /// that leads to it: the first directory on the way that has not been
+    /// answered is asked for, and `None` means the command must wait for it.
+    /// An element missing from an answered directory does not exist.
+    fn locate(&mut self, cx: &mut Cx, p: &Params) -> Result<Option<Vec<u32>>, CommandError> {
+        let steps = Self::steps(p)?;
+        let shown = |upto: usize| -> String {
+            let parts: Vec<String> = steps[..upto]
+                .iter()
+                .map(|s| match s {
+                    Step::Number(n) => n.to_string(),
+                    Step::Identifier(i) => i.clone(),
+                })
+                .collect();
+            let numeric = matches!(steps.first(), Some(Step::Number(_)));
+            parts.join(if numeric { "." } else { "/" })
+        };
+        let mut at: Vec<u32> = Vec::new();
+        for (i, step) in steps.iter().enumerate() {
+            if let Some(child) = self.child(&at, step) {
+                at = child;
+                continue;
+            }
+            if let Some(e) = self.tree.get(&at) {
+                if !matches!(e.kind, Kind::Node | Kind::Matrix) {
+                    return Err(invalid(format!(
+                        "'{}' is a {}, which holds no elements",
+                        shown(i),
+                        e.kind.name()
+                    )));
+                }
+            }
+            let parent = if at.is_empty() {
+                "the root".to_string()
+            } else {
+                format!("'{}'", shown(i))
+            };
+            if self.dir_answered.contains(&at) {
+                return Err(invalid(format!(
+                    "no element '{}': {parent} has no such element",
+                    shown(i + 1)
+                )));
+            }
+            if self.dir_outstanding.contains_key(&at) {
+                return Ok(None);
+            }
+            if self.dir_timed_out.contains(&at) && self.retrying {
+                cx.log(
+                    Level::Debug,
+                    format!("{parent} did not answer GetDirectory"),
+                );
+                return Err(CommandError::Timeout);
+            }
+            self.dir_timed_out.remove(&at);
+            // Ask now. A directory the walk has queued stays the walk's.
+            match self.dir_queue.iter().position(|q| *q == at) {
+                Some(i) => {
+                    self.dir_queue.remove(i);
+                }
+                None => {
+                    self.on_demand.insert(at.clone());
+                }
+            }
+            self.send_directory(cx, &at, -1);
+            return Ok(None);
+        }
+        Ok(Some(at))
+    }
+
+    /// Run again the commands waiting for directories, and look for the
+    /// subscriptions still to be restored.
+    fn retry_deferred(&mut self, cx: &mut Cx) {
+        if self.deferred.is_empty() && self.restore.is_empty() {
+            return;
+        }
+        self.retrying = true;
+        for d in std::mem::take(&mut self.deferred) {
+            if let Err(e) = self.run(cx, d.id, &d.name, &d.params) {
+                cx.complete(d.id, Err(e));
+            }
+        }
+        for name_key in std::mem::take(&mut self.restore) {
+            let mut p = Params::new();
+            p.insert("path".into(), json!(name_key));
+            match self.locate(cx, &p) {
+                Ok(Some(path)) => {
+                    if !path.is_empty() && self.subscribed_now.insert(path.clone()) {
+                        let root = self.command_on(&path, glow::Command::new(glow::SUBSCRIBE));
+                        self.send(cx, &root);
+                    }
+                }
+                Ok(None) => self.restore.push(name_key),
+                Err(e) => cx.log(
+                    Level::Debug,
+                    format!("subscription '{name_key}' not restored: {e}"),
+                ),
+            }
+        }
+        self.retrying = false;
     }
 
     fn element_of(&self, path: &[u32], kind: Kind) -> Result<&Elem, CommandError> {
@@ -616,7 +818,11 @@ impl EmberPlus {
             };
             self.send_directory(cx, &path, -1);
         }
-        if !self.walk_complete && self.dir_queue.is_empty() && self.dir_outstanding.is_empty() {
+        let walking = self
+            .dir_outstanding
+            .keys()
+            .any(|k| !self.on_demand.contains(k));
+        if !self.walk_complete && self.dir_queue.is_empty() && !walking {
             self.walk_complete = true;
             p.0.insert("walk".into(), json!({"complete": true}));
         }
@@ -626,6 +832,8 @@ impl EmberPlus {
         if self.dir_outstanding.remove(path).is_none() {
             return;
         }
+        self.on_demand.remove(path);
+        self.dir_answered.insert(path.to_vec());
         let mut i = 0;
         while i < self.dir_waiters.len() {
             if self.dir_waiters[i].0 == path {
@@ -645,9 +853,23 @@ impl EmberPlus {
         self.streams.clear();
         self.dir_queue.clear();
         self.dir_requested.clear();
+        self.dir_answered.clear();
+        self.dir_timed_out.clear();
+        self.on_demand.clear();
         self.subscribed_now.clear();
+        // The full walk finds every subscribed element; the others look for
+        // them, walking only their branches.
+        self.restore = if self.settings.walk == Walk::Full {
+            Vec::new()
+        } else {
+            self.subscriptions.iter().cloned().collect()
+        };
         self.walk_complete = false;
-        cx.state(json!({"elements": null, "identifiers": null, "walk": {"complete": false}}));
+        cx.state(json!({
+            "elements": null,
+            "identifiers": null,
+            "walk": {"complete": false, "mode": self.settings.walk.name()},
+        }));
         self.enqueue(Vec::new());
         let mut p = Patch::default();
         self.pump(cx, &mut p);
@@ -726,10 +948,17 @@ impl EmberPlus {
         }
     }
 
+    /// Queue a newly found node or matrix for the walk, as the walk mode
+    /// asks.
     fn walk_child(&mut self, path: &[u32], kind: Kind) {
+        let depth = match self.settings.walk {
+            Walk::Full => usize::MAX,
+            Walk::Depth => self.settings.walk_depth,
+            Walk::Lazy => return,
+        };
         let wanted = match kind {
-            Kind::Node => path.len() < self.settings.walk_depth,
-            Kind::Matrix => self.settings.walk_matrices && path.len() <= self.settings.walk_depth,
+            Kind::Node => path.len() < depth,
+            Kind::Matrix => self.settings.walk_matrices && path.len() <= depth,
             _ => false,
         };
         if wanted {
@@ -801,9 +1030,11 @@ impl EmberPlus {
                 let e = self.tree.get_mut(path).expect("touched");
                 let back = online && !e.online;
                 e.online = online;
-                // A node back online may hold a different sub-tree: ask again.
+                // A node back online may hold a different sub-tree: ask again
+                // for a directory asked for before, whatever the walk mode.
                 if back && self.dir_requested.remove(path) {
-                    self.walk_child(path, Kind::Node);
+                    self.dir_answered.remove(path);
+                    self.enqueue(path.to_vec());
                 }
             }
         }
@@ -1200,6 +1431,7 @@ impl EmberPlus {
             }
         }
         self.resubscribe(cx);
+        self.retry_deferred(cx);
         self.pump(cx, &mut p);
         p.flush(cx);
     }
@@ -1252,9 +1484,26 @@ impl EmberPlus {
         p: &Params,
     ) -> Result<(), CommandError> {
         let deadline = cx.now() + self.settings.request_timeout;
+        // The element's numeric path, or wait for the directories that lead
+        // to it and run the command again when they arrive.
+        macro_rules! locate {
+            () => {
+                match self.locate(cx, p)? {
+                    Some(path) => path,
+                    None => {
+                        self.deferred.push(Deferred {
+                            id,
+                            name: name.to_string(),
+                            params: p.clone(),
+                        });
+                        return Ok(());
+                    }
+                }
+            };
+        }
         match name {
             "get_directory" => {
-                let path = self.resolve(p)?;
+                let path = locate!();
                 let mask = p
                     .get("field_mask")
                     .and_then(Value::as_str)
@@ -1269,7 +1518,7 @@ impl EmberPlus {
                 self.start_walk(cx);
             }
             "set_parameter" | "set_parameter_null" => {
-                let path = self.resolve(p)?;
+                let path = locate!();
                 let e = self.element_of(&path, Kind::Parameter)?;
                 if let Some(a @ (0 | 1)) = e.access {
                     return Err(invalid(format!(
@@ -1305,7 +1554,7 @@ impl EmberPlus {
                 self.arm_reply_timer(cx);
             }
             "subscribe" | "unsubscribe" => {
-                let path = self.resolve(p)?;
+                let path = locate!();
                 if path.is_empty() {
                     return Err(invalid("give the path of an element"));
                 }
@@ -1329,7 +1578,7 @@ impl EmberPlus {
                 cx.complete(id, Ok(Outcome::Unverified));
             }
             "matrix_connect" | "matrix_disconnect" | "matrix_absolute" => {
-                let path = self.resolve(p)?;
+                let path = locate!();
                 let e = self.element_of(&path, Kind::Matrix)?;
                 let target = p
                     .get("target")
@@ -1369,7 +1618,7 @@ impl EmberPlus {
                 self.arm_reply_timer(cx);
             }
             "invoke_function" => {
-                let path = self.resolve(p)?;
+                let path = locate!();
                 let e = self.element_of(&path, Kind::Function)?;
                 let given = match p.get("arguments") {
                     None => Vec::new(),
@@ -1604,6 +1853,8 @@ impl Module for EmberPlus {
                     .collect();
                 for path in expired {
                     self.dir_outstanding.remove(&path);
+                    self.on_demand.remove(&path);
+                    self.dir_timed_out.insert(path.clone());
                     if path.is_empty() && !self.connected {
                         self.lost(
                             cx,
@@ -1650,6 +1901,8 @@ impl Module for EmberPlus {
                         cx.complete(id, Err(CommandError::Timeout));
                     }
                 }
+                // Commands waiting on a directory that timed out now fail.
+                self.retry_deferred(cx);
                 let mut p = Patch::default();
                 self.pump(cx, &mut p);
                 p.flush(cx);
@@ -2354,6 +2607,313 @@ mod tests {
         assert_eq!(
             stream_slice(&1.5f64.to_be_bytes(), &d(22, 0)),
             Some(Glow::Real(1.5))
+        );
+    }
+
+    /// Connected with these settings, and the root answered with node 1
+    /// "Device" and, unless `bare_root`, its child node 1.6 "Sub" inline.
+    fn rooted(settings: Value) -> (EmberPlus, Value, Vec<Action>) {
+        let mut m = module(settings);
+        let mut st = json!({});
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        state(&mut st, &a);
+        assert_eq!(sent(&a), vec![Root::Elements(vec![get_dir(-1)])]);
+        let a = feed(
+            &mut m,
+            10,
+            Root::Elements(vec![node(Id::Number(1), Some("Device"), None)]),
+        );
+        state(&mut st, &a);
+        (m, st, a)
+    }
+
+    /// Node 1's directory: gain, a router and node 1.6 "Sub" holding 1.6.1
+    /// "trim".
+    fn device_children() -> Root {
+        Root::Elements(vec![Element::Node(Node {
+            id: Id::Path(vec![1]),
+            contents: None,
+            children: Some(vec![
+                param(
+                    1,
+                    ParameterContents {
+                        identifier: Some("gain".into()),
+                        value: Some(Glow::Real(-10.0)),
+                        access: Some(3),
+                        ..Default::default()
+                    },
+                ),
+                Element::Matrix(Matrix {
+                    id: Id::Number(4),
+                    contents: Some(MatrixContents {
+                        identifier: Some("router".into()),
+                        target_count: Some(4),
+                        source_count: Some(4),
+                        ..Default::default()
+                    }),
+                    children: None,
+                    targets: None,
+                    sources: None,
+                    connections: None,
+                }),
+                node(Id::Number(6), Some("Sub"), None),
+            ]),
+        })])
+    }
+
+    fn directory_of(path: Vec<u32>) -> Root {
+        Root::Elements(vec![Element::Node(Node {
+            id: Id::Path(path),
+            contents: None,
+            children: Some(vec![get_dir(-1)]),
+        })])
+    }
+
+    #[test]
+    fn lazy_walks_only_the_root_and_then_what_commands_need() {
+        let (mut m, mut st, a) = rooted(json!({"walk": "lazy"}));
+        // Nothing beyond the root is asked for, and the walk is complete.
+        assert_eq!(sent(&a), vec![]);
+        assert_eq!(st["walk"], json!({"complete": true, "mode": "lazy"}));
+        assert_eq!(st["identifiers"]["Device"], "1");
+
+        // A value change by identifier path: node 1's directory first.
+        let a = run(
+            &mut m,
+            100,
+            1,
+            "set_parameter",
+            json!({"path": "Device/gain", "value": -6.5}),
+        );
+        assert_eq!(completed(&a, 1), None);
+        assert_eq!(sent(&a), vec![directory_of(vec![1])]);
+        // Another command on the same branch waits for the same answer.
+        let a = run(
+            &mut m,
+            105,
+            2,
+            "get_directory",
+            json!({"path": "Device/Sub"}),
+        );
+        assert_eq!(sent(&a), vec![]);
+        let a = feed(&mut m, 110, device_children());
+        state(&mut st, &a);
+        // The value change goes out, and so does Sub's directory; the router
+        // and Sub are not walked on their own.
+        let out = sent(&a);
+        assert_eq!(out.len(), 2, "{out:?}");
+        assert!(
+            out.contains(&Root::Elements(vec![Element::Parameter(Parameter {
+                id: Id::Path(vec![1, 1]),
+                contents: Some(ParameterContents {
+                    value: Some(Glow::Real(-6.5)),
+                    ..Default::default()
+                }),
+                children: None
+            })]))
+        );
+        assert!(out.contains(&directory_of(vec![1, 6])));
+        assert_eq!(st["identifiers"]["Device/gain"], "1.1");
+        assert_eq!(st["walk"]["complete"], true);
+        let a = feed(
+            &mut m,
+            120,
+            Root::Elements(vec![Element::Parameter(Parameter {
+                id: Id::Path(vec![1, 1]),
+                contents: Some(ParameterContents {
+                    value: Some(Glow::Real(-6.5)),
+                    ..Default::default()
+                }),
+                children: None,
+            })]),
+        );
+        assert_eq!(
+            completed(&a, 1),
+            Some(Ok(Outcome::Value { value: json!(-6.5) }))
+        );
+        let a = feed(
+            &mut m,
+            130,
+            Root::Elements(vec![Element::Node(Node {
+                id: Id::Path(vec![1, 6]),
+                contents: None,
+                children: Some(vec![param(
+                    1,
+                    ParameterContents {
+                        identifier: Some("trim".into()),
+                        value: Some(Glow::Integer(0)),
+                        ..Default::default()
+                    },
+                )]),
+            })]),
+        );
+        assert_eq!(completed(&a, 2), Some(Ok(Outcome::Ack)));
+
+        // Known now: no directory is needed.
+        let a = run(
+            &mut m,
+            140,
+            3,
+            "matrix_connect",
+            json!({"path": "Device/router", "target": 1, "sources": [2]}),
+        );
+        let out = sent(&a);
+        assert_eq!(out.len(), 1);
+        assert!(matches!(&out[0], Root::Elements(e) if matches!(e[0], Element::Matrix(_))));
+
+        // Missing from an answered directory: refused at once.
+        let a = run(
+            &mut m,
+            150,
+            4,
+            "set_parameter",
+            json!({"path": "Device/nope", "value": 1}),
+        );
+        assert!(matches!(
+            completed(&a, 4),
+            Some(Err(CommandError::InvalidParams { .. }))
+        ));
+        assert_eq!(sent(&a), vec![]);
+        // Nothing can be under a parameter.
+        let a = run(
+            &mut m,
+            150,
+            5,
+            "subscribe",
+            json!({"path": "Device/gain/x"}),
+        );
+        assert!(matches!(
+            completed(&a, 5),
+            Some(Err(CommandError::InvalidParams { .. }))
+        ));
+        // A numeric path walks the same way.
+        let a = run(&mut m, 160, 6, "subscribe", json!({"path": "1.6.1"}));
+        assert_eq!(completed(&a, 6), Some(Ok(Outcome::Unverified)));
+    }
+
+    #[test]
+    fn a_lazy_lookup_that_goes_unanswered_times_out() {
+        let (mut m, _, _) = rooted(json!({"walk": "lazy"}));
+        let a = run(
+            &mut m,
+            100,
+            1,
+            "invoke_function",
+            json!({"path": "Device/add", "arguments": []}),
+        );
+        assert_eq!(sent(&a), vec![directory_of(vec![1])]);
+        let mut cx = Cx::new(20_000);
+        m.timer(&mut cx, REPLY);
+        let a = cx.take();
+        assert_eq!(completed(&a, 1), Some(Err(CommandError::Timeout)));
+        // Asked again by a later command.
+        let a = run(
+            &mut m,
+            20_100,
+            2,
+            "get_directory",
+            json!({"path": "Device/add"}),
+        );
+        assert_eq!(sent(&a), vec![directory_of(vec![1])]);
+    }
+
+    #[test]
+    fn depth_walks_to_walk_depth() {
+        // One level: only the root.
+        let (_, st, a) = rooted(json!({"walk": "depth", "walk_depth": 1}));
+        assert_eq!(sent(&a), vec![]);
+        assert_eq!(st["walk"], json!({"complete": true, "mode": "depth"}));
+
+        // Two levels: node 1, and matrices found there; not node 1.6.
+        let (mut m, mut st, a) = rooted(json!({"walk": "depth", "walk_depth": 2}));
+        assert_eq!(sent(&a), vec![directory_of(vec![1])]);
+        assert_eq!(st["walk"]["complete"], false);
+        let a = feed(&mut m, 20, device_children());
+        state(&mut st, &a);
+        let out = sent(&a);
+        assert_eq!(out.len(), 1);
+        assert!(matches!(&out[0], Root::Elements(e)
+            if matches!(&e[0], Element::Matrix(x) if x.id == Id::Path(vec![1, 4]))));
+        let a = feed(
+            &mut m,
+            30,
+            Root::Elements(vec![bare(Kind::Matrix, Id::Path(vec![1, 4]), None)]),
+        );
+        state(&mut st, &a);
+        assert_eq!(st["walk"]["complete"], true);
+        // Deeper elements are found on demand.
+        let a = run(
+            &mut m,
+            40,
+            1,
+            "get_directory",
+            json!({"path": "Device/Sub/trim"}),
+        );
+        assert_eq!(sent(&a), vec![directory_of(vec![1, 6])]);
+
+        // walk_depth alone, as before the walk setting, is depth.
+        let (_, st, a) = rooted(json!({"walk_depth": 1}));
+        assert_eq!(sent(&a), vec![]);
+        assert_eq!(st["walk"]["mode"], "depth");
+        // Neither: full.
+        let (_, st, a) = rooted(json!({}));
+        assert_eq!(sent(&a), vec![directory_of(vec![1])]);
+        assert_eq!(st["walk"]["mode"], "full");
+    }
+
+    #[test]
+    fn lazy_restores_subscriptions_by_walking_their_branch() {
+        let (mut m, _, _) = rooted(json!({"walk": "lazy"}));
+        run(&mut m, 100, 1, "subscribe", json!({"path": "Device/Sub"}));
+        feed(&mut m, 110, device_children());
+        let a = feed(
+            &mut m,
+            120,
+            Root::Elements(vec![Element::Node(Node {
+                id: Id::Path(vec![1, 6]),
+                contents: None,
+                children: Some(vec![]),
+            })]),
+        );
+        let _ = a;
+        let mut cx = Cx::new(200);
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Closed {
+                reason: "reset".into(),
+            },
+        );
+        m.timer(&mut cx, RETRY);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        // Device is now node 3: its directory is asked for, then Sub is
+        // subscribed to at its new number.
+        let a = feed(
+            &mut m,
+            300,
+            Root::Elements(vec![node(Id::Number(3), Some("Device"), None)]),
+        );
+        assert_eq!(sent(&a), vec![directory_of(vec![3])]);
+        let a = feed(
+            &mut m,
+            310,
+            Root::Elements(vec![Element::Node(Node {
+                id: Id::Path(vec![3]),
+                contents: None,
+                children: Some(vec![node(Id::Number(2), Some("Sub"), None)]),
+            })]),
+        );
+        assert_eq!(
+            sent(&a),
+            vec![Root::Elements(vec![Element::Node(Node {
+                id: Id::Path(vec![3, 2]),
+                contents: None,
+                children: Some(vec![Element::Command(Command::new(SUBSCRIBE))])
+            })])]
         );
     }
 
