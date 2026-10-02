@@ -879,11 +879,15 @@ A native spec's commands have no `send`, `expect` or `transport`; the module
 defines those. `reason` says why the protocol cannot be expressed as data.
 Vectors apply to native modules exactly as to spec-driven ones.
 
-Every spec, spec-driven or native, belongs to one device family, a Cargo
-feature of the core (`sennheiser`, `shure`, `sony`, ...). A build embeds the
-specs, and compiles the native modules, of the families it enables; the spec
-engine is always built. A core can further be started for named devices only
-(`devices` in its options), and then its catalogue lists only those.
+Every spec, spec-driven or native, is one integration, and each integration
+is a Cargo feature of the core named after its spec id (`sennheiser-ew-dx`,
+`shure-wireless`, `sony-camera`, ...). A build embeds the specs, and compiles
+the native modules, native extensions and discovery protocols, of exactly the
+integrations it enables; vendor groups (`vendor-sennheiser`) and `all` enable
+several at once. The spec engine and transports are shared and always built.
+A core can further be started for named integrations only (`devices` in its
+options: spec ids, vendor groups or `all`), and then its catalogue lists only
+those.
 
 ### Streams
 
@@ -935,3 +939,4 @@ closed and each is named in the spec, so it is never hidden:
 |---|---|
 | `panasonic-update-notification` | Panasonic AW-series cameras' update notifications: registers a local TCP port with the camera (`/cgi-bin/event?connect=start`), receives the changed settings it pushes there, and passes each one, a response text such as `p1`, to the spec's telemetry rules. Registers again when the camera's 60-second version notices stop, and unregisters on closing |
 | `aja-config-events` | AJA's event connection (Ki Pro, KUMO): sends the spec's `open_event_connection` request, then its `wait_for_events` request with the returned connection id, again as each reply arrives, beside the command queue. Each element of the reply, `{param_id, param_type, int_value, str_value}`, is offered to the spec's telemetry rules as two text messages, `event <param_id> value=<value>` and `event <param_id> value_name=<name>`: as a `/config?action=get` reply gives them, a string parameter's value is `str_value` and its name empty, and any other's value is `int_value` and its name `str_value`, or the value when that is empty. Opens a new connection when the id has expired or a request fails, after 1 s doubling to 30 s |
+| `resolume-push` | Resolume Arena and Avenue's websocket API (`ws://host:port/api/v1`): reads the composition Resolume sends on connecting and after each structural change into state keyed by unique id (composition, layers, columns, clips, decks, layer groups), subscribes to every parameter that state shows with `{"action":"subscribe","parameter":"/parameter/by-id/<id>"}`, and applies each `parameter_subscribed` and `parameter_update`. A new composition is diffed against the last: removed items leave state and are unsubscribed, new ones are subscribed. Reads the composition again over REST after a deck switch, after a structural command of the session's own, and as a slow safety refresh (`composition_refresh_s`) for a deck's `closed`, which is not a parameter. Reopens the websocket after 1 s doubling to 30 s |

@@ -1,6 +1,10 @@
 //! Spec-driven devices simulated on real sockets, driven through the public API.
 
-#![cfg(all(feature = "behringer", feature = "blackmagic", feature = "qlab"))]
+#![cfg(all(
+    feature = "behringer-x32",
+    feature = "blackmagic-hyperdeck",
+    feature = "qlab"
+))]
 
 use std::time::Duration;
 

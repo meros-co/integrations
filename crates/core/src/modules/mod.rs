@@ -1,67 +1,88 @@
 //! Device modules: the spec engine for spec-driven devices, and a hand-written
-//! module for each native one. A native module is compiled only with its
-//! feature family (build.rs), the same feature that embeds its spec, so a
-//! spec in the catalogue always has its module.
+//! module for each native one. A native module or native extension is
+//! compiled only with the feature of the integration (spec id) that uses it,
+//! the same feature that embeds the spec (build.rs), so a spec in the
+//! catalogue always has its module and no other integration's code is built.
+//! A module shared by several integrations (one protocol, several product
+//! lines) is compiled when any of them is.
 
-#[cfg(feature = "aja")]
+#[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
-#[cfg(feature = "allenheath")]
+#[cfg(any(
+    feature = "allenheath-ahm",
+    feature = "allenheath-cq",
+    feature = "allenheath-dlive",
+    feature = "allenheath-qu",
+    feature = "allenheath-sq"
+))]
 mod allenheath;
-#[cfg(feature = "allenheath")]
+#[cfg(feature = "allenheath-ahm")]
 mod allenheath_ahm;
-#[cfg(feature = "allenheath")]
+#[cfg(feature = "allenheath-dlive")]
 mod allenheath_dlive;
-#[cfg(feature = "allenheath")]
+#[cfg(any(
+    feature = "allenheath-ahm",
+    feature = "allenheath-cq",
+    feature = "allenheath-dlive",
+    feature = "allenheath-qu",
+    feature = "allenheath-sq"
+))]
 mod allenheath_midi;
-#[cfg(feature = "allenheath")]
+#[cfg(feature = "allenheath-qu")]
 mod allenheath_qu;
-#[cfg(feature = "allenheath")]
+#[cfg(any(feature = "allenheath-sq", feature = "allenheath-cq"))]
 mod allenheath_sq;
-#[cfg(feature = "analogway")]
+#[cfg(any(
+    feature = "analogway-alta4k",
+    feature = "analogway-livepremier",
+    feature = "analogway-midra4k"
+))]
 mod analogway;
-#[cfg(feature = "blackmagic")]
+#[cfg(feature = "blackmagic-atem")]
 mod atem;
 #[cfg(feature = "emberplus")]
 mod emberplus;
-#[cfg(feature = "generic")]
+#[cfg(feature = "generic-http")]
 mod generic_http;
-#[cfg(feature = "generic")]
+#[cfg(feature = "generic-osc")]
 mod generic_osc;
-#[cfg(feature = "generic")]
+#[cfg(any(feature = "generic-tcp-udp", feature = "generic-osc"))]
 mod generic_tcp_udp;
-#[cfg(feature = "generic")]
+#[cfg(feature = "http-snapshot")]
 mod http_snapshot;
-#[cfg(feature = "obs")]
+#[cfg(feature = "obs-studio")]
 mod obs;
-#[cfg(feature = "panasonic")]
+#[cfg(feature = "panasonic-ptz")]
 mod panasonic_notify;
 #[cfg(feature = "pjlink")]
 mod pjlink;
 #[cfg(feature = "qsys")]
 mod qsys;
-#[cfg(feature = "sennheiser")]
+#[cfg(feature = "resolume")]
+mod resolume_push;
+#[cfg(feature = "sennheiser-digital-6000")]
 mod sennheiser_d6000;
-#[cfg(feature = "sennheiser")]
+#[cfg(feature = "sennheiser-ew-dx")]
 mod sennheiser_ewdx;
-#[cfg(feature = "sennheiser")]
+#[cfg(feature = "sennheiser-ew-g3-g4")]
 mod sennheiser_mcp;
-#[cfg(feature = "shure")]
+#[cfg(feature = "shure-wireless")]
 mod shure;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera_content;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera_dataset;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera_ftp;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera_http;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera_props;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
-#[cfg(feature = "tsl")]
+#[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 mod tsl;
 #[cfg(feature = "visca")]
 mod visca;
@@ -86,37 +107,41 @@ pub(crate) fn construct(
         let engine = SpecEngine::new(Arc::new(spec.clone()), context.clone())?;
         return match extension {
             None => Ok(Box::new(engine)),
-            #[cfg(feature = "panasonic")]
+            #[cfg(feature = "panasonic-ptz")]
             Some("panasonic-update-notification") => Ok(Box::new(
                 panasonic_notify::PanasonicNotify::new(engine, &context),
             )),
-            #[cfg(feature = "aja")]
+            #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
             Some("aja-config-events") => Ok(Box::new(aja_config_events::AjaConfigEvents::new(
                 engine, spec, &context,
             )?)),
+            #[cfg(feature = "resolume")]
+            Some("resolume-push") => Ok(Box::new(resolume_push::ResolumePush::new(
+                engine, spec, &context,
+            ))),
             Some(other) => Err(format!("no native extension '{other}'")),
         };
     }
     match spec.id.as_str() {
-        #[cfg(feature = "sennheiser")]
+        #[cfg(feature = "sennheiser-ew-g3-g4")]
         "sennheiser-ew-g3-g4" => Ok(Box::new(sennheiser_mcp::Mcp::new(context))),
-        #[cfg(feature = "sennheiser")]
+        #[cfg(feature = "sennheiser-digital-6000")]
         "sennheiser-digital-6000" => Ok(Box::new(sennheiser_d6000::D6000::new(context))),
-        #[cfg(feature = "blackmagic")]
+        #[cfg(feature = "blackmagic-atem")]
         "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
-        #[cfg(feature = "obs")]
+        #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
-        #[cfg(feature = "shure")]
+        #[cfg(feature = "shure-wireless")]
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
-        #[cfg(feature = "sony")]
+        #[cfg(feature = "sony-camera")]
         "sony-camera" => Ok(Box::new(sony_camera::SonyCamera::new(context)?)),
         // TSL defines no port, so the host must give one.
-        #[cfg(feature = "tsl")]
+        #[cfg(feature = "tsl-umd-listener")]
         "tsl-umd-listener" => match context.port {
             Some(port) => Ok(Box::new(tsl::Listener::new(port, &context.model))),
             None => Err("TSL UMD has no standard port: give the port to listen on".into()),
         },
-        #[cfg(feature = "tsl")]
+        #[cfg(feature = "tsl-umd-display")]
         "tsl-umd-display" => match context.port {
             Some(port) => Ok(Box::new(tsl::Sender::new(&context, port))),
             None => Err("TSL UMD has no standard port: give the display's port".into()),
@@ -127,7 +152,11 @@ pub(crate) fn construct(
         "visca" => Ok(Box::new(visca::Visca::new(context))),
         #[cfg(feature = "qsys")]
         "qsys" => Ok(Box::new(qsys::Qsys::new(context))),
-        #[cfg(feature = "analogway")]
+        #[cfg(any(
+            feature = "analogway-alta4k",
+            feature = "analogway-livepremier",
+            feature = "analogway-midra4k"
+        ))]
         "analogway-livepremier" | "analogway-midra4k" | "analogway-alta4k" => {
             let dialect = analogway::Dialect::for_spec(&spec.id).expect("an AWJ spec");
             Ok(Box::new(analogway::AnalogWay::new(dialect, context)))
@@ -136,17 +165,23 @@ pub(crate) fn construct(
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
-        #[cfg(feature = "generic")]
+        #[cfg(feature = "generic-osc")]
         "generic-osc" => Ok(Box::new(generic_osc::GenericOsc::new(context)?)),
-        #[cfg(feature = "generic")]
+        #[cfg(feature = "generic-tcp-udp")]
         "generic-tcp-udp" => Ok(Box::new(generic_tcp_udp::GenericTcpUdp::new(context)?)),
-        #[cfg(feature = "generic")]
+        #[cfg(feature = "generic-http")]
         "generic-http" => Ok(Box::new(generic_http::GenericHttp::new(context)?)),
-        #[cfg(feature = "generic")]
+        #[cfg(feature = "http-snapshot")]
         "http-snapshot" => Ok(Box::new(http_snapshot::HttpSnapshot::new(context)?)),
-        #[cfg(feature = "sennheiser")]
+        #[cfg(feature = "sennheiser-ew-dx")]
         "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
-        #[cfg(feature = "allenheath")]
+        #[cfg(any(
+            feature = "allenheath-ahm",
+            feature = "allenheath-cq",
+            feature = "allenheath-dlive",
+            feature = "allenheath-qu",
+            feature = "allenheath-sq"
+        ))]
         "allenheath-dlive" | "allenheath-ahm" | "allenheath-qu" | "allenheath-sq"
         | "allenheath-cq" => Ok(Box::new(allenheath::AllenHeath::new(&spec.id, context)?)),
         other => Err(format!("no native module for '{other}'")),

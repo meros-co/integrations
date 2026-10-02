@@ -5,7 +5,7 @@
 //! protocol documentation defines, answers the requests the core makes, and
 //! emits a scene change event when the program scene is set.
 
-#![cfg(feature = "obs")]
+#![cfg(feature = "obs-studio")]
 // tungstenite's handshake callback signature returns a large error type.
 #![allow(clippy::result_large_err)]
 

@@ -1,7 +1,7 @@
 //! Plays tests/bindings/script.json through the sidecar over HTTP against
 //! integrations-sim, the same script every other delivery runs.
 
-// The script drives devices from several families.
+// The script drives devices from several integrations, so it needs them all.
 #![cfg(feature = "all")]
 
 use std::io::{BufRead, BufReader};

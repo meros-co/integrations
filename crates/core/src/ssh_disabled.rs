@@ -1,5 +1,5 @@
-//! Stands in for `ssh.rs` in a build without the `sony` feature, the only
-//! family whose devices tunnel over SSH; it leaves out russh and its
+//! Stands in for `ssh.rs` in a build without the `sony-camera` integration,
+//! the only one whose devices tunnel over SSH; it leaves out russh and its
 //! dependencies. A module that asks for a tunnel anyway gets a stream that
 //! closes at once, saying why.
 

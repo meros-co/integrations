@@ -5,7 +5,7 @@
 //! authentication as "api", /api/ssc/version, /api/device/identity, the
 //! subscription stream and its /add endpoint, the channel resources, and mute.
 
-#![cfg(feature = "sennheiser")]
+#![cfg(feature = "sennheiser-ew-dx")]
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};

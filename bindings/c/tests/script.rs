@@ -2,7 +2,7 @@
 //! integrations-sim: every call crosses the C ABI as NUL-terminated strings,
 //! exactly as a C or C++ host makes it.
 
-// The script drives devices from several families.
+// The script drives devices from several integrations, so it needs them all.
 #![cfg(feature = "all")]
 
 use std::ffi::{c_char, CStr, CString};

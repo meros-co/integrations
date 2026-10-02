@@ -10,11 +10,14 @@
 //!                          [--bind-address ADDR] [--devices ID,ID,...]
 //! ```
 //!
-//! `--devices` names the only devices (spec ids) the service works with, for a
-//! product that uses only some: the catalogue lists only them, opening any
-//! other is refused with `not_selected`, and discovery runs only the protocols
-//! that find them. An id the build does not include stops the service at
-//! startup.
+//! `--devices` names the only integrations the service works with (spec ids,
+//! vendor groups such as `vendor-sennheiser`, or `all`), for a product that
+//! uses only some: the catalogue lists only them, opening any other is refused
+//! with `not_selected`, and discovery runs only the protocols that find them.
+//! A name the build does not include stops the service at startup. Which
+//! integrations are built into the service at all is chosen when it is built:
+//! `cargo build -p meros-integrations-sidecar --no-default-features
+//! --features meros-integrations/sennheiser-ew-dx,...`.
 //!
 //! | Method and path              | Body / query                          | Returns                    |
 //! |------------------------------|---------------------------------------|----------------------------|
@@ -361,27 +364,21 @@ fn parse_args() -> Result<Args, String> {
     }
     let mut listen: SocketAddr = DEFAULT_LISTEN.parse().unwrap();
     let mut token_file = PathBuf::from("meros-integrations.token");
-    let mut options = meros_integrations::CoreOptions::default();
+    let mut options = meros_integrations::CoreOptions::new();
     while let Some(flag) = args.next() {
         let value = args.next().ok_or(format!("{flag} needs a value"))?;
         match flag.as_str() {
             "--listen" => listen = value.parse().map_err(|e| format!("--listen: {e}"))?,
             "--token-file" => token_file = PathBuf::from(value),
             "--bind-address" => {
-                options.bind_address =
-                    Some(value.parse().map_err(|e| format!("--bind-address: {e}"))?)
+                options =
+                    options.bind_address(value.parse().map_err(|e| format!("--bind-address: {e}"))?)
             }
-            // The only devices this sidecar works with, by spec id; every
-            // device in the build when absent.
+            // The only integrations this sidecar works with: spec ids, vendor
+            // groups or `all`; every integration in the build when absent.
             "--devices" => {
-                options.devices = Some(
-                    value
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|id| !id.is_empty())
-                        .map(String::from)
-                        .collect(),
-                )
+                options =
+                    options.devices(value.split(',').map(str::trim).filter(|id| !id.is_empty()))
             }
             other => return Err(format!("unknown flag {other}")),
         }

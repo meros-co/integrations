@@ -104,9 +104,10 @@ export interface CoreOptions {
   /** The local network interface address for device traffic; every interface when absent. */
   bindAddress?: string;
   /**
-   * The only devices (spec ids) this core works with; every device in the
-   * build when absent. The catalogue then lists only them, opening any other
-   * throws 'not_selected', and discovery runs only their protocols. An id the
+   * The only integrations this core works with: spec ids, vendor groups
+   * ('vendor-sennheiser') or 'all'; every integration in the build when
+   * absent. The catalogue then lists only them, opening any other throws
+   * 'not_selected', and discovery runs only their protocols. A name the
    * build does not include makes the constructor throw.
    */
   devices?: string[];

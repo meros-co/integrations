@@ -22,18 +22,35 @@ library and the network stack use:
 the interface end to end. `cargo test -p meros-integrations-c` plays the shared
 binding script through the same functions.
 
-A product that uses only some devices names them when it starts the core:
-`mi_core_create("{\"devices\":[\"sennheiser-ew-g3-g4\",\"shure-wireless\"]}", &error)`.
-The catalogue then lists only those devices, `mi_open` of any other returns
-`{"error":{"error":"not_selected"}}`, and discovery runs only the protocols
-that find them. To leave the other device families out of the library itself,
-build it with only the families it needs (see the core's feature list in
+## Choosing integrations
+
+The library contains every integration unless you name the ones you want
+when you build it. Name spec ids, vendor groups (`vendor-sennheiser`) or
+`all`, each as a feature of the core (the list is in
 `crates/core/Cargo.toml`):
 
 ```
 cargo build --release -p meros-integrations-c --no-default-features \
-  --features meros-integrations/sennheiser,meros-integrations/shure
+  --features meros-integrations/sennheiser-ew-dx,meros-integrations/shure-wireless
 ```
+
+Integrations left out have neither their spec, their code nor their
+dependencies in the library.
+
+At run time a core can be narrowed further to some of the integrations the
+library was built with:
+`mi_core_create("{\"devices\":[\"sennheiser-ew-g3-g4\",\"shure-wireless\"]}", &error)`.
+`devices` takes spec ids, vendor groups or `"all"`. The catalogue then lists
+only those devices, `mi_open` of any other returns
+`{"error":{"error":"not_selected"}}`, and discovery runs only the protocols
+that find them. Opening a device whose integration was not built in returns
+`{"error":{"error":"not_built","feature":"<spec id>"}}`, naming the feature
+to build with.
+
+`cargo test -p meros-integrations-c` plays the shared script, which needs a
+build with every integration (the default).
+
+## Threads and streams
 
 Every call blocks, so make calls from worker threads. The library never calls
 back into the host: read events with `mi_wait_events` on a thread of your own,

@@ -2,7 +2,7 @@
 //! 127.0.0.1 listens on 53212, and a simulated receiver at 127.0.0.2 answers
 //! as a G3/G4 would.
 
-#![cfg(feature = "sennheiser")]
+#![cfg(feature = "sennheiser-ew-g3-g4")]
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
@@ -12,11 +12,8 @@ use tokio::net::UdpSocket;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_g3_g4_is_discovered_and_identified_as_a_receiver() {
-    let core = Core::with_options(CoreOptions {
-        bind_address: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-        ..Default::default()
-    })
-    .unwrap();
+    let core = Core::with_options(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
+        .unwrap();
     core.discover(DiscoverRequest {
         action: DiscoverAction::Listen,
         protocols: vec!["mcp".into()],

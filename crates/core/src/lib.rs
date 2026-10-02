@@ -2,11 +2,11 @@
 //! devices, shared by every consumer.
 //!
 //! ```no_run
-//! use meros_integrations::{Core, OpenRequest};
+//! use meros_integrations::{Core, CoreOptions, OpenRequest};
 //! use serde_json::json;
 //!
 //! # async fn demo() -> Result<(), Box<dyn std::error::Error>> {
-//! let core = Core::new()?;
+//! let core = Core::with_options(CoreOptions::new().devices(["sennheiser-ew-g3-g4"]))?;
 //! let device = core.open(OpenRequest {
 //!     device: "sennheiser-ew-g3-g4".into(),
 //!     model: "em-300-500-g4".into(),
@@ -20,14 +20,17 @@
 //! # Ok(()) }
 //! ```
 //!
-//! A product that uses only some devices names them, at run time with
-//! [`CoreOptions::devices`], and at build time with the crate's feature
-//! families (`default-features = false, features = ["sennheiser", "shure"]`),
-//! which leave the other families' specs and native modules out of the binary.
-//! The spec engine is always built.
+//! Every spec is one integration, and a product chooses exactly the
+//! integrations it uses. At build time each is a Cargo feature named after
+//! its spec id (`features = ["sennheiser-ew-dx", "shure-wireless"]`); a
+//! vendor group (`vendor-sennheiser`) or `all` enables several at once. The
+//! default is none. An integration left out has neither its spec, its native
+//! module, its discovery protocol nor its own dependencies in the binary. At
+//! run time [`CoreOptions::devices`] narrows a core to some of the built
+//! integrations. The spec engine and transports are shared and always built.
 
-// Which helpers a build uses depends on the families it includes; a build
-// without every family leaves some unused, which is not a defect.
+// Which helpers a build uses depends on the integrations it includes; a build
+// without every integration leaves some unused, which is not a defect.
 #![cfg_attr(
     not(feature = "all"),
     allow(dead_code, unused_imports, unused_variables)
@@ -41,17 +44,19 @@ pub mod events;
 mod files;
 mod http;
 pub mod json;
+#[cfg(feature = "sennheiser-ew-g3-g4")]
+mod mcp_discovery;
 pub mod module;
 mod modules;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
 mod session;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod ssdp;
 pub mod sse;
-#[cfg(feature = "sony")]
+#[cfg(feature = "sony-camera")]
 mod ssh;
-#[cfg(not(feature = "sony"))]
+#[cfg(not(feature = "sony-camera"))]
 #[path = "ssh_disabled.rs"]
 mod ssh;
 pub mod streams;
@@ -109,8 +114,9 @@ pub enum OpenError {
     /// started with (`CoreOptions::devices`).
     #[error("device '{device}' is not among the devices this core was started with")]
     NotSelected { device: String },
-    /// The device's feature family was left out of this build.
-    #[error("device '{device}' is not in this build: it comes with the '{feature}' feature")]
+    /// The device's integration was left out of this build; `feature` is
+    /// the Cargo feature that builds it in (its spec id).
+    #[error("device '{device}' is not in this build: it needs the '{feature}' feature")]
     NotBuilt { device: String, feature: String },
     #[error("device '{device}' has no model '{model}'")]
     UnknownModel { device: String, model: String },
@@ -141,8 +147,22 @@ pub struct Core {
     discovery: discovery::Discovery,
 }
 
-/// How a core is set up. Every field has a default suitable for most hosts.
+/// How a core is set up. Every option has a default suitable for most hosts.
+///
+/// Build it with [`CoreOptions::new`] and its setters, so options added later
+/// break no one:
+///
+/// ```
+/// use meros_integrations::CoreOptions;
+///
+/// let options = CoreOptions::new()
+///     .devices(["sennheiser-ew-dx", "shure-wireless"])
+///     .bind_address("192.168.10.5".parse().unwrap());
+/// ```
+///
+/// Bindings take the same options as JSON (`{"devices": [...]}`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CoreOptions {
     /// The local address UDP sockets bind to: the network interface device
     /// traffic uses. Absent means every interface. A venue with separate
@@ -150,13 +170,39 @@ pub struct CoreOptions {
     /// devices that answer on both are only heard on one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bind_address: Option<IpAddr>,
-    /// The spec ids this core works with; absent means every device in the
-    /// build. With a list, the catalogue holds only those specs, opening any
-    /// other device fails with `not_selected`, discovery runs only the
-    /// protocols that find them, and only they are reported as discovered.
-    /// An id the build does not include fails construction.
+    /// The integrations this core works with: spec ids, vendor groups
+    /// (`vendor-sennheiser`: those of the vendor's integrations in the build)
+    /// or `all`. Absent means every integration in the build. With a list,
+    /// the catalogue holds only those specs, opening any other device fails
+    /// with `not_selected`, discovery runs only the protocols that find them,
+    /// and only they are reported as discovered. A name the build does not
+    /// include fails construction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub devices: Option<Vec<String>>,
+}
+
+impl CoreOptions {
+    /// The defaults: every interface, every integration in the build.
+    pub fn new() -> CoreOptions {
+        CoreOptions::default()
+    }
+
+    /// Work only with these integrations (see [`CoreOptions::devices`]).
+    pub fn devices<I, S>(mut self, devices: I) -> CoreOptions
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.devices = Some(devices.into_iter().map(Into::into).collect());
+        self
+    }
+
+    /// Bind UDP sockets to this local address (see
+    /// [`CoreOptions::bind_address`]).
+    pub fn bind_address(mut self, address: IpAddr) -> CoreOptions {
+        self.bind_address = Some(address);
+        self
+    }
 }
 
 impl Core {
@@ -167,7 +213,8 @@ impl Core {
     }
 
     /// Start the core with options. Fails with `InvalidInput` when
-    /// `devices` names a spec this build does not include, or is empty.
+    /// `devices` names an integration this build does not include, or is
+    /// empty.
     pub fn with_options(options: CoreOptions) -> std::io::Result<Core> {
         let embedded = Catalog::embedded();
         let catalog = match &options.devices {
@@ -239,7 +286,7 @@ impl Core {
             let device = request.device.clone();
             if self.excluded.contains(&device) {
                 OpenError::NotSelected { device }
-            } else if let Some(feature) = catalog::family(&device) {
+            } else if let Some(feature) = catalog::feature(&device) {
                 OpenError::NotBuilt {
                     device,
                     feature: feature.into(),

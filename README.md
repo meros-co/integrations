@@ -26,18 +26,33 @@ one you use.
 
 Pin an exact version. A new release can change what is sent to your hardware.
 
-If you only need some devices, you can leave the rest out:
+Each device type is one **integration**, named by its spec id
+(`sennheiser-ew-dx`, `shure-wireless`, `sony-camera`, ...; the full list is
+under [Devices](#devices)). You choose which integrations you get, one by one,
+or by vendor (`vendor-sennheiser`, `vendor-sony`, ...), or `all`.
 
-- **When starting the core**, pass the spec ids you use as `devices` in the
-  core options (`CoreOptions` in Rust, the options JSON in C,
-  `new Core({ devices })` in Node, `Core(devices=...)` in Python,
-  `--devices a,b,c` for the HTTP service). Only those devices are listed,
-  opened and discovered.
-- **When building**, enable only the device families you need. The other
-  families' specs and code are left out of the binary:
-  `meros-integrations = { version = "...", default-features = false, features = ["sennheiser", "shure"] }`.
-  The families are listed in `crates/core/Cargo.toml`. All of them are on by
-  default.
+**When building**, name the integrations to build in. Every other
+integration, with its spec, code, discovery and dependencies, is left out:
+
+| Package | How to choose |
+|---|---|
+| Rust | `meros-integrations = { version = "...", features = ["sennheiser-ew-dx", "shure-wireless"] }` |
+| C | `cargo build --release -p meros-integrations-c --no-default-features --features meros-integrations/sennheiser-ew-dx,meros-integrations/shure-wireless` |
+| Node | `MEROS_INTEGRATIONS=sennheiser-ew-dx,shure-wireless npm run build` (in `bindings/node`) |
+| Python | `python build_dev.py --integrations sennheiser-ew-dx,shure-wireless` (in `bindings/python`), or for a wheel `maturin build --release --no-default-features --features meros-integrations/sennheiser-ew-dx,meros-integrations/shure-wireless` |
+| HTTP service | `cargo build --release -p meros-integrations-sidecar --no-default-features --features meros-integrations/sennheiser-ew-dx,meros-integrations/shure-wireless` |
+
+The Rust crate builds no integration unless you name some. The C library,
+Node and Python packages and the HTTP service build all of them unless you
+name some. The features are listed in `crates/core/Cargo.toml`; each package's README
+has the details.
+
+**When starting the core**, you can narrow it further to some of the
+integrations it was built with: pass their spec ids or vendor groups as
+`devices` in the core options (`CoreOptions::new().devices([...])` in Rust,
+the options JSON in C, `new Core({ devices })` in Node, `Core(devices=...)` in
+Python, `--devices a,b,c` for the HTTP service). Only those devices are
+listed, opened and discovered.
 
 ## How devices are described
 
@@ -159,7 +174,7 @@ from the device. Every model is currently `none`.
 ## Repository layout
 
 ```
-specs/      one YAML file per device family
+specs/      one YAML file per integration
 schema/     JSON Schema for the spec format
 vectors/    expected bytes for each command, used by the tests
 crates/     the Rust library, the HTTP service and a device simulator
@@ -178,12 +193,16 @@ python tools/validate.py
 `cargo test` runs the library's tests, including every conformance vector.
 `validate.py` checks each spec against the schema and the format's rules.
 
-Builds with only some device families should also pass, for example:
+Builds with only some integrations should also pass, for example:
 
 ```
-cargo test -p meros-integrations --no-default-features --features sennheiser,shure
-cargo build -p meros-integrations --no-default-features
+cargo test -p meros-integrations --features sennheiser-ew-dx,shure-wireless
+cargo test -p meros-integrations --features all
+cargo build -p meros-integrations
+python tools/check_features.py
 ```
+
+`check_features.py` builds the library once per integration, each on its own.
 
 ## Contributing
 

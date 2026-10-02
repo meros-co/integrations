@@ -23,8 +23,9 @@ typedef struct MiCore MiCore;
 MiCore *mi_core_new(void);
 /* options: {"bind_address":"<local interface address>",
  *           "devices":["<spec id>",...]}, or NULL for defaults.
- * devices: the only devices this core works with; absent means every device
- * in the build. The catalogue then lists only them, mi_open of any other
+ * devices: the only integrations this core works with (spec ids, vendor
+ * groups such as "vendor-sennheiser", or "all"); absent means every
+ * integration in the build. The catalogue then lists only them, mi_open of any other
  * fails with "not_selected", and discovery runs only their protocols.
  * NULL if the options are invalid (including an unknown device id) or the
  * core cannot start. */

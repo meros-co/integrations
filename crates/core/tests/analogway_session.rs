@@ -13,7 +13,12 @@
 //! against a TPP device that answers each command line with its register,
 //! checking the full register sequences the vectors can only begin.
 
-#![cfg(feature = "analogway")]
+#![cfg(all(
+    feature = "analogway-livecore",
+    feature = "analogway-livepremier",
+    feature = "analogway-midra",
+    feature = "analogway-midra4k"
+))]
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

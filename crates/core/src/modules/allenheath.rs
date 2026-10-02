@@ -41,10 +41,14 @@ use std::net::SocketAddr;
 
 use serde_json::{Map, Value};
 
+#[cfg(feature = "allenheath-ahm")]
 use super::allenheath_ahm::Ahm;
+#[cfg(feature = "allenheath-dlive")]
 use super::allenheath_dlive::Dlive;
 use super::allenheath_midi::{self as midi, Assembler, Event, Law, Parser, Update};
+#[cfg(feature = "allenheath-qu")]
 use super::allenheath_qu::Qu;
+#[cfg(any(feature = "allenheath-sq", feature = "allenheath-cq"))]
 use super::allenheath_sq::Sq;
 use crate::catalog::Params;
 use crate::module::{
@@ -325,9 +329,13 @@ pub(crate) struct AllenHeath {
 /// The dialect for a spec and model, or why there is none.
 fn dialect(spec: &str, ctx: &OpenContext) -> Result<Box<dyn Dialect>, String> {
     Ok(match spec {
+        #[cfg(feature = "allenheath-dlive")]
         "allenheath-dlive" => Box::new(Dlive::new(&ctx.model, &ctx.settings)?),
+        #[cfg(feature = "allenheath-ahm")]
         "allenheath-ahm" => Box::new(Ahm::new(&ctx.settings)),
+        #[cfg(feature = "allenheath-qu")]
         "allenheath-qu" => Box::new(Qu::new(&ctx.model, &ctx.settings)?),
+        #[cfg(any(feature = "allenheath-sq", feature = "allenheath-cq"))]
         "allenheath-sq" | "allenheath-cq" => Box::new(Sq::new(&ctx.model, &ctx.settings)?),
         other => return Err(format!("no Allen & Heath dialect for '{other}'")),
     })

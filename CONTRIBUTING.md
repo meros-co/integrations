@@ -95,15 +95,25 @@ python tools/validate.py
 python tools/make_vectors.py
 cargo test
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test -p meros-integrations --no-default-features --features sennheiser,shure
-cargo build -p meros-integrations --no-default-features
+cargo fmt --all -- --check
+cargo test -p meros-integrations --features sennheiser-ew-dx,shure-wireless
+cargo build -p meros-integrations
+python tools/check_features.py
 ```
 
-A new spec belongs to a device family, a Cargo feature of the core: add it to
-`FAMILIES` in `crates/core/build.rs` (the build fails until it is in one), and
-a new family to `[features]` and `all` in `crates/core/Cargo.toml`. A new
-native module is compiled under its family's feature (`#[cfg(feature = ...)]`
-in `crates/core/src/modules/mod.rs`).
+Every spec is an integration, and every integration is a Cargo feature of the
+core named after its spec id. Adding a spec means adding its feature:
+
+- add the spec id to its vendor group in `VENDOR_GROUPS` in
+  `crates/core/build.rs` (the build fails until it is there), or a new
+  `vendor-...` group for a new vendor;
+- in `crates/core/Cargo.toml`, add `<spec-id> = []` (listing `dep:...` for an
+  optional dependency only it needs), add it to its `vendor-...` group, and a
+  new group to `all`. A test checks that the two tables agree;
+- compile its native module, native extension or discovery protocol under
+  `#[cfg(feature = "<spec-id>")]` (`crates/core/src/modules/mod.rs`), and its
+  tests under the same feature;
+- run `python tools/check_features.py <spec-id>` to check it builds alone.
 
 ## Review checklist
 

@@ -75,9 +75,10 @@ class Core extends EventEmitter {
   /**
    * @param {{ bindAddress?: string, devices?: string[] }} [options]
    *   bindAddress: the local network interface for device traffic; every
-   *   interface when absent. devices: the only devices (spec ids) this core
-   *   works with; every device in the build when absent. Throws for an id the
-   *   build does not include.
+   *   interface when absent. devices: the only integrations this core works
+   *   with: spec ids, vendor groups ('vendor-sennheiser') or 'all'; every
+   *   integration in the build when absent. Throws for a name the build does
+   *   not include.
    */
   constructor(options = {}) {
     super();

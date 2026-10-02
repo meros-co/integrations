@@ -6,7 +6,7 @@
 //! knows, records every byte, and pushes changes of its own as a console does
 //! when it is operated: a scene recall and a fader move, using running status.
 
-#![cfg(feature = "allenheath")]
+#![cfg(all(feature = "allenheath-dlive", feature = "allenheath-sq"))]
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

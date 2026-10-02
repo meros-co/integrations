@@ -100,8 +100,9 @@ class Core:
         """bind_address: the local network interface for device traffic;
         every interface when None.
 
-        devices: the only devices (spec ids) this core works with; every
-        device in the build when None. The catalogue then lists only them,
+        devices: the only integrations this core works with: spec ids,
+        vendor groups ("vendor-sennheiser") or "all"; every integration in
+        the build when None. The catalogue then lists only them,
         opening any other raises IntegrationsError "not_selected", and
         discovery runs only their protocols. Raises RuntimeError for an id
         the build does not include."""

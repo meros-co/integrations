@@ -80,11 +80,8 @@ async fn discovered(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn class_2_projectors_are_found_by_search_and_link_up() {
-    let core = Core::with_options(CoreOptions {
-        bind_address: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-        ..Default::default()
-    })
-    .unwrap();
+    let core = Core::with_options(CoreOptions::new().bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST)))
+        .unwrap();
 
     // Open first, so its notification route exists before discovery listens.
     // Nothing listens on its TCP port; only the UDP route matters here.

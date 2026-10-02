@@ -11,112 +11,229 @@ build = "build.rs"
 [lib]
 name = "meros_integrations"
 
-# Device families. Each embeds its specs and compiles its native modules;
-# the spec engine, transports and catalogue are always built. The default is
-# every family. A product that needs only some depends with
-#   meros-integrations = { ..., default-features = false, features = ["sennheiser", "shure"] }
-# and gets a smaller binary whose catalogue holds only those families. Which
-# spec belongs to which family is listed in build.rs.
+# Integrations. Every spec in specs/ is one integration, built in by the
+# feature named after its spec id: it embeds that spec and compiles that
+# integration's native module, discovery protocol and dependencies, nothing
+# else. A consumer names exactly the integrations it uses:
+#   meros-integrations = { ..., features = ["sennheiser-ew-dx", "shure-wireless"] }
+# A vendor group (`vendor-sennheiser`) enables every integration of one vendor,
+# and `all` enables every integration; both are conveniences, never required.
+# The default is no integration, so nothing is built in that was not named.
+# build.rs holds the same table and fails the build for a spec not in it.
 [features]
-default = ["all"]
+default = []
 all = [
-    "aja",
-    "allenheath",
-    "analogway",
-    "barco",
-    "behringer",
-    "birddog",
-    "blackmagic",
-    "chamsys",
-    "emberplus",
-    "etc",
-    "generic",
-    "h2r",
-    "kramer",
-    "ma-lighting",
-    "newtek",
-    "obs",
-    "panasonic",
-    "pjlink",
-    "ptzoptics",
-    "qlab",
-    "qsys",
-    "renewedvision",
-    "resolume",
-    "roland",
-    "ross",
-    "sennheiser",
-    "shure",
-    "sony",
-    "tsl",
-    "visca",
-    "vmix",
-    "yamaha",
+    "vendor-aja",
+    "vendor-allenheath",
+    "vendor-analogway",
+    "vendor-barco",
+    "vendor-behringer",
+    "vendor-birddog",
+    "vendor-blackmagic",
+    "vendor-chamsys",
+    "vendor-etc",
+    "vendor-figure53",
+    "vendor-generic",
+    "vendor-h2r",
+    "vendor-kramer",
+    "vendor-lawo",
+    "vendor-ma-lighting",
+    "vendor-newtek",
+    "vendor-obs",
+    "vendor-panasonic",
+    "vendor-pjlink",
+    "vendor-ptzoptics",
+    "vendor-qsc",
+    "vendor-renewedvision",
+    "vendor-resolume",
+    "vendor-roland",
+    "vendor-ross",
+    "vendor-sennheiser",
+    "vendor-shure",
+    "vendor-sony",
+    "vendor-studiocoast",
+    "vendor-tsl",
+    "vendor-yamaha",
 ]
-# AJA Ki Pro and KUMO (spec-driven, with the native config-event extension)
-aja = []
-# Allen & Heath dLive/Avantis, AHM, Qu, SQ and CQ (native)
-allenheath = []
-# Analog Way LivePremier, Midra 4K, Alta 4K (native) and LiveCore, Midra, Picturall
-analogway = []
-# Barco Event Master
-barco = []
-# Behringer WING, X32 and X Air
-behringer = []
-# BirdDog cameras
+
+# Vendor groups: every integration of one vendor.
+vendor-aja = ["aja-kipro", "aja-kumo"]
+vendor-allenheath = ["allenheath-ahm", "allenheath-cq", "allenheath-dlive", "allenheath-qu", "allenheath-sq"]
+vendor-analogway = ["analogway-alta4k", "analogway-livecore", "analogway-livepremier", "analogway-midra", "analogway-midra4k", "analogway-picturall"]
+vendor-barco = ["barco-eventmaster"]
+vendor-behringer = ["behringer-wing", "behringer-x32", "behringer-xair"]
+vendor-birddog = ["birddog"]
+vendor-blackmagic = ["blackmagic-atem", "blackmagic-camera", "blackmagic-hyperdeck", "blackmagic-streaming", "blackmagic-videohub"]
+vendor-chamsys = ["chamsys-magicq", "chamsys-magicq-udp"]
+vendor-etc = ["etc-eos"]
+vendor-figure53 = ["qlab"]
+vendor-generic = ["generic-http", "generic-osc", "generic-tcp-udp", "http-snapshot"]
+vendor-h2r = ["h2r-graphics"]
+vendor-kramer = ["kramer-p3000"]
+vendor-lawo = ["emberplus"]
+vendor-ma-lighting = ["grandma2", "grandma3"]
+vendor-newtek = ["newtek-tricaster"]
+vendor-obs = ["obs-studio"]
+vendor-panasonic = ["panasonic-ptz"]
+vendor-pjlink = ["pjlink"]
+vendor-ptzoptics = ["ptzoptics"]
+vendor-qsc = ["qsys"]
+vendor-renewedvision = ["propresenter", "renewedvision-pvp"]
+vendor-resolume = ["resolume"]
+vendor-roland = ["roland-p20hd", "roland-v160hd", "roland-v600uhd", "roland-v60hd", "roland-vr400uhd", "roland-xs42h", "roland-xs62s", "roland-xs80h"]
+vendor-ross = ["ross-xpression", "ross-xpression-udp", "rosstalk"]
+vendor-sennheiser = ["sennheiser-digital-6000", "sennheiser-ew-dx", "sennheiser-ew-g3-g4"]
+vendor-shure = ["shure-wireless"]
+vendor-sony = ["sony-camera", "visca"]
+vendor-studiocoast = ["vmix"]
+vendor-tsl = ["tsl-umd-display", "tsl-umd-listener"]
+vendor-yamaha = ["yamaha-cl-ql", "yamaha-dm3", "yamaha-dm7", "yamaha-dme7", "yamaha-rivage", "yamaha-rm", "yamaha-tf"]
+
+# One feature per integration (spec id).
+# AJA Ki Pro recorders (with a native extension)
+aja-kipro = []
+# AJA KUMO SDI routers and control panels (with a native extension)
+aja-kumo = []
+# Allen & Heath AHM (native)
+allenheath-ahm = []
+# Allen & Heath CQ (CQ-12T, CQ-18T, CQ-20B) (native)
+allenheath-cq = []
+# Allen & Heath dLive and Avantis (native)
+allenheath-dlive = []
+# Allen & Heath Qu (Qu-16, Qu-24, Qu-32, Qu-Pac, Qu-SB) (native)
+allenheath-qu = []
+# Allen & Heath SQ, SQ+ and Qu-5/6/7 (native)
+allenheath-sq = []
+# Analog Way Alta 4K (AWJ) (native)
+analogway-alta4k = []
+# Analog Way LiveCore series (TPP)
+analogway-livecore = []
+# Analog Way LivePremier / Aquilon (AWJ) (native)
+analogway-livepremier = []
+# Analog Way Midra series (TPP)
+analogway-midra = []
+# Analog Way Midra 4K (AWJ) (native)
+analogway-midra4k = []
+# Analog Way Picturall media servers
+analogway-picturall = []
+# Barco Event Master (JSON-RPC API)
+barco-eventmaster = []
+# Behringer WING
+behringer-wing = []
+# Behringer X32 / Midas M32
+behringer-x32 = []
+# Behringer X AIR / Midas M AIR
+behringer-xair = []
+# BirdDog cameras (RESTful API)
 birddog = []
-# Blackmagic ATEM (native), cameras, HyperDeck, Web Presenter / Streaming Encoder, Videohub
-blackmagic = []
-# ChamSys MagicQ (TCP and UDP)
-chamsys = []
-# Ember+ (native)
+# Blackmagic ATEM switchers (native)
+blackmagic-atem = []
+# Blackmagic cameras (Camera Control REST API)
+blackmagic-camera = []
+# Blackmagic HyperDeck
+blackmagic-hyperdeck = []
+# Blackmagic Web Presenter / Streaming Encoder
+blackmagic-streaming = []
+# Blackmagic Videohub
+blackmagic-videohub = []
+# ChamSys MagicQ / QuickQ
+chamsys-magicq = []
+# ChamSys MagicQ / QuickQ Remote Ethernet Protocol
+chamsys-magicq-udp = []
+# Ember+ provider (generic consumer) (native)
 emberplus = []
-# ETC Eos
-etc = []
-# generic HTTP, OSC and TCP/UDP devices, and HTTP JPEG snapshots (native)
-generic = []
-# H2R Graphics
-h2r = []
-# Kramer Protocol 3000
-kramer = []
-# MA Lighting grandMA2 and grandMA3
-ma-lighting = []
-# NewTek TriCaster
-newtek = []
-# OBS Studio (native)
-obs = []
-# Panasonic PTZ cameras (spec-driven, with the native update-notification extension)
-panasonic = []
-# PJLink projectors (native), and PJLink discovery
-pjlink = []
+# ETC Eos family
+etc-eos = []
+# Generic HTTP device (native)
+generic-http = []
+# Generic OSC device (native)
+generic-osc = []
+# Generic TCP or UDP device (native)
+generic-tcp-udp = []
+# MA Lighting grandMA2
+grandma2 = []
+# MA Lighting grandMA3
+grandma3 = []
+# H2R Graphics (HTTP API)
+h2r-graphics = []
+# Camera snapshot over HTTP (live preview from a JPEG URL) (native)
+http-snapshot = []
+# Kramer Protocol 3000 matrices and switchers
+kramer-p3000 = []
+# NewTek / Vizrt TriCaster
+newtek-tricaster = []
+# OBS Studio (obs-websocket 5) (native)
+obs-studio = []
+# Panasonic AW-series PTZ cameras (with a native extension)
+panasonic-ptz = []
+# PJLink projectors and displays (Class 1 and Class 2) (native)
+pjlink = [] # also PJLink discovery
+# ProPresenter 7 (ProPresenter API)
+propresenter = []
 # PTZOptics cameras
 ptzoptics = []
-# QLab
+# Figure 53 QLab
 qlab = []
-# Q-SYS (native)
+# QSC Q-SYS Core (Q-SYS Remote Control, QRC) (native)
 qsys = []
-# Renewed Vision ProPresenter and ProVideoPlayer
-renewedvision = []
-# Resolume
+# ProVideoPlayer 3 (PVP3 HTTP API)
+renewedvision-pvp = []
+# Resolume Arena / Avenue (REST API)
 resolume = []
-# Roland video switchers
-roland = []
-# Ross switchers (RossTalk) and XPression
-ross = []
-# Sennheiser EW G3/G4 (MCP), EW-DX and Digital 6000 (native), and MCP discovery
-sennheiser = []
-# Shure wireless (native)
-shure = []
-# Sony cameras (native), SSDP discovery, and the SSH tunnel they use (russh)
-sony = ["dep:russh"]
-# TSL UMD listener and display (native)
-tsl = []
-# VISCA over IP cameras (native)
+# Roland P-20HD (LAN control)
+roland-p20hd = []
+# Roland V-160HD / V-80HD / VR-120HD / VR-6HD / V-1-4K (LAN control)
+roland-v160hd = []
+# Roland V-600UHD (LAN control)
+roland-v600uhd = []
+# Roland V-60HD (LAN control)
+roland-v60hd = []
+# Roland VR-400UHD (LAN control)
+roland-vr400uhd = []
+# Roland XS-42H / VP-42H (LAN control)
+roland-xs42h = []
+# Roland XS-62S (LAN control)
+roland-xs62s = []
+# Roland XS-82H / XS-83H / XS-84H (LAN control)
+roland-xs80h = []
+# Ross XPression (RossTalk)
+ross-xpression = []
+# Ross XPression (RossTalk over UDP)
+ross-xpression-udp = []
+# Ross Video production switchers (RossTalk)
+rosstalk = []
+# Sennheiser Digital 6000 receivers (SSC) (native)
+sennheiser-digital-6000 = []
+# Sennheiser Evolution Wireless Digital EW-DX receivers (SSCv2) (native)
+sennheiser-ew-dx = []
+# Sennheiser evolution wireless G3 / G4 (Media Control Protocol) (native)
+sennheiser-ew-g3-g4 = [] # also MCP discovery
+# Shure networked wireless (command strings) (native)
+shure-wireless = []
+# Sony cameras over Camera Control PTP 3 and PTP 2 (Alpha, FX, ZV, cinema line, pan/tilt) (native)
+sony-camera = ["dep:russh"] # also SSDP discovery and the SSH tunnel (russh)
+# TSL UMD tally sent to displays and multiviewers (native)
+tsl-umd-display = []
+# TSL UMD tally received from a switcher (native)
+tsl-umd-listener = []
+# VISCA PTZ cameras (Sony VISCA over IP, and VISCA over TCP/UDP) (native)
 visca = []
 # vMix (native)
 vmix = []
-# Yamaha consoles, RM series and DME7
-yamaha = []
+# Yamaha CL and QL series digital mixing consoles (Remote Control Protocol, TCP 49280)
+yamaha-cl-ql = []
+# Yamaha DM3 series digital mixing consoles (Remote Control Protocol, TCP 49280)
+yamaha-dm3 = []
+# Yamaha DM7 series digital mixing consoles (Remote Control Protocol, TCP 49280)
+yamaha-dm7 = []
+# Yamaha DME7 digital signal processor
+yamaha-dme7 = []
+# Yamaha RIVAGE PM series digital mixing systems (Remote Control Protocol, TCP 49280)
+yamaha-rivage = []
+# Yamaha RM series (RM-CR, RM-CG, RM-TT, RM-WAP)
+yamaha-rm = []
+# Yamaha TF series digital mixing consoles (Remote Control Protocol, TCP 49280)
+yamaha-tf = []
 
 [dependencies]
 base64 = "0.22"
@@ -127,7 +244,7 @@ regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 roxmltree = "0.21.1"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-# Only Sony cameras tunnel over SSH; see the `sony` feature.
+# Only Sony cameras tunnel over SSH; see the `sony-camera` feature.
 russh = { version = "0.63", default-features = false, features = ["ring", "rsa"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

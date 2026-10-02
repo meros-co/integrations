@@ -9,7 +9,7 @@
 //! return nothing. Every `/config?action=get` is answered, so the engine's
 //! reads on connecting and commands work beside the waits.
 
-#![cfg(feature = "aja")]
+#![cfg(all(feature = "aja-kipro", feature = "aja-kumo"))]
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

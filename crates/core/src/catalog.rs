@@ -206,26 +206,50 @@ impl Catalog {
     }
 
     /// Keep only the named specs, for a product that uses only some devices.
-    /// An id this build does not include is an error that says why: unknown,
-    /// or in a feature family the build left out.
+    /// Each name is a spec id, a vendor group (`vendor-sennheiser`: those of
+    /// the vendor's integrations this build includes) or `all`. A name this
+    /// build cannot meet is an error that says why: unknown, or an integration
+    /// whose feature the build left out.
     pub fn select(mut self, ids: &[String]) -> Result<Catalog, String> {
         if ids.is_empty() {
             return Err(
                 "the device selection is empty: leave it out to include every device".into(),
             );
         }
+        let mut keep = std::collections::BTreeSet::new();
         for id in ids {
-            if self.devices.contains_key(id) {
+            if id == "all" {
+                keep.extend(self.devices.keys().cloned());
                 continue;
             }
-            return Err(match family(id) {
-                Some(feature) => format!(
-                    "device '{id}' is not in this build: it comes with the '{feature}' feature"
-                ),
+            if let Some((group, specs)) = VENDOR_GROUPS.iter().find(|(group, _)| group == id) {
+                let built: Vec<&str> = specs
+                    .iter()
+                    .copied()
+                    .filter(|spec| self.devices.contains_key(*spec))
+                    .collect();
+                if built.is_empty() {
+                    return Err(format!(
+                        "vendor group '{group}' has no integration in this build: enable the \
+                         '{group}' feature, or the feature of one of its integrations ({})",
+                        specs.join(", ")
+                    ));
+                }
+                keep.extend(built.into_iter().map(String::from));
+                continue;
+            }
+            if self.devices.contains_key(id) {
+                keep.insert(id.clone());
+                continue;
+            }
+            return Err(match feature(id) {
+                Some(feature) => {
+                    format!("device '{id}' is not in this build: it needs the '{feature}' feature")
+                }
                 None => format!("unknown device '{id}' in the selection"),
             });
         }
-        self.devices.retain(|id, _| ids.contains(id));
+        self.devices.retain(|id, _| keep.contains(id));
         Ok(self)
     }
 
@@ -248,18 +272,25 @@ impl Catalog {
     }
 }
 
-/// The Cargo feature that builds a spec in, whether or not this build has it;
-/// `None` for an id no spec has.
-pub fn family(id: &str) -> Option<&'static str> {
+/// The Cargo feature that builds an integration in, whether or not this build
+/// has it: the spec id itself. `None` for an id no spec has.
+pub fn feature(id: &str) -> Option<&'static str> {
     ALL_SPECS
         .iter()
-        .find(|(spec, _)| *spec == id)
-        .map(|(_, family)| *family)
+        .find(|(spec, _, _)| *spec == id)
+        .map(|(spec, _, _)| *spec)
 }
 
-/// Every feature family and whether this build includes it.
-pub fn families() -> &'static [(&'static str, bool)] {
-    FAMILIES
+/// Every integration in the source tree: its spec id (also its feature
+/// name), whether this build includes it, and its vendor group.
+pub fn integrations() -> &'static [(&'static str, bool, &'static str)] {
+    ALL_SPECS
+}
+
+/// Every vendor group feature and the integrations it enables. A vendor
+/// group's name can also be given in a core's `devices` selection.
+pub fn vendor_groups() -> &'static [(&'static str, &'static [&'static str])] {
+    VENDOR_GROUPS
 }
 
 /// Validate `given` against `declared`, applying defaults.
@@ -399,26 +430,91 @@ mod tests {
         }
     }
 
-    #[test]
-    fn every_family_is_a_cargo_feature_in_all() {
-        let manifest = include_str!("../Cargo.toml");
-        let all = manifest
-            .split("\nall = [")
+    /// The features in Cargo.toml's [features], each with its list.
+    fn manifest_features() -> BTreeMap<String, Vec<String>> {
+        let manifest = include_str!("../Cargo.toml").replace("\r\n", "\n");
+        let section = manifest
+            .split("\n[features]\n")
             .nth(1)
-            .and_then(|rest| rest.split(']').next())
-            .expect("an `all` feature");
-        for (family, built) in FAMILIES {
-            assert!(
-                manifest.contains(&format!("\n{family} = [")),
-                "family '{family}' has no feature in Cargo.toml"
+            .and_then(|rest| rest.split("\n[").next())
+            .expect("a [features] section");
+        let mut features = BTreeMap::new();
+        let mut current: Option<(String, String)> = None;
+        for line in section.lines() {
+            let line = line.split(" #").next().unwrap().trim();
+            if line.starts_with('#') || line.is_empty() {
+                continue;
+            }
+            match &mut current {
+                Some((_, list)) => list.push_str(line),
+                None => {
+                    let (name, list) = line.split_once(" = ").expect("name = [...]");
+                    current = Some((name.to_string(), list.to_string()));
+                }
+            }
+            if current
+                .as_ref()
+                .is_some_and(|(_, list)| list.ends_with(']'))
+            {
+                let (name, list) = current.take().unwrap();
+                let items = list
+                    .trim_matches(|c| c == '[' || c == ']')
+                    .split(',')
+                    .map(|s| s.trim().trim_matches('"').to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                features.insert(name, items);
+            }
+        }
+        features
+    }
+
+    #[test]
+    fn the_integration_table_matches_the_cargo_features() {
+        let features = manifest_features();
+        assert!(
+            features["default"].is_empty(),
+            "the default is no integration"
+        );
+        let groups: Vec<String> = VENDOR_GROUPS.iter().map(|(g, _)| g.to_string()).collect();
+        assert_eq!(features["all"], groups, "'all' enables every vendor group");
+        for (group, specs) in VENDOR_GROUPS {
+            let listed = features
+                .get(*group)
+                .unwrap_or_else(|| panic!("vendor group '{group}' has no feature"));
+            assert_eq!(
+                listed, *specs,
+                "'{group}' must enable exactly its integrations"
             );
+        }
+        for (spec, built, group) in ALL_SPECS {
+            let own = features
+                .get(*spec)
+                .unwrap_or_else(|| panic!("integration '{spec}' has no feature"));
             assert!(
-                all.contains(&format!("\"{family}\"")),
-                "'all' does not include '{family}'"
+                own.iter().all(|f| f.starts_with("dep:")),
+                "'{spec}' may enable only its own optional dependencies, not {own:?}"
+            );
+            assert!(VENDOR_GROUPS
+                .iter()
+                .any(|(g, s)| g == group && s.contains(spec)));
+            assert_eq!(
+                *built,
+                EMBEDDED_SPECS.iter().any(|(file, _)| file == spec),
+                "{spec}"
             );
             if cfg!(feature = "all") {
-                assert!(built, "'all' is on but '{family}' is not built");
+                assert!(built, "'all' is on but '{spec}' is not built");
             }
+        }
+        for name in features.keys() {
+            assert!(
+                name == "default"
+                    || name == "all"
+                    || groups.contains(name)
+                    || ALL_SPECS.iter().any(|(spec, _, _)| spec == name),
+                "feature '{name}' is neither an integration, a vendor group nor 'all'"
+            );
         }
     }
 
@@ -440,12 +536,25 @@ mod tests {
             .unwrap_err();
         assert!(err.contains("unknown device 'no-such-device'"), "{err}");
         assert!(Catalog::embedded().select(&[]).is_err());
-        if let Some((id, family)) = ALL_SPECS
-            .iter()
-            .find(|(id, _)| !Catalog::embedded().devices.contains_key(*id))
-        {
+        if let Some((id, _, _)) = ALL_SPECS.iter().find(|(_, built, _)| !built) {
             let err = Catalog::embedded().select(&[id.to_string()]).unwrap_err();
-            assert!(err.contains(&format!("the '{family}' feature")), "{err}");
+            assert!(err.contains(&format!("the '{id}' feature")), "{err}");
+        }
+        let every = Catalog::embedded().select(&["all".into()]).unwrap();
+        assert_eq!(every.devices.len(), EMBEDDED_SPECS.len());
+        for (group, specs) in VENDOR_GROUPS {
+            let built: Vec<&str> = specs
+                .iter()
+                .copied()
+                .filter(|s| Catalog::embedded().device(s).is_some())
+                .collect();
+            match Catalog::embedded().select(&[group.to_string()]) {
+                Ok(selected) => assert_eq!(selected.devices.keys().collect::<Vec<_>>(), built),
+                Err(err) => {
+                    assert!(built.is_empty(), "{group}: {err}");
+                    assert!(err.contains(&format!("the '{group}' feature")), "{err}");
+                }
+            }
         }
     }
 

@@ -5,7 +5,7 @@
 //! and echoes control writes with the resulting values. Like that simulator it
 //! does not reflect `/osc/xid`, so replies are matched by path.
 
-#![cfg(feature = "sennheiser")]
+#![cfg(feature = "sennheiser-digital-6000")]
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;

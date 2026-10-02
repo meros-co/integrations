@@ -1,26 +1,27 @@
-//! A core started for some devices, as RFDeck uses it: Sennheiser and Shure
-//! wireless only. Its catalogue, open and discovery know nothing else.
+//! A core started for some devices: Sennheiser and Shure wireless only. Its
+//! catalogue, open and discovery know nothing else.
 
-#![cfg(all(feature = "sennheiser", feature = "shure"))]
+#![cfg(all(
+    feature = "sennheiser-digital-6000",
+    feature = "sennheiser-ew-dx",
+    feature = "sennheiser-ew-g3-g4",
+    feature = "shure-wireless"
+))]
 
 use meros_integrations::{
     json as api, Core, CoreOptions, DiscoverAction, DiscoverRequest, OpenError, OpenRequest,
 };
 use serde_json::json;
 
-const RFDECK: [&str; 4] = [
+const WIRELESS: [&str; 4] = [
     "sennheiser-ew-dx",
     "sennheiser-ew-g3-g4",
     "sennheiser-digital-6000",
     "shure-wireless",
 ];
 
-fn rfdeck() -> Core {
-    Core::with_options(CoreOptions {
-        devices: Some(RFDECK.iter().map(|s| s.to_string()).collect()),
-        ..Default::default()
-    })
-    .unwrap()
+fn wireless() -> Core {
+    Core::with_options(CoreOptions::new().devices(WIRELESS)).unwrap()
 }
 
 fn open(core: &Core, device: &str, model: &str) -> Result<u64, OpenError> {
@@ -43,27 +44,30 @@ fn discover(protocols: &[&str], action: DiscoverAction) -> DiscoverRequest {
 
 #[test]
 fn the_catalogue_holds_only_the_selected_devices() {
-    let core = rfdeck();
+    let core = wireless();
     let mut ids: Vec<&str> = core.catalog().devices.keys().map(String::as_str).collect();
     ids.sort();
-    let mut expected = RFDECK.to_vec();
+    let mut expected = WIRELESS.to_vec();
     expected.sort();
     assert_eq!(ids, expected);
     // The JSON every binding returns is the same catalogue.
     let catalog = api::catalog(&core);
-    assert_eq!(catalog["devices"].as_object().unwrap().len(), RFDECK.len());
+    assert_eq!(
+        catalog["devices"].as_object().unwrap().len(),
+        WIRELESS.len()
+    );
     assert!(catalog["devices"].get("sony-camera").is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_selected_device_opens_and_any_other_is_refused() {
-    let core = rfdeck();
+    let core = wireless();
     let device = open(&core, "shure-wireless", "ulxd4").unwrap();
     core.close(device).await;
 
     let every = Core::new().unwrap();
     for (id, spec) in &every.catalog().devices {
-        if RFDECK.contains(&id.as_str()) {
+        if WIRELESS.contains(&id.as_str()) {
             continue;
         }
         assert_eq!(
@@ -92,7 +96,7 @@ async fn a_selected_device_opens_and_any_other_is_refused() {
 
 #[test]
 fn discovery_runs_only_the_protocols_of_the_selected_devices() {
-    let core = rfdeck();
+    let core = wireless();
     assert_eq!(core.discovery_protocols(), ["mcp"]);
     for excluded in ["ssdp", "pjlink"] {
         let err = core
@@ -107,11 +111,7 @@ fn discovery_runs_only_the_protocols_of_the_selected_devices() {
     // Empty means every protocol of the selection: here MCP alone.
     core.discover(discover(&[], DiscoverAction::Stop)).unwrap();
 
-    let shure_only = Core::with_options(CoreOptions {
-        devices: Some(vec!["shure-wireless".into()]),
-        ..Default::default()
-    })
-    .unwrap();
+    let shure_only = Core::with_options(CoreOptions::new().devices(["shure-wireless"])).unwrap();
     assert!(shure_only.discovery_protocols().is_empty());
     assert!(shure_only
         .discover(discover(&["mcp"], DiscoverAction::Listen))
@@ -124,12 +124,9 @@ fn discovery_runs_only_the_protocols_of_the_selected_devices() {
 #[test]
 fn a_selection_the_build_cannot_meet_fails_construction() {
     for devices in [vec!["no-such-device".to_string()], vec![]] {
-        let err = Core::with_options(CoreOptions {
-            devices: Some(devices),
-            ..Default::default()
-        })
-        .err()
-        .expect("refused");
+        let err = Core::with_options(CoreOptions::new().devices(devices))
+            .err()
+            .expect("refused");
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
     }
     // The JSON options every binding passes.
@@ -138,10 +135,11 @@ fn a_selection_the_build_cannot_meet_fails_construction() {
     assert!(Core::with_options(options).is_ok());
 }
 
-/// A build without the `sony` family has no Sony camera at all, and says so.
-#[cfg(not(feature = "sony"))]
+/// A build without the `sony-camera` integration has no Sony camera at all,
+/// and says so.
+#[cfg(not(feature = "sony-camera"))]
 #[test]
-fn a_family_left_out_of_the_build_is_named() {
+fn an_integration_left_out_of_the_build_is_named() {
     let core = Core::new().unwrap();
     assert!(core.catalog().device("sony-camera").is_none());
     assert!(!core.discovery_protocols().contains(&"ssdp"));
@@ -149,15 +147,36 @@ fn a_family_left_out_of_the_build_is_named() {
         open(&core, "sony-camera", "ilce-7m4"),
         Err(OpenError::NotBuilt {
             device: "sony-camera".into(),
-            feature: "sony".into()
+            feature: "sony-camera".into()
         })
     );
-    let err = Core::with_options(CoreOptions {
-        devices: Some(vec!["sony-camera".into()]),
-        ..Default::default()
-    })
-    .err()
-    .expect("refused")
-    .to_string();
-    assert!(err.contains("the 'sony' feature"), "{err}");
+    let err = Core::with_options(CoreOptions::new().devices(["sony-camera"]))
+        .err()
+        .expect("refused")
+        .to_string();
+    assert!(err.contains("the 'sony-camera' feature"), "{err}");
+}
+
+/// A vendor group names every integration of one vendor in the build.
+#[test]
+fn a_vendor_group_selects_its_integrations() {
+    let core =
+        Core::with_options(CoreOptions::new().devices(["vendor-sennheiser", "shure-wireless"]))
+            .unwrap();
+    let mut ids: Vec<&str> = core.catalog().devices.keys().map(String::as_str).collect();
+    ids.sort();
+    let mut expected = WIRELESS.to_vec();
+    expected.sort();
+    assert_eq!(ids, expected);
+    let options = api::core_options(&json!({"devices": ["vendor-shure"]})).unwrap();
+    let shure = Core::with_options(options).unwrap();
+    assert_eq!(
+        shure.catalog().devices.keys().collect::<Vec<_>>(),
+        ["shure-wireless"]
+    );
+    let every = Core::with_options(CoreOptions::new().devices(["all"])).unwrap();
+    assert_eq!(
+        every.catalog().devices.len(),
+        Core::new().unwrap().catalog().devices.len()
+    );
 }
