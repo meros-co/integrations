@@ -255,3 +255,78 @@ telemetry(X, "fx-parameter", inbound_hex="2f66782f342f7061722f3233000000002c6600
           expect_state={"fx": {"4": {"parameters": {"23": 0.5}}}})
 telemetry(X, "user-control", inbound_hex=hexs(osc("/-stat/userpar/01/value", ("i", 127))),
           expect_state={"user_controls": {"1": {"value": 127}}})
+
+
+# ── Levels in dB ──────────────────────────────────────────────────────────
+# Maillot p.128, both directions, written here from the document's C-like
+# code rather than from the spec's points.
+def _x32_db(f):
+    if f >= 0.5:
+        return f * 40.0 - 30.0
+    if f >= 0.25:
+        return f * 80.0 - 50.0
+    if f >= 0.0625:
+        return f * 160.0 - 70.0
+    return f * 480.0 - 90.0
+
+
+def _x32_position(d):
+    if d < -60.0:
+        return (d + 90.0) / 480.0
+    if d < -30.0:
+        return (d + 70.0) / 160.0
+    if d < -10.0:
+        return (d + 50.0) / 80.0
+    return (d + 30.0) / 40.0
+
+
+def _fader_db_vectors(spec_id, db=-20.0):
+    """A vector for every *_db command, from its 0-1 sibling's vector: the
+    same address with the level given in dB, or the same reply read as dB;
+    and every telemetry vector's fader and send levels also stated in dB."""
+    commands = yaml.safe_load((ROOT / "specs" / f"{spec_id}.yaml").read_text(encoding="utf-8"))["commands"]
+    have = {v["command"] for v in V if v.get("spec") == spec_id and "command" in v}
+    for v in list(V):
+        if v.get("spec") != spec_id or "command" not in v:
+            continue
+        name = v["command"] + "_db"
+        if name not in commands or name in have:
+            continue
+        have.add(name)
+        wire = bytes.fromhex(v["expect_wire_hex"])
+        address = wire[:wire.index(0)].decode()
+        new = {"spec": spec_id, "command": name, "input": dict(v["input"])}
+        if "level" in new["input"]:
+            del new["input"]["level"]
+            new["input"]["level_db"] = db
+            new["expect_wire_hex"] = hexs(osc(address, ("f", _x32_position(db))))
+        else:
+            new["expect_wire_hex"] = v["expect_wire_hex"]
+            if "device_reply_hex" in v:
+                reply = bytes.fromhex(v["device_reply_hex"])
+                (position,) = struct.unpack(">f", reply[-4:])
+                new["device_reply_hex"] = v["device_reply_hex"]
+                new["expect_result"] = {"ok": {"kind": "value", "value": _x32_db(position)}}
+        V.append(new)
+
+    def add_db(node, trail):
+        if not isinstance(node, dict):
+            return
+        for key in list(node):
+            value = node[key]
+            if (key in ("fader", "level", "mono_level") and isinstance(value, float)
+                    and trail[:1] not in (["talkback"], ["monitor"])):
+                node[key + "_db"] = round(_x32_db(value), 1)
+            else:
+                add_db(value, trail + [key])
+
+    for v in V:
+        if v.get("spec") == spec_id and "expect_state" in v:
+            add_db(v["expect_state"], [])
+
+
+_fader_db_vectors(X)
+telemetry(X, "channel-fader-db", inbound_hex=hexs(osc("/ch/05/mix/fader", ("f", 0.375))),
+          expect_state={"channels": {"5": {"fader": 0.375, "fader_db": -20.0}}})
+telemetry(X, "dca-fader-minus-infinity", inbound_hex=hexs(osc("/dca/1/fader", ("f", 0.0))),
+          expect_state={"dcas": {"1": {"fader": 0.0, "fader_db": -90.0}}})

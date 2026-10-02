@@ -30,6 +30,7 @@ commands: { … }               # §4
 quirks: [ … ]                 # §6, optional
 state: { … }                  # the state the device reports, optional
 telemetry: { … }              # §8, optional
+conversions: { … }            # §4, named value conversions, optional
 ```
 
 `id` is the consumer-facing identifier. It does not change once published.
@@ -44,7 +45,10 @@ state:
 
 ## 2. Transports
 
-One transport per spec. The core implements each transport once.
+One transport per spec. The core implements each transport once. A device that
+takes commands one way and pushes state on a websocket (Resolume: REST for
+commands, a websocket for changes) keeps its command transport and adds the
+websocket under `telemetry.websocket` (§8).
 
 ### `line-tcp`
 
@@ -113,7 +117,7 @@ transport:
 ### `line-udp`
 
 Text messages over UDP, one message per datagram (ChamSys MagicQ's remote
-protocol, XPression's RossTalk over UDP).
+protocol, XPression's RossTalk over UDP in `ross-xpression-udp`).
 
 ```yaml
 transport:
@@ -144,7 +148,7 @@ transport:
 The core reports `unverified` for writes to such devices rather than success.
 
 Some devices send their feedback to a destination configured on the device,
-not back to the sender (grandMA3). `listen_port` receives on a fixed local
+not back to the sender (grandMA3's Object Playback Feedback). `listen_port` receives on a fixed local
 port instead of an ephemeral one; the port is shared by every device that
 uses it, and each datagram goes to the device it came from:
 
@@ -209,6 +213,51 @@ values: [http, https], default: http }`. Devices that serve HTTPS with a
 self-signed certificate declare `accept_invalid_certs: true`: the connection is
 encrypted, but the device's identity is not checked.
 
+### `ws`
+
+Text messages over a WebSocket, usually JSON.
+
+```yaml
+transport:
+  type: ws
+  port: 9000
+  path: /api/v1               # the request path, from /
+  scheme: ws                  # ws | wss | {setting: name}
+  subprotocol: v1.control     # optional, sent as Sec-WebSocket-Protocol
+  auth: none                  # none | basic | bearer
+  timeout_ms: 2000
+  reply: expected             # expected | none
+```
+
+Templates are text messages, rendered as for `line-tcp` with nothing added; a
+JSON message is a template such as `'{"action":"get","path":{name:json}}'`.
+With `auth: basic` or `bearer`, the credential goes on the opening request as
+for `http`, and a 401 or 403 answer to it is the same terminal refusal.
+
+A reply is matched in one of two ways. With `expect.reply_json`, it is the
+message whose JSON holds the rendered values at those JSON paths: a request id
+the command sends, or what the device echoes (the parameter path it was
+asked for). Other messages arriving meanwhile are not the reply. Without it,
+the next message is the reply, as on `line-tcp`, and `reply_match` excludes
+messages that cannot be one.
+
+```yaml
+commands:
+  get_name:
+    params: { layer: { type: int, min: 1, required: true } }
+    send: '{"action":"get","parameter":"/composition/layers/{layer}/name"}'
+    expect:
+      reply_json: { "$.type": "parameter_get", "$.path": "/composition/layers/{layer}/name" }
+      json_path: "$.value"
+    returns: value
+```
+
+Every message, reply or not, is also offered to the telemetry rules (§8).
+`on_connect` steps are sent when the websocket opens; telemetry `subscribe` and
+`poll` messages are sent straight away rather than queued, because a websocket
+device pushes and what it sends back goes to the rules. Pings are answered by
+the core. `wss` needs the core's websocket client built with TLS support.
+
 ### Settings and connection setup
 
 Per-installation values that are not command parameters — credentials, ports,
@@ -271,6 +320,23 @@ match means the device refused the credential, which is terminal as for HTTP
 password is not sent again until the host opens the device with corrected
 settings. This is still not a handshake: the step is sent once, unchanged,
 whatever the device says.
+
+`refused` does not need `after_prompt`: on any line transport (`line-tcp` and
+`line-udp`), a login step can declare the text a device answers a failed login
+with, even when it answers in free text. A device whose console echoes free
+text afterwards can declare `accepted` too, a regex over reply lines: once a
+line matches it, the login is accepted and `refused` stops applying, so later
+output that happens to match is not taken for a refusal. Both are only ever
+written from the device's documented texts; a spec whose device documents no
+failure text (grandMA2) declares neither, and a wrong credential there goes
+unnoticed.
+
+```yaml
+on_connect:
+  - send: "login {settings.username} {settings.password}"
+    refused: "^Login failed"
+    accepted: "^Logged in as "
+```
 
 A step the device answers (a login acknowledged with `ACK`) declares
 `await_reply: true`. It is then queued like a query: sent in turn, its reply
@@ -393,6 +459,9 @@ The directive set is closed.
 | `signed` | Integer with an explicit leading sign: `7` → `+7`, `-7` → `-7` |
 | `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75` |
 
+| `to.<name>` | A number converted to the wire by the named conversion (below): `{level_db:to.x32_fader}` |
+| `from.<name>` | A wire number converted back to the operator's value: `{arg0:from.x32_fader:.1f}` |
+
 Offsets apply before formatting, and directives apply left to right.
 
 `bool10` covers flags whose sense is inverted relative to the parameter name,
@@ -402,6 +471,32 @@ Offsets exist because several protocols number from zero while operators count
 from one: Videohub inputs and outputs, and Panasonic PTZ presets, are all
 0-based on the wire. Declaring the offset keeps the operator-facing parameter
 1-based without each consumer reimplementing the conversion.
+
+### Conversions
+
+Some devices take a value on a scale the operator does not use: the X32's
+fader position 0.0-1.0 for a level in dB. A spec declares the conversion once,
+as points joined by straight lines, and uses it in both directions:
+
+```yaml
+conversions:
+  x32_fader:                  # Maillot p.128: four linear segments
+    points: [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]
+```
+
+Each point is `[wire, value]`. Wire values rise strictly, and values rise or
+fall strictly, so the conversion inverts. A value on a point converts to that
+point exactly; between points, by the straight line between them. A value
+outside the points does not convert: a command is rejected before
+transmission and a telemetry value is not assigned. Nothing is clamped.
+
+`to.<name>` converts a command's value to the wire and `from.<name>` a wire
+value to the operator's. Conversions come before other directives and produce
+a float, so as text a converted value needs one `.Nf`; as the whole value of
+an OSC `float` argument, or the whole value of a state assignment, it is a
+number and needs none. `expect.convert: <name>` converts a command's returned
+value from the wire (§5). A documented formula made of linear segments is
+written as its segment ends; a curved law has no exact form here.
 
 ### OSC commands
 
@@ -485,6 +580,8 @@ expect:
   code_range: [200, 299]    # leading numeric response code
   address: /ch/01/config/name       # OSC only: the reply's address
   arg: 0                    # OSC only: argument returned as the value
+  reply_json: { "$.id": "{id}" }    # ws only: what identifies the reply (§2)
+  convert: x32_fader        # the returned value, converted from the wire (§4)
 ```
 
 Some OSC devices answer with JSON inside a string argument: QLab replies on
@@ -661,6 +758,80 @@ offered to `path` rules, which match the request's path and query:
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`.
 
+#### Poll replies on another address
+
+An OSC query is answered on its own address by most devices. ETC Eos answers
+`/eos/get/...` on `/eos/out/get/...`, sometimes with a count appended
+(`/eos/out/get/cuelist/1/list/0/13`). A poll item names the address its reply
+arrives on, as an RE2-safe regex, and waits for a message matching it:
+
+```yaml
+  poll:
+    send:
+      - { address: /eos/get/version, reply_address: "^/eos/out/get/version$" }
+      - { address: /eos/get/cuelist/1, reply_address: "^/eos/out/get/cuelist/1/list/0/\\d+$" }
+```
+
+`reply_address` is for poll items on OSC transports. Because such a reply
+names what it answers, a query that is never answered (a cue list that does
+not exist) times out without the stream being reset, and the next query goes;
+the same holds for commands with `expect.address` on `osc-tcp` and for
+`reply_json` on `ws`. A reply taken in order still resets the stream on a
+timeout, since a late one would be read as the next answer.
+
+#### OSC type tags
+
+A device can send different shapes on one address: grandMA3 sends a
+sequence's key feedback as `sis` and its fader feedback as `sif`, both on
+`/13.13.1.6.<n>`. `arg_types` limits an `address` rule to messages with
+exactly those type tags:
+
+```yaml
+    - address: '^/13\.13\.1\.6\.(\d+)$'
+      arg_types: sif
+      state: { "sequences.{1}.faders.{arg0}": "{arg2}" }
+```
+
+#### Websocket messages
+
+A message on a websocket, the transport's (§2) or `telemetry.websocket`'s, is
+offered to the text rules and, when it is JSON, to `json_match` rules:
+
+| Rule | Matches | Captures |
+|---|---|---|
+| `json_match` | A JSON message whose value at each JSON path matches its regex (a string as is, anything else as compact JSON) | `{1}`, `{2}`, … across the regexes in order; `json` names values by JSON path |
+| `json_match` + `json_each` | As above, holding an array at `json_each` | once per element; `json` paths relative to it |
+
+```yaml
+    - json_match: { "$.type": "^parameter_(subscribed|update)$", "$.path": "^/composition/master$" }
+      json: { value: "$.value" }
+      state: { composition.master: "{value}" }
+```
+
+#### A push websocket beside the transport
+
+`telemetry.websocket` opens a websocket when the device is opened and keeps
+it open, reopening it with backoff when it closes. It does not carry commands
+and does not decide whether the device is connected; the transport does.
+
+```yaml
+telemetry:
+  websocket:
+    path: /api/v1             # required
+    port: 8080                # defaults to the transport's port
+    scheme: ws                # ws | wss | {setting: name}
+    subprotocol: v1           # optional
+    send:                     # sent each time it opens: the subscriptions
+      - '{"action":"subscribe","parameter":"/composition/master"}'
+```
+
+The transport's `basic` or `bearer` credential goes on its opening request; a
+401 or 403 answer is the terminal refusal of §2. `send` items are templates
+over settings. Its messages go through the rules like any other.
+
+A telemetry vector for a websocket gives `inbound_ws` (the message text), and
+optionally `expect_connect_ws`, the messages sent when it opens.
+
 ## Native modules
 
 Protocols requiring session state, sequencing or logic that depends on what the
@@ -703,6 +874,39 @@ A native spec's commands have no `send`, `expect` or `transport`; the module
 defines those. `reason` says why the protocol cannot be expressed as data.
 Vectors apply to native modules exactly as to spec-driven ones.
 
+### Streams
+
+A native module can publish continuous media, such as a camera's live view.
+The spec declares each stream under `streams`, keyed by a stream name in
+`snake_case`, so consumers can find it in the catalogue:
+
+```yaml
+streams:
+  live:
+    format: jpeg                  # every frame is one complete JPEG image
+    summary: The camera's live view, while watched
+    models: [ilme-fx6]            # optional; every model when absent
+```
+
+`format` is from a closed set: `jpeg` (one complete JPEG, ITU-T T.81, per
+frame). `live` is the conventional name for a device's main picture, so a
+consumer can show a preview of any device without knowing it.
+
+A stream runs only while it is watched. The module learns that through its
+`stream_watch` callback, called once when a stream gains its first watcher and
+once when it loses its last, and publishes frames in between with
+`cx.frame(stream, format, data)`. A module that has to start something on the
+device to produce frames (a camera's live view mode) starts it there and stops
+it when the last watcher leaves.
+
+Frames do not travel with events. Each watcher holds at most one undelivered
+frame: a newer frame replaces it and is counted, so a slow consumer gets the
+latest picture, never a backlog, and memory stays bounded. Every frame carries
+a `sequence` that rises by one per frame published and a `dropped` count of the
+frames this watcher missed since its last. Only a device implemented natively,
+or through a native extension that publishes frames, can declare `streams`; the
+spec engine publishes none.
+
 ### Native extensions
 
 A spec-driven device can name one native `extension` for a single thing the
@@ -719,3 +923,4 @@ closed and each is named in the spec, so it is never hidden:
 | Extension | Adds |
 |---|---|
 | `panasonic-update-notification` | Panasonic AW-series cameras' update notifications: registers a local TCP port with the camera (`/cgi-bin/event?connect=start`), receives the changed settings it pushes there, and passes each one, a response text such as `p1`, to the spec's telemetry rules. Registers again when the camera's 60-second version notices stop, and unregisters on closing |
+| `aja-config-events` | AJA's event connection (Ki Pro, KUMO): sends the spec's `open_event_connection` request, then its `wait_for_events` request with the returned connection id, again as each reply arrives, beside the command queue. Each element of the reply, `{param_id, param_type, int_value, str_value}`, is offered to the spec's telemetry rules as two text messages, `event <param_id> value=<value>` and `event <param_id> value_name=<name>`: as a `/config?action=get` reply gives them, a string parameter's value is `str_value` and its name empty, and any other's value is `int_value` and its name `str_value`, or the value when that is empty. Opens a new connection when the id has expired or a request fails, after 1 s doubling to 30 s |

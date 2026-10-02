@@ -39,3 +39,8 @@ text(XP, "uncue_all", {}, "UNCUEALL\r\n")
 text(XP, "uncue", {"take_id": 12}, "UNCUE 0012\r\n")
 text(XP, "sequencer_up", {}, "UP\r\n")
 text(XP, "up_next", {"take_id": 1001}, "UPNEXT 1001\r\n")
+
+# The same commands over UDP (ross-xpression-udp): one datagram per command,
+# the same CR LF-ended line, so each TCP vector is restated for it.
+for _v in [v for v in V if v.get("spec") == XP and "command" in v]:
+    V.append({**_v, "spec": "ross-xpression-udp"})

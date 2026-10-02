@@ -13,6 +13,8 @@ pub(crate) enum Arg {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Message {
     pub(crate) address: String,
+    /// The type tags of the arguments decoded, without the leading comma.
+    pub(crate) types: String,
     pub(crate) args: Vec<Value>,
 }
 
@@ -113,6 +115,7 @@ fn decode_into(packet: &[u8], out: &mut Vec<Message>) {
         String::new()
     };
     let mut args = Vec::new();
+    let mut types = String::new();
     for tag in tags.chars().skip_while(|c| *c == ',') {
         let arg = match tag {
             'i' => r.i32().map(|n| json!(n)),
@@ -137,11 +140,18 @@ fn decode_into(packet: &[u8], out: &mut Vec<Message>) {
             _ => None,
         };
         match arg {
-            Some(a) => args.push(a),
+            Some(a) => {
+                args.push(a);
+                types.push(tag);
+            }
             None => break,
         }
     }
-    out.push(Message { address, args });
+    out.push(Message {
+        address,
+        types,
+        args,
+    });
 }
 
 #[cfg(test)]
@@ -165,6 +175,7 @@ mod tests {
         let m = &decode(&bytes)[0];
         assert_eq!(m.address, "/x");
         assert_eq!(m.args, vec![json!("Vox"), json!(0.75), json!(-2)]);
+        assert_eq!(m.types, "sfi");
     }
 
     #[test]

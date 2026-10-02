@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use super::SpecEngine;
 use crate::catalog::{validate, Catalog};
-use crate::module::{Action, Cx, HttpResponse, Module, OpenContext, TcpInput};
+use crate::module::{Action, Cx, HttpResponse, Module, OpenContext, TcpInput, WsInput};
 
 const HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10));
 
@@ -62,6 +62,10 @@ fn wire(actions: &[Action]) -> Vec<Wire> {
             Action::TcpSend { data, .. } | Action::UdpSend { data, .. } => {
                 Some(Wire::Bytes(data.clone()))
             }
+            Action::WsSend {
+                socket: "device",
+                text,
+            } => Some(Wire::Bytes(text.clone().into_bytes())),
             Action::Http { request, .. } => {
                 let after_host = request.url.splitn(4, '/').nth(3).unwrap_or("");
                 Some(Wire::Http {
@@ -159,6 +163,46 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         }
         connected = cx.take();
     }
+    if connected.iter().any(|a| {
+        matches!(
+            a,
+            Action::WsOpen {
+                socket: "device",
+                ..
+            }
+        )
+    }) {
+        let mut cx = Cx::new(1);
+        engine.ws(&mut cx, "device", WsInput::Opened);
+        connected = cx.take();
+    }
+    // A push websocket beside the transport: what is sent on opening it.
+    if engine.push.is_some() {
+        let mut cx = Cx::new(2);
+        engine.ws(&mut cx, "push", WsInput::Opened);
+        let sent: Vec<String> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::WsSend {
+                    socket: "push",
+                    text,
+                } => Some(text),
+                _ => None,
+            })
+            .collect();
+        if let Some(expected) = v.get("expect_connect_ws") {
+            let expected: Vec<String> = serde_json::from_value(expected.clone())
+                .map_err(|e| format!("expect_connect_ws: {e}"))?;
+            if sent != expected {
+                return Err(format!(
+                    "websocket connect mismatch
+  expected {expected:?}
+  sent     {sent:?}"
+                ));
+            }
+        }
+    }
     let expect_connect = if let Some(w) = v.get("expect_connect_wire") {
         Some(expected_wire(&json!({ "expect_wire": w })).unwrap())
     } else {
@@ -179,6 +223,12 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
         engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &unhex(h));
+    } else if let Some(text) = v.get("inbound_ws").and_then(Value::as_str) {
+        let socket = match engine.transport {
+            super::Transport::Ws { .. } => "device",
+            _ => "push",
+        };
+        engine.ws(&mut cx, socket, WsInput::Text(text.to_string()));
     } else if let Some(r) = v.get("inbound_http") {
         // The reply to a request for this path, as the engine offers it.
         let path = r["path"].as_str().ok_or("inbound_http needs a path")?;
@@ -216,10 +266,20 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
 fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
     let awaiting = engine.current.as_ref().and_then(|f| f.awaiting.as_ref());
     match awaiting {
+        // A reply_address pattern: no reply can be made up for it, so the
+        // query times out, which leaves an addressed stream open.
+        Some(super::Await::Osc(Some(super::OscReply::Pattern(_)))) => {
+            engine.timer(cx, super::REPLY);
+        }
         Some(super::Await::Osc(address)) => {
-            let reply = super::osc::encode(address.as_deref().unwrap_or("/probe-reply"), &[]);
+            let address = match address {
+                Some(super::OscReply::Exact(a)) => a.clone(),
+                _ => "/probe-reply".to_string(),
+            };
+            let reply = super::osc::encode(&address, &[]);
             engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &reply);
         }
+        Some(super::Await::Ws(_)) => engine.ws(cx, "device", WsInput::Text("{}".into())),
         _ => engine.tcp(cx, "device", TcpInput::Data(success.to_vec())),
     }
 }
@@ -227,7 +287,7 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let text = std::fs::read_to_string(path).unwrap();
     let v: Value = serde_yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
-    if ["inbound", "inbound_hex", "inbound_http"]
+    if ["inbound", "inbound_hex", "inbound_http", "inbound_ws"]
         .iter()
         .any(|k| v.get(k).is_some())
     {
@@ -288,6 +348,17 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         if let Some((_, prompt, _)) = engine.prompt_wait.clone() {
             engine.tcp(&mut cx, "device", TcpInput::Data(prompt.into_bytes()));
         }
+    }
+    if started.iter().any(|a| {
+        matches!(
+            a,
+            Action::WsOpen {
+                socket: "device",
+                ..
+            }
+        )
+    }) {
+        engine.ws(&mut cx, "device", WsInput::Opened);
     }
     for id in http_ids(&started) {
         engine.http_response(
@@ -503,7 +574,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
         let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
-        if ["inbound", "inbound_hex", "inbound_http"]
+        if ["inbound", "inbound_hex", "inbound_http", "inbound_ws"]
             .iter()
             .any(|k| v.get(k).is_some())
         {

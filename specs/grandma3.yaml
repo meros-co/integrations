@@ -88,12 +88,19 @@ source:
 # OSC over UDP to the port of an OSC configuration line with Receive (and, for /cmd, Receive
 # Command) set to Yes and no Prefix. MA documents no default port on the OSC page; 8000 is the
 # value the use-case pages call the default, and the host's configured port overrides it. The
-# console never acknowledges a message, and its feedback goes to the line's Destination IP and
-# Port, not to the sender's socket, so nothing is read back (see quirks).
+# console never acknowledges a message. Its feedback (Object Playback Feedback, with Send Yes)
+# goes to the line's Destination IP and Port, not to the sender's socket: set Destination IP to
+# this host and Port to the feedback_port setting, and the core receives on that fixed local
+# port (shared by every console sending there, each datagram routed by its source address).
+# With feedback_port empty nothing is read back.
 transport:
   type: osc-udp
   port: 8000
   reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535 }
 
 models:
   - id: grandma3-full-size
@@ -1672,6 +1679,35 @@ commands:
     send: { address: "/cmd", args: [ { value: "SaveShow", type: string } ] }
     returns: none
 
+telemetry:
+  # Object Playback Feedback (OSC page and Advanced Examples): key feedback as
+  # <Key function>,0|1[,text] and fader feedback as <Fader function>,<handle>,<percent>.
+  updates:
+    - address: '^/13\.13\.1\.6\.(\d+)$'
+      arg_types: sis
+      state:
+        "sequences.{1}.keys.{arg0}": { value: "{arg1}", map: { "0": false, "1": true } }
+        "sequences.{1}.text": "{arg2}"
+    - address: '^/13\.13\.1\.6\.(\d+)$'
+      arg_types: sif
+      state:
+        "sequences.{1}.faders.{arg0}": "{arg2}"
+    - address: '^/13\.12\.(\d+)\.(\d+)$'
+      arg_types: si
+      state:
+        "masters.{1}.{2}.keys.{arg0}": { value: "{arg1}", map: { "0": false, "1": true } }
+    - address: '^/13\.12\.(\d+)\.(\d+)$'
+      arg_types: sif
+      state:
+        "masters.{1}.{2}.faders.{arg0}": "{arg2}"
+
+state:
+  sequences.*.keys.*:   { type: bool, description: "Key feedback for sequence N (/13.13.1.6.N), by key function name (Go+, Flash, Temp, ...): true while MA reports 1" }
+  sequences.*.text:     { type: string, description: "Sequence feedback text as MA sends it: sequence name, cue number and cue name" }
+  sequences.*.faders.*: { type: float, unit: "%", description: "Fader feedback for sequence N, by fader function name (Master, CrossFade, ...), 0.0-100.0" }
+  masters.*.*.keys.*:   { type: bool, description: "Key feedback for master X.Y (/13.12.X.Y; 2.1 is the grand master), by key function name" }
+  masters.*.*.faders.*: { type: float, unit: "%", description: "Fader feedback for master X.Y, by fader function name, 0.0-100.0" }
+
 quirks:
   - models: [all]
     severity: critical
@@ -1706,10 +1742,19 @@ quirks:
       <Key function>,1|0,"<SequenceName CueNumber CueName>" and /13.13.1.6.X,sif,<Fader
       function>,<handle>,<percent>; for a master, /13.12.X.Y,si and sif; also for groups, presets,
       sounds, worlds, plugin components, screen configurations and timers (formats not given).
-      That feedback goes to the line's Destination IP and Port, not back to the sending socket,
-      and the osc-udp transport reads replies only on its own ephemeral source port, so the
-      feedback cannot be received and no state is tracked. Mode TCP is not used either: MA does
-      not document its framing or which side connects.
+      That feedback goes to the line's Destination IP and Port, not back to the sending socket.
+      With the feedback_port setting, the core listens on that local port; the console's line
+      then needs Send Yes, Destination IP this host and Port feedback_port, and the line's
+      Mode, Port and prefix rules above still apply (an outgoing prefix would change the
+      addresses, so it must stay empty). Only the two documented shapes are read: a sequence
+      (/13.13.1.6.X) and a master (/13.12.X.Y), each as sis/si key feedback and sif fader
+      feedback, told apart by their OSC type tags; sii (relative encoder) feedback and the
+      other object kinds, whose formats MA does not give, are not read. The sequence address
+      is the one the OSC page prints; if 2.5 moved sequences (see the next quirk), their
+      feedback is not matched. Key state is the 0/1 MA sends for that key function, and the
+      sequence text is MA's "<SequenceName> <CueNumber> <CueName>" (";" between name and cue
+      number since 2.5), kept as sent. Mode TCP is not used: MA does not document its framing
+      or which side connects.
 
   - models: [all]
     severity: warning

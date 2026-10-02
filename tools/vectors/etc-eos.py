@@ -243,7 +243,10 @@ e("get_csv", {}, ("/eos/get/csv",))
 
 # Telemetry: the implicit outputs and get replies (OSC Dictionary, OSC Outputs).
 T, F_ = ("T", None), ("F", None)   # OSC True/False tags carry no data
-telemetry(E, "subscribe-on-connect", expect_connect_wire_hex=[hexs(length_prefixed(osc("/eos/subscribe", ("i", 1))))],
+# On connecting: the subscription, then the first OSC Get query of the poll
+# (the rest follow one at a time, each as the previous one is answered).
+telemetry(E, "subscribe-on-connect", expect_connect_wire_hex=[hexs(length_prefixed(osc("/eos/subscribe", ("i", 1)))),
+                                                               hexs(length_prefixed(osc("/eos/get/version")))],
           inbound_hex=hexs(osc("/eos/out/show/name", ("s", "New Show Name"))),
           expect_state={"show": {"name": "New Show Name"}})
 telemetry(E, "version", inbound_hex=hexs(osc("/eos/out/get/version", ("s", "3.3.0.273"), ("s", "3.3.0.102"), ("i", 0))),

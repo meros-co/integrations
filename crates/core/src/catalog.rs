@@ -39,6 +39,10 @@ pub struct DeviceSpec {
     /// Telemetry fields, keyed by dotted path with `*` for a channel number.
     #[serde(default)]
     pub state: BTreeMap<String, StateField>,
+    /// Continuous media the device's module publishes, such as a camera's
+    /// live view, keyed by stream name. Watched with `Core::open_stream`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub streams: BTreeMap<String, StreamSpec>,
     /// Wire behaviour for spec-driven devices, kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub transport: Option<Value>,
@@ -50,6 +54,10 @@ pub struct DeviceSpec {
     /// Numeric response code to failure message, used with `code_range`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub codes: BTreeMap<String, String>,
+    /// Named value conversions (a fader law), used by the `to.` and `from.`
+    /// template directives; kept verbatim for the spec engine.
+    #[serde(default, skip_serializing)]
+    pub conversions: Option<Value>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +154,18 @@ pub struct StateField {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
     pub description: String,
+}
+
+/// A stream a native module publishes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamSpec {
+    /// The frame encoding: `jpeg`.
+    pub format: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// The models that have it; every model when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub models: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

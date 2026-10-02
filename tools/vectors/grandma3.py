@@ -162,3 +162,18 @@ g3cmd("go_timer", {"timer": 4}, "Go+ Timer 4")
 g3cmd("off_timer", {"timer": 4}, "Off Timer 4")
 g3cmd("pause_timer", {"timer": 4}, "Pause Timer 4")
 g3cmd("save_show", {}, "SaveShow")
+
+
+# ── Object Playback Feedback (OSC page; Advanced Examples feedback table) ──
+# Received on the feedback_port when the line sends to this host. The sis
+# example is MA's own: /13.13.1.6.1,sis,Flash,1,Strobe 1 Cue 1.
+telemetry(G3, "sequence-key", inbound_hex=hexs(osc("/13.13.1.6.1", ("s", "Flash"), ("i", 1), ("s", "Strobe 1 Cue 1"))),
+          expect_state={"sequences": {"1": {"keys": {"Flash": True}, "text": "Strobe 1 Cue 1"}}})
+telemetry(G3, "sequence-fader", inbound_hex=hexs(osc("/13.13.1.6.4", ("s", "Master"), ("i", 3), ("f", 75.5))),
+          expect_state={"sequences": {"4": {"faders": {"Master": 75.5}}}})
+telemetry(G3, "sequence-relative-ignored", inbound_hex=hexs(osc("/13.13.1.6.4", ("s", "Master"), ("i", 0), ("i", 10))),
+          expect_state={})
+telemetry(G3, "grand-master-fader", inbound_hex=hexs(osc("/13.12.2.1", ("s", "Master"), ("i", 1), ("f", 50.0))),
+          expect_state={"masters": {"2": {"1": {"faders": {"Master": 50.0}}}}})
+telemetry(G3, "master-key", inbound_hex=hexs(osc("/13.12.2.1", ("s", "Flash"), ("i", 0))),
+          expect_state={"masters": {"2": {"1": {"keys": {"Flash": False}}}}})

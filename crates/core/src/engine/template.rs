@@ -20,12 +20,114 @@ fn placeholder() -> &'static Regex {
 }
 
 /// Where values come from: a command's parameters and the device's settings,
-/// both already validated with defaults applied.
+/// both already validated with defaults applied, and the spec's conversions.
 pub(crate) struct Values<'a> {
     pub(crate) params: &'a Params,
     pub(crate) param_specs: &'a BTreeMap<String, ParamSpec>,
     pub(crate) settings: &'a Params,
     pub(crate) setting_specs: &'a BTreeMap<String, ParamSpec>,
+    pub(crate) conversions: &'a Conversions,
+}
+
+/// A spec's named conversions: SPEC.md §4, "Conversions".
+pub(crate) type Conversions = BTreeMap<String, Conversion>;
+
+/// A piecewise-linear conversion between a wire value and the value an
+/// operator uses (an X32 fader position and its dB), given as points joined
+/// by straight lines. Both columns are strictly monotonic, so it inverts.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Conversion {
+    /// (wire, value), wire ascending.
+    by_wire: Vec<(f64, f64)>,
+    /// (value, wire), value ascending.
+    by_value: Vec<(f64, f64)>,
+}
+
+impl Conversion {
+    fn parse(name: &str, v: &Value) -> Result<Conversion, String> {
+        let points = v
+            .get("points")
+            .and_then(Value::as_array)
+            .ok_or(format!("conversion '{name}' needs points"))?;
+        let mut by_wire = Vec::new();
+        for p in points {
+            let pair = p.as_array().filter(|a| a.len() == 2);
+            match pair.and_then(|a| Some((a[0].as_f64()?, a[1].as_f64()?))) {
+                Some(pair) => by_wire.push(pair),
+                None => return Err(format!("conversion '{name}': a point is [wire, value]")),
+            }
+        }
+        if by_wire.len() < 2 {
+            return Err(format!("conversion '{name}' needs at least two points"));
+        }
+        fn rising(a: &[(f64, f64)]) -> bool {
+            a.windows(2).all(|w| w[0].0 < w[1].0)
+        }
+        if !rising(&by_wire) {
+            return Err(format!("conversion '{name}': wire values must rise"));
+        }
+        let mut by_value: Vec<(f64, f64)> = by_wire.iter().map(|&(w, v)| (v, w)).collect();
+        if !rising(&by_value) {
+            by_value.reverse();
+            if !rising(&by_value) {
+                return Err(format!(
+                    "conversion '{name}': values must rise or fall with the wire"
+                ));
+            }
+        }
+        Ok(Conversion { by_wire, by_value })
+    }
+
+    /// The wire value for an operator value; `None` outside the points.
+    pub(crate) fn value_to_wire(&self, value: f64) -> Option<f64> {
+        interpolate(&self.by_value, value)
+    }
+
+    /// The operator value for a wire value; `None` outside the points.
+    pub(crate) fn wire_to_value(&self, wire: f64) -> Option<f64> {
+        interpolate(&self.by_wire, wire)
+    }
+}
+
+/// Linear interpolation over points sorted by x. An x on a point gives that
+/// point's y exactly; an x outside the points gives nothing.
+fn interpolate(points: &[(f64, f64)], x: f64) -> Option<f64> {
+    if let Some(&(_, y)) = points.iter().find(|(px, _)| *px == x) {
+        return Some(y);
+    }
+    let i = points.windows(2).position(|w| w[0].0 < x && x < w[1].0)?;
+    let ((x0, y0), (x1, y1)) = (points[i], points[i + 1]);
+    Some(y0 + (x - x0) * (y1 - y0) / (x1 - x0))
+}
+
+/// The spec's `conversions` section.
+pub(crate) fn conversions(spec: Option<&Value>) -> Result<Conversions, String> {
+    let mut out = Conversions::new();
+    for (name, v) in spec.and_then(Value::as_object).into_iter().flatten() {
+        out.insert(name.clone(), Conversion::parse(name, v)?);
+    }
+    Ok(out)
+}
+
+/// A `to.<name>` or `from.<name>` directive: the conversion and its direction.
+fn conversion_directive(d: &str) -> Option<(&str, bool)> {
+    d.strip_prefix("to.")
+        .map(|n| (n, true))
+        .or_else(|| d.strip_prefix("from.").map(|n| (n, false)))
+}
+
+fn apply_conversion(x: f64, d: &str, values: &Values) -> Result<f64, String> {
+    let (name, to_wire) = conversion_directive(d).ok_or(format!("bad directive ':{d}'"))?;
+    let c = values
+        .conversions
+        .get(name)
+        .ok_or(format!("conversion '{name}' is not declared"))?;
+    let out = if to_wire {
+        c.value_to_wire(x)
+    } else {
+        c.wire_to_value(x)
+    };
+    out.ok_or(format!("{x} is outside conversion '{name}'"))
 }
 
 impl Values<'_> {
@@ -76,8 +178,66 @@ pub(crate) fn sole_value<'a>(template: &str, values: &'a Values) -> Option<(&'a 
     values.lookup(&caps[1]).ok()
 }
 
+/// If `template` is exactly one numeric placeholder whose directives are all
+/// conversions, the converted number: an OSC float argument or a state value
+/// takes it as a number, with no text form involved.
+pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f64, String>> {
+    let caps = placeholder().captures(template)?;
+    if caps.get(0)?.as_str() != template || caps[2].is_empty() {
+        return None;
+    }
+    let directives: Vec<&str> = caps[2].split(':').filter(|d| !d.is_empty()).collect();
+    if !directives.iter().all(|d| conversion_directive(d).is_some()) {
+        return None;
+    }
+    let (value, kind) = match values.lookup(&caps[1]) {
+        Ok(v) => v,
+        Err(e) => return Some(Err(e)),
+    };
+    if !matches!(kind, ParamType::Int | ParamType::Float) {
+        return Some(Err(format!(
+            "a conversion needs a number, not '{}'",
+            &caps[1]
+        )));
+    }
+    let mut x = value.as_f64()?;
+    for d in directives {
+        x = match apply_conversion(x, d, values) {
+            Ok(x) => x,
+            Err(e) => return Some(Err(e)),
+        };
+    }
+    Some(Ok(x))
+}
+
 fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String, String> {
     let (value, kind) = values.lookup(name)?;
+
+    // Conversions come first and produce a float, which then needs `.Nf`.
+    let converted = directives
+        .iter()
+        .take_while(|d| conversion_directive(d).is_some())
+        .count();
+    if converted > 0 {
+        if !matches!(kind, ParamType::Int | ParamType::Float) {
+            return Err(format!("a conversion needs a number, not '{name}'"));
+        }
+        let mut x = value
+            .as_f64()
+            .ok_or_else(|| format!("'{name}' is not a number"))?;
+        for d in &directives[..converted] {
+            x = apply_conversion(x, d, values)?;
+        }
+        let places = match &directives[converted..] {
+            [d] => d.strip_prefix('.').and_then(|r| r.strip_suffix('f')),
+            _ => None,
+        }
+        .ok_or_else(|| format!("converted '{name}' rendered as text needs one ':.Nf'"))?;
+        let places: u32 = places
+            .parse()
+            .map_err(|_| format!("bad directive on '{name}'"))?;
+        return Ok(fixed(x, places));
+    }
 
     match kind {
         ParamType::Int => {
@@ -254,13 +414,50 @@ mod tests {
         let (p, s) = values(params, specs);
         let empty = Params::new();
         let empty_specs = BTreeMap::new();
+        let conversions = conversions(Some(&json!({
+            "fader": {"points": [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]},
+        })))
+        .unwrap();
         let v = Values {
             params: &p,
             param_specs: &s,
             settings: &empty,
             setting_specs: &empty_specs,
+            conversions: &conversions,
         };
         render(template, &v, no_escape)
+    }
+
+    #[test]
+    fn conversions_both_ways() {
+        let c = conversions(Some(&json!({
+            "fader": {"points": [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]},
+        })))
+        .unwrap();
+        let f = &c["fader"];
+        // Maillot p.128: 0 dB is 0.75, +10 is 1.0, the segment ends exact.
+        assert_eq!(f.value_to_wire(0.0), Some(0.75));
+        assert_eq!(f.value_to_wire(10.0), Some(1.0));
+        assert_eq!(f.value_to_wire(-30.0), Some(0.25));
+        assert_eq!(f.value_to_wire(-75.0), Some(0.03125));
+        assert_eq!(f.wire_to_value(0.75), Some(0.0));
+        assert_eq!(f.wire_to_value(0.375), Some(-20.0));
+        assert_eq!(f.wire_to_value(0.0), Some(-90.0));
+        // Outside the points there is no value: never clamped.
+        assert_eq!(f.value_to_wire(10.5), None);
+        assert_eq!(f.wire_to_value(1.01), None);
+        let s = "db: { type: float }";
+        assert_eq!(
+            go("{db:to.fader:.4f}", json!({"db": -20.0}), s).unwrap(),
+            "0.3750"
+        );
+        assert!(go("{db:to.fader}", json!({"db": -20.0}), s).is_err());
+        assert!(go("{db:to.fader:.1f}", json!({"db": 11.0}), s).is_err());
+        assert!(go("{db:to.nope:.1f}", json!({"db": 1.0}), s).is_err());
+        // A falling table inverts too.
+        let c = conversions(Some(&json!({"att": {"points": [[0, 0], [100, -50]]}}))).unwrap();
+        assert_eq!(c["att"].value_to_wire(-25.0), Some(50.0));
+        assert!(conversions(Some(&json!({"bad": {"points": [[0, 0], [1, 1], [2, 0]]}}))).is_err());
     }
 
     #[test]

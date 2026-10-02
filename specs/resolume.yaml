@@ -37,8 +37,17 @@ source:
     author: Resolume
     url: https://resolume.com/support/en/websocket-api
     note: >
-      Manufacturer document. The only channel on which Resolume pushes parameter
-      changes; not used here (see quirks).
+      Manufacturer document, retrieved 2026-10-01. The only channel on which
+      Resolume pushes parameter changes: ws://address:port/api/v1 on the
+      webserver's port; on connecting the composition state, then
+      sources_update and effects_update; parameter actions {"action":
+      <action>, "parameter": <path>} with subscribe, unsubscribe, set, get,
+      reset and trigger; a parameter path is /parameter/by-id/<id> or "the
+      logical path, based on the paths from the reference documentation,
+      without /api/v1 and with the parameter name appended"; every action but
+      trigger and reset answered with the parameter plus 'type'
+      (parameter_subscribed, parameter_unsubscribed, parameter_get,
+      parameter_set, parameter_update) and 'path'. Used for telemetry.
   - title: OSC (support article, v7.18)
     author: Resolume
     url: https://resolume.com/support/en/osc
@@ -655,10 +664,22 @@ commands:
     returns: value
 
 telemetry:
-  # Resolume pushes changes only over its websocket API, which the format has
-  # no transport for, so the product and the whole composition are asked for
-  # every second. get_product's and get_composition's replies update the state
-  # too.
+  # Commands stay on REST. Resolume pushes changes only over its websocket API,
+  # and only for parameters a client subscribes to by path. The composition's
+  # own parameters have fixed logical paths and are subscribed; layers,
+  # columns, decks and groups are keyed here by unique id, and subscribing to
+  # them needs ids or positions the format cannot derive from the composition,
+  # so the product and the whole composition are still asked for every second.
+  # get_product's and get_composition's replies update the state too.
+  websocket:
+    path: /api/v1
+    send:
+      - '{"action":"subscribe","parameter":"/composition/master"}'
+      - '{"action":"subscribe","parameter":"/composition/video/opacity"}'
+      - '{"action":"subscribe","parameter":"/composition/speed"}'
+      - '{"action":"subscribe","parameter":"/composition/bypassed"}'
+      - '{"action":"subscribe","parameter":"/composition/crossfader/phase"}'
+      - '{"action":"subscribe","parameter":"/composition/tempocontroller/tempo"}'
   poll:
     every_ms: 1000
     send:
@@ -767,6 +788,31 @@ telemetry:
         "groups.{id}.bypassed": "{bypassed}"
         "groups.{id}.solo": "{solo}"
         "groups.{id}.selected": "{selected}"
+
+    # Websocket: the answer to each subscription, and every later change.
+    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/master$" }
+      json: { value: "$.value" }
+      state: { composition.master: "{value}" }
+
+    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/video/opacity$" }
+      json: { value: "$.value" }
+      state: { composition.opacity: "{value}" }
+
+    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/speed$" }
+      json: { value: "$.value" }
+      state: { composition.speed: "{value}" }
+
+    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/bypassed$" }
+      json: { value: "$.value" }
+      state: { composition.bypassed: "{value}" }
+
+    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/crossfader/phase$" }
+      json: { value: "$.value" }
+      state: { crossfader.phase: "{value}" }
+
+    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/tempocontroller/tempo$" }
+      json: { value: "$.value" }
+      state: { tempo.bpm: "{value}" }
 
 state:
   product.name: { type: string, description: "Product serving the API: Arena or Avenue" }
@@ -895,9 +941,16 @@ quirks:
     severity: warning
     text: >
       There is no push over HTTP. Resolume pushes parameter changes only over
-      its websocket API (ws://host:port/api/v1), so the composition is asked
-      for once a second. The reply contains every deck, layer, column, clip and
-      effect, and grows with the composition.
+      its websocket API (ws://host:port/api/v1, the webserver's port), and
+      only for parameters subscribed by path. The composition's master,
+      opacity, speed, bypass, crossfader phase and tempo are subscribed by
+      their logical paths and update as they change; the subscription paths
+      are derived by the document's stated rule, as it gives no example for
+      them. Everything else is keyed by unique id and still comes from asking
+      for the composition once a second, whose reply contains every deck,
+      layer, column, clip and effect and grows with the composition. The
+      composition state Resolume sends on connecting the websocket, and its
+      sources and effects updates, are not read.
 
   - models: [all]
     severity: warning

@@ -185,3 +185,25 @@ telemetry(RS, "layer-idle", inbound_http={"path": "/api/v1/composition", "body":
                 "video": {"opacity": {"value": 1.0}}, "active_clip": None}]})},
     expect_state={"layers": {"1641549604810": {"name": "Overlay", "opacity": 1.0, "master": 0.5,
                                                "bypassed": False, "solo": True, "selected": False}}})
+
+# Websocket API (support article v7.8): subscriptions sent when the websocket
+# opens, as {"action": "subscribe", "parameter": <logical path>}, and the
+# parameter Resolume sends back with 'type' and 'path' added.
+_RS_SUBSCRIBED = ["/composition/master", "/composition/video/opacity", "/composition/speed",
+                  "/composition/bypassed", "/composition/crossfader/phase",
+                  "/composition/tempocontroller/tempo"]
+telemetry(RS, "ws-master", expect_connect_ws=[
+    json.dumps({"action": "subscribe", "parameter": p}, separators=(",", ":")) for p in _RS_SUBSCRIBED],
+    inbound_ws=json.dumps({"type": "parameter_update", "path": "/composition/master", "id": 1650000000001,
+                           "valuetype": "ParamRange", "min": 0.0, "max": 1.0, "value": 0.5}),
+    expect_state={"composition": {"master": 0.5}})
+telemetry(RS, "ws-tempo-subscribed", inbound_ws=json.dumps({
+    "type": "parameter_subscribed", "path": "/composition/tempocontroller/tempo", "id": 1650000000002,
+    "valuetype": "ParamRange", "min": 20.0, "max": 500.0, "value": 128.0}),
+    expect_state={"tempo": {"bpm": 128.0}})
+telemetry(RS, "ws-bypassed", inbound_ws=json.dumps({
+    "type": "parameter_update", "path": "/composition/bypassed", "id": 1650000000003,
+    "valuetype": "ParamBoolean", "value": True}),
+    expect_state={"composition": {"bypassed": True}})
+telemetry(RS, "ws-sources-ignored", inbound_ws=json.dumps({"type": "sources_update", "value": {}}),
+          expect_state={})

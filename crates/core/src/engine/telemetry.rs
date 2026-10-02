@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use regex::Regex;
 use serde_json::{Map, Value};
 
-use super::template::{render, sole_value, Values};
+use super::template::{render, sole_converted, sole_value, Conversions, Values};
 use crate::catalog::{ParamSpec, ParamType, Params, StateField};
 
 /// One assignment: a state path and the value to put there.
@@ -44,6 +44,17 @@ enum Matcher {
         address: Regex,
         json: BTreeMap<String, String>,
         json_arg: usize,
+        /// The message's OSC type tags must be exactly these (`sis`), for a
+        /// device that sends different shapes on one address (grandMA3).
+        arg_types: Option<String>,
+    },
+    /// A JSON message on a websocket. Every `select` JSON path must hold a
+    /// value matching its regex; their captures are `{1}`, `{2}`, ... in
+    /// order. `json` and `each` work as for an HTTP reply.
+    Json {
+        select: Vec<(String, Regex)>,
+        json: BTreeMap<String, String>,
+        each: Option<String>,
     },
     /// The JSON reply to an HTTP request whose path matches; `json` names the
     /// values to take, by JSON path.
@@ -84,8 +95,12 @@ pub(crate) enum Inbound<'a> {
     Text(&'a str),
     Osc {
         address: &'a str,
+        /// The type tags, without the leading comma.
+        types: &'a str,
         args: &'a [Value],
     },
+    /// A JSON message received on a websocket.
+    Json(&'a Value),
     /// An HTTP reply, with the path and query it answered.
     Http {
         path: &'a str,
@@ -103,6 +118,7 @@ pub(crate) struct Telemetry {
     pub(crate) poll_every: Option<u64>,
     rules: Vec<Rule>,
     types: Vec<(Vec<String>, String)>,
+    conversions: Conversions,
 }
 
 fn regex(v: &Value, what: &str) -> Result<Regex, String> {
@@ -151,14 +167,16 @@ impl Telemetry {
     pub(crate) fn shared(
         spec: Option<&Value>,
         state: &BTreeMap<String, StateField>,
+        conversions: Option<&Value>,
     ) -> Result<std::sync::Arc<Telemetry>, String> {
         use std::collections::HashMap;
         use std::sync::{Arc, Mutex};
         type Cache = Mutex<Option<HashMap<String, Arc<Telemetry>>>>;
         static CACHE: Cache = Mutex::new(None);
         let key = format!(
-            "{}\u{0}{}",
+            "{}\u{0}{}\u{0}{}",
             spec.map(Value::to_string).unwrap_or_default(),
+            conversions.map(Value::to_string).unwrap_or_default(),
             state
                 .iter()
                 .map(|(path, field)| format!("{path}={}", field.kind))
@@ -173,7 +191,8 @@ impl Telemetry {
         {
             return Ok(hit.clone());
         }
-        let parsed = Arc::new(Telemetry::parse(spec, state)?);
+        let conversions = super::template::conversions(conversions)?;
+        let parsed = Arc::new(Telemetry::parse(spec, state, conversions)?);
         CACHE
             .lock()
             .unwrap()
@@ -185,6 +204,7 @@ impl Telemetry {
     pub(crate) fn parse(
         spec: Option<&Value>,
         state: &BTreeMap<String, StateField>,
+        conversions: Conversions,
     ) -> Result<Telemetry, String> {
         let types: Vec<(Vec<String>, String)> = state
             .iter()
@@ -193,6 +213,7 @@ impl Telemetry {
         let Some(spec) = spec else {
             return Ok(Telemetry {
                 types,
+                conversions,
                 ..Telemetry::default()
             });
         };
@@ -204,6 +225,7 @@ impl Telemetry {
             poll_every: every(spec.get("poll")),
             rules: Vec::new(),
             types,
+            conversions,
         };
         for rule in spec
             .get("updates")
@@ -227,6 +249,26 @@ impl Telemetry {
                     address: regex(a, "address")?,
                     json: json_paths(rule)?,
                     json_arg: rule.get("json_arg").and_then(Value::as_u64).unwrap_or(0) as usize,
+                    arg_types: rule
+                        .get("arg_types")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                }
+            } else if let Some(select) = rule.get("json_match") {
+                let mut out = Vec::new();
+                for (path, re) in select
+                    .as_object()
+                    .ok_or("telemetry: json_match maps JSON paths to regexes")?
+                {
+                    out.push((path.clone(), regex(re, "json_match")?));
+                }
+                Matcher::Json {
+                    select: out,
+                    json: json_paths(rule)?,
+                    each: rule
+                        .get("json_each")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
                 }
             } else if let Some(p) = rule.get("path") {
                 let path = regex(p, "path")?;
@@ -282,7 +324,9 @@ impl Telemetry {
                     return Err("telemetry: a header rule needs each_line or fields".into());
                 }
             } else {
-                return Err("telemetry: a rule needs match, address, header or path".into());
+                return Err(
+                    "telemetry: a rule needs match, address, header, path or json_match".into(),
+                );
             };
             t.rules.push(Rule {
                 matcher,
@@ -421,14 +465,64 @@ impl Telemetry {
                         any |= self.assign_all(&rule.assign, &values, &mut patch);
                     }
                 }
+                (Matcher::Json { select, json, each }, Inbound::Json(doc)) => {
+                    let mut base = Vec::new();
+                    let mut matched = true;
+                    for (path, re) in select {
+                        let text = match super::expect::json_path(doc, path) {
+                            Some(Value::String(s)) => s.clone(),
+                            Some(other) => other.to_string(),
+                            None => {
+                                matched = false;
+                                break;
+                            }
+                        };
+                        let Some(caps) = re.captures(&text) else {
+                            matched = false;
+                            break;
+                        };
+                        let offset = base.len();
+                        for (i, v) in captures(&caps) {
+                            let n: usize = i.parse().unwrap_or(0);
+                            base.push(((n + offset).to_string(), v));
+                        }
+                    }
+                    if !matched {
+                        continue;
+                    }
+                    let items: Vec<&Value> = match each {
+                        Some(each) => super::expect::json_path(doc, each)
+                            .and_then(Value::as_array)
+                            .map(|a| a.iter().collect())
+                            .unwrap_or_default(),
+                        None => vec![*doc],
+                    };
+                    for item in items {
+                        let mut values = base.clone();
+                        for (name, json_path) in json {
+                            if let Some(v) = super::expect::json_path(item, json_path) {
+                                values.push((name.clone(), v.clone()));
+                            }
+                        }
+                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                    }
+                }
                 (
                     Matcher::Osc {
                         address: re,
                         json,
                         json_arg,
+                        arg_types,
                     },
-                    Inbound::Osc { address, args },
+                    Inbound::Osc {
+                        address,
+                        types,
+                        args,
+                    },
                 ) => {
+                    if arg_types.as_deref().is_some_and(|t| t != *types) {
+                        continue;
+                    }
                     if let Some(caps) = re.captures(address) {
                         let mut values = captures(&caps);
                         for (i, a) in args.iter().enumerate() {
@@ -493,6 +587,7 @@ impl Telemetry {
             param_specs: &specs,
             settings: &empty,
             setting_specs: &empty_specs,
+            conversions: &self.conversions,
         };
         let mut any = false;
         for a in assigns {
@@ -511,6 +606,14 @@ impl Telemetry {
                 .and_then(|n| texts.get(n).copied());
             let raw = match (text, kind) {
                 (Some(t), "string") => Value::String(t.to_string()),
+                // A conversion of one capture (a fader position to dB) is a
+                // number; one outside the conversion is not assigned.
+                _ if sole_converted(&a.value, &ctx).is_some() => {
+                    match sole_converted(&a.value, &ctx) {
+                        Some(Ok(x)) => Value::from(x),
+                        _ => continue,
+                    }
+                }
                 _ => match sole_value(&a.value, &ctx) {
                     Some((v, _)) => v.clone(),
                     None => match render(&a.value, &ctx, |s| s.to_string()) {
@@ -631,6 +734,7 @@ mod tests {
                 "state": {"outputs.{1:+1}.input": "{2:+1}"},
             }]})),
             &state(json!({"outputs.*.input": {"type": "int", "description": "x"}})),
+            Conversions::new(),
         )
         .unwrap();
         let patch = t
@@ -659,6 +763,7 @@ mod tests {
                 "transport.speed": {"type": "int", "description": "x"},
                 "transport.single_clip": {"type": "bool", "description": "x"},
             })),
+            Conversions::new(),
         )
         .unwrap();
         let patch = t
@@ -683,11 +788,13 @@ mod tests {
                 "channels.*.mute": {"type": "bool", "description": "x"},
                 "channels.*.fader": {"type": "float", "description": "x"},
             })),
+            Conversions::new(),
         )
         .unwrap();
         let p = t
             .apply(&Inbound::Osc {
                 address: "/ch/07/mix/on",
+                types: "i",
                 args: &[json!(0)],
             })
             .unwrap();
@@ -695,6 +802,7 @@ mod tests {
         let p = t
             .apply(&Inbound::Osc {
                 address: "/ch/07/mix/fader",
+                types: "f",
                 args: &[json!(0.75)],
             })
             .unwrap();
@@ -710,6 +818,7 @@ mod tests {
                 "state": {"cues.{1}.name": "{name}"},
             }]})),
             &state(json!({"cues.*.name": {"type": "string", "description": "x"}})),
+            Conversions::new(),
         )
         .unwrap();
         let reply =
@@ -717,6 +826,7 @@ mod tests {
         let p = t
             .apply(&Inbound::Osc {
                 address: "/reply/cue_id/A1/name",
+                types: "s",
                 args: &[json!(reply)],
             })
             .unwrap();
@@ -725,6 +835,7 @@ mod tests {
         assert_eq!(
             t.apply(&Inbound::Osc {
                 address: "/reply/cue_id/A1/name",
+                types: "s",
                 args: &[json!("Intro")],
             }),
             None
@@ -742,6 +853,7 @@ mod tests {
                 "shutter": {"type": "string", "description": "x"},
                 "gain": {"type": "string", "description": "x"},
             })),
+            Conversions::new(),
         )
         .unwrap();
         assert_eq!(
@@ -755,10 +867,99 @@ mod tests {
     }
 
     #[test]
+    fn json_messages_selected_by_path_with_each() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.type": "^parameter_(update|subscribed)$", "$.path": "^/composition/layers/(\\d+)/video/opacity$"},
+                 "json": {"value": "$.value"},
+                 "state": {"positions.{2}.opacity": "{value}"}},
+                {"json_match": {"$.layers": "^\\["}, "json_each": "$.layers",
+                 "json": {"id": "$.id", "name": "$.name.value"},
+                 "state": {"layers.{id}.name": "{name}"}},
+            ]})),
+            &state(json!({
+                "positions.*.opacity": {"type": "float", "description": "x"},
+                "layers.*.name": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let update = json!({"type": "parameter_update", "path": "/composition/layers/2/video/opacity",
+                            "id": 17, "valuetype": "ParamRange", "value": 0.25});
+        assert_eq!(
+            t.apply(&Inbound::Json(&update)).unwrap(),
+            json!({"positions": {"2": {"opacity": 0.25}}})
+        );
+        let composition = json!({"layers": [{"id": 5, "name": {"value": "Bg"}}, {"id": 6, "name": {"value": "Fg"}}]});
+        assert_eq!(
+            t.apply(&Inbound::Json(&composition)).unwrap(),
+            json!({"layers": {"5": {"name": "Bg"}, "6": {"name": "Fg"}}})
+        );
+        assert!(t
+            .apply(&Inbound::Json(&json!({"type": "sources_update"})))
+            .is_none());
+    }
+
+    #[test]
+    fn osc_type_tags_and_conversions() {
+        let conversions = super::super::template::conversions(Some(&json!({
+            "fader": {"points": [[0.0, -90.0], [0.0625, -60.0], [0.25, -30.0], [0.5, -10.0], [1.0, 10.0]]},
+        })))
+        .unwrap();
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/seq/(\\d+)$", "arg_types": "sis",
+                 "state": {"seq.{1}.cue": "{arg2}"}},
+                {"address": "^/seq/(\\d+)$", "arg_types": "sif",
+                 "state": {"seq.{1}.fader": "{arg2}"}},
+                {"address": "^/ch/(\\d+)/fader$", "state": {"ch.{1}.db": "{arg0:from.fader:.1f}", "ch.{1}.raw_db": "{arg0:from.fader}"}},
+            ]})),
+            &state(json!({
+                "seq.*.cue": {"type": "string", "description": "x"},
+                "seq.*.fader": {"type": "float", "description": "x"},
+                "ch.*.db": {"type": "float", "description": "x"},
+                "ch.*.raw_db": {"type": "float", "description": "x"},
+            })),
+            conversions,
+        )
+        .unwrap();
+        let osc = |types, args: &[Value]| {
+            t.apply(&Inbound::Osc {
+                address: "/seq/1",
+                types,
+                args,
+            })
+        };
+        assert_eq!(
+            osc("sis", &[json!("Flash"), json!(1), json!("Strobe 1 Cue 1")]).unwrap(),
+            json!({"seq": {"1": {"cue": "Strobe 1 Cue 1"}}})
+        );
+        assert_eq!(
+            osc("sif", &[json!("Master"), json!(3), json!(75.0)]).unwrap(),
+            json!({"seq": {"1": {"fader": 75.0}}})
+        );
+        assert!(osc("sii", &[json!("Master"), json!(3), json!(5)]).is_none());
+        let fader = |x: f64| {
+            t.apply(&Inbound::Osc {
+                address: "/ch/3/fader",
+                types: "f",
+                args: &[json!(x)],
+            })
+        };
+        assert_eq!(
+            fader(0.375).unwrap(),
+            json!({"ch": {"3": {"db": -20.0, "raw_db": -20.0}}})
+        );
+        // Outside the conversion's points: nothing is assigned.
+        assert!(fader(1.5).is_none());
+    }
+
+    #[test]
     fn undeclared_paths_are_refused_at_load() {
         let e = Telemetry::parse(
             Some(&json!({"updates": [{"match": "^X (\\d+)$", "state": {"nope.{1}": "{1}"}}]})),
             &state(json!({})),
+            Conversions::new(),
         )
         .unwrap_err();
         assert!(e.contains("not declared"));
@@ -769,6 +970,7 @@ mod tests {
         let t = Telemetry::parse(
             Some(&json!({"updates": [{"match": "^SPEED (.*)$", "state": {"speed": "{1}"}}]})),
             &state(json!({"speed": {"type": "int", "description": "x"}})),
+            Conversions::new(),
         )
         .unwrap();
         assert!(t.apply(&Inbound::Text("SPEED fast")).is_none());

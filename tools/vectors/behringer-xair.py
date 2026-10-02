@@ -423,3 +423,8 @@ _t("recorder-remaining", "/-stat/tape/rtime", ("i", -3), {"recorder": {"remainin
 _t("recorder-file", "/-stat/tape/file", ("s", "R_20260101-120000.wav"), {"recorder": {"file": "R_20260101-120000.wav"}})
 _t("usb-mounted", "/-stat/usbmounted", ("i", 1), {"recorder": {"usb_mounted": True}})
 _t("console-name", "/-prefs/name", ("s", "XR18-1A-2B-3C"), {"console": {"name": "XR18-1A-2B-3C"}})
+
+
+# Levels in dB: the X32 family's fader law (behringer-x32.py, _fader_db_vectors).
+_fader_db_vectors(XA)
+_t("channel-fader-db", "/ch/02/mix/fader", ("f", 0.875), {"channels": {"2": {"fader": 0.875, "fader_db": 5.0}}})

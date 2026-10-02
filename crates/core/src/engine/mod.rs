@@ -25,13 +25,19 @@ use serde_json::{Map, Value};
 use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest, HttpResponse, Key,
-    Level, Millis, Module, OpenContext, Outcome, RequestId, TcpInput,
+    Level, Millis, Module, OpenContext, Outcome, RequestId, TcpInput, WsInput, WsRequest,
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
-use template::{no_escape, percent_encode, render, sole_value, Values};
+use template::{
+    no_escape, percent_encode, render, sole_converted, sole_value, Conversions, Values,
+};
 
 const SOCKET: Key = "device";
+/// The websocket a spec on another transport receives pushed state on
+/// (`telemetry.websocket`).
+const PUSH: Key = "push";
+const PUSH_RECONNECT: Key = "push-reconnect";
 const REPLY: Key = "reply";
 const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
@@ -82,9 +88,27 @@ enum Transport {
         /// Statuses that mean the credential was refused.
         refusal: Vec<u16>,
     },
+    /// Text messages over a websocket, usually JSON.
+    Ws {
+        port: u16,
+        request: WsRequest,
+        auth: HttpAuth,
+        replies: bool,
+        /// As for line-tcp: a message not matching it is never a reply taken
+        /// in order.
+        reply_match: Option<Regex>,
+    },
 }
 
-/// How an HTTP device authenticates (SPEC.md §2).
+/// The websocket a spec on another transport takes pushed state from.
+#[derive(Debug)]
+struct Push {
+    request: WsRequest,
+    /// Messages sent each time it opens: the subscriptions.
+    send: Vec<Value>,
+}
+
+/// How an HTTP or websocket device authenticates (SPEC.md §2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HttpAuth {
     None,
@@ -96,14 +120,22 @@ enum HttpAuth {
 
 impl Transport {
     fn is_stream(&self) -> bool {
-        matches!(self, Transport::LineTcp { .. } | Transport::OscTcp { .. })
+        matches!(
+            self,
+            Transport::LineTcp { .. } | Transport::OscTcp { .. } | Transport::Ws { .. }
+        )
+    }
+
+    fn is_osc(&self) -> bool {
+        matches!(self, Transport::OscUdp { .. } | Transport::OscTcp { .. })
     }
 
     fn replies(&self) -> bool {
         match self {
             Transport::LineTcp { replies, .. }
             | Transport::LineUdp { replies, .. }
-            | Transport::OscUdp { replies, .. } => *replies,
+            | Transport::OscUdp { replies, .. }
+            | Transport::Ws { replies, .. } => *replies,
             Transport::OscTcp { .. } | Transport::Http { .. } => true,
         }
     }
@@ -114,23 +146,55 @@ impl Transport {
 enum Outgoing {
     Bytes(Vec<u8>),
     Http(HttpRequest),
+    Ws(String),
+}
+
+/// The OSC reply a message waits for.
+#[derive(Debug, Clone)]
+enum OscReply {
+    /// A command's `expect.address`, or a query answered on its own address.
+    Exact(String),
+    /// A poll item's `reply_address` (ETC Eos: `/eos/out/get/...`).
+    Pattern(Regex),
+}
+
+impl OscReply {
+    fn matches(&self, address: &str) -> bool {
+        match self {
+            OscReply::Exact(a) => a == address,
+            OscReply::Pattern(re) => re.is_match(address),
+        }
+    }
 }
 
 /// What reply the command in flight is waiting for.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 enum Await {
     /// The next reply message on a text stream.
     Text,
     /// An OSC message on this address; `None` for a probe, where any will do.
-    Osc(Option<String>),
+    Osc(Option<OscReply>),
     Http(RequestId),
+    /// A websocket message: the one whose JSON holds these values
+    /// (`expect.reply_json`), or with `None` the next one, in order.
+    Ws(Option<Vec<(String, String)>>),
+}
+
+impl Await {
+    /// A reply that names what it answers: a late one cannot be taken for
+    /// the answer to a later message, so a timeout need not reset a stream.
+    fn addressed(&self) -> bool {
+        matches!(self, Await::Osc(Some(_)) | Await::Ws(Some(_)))
+    }
 }
 
 #[derive(Debug)]
 struct InFlight {
     /// `None` for a liveness probe.
     id: Option<CommandId>,
-    messages: VecDeque<(Outgoing, Option<String>)>,
+    messages: VecDeque<(Outgoing, Option<OscReply>)>,
+    /// Over a websocket: what identifies the reply (`expect.reply_json`).
+    ws_reply: Option<Vec<(String, String)>>,
     expect: Map<String, Value>,
     returns: String,
     awaiting: Option<Await>,
@@ -176,12 +240,114 @@ pub(crate) struct SpecEngine {
     /// and the link is not reported connected, until the prompt arrives.
     prompt_wait: Option<(usize, String, Vec<u8>)>,
     /// `refused` patterns of the login steps sent: a line matching one is the
-    /// device refusing the credential.
-    refusals: Vec<Regex>,
+    /// device refusing the credential. Each stops applying once a line matches
+    /// the step's `accepted` pattern, if it has one.
+    refusals: Vec<(Regex, Option<Regex>)>,
+    /// The spec's conversions, for templates.
+    conversions: Conversions,
+    /// `telemetry.websocket`: a push channel beside the transport.
+    push: Option<Push>,
+    push_backoff: Millis,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
     v.get(key).and_then(Value::as_str)
+}
+
+/// A scheme, or `{setting: name}` naming the operator's choice of the two.
+fn scheme_of(
+    t: &Value,
+    settings: &Params,
+    plain: &'static str,
+    secure: &'static str,
+) -> Result<String, String> {
+    let bad = || format!("scheme needs {plain}, {secure} or {{setting: name}}");
+    let scheme = match t.get("scheme") {
+        None => plain.to_string(),
+        Some(Value::String(s)) => s.clone(),
+        Some(Value::Object(o)) => {
+            let name = o.get("setting").and_then(Value::as_str).ok_or_else(bad)?;
+            settings
+                .get(name)
+                .and_then(Value::as_str)
+                .unwrap_or(plain)
+                .to_string()
+        }
+        Some(_) => return Err(bad()),
+    };
+    if scheme != plain && scheme != secure {
+        return Err(format!("scheme '{scheme}' is not {plain} or {secure}"));
+    }
+    Ok(scheme)
+}
+
+/// `Authorization` for Basic and Bearer, from the `username`, `password` and
+/// `token` settings; nothing for a bearer token left empty.
+fn auth_headers(auth: HttpAuth, settings: &Params) -> Vec<(String, String)> {
+    let setting = |name: &str| {
+        settings
+            .get(name)
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+    match auth {
+        HttpAuth::Basic => {
+            use base64::Engine;
+            let token = base64::engine::general_purpose::STANDARD.encode(format!(
+                "{}:{}",
+                setting("username"),
+                setting("password")
+            ));
+            vec![("Authorization".to_string(), format!("Basic {token}"))]
+        }
+        HttpAuth::Bearer => {
+            let token = setting("token");
+            if token.is_empty() {
+                Vec::new()
+            } else {
+                vec![("Authorization".to_string(), format!("Bearer {token}"))]
+            }
+        }
+        HttpAuth::None | HttpAuth::Digest => Vec::new(),
+    }
+}
+
+fn host_text(host: IpAddr) -> String {
+    match host {
+        IpAddr::V6(v6) => format!("[{v6}]"),
+        v4 => v4.to_string(),
+    }
+}
+
+/// A websocket's opening request: `scheme://host:port/path`, the subprotocol
+/// and any credential.
+fn ws_request(
+    t: &Value,
+    host: IpAddr,
+    port: u16,
+    settings: &Params,
+    auth: HttpAuth,
+) -> Result<WsRequest, String> {
+    let scheme = scheme_of(t, settings, "ws", "wss")?;
+    let path = str_field(t, "path").unwrap_or("/");
+    if !path.starts_with('/') {
+        return Err("a websocket path starts with /".into());
+    }
+    let mut headers = auth_headers(auth, settings);
+    if let Some(p) = str_field(t, "subprotocol") {
+        headers.push(("Sec-WebSocket-Protocol".to_string(), p.to_string()));
+    }
+    Ok(WsRequest {
+        url: format!("{scheme}://{}:{port}{path}", host_text(host)),
+        headers,
+    })
+}
+
+/// A websocket handshake the device answered 401 or 403: the credential
+/// refused.
+fn handshake_refused(reason: &str) -> bool {
+    reason.starts_with("connect: HTTP 401") || reason.starts_with("connect: HTTP 403")
 }
 
 impl SpecEngine {
@@ -281,27 +447,27 @@ impl SpecEngine {
                     other => return Err(format!("osc-tcp framing {other:?} is not implemented")),
                 },
             },
-            "http" => {
-                // A scheme, or {setting: name} naming the operator's choice.
-                let scheme = match t.get("scheme") {
-                    None => "http".to_string(),
-                    Some(Value::String(s)) => s.clone(),
-                    Some(Value::Object(o)) => {
-                        let name = o
-                            .get("setting")
-                            .and_then(Value::as_str)
-                            .ok_or("scheme needs http, https or {setting: name}")?;
-                        ctx.settings
-                            .get(name)
-                            .and_then(Value::as_str)
-                            .unwrap_or("http")
-                            .to_string()
-                    }
-                    Some(_) => return Err("scheme needs http, https or {setting: name}".into()),
+            "ws" => {
+                let auth = match str_field(&t, "auth").unwrap_or("none") {
+                    "none" => HttpAuth::None,
+                    "basic" => HttpAuth::Basic,
+                    "bearer" => HttpAuth::Bearer,
+                    other => return Err(format!("ws auth '{other}' is not implemented")),
                 };
-                if scheme != "http" && scheme != "https" {
-                    return Err(format!("scheme '{scheme}' is not http or https"));
+                let reply_match = match str_field(&t, "reply_match") {
+                    Some(p) => Some(Regex::new(p).map_err(|e| format!("reply_match: {e}"))?),
+                    None => None,
+                };
+                Transport::Ws {
+                    port,
+                    request: ws_request(&t, ctx.host, port, &ctx.settings, auth)?,
+                    auth,
+                    replies: str_field(&t, "reply") != Some("none"),
+                    reply_match,
                 }
+            }
+            "http" => {
+                let scheme = scheme_of(&t, &ctx.settings, "http", "https")?;
                 let auth = match str_field(&t, "auth").unwrap_or("none") {
                     "none" => HttpAuth::None,
                     "basic" => HttpAuth::Basic,
@@ -309,10 +475,7 @@ impl SpecEngine {
                     "bearer" => HttpAuth::Bearer,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
-                let host = match ctx.host {
-                    IpAddr::V6(v6) => format!("[{v6}]"),
-                    v4 => v4.to_string(),
-                };
+                let host = host_text(ctx.host);
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
                     auth,
@@ -334,7 +497,36 @@ impl SpecEngine {
         };
 
         let probe = t.get("probe").cloned();
-        let telemetry = telemetry::Telemetry::shared(spec.telemetry.as_ref(), &spec.state)?;
+        let telemetry = telemetry::Telemetry::shared(
+            spec.telemetry.as_ref(),
+            &spec.state,
+            spec.conversions.as_ref(),
+        )?;
+        let conversions = template::conversions(spec.conversions.as_ref())?;
+        let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
+            None => None,
+            Some(w) => {
+                let push_port = match w.get("port").and_then(Value::as_u64) {
+                    Some(p @ 1..=65535) => p as u16,
+                    Some(_) => return Err("telemetry.websocket.port is not a port".into()),
+                    None => port,
+                };
+                // The transport's credential goes on the websocket's opening
+                // request too.
+                let auth = match &transport {
+                    Transport::Http { auth, .. } | Transport::Ws { auth, .. } => *auth,
+                    _ => HttpAuth::None,
+                };
+                Some(Push {
+                    request: ws_request(w, ctx.host, push_port, &ctx.settings, auth)?,
+                    send: match w.get("send") {
+                        Some(Value::Array(items)) => items.clone(),
+                        Some(one) => vec![one.clone()],
+                        None => Vec::new(),
+                    },
+                })
+            }
+        };
         Ok(SpecEngine {
             spec,
             host: ctx.host,
@@ -355,6 +547,9 @@ impl SpecEngine {
             refused: None,
             prompt_wait: None,
             refusals: Vec::new(),
+            conversions,
+            push,
+            push_backoff: RECONNECT_MIN,
         })
     }
 
@@ -363,7 +558,8 @@ impl SpecEngine {
             Transport::LineTcp { port, .. }
             | Transport::LineUdp { port, .. }
             | Transport::OscUdp { port, .. }
-            | Transport::OscTcp { port, .. } => *port,
+            | Transport::OscTcp { port, .. }
+            | Transport::Ws { port, .. } => *port,
             Transport::Http { .. } => 0,
         }
     }
@@ -385,6 +581,7 @@ impl SpecEngine {
             param_specs: specs,
             settings: &self.settings,
             setting_specs: &self.spec.settings,
+            conversions: &self.conversions,
         }
     }
 
@@ -403,6 +600,12 @@ impl SpecEngine {
                     return Err("the message contains non-ASCII characters".into());
                 }
                 Ok(Outgoing::Bytes(framed.into_bytes()))
+            }
+            Transport::Ws { .. } => {
+                let template = item
+                    .as_str()
+                    .ok_or("a websocket message must be a string")?;
+                Ok(Outgoing::Ws(render(template, values, no_escape)?))
             }
             Transport::OscUdp { .. } | Transport::OscTcp { .. } => {
                 let packet = build_osc(item, values)?;
@@ -443,7 +646,7 @@ impl SpecEngine {
                     url.push('?');
                     url.push_str(&pairs.join("&"));
                 }
-                let mut headers = Vec::new();
+                let mut headers = auth_headers(*auth, &self.settings);
                 let setting = |name: &str| {
                     self.settings
                         .get(name)
@@ -452,18 +655,6 @@ impl SpecEngine {
                         .to_string()
                 };
                 let (user, pass) = (setting("username"), setting("password"));
-                if *auth == HttpAuth::Basic {
-                    use base64::Engine;
-                    let token =
-                        base64::engine::general_purpose::STANDARD.encode(format!("{user}:{pass}"));
-                    headers.push(("Authorization".to_string(), format!("Basic {token}")));
-                }
-                if *auth == HttpAuth::Bearer {
-                    let token = setting("token");
-                    if !token.is_empty() {
-                        headers.push(("Authorization".to_string(), format!("Bearer {token}")));
-                    }
-                }
                 let body = match str_field(item, "body") {
                     Some(b) => Some(render(b, values, no_escape)?.into_bytes()),
                     None => None,
@@ -525,25 +716,39 @@ impl SpecEngine {
             }
         };
         let values = self.values(&job.params, param_specs);
+        let osc = self.transport.is_osc();
         let awaited_address = match expect.get("address").and_then(Value::as_str) {
-            Some(a) => Some(render(a, &values, no_escape)?),
-            // A telemetry query is answered on its own address; anything else
-            // arriving meanwhile (a pushed change) is not its reply.
-            None => match (&job.item, &self.transport) {
-                (
-                    Some(Value::String(address)),
-                    Transport::OscUdp { .. } | Transport::OscTcp { .. },
-                ) => Some(address.clone()),
+            Some(a) => Some(OscReply::Exact(render(a, &values, no_escape)?)),
+            // A telemetry query is answered on its own address, or on the
+            // `reply_address` it names; anything else arriving meanwhile (a
+            // pushed change) is not its reply.
+            None => match &job.item {
+                Some(Value::String(address)) if osc => Some(OscReply::Exact(address.clone())),
+                Some(Value::Object(o)) if osc => match o.get("reply_address") {
+                    Some(Value::String(re)) => Some(OscReply::Pattern(
+                        Regex::new(re).map_err(|e| format!("reply_address: {e}"))?,
+                    )),
+                    _ => None,
+                },
                 _ => None,
             },
+        };
+        let ws_reply = match expect.get("reply_json").and_then(Value::as_object) {
+            Some(fields) => {
+                let mut out = Vec::new();
+                for (path, template) in fields {
+                    let template = template.as_str().ok_or("reply_json values are templates")?;
+                    out.push((path.clone(), render(template, &values, no_escape)?));
+                }
+                Some(out)
+            }
+            None => None,
         };
         let mut messages = VecDeque::new();
         for item in &items {
             // OSC probes are bare addresses in the spec.
-            let item = match (item, &self.transport) {
-                (Value::String(address), Transport::OscUdp { .. } | Transport::OscTcp { .. }) => {
-                    serde_json::json!({ "address": address })
-                }
+            let item = match item {
+                Value::String(address) if osc => serde_json::json!({ "address": address }),
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
@@ -552,6 +757,7 @@ impl SpecEngine {
         Ok(InFlight {
             id: job.id,
             messages,
+            ws_reply,
             expect,
             returns,
             awaiting: None,
@@ -611,6 +817,10 @@ impl SpecEngine {
                 return;
             };
             let awaiting = match outgoing {
+                Outgoing::Ws(text) => {
+                    cx.ws_send(SOCKET, text);
+                    Await::Ws(flight.ws_reply.clone())
+                }
                 Outgoing::Bytes(bytes) => {
                     match &self.transport {
                         Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
@@ -678,6 +888,30 @@ impl SpecEngine {
             &reply,
             headed,
         );
+        // `expect.convert`: the returned wire value in the operator's terms.
+        let result = match (result, flight.expect.get("convert").and_then(Value::as_str)) {
+            (Ok(Outcome::Value { value }), Some(name)) => {
+                let wire = value
+                    .as_f64()
+                    .or_else(|| value.as_str().and_then(|s| s.trim().parse().ok()));
+                match (wire, self.conversions.get(name)) {
+                    (Some(w), Some(c)) => match c.wire_to_value(w) {
+                        Some(x) => Ok(Outcome::Value {
+                            value: Value::from(x),
+                        }),
+                        None => Err(CommandError::DeviceError {
+                            code: None,
+                            message: format!("reply {w} is outside conversion '{name}'"),
+                        }),
+                    },
+                    _ => Err(CommandError::DeviceError {
+                        code: None,
+                        message: format!("reply {value} cannot be converted with '{name}'"),
+                    }),
+                }
+            }
+            (result, _) => result,
+        };
         let done = result.is_err() || flight.messages.is_empty();
         if done {
             let flight = self.current.take().unwrap();
@@ -756,6 +990,7 @@ impl SpecEngine {
                 self.packets = Some(PacketReader::new(*framing));
                 cx.tcp_open(SOCKET, SocketAddr::new(self.host, self.port()));
             }
+            Transport::Ws { request, .. } => cx.ws_open(SOCKET, request.clone()),
             Transport::OscUdp { listen, .. } | Transport::LineUdp { listen, .. } => {
                 cx.udp_open(SOCKET, listen.map_or(Bind::Ephemeral, Bind::Shared));
                 self.send_on_connect(cx, 0, false);
@@ -785,7 +1020,10 @@ impl SpecEngine {
                 message: reason.clone(),
             },
         );
-        cx.tcp_close(SOCKET);
+        match self.transport {
+            Transport::Ws { .. } => cx.ws_close(SOCKET),
+            _ => cx.tcp_close(SOCKET),
+        }
         cx.cancel_timer(PROBE);
         cx.cancel_timer(RENEW);
         cx.cancel_timer(POLL);
@@ -803,15 +1041,16 @@ impl SpecEngine {
         let empty_specs = BTreeMap::new();
         let steps = self.spec.on_connect.clone();
         for (index, step) in steps.iter().enumerate().skip(from) {
-            let (item, when_set, prompt, refused, await_reply) = match step {
+            let (item, when_set, prompt, refused, accepted, await_reply) = match step {
                 Value::Object(m) if m.contains_key("send") => (
                     m.get("send").cloned().unwrap_or(Value::Null),
                     m.get("when_set").and_then(Value::as_str),
                     m.get("after_prompt").and_then(Value::as_str),
                     m.get("refused").and_then(Value::as_str),
+                    m.get("accepted").and_then(Value::as_str),
                     m.get("await_reply").and_then(Value::as_bool) == Some(true),
                 ),
-                other => (other.clone(), None, None, None, false),
+                other => (other.clone(), None, None, None, None, false),
             };
             if let Some(setting) = when_set {
                 let set = self
@@ -830,8 +1069,15 @@ impl SpecEngine {
                 }
             }
             if let Some(pattern) = refused {
+                let accepted = accepted.and_then(|p| match Regex::new(p) {
+                    Ok(re) => Some(re),
+                    Err(e) => {
+                        cx.log(Level::Warning, format!("on_connect accepted: {e}"));
+                        None
+                    }
+                });
                 match Regex::new(pattern) {
-                    Ok(re) => self.refusals.push(re),
+                    Ok(re) => self.refusals.push((re, accepted)),
                     Err(e) => cx.log(Level::Warning, format!("on_connect refused: {e}")),
                 }
             }
@@ -849,12 +1095,8 @@ impl SpecEngine {
             }
             let values = self.values(&empty, &empty_specs);
             match self.build(&item, &values) {
-                Ok(Outgoing::Bytes(bytes)) => match &self.transport {
-                    Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
-                        cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
-                    }
-                    _ => cx.tcp_send(SOCKET, bytes),
-                },
+                Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
+                Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
                 Ok(Outgoing::Http(request)) => {
                     let id = self.next_request;
                     self.next_request += 1;
@@ -864,6 +1106,27 @@ impl SpecEngine {
             }
         }
         true
+    }
+
+    /// Bytes to the device, over the transport's socket.
+    fn transmit(&self, cx: &mut Cx, bytes: Vec<u8>) {
+        match &self.transport {
+            Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
+                cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
+            }
+            _ => cx.tcp_send(SOCKET, bytes),
+        }
+    }
+
+    /// The stream is open: the connection sequence, then traffic.
+    fn opened(&mut self, cx: &mut Cx) {
+        self.backoff = RECONNECT_MIN;
+        self.last_heard = cx.now();
+        self.prompt_wait = None;
+        self.refusals.clear();
+        if self.send_on_connect(cx, 0, false) {
+            self.ready(cx);
+        }
     }
 
     /// The connection sequence is done: report the link and start traffic.
@@ -902,6 +1165,9 @@ impl SpecEngine {
                 poll && replies
             }
             Transport::OscTcp { .. } => poll,
+            // A websocket device pushes; what it sends back after a
+            // subscription goes to the rules like anything else.
+            Transport::Ws { .. } => false,
         };
         for item in items {
             if queued {
@@ -914,8 +1180,8 @@ impl SpecEngine {
                 });
                 continue;
             }
-            let item = match (&item, &self.transport) {
-                (Value::String(address), Transport::OscUdp { .. } | Transport::OscTcp { .. }) => {
+            let item = match &item {
+                Value::String(address) if self.transport.is_osc() => {
                     serde_json::json!({ "address": address })
                 }
                 _ => item,
@@ -924,12 +1190,8 @@ impl SpecEngine {
             let empty_specs = BTreeMap::new();
             let values = self.values(&empty, &empty_specs);
             match self.build(&item, &values) {
-                Ok(Outgoing::Bytes(bytes)) => match &self.transport {
-                    Transport::OscUdp { port, .. } | Transport::LineUdp { port, .. } => {
-                        cx.udp_send(SOCKET, SocketAddr::new(self.host, *port), bytes)
-                    }
-                    _ => cx.tcp_send(SOCKET, bytes),
-                },
+                Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
+                Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
                 Ok(Outgoing::Http(_)) => {
                     cx.log(Level::Warning, "telemetry over HTTP is not implemented")
                 }
@@ -970,10 +1232,14 @@ impl SpecEngine {
     }
 
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
-        if self.refusals.iter().any(|re| re.is_match(&message)) {
+        if self.refusals.iter().any(|(re, _)| re.is_match(&message)) {
             self.refuse(cx, format!("login refused: {}", message.trim()));
             return;
         }
+        // A login the device confirmed can no longer be refused: later free
+        // text that happens to match is not about the login.
+        self.refusals
+            .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
         self.apply_text(cx, &message);
         let waiting = matches!(
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
@@ -999,17 +1265,126 @@ impl SpecEngine {
         }
     }
 
+    /// Offer a websocket message to the telemetry rules: as JSON where it
+    /// parses, and as text.
+    fn apply_ws(&self, cx: &mut Cx, text: &str) {
+        if let Ok(doc) = serde_json::from_str::<Value>(text) {
+            if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
+                cx.state(patch);
+            }
+        }
+        self.apply_text(cx, text);
+    }
+
+    fn inbound_ws(&mut self, cx: &mut Cx, text: String) {
+        self.apply_ws(cx, &text);
+        let ours =
+            match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
+                Some(Await::Ws(Some(fields))) => serde_json::from_str::<Value>(&text)
+                    .ok()
+                    .is_some_and(|doc| {
+                        fields
+                            .iter()
+                            .all(|(path, want)| match expect::json_path(&doc, path) {
+                                Some(Value::String(s)) => s == want,
+                                Some(other) => {
+                                    let text = other.to_string();
+                                    text == *want
+                                }
+                                None => false,
+                            })
+                    }),
+                Some(Await::Ws(None)) => match &self.transport {
+                    Transport::Ws {
+                        reply_match: Some(re),
+                        ..
+                    } => re.is_match(&text),
+                    _ => true,
+                },
+                _ => false,
+            };
+        if ours {
+            self.reply(cx, Reply::Text(text));
+        } else {
+            self.last_heard = cx.now();
+            cx.alive();
+        }
+    }
+
+    /// The push channel (`telemetry.websocket`).
+    fn open_push(&mut self, cx: &mut Cx) {
+        if let Some(push) = &self.push {
+            cx.ws_open(PUSH, push.request.clone());
+        }
+    }
+
+    fn push_input(&mut self, cx: &mut Cx, input: WsInput) {
+        if self.refused.is_some() {
+            return;
+        }
+        match input {
+            WsInput::Opened => {
+                self.push_backoff = RECONNECT_MIN;
+                let items = self
+                    .push
+                    .as_ref()
+                    .map(|p| p.send.clone())
+                    .unwrap_or_default();
+                let empty = Params::new();
+                let empty_specs = BTreeMap::new();
+                let values = self.values(&empty, &empty_specs);
+                for item in items {
+                    match item.as_str().map(|t| render(t, &values, no_escape)) {
+                        Some(Ok(text)) => cx.ws_send(PUSH, text),
+                        Some(Err(e)) => {
+                            cx.log(Level::Warning, format!("websocket message not sent: {e}"))
+                        }
+                        None => cx.log(Level::Warning, "a websocket message must be a string"),
+                    }
+                }
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            WsInput::Text(text) => {
+                self.apply_ws(cx, &text);
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            WsInput::Binary(_) | WsInput::Activity => {
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            WsInput::Closed { reason, .. } => {
+                let credentialed = !auth_headers_empty(&self.push);
+                if credentialed && handshake_refused(&reason) {
+                    self.refuse(
+                        cx,
+                        format!("the device refused the credential on its websocket ({reason})"),
+                    );
+                    return;
+                }
+                cx.log(
+                    Level::Info,
+                    format!("push websocket closed: {reason}; reopening"),
+                );
+                cx.set_timer(PUSH_RECONNECT, self.push_backoff);
+                self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
+            }
+        }
+    }
+
     fn inbound_osc(&mut self, cx: &mut Cx, packet: &[u8]) {
         for message in osc::decode(packet) {
             if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Osc {
                 address: &message.address,
+                types: &message.types,
                 args: &message.args,
             }) {
                 cx.state(patch);
             }
             let matches = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Osc(None)) => true,
-                Some(Await::Osc(Some(address))) => *address == message.address,
+                Some(Await::Osc(Some(reply))) => reply.matches(&message.address),
                 _ => false,
             };
             if matches {
@@ -1020,6 +1395,16 @@ impl SpecEngine {
             }
         }
     }
+}
+
+/// Whether the push channel's opening request carries a credential.
+fn auth_headers_empty(push: &Option<Push>) -> bool {
+    push.as_ref().is_none_or(|p| {
+        !p.request
+            .headers
+            .iter()
+            .any(|(name, _)| name == "Authorization")
+    })
 }
 
 /// Encode one OSC `send` item: `{address, args: [{value, type}]}`.
@@ -1040,6 +1425,10 @@ fn build_osc(item: &Value, values: &Values) -> Result<Vec<u8>, String> {
         let kind = str_field(arg, "type").ok_or("OSC argument has no type")?;
         let sole = sole_value(template, values);
         args.push(match kind {
+            // A converted value (dB to a fader position) is a number too.
+            "float" if sole_converted(template, values).is_some() => {
+                osc::Arg::Float(sole_converted(template, values).unwrap()? as f32)
+            }
             "float" => match sole {
                 Some((v, _)) if v.is_number() => osc::Arg::Float(v.as_f64().unwrap() as f32),
                 _ => osc::Arg::Float(
@@ -1065,6 +1454,7 @@ impl Module for SpecEngine {
     fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         self.connect(cx);
+        self.open_push(cx);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
@@ -1096,15 +1486,7 @@ impl Module for SpecEngine {
 
     fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
         match input {
-            TcpInput::Connected => {
-                self.backoff = RECONNECT_MIN;
-                self.last_heard = cx.now();
-                self.prompt_wait = None;
-                self.refusals.clear();
-                if self.send_on_connect(cx, 0, false) {
-                    self.ready(cx);
-                }
-            }
+            TcpInput::Connected => self.opened(cx),
             TcpInput::Data(mut bytes) => {
                 if let Some((step, prompt, seen)) = self.prompt_wait.as_mut() {
                     // The prompt has no line ending, so it is looked for in the
@@ -1140,6 +1522,35 @@ impl Module for SpecEngine {
                 }
             }
             TcpInput::Closed { reason } => self.lost(cx, reason),
+        }
+    }
+
+    fn ws(&mut self, cx: &mut Cx, socket: Key, input: WsInput) {
+        if socket == PUSH {
+            self.push_input(cx, input);
+            return;
+        }
+        if self.refused.is_some() {
+            return;
+        }
+        match input {
+            WsInput::Opened => self.opened(cx),
+            WsInput::Text(text) => self.inbound_ws(cx, text),
+            WsInput::Binary(_) | WsInput::Activity => {
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            WsInput::Closed { reason, .. } => {
+                let credentialed = matches!(
+                    self.transport,
+                    Transport::Ws { auth, .. } if auth != HttpAuth::None
+                );
+                if credentialed && handshake_refused(&reason) {
+                    self.refuse(cx, format!("the device refused the credential ({reason})"));
+                } else {
+                    self.lost(cx, reason);
+                }
+            }
         }
     }
 
@@ -1217,6 +1628,11 @@ impl Module for SpecEngine {
         }
         match key {
             REPLY => {
+                let addressed = self
+                    .current
+                    .as_ref()
+                    .and_then(|f| f.awaiting.as_ref())
+                    .is_some_and(Await::addressed);
                 let Some(flight) = self.current.take() else {
                     return;
                 };
@@ -1233,11 +1649,12 @@ impl Module for SpecEngine {
                         }
                     }
                 }
-                if self.transport.is_stream() {
+                if self.transport.is_stream() && !addressed {
                     // A late reply would otherwise be read as the answer to
                     // the next command. Start the stream afresh.
                     self.lost(cx, "no reply within the timeout".into());
                 } else {
+                    // Replies matched by address cannot be mistaken.
                     self.pump(cx);
                 }
             }
@@ -1250,6 +1667,7 @@ impl Module for SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             RECONNECT => self.connect(cx),
+            PUSH_RECONNECT => self.open_push(cx),
             PROMPT => {
                 if self.prompt_wait.take().is_some() {
                     self.lost(cx, "no login prompt within the timeout".into());
@@ -1274,7 +1692,13 @@ impl Module for SpecEngine {
     }
 
     fn stop(&mut self, cx: &mut Cx) {
-        cx.tcp_close(SOCKET);
+        match self.transport {
+            Transport::Ws { .. } => cx.ws_close(SOCKET),
+            _ => cx.tcp_close(SOCKET),
+        }
+        if self.push.is_some() {
+            cx.ws_close(PUSH);
+        }
     }
 }
 
@@ -1698,5 +2122,355 @@ mod tests {
                 result: Err(CommandError::Auth { .. })
             }]
         ));
+    }
+    fn open_spec(spec: DeviceSpec, model: &str, settings: Value) -> SpecEngine {
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: model.into(),
+                channels: None,
+                settings: settings.as_object().unwrap().clone(),
+            },
+        )
+        .unwrap()
+    }
+
+    fn ws_sent(actions: &[Action], socket: Key) -> Vec<String> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::WsSend { socket: s, text } if *s == socket => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn completed(actions: &[Action]) -> Vec<(CommandId, crate::module::CommandResult)> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::Complete { id, result } => Some((*id, result.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A websocket device: JSON requests, replies matched by an id field or
+    /// taken in order, pushed messages through the rules.
+    fn ws_device(auth: &str) -> SpecEngine {
+        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        spec.transport = Some(json!({
+            "type": "ws", "port": 9000, "path": "/api/v1", "subprotocol": "v1.ctl",
+            "auth": auth, "timeout_ms": 1000,
+        }));
+        spec.settings = serde_json::from_value(json!({
+            "token": {"type": "string", "secret": true, "default": "t0k"},
+        }))
+        .unwrap();
+        spec.on_connect = vec![json!(r#"{"action":"hello"}"#)];
+        spec.commands = serde_json::from_value(json!({
+            "get_level": {
+                "params": {"layer": {"type": "int", "min": 1, "required": true}},
+                "send": r#"{"action":"get","parameter":"/layers/{layer}/level"}"#,
+                "expect": {"reply_json": {"$.type": "parameter_get", "$.path": "/layers/{layer}/level"},
+                           "json_path": "$.value"},
+                "returns": "value",
+            },
+            "ping": {"send": "{\"ping\":1}", "expect": {"json_equals": {"$.pong": 1}}, "returns": "ack"},
+        }))
+        .unwrap();
+        spec.models[0].supports = vec!["get_level".into(), "ping".into()];
+        spec.state = serde_json::from_value(json!({
+            "layers.*.level": {"type": "float", "description": "x"},
+        }))
+        .unwrap();
+        spec.telemetry = Some(json!({
+            "subscribe": {"send": [r#"{"action":"subscribe","parameter":"/layers/1/level"}"#]},
+            "updates": [{
+                "json_match": {"$.type": "^parameter_(update|get)$", "$.path": "^/layers/(\\d+)/level$"},
+                "json": {"value": "$.value"},
+                "state": {"layers.{2}.level": "{value}"},
+            }],
+        }));
+        open_spec(spec, "p3000-generic", json!({"token": "t0k"}))
+    }
+
+    #[test]
+    fn a_websocket_transport_matches_replies_by_id_or_order() {
+        let mut e = ws_device("bearer");
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let request = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::WsOpen {
+                    socket: SOCKET,
+                    request,
+                } => Some(request),
+                _ => None,
+            })
+            .expect("the websocket opens");
+        assert_eq!(request.url, "ws://127.0.0.1:9000/api/v1");
+        assert!(request
+            .headers
+            .contains(&("Sec-WebSocket-Protocol".into(), "v1.ctl".into())));
+        assert!(request
+            .headers
+            .contains(&("Authorization".into(), "Bearer t0k".into())));
+
+        // Opened: the connection step, then the subscription, straight away.
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, SOCKET, WsInput::Opened);
+        let a = cx.take();
+        assert!(connected(&a));
+        assert_eq!(
+            ws_sent(&a, SOCKET),
+            vec![
+                r#"{"action":"hello"}"#.to_string(),
+                r#"{"action":"subscribe","parameter":"/layers/1/level"}"#.to_string()
+            ]
+        );
+
+        // A reply is the message holding the rendered id fields; a push that
+        // arrives first is state, not the reply.
+        let mut cx = Cx::new(2);
+        let params = json!({"layer": 2}).as_object().unwrap().clone();
+        e.command(&mut cx, 1, "get_level", &params);
+        assert_eq!(
+            ws_sent(&cx.take(), SOCKET),
+            vec![r#"{"action":"get","parameter":"/layers/2/level"}"#.to_string()]
+        );
+        let mut cx = Cx::new(3);
+        e.ws(
+            &mut cx,
+            SOCKET,
+            WsInput::Text(
+                r#"{"type":"parameter_update","path":"/layers/1/level","value":0.5}"#.into(),
+            ),
+        );
+        let a = cx.take();
+        assert!(completed(&a).is_empty());
+        assert!(a.contains(&Action::State(json!({"layers": {"1": {"level": 0.5}}}))));
+        let mut cx = Cx::new(4);
+        e.ws(
+            &mut cx,
+            SOCKET,
+            WsInput::Text(
+                r#"{"type":"parameter_get","path":"/layers/2/level","value":0.25}"#.into(),
+            ),
+        );
+        assert_eq!(
+            completed(&cx.take()),
+            vec![(1, Ok(Outcome::Value { value: json!(0.25) }))]
+        );
+
+        // Without reply_json, the next message is the reply.
+        let mut cx = Cx::new(5);
+        e.command(&mut cx, 2, "ping", &Params::new());
+        e.ws(&mut cx, SOCKET, WsInput::Text(r#"{"pong":2}"#.into()));
+        assert!(matches!(
+            &completed(&cx.take())[..],
+            [(2, Err(CommandError::DeviceError { .. }))]
+        ));
+
+        // An unanswered id-matched request times out without resetting the
+        // stream: a late reply names what it answers.
+        let mut cx = Cx::new(6);
+        e.command(&mut cx, 3, "get_level", &params);
+        e.timer(&mut cx, REPLY);
+        let a = cx.take();
+        assert_eq!(completed(&a), vec![(3, Err(CommandError::Timeout))]);
+        assert!(!a.iter().any(|a| matches!(a, Action::WsClose { .. })));
+    }
+
+    #[test]
+    fn a_refused_websocket_handshake_is_terminal() {
+        let mut e = ws_device("bearer");
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.ws(
+            &mut cx,
+            SOCKET,
+            WsInput::Closed {
+                code: None,
+                reason: "connect: HTTP 401 Unauthorized".into(),
+            },
+        );
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+        assert!(!a.contains(&Action::SetTimer {
+            key: RECONNECT,
+            after: RECONNECT_MIN
+        }));
+        // Without a credential it is an ordinary loss, retried.
+        let mut e = ws_device("none");
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.ws(
+            &mut cx,
+            SOCKET,
+            WsInput::Closed {
+                code: None,
+                reason: "connect: HTTP 401 Unauthorized".into(),
+            },
+        );
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: RECONNECT,
+            after: RECONNECT_MIN
+        }));
+    }
+
+    #[test]
+    fn a_push_websocket_beside_http() {
+        let mut spec = Catalog::embedded().device("resolume").unwrap().clone();
+        spec.transport.as_mut().unwrap()["port"] = json!(8080);
+        let mut e = open_spec(spec, "arena", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        let request = a
+            .iter()
+            .find_map(|a| match a {
+                Action::WsOpen {
+                    socket: PUSH,
+                    request,
+                } => Some(request.clone()),
+                _ => None,
+            })
+            .expect("the push channel opens");
+        assert_eq!(request.url, "ws://127.0.0.1:8080/api/v1");
+
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        let subscriptions = ws_sent(&cx.take(), PUSH);
+        assert!(subscriptions
+            .iter()
+            .any(|t| t.contains(r#""action":"subscribe""#)));
+
+        let mut cx = Cx::new(2);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Text(
+                r#"{"type":"parameter_update","path":"/composition/master","id":7,"valuetype":"ParamRange","value":0.5}"#
+                    .into(),
+            ),
+        );
+        assert!(cx
+            .take()
+            .contains(&Action::State(json!({"composition": {"master": 0.5}}))));
+
+        // Closed: reopened with backoff; the HTTP side is untouched.
+        let mut cx = Cx::new(3);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Closed {
+                code: None,
+                reason: "closed by the device".into(),
+            },
+        );
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: PUSH_RECONNECT,
+            after: RECONNECT_MIN
+        }));
+        assert!(!a.iter().any(|a| matches!(a, Action::Connection(_))));
+        let mut cx = Cx::new(4);
+        e.timer(&mut cx, PUSH_RECONNECT);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::WsOpen { socket: PUSH, .. })));
+    }
+
+    #[test]
+    fn an_osc_poll_item_waits_for_its_reply_address() {
+        let spec = Catalog::embedded().device("etc-eos").unwrap().clone();
+        let mut e = open_spec(spec, "eos", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        // The first poll query is in flight; a push on another address and
+        // the query's own address are not its reply, /eos/out/get/... is.
+        let push = framing::frame_packet(
+            PacketFraming::LengthPrefixed,
+            &osc::encode("/eos/out/get/version", &[osc::Arg::Str("3.3.0".into())]),
+        );
+        let before = e.queue.len();
+        let mut cx = Cx::new(1);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(push));
+        assert!(cx
+            .take()
+            .contains(&Action::State(json!({"version": {"eos": "3.3.0"}}))));
+        assert_eq!(e.queue.len() + 1, before, "the next query was sent");
+        // A query that is never answered times out without dropping the link.
+        let mut cx = Cx::new(2);
+        e.timer(&mut cx, REPLY);
+        let a = cx.take();
+        assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
+        assert!(e.current.is_some(), "and the next query goes");
+    }
+
+    #[test]
+    fn an_accepted_login_ends_the_refusal_watch() {
+        let mut spec = Catalog::embedded().device("kramer-p3000").unwrap().clone();
+        spec.on_connect = vec![json!({
+            "send": "login", "refused": "denied", "accepted": "^Welcome",
+        })];
+        spec.telemetry = None;
+        let mut e = open_spec(spec, "p3000-generic", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"Welcome admin\r\n".to_vec()),
+        );
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"access denied to file\r\n".to_vec()),
+        );
+        assert!(!cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+    }
+
+    #[test]
+    fn a_converted_value_is_sent_as_an_osc_float() {
+        let spec = Catalog::embedded().device("behringer-x32").unwrap().clone();
+        let mut e = open_spec(spec, "x32", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.queue.clear();
+        e.current = None;
+        cx.take();
+        let mut cx = Cx::new(1);
+        let params = json!({"channel": 1, "level_db": 0.0})
+            .as_object()
+            .unwrap()
+            .clone();
+        e.command(&mut cx, 1, "set_channel_fader_db", &params);
+        let sent: Vec<Vec<u8>> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { data, .. } => Some(data),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            sent,
+            [osc::encode("/ch/01/mix/fader", &[osc::Arg::Float(0.75)])]
+        );
     }
 }

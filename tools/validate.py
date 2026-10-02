@@ -33,7 +33,10 @@ DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^\.\d+f$"), {"float"}),               # fixed decimals
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
     (re.compile(r"^(upper|lower|json|url)$"), {"string", "enum"}),
+    (re.compile(r"^(to|from)\.[a-z0-9_]+$"), {"int", "float"}),  # a named conversion
 ]
+
+CONVERSION = re.compile(r"^(to|from)\.([a-z0-9_]+)$")
 
 # Types that cannot carry characters needing escaping, so they are safe in a
 # raw_query, which is sent without encoding.
@@ -73,6 +76,7 @@ def check_template(
     settings: dict,
     where: str,
     conditional_setting: str | None = None,
+    conversions: dict | None = None,
 ) -> list[str]:
     """Placeholder rules from SPEC.md §4: every reference resolves, is always
     present, and uses directives valid for its type."""
@@ -113,9 +117,26 @@ def check_template(
                     f"{where}: directive ':{directive}' does not apply to {ptype} '{name}'"
                 )
 
+        # Conversions come first, name a declared conversion, and make a
+        # float: as text it needs exactly one ':.Nf' after them.
+        converted = 0
+        while converted < len(directives) and CONVERSION.match(directives[converted]):
+            converted += 1
+        for d in directives[converted:]:
+            if CONVERSION.match(d):
+                errors.append(f"{where}: conversion ':{d}' on '{name}' must come before other directives")
+        for d in directives[:converted]:
+            conv = CONVERSION.match(d).group(2)
+            if conv not in (conversions or {}):
+                errors.append(f"{where}: ':{d}' names undeclared conversion '{conv}'")
+
         # A float rendered as text has no language-neutral default form.
         is_numeric_osc_arg = context == "osc-arg-float" and match.group(0) == text
-        if ptype == "float" and not is_numeric_osc_arg:
+        if converted and not is_numeric_osc_arg:
+            rest = directives[converted:]
+            if len(rest) != 1 or not re.match(r"^\.\d+f$", rest[0]):
+                errors.append(f"{where}: converted '{name}' rendered as text needs one ':.Nf' after the conversion")
+        elif ptype == "float" and not is_numeric_osc_arg:
             if not any(re.match(r"^\.\d+f$", d) for d in directives):
                 errors.append(f"{where}: float '{name}' rendered as text needs a ':.Nf' directive")
 
@@ -157,9 +178,14 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     settings: dict = doc.get("settings") or {}
     native = doc.get("implementation") == "native"
 
-    if not commands and not doc.get("state"):
+    if not commands and not doc.get("state") and not doc.get("streams"):
         # A receive-only device (a tally listener) has state and no commands.
-        errors.append("a device requires at least one command, or declared state")
+        errors.append("a device requires at least one command, declared state, or a stream")
+
+    # Streams are published by a module: a native device, or a spec-driven one
+    # through its native extension. The spec engine itself publishes none.
+    if doc.get("streams") and not native and not doc.get("extension"):
+        errors.append("'streams' needs implementation: native (or a native extension that publishes them)")
 
     if native and doc.get("extension"):
         errors.append("'extension' adds to a spec-driven device; a native device has its module")
@@ -202,17 +228,52 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                     f"vectors/{doc['id']}/ — see CONTRIBUTING.md"
                 )
 
+    # A stream's models must be real models.
+    for name, stream in (doc.get("streams") or {}).items():
+        bad = set(stream.get("models") or []) - model_ids
+        if bad:
+            errors.append(f"streams.{name} references unknown model(s): {sorted(bad)}")
+
     # Quirks must reference real models (or the literal 'all').
     for i, quirk in enumerate(doc.get("quirks", [])):
         bad = {m for m in quirk["models"] if m != "all" and m not in model_ids}
         if bad:
             errors.append(f"quirk[{i}] references unknown model(s): {sorted(bad)}")
 
+    conversions: dict = doc.get("conversions") or {}
+    for cname, conv in conversions.items():
+        points = conv.get("points", [])
+        wires = [p[0] for p in points]
+        values = [p[1] for p in points]
+        if any(a >= b for a, b in zip(wires, wires[1:])):
+            errors.append(f"conversions.{cname}: wire values must rise strictly")
+        rising = all(a < b for a, b in zip(values, values[1:]))
+        falling = all(a > b for a, b in zip(values, values[1:]))
+        if not (rising or falling):
+            errors.append(f"conversions.{cname}: values must rise or fall strictly, so the conversion inverts")
+
+    transport_type = (doc.get("transport") or {}).get("type")
+
     # Templates: commands, connection setup and the probe.
     for name, command in commands.items():
         params = command.get("params") or {}
         for context, text in template_strings(command.get("send", [])):
-            errors += check_template(context, text, params, settings, f"commands.{name}")
+            errors += check_template(context, text, params, settings, f"commands.{name}",
+                                     conversions=conversions)
+        expect_ = command.get("expect") or {}
+        if "reply_json" in expect_:
+            if transport_type != "ws":
+                errors.append(f"commands.{name}: expect.reply_json needs a ws transport")
+            for path_, template in expect_["reply_json"].items():
+                if not path_.startswith("$"):
+                    errors.append(f"commands.{name}: reply_json key '{path_}' is not a JSON path")
+                errors += check_template("text", template, params, settings,
+                                         f"commands.{name}.expect.reply_json")
+        if "convert" in expect_:
+            if expect_["convert"] not in conversions:
+                errors.append(f"commands.{name}: expect.convert names undeclared conversion '{expect_['convert']}'")
+            if command.get("returns") != "value":
+                errors.append(f"commands.{name}: expect.convert needs returns: value")
 
         expect = command.get("expect") or {}
         returns = command.get("returns", "ack")
@@ -226,13 +287,23 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                                      f"commands.{name}.expect")
 
     transport = doc.get("transport") or {}
-    scheme = transport.get("scheme")
-    if isinstance(scheme, dict):
+    websocket = (doc.get("telemetry") or {}).get("websocket")
+    schemes = [("transport", transport.get("scheme"),
+                {"ws", "wss"} if transport_type == "ws" else {"http", "https"})]
+    if websocket:
+        schemes.append(("telemetry.websocket", websocket.get("scheme"), {"ws", "wss"}))
+    for where_, scheme, allowed in schemes:
+        if not isinstance(scheme, dict):
+            continue
         decl = settings.get(scheme.get("setting"))
         if decl is None:
-            errors.append(f"transport.scheme names unknown setting '{scheme.get('setting')}'")
-        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"http", "https"}:
-            errors.append("transport.scheme's setting must be an enum of http and https")
+            errors.append(f"{where_}.scheme names unknown setting '{scheme.get('setting')}'")
+        elif decl.get("type") != "enum" or set(decl.get("values", [])) - allowed:
+            errors.append(f"{where_}.scheme's setting must be an enum of {' and '.join(sorted(allowed))}")
+    if websocket:
+        for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
+                                 else [websocket.get("send")] if websocket.get("send") else []):
+            errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")
     if transport.get("auth") == "bearer" and "token" not in settings:
         errors.append("auth: bearer needs a 'token' setting")
     if transport.get("auth") in ("basic", "digest") and not {"username", "password"} <= settings.keys():
@@ -251,16 +322,19 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
             transport_type = (doc.get("transport") or {}).get("type")
             if "after_prompt" in step and transport_type != "line-tcp":
                 errors.append(f"on_connect[{i}]: after_prompt needs a line-tcp transport")
-            if "refused" in step:
-                try:
-                    re.compile(step["refused"])
-                except re.error as e:
-                    errors.append(f"on_connect[{i}]: refused does not compile: {e}")
+            for key in ("refused", "accepted"):
+                if key in step:
+                    try:
+                        re.compile(step[key])
+                    except re.error as e:
+                        errors.append(f"on_connect[{i}]: {key} does not compile: {e}")
+            if "accepted" in step and "refused" not in step:
+                errors.append(f"on_connect[{i}]: accepted ends a refused watch; it needs refused")
             step = step["send"]
         for context, text in template_strings(step):
             errors += check_template(context, text, {}, settings, f"on_connect[{i}]", conditional)
 
-    errors += telemetry_checks(doc)
+    errors += telemetry_checks(doc, conversions)
 
     probe = (doc.get("transport") or {}).get("probe")
     if probe is not None:
@@ -270,11 +344,25 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     return errors
 
 
-def telemetry_checks(doc: dict) -> list[str]:
+def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     """Every path a telemetry rule writes must be declared in 'state', so its
-    type is known, and every regex must compile."""
+    type is known, every regex must compile, and every conversion a value
+    names must be declared."""
     errors: list[str] = []
     telemetry = doc.get("telemetry") or {}
+    transport_type = (doc.get("transport") or {}).get("type")
+
+    poll = (telemetry.get("poll") or {}).get("send", [])
+    for i, item in enumerate(poll if isinstance(poll, list) else [poll]):
+        if isinstance(item, dict) and "reply_address" in item:
+            if transport_type not in ("osc-udp", "osc-tcp"):
+                errors.append(f"telemetry.poll.send[{i}]: reply_address needs an OSC transport")
+            try:
+                re.compile(item["reply_address"])
+            except re.error as e:
+                errors.append(f"telemetry.poll.send[{i}].reply_address: {e}")
+
+    has_ws = transport_type == "ws" or "websocket" in telemetry
     declared = [key.split(".") for key in (doc.get("state") or {})]
 
     def is_declared(path: str) -> bool:
@@ -292,6 +380,24 @@ def telemetry_checks(doc: dict) -> list[str]:
                     re.compile(rule[key])
                 except re.error as e:
                     errors.append(f"{where}.{key}: {e}")
+        for jpath, pattern in (rule.get("json_match") or {}).items():
+            if not jpath.startswith("$"):
+                errors.append(f"{where}.json_match: '{jpath}' is not a JSON path")
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(f"{where}.json_match: {e}")
+        if "json_match" in rule and not has_ws:
+            errors.append(f"{where}: json_match reads websocket messages; the spec has no websocket")
+        if "arg_types" in rule and "address" not in rule:
+            errors.append(f"{where}: arg_types applies to an address rule")
+        for value in (rule.get("state") or {}).values():
+            template = value if isinstance(value, str) else value.get("value", "")
+            for m in PLACEHOLDER.finditer(template):
+                for d in [d for d in m.group(2).split(":") if d]:
+                    c = CONVERSION.match(d)
+                    if c and c.group(2) not in (conversions or {}):
+                        errors.append(f"{where}: ':{d}' names undeclared conversion '{c.group(2)}'")
         paths = list((rule.get("state") or {}).keys())
         for field in (rule.get("fields") or {}).values():
             paths.append(field if isinstance(field, str) else field.get("path", ""))

@@ -155,7 +155,7 @@
               "send"
             ],
             "additionalProperties": false,
-            "description": "A step with conditions. when_set: sent only when the named setting is non-empty, decided from configuration before connecting. after_prompt: sent only once the device has sent this text (line-tcp). refused: a reply line matching this regex is the device refusing the credential.",
+            "description": "A step with conditions. when_set: sent only when the named setting is non-empty, decided from configuration before connecting. after_prompt: sent only once the device has sent this text (line-tcp). refused: a reply line matching this regex is the device refusing the credential. accepted: once a reply line matches this regex, refused stops applying.",
             "properties": {
               "send": {
                 "oneOf": [
@@ -186,6 +186,10 @@
                 "type": "boolean",
                 "default": false,
                 "description": "On a transport whose device replies: queue the step like a query, so its reply is consumed and no command goes ahead of it."
+              },
+              "accepted": {
+                "type": "string",
+                "description": "With refused: regex over reply lines. Once a line matches, the device has accepted the login and refused no longer applies."
               }
             }
           }
@@ -218,10 +222,72 @@
         "type": "string"
       }
     },
+    "conversions": {
+      "type": "object",
+      "description": "Named piecewise-linear conversions between a wire value and the value an operator uses (a fader law). Used in templates as {x:to.<name>} (value to wire) and {x:from.<name>} (wire to value), and by expect.convert (SPEC.md §4).",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "points"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "points": {
+            "type": "array",
+            "minItems": 2,
+            "description": "[wire, value] pairs joined by straight lines; wire strictly rising, value strictly rising or strictly falling. Values outside the points do not convert.",
+            "items": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
     "quirks": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/quirk"
+      }
+    },
+    "streams": {
+      "type": "object",
+      "description": "Continuous media a native module publishes, such as a camera's live view, keyed by stream name. Consumers watch a stream by name; frames are delivered outside the event queue, newest only. See SPEC.md, Native modules, Streams.",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "jpeg"
+            ],
+            "description": "The encoding of every frame: jpeg is one complete JPEG image (ITU-T T.81) per frame."
+          },
+          "summary": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            },
+            "description": "The models that have the stream; every model when absent."
+          }
+        }
       }
     },
     "state": {
@@ -321,7 +387,7 @@
                       "type": "string"
                     },
                     {
-                      "$ref": "#/$defs/oscSend"
+                      "$ref": "#/$defs/oscPollSend"
                     },
                     {
                       "$ref": "#/$defs/httpSend"
@@ -336,7 +402,7 @@
                         "type": "string"
                       },
                       {
-                        "$ref": "#/$defs/oscSend"
+                        "$ref": "#/$defs/oscPollSend"
                       },
                       {
                         "$ref": "#/$defs/httpSend"
@@ -445,7 +511,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "With path: names for values taken from a JSON reply, by JSON path. With address: from the JSON in the string argument at json_arg."
+                "description": "With path: names for values taken from a JSON reply, by JSON path. With address: from the JSON in the string argument at json_arg. With json_match: from the websocket message."
               },
               "xml_each": {
                 "type": "string",
@@ -453,7 +519,20 @@
               },
               "json_each": {
                 "type": "string",
-                "description": "With path and json: a JSON path to an array; the rule matches once per element, json paths relative to it."
+                "description": "With path or json_match, and json: a JSON path to an array; the rule matches once per element, json paths relative to it."
+              },
+              "arg_types": {
+                "type": "string",
+                "pattern": "^[ifsbhdTFN]*$",
+                "description": "With address: the message's OSC type tags must be exactly these (without the comma), for a device that sends different shapes on one address."
+              },
+              "json_match": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "A JSON message on a websocket: JSON path to an RE2-safe regex its value must match (a string as is, anything else as compact JSON). Captures are {1}, {2}, ... across the regexes in order."
               }
             },
             "oneOf": [
@@ -495,15 +574,84 @@
                   "xml_each",
                   "state"
                 ]
+              },
+              {
+                "required": [
+                  "json_match",
+                  "state"
+                ]
               }
             ]
+          }
+        },
+        "websocket": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "description": "A websocket opened beside the transport, for a device that takes commands one way (REST) and pushes state on a websocket. Its messages go through the update rules; it is reopened with backoff when it closes.",
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^/"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "Defaults to the transport's port."
+            },
+            "scheme": {
+              "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss.",
+              "oneOf": [
+                {
+                  "enum": [
+                    "ws",
+                    "wss"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "setting"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "setting": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "default": "ws"
+            },
+            "subprotocol": {
+              "type": "string",
+              "description": "Sent as Sec-WebSocket-Protocol."
+            },
+            "send": {
+              "description": "Text messages (templates over settings) sent each time the websocket opens: the subscriptions.",
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
           }
         }
       }
     },
     "extension": {
       "enum": [
-        "panasonic-update-notification"
+        "panasonic-update-notification",
+        "aja-config-events"
       ],
       "description": "A native addition to a spec-driven device, for what the format cannot express. Named here so it is never hidden."
     }
@@ -819,6 +967,82 @@
             "port"
           ],
           "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ws"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/"
+            },
+            "scheme": {
+              "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss.",
+              "oneOf": [
+                {
+                  "enum": [
+                    "ws",
+                    "wss"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "setting"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "setting": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "default": "ws"
+            },
+            "subprotocol": {
+              "type": "string",
+              "description": "Sent as Sec-WebSocket-Protocol."
+            },
+            "auth": {
+              "enum": [
+                "none",
+                "basic",
+                "bearer"
+              ],
+              "default": "none",
+              "description": "Credential on the opening request, from the username and password, or token, settings. A 401 or 403 answer is terminal, as for http."
+            },
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reply": {
+              "enum": [
+                "expected",
+                "none"
+              ],
+              "default": "expected"
+            },
+            "reply_match": {
+              "type": "string",
+              "description": "RE2-safe regex. For replies taken in order: a message not matching it is never taken as a reply."
+            },
+            "probe": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "port",
+            "path"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -1010,6 +1234,47 @@
         }
       }
     },
+    "oscPollSend": {
+      "type": "object",
+      "required": [
+        "address"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "value",
+              "type"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "int",
+                  "float",
+                  "string",
+                  "blob"
+                ]
+              }
+            }
+          }
+        },
+        "reply_address": {
+          "type": "string",
+          "description": "Telemetry poll only: RE2-safe regex over the address the device answers on, for a query answered on another address (ETC Eos: /eos/get/... on /eos/out/get/...)."
+        }
+      }
+    },
     "httpSend": {
       "type": "object",
       "required": [
@@ -1102,6 +1367,18 @@
           "minimum": 0,
           "default": 0,
           "description": "OSC only. Index of the reply argument returned as the value."
+        },
+        "reply_json": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Websocket only. JSON path to a template: the reply is the message whose values at these paths equal the rendered templates (a request id, or the parameter asked for). Without it, the next message is the reply."
+        },
+        "convert": {
+          "type": "string",
+          "description": "The name of a conversion: the returned value is converted from the wire."
         }
       }
     },
