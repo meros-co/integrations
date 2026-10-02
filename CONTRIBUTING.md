@@ -8,7 +8,9 @@ reviews every change against the checklist below.
 1. **Device behaviour the documentation gets wrong or leaves out.** Add it to
    the spec as a quirk.
 2. **Test results from real hardware.** Most models here have only been tested
-   against simulated devices. See [Verification](#verification).
+   against simulated devices. [VERIFICATION.md](VERIFICATION.md) lists what
+   most needs checking; report results with an issue or a pull request, as
+   described there. See also [Verification](#verification).
 3. **Corrections.** Wrong ranges, misread replies, commands a model doesn't
    have.
 4. **New devices.**

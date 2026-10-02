@@ -98,6 +98,9 @@ Each model records how far it has been tested.
 A model moves to `bench` or `field` only with a conformance vector recorded
 from the device. Every model is currently `none`.
 
+[VERIFICATION.md](VERIFICATION.md) lists the behaviour that most needs
+checking on real devices, and how to report what you find.
+
 ## Repository layout
 
 ```
