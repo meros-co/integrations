@@ -259,9 +259,15 @@ quirks:
   - models: [class-2]
     severity: info
     text: >
-      Discovery by %2SRCH broadcast to UDP 4352 (§3.2, answered by %2ACKN=<MAC> from each projector within
-      0-10 s, to UDP 4352 of the controller) is not part of this device module; the device is added by
-      address.
+      Discovery (protocol pjlink) broadcasts %2SRCH to UDP 4352 on each interface's subnet and
+      255.255.255.255, and by unicast to up to 32 hinted addresses (unicast is not in the specification),
+      three times a second apart, then collects %2ACKN=<MAC> answers (due within 0-10 s, to UDP 4352 of the
+      controller) for 30 s (§3.2); while listening it also reports %2LKUP=<MAC> link-up announcements
+      (§3.3). Both find Class 2 projectors only (Class 1 has no search) and give the MAC address, not the
+      name, maker or model: discovery opens no TCP connection, since many projectors accept one at a time.
+      Discovery shares UDP 4352 with the notification listener and hears only addresses no open device
+      claims, so an open projector with notifications on is not reported by a scan; its notifications keep
+      reaching its device.
 
 state:
   power: { type: string, description: "'off' (standby), 'on' (lamp on), 'cooling' or 'warming' (POWR ?, §4.2)" }

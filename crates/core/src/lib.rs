@@ -30,6 +30,7 @@ mod http;
 pub mod json;
 pub mod module;
 mod modules;
+mod pjlink_discovery;
 mod session;
 mod ssdp;
 pub mod sse;
@@ -37,6 +38,7 @@ mod ssh;
 pub mod streams;
 mod tcp;
 mod tcp_listen;
+mod tls;
 mod udp;
 mod ws;
 

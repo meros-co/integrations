@@ -27,7 +27,9 @@
 //!   transmitter reports Af). The name is operator-set, so it is weak
 //!   evidence of identity.
 //!
-//! Sony cameras (SSDP) are found by `crate::ssdp`, whose rules are there.
+//! Sony cameras (SSDP) are found by `crate::ssdp`, and PJLink Class 2
+//! projectors (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`,
+//! whose rules are there.
 //! Protocols are independent: each listens, scans and stops on its own.
 
 use std::collections::{BTreeSet, HashMap};
@@ -44,7 +46,11 @@ use crate::events::Event;
 use crate::session::Services;
 
 pub const MCP_PORT: u16 = 53212;
-const PROTOCOLS: [&str; 2] = ["mcp", crate::ssdp::PROTOCOL];
+const PROTOCOLS: [&str; 3] = [
+    "mcp",
+    crate::ssdp::PROTOCOL,
+    crate::pjlink_discovery::PROTOCOL,
+];
 const MCP_PROBE: &str = "Push 5 500 3\r";
 const MCP_NAME: &str = "Name\r";
 const SWEEP_BATCH: usize = 32;
@@ -56,13 +62,15 @@ const SWEEP_MAX_SUBNETS: usize = 8;
 pub struct DiscoverRequest {
     /// `listen` (passively), `scan` (listen, and probe now) or `stop`.
     pub action: DiscoverAction,
-    /// Which discovery protocols: `mcp` (Sennheiser G3/G4) and `ssdp` (Sony
-    /// cameras). Empty means all of them.
+    /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
+    /// cameras) and `pjlink` (PJLink Class 2 projectors). Empty means all of
+    /// them.
     #[serde(default)]
     pub protocols: Vec<String>,
     /// Addresses where devices were last seen. An MCP scan also sweeps their
     /// /24s; an SSDP scan also asks each by unicast M-SEARCH, which reaches
-    /// cameras multicast does not (across a router).
+    /// cameras multicast does not (across a router); a PJLink scan also
+    /// sends each a unicast `%2SRCH`.
     #[serde(default)]
     pub hints: Vec<Ipv4Addr>,
 }
@@ -190,6 +198,7 @@ struct State {
 pub(crate) struct Discovery {
     state: Mutex<State>,
     ssdp: crate::ssdp::Ssdp,
+    pjlink: crate::pjlink_discovery::PjLinkDiscovery,
 }
 
 impl Discovery {
@@ -206,7 +215,11 @@ impl Discovery {
         }
         let wants =
             |p: &str| request.protocols.is_empty() || request.protocols.iter().any(|q| q == p);
-        let (mcp, ssdp) = (wants("mcp"), wants(crate::ssdp::PROTOCOL));
+        let (mcp, ssdp, pjlink) = (
+            wants("mcp"),
+            wants(crate::ssdp::PROTOCOL),
+            wants(crate::pjlink_discovery::PROTOCOL),
+        );
         match request.action {
             DiscoverAction::Stop => {
                 if mcp {
@@ -214,6 +227,9 @@ impl Discovery {
                 }
                 if ssdp {
                     self.ssdp.stop();
+                }
+                if pjlink {
+                    self.pjlink.stop(services);
                 }
                 Ok(())
             }
@@ -223,6 +239,9 @@ impl Discovery {
                 }
                 if ssdp {
                     self.ssdp.listen(services)?;
+                }
+                if pjlink {
+                    self.pjlink.listen(services)?;
                 }
                 Ok(())
             }
@@ -234,6 +253,10 @@ impl Discovery {
                 if ssdp {
                     self.ssdp.listen(services)?;
                     self.ssdp.scan(services, &request.hints)?;
+                }
+                if pjlink {
+                    self.pjlink.listen(services)?;
+                    self.pjlink.scan(services, &request.hints);
                 }
                 Ok(())
             }

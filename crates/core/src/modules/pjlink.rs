@@ -860,6 +860,8 @@ impl Module for PjLink {
                     self.queue_cycle();
                 }
                 Some(Notice::Poll) => self.queue_cycle(),
+                // A search answer: discovery's business, not this device's.
+                None if line.to_ascii_uppercase().starts_with("%2ACKN=") => {}
                 None => cx.log(
                     Level::Debug,
                     format!("PJLink: ignored notification '{line}'"),
