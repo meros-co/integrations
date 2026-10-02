@@ -131,8 +131,8 @@ _rs("set_group_solo", {"group": 1, "solo": False}, "PUT", _C + "/layergroups/1",
 _rs("set_group_name", {"group": 1, "name": "Front"}, "PUT", _C + "/layergroups/1", '{"name":{"value":"Front"}}')
 _rs("get_group", {"group": 1}, "GET", _C + "/layergroups/1")
 
-# Telemetry: the ProductInfo and Composition schemas, cut to the properties
-# the rules read. The document lists no option names for ChoiceParameters, so
+# Telemetry: replies to get_product (and the probe) and get_composition; the
+# ProductInfo and Composition schemas, cut to the properties the rules read. The document lists no option names for ChoiceParameters, so
 # "Fade", "Linear", "Playing" and "A" are placeholders carried through as text.
 telemetry(RS, "product", inbound_http={
     "path": "/api/v1/product",
@@ -178,7 +178,8 @@ telemetry(RS, "composition", inbound_http={"path": "/api/v1/composition", "body"
         "groups": {"1641549604808": {"name": "Front", "opacity": 1.0, "master": 0.5, "bypassed": True,
                                      "solo": False, "selected": False}}})
 
-# A layer with nothing playing: active_clip is null and is not assigned.
+# A get_composition reply with a layer with nothing playing: active_clip is null
+# and is not assigned by the rules (the extension removes it by push).
 telemetry(RS, "layer-idle", inbound_http={"path": "/api/v1/composition", "body": json.dumps({
     "layers": [{"id": 1641549604810, "name": {"value": "Overlay"}, "selected": {"value": False},
                 "bypassed": {"value": False}, "solo": {"value": True}, "master": {"value": 0.5},
@@ -186,24 +187,7 @@ telemetry(RS, "layer-idle", inbound_http={"path": "/api/v1/composition", "body":
     expect_state={"layers": {"1641549604810": {"name": "Overlay", "opacity": 1.0, "master": 0.5,
                                                "bypassed": False, "solo": True, "selected": False}}})
 
-# Websocket API (support article v7.8): subscriptions sent when the websocket
-# opens, as {"action": "subscribe", "parameter": <logical path>}, and the
-# parameter Resolume sends back with 'type' and 'path' added.
-_RS_SUBSCRIBED = ["/composition/master", "/composition/video/opacity", "/composition/speed",
-                  "/composition/bypassed", "/composition/crossfader/phase",
-                  "/composition/tempocontroller/tempo"]
-telemetry(RS, "ws-master", expect_connect_ws=[
-    json.dumps({"action": "subscribe", "parameter": p}, separators=(",", ":")) for p in _RS_SUBSCRIBED],
-    inbound_ws=json.dumps({"type": "parameter_update", "path": "/composition/master", "id": 1650000000001,
-                           "valuetype": "ParamRange", "min": 0.0, "max": 1.0, "value": 0.5}),
-    expect_state={"composition": {"master": 0.5}})
-telemetry(RS, "ws-tempo-subscribed", inbound_ws=json.dumps({
-    "type": "parameter_subscribed", "path": "/composition/tempocontroller/tempo", "id": 1650000000002,
-    "valuetype": "ParamRange", "min": 20.0, "max": 500.0, "value": 128.0}),
-    expect_state={"tempo": {"bpm": 128.0}})
-telemetry(RS, "ws-bypassed", inbound_ws=json.dumps({
-    "type": "parameter_update", "path": "/composition/bypassed", "id": 1650000000003,
-    "valuetype": "ParamBoolean", "value": True}),
-    expect_state={"composition": {"bypassed": True}})
-telemetry(RS, "ws-sources-ignored", inbound_ws=json.dumps({"type": "sources_update", "value": {}}),
-          expect_state={})
+# The websocket API (support article v7.8) is read by the resolume-push
+# extension, not by these rules: its composition reading, subscriptions by
+# parameter id and updates are tested in crates/core/src/modules/resolume_push.rs
+# and crates/core/tests/resolume_session.rs.

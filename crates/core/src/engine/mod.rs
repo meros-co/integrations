@@ -2389,7 +2389,7 @@ mod tests {
         assert!(request.accept_invalid_certs);
 
         // A push websocket inherits it from an HTTPS transport.
-        let mut spec = Catalog::source_tree().device("resolume").unwrap().clone();
+        let mut spec = with_push_websocket();
         spec.transport.as_mut().unwrap()["accept_invalid_certs"] = json!(true);
         let mut e = open_spec(spec, "arena", json!({}));
         let mut cx = Cx::new(0);
@@ -2400,9 +2400,30 @@ mod tests {
         )));
     }
 
+    /// Resolume's REST spec with a push websocket declared in the format
+    /// itself (the shipped spec uses its native extension instead).
+    fn with_push_websocket() -> crate::catalog::DeviceSpec {
+        let mut spec = Catalog::source_tree().device("resolume").unwrap().clone();
+        spec.telemetry = Some(json!({
+            "websocket": {
+                "path": "/api/v1",
+                "send": [r#"{"action":"subscribe","parameter":"/composition/master"}"#],
+            },
+            "updates": [{
+                "json_match": {
+                    "$.type": "^parameter_(subscribed|update|get|set)$",
+                    "$.path": "^/composition/master$",
+                },
+                "json": {"value": "$.value"},
+                "state": {"composition.master": "{value}"},
+            }],
+        }));
+        spec
+    }
+
     #[test]
     fn a_push_websocket_beside_http() {
-        let mut spec = Catalog::source_tree().device("resolume").unwrap().clone();
+        let mut spec = with_push_websocket();
         spec.transport.as_mut().unwrap()["port"] = json!(8080);
         let mut e = open_spec(spec, "arena", json!({}));
         let mut cx = Cx::new(0);

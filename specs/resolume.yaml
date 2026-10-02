@@ -37,7 +37,7 @@ source:
     author: Resolume
     url: https://resolume.com/support/en/websocket-api
     note: >
-      Manufacturer document, retrieved 2026-10-01. The only channel on which
+      Manufacturer document, retrieved 2026-10-02. The only channel on which
       Resolume pushes parameter changes: ws://address:port/api/v1 on the
       webserver's port; on connecting the composition state, then
       sources_update and effects_update; parameter actions {"action":
@@ -47,7 +47,11 @@ source:
       without /api/v1 and with the parameter name appended"; every action but
       trigger and reset answered with the parameter plus 'type'
       (parameter_subscribed, parameter_unsubscribed, parameter_get,
-      parameter_set, parameter_update) and 'path'. Used for telemetry.
+      parameter_set, parameter_update) and 'path'; parameter_update "is sent
+      for parameters that have a subscription where the value is changed";
+      the composition message "repeated ... when there are structural
+      changes. For example: a column or layer is added/removed". Used by the
+      resolume-push extension for all telemetry.
   - title: OSC (support article, v7.18)
     author: Resolume
     url: https://resolume.com/support/en/osc
@@ -69,6 +73,19 @@ transport:
   auth: none
   timeout_ms: 5000
   probe: { method: GET, path: /api/v1/product }
+
+# The whole composition is kept current by push over Resolume's websocket API
+# (the resolume-push extension, SPEC.md "Native extensions"): it reads the
+# composition Resolume sends on connecting and after each structural change,
+# subscribes to every parameter the state below shows by its unique id, and
+# applies each update. Commands stay on REST.
+extension: resolume-push
+
+settings:
+  # A safety re-read of the composition over REST, in seconds (0 for none),
+  # restarted by every composition Resolume sends. Only for what the
+  # websocket cannot report: a deck closed or opened from Resolume itself.
+  composition_refresh_s: { type: int, min: 0, max: 3600, default: 60 }
 
 models:
   - id: arena
@@ -664,27 +681,11 @@ commands:
     returns: value
 
 telemetry:
-  # Commands stay on REST. Resolume pushes changes only over its websocket API,
-  # and only for parameters a client subscribes to by path. The composition's
-  # own parameters have fixed logical paths and are subscribed; layers,
-  # columns, decks and groups are keyed here by unique id, and subscribing to
-  # them needs ids or positions the format cannot derive from the composition,
-  # so the product and the whole composition are still asked for every second.
-  # get_product's and get_composition's replies update the state too.
-  websocket:
-    path: /api/v1
-    send:
-      - '{"action":"subscribe","parameter":"/composition/master"}'
-      - '{"action":"subscribe","parameter":"/composition/video/opacity"}'
-      - '{"action":"subscribe","parameter":"/composition/speed"}'
-      - '{"action":"subscribe","parameter":"/composition/bypassed"}'
-      - '{"action":"subscribe","parameter":"/composition/crossfader/phase"}'
-      - '{"action":"subscribe","parameter":"/composition/tempocontroller/tempo"}'
-  poll:
-    every_ms: 1000
-    send:
-      - { method: GET, path: /api/v1/product }
-      - { method: GET, path: /api/v1/composition }
+  # State comes from the resolume-push extension, by push: it reads the
+  # composition from the websocket and subscribes to each parameter by its
+  # unique id, which the format cannot express. Nothing is polled; the probe
+  # (GET /api/v1/product) fills product.*. The rules below apply to replies
+  # to get_product and get_composition, which the extension's push supersedes.
   updates:
     - path: "^/api/v1/product$"
       json: { name: "$.name", major: "$.major", minor: "$.minor", micro: "$.micro", revision: "$.revision" }
@@ -789,31 +790,6 @@ telemetry:
         "groups.{id}.solo": "{solo}"
         "groups.{id}.selected": "{selected}"
 
-    # Websocket: the answer to each subscription, and every later change.
-    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/master$" }
-      json: { value: "$.value" }
-      state: { composition.master: "{value}" }
-
-    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/video/opacity$" }
-      json: { value: "$.value" }
-      state: { composition.opacity: "{value}" }
-
-    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/speed$" }
-      json: { value: "$.value" }
-      state: { composition.speed: "{value}" }
-
-    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/bypassed$" }
-      json: { value: "$.value" }
-      state: { composition.bypassed: "{value}" }
-
-    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/crossfader/phase$" }
-      json: { value: "$.value" }
-      state: { crossfader.phase: "{value}" }
-
-    - json_match: { "$.type": "^parameter_(subscribed|update|get|set)$", "$.path": "^/composition/tempocontroller/tempo$" }
-      json: { value: "$.value" }
-      state: { tempo.bpm: "{value}" }
-
 state:
   product.name: { type: string, description: "Product serving the API: Arena or Avenue" }
   product.major: { type: int, description: "Major version number" }
@@ -837,26 +813,35 @@ state:
   tempo.push_parameter: { type: int, description: "Unique id of the tempo push button, for trigger_parameter" }
   tempo.pull_parameter: { type: int, description: "Unique id of the tempo pull button, for trigger_parameter" }
   layers.*.name: { type: string, description: "Layer name, keyed by the layer's unique id" }
+  layers.*.position: { type: int, description: "1-based place in the composition's layer list, the number layer commands take (see quirks)" }
+  layers.*.group: { type: int, description: "Unique id of the layer group the layer is in (Arena)" }
   layers.*.opacity: { type: float, description: "Layer video opacity, 0.0 to 1.0" }
   layers.*.master: { type: float, description: "Layer master level, 0.0 to 1.0" }
   layers.*.bypassed: { type: bool, description: "Layer bypassed" }
   layers.*.solo: { type: bool, description: "Layer soloed" }
   layers.*.selected: { type: bool, description: "Layer is the selected layer" }
   layers.*.crossfader_group: { type: string, description: "Crossfader side the layer is assigned to, the selected option's name" }
-  layers.*.active_clip: { type: int, description: "Unique id of the clip playing in the layer" }
-  layers.*.active_clip_name: { type: string, description: "Name of the clip playing in the layer" }
+  layers.*.active_clip: { type: int, description: "Unique id of the clip playing in the layer; absent when nothing plays" }
+  layers.*.active_clip_name: { type: string, description: "Name of the clip playing in the layer; absent when nothing plays" }
   columns.*.name: { type: string, description: "Column name, keyed by the column's unique id" }
+  columns.*.position: { type: int, description: "1-based place in the composition's column list, the number column commands and a clip's position take" }
   columns.*.connected: { type: string, description: "Column connection state, the selected option's name" }
   columns.*.selected: { type: bool, description: "Column is the selected column" }
   decks.*.name: { type: string, description: "Deck name, keyed by the deck's unique id" }
+  decks.*.position: { type: int, description: "1-based place in the composition's deck list, the number deck commands take" }
   decks.*.selected: { type: bool, description: "Deck is the selected (active) deck" }
   decks.*.closed: { type: bool, description: "Deck is closed" }
   groups.*.name: { type: string, description: "Layer group name, keyed by the group's unique id (Arena)" }
+  groups.*.position: { type: int, description: "1-based place in the composition's layer group list, the number group commands take" }
   groups.*.opacity: { type: float, description: "Layer group video opacity, 0.0 to 1.0" }
   groups.*.master: { type: float, description: "Layer group master level, 0.0 to 1.0" }
   groups.*.bypassed: { type: bool, description: "Layer group bypassed" }
   groups.*.solo: { type: bool, description: "Layer group soloed" }
   groups.*.selected: { type: bool, description: "Layer group is the selected group" }
+  clips.*.name: { type: string, description: "Clip name, keyed by the clip's unique id; empty for an empty slot" }
+  clips.*.connected: { type: string, description: "Clip connection state, the selected option's name (Empty, Disconnected, Previewing, Connected, Connected & previewing)" }
+  clips.*.layer: { type: int, description: "Unique id of the layer the clip slot is in" }
+  clips.*.column: { type: int, description: "Unique id of the column the clip slot is in; its position is the clip number clip commands take" }
 
 quirks:
   - models: [all]
@@ -884,15 +869,22 @@ quirks:
       change when items are reordered, added or removed. The document gives no
       maximum; a position that does not exist answers 404. The state is keyed by
       each item's unique id instead, which the document says stays constant
-      across sessions and reordering, because the composition reply carries no
-      position for an item.
+      across sessions and reordering. layers.*.position, columns.*.position,
+      decks.*.position and groups.*.position are each item's 1-based place in
+      the composition's own list, updated with every composition Resolume
+      sends; the document says positions are "by position in the
+      composition" but does not state in words that the list order is that
+      position. A layer listed only inside a layer group has no position.
 
   - models: [all]
     severity: warning
     text: >
       Only the layers and clips of the active deck can be read or changed (Deck
       schema). After select_deck, layer and clip positions refer to the newly
-      selected deck.
+      selected deck. A deck switch, by any client, turns that deck's
+      'selected' parameter true; the extension then reads the composition
+      again over REST, since the websocket article lists only layers and
+      columns added or removed as structural changes that resend it.
 
   - models: [all]
     severity: warning
@@ -938,28 +930,51 @@ quirks:
       state holds under tempo.*_parameter and crossfader.side_*_parameter.
 
   - models: [all]
-    severity: warning
+    severity: info
     text: >
-      There is no push over HTTP. Resolume pushes parameter changes only over
-      its websocket API (ws://host:port/api/v1, the webserver's port), and
-      only for parameters subscribed by path. The composition's master,
-      opacity, speed, bypass, crossfader phase and tempo are subscribed by
-      their logical paths and update as they change; the subscription paths
-      are derived by the document's stated rule, as it gives no example for
-      them. Everything else is keyed by unique id and still comes from asking
-      for the composition once a second, whose reply contains every deck,
-      layer, column, clip and effect and grows with the composition. The
-      composition state Resolume sends on connecting the websocket, and its
-      sources and effects updates, are not read.
+      State is pushed. The resolume-push extension opens Resolume's websocket
+      (ws://host:port/api/v1, the webserver's port), reads the composition
+      Resolume sends on connecting and again after each structural change,
+      and subscribes to every parameter the state shows by
+      /parameter/by-id/<id>: the composition's name, master, opacity, speed,
+      bypass, crossfader phase, behaviour and curve, tempo and play state;
+      each layer's name, opacity, master, bypass, solo, selected and
+      crossfader side; each column's name, connected and selected; each
+      deck's name and selected; each layer group's name, opacity, master,
+      bypass, solo and selected; and each clip's name and connected state.
+      A new composition is compared with the last: items that went are
+      removed from state and their parameters unsubscribed, new ones are
+      read and subscribed. A composition with many clips means as many
+      subscriptions, sent once per connection and once per new item. Nothing
+      is polled.
 
   - models: [all]
     severity: warning
     text: >
-      A layer's active_clip is null when nothing plays in it. A null is not
-      assigned, so layers.*.active_clip and active_clip_name keep the last clip
-      that played after the layer is cleared. Each clip's own connection state
-      (Empty, Disconnected, Previewing, Connected, Connected & previewing, per
-      Resolume's example application) is read with get_clip_connected.
+      Three changes bring no new composition on the websocket, so it is
+      read again over REST (GET /api/v1/composition) for them: a deck switch
+      (see above); after this session's add_deck, open_deck, close_deck,
+      select_deck, open_composition, new_composition, undo and redo succeed;
+      and a deck closed or opened from Resolume itself or another client,
+      because a deck's 'closed' is a plain boolean in the Deck schema, not a
+      parameter with an id, and cannot be subscribed. For the last only, the
+      composition is read again when none has arrived for
+      composition_refresh_s seconds (default 60; 0 turns it off, and
+      decks.*.closed then changes only with a structural change). The
+      composition message's exact shape is not documented beyond "similar
+      to GET /composition"; a bare composition object, or one wrapped as
+      {"type": ..., "value": <composition>} like sources_update, is read.
+
+  - models: [all]
+    severity: info
+    text: >
+      A layer's active clip is the clip whose connected state is Connected or
+      Connected & previewing (the states Resolume's example application
+      lists), taken from the composition's active_clip when it gives one.
+      layers.*.active_clip and active_clip_name are removed when nothing
+      plays. A reply to get_composition, read by the rules above, does not
+      remove them, as a null is not assigned there; the next pushed change
+      corrects it.
 
   - models: [all]
     severity: info
