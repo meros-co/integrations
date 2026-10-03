@@ -847,6 +847,27 @@ telemetry:
       - '{"action":"subscribe","parameter":"/composition/master"}'
 ```
 
+A device that pushes over Socket.IO (H2R Graphics, FreeShow) sets `socketio`:
+
+```yaml
+telemetry:
+  websocket:
+    path: /socket.io/
+    socketio: true            # or { engine_io: 3, namespace: /stage }
+    send:                     # events emitted once the namespace is joined
+      - '["subscribe", {"topic": "slides"}]'
+  updates:
+    - json_match: { "$.event": "^slide$" }
+      json: { index: "$.data.index" }
+      state: { slide.index: "{index}" }
+```
+
+The core adds `EIO=4&transport=websocket` (or `EIO=3`) to the query, joins
+the namespace when the server's open packet arrives, answers pings (Engine.IO
+4) or sends them at the server's interval (Engine.IO 3), and gives each event
+to the `json_match` rules as `{"event": <name>, "data": <first argument>,
+"args": [<every argument>]}`.
+
 The transport's `basic` or `bearer` credential goes on its opening request; a
 401 or 403 answer is the terminal refusal of §2. `send` items are templates
 over settings. Its messages go through the rules like any other.
