@@ -86,7 +86,7 @@ transport:
   probe: { method: POST, path: /, body: '{"params":{},"method":"powerStatus","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
 
 settings:
-  super_operator_password: { type: string, secret: true, default: "" }
+  super_operator_password: { type: string, secret: true, default: "", label: Super operator password, description: "The super operator password set on the processor, sent by the _as_super_operator commands in multi-operator mode." }
 
 ports:
   - { port: 9999, protocol: http, role: control }
@@ -223,7 +223,7 @@ commands:
   reset_frame:
     summary: "Reset: 0 soft reset, 1 factory reset, 2 factory reset keeping IP, 3 keeping IP and EDID, 4 keeping VPID, 5 power down (R5919184/00 resetFrameSettings)"
     params:
-      reset: { type: int, min: 0, max: 5, required: true }
+      reset: { type: int, min: 0, max: 5, required: true, label: Reset type, description: "0 soft reset, 1 factory reset, 2 factory reset keeping IP settings, 3 keeping IP and EDID, 4 keeping VPID, 5 power down; nothing asks for confirmation." }
     send: { method: POST, path: /, body: '{"params":{"reset":{reset}},"method":"resetFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -231,7 +231,7 @@ commands:
   reset_frame_encore3:
     summary: "Reset: 0 soft reset, 1 factory reset, 2 factory reset and keep all, 3 power down (Encore3 v10.0 resetFrameSettings)"
     params:
-      reset: { type: int, min: 0, max: 3, required: true }
+      reset: { type: int, min: 0, max: 3, required: true, label: Reset type, description: "0 soft reset, 1 factory reset, 2 factory reset keeping all saved options, 3 power down; nothing asks for confirmation." }
     send: { method: POST, path: /, body: '{"params":{"reset":{reset}},"method":"resetFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -239,7 +239,7 @@ commands:
   factory_reset_keep:
     summary: "Factory reset and keep: 0 all, 1 IP settings, 2 input EDIDs, 3 unit ID, 4 system native rate (Encore3 v10.0 resetFrameSettings reset 2 with saveOptions)"
     params:
-      keep: { type: int, min: 0, max: 4, required: true }
+      keep: { type: int, min: 0, max: 4, required: true, label: Keep, description: "What the factory reset keeps: 0 all, 1 IP settings, 2 input EDIDs, 3 unit ID, 4 system native rate." }
     send: { method: POST, path: /, body: '{"params":{"reset":2,"saveOptions":{keep}},"method":"resetFrameSettings","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -254,7 +254,7 @@ commands:
   all_trans_time:
     summary: "Transition every armed destination with this transition time in frames (Doc 8.2, Encore3 v10.0 allTrans transTime)"
     params:
-      frames: { type: int, min: 0, required: true }
+      frames: { type: int, min: 0, required: true, label: Transition time, description: "Transition time in frames applied to every armed destination for this transition." }
     send: { method: POST, path: /, body: '{"params":{"transTime":{frames}},"method":"allTrans","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -262,7 +262,7 @@ commands:
   all_trans_as_operator:
     summary: "allTrans on the destinations of one operator, 0 to 2, in multi-operator mode (Doc 8.2, Encore3 v10.0 allTrans operatorId)"
     params:
-      operator: { type: int, min: 0, max: 2, required: true }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
     send: { method: POST, path: /, body: '{"params":{"operatorId":{operator}},"method":"allTrans","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -282,7 +282,7 @@ commands:
   cut_as_operator:
     summary: "Cut on the destinations of one operator, 0 to 2, in multi-operator mode (Doc 8.2, Encore3 v10.0 cut operatorId)"
     params:
-      operator: { type: int, min: 0, max: 2, required: true }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
     send: { method: POST, path: /, body: '{"params":{"operatorId":{operator}},"method":"cut","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -297,8 +297,8 @@ commands:
   list_presets:
     summary: "Presets, all or those containing a destination: -2 excludes that destination type, -1 any, 0-999 that destination (R5919184/00 listPresets)"
     params:
-      screen: { type: int, min: -2, max: 999, default: -1 }
-      aux: { type: int, min: -2, max: 999, default: -1 }
+      screen: { type: int, min: -2, max: 999, default: -1, label: Screen destination, description: "Lists presets holding this screen destination id (0-based); -1 matches any, -2 excludes presets with screen destinations." }
+      aux: { type: int, min: -2, max: 999, default: -1, label: Aux destination, description: "Lists presets holding this aux destination id (0-based); -1 matches any, -2 excludes presets with aux destinations." }
     send: { method: POST, path: /, body: '{"params":{"ScreenDest":{screen},"AuxDest":{aux}},"method":"listPresets","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -306,7 +306,7 @@ commands:
   list_destinations_for_preset:
     summary: "The destinations a preset holds, -1 for every preset (R5919184/00 listDestinationsForPreset)"
     params:
-      preset: { type: int, min: -1, max: 999, default: -1 }
+      preset: { type: int, min: -1, max: 999, default: -1, label: Preset, description: "Preset id as listPresets returns it (0-based, not the serial number), or -1 for every preset." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"listDestinationsForPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -314,7 +314,7 @@ commands:
   save_preset:
     summary: "Save the selected destinations' previews as a new preset with this name (R5919184/00 savePreset)"
     params:
-      name: { type: string, required: true }
+      name: { type: string, required: true, label: Preset name, description: "Name for the new preset saved from the selected destinations' previews." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -322,9 +322,9 @@ commands:
   save_preset_numbered:
     summary: "Save a preset at this serial number (overwriting it), from preview or program (Doc 8.2, Encore3 v10.0 savePreset serialNo, saveFromProgram)"
     params:
-      name: { type: string, required: true }
-      serial: { type: float, min: 0, required: true }
-      from_program: { type: bool, default: false }
+      name: { type: string, required: true, label: Preset name, description: "Name for the preset saved at this serial number." }
+      serial: { type: float, min: 0, required: true, label: Preset serial number, description: "Serial number to save the preset at, such as 3.00; an existing preset there is overwritten, and it is sent with two decimals." }
+      from_program: { type: bool, default: false, label: Save from program, description: "On saves what is in program, off saves what is in preview." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"serialNo":{serial:.2f},"saveFromProgram":{from_program:bool01}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -332,8 +332,8 @@ commands:
   save_preset_as_operator:
     summary: "Save a preset as operator 0 to 2 in multi-operator mode (Doc 8.2, Encore3 v10.0 savePreset operatorId)"
     params:
-      name: { type: string, required: true }
-      operator: { type: int, min: 0, max: 2, required: true }
+      name: { type: string, required: true, label: Preset name, description: "Name for the new preset saved for this operator." }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"operatorId":{operator}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -341,7 +341,7 @@ commands:
   save_preset_as_super_operator:
     summary: "Save a preset as the super operator (Doc 8.2, Encore3 v10.0 savePreset password)"
     params:
-      name: { type: string, required: true }
+      name: { type: string, required: true, label: Preset name, description: "Name for the new preset saved as the super operator." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"password":{settings.super_operator_password:json}},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -349,7 +349,7 @@ commands:
   save_preset_custom:
     summary: "savePreset with a params object of the documented savePreset schema: presetName, ScreenDestination and AuxDestination arrays of {\"id\": n}, serialNo, saveFromProgram, operatorId or password (R5919184/00 savePreset)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "savePreset params object as Barco documents it: presetName, ScreenDestination and AuxDestination arrays of {\"id\": n}, serialNo, saveFromProgram, and operatorId or password." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"savePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -357,8 +357,8 @@ commands:
   rename_preset:
     summary: "Rename the preset with this id (R5919184/00 renamePreset id)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
-      new_name: { type: string, required: true }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
+      new_name: { type: string, required: true, label: New name, description: "The new name for the preset." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset},"newPresetName":{new_name:json}},"method":"renamePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -366,8 +366,8 @@ commands:
   rename_preset_by_serial:
     summary: "Rename the preset with this serial number (R5919184/00 renamePreset presetSno)"
     params:
-      serial: { type: float, min: 0, required: true }
-      new_name: { type: string, required: true }
+      serial: { type: float, min: 0, required: true, label: Preset serial number, description: "Preset serial number such as 3.00, as shown on the processor; sent with two decimals, so 1.1 and 1.10 are the same." }
+      new_name: { type: string, required: true, label: New name, description: "The new name for the preset." }
     send: { method: POST, path: /, body: '{"params":{"presetSno":{serial:.2f},"newPresetName":{new_name:json}},"method":"renamePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -375,8 +375,8 @@ commands:
   rename_preset_by_name:
     summary: "Rename the preset with this name (R5919184/00 renamePreset presetName)"
     params:
-      name: { type: string, required: true }
-      new_name: { type: string, required: true }
+      name: { type: string, required: true, label: Preset name, description: "Preset name as shown on the processor; names are case sensitive." }
+      new_name: { type: string, required: true, label: New name, description: "The new name for the preset." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json},"newPresetName":{new_name:json}},"method":"renamePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -384,7 +384,7 @@ commands:
   delete_preset:
     summary: "Delete the preset with this id (R5919184/00 deletePreset id)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -392,7 +392,7 @@ commands:
   delete_preset_by_serial:
     summary: "Delete the preset with this serial number (R5919184/00 deletePreset presetSno)"
     params:
-      serial: { type: float, min: 0, required: true }
+      serial: { type: float, min: 0, required: true, label: Preset serial number, description: "Preset serial number such as 3.00, as shown on the processor; sent with two decimals, so 1.1 and 1.10 are the same." }
     send: { method: POST, path: /, body: '{"params":{"presetSno":{serial:.2f}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -400,7 +400,7 @@ commands:
   delete_preset_by_name:
     summary: "Delete the preset with this name (R5919184/00 deletePreset presetName)"
     params:
-      name: { type: string, required: true }
+      name: { type: string, required: true, label: Preset name, description: "Preset name as shown on the processor; names are case sensitive." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -408,8 +408,8 @@ commands:
   delete_preset_as_operator:
     summary: "Delete a preset as operator 0 to 2 (Doc 8.2, Encore3 v10.0 deletePreset operatorId)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
-      operator: { type: int, min: 0, max: 2, required: true }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset},"operatorId":{operator}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -417,7 +417,7 @@ commands:
   delete_preset_as_super_operator:
     summary: "Delete a preset as the super operator (Doc 8.2, Encore3 v10.0 deletePreset password)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset},"password":{settings.super_operator_password:json}},"method":"deletePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -425,8 +425,8 @@ commands:
   activate_preset:
     summary: "Recall the preset with this id to preview, or to program (R5919184/00 activatePreset id, type)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
-      program: { type: bool, default: false }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
+      program: { type: bool, default: false, label: To program, description: "On recalls the preset straight to program, off recalls it to preview." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset},"type":{program:bool01}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -434,8 +434,8 @@ commands:
   activate_preset_by_serial:
     summary: "Recall the preset with this serial number to preview, or to program (R5919184/00 activatePreset presetSno, type)"
     params:
-      serial: { type: float, min: 0, required: true }
-      program: { type: bool, default: false }
+      serial: { type: float, min: 0, required: true, label: Preset serial number, description: "Preset serial number such as 3.00, as shown on the processor; sent with two decimals, so 1.1 and 1.10 are the same." }
+      program: { type: bool, default: false, label: To program, description: "On recalls the preset straight to program, off recalls it to preview." }
     send: { method: POST, path: /, body: '{"params":{"presetSno":{serial:.2f},"type":{program:bool01}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -443,7 +443,7 @@ commands:
   activate_preset_by_name:
     summary: "Recall the preset with this name to preview (R5919184/00 activatePreset presetName)"
     params:
-      name: { type: string, required: true }
+      name: { type: string, required: true, label: Preset name, description: "Preset name as shown on the processor; names are case sensitive." }
     send: { method: POST, path: /, body: '{"params":{"presetName":{name:json}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -451,8 +451,8 @@ commands:
   activate_preset_as_operator:
     summary: "Recall a preset as operator 0 to 2 (Doc 8.2, Encore3 v10.0 activatePreset operatorId)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
-      operator: { type: int, min: 0, max: 2, required: true }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset},"operatorId":{operator}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -460,7 +460,7 @@ commands:
   activate_preset_as_super_operator:
     summary: "Recall a preset as the super operator (Doc 8.2, Encore3 v10.0 activatePreset password)"
     params:
-      preset: { type: int, min: 0, max: 999, required: true }
+      preset: { type: int, min: 0, max: 999, required: true, label: Preset, description: "Preset id, the processor's 0-based index as listPresets returns it, which is not its serial number." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset},"password":{settings.super_operator_password:json}},"method":"activatePreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -475,7 +475,7 @@ commands:
   list_destinations:
     summary: "Destinations: 0 all, 1 screen destinations, 2 aux destinations (R5919184/00 listDestinations)"
     params:
-      type: { type: int, min: 0, max: 2, default: 0 }
+      type: { type: int, min: 0, max: 2, default: 0, label: Destination type, description: "0 lists all destinations, 1 screen destinations only, 2 aux destinations only." }
     send: { method: POST, path: /, body: '{"params":{"type":{type}},"method":"listDestinations","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -483,7 +483,7 @@ commands:
   list_content:
     summary: "Backgrounds, layers and transition of a screen destination (R5919184/00 listContent)"
     params:
-      screen: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen}},"method":"listContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -491,8 +491,8 @@ commands:
   list_output_content:
     summary: "Backgrounds and the layers of one output of a screen destination (Encore3 v10.0 listContent DestOutMap)"
     params:
-      screen: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Index of the output within the screen destination (Encore3 DestOutMap), from 0." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen},"DestOutMap":{output}},"method":"listContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -500,7 +500,7 @@ commands:
   change_content:
     summary: "changeContent with a params object of the documented changeContent schema: id, DestOutMap (Encore3), TestPattern, BGLyr, Layers with id, LastSrcIdx, Window, Source, Mask, PvwMode, PgmMode (R5919184/00 changeContent)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "changeContent params object as Barco documents it: id, DestOutMap (Encore3), TestPattern, BGLyr, and Layers with id, LastSrcIdx, Window, Source, Mask, PvwMode and PgmMode." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -508,15 +508,15 @@ commands:
   change_layer_source:
     summary: "Put a source in a layer of a screen destination at this window, in preview and/or program (R5919184/00 changeContent Layers)"
     params:
-      screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
-      source: { type: int, min: 0, required: true }
-      h_pos: { type: int, required: true }
-      v_pos: { type: int, required: true }
-      h_size: { type: int, min: 0, required: true }
-      v_size: { type: int, min: 0, required: true }
-      preview: { type: bool, default: true }
-      program: { type: bool, default: false }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
+      source: { type: int, min: 0, required: true, label: Source, description: "Source id, the processor's 0-based index as listSources returns it." }
+      h_pos: { type: int, required: true, label: Horizontal position, description: "Left edge of the layer's window in pixels from the left of the destination; may be negative to start off screen." }
+      v_pos: { type: int, required: true, label: Vertical position, description: "Top edge of the layer's window in pixels from the top of the destination; may be negative to start off screen." }
+      h_size: { type: int, min: 0, required: true, label: Width, description: "Width of the layer's window in pixels." }
+      v_size: { type: int, min: 0, required: true, label: Height, description: "Height of the layer's window in pixels." }
+      preview: { type: bool, default: true, label: Apply to preview, description: "On applies the change in preview (PvwMode), which is the default." }
+      program: { type: bool, default: false, label: Apply to program, description: "On applies the change in program (PgmMode) as well or instead of preview." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen},"Layers":[{"id":{layer},"LastSrcIdx":{source},"Window":{"HPos":{h_pos},"VPos":{v_pos},"HSize":{h_size},"VSize":{v_size}},"PvwMode":{preview:bool01},"PgmMode":{program:bool01}}]},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -524,16 +524,16 @@ commands:
   change_output_layer_source:
     summary: "As change_layer_source, for a layer of one output of the screen destination (Encore3 v10.0 changeContent DestOutMap, Layers)"
     params:
-      screen: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
-      source: { type: int, min: 0, required: true }
-      h_pos: { type: int, required: true }
-      v_pos: { type: int, required: true }
-      h_size: { type: int, min: 0, required: true }
-      v_size: { type: int, min: 0, required: true }
-      preview: { type: bool, default: true }
-      program: { type: bool, default: false }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Index of the output within the screen destination (Encore3 DestOutMap), from 0." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
+      source: { type: int, min: 0, required: true, label: Source, description: "Source id, the processor's 0-based index as listSources returns it." }
+      h_pos: { type: int, required: true, label: Horizontal position, description: "Left edge of the layer's window in pixels from the left of the destination; may be negative to start off screen." }
+      v_pos: { type: int, required: true, label: Vertical position, description: "Top edge of the layer's window in pixels from the top of the destination; may be negative to start off screen." }
+      h_size: { type: int, min: 0, required: true, label: Width, description: "Width of the layer's window in pixels." }
+      v_size: { type: int, min: 0, required: true, label: Height, description: "Height of the layer's window in pixels." }
+      preview: { type: bool, default: true, label: Apply to preview, description: "On applies the change in preview (PvwMode), which is the default." }
+      program: { type: bool, default: false, label: Apply to program, description: "On applies the change in program (PgmMode) as well or instead of preview." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen},"DestOutMap":{output},"Layers":[{"id":{layer},"LastSrcIdx":{source},"Window":{"HPos":{h_pos},"VPos":{v_pos},"HSize":{h_size},"VSize":{v_size}},"PvwMode":{preview:bool01},"PgmMode":{program:bool01}}]},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -541,14 +541,14 @@ commands:
   set_layer_mask:
     summary: "Mask a layer's edges, in percent, in preview and/or program (R5919184/00 changeContent Layers Mask, sent apart from Window as Encore3 v10.0 requires)"
     params:
-      screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
-      left: { type: float, min: 0, max: 100, required: true }
-      right: { type: float, min: 0, max: 100, required: true }
-      top: { type: float, min: 0, max: 100, required: true }
-      bottom: { type: float, min: 0, max: 100, required: true }
-      preview: { type: bool, default: true }
-      program: { type: bool, default: false }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
+      left: { type: float, min: 0, max: 100, required: true, label: Left mask, description: "How much of the layer's left edge to mask, in percent from 0 to 100." }
+      right: { type: float, min: 0, max: 100, required: true, label: Right mask, description: "How much of the layer's right edge to mask, in percent from 0 to 100." }
+      top: { type: float, min: 0, max: 100, required: true, label: Top mask, description: "How much of the layer's top edge to mask, in percent from 0 to 100." }
+      bottom: { type: float, min: 0, max: 100, required: true, label: Bottom mask, description: "How much of the layer's bottom edge to mask, in percent from 0 to 100." }
+      preview: { type: bool, default: true, label: Apply to preview, description: "On applies the change in preview (PvwMode), which is the default." }
+      program: { type: bool, default: false, label: Apply to program, description: "On applies the mask in program (PgmMode) as well or instead of preview." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen},"Layers":[{"id":{layer},"Mask":{"Left":{left:.2f},"Right":{right:.2f},"Top":{top:.2f},"Bottom":{bottom:.2f}},"PvwMode":{preview:bool01},"PgmMode":{program:bool01}}]},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -556,8 +556,8 @@ commands:
   set_screen_test_pattern:
     summary: "Test pattern on a screen destination, 0 off (R5919184/00 changeContent TestPattern)"
     params:
-      screen: { type: int, min: 0, required: true }
-      pattern: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      pattern: { type: int, min: 0, required: true, label: Test pattern, description: "Test pattern number, 0 off; the documents list no table, but their examples give 3 for 100% colour bars and 5 for a 32x32 grid." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen},"TestPattern":{pattern}},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -565,9 +565,9 @@ commands:
   set_output_test_pattern:
     summary: "Test pattern on one output of a screen destination, 0 off (Encore3 v10.0 changeContent DestOutMap, TestPattern)"
     params:
-      screen: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
-      pattern: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Index of the output within the screen destination (Encore3 DestOutMap), from 0." }
+      pattern: { type: int, min: 0, required: true, label: Test pattern, description: "Test pattern number, 0 off; the documents list no table, but their examples give 3 for 100% colour bars and 5 for a 32x32 grid." }
     send: { method: POST, path: /, body: '{"params":{"id":{screen},"DestOutMap":{output},"TestPattern":{pattern}},"method":"changeContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -575,7 +575,7 @@ commands:
   list_aux_content:
     summary: "Name and preview and program sources of an aux destination (R5919184/00 listAuxContent)"
     params:
-      aux: { type: int, min: 0, required: true }
+      aux: { type: int, min: 0, required: true, label: Aux destination, description: "Aux destination id, the processor's 0-based index as listDestinations returns it." }
     send: { method: POST, path: /, body: '{"params":{"id":{aux}},"method":"listAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -583,9 +583,9 @@ commands:
   change_aux_content:
     summary: "Set the preview and program sources of an aux destination (R5919184/00 changeAuxContent)"
     params:
-      aux: { type: int, min: 0, required: true }
-      preview_source: { type: int, min: 0, required: true }
-      program_source: { type: int, min: 0, required: true }
+      aux: { type: int, min: 0, required: true, label: Aux destination, description: "Aux destination id, the processor's 0-based index as listDestinations returns it." }
+      preview_source: { type: int, min: 0, required: true, label: Preview source, description: "Source id, 0-based as listSources returns it, to put in the aux destination's preview." }
+      program_source: { type: int, min: 0, required: true, label: Program source, description: "Source id, 0-based as listSources returns it, to put in the aux destination's program." }
     send: { method: POST, path: /, body: '{"params":{"id":{aux},"PvwLastSrcIndex":{preview_source},"PgmLastSrcIndex":{program_source}},"method":"changeAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -593,10 +593,10 @@ commands:
   change_aux_content_named:
     summary: "Set the name and the preview and program sources of an aux destination (R5919184/00 changeAuxContent Name)"
     params:
-      aux: { type: int, min: 0, required: true }
-      name: { type: string, required: true }
-      preview_source: { type: int, min: 0, required: true }
-      program_source: { type: int, min: 0, required: true }
+      aux: { type: int, min: 0, required: true, label: Aux destination, description: "Aux destination id, the processor's 0-based index as listDestinations returns it." }
+      name: { type: string, required: true, label: Aux name, description: "New name for the aux destination." }
+      preview_source: { type: int, min: 0, required: true, label: Preview source, description: "Source id, 0-based as listSources returns it, to put in the aux destination's preview." }
+      program_source: { type: int, min: 0, required: true, label: Program source, description: "Source id, 0-based as listSources returns it, to put in the aux destination's program." }
     send: { method: POST, path: /, body: '{"params":{"id":{aux},"Name":{name:json},"PvwLastSrcIndex":{preview_source},"PgmLastSrcIndex":{program_source}},"method":"changeAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -604,8 +604,8 @@ commands:
   set_aux_test_pattern:
     summary: "Test pattern on an aux destination, 0 off (R5919184/00 changeAuxContent TestPattern)"
     params:
-      aux: { type: int, min: 0, required: true }
-      pattern: { type: int, min: 0, required: true }
+      aux: { type: int, min: 0, required: true, label: Aux destination, description: "Aux destination id, the processor's 0-based index as listDestinations returns it." }
+      pattern: { type: int, min: 0, required: true, label: Test pattern, description: "Test pattern number, 0 off; the documents list no table, but their examples give 3 for 100% colour bars and 5 for a 32x32 grid." }
     send: { method: POST, path: /, body: '{"params":{"id":{aux},"TestPattern":{pattern}},"method":"changeAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -613,8 +613,8 @@ commands:
   freeze_input:
     summary: "Freeze or unfreeze an input source (R5919184/00 freezeDestSource type 0)"
     params:
-      source: { type: int, min: 0, required: true }
-      frozen: { type: bool, default: true }
+      source: { type: int, min: 0, required: true, label: Input source, description: "Input source id, the processor's 0-based index as listSources returns it." }
+      frozen: { type: bool, default: true, label: Frozen, description: "On freezes the picture, off unfreezes it." }
     send: { method: POST, path: /, body: '{"params":{"type":0,"id":{source},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -622,8 +622,8 @@ commands:
   freeze_background:
     summary: "Freeze or unfreeze a background source (R5919184/00 freezeDestSource type 1)"
     params:
-      source: { type: int, min: 0, required: true }
-      frozen: { type: bool, default: true }
+      source: { type: int, min: 0, required: true, label: Background source, description: "Background source id, 0-based, as listSources with type 1 returns it." }
+      frozen: { type: bool, default: true, label: Frozen, description: "On freezes the picture, off unfreezes it." }
     send: { method: POST, path: /, body: '{"params":{"type":1,"id":{source},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -631,8 +631,8 @@ commands:
   freeze_screen:
     summary: "Freeze or unfreeze a screen destination (R5919184/00 freezeDestSource type 2)"
     params:
-      screen: { type: int, min: 0, required: true }
-      frozen: { type: bool, default: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      frozen: { type: bool, default: true, label: Frozen, description: "On freezes the picture, off unfreezes it." }
     send: { method: POST, path: /, body: '{"params":{"type":2,"id":{screen},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -640,8 +640,8 @@ commands:
   freeze_aux:
     summary: "Freeze or unfreeze an aux destination (R5919184/00 freezeDestSource type 3)"
     params:
-      aux: { type: int, min: 0, required: true }
-      frozen: { type: bool, default: true }
+      aux: { type: int, min: 0, required: true, label: Aux destination, description: "Aux destination id, the processor's 0-based index as listDestinations returns it." }
+      frozen: { type: bool, default: true, label: Frozen, description: "On freezes the picture, off unfreezes it." }
     send: { method: POST, path: /, body: '{"params":{"type":3,"id":{aux},"screengroup":0,"mode":{frozen:bool01}},"method":"freezeDestSource","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -649,9 +649,9 @@ commands:
   arm_destinations:
     summary: "Arm or unarm destinations for transitions and preset saving; screens and auxes are arrays of {\"id\": n} (Doc 8.2, Encore3 v10.0 armUnarmDestination)"
     params:
-      armed: { type: bool, default: true }
-      screens: { type: json, required: true }
-      auxes: { type: json, required: true }
+      armed: { type: bool, default: true, label: Armed, description: "On arms the listed destinations for transitions and preset saving, off unarms them." }
+      screens: { type: json, required: true, label: Screen destinations, description: "JSON array of screen destinations as {\"id\": n} objects with 0-based ids, for example [{\"id\": 0}]; [] for none." }
+      auxes: { type: json, required: true, label: Aux destinations, description: "JSON array of aux destinations as {\"id\": n} objects with 0-based ids, for example [{\"id\": 1}]; [] for none." }
     send: { method: POST, path: /, body: '{"params":{"arm":{armed:bool01},"ScreenDestination":{screens},"AuxDestination":{auxes}},"method":"armUnarmDestination","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -659,7 +659,7 @@ commands:
   activate_dest_group:
     summary: "Recall the destination group with this id (R5919184/00 activateDestGroup id)"
     params:
-      group: { type: int, min: 0, required: true }
+      group: { type: int, min: 0, required: true, label: Destination group, description: "Destination group id, the processor's 0-based index." }
     send: { method: POST, path: /, body: '{"params":{"id":{group}},"method":"activateDestGroup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -667,7 +667,7 @@ commands:
   activate_dest_group_by_serial:
     summary: "Recall the destination group with this serial number (R5919184/00 activateDestGroup destGrpSno)"
     params:
-      serial: { type: float, min: 0, required: true }
+      serial: { type: float, min: 0, required: true, label: Group serial number, description: "Destination group serial number as shown on the processor, sent with two decimals." }
     send: { method: POST, path: /, body: '{"params":{"destGrpSno":{serial:.2f}},"method":"activateDestGroup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -675,7 +675,7 @@ commands:
   activate_dest_group_by_name:
     summary: "Recall the destination group with this name (R5919184/00 activateDestGroup, key as in its example)"
     params:
-      name: { type: string, required: true }
+      name: { type: string, required: true, label: Group name, description: "Destination group name as shown on the processor; the documents disagree on the key, see the quirks." }
     send: { method: POST, path: /, body: '{"params":{"destGrpName":{name:json}},"method":"activateDestGroup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -684,8 +684,8 @@ commands:
   fill_hv:
     summary: "Fit a layer of a screen destination to the screen's width and height (Doc 8.2, Encore3 v10.0 fillHV)"
     params:
-      screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
     send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"Layers":[{"id":{layer}}]},"method":"fillHV","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -693,9 +693,9 @@ commands:
   fill_hv_output:
     summary: "Fit an output layer of a screen destination to the screen (Encore3 v10.0 fillHV DestOutMap)"
     params:
-      screen: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Index of the output within the screen destination (Encore3 DestOutMap), from 0." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
     send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"DestOutMap":{output},"Layers":[{"id":{layer}}]},"method":"fillHV","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -703,7 +703,7 @@ commands:
   fill_hv_custom:
     summary: "fillHV with a params object of the documented schema: screenId, DestOutMap (Encore3), Layers array of {\"id\": n} (Doc 8.2, Encore3 v10.0 fillHV)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "fillHV params object as Barco documents it: screenId, DestOutMap (Encore3 only) and a Layers array of {\"id\": n}." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"fillHV","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -711,8 +711,8 @@ commands:
   clear_layer:
     summary: "Clear a layer from a screen destination (Doc 8.2, Encore3 v10.0 clearLayers)"
     params:
-      screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
     send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"Layers":[{"id":{layer}}]},"method":"clearLayers","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -720,9 +720,9 @@ commands:
   clear_output_layer:
     summary: "Clear an output layer from a screen destination (Encore3 v10.0 clearLayers DestOutMap)"
     params:
-      screen: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Index of the output within the screen destination (Encore3 DestOutMap), from 0." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
     send: { method: POST, path: /, body: '{"params":{"screenId":{screen},"DestOutMap":{output},"Layers":[{"id":{layer}}]},"method":"clearLayers","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -730,7 +730,7 @@ commands:
   clear_layers_custom:
     summary: "clearLayers with a params object of the documented schema: screenId, DestOutMap (Encore3), Layers array of {\"id\": n} (Doc 8.2, Encore3 v10.0 clearLayers)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "clearLayers params object as Barco documents it: screenId, DestOutMap (Encore3 only) and a Layers array of {\"id\": n}." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"clearLayers","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -745,7 +745,7 @@ commands:
   list_sources_by_type:
     summary: "Sources: 0 all input sources, 1 background sources only (R5919184/00 listSources type)"
     params:
-      type: { type: int, min: 0, max: 1, required: true }
+      type: { type: int, min: 0, max: 1, required: true, label: Source type, description: "0 lists all input sources, 1 lists background sources only." }
     send: { method: POST, path: /, body: '{"params":{"type":{type}},"method":"listSources","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -759,7 +759,7 @@ commands:
   get_input:
     summary: "One configured input, by input configuration index (Doc 8.2, Encore3 v10.0 listInputs inputId)"
     params:
-      input: { type: int, min: 0, required: true }
+      input: { type: int, min: 0, required: true, label: Input configuration, description: "Input configuration index, from 0, as listInputs returns it." }
     send: { method: POST, path: /, body: '{"params":{"inputId":{input}},"method":"listInputs","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -773,7 +773,7 @@ commands:
   get_output:
     summary: "One configured output, by output configuration index (Doc 8.2, Encore3 v10.0 listOutputs outputCfgId)"
     params:
-      output: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output configuration, description: "Output configuration index, from 0, as listOutputs returns it." }
     send: { method: POST, path: /, body: '{"params":{"outputCfgId":{output}},"method":"listOutputs","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -787,7 +787,7 @@ commands:
   list_source_main_backup_by_kind:
     summary: "Inputs (0) or backgrounds (1) with a backup configured (Doc 8.2 listSourceMainBackup inputType)"
     params:
-      kind: { type: int, min: 0, max: 1, required: true }
+      kind: { type: int, min: 0, max: 1, required: true, label: Source kind, description: "0 lists inputs with a backup configured, 1 lists backgrounds with a backup configured." }
     send: { method: POST, path: /, body: '{"params":{"inputType":{kind}},"method":"listSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -795,7 +795,7 @@ commands:
   list_source_main_backup_for_input:
     summary: "The backups of one input, 0-99 (Encore3 v10.0 listSourceMainBackup inputType)"
     params:
-      input: { type: int, min: 0, max: 99, required: true }
+      input: { type: int, min: 0, max: 99, required: true, label: Input, description: "Input id from 0 to 99 whose backups to list." }
     send: { method: POST, path: /, body: '{"params":{"inputType":{input}},"method":"listSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -803,7 +803,7 @@ commands:
   activate_source_main_backup:
     summary: "activateSourceMainBackup with a params object of the documented schema: inputId, Backup1-3 of {SrcType, SourceId}, BackUpState (Doc 8.2, Encore3 v10.0 activateSourceMainBackup)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "activateSourceMainBackup params object as Barco documents it: inputId, Backup1 to Backup3 each of {SrcType, SourceId}, and BackUpState." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"activateSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -811,7 +811,7 @@ commands:
   reset_source_main_backup:
     summary: "Return an input from its backup to its primary source (Doc 8.2, Encore3 v10.0 resetSourceMainBackup)"
     params:
-      input: { type: int, min: 0, required: true }
+      input: { type: int, min: 0, required: true, label: Input, description: "Input id, 0-based, to return from its backup to its primary source." }
     send: { method: POST, path: /, body: '{"params":{"id":{input}},"method":"resetSourceMainBackup","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -819,10 +819,10 @@ commands:
   control_3d_input:
     summary: "3D on an input configuration: off or sequential, sync source mini-DIN 1-4, sync invert (R5919184/00 3dControl)"
     params:
-      input: { type: int, min: 0, required: true }
-      sequential: { type: bool, required: true }
-      sync_source: { type: int, min: 1, max: 4, default: 1 }
-      invert: { type: bool, default: false }
+      input: { type: int, min: 0, required: true, label: Input configuration, description: "Input configuration index, from 0, as listInputs returns it." }
+      sequential: { type: bool, required: true, label: "3D sequential", description: "On sets 3D to frame sequential, off turns 3D off." }
+      sync_source: { type: int, min: 1, max: 4, default: 1, label: "3D sync source", description: "Mini-DIN connector, 1 to 4, that carries the 3D sync signal." }
+      invert: { type: bool, default: false, label: Invert sync, description: "On inverts the 3D sync signal." }
     send: { method: POST, path: /, body: '{"params":{"id":{input},"type":{sequential:bool01},"syncSource":{sync_source},"syncInvert":{invert:bool01}},"method":"3dControl","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -830,7 +830,7 @@ commands:
   control_3d_input_reset:
     summary: "Reset an input configuration's 3D controls (R5919184/00 3dControl with id only)"
     params:
-      input: { type: int, min: 0, required: true }
+      input: { type: int, min: 0, required: true, label: Input configuration, description: "Input configuration index, from 0, as listInputs returns it." }
     send: { method: POST, path: /, body: '{"params":{"id":{input}},"method":"3dControl","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -838,8 +838,8 @@ commands:
   control_3d_output:
     summary: "3D on an output configuration: off or sequential (Doc 8.2 3dControlOutput)"
     params:
-      output: { type: int, min: 0, required: true }
-      sequential: { type: bool, required: true }
+      output: { type: int, min: 0, required: true, label: Output configuration, description: "Output configuration index, from 0, as listOutputs returns it." }
+      sequential: { type: bool, required: true, label: "3D sequential", description: "On sets 3D to frame sequential, off turns 3D off." }
     send: { method: POST, path: /, body: '{"params":{"outputId":{output},"3Dtype":{sequential:bool01}},"method":"3dControlOutput","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -847,7 +847,7 @@ commands:
   control_3d_output_reset:
     summary: "Reset an output configuration's 3D controls (Doc 8.2 3dControlOutput with outputId only)"
     params:
-      output: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output configuration, description: "Output configuration index, from 0, as listOutputs returns it." }
     send: { method: POST, path: /, body: '{"params":{"outputId":{output}},"method":"3dControlOutput","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -862,8 +862,8 @@ commands:
   take_still:
     summary: "Capture a still from an input source into still file id (file 5 is StillStore6) (R5919184/00 takeStill type 0)"
     params:
-      source: { type: int, min: 0, required: true }
-      file: { type: int, min: 0, required: true }
+      source: { type: int, min: 0, required: true, label: Input source, description: "Input source to capture from, 0-based as listSources returns it; a destination's id makes the capture fail." }
+      file: { type: int, min: 0, required: true, label: Still file, description: "Still file id to capture into, from 0; file N is stored as StillStore N+1, so 5 is StillStore6." }
     send: { method: POST, path: /, body: '{"params":{"type":0,"id":{source},"file":{file}},"method":"takeStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -871,8 +871,8 @@ commands:
   take_still_from_background:
     summary: "Capture a still from a background source into still file id (R5919184/00 takeStill type 1)"
     params:
-      source: { type: int, min: 0, required: true }
-      file: { type: int, min: 0, required: true }
+      source: { type: int, min: 0, required: true, label: Background source, description: "Background source to capture from, 0-based as listSources with type 1 returns it." }
+      file: { type: int, min: 0, required: true, label: Still file, description: "Still file id to capture into, from 0; file N is stored as StillStore N+1, so 5 is StillStore6." }
     send: { method: POST, path: /, body: '{"params":{"type":1,"id":{source},"file":{file}},"method":"takeStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -880,7 +880,7 @@ commands:
   delete_still:
     summary: "Delete a still (R5919184/00 deleteStill)"
     params:
-      still: { type: int, min: 0, required: true }
+      still: { type: int, min: 0, required: true, label: Still, description: "Still id, the processor's 0-based index as listStill returns it." }
     send: { method: POST, path: /, body: '{"params":{"id":{still}},"method":"deleteStill","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -895,8 +895,8 @@ commands:
   activate_cue:
     summary: "Play (0), pause (1) or stop (2) the cue with this id (R5919184/00 activateCue id, type)"
     params:
-      cue: { type: int, min: 0, required: true }
-      action: { type: int, min: 0, max: 2, default: 0 }
+      cue: { type: int, min: 0, required: true, label: Cue, description: "Cue id, the processor's 0-based index as listCues returns it." }
+      action: { type: int, min: 0, max: 2, default: 0, label: Action, description: "0 plays the cue, 1 pauses it, 2 stops it." }
     send: { method: POST, path: /, body: '{"params":{"id":{cue},"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -904,8 +904,8 @@ commands:
   activate_cue_by_name:
     summary: "Play (0), pause (1) or stop (2) the cue with this name (R5919184/00 activateCue cueName)"
     params:
-      name: { type: string, required: true }
-      action: { type: int, min: 0, max: 2, default: 0 }
+      name: { type: string, required: true, label: Cue name, description: "Cue name as shown on the processor." }
+      action: { type: int, min: 0, max: 2, default: 0, label: Action, description: "0 plays the cue, 1 pauses it, 2 stops it." }
     send: { method: POST, path: /, body: '{"params":{"cueName":{name:json},"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -913,8 +913,8 @@ commands:
   activate_cue_by_serial:
     summary: "Play (0), pause (1) or stop (2) the cue with this serial number (R5919184/00 activateCue cueSerialNo)"
     params:
-      serial: { type: float, min: 0, required: true }
-      action: { type: int, min: 0, max: 2, default: 0 }
+      serial: { type: float, min: 0, required: true, label: Cue serial number, description: "Cue serial number as shown on the processor, sent with two decimals." }
+      action: { type: int, min: 0, max: 2, default: 0, label: Action, description: "0 plays the cue, 1 pauses it, 2 stops it." }
     send: { method: POST, path: /, body: '{"params":{"cueSerialNo":{serial:.2f},"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -922,7 +922,7 @@ commands:
   cue_transport:
     summary: "Pause (1) or stop (2) with no cue named, as in the document's examples (R5919184/00 activateCue type only)"
     params:
-      action: { type: int, min: 1, max: 2, required: true }
+      action: { type: int, min: 1, max: 2, required: true, label: Action, description: "1 pauses, 2 stops; the documents do not say which cue this applies to without a cue id." }
     send: { method: POST, path: /, body: '{"params":{"type":{action}},"method":"activateCue","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -937,9 +937,9 @@ commands:
   recall_user_key:
     summary: "Apply the user key with this id to a layer of a screen destination (Doc 8.2, Encore3 v10.0 recallUserKey id)"
     params:
-      key: { type: int, min: 0, required: true }
-      screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
+      key: { type: int, min: 0, required: true, label: User key, description: "User key id, the processor's 0-based index as listUserKeys returns it." }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
     send: { method: POST, path: /, body: '{"params":{"id":{key},"ScreenDestination":[{screen}],"Layer":[{layer}]},"method":"recallUserKey","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -947,9 +947,9 @@ commands:
   recall_user_key_by_name:
     summary: "Apply the user key with this name to a layer of a screen destination (Doc 8.2, Encore3 v10.0 recallUserKey userkeyName)"
     params:
-      name: { type: string, required: true }
-      screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
+      name: { type: string, required: true, label: User key name, description: "User key name as shown on the processor." }
+      screen: { type: int, min: 0, required: true, label: Screen destination, description: "Screen destination id, the processor's 0-based index as listDestinations returns it." }
+      layer: { type: int, min: 0, required: true, label: Layer, description: "Layer id within the screen destination, the processor's 0-based index as listContent returns it." }
     send: { method: POST, path: /, body: '{"params":{"userkeyName":{name:json},"ScreenDestination":[{screen}],"Layer":[{layer}]},"method":"recallUserKey","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -957,7 +957,7 @@ commands:
   recall_user_key_custom:
     summary: "recallUserKey with a params object of the documented schema: id or userkeyName, ScreenDestination, DestOutMap (Encore3) and Layer index arrays (Doc 8.2, Encore3 v10.0 recallUserKey)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "recallUserKey params object as Barco documents it: id or userkeyName, with ScreenDestination, DestOutMap (Encore3 only) and Layer index arrays." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"recallUserKey","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -966,7 +966,7 @@ commands:
   list_super_dest_content:
     summary: "Size, member screens and super layers of a super screen destination (Doc 8.2 listSuperDestContent)"
     params:
-      super_screen: { type: int, min: 0, required: true }
+      super_screen: { type: int, min: 0, required: true, label: Super screen destination, description: "Super screen destination id, the processor's 0-based index." }
     send: { method: POST, path: /, body: '{"params":{"id":{super_screen}},"method":"listSuperDestContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -974,7 +974,7 @@ commands:
   list_super_aux_content:
     summary: "Size and member aux destinations of a super aux (Doc 8.2 listSuperAuxContent)"
     params:
-      super_aux: { type: int, min: 0, required: true }
+      super_aux: { type: int, min: 0, required: true, label: Super aux, description: "Super aux destination id, the processor's 0-based index." }
     send: { method: POST, path: /, body: '{"params":{"id":{super_aux}},"method":"listSuperAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -982,12 +982,12 @@ commands:
   set_super_layer_window:
     summary: "Position and size a super layer across every screen of a super destination (Doc 8.2 changeSuperDestContent GlobalLayers)"
     params:
-      super_screen: { type: int, min: 0, required: true }
-      layer: { type: int, min: 0, required: true }
-      h_pos: { type: int, required: true }
-      v_pos: { type: int, required: true }
-      h_size: { type: int, min: 0, required: true }
-      v_size: { type: int, min: 0, required: true }
+      super_screen: { type: int, min: 0, required: true, label: Super screen destination, description: "Super screen destination id, the processor's 0-based index." }
+      layer: { type: int, min: 0, required: true, label: Super layer, description: "Super layer id within the super destination, 0-based, as listSuperDestContent returns it." }
+      h_pos: { type: int, required: true, label: Horizontal position, description: "Left edge of the super layer's window in pixels across the whole super destination; may be negative." }
+      v_pos: { type: int, required: true, label: Vertical position, description: "Top edge of the super layer's window in pixels across the whole super destination; may be negative." }
+      h_size: { type: int, min: 0, required: true, label: Width, description: "Width of the super layer's window in pixels." }
+      v_size: { type: int, min: 0, required: true, label: Height, description: "Height of the super layer's window in pixels." }
     send: { method: POST, path: /, body: '{"params":{"id":{super_screen},"GlobalLayers":[{"id":{layer},"Window":{"HPos":{h_pos},"VPos":{v_pos},"HSize":{h_size},"VSize":{v_size}}}]},"method":"changeSuperDestContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -995,7 +995,7 @@ commands:
   change_super_dest_content:
     summary: "changeSuperDestContent with a params object of the documented schema: id, GlobalLayers of {id, Window} (Doc 8.2 changeSuperDestContent)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "changeSuperDestContent params object as Barco documents it: id and GlobalLayers of {id, Window}." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"changeSuperDestContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1003,7 +1003,7 @@ commands:
   change_super_aux_content:
     summary: "changeSuperAuxContent with a params object of the documented schema: id, Destinations of {id, Name, PvwLastSrcIndex, PgmLastSrcIndex} (Doc 8.2 changeSuperAuxContent)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "changeSuperAuxContent params object as Barco documents it: id and Destinations of {id, Name, PvwLastSrcIndex, PgmLastSrcIndex}." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"changeSuperAuxContent","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1018,8 +1018,8 @@ commands:
   enable_operator:
     summary: "Enable or disable operator 0 to 2 (Doc 8.2, Encore3 v10.0 configureOperator enable)"
     params:
-      operator: { type: int, min: 0, max: 2, required: true }
-      enabled: { type: bool, default: true }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
+      enabled: { type: bool, default: true, label: Enabled, description: "On enables the operator profile, which puts the processor in multi-operator mode; off disables it." }
     send: { method: POST, path: /, body: '{"params":{"operatorId":{operator},"enable":{enabled:bool01}},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1027,8 +1027,8 @@ commands:
   rename_operator:
     summary: "Name operator 0 to 2 (Doc 8.2, Encore3 v10.0 configureOperator name)"
     params:
-      operator: { type: int, min: 0, max: 2, required: true }
-      name: { type: string, required: true }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
+      name: { type: string, required: true, label: Operator name, description: "Name to give the operator profile." }
     send: { method: POST, path: /, body: '{"params":{"operatorId":{operator},"name":{name:json}},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1036,9 +1036,9 @@ commands:
   set_operator_preset_range:
     summary: "The preset serial number range of operator 0 to 2 (Doc 8.2, Encore3 v10.0 configureOperator startRange, endRange)"
     params:
-      operator: { type: int, min: 0, max: 2, required: true }
-      start: { type: int, min: 0, required: true }
-      end: { type: int, min: 0, required: true }
+      operator: { type: int, min: 0, max: 2, required: true, label: Operator, description: "Multi-operator profile, numbered 0 to 2." }
+      start: { type: int, min: 0, required: true, label: First preset, description: "First preset serial number in the operator's range." }
+      end: { type: int, min: 0, required: true, label: Last preset, description: "Last preset serial number in the operator's range." }
     send: { method: POST, path: /, body: '{"params":{"operatorId":{operator},"startRange":{start},"endRange":{end}},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1046,7 +1046,7 @@ commands:
   configure_operator:
     summary: "configureOperator with a params object of the documented schema: operatorId, name, startRange, endRange, enable, add and remove of {destType, destIndex} (Doc 8.2, Encore3 v10.0 configureOperator)"
     params:
-      params: { type: json, required: true }
+      params: { type: json, required: true, label: Parameters, description: "configureOperator params object as Barco documents it: operatorId, name, startRange, endRange, enable, and add and remove lists of {destType, destIndex}." }
     send: { method: POST, path: /, body: '{"params":{params},"method":"configureOperator","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1055,8 +1055,8 @@ commands:
   change_mvr_layout:
     summary: "Multiviewer layout 0-3 on a frame unit (Doc 8.2 mvrLayoutChange)"
     params:
-      unit: { type: int, min: 0, required: true }
-      layout: { type: int, min: 0, max: 3, required: true }
+      unit: { type: int, min: 0, required: true, label: Frame unit, description: "Frame unit id in a linked system, from 0." }
+      layout: { type: int, min: 0, max: 3, required: true, label: Multiviewer layout, description: "Multiviewer layout number from 0 to 3." }
     send: { method: POST, path: /, body: '{"params":{"frameUnitId":{unit},"mvrLayoutId":{layout}},"method":"mvrLayoutChange","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1064,9 +1064,9 @@ commands:
   change_mvr_layout_encore3:
     summary: "Layout 0-9 of multiviewer 0 or 1 on a frame unit (Encore3 v10.0 mvrLayoutChange)"
     params:
-      unit: { type: int, min: 0, required: true }
-      mvr: { type: int, min: 0, max: 1, required: true }
-      layout: { type: int, min: 0, max: 9, required: true }
+      unit: { type: int, min: 0, required: true, label: Frame unit, description: "Frame unit id in a linked system, from 0." }
+      mvr: { type: int, min: 0, max: 1, required: true, label: Multiviewer, description: "Multiviewer number on the frame unit, 0 or 1." }
+      layout: { type: int, min: 0, max: 9, required: true, label: Multiviewer layout, description: "Multiviewer layout number from 0 to 9." }
     send: { method: POST, path: /, body: '{"params":{"frameUnitId":{unit},"mvrId":{mvr},"mvrLayoutId":{layout}},"method":"mvrLayoutChange","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1074,7 +1074,7 @@ commands:
   list_mvr_presets:
     summary: "MVR presets and their layouts, -1 for all (Encore3 v10.0 listMvrPreset)"
     params:
-      preset: { type: int, min: -1, max: 9, default: -1 }
+      preset: { type: int, min: -1, max: 9, default: -1, label: MVR preset, description: "MVR preset number from 0 to 9, or -1 for all." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"listMvrPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -1082,7 +1082,7 @@ commands:
   activate_mvr_preset:
     summary: "Recall an MVR preset, 0-9 (Encore3 v10.0 activateMvrPreset)"
     params:
-      preset: { type: int, min: 0, max: 9, required: true }
+      preset: { type: int, min: 0, max: 9, required: true, label: MVR preset, description: "MVR preset number to recall, from 0 to 9." }
     send: { method: POST, path: /, body: '{"params":{"id":{preset}},"method":"activateMvrPreset","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 } }
     returns: ack
@@ -1091,9 +1091,9 @@ commands:
   subscribe:
     summary: "Ask the processor to POST change notifications to hostname:port; notifications is an array of ScreenDestChanged, AUXDestChanged, FrameChanged, NativeRateChanged, InputCfgChanged, SourceChanged, BGSourceChanged, PresetChanged, StillChanged, OutputCfgChanged, CueChanged (R5919184/00 subscribe)"
     params:
-      hostname: { type: string, required: true }
-      port: { type: int, min: 1, max: 65535, required: true }
-      notifications: { type: json, required: true }
+      hostname: { type: string, required: true, label: Listener host, description: "Host name or IP address of the HTTP receiver the processor posts notifications to." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Listener port, description: "TCP port of the HTTP receiver that gets the notifications." }
+      notifications: { type: json, required: true, label: Notifications, description: "JSON array of notification types, such as [\"ScreenDestChanged\", \"SourceChanged\"]; the types are ScreenDestChanged, AUXDestChanged, FrameChanged, NativeRateChanged, InputCfgChanged, SourceChanged, BGSourceChanged, PresetChanged, StillChanged, OutputCfgChanged and CueChanged." }
     send: { method: POST, path: /, body: '{"params":{"hostname":{hostname:json},"port":"{port}","notification":{notifications}},"method":"subscribe","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value
@@ -1101,9 +1101,9 @@ commands:
   unsubscribe:
     summary: "Remove a notification subscription for hostname:port (R5919184/00 unsubscribe)"
     params:
-      hostname: { type: string, required: true }
-      port: { type: int, min: 1, max: 65535, required: true }
-      notifications: { type: json, required: true }
+      hostname: { type: string, required: true, label: Listener host, description: "Host name or IP address of the HTTP receiver the processor posts notifications to." }
+      port: { type: int, min: 1, max: 65535, required: true, label: Listener port, description: "TCP port of the HTTP receiver that gets the notifications." }
+      notifications: { type: json, required: true, label: Notifications, description: "JSON array of the notification types to stop, as given when subscribing, such as [\"ScreenDestChanged\"]." }
     send: { method: POST, path: /, body: '{"params":{"hostname":{hostname:json},"port":"{port}","notification":{notifications}},"method":"unsubscribe","id":"1234","jsonrpc":"2.0"}', content_type: application/json }
     expect: { status: 200, json_equals: { "$.result.success": 0 }, json_path: "$.result.response" }
     returns: value

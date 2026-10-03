@@ -119,7 +119,7 @@ commands:
   get_cues:
     summary: A timeline's cues with their ids and names (GET /v0/cues/{timeline_id})
     params:
-      timeline: { type: int, min: 0, required: true }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
     send: { method: GET, path: "/v0/cues/{timeline}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -134,7 +134,7 @@ commands:
   play_timeline:
     summary: Play a timeline, by id (POST /v0/play/{timeline_id})
     params:
-      timeline: { type: int, min: 0, required: true }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
     send: { method: POST, path: "/v0/play/{timeline}" }
     expect: { status: 200 }
     returns: ack
@@ -142,7 +142,7 @@ commands:
   pause_timeline:
     summary: Pause a timeline (POST /v0/pause/{timeline_id})
     params:
-      timeline: { type: int, min: 0, required: true }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
     send: { method: POST, path: "/v0/pause/{timeline}" }
     expect: { status: 200 }
     returns: ack
@@ -150,7 +150,7 @@ commands:
   stop_timeline:
     summary: Stop a timeline and return it to its start (POST /v0/stop/{timeline_id})
     params:
-      timeline: { type: int, min: 0, required: true }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
     send: { method: POST, path: "/v0/stop/{timeline}" }
     expect: { status: 200 }
     returns: ack
@@ -158,8 +158,8 @@ commands:
   set_timeline_state:
     summary: Run, pause or stop a timeline (POST /v0/play with a PlaybackStateChange)
     params:
-      timeline: { type: int, min: 0, required: true }
-      state:    { type: enum, values: [run, pause, stop], required: true }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
+      state:    { type: enum, values: [run, pause, stop], required: true, label: Playback state, description: "run plays the timeline, pause holds it where it is, stop returns it to its start." }
     send: { method: POST, path: /v0/play, body: '{"timelineId":{timeline},"state":"{state}"}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -167,9 +167,9 @@ commands:
   set_timeline_state_at:
     summary: Run, pause or stop a timeline at a time in ms (POST /v0/play with timelineTime)
     params:
-      timeline: { type: int, min: 0, required: true }
-      state:    { type: enum, values: [run, pause, stop], required: true }
-      time_ms:  { type: int, min: 0, required: true }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
+      state:    { type: enum, values: [run, pause, stop], required: true, label: Playback state, description: "run plays the timeline, pause holds it where it is, stop returns it to its start." }
+      time_ms:  { type: int, min: 0, required: true, label: Time, description: "Position on the timeline in milliseconds from its start." }
     send: { method: POST, path: /v0/play, body: '{"timelineId":{timeline},"state":"{state}","timelineTime":{time_ms}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -177,9 +177,9 @@ commands:
   jump_to_time:
     summary: Move a timeline to a time in ms, then play or pause it (POST /v0/jump-to-time/{timeline_id})
     params:
-      timeline: { type: int, min: 0, required: true }
-      time_ms:  { type: int, min: 0, required: true }
-      state:    { type: enum, values: [play, pause], default: pause }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
+      time_ms:  { type: int, min: 0, required: true, label: Time, description: "Position on the timeline in milliseconds from its start." }
+      state:    { type: enum, values: [play, pause], default: pause, label: Then, description: "Whether the timeline plays or stays paused after the jump." }
     send: { method: POST, path: "/v0/jump-to-time/{timeline}", query: { time: "{time_ms}", state: "{state}" } }
     expect: { status: 200 }
     returns: ack
@@ -187,9 +187,9 @@ commands:
   jump_to_cue:
     summary: Move a timeline to the start of a cue, by ids, then play or pause it (POST /v0/jump-to-cue/{timeline_id}/{cue_id})
     params:
-      timeline: { type: int, min: 0, required: true }
-      cue:      { type: int, min: 0, required: true }
-      state:    { type: enum, values: [play, pause], default: pause }
+      timeline: { type: int, min: 0, required: true, label: Timeline, description: "The timeline's numeric id, as get_timelines lists it." }
+      cue:      { type: int, min: 0, required: true, label: Cue, description: "The cue's numeric id within the timeline, as get_cues lists it." }
+      state:    { type: enum, values: [play, pause], default: pause, label: Then, description: "Whether the timeline plays or stays paused after the jump." }
     send: { method: POST, path: "/v0/jump-to-cue/{timeline}/{cue}", query: { state: "{state}" } }
     expect: { status: 200 }
     returns: ack
@@ -198,9 +198,9 @@ commands:
   set_input:
     summary: Set an input variable, by key, over a transition in ms (POST /v0/input/{key})
     params:
-      key:         { type: string, max_length: 256, required: true }
-      value:       { type: float, required: true }
-      duration_ms: { type: int, min: 0, default: 50 }
+      key:         { type: string, max_length: 256, required: true, label: Input key, description: "The input variable's key, as named in the WATCHOUT show." }
+      value:       { type: float, required: true, label: Value, description: "New value for the input variable, within the range set for it in the show." }
+      duration_ms: { type: int, min: 0, default: 50, label: Transition time, description: "Time in milliseconds over which the input moves to the new value; 50 when not given." }
     send: { method: POST, path: "/v0/input/{key}", query: { value: "{value:.4f}", duration: "{duration_ms}" } }
     expect: { status: 200 }
     returns: ack
@@ -211,7 +211,7 @@ commands:
       {"key": <key>, "value": <number>, "duration": <ms, optional>}, as the
       document's input schema gives it
     params:
-      inputs: { type: json, required: true }
+      inputs: { type: json, required: true, label: Inputs, description: "JSON array of inputs to set, each {\"key\": name, \"value\": number} with an optional \"duration\" in milliseconds." }
     send: { method: POST, path: /v0/inputs, body: "{inputs}", content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -232,8 +232,8 @@ commands:
   set_cue_set_by_id:
     summary: Select a cue set's variant, by ids (POST /v0/cue-group-state/by-id/{group_id}/{variant_id})
     params:
-      group:   { type: int, min: 0, required: true }
-      variant: { type: int, min: 0, required: true }
+      group:   { type: int, min: 0, required: true, label: Cue set, description: "The cue set's numeric id." }
+      variant: { type: int, min: 0, required: true, label: Variant, description: "The numeric id of the variant to make active." }
     send: { method: POST, path: "/v0/cue-group-state/by-id/{group}/{variant}" }
     expect: { status: 200 }
     returns: ack
@@ -241,8 +241,8 @@ commands:
   set_cue_set_by_name:
     summary: Select a cue set's variant, by names (POST /v0/cue-group-state/by-name/{group_name}/{variant_name})
     params:
-      group:   { type: string, max_length: 256, required: true }
-      variant: { type: string, max_length: 256, required: true }
+      group:   { type: string, max_length: 256, required: true, label: Cue set, description: "The cue set's name as shown in WATCHOUT, such as Language." }
+      variant: { type: string, max_length: 256, required: true, label: Variant, description: "The name of the variant to make active, such as English." }
     send: { method: POST, path: "/v0/cue-group-state/by-name/{group}/{variant}" }
     expect: { status: 200 }
     returns: ack
@@ -250,7 +250,7 @@ commands:
   set_cue_sets_by_id:
     summary: Select variants of several cue sets, a JSON map of group id to variant id (POST /v0/cue-group-state/by-id)
     params:
-      selection: { type: json, required: true }
+      selection: { type: json, required: true, label: Selection, description: "JSON map of cue set id to the variant id to make active." }
     send: { method: POST, path: /v0/cue-group-state/by-id, body: "{selection}", content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -258,7 +258,7 @@ commands:
   set_cue_sets_by_name:
     summary: Select variants of several cue sets, a JSON map of set name to variant name (POST /v0/cue-group-state/by-name)
     params:
-      selection: { type: json, required: true }
+      selection: { type: json, required: true, label: Selection, description: "JSON map of cue set name to the variant name to make active, such as {\"Language\": \"English\"}." }
     send: { method: POST, path: /v0/cue-group-state/by-name, body: "{selection}", content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -275,9 +275,9 @@ commands:
       Which of the given cues ("timeline_id/cue_id", a JSON array of strings) are
       hit at a stage position (POST /v0/hittest); answers {"hit_cues": [...]}
     params:
-      cues: { type: json, required: true }
-      x:    { type: float, required: true }
-      y:    { type: float, required: true }
+      cues: { type: json, required: true, label: Cues, description: "JSON array of cues to test, each as \"timeline_id/cue_id\"." }
+      x:    { type: float, required: true, label: X, description: "Horizontal stage position to test, in stage coordinates." }
+      y:    { type: float, required: true, label: "Y", description: "Vertical stage position to test, in stage coordinates." }
     send: { method: POST, path: /v0/hittest, body: '{"cues":{cues},"x":{x:.2f},"y":{y:.2f}}', content_type: application/json }
     expect: { status: 200, json_path: "$.hit_cues" }
     returns: value
@@ -287,7 +287,7 @@ commands:
       MIDI Show Control commands (POST /v0/msc): a JSON array such as
       [{"command": {"go": {}}}], as the node's MSC schema gives it
     params:
-      commands: { type: json, required: true }
+      commands: { type: json, required: true, label: MSC commands, description: "JSON array of MIDI Show Control commands as the node's MSC schema gives them, such as [{\"command\": {\"go\": {}}}]." }
     send: { method: POST, path: /v0/msc, body: "{commands}", content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -295,7 +295,7 @@ commands:
   load_show:
     summary: Replace the running show with a show in WATCHOUT's show JSON (POST /v0/show); see quirks
     params:
-      show: { type: json, required: true }
+      show: { type: json, required: true, label: Show, description: "The complete show in WATCHOUT's show JSON, which replaces the running show at once." }
     send: { method: POST, path: /v0/show, body: "{show}", content_type: application/json }
     expect: { status: 200 }
     returns: ack

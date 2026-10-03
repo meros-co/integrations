@@ -42,27 +42,27 @@ settings:
   # In every mode a command naming an element that is not known yet, by
   # identifier path or numeric path, asks for just the directories on the way
   # to it, and runs when they have answered.
-  walk: { type: enum, values: [full, depth, lazy] }
+  walk: { type: enum, values: [full, depth, lazy], label: Tree walk, description: "How much of the tree is read and kept up to date on connecting: full reads every node and matrix, depth reads to the walk depth, lazy only the root's elements; full when neither is set." }
   # Levels walked in depth mode: 1 is the root's elements, 2 also their
   # children, and so on. 2 when not given.
-  walk_depth: { type: int, min: 1, max: 255 }
+  walk_depth: { type: int, min: 1, max: 255, label: Walk depth, description: "Levels read in depth mode: 1 is the root's elements, 2 also their children, and so on; 2 when not given." }
   # In full and depth modes, ask each matrix the walk finds for its targets,
   # sources and connections (this also subscribes to connection changes). In
   # lazy mode a matrix's connections come from get_directory on it.
-  walk_matrices: { type: bool, default: true }
+  walk_matrices: { type: bool, default: true, label: Read matrices, description: "In full and depth modes, also read each matrix's targets, sources and connections and follow their changes." }
   # Address requests with QualifiedNode/QualifiedParameter/... and the full
   # path; false spells the path out as nested elements, for providers that do
   # not accept the qualified types in requests.
-  qualified_requests: { type: bool, default: true }
+  qualified_requests: { type: bool, default: true, label: Qualified requests, description: "On addresses requests by full path with qualified element types; turn off for providers that only accept the path spelled out as nested elements." }
   # GetDirectory requests in flight at once during the walk.
-  directory_concurrency: { type: int, min: 1, max: 256, default: 8 }
+  directory_concurrency: { type: int, min: 1, max: 256, default: 8, label: Concurrent requests, description: "Number of directory requests in flight at once while reading the tree." }
   # Send an S101 keep-alive request after this long without hearing from the
   # provider, and drop the connection if it is not answered within the timeout.
-  keepalive_interval_ms: { type: int, min: 500, max: 600000, default: 5000 }
-  keepalive_timeout_ms: { type: int, min: 500, max: 600000, default: 5000 }
+  keepalive_interval_ms: { type: int, min: 500, max: 600000, default: 5000, label: Keep-alive interval, description: "Milliseconds without hearing from the provider before a keep-alive request is sent." }
+  keepalive_timeout_ms: { type: int, min: 500, max: 600000, default: 5000, label: Keep-alive timeout, description: "Milliseconds to wait for the keep-alive answer before the connection is dropped." }
   # How long a GetDirectory, value change, matrix operation or invocation
   # waits for the provider's answer.
-  request_timeout_ms: { type: int, min: 500, max: 600000, default: 10000 }
+  request_timeout_ms: { type: int, min: 500, max: 600000, default: 10000, label: Request timeout, description: "Milliseconds a directory request, value change, matrix operation or function call waits for the provider's answer." }
 
 ports:
   - { port: 9000, protocol: tcp, role: control, note: "a common provider default, not a standard: providers choose their own" }
@@ -85,11 +85,13 @@ commands:
       GetDirectory on an element (the root when path is empty): its children and their properties become state,
       and the provider then reports changes below it. Acknowledged when the provider answers
     params:
-      path: &path { type: string, default: "", max_length: 4096 }
+      path: &path { type: string, default: "", max_length: 4096, label: Element path, description: "The element to list, by identifier path (identifiers joined by '/', such as Device/Audio/Gain) or numeric path (such as 1.2.3); empty for the root." }
       field_mask:
         type: enum
         values: [all, default, sparse, identifier, description, tree, value, connections]
         default: all
+        label: Fields
+        description: "Which properties to ask the provider for: all (the default), the provider's default set, sparse, or only the identifier, description, tree, value or connections."
     returns: ack
   refresh:
     summary: "Forget the tree and walk it again from the root; acknowledged when the root has answered"
@@ -101,34 +103,34 @@ commands:
       reports access none or read, or the value is outside its minimum/maximum. Returns the value the provider
       reports back, which is its current value if it refused the change
     params:
-      path: { type: string, required: true, max_length: 4096 }
-      value: { type: json, required: true }
+      path: { type: string, required: true, max_length: 4096, label: Element path, description: "The element, by identifier path (identifiers joined by '/', such as Device/Audio/Gain) or numeric path (such as 1.2.3); identifier paths stay valid across sessions, numeric paths may not." }
+      value: { type: json, required: true, label: Value, description: "New value in the parameter's own type: a number (real also takes \"inf\", \"-inf\" or \"nan\"), text, true or false, octets as a hex string, or an enum entry's number or name." }
     returns: value
   set_parameter_null:
     summary: "Set a nullable parameter (one whose default is null) to null; returns the value the provider reports back"
     params:
-      path: { type: string, required: true, max_length: 4096 }
+      path: { type: string, required: true, max_length: 4096, label: Element path, description: "The element, by identifier path (identifiers joined by '/', such as Device/Audio/Gain) or numeric path (such as 1.2.3); identifier paths stay valid across sessions, numeric paths may not." }
     returns: value
   subscribe:
     summary: >
       Subscribe to an element, needed for a parameter with a stream identifier before the provider streams its
       value. Kept across reconnections by identifier path. The protocol has no acknowledgement
     params:
-      path: { type: string, required: true, max_length: 4096 }
+      path: { type: string, required: true, max_length: 4096, label: Element path, description: "The element, by identifier path (identifiers joined by '/', such as Device/Audio/Gain) or numeric path (such as 1.2.3); identifier paths stay valid across sessions, numeric paths may not." }
     returns: ack
   unsubscribe:
     summary: "Unsubscribe from an element; on a node, from every parameter below it. The protocol has no acknowledgement"
     params:
-      path: { type: string, required: true, max_length: 4096 }
+      path: { type: string, required: true, max_length: 4096, label: Element path, description: "The element, by identifier path (identifiers joined by '/', such as Device/Audio/Gain) or numeric path (such as 1.2.3); identifier paths stay valid across sessions, numeric paths may not." }
     returns: ack
   matrix_connect:
     summary: >
       Connect sources (array of source numbers) to a matrix target (operation connect). Returns the
       connection the provider reports for the target: {target, sources, disposition}; a locked target fails
     params:
-      path: &matrix_path { type: string, required: true, max_length: 4096 }
-      target: &target { type: int, min: 0, max: 4294967295, required: true }
-      sources: &sources { type: json, required: true }
+      path: &matrix_path { type: string, required: true, max_length: 4096, label: Matrix path, description: "The matrix, by identifier path (identifiers joined by '/') or numeric path (such as 1.2.3)." }
+      target: &target { type: int, min: 0, max: 4294967295, required: true, label: Target, description: "Matrix target number, as the provider numbers its targets." }
+      sources: &sources { type: json, required: true, label: Sources, description: "Array of matrix source numbers, such as [1, 4]; for absolute, an empty array disconnects every source from the target." }
     returns: value
   matrix_disconnect:
     summary: "Disconnect sources (array of source numbers) from a matrix target (operation disconnect); returns the reported connection"
@@ -145,8 +147,8 @@ commands:
       Invoke a function with its arguments (array, typed by the function's argument description). Returns the
       result tuple as an array; an InvocationResult with success false fails
     params:
-      path: { type: string, required: true, max_length: 4096 }
-      arguments: { type: json, default: [] }
+      path: { type: string, required: true, max_length: 4096, label: Element path, description: "The element, by identifier path (identifiers joined by '/', such as Device/Audio/Gain) or numeric path (such as 1.2.3); identifier paths stay valid across sessions, numeric paths may not." }
+      arguments: { type: json, default: [], label: Arguments, description: "Array of the function's arguments in order, each in the type the function's argument description gives; empty for none." }
     returns: value
 
 state:

@@ -100,14 +100,14 @@ source:
 settings:
   # Sent only when the Tesira asks for them (a protected system). An
   # unprotected system accepts default/default.
-  username: { type: string, default: default, max_length: 64 }
-  password: { type: string, secret: true, default: default, max_length: 64 }
+  username: { type: string, default: default, max_length: 64, label: Username, description: "Username for a protected Tesira system; an unprotected system accepts default." }
+  password: { type: string, secret: true, default: default, max_length: 64, label: Password, description: "Password for a protected Tesira system; an unprotected system accepts default." }
   # Block attributes kept current while the device is open, subscribed to on
   # every connection: entries separated by ";" or line breaks, each
   # "<instance tag> <attribute> [index ...] [@<minimum interval ms>]", a tag
   # with spaces in double quotes. For example:
   #   Level1 level 1; Level1 mute 1; "Room Mics" mutes; AudioMeter1 level 1 @250
-  subscriptions: { type: string, default: "", max_length: 8192 }
+  subscriptions: { type: string, default: "", max_length: 8192, label: Subscriptions, description: "Block attributes kept current while connected, separated by ; or line breaks, each as tag attribute [index] [@minimum interval ms], such as Level1 level 1 @250." }
 
 ports:
   - { port: 23, protocol: tcp, role: control, note: "Telnet" }
@@ -145,9 +145,9 @@ commands:
   get:
     summary: "Read a block attribute: <tag> get <attribute> [index]. Returns the value (number, true/false, string, list or object) and stores it at blocks.<tag>.<attribute>[.<index>...]"
     params:
-      tag: &tag { type: string, required: true, max_length: 128, pattern: "^[^\"/&]+$" }
-      attribute: &attribute { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$" }
-      index: &index { type: string, default: "", max_length: 64, pattern: "^[A-Za-z0-9_:. -]*$" }
+      tag: &tag { type: string, required: true, max_length: 128, pattern: "^[^\"/&]+$", label: Instance tag, description: "The block's instance tag as named in the Tesira design, such as Level1." }
+      attribute: &attribute { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$", label: Attribute, description: "Attribute name from the block's attribute table, such as level or mute; case matters." }
+      index: &index { type: string, default: "", max_length: 64, pattern: "^[A-Za-z0-9_:. -]*$", label: Index, description: "Index or indexes the attribute takes, such as a channel number or two numbers separated by a space; empty when it takes none." }
     returns: value
   set:
     summary: "Set a block attribute: <tag> set <attribute> [index] <value>, the value in TTP form (a number, true/false, a \"quoted string\", or a list/object as the attribute table gives it)"
@@ -155,7 +155,7 @@ commands:
       tag: *tag
       attribute: *attribute
       index: *index
-      value: { type: string, required: true, max_length: 1024 }
+      value: { type: string, required: true, max_length: 1024, label: Value, description: "New value in TTP form: a number, true or false, a \"quoted string\", or a list or object as the attribute table gives it." }
     returns: ack
   increment:
     summary: "Raise a numeric block attribute by an amount: <tag> increment <attribute> [index] <amount>"
@@ -163,7 +163,7 @@ commands:
       tag: *tag
       attribute: *attribute
       index: *index
-      amount: { type: float, required: true, min: -1000000, max: 1000000 }
+      amount: { type: float, required: true, min: -1000000, max: 1000000, label: Amount, description: "Amount to add to the attribute, in its own unit (dB for a level)." }
     returns: ack
   decrement:
     summary: "Lower a numeric block attribute by an amount: <tag> decrement <attribute> [index] <amount>"
@@ -171,7 +171,7 @@ commands:
       tag: *tag
       attribute: *attribute
       index: *index
-      amount: { type: float, required: true, min: -1000000, max: 1000000 }
+      amount: { type: float, required: true, min: -1000000, max: 1000000, label: Amount, description: "Amount to subtract from the attribute, in its own unit (dB for a level)." }
     returns: ack
   toggle:
     summary: "Toggle a two-state block attribute: <tag> toggle <attribute> [index]"
@@ -186,7 +186,7 @@ commands:
       tag: *tag
       attribute: *attribute
       index: *index
-      rate_ms: { type: int, min: 0, max: 3600000, default: 0 }
+      rate_ms: { type: int, min: 0, max: 3600000, default: 0, label: Minimum interval, description: "Shortest time between updates in milliseconds; 0 sends none, only the initial value." }
     returns: ack
   unsubscribe:
     summary: "Cancel a subscription made in this session (by the subscribe command or the subscriptions setting)"
@@ -199,13 +199,13 @@ commands:
     summary: "Run a block's service code: <tag> <service> [arguments], e.g. a Dialer's speedDial or a DTMF Decode's clear. Arguments are sent as written"
     params:
       tag: *tag
-      service: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$" }
-      arguments: { type: string, default: "", max_length: 1024 }
+      service: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$", label: Service, description: "Service code of the block, such as speedDial on a Dialer or clear on a DTMF Decode." }
+      arguments: { type: string, default: "", max_length: 1024, label: Arguments, description: "The service's arguments, sent as written; empty when it takes none." }
     returns: value
   raw:
     summary: "Send one TTP line as written and return what its +OK carries; for anything the other commands do not cover. Avoid subscribe here: its publications cannot be placed in state"
     params:
-      command: { type: string, required: true, max_length: 2048 }
+      command: { type: string, required: true, max_length: 2048, label: TTP command, description: "One complete Tesira Text Protocol line, sent as written." }
     returns: value
   get_aliases:
     summary: "SESSION get aliases: the instance tags of the running design"
@@ -216,21 +216,21 @@ commands:
     summary: "Read a channel's level (attribute level), dB"
     params:
       tag: *tag
-      channel: &channel { type: int, min: 0, max: 256, required: true }
+      channel: &channel { type: int, min: 0, max: 256, required: true, label: Channel, description: "Channel number in the block, from 1; 0 addresses a ganged block." }
     returns: value
   set_level:
     summary: "Set a channel's level in dB, within the block's minLevel to maxLevel (Level blocks: -100 to +12 dB). Channel 0 addresses a ganged block"
     params:
       tag: *tag
       channel: *channel
-      level_db: { type: float, min: -100, max: 12, required: true }
+      level_db: { type: float, min: -100, max: 12, required: true, label: Level, description: "Level in dB, within the block's minimum and maximum (-100 to +12 dB on Level blocks)." }
     returns: ack
   increment_level:
     summary: "Raise a channel's level by a step in dB"
     params:
       tag: *tag
       channel: *channel
-      step_db: &step { type: float, min: 0, max: 112, required: true }
+      step_db: &step { type: float, min: 0, max: 112, required: true, label: Step, description: "Amount in dB to move the level by." }
     returns: ack
   decrement_level:
     summary: "Lower a channel's level by a step in dB"
@@ -250,7 +250,7 @@ commands:
     params:
       tag: *tag
       channel: *channel
-      muted: { type: bool, default: true }
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the channel, off unmutes it." }
     returns: ack
   toggle_mute:
     summary: "Toggle a channel's mute"
@@ -264,7 +264,7 @@ commands:
     summary: "Source Selector: select a source (sourceSelection), 0 for none"
     params:
       tag: *tag
-      source: { type: int, min: 0, max: 64, required: true }
+      source: { type: int, min: 0, max: 64, required: true, label: Source, description: "Source Selector input number from 1, or 0 for no source." }
     returns: ack
   get_source:
     summary: "Source Selector: the selected source (sourceSelection), 0 for none"
@@ -275,23 +275,23 @@ commands:
     summary: "Router: route an input to an output (input <output> <input>), input 0 for none"
     params:
       tag: *tag
-      output: { type: int, min: 1, max: 256, required: true }
-      input: { type: int, min: 0, max: 256, required: true }
+      output: { type: int, min: 1, max: 256, required: true, label: Output, description: "Router output number, from 1." }
+      input: { type: int, min: 0, max: 256, required: true, label: Input, description: "Router input number from 1, or 0 to route nothing to the output." }
     returns: ack
   get_route:
     summary: "Router: the input routed to an output, 0 for none"
     params:
       tag: *tag
-      output: { type: int, min: 1, max: 256, required: true }
+      output: { type: int, min: 1, max: 256, required: true, label: Output, description: "Router output number, from 1." }
     returns: value
   set_crosspoint:
     summary: "Turn a mixer crosspoint on or off: crosspointLevelState on a Matrix Mixer, crosspoint on a Standard Mixer"
     params:
       tag: *tag
-      input: &mixin { type: int, min: 1, max: 256, required: true }
-      output: &mixout { type: int, min: 1, max: 256, required: true }
-      enabled: { type: bool, default: true }
-      mixer: { type: enum, values: [matrix, standard], default: matrix }
+      input: &mixin { type: int, min: 1, max: 256, required: true, label: Mixer input, description: "Mixer input number, from 1." }
+      output: &mixout { type: int, min: 1, max: 256, required: true, label: Mixer output, description: "Mixer output number, from 1." }
+      enabled: { type: bool, default: true, label: "On", description: "On turns the crosspoint on, off turns it off." }
+      mixer: { type: enum, values: [matrix, standard], default: matrix, label: Mixer type, description: "The kind of mixer block: matrix for a Matrix Mixer, standard for a Standard Mixer." }
     returns: ack
   set_crosspoint_level:
     summary: "Matrix Mixer: set a crosspoint's level (crosspointLevel), -100 to 0 dB"
@@ -299,28 +299,28 @@ commands:
       tag: *tag
       input: *mixin
       output: *mixout
-      level_db: { type: float, min: -100, max: 0, required: true }
+      level_db: { type: float, min: -100, max: 0, required: true, label: Level, description: "Crosspoint level in dB, from -100 to 0." }
     returns: ack
   set_logic_state:
     summary: "Logic State or Flip Flop block: set a channel's state"
     params:
       tag: *tag
-      channel: { type: int, min: 1, max: 256, required: true }
-      state: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 256, required: true, label: Channel, description: "Logic State or Flip Flop channel number, from 1." }
+      state: { type: bool, required: true, label: State, description: "On sets the logic channel true, off sets it false." }
     returns: ack
   set_wall:
     summary: "Room Combiner: open or close a wall (wallState)"
     params:
       tag: *tag
-      wall: { type: int, min: 1, max: 256, required: true }
-      closed: { type: bool, required: true }
+      wall: { type: int, min: 1, max: 256, required: true, label: Wall, description: "Room Combiner wall number, from 1." }
+      closed: { type: bool, required: true, label: Closed, description: "On closes the wall, separating the rooms; off opens it, combining them." }
     returns: ack
 
   # ── DEVICE services ────────────────────────────────────────────────────
   recall_preset:
     summary: "DEVICE recallPreset <id>: recall a preset of the design by its ID (preset IDs start at 1001 in Tesira software)"
     params:
-      preset: &preset { type: int, min: 1, max: 2147483647, required: true }
+      preset: &preset { type: int, min: 1, max: 2147483647, required: true, label: Preset, description: "Preset ID as shown in Tesira software, where preset IDs start at 1001." }
     returns: ack
   recall_preset_show_failures:
     summary: "DEVICE recallPresetShowFailures <id>: recall a preset and return the devices that failed to recall it"
@@ -330,7 +330,7 @@ commands:
   recall_preset_by_name:
     summary: "DEVICE recallPresetByName \"<name>\": recall a preset by its name"
     params:
-      name: &presetname { type: string, required: true, max_length: 128 }
+      name: &presetname { type: string, required: true, max_length: 128, label: Preset name, description: "The preset's name as shown in Tesira software." }
     returns: ack
   save_preset:
     summary: "DEVICE savePreset <id>: store the current state in a preset, replacing what it held"
@@ -351,7 +351,7 @@ commands:
   start_partition_audio:
     summary: "DEVICE startPartitionAudio <partition>: start audio in one partition"
     params:
-      partition: &partition { type: int, min: 0, max: 255, required: true }
+      partition: &partition { type: int, min: 0, max: 255, required: true, label: Partition, description: "Partition ID as set in the Tesira design." }
     returns: ack
   stop_partition_audio:
     summary: "DEVICE stopPartitionAudio <partition>: stop audio in one partition"
@@ -367,16 +367,16 @@ commands:
     summary: "Dialer: dial a number on a line and call appearance (commas insert one-second pauses)"
     params:
       tag: *tag
-      line: &line { type: int, min: 1, max: 2, required: true }
-      call_appearance: &ca { type: int, min: 1, max: 6, default: 1 }
-      number: { type: string, required: true, max_length: 64, pattern: "^[0-9*#,+A-Za-z@._:-]+$" }
+      line: &line { type: int, min: 1, max: 2, required: true, label: Line, description: "Dialer line number, 1 or 2." }
+      call_appearance: &ca { type: int, min: 1, max: 6, default: 1, label: Call appearance, description: "Call appearance on the line, from 1 to 6; 1 for a line with one." }
+      number: { type: string, required: true, max_length: 64, pattern: "^[0-9*#,+A-Za-z@._:-]+$", label: Number, description: "Number to dial; each comma inserts a one-second pause, and a VoIP line may take a SIP address." }
     returns: ack
   send_dtmf:
     summary: "Dialer: send DTMF digits on a line that is off hook"
     params:
       tag: *tag
       line: *line
-      digits: { type: string, required: true, max_length: 64, pattern: "^[0-9*#]+$" }
+      digits: { type: string, required: true, max_length: 64, pattern: "^[0-9*#]+$", label: DTMF digits, description: "Digits to send as tones, 0-9, * and #." }
     returns: ack
   end_call:
     summary: "Dialer: end the call on a line and call appearance"

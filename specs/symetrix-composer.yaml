@@ -103,8 +103,8 @@ commands:
   set_controller:
     summary: "CS: move a controller to an absolute position, 0-65535; ACK, or NAK when the controller number does not exist"
     params:
-      controller: &controller { type: int, min: 1, max: 10000, required: true }
-      position: &position { type: int, min: 0, max: 65535, required: true }
+      controller: &controller { type: int, min: 1, max: 10000, required: true, label: Controller, description: "The controller number the designer assigned to the control in Composer, from 1 to 10000." }
+      position: &position { type: int, min: 0, max: 65535, required: true, label: Position, description: "Controller position from 0 to 65535: for a -72 to +12 dB fader 0 is off and 65535 is +12 dB; a button is 0 off and 65535 on." }
     send: "CS {controller} {position}"
     expect: &ack { matches: "^ACK\\s*$" }
     returns: ack
@@ -116,7 +116,7 @@ commands:
     returns: ack
   increment_controller:
     summary: "CC <n> 1 <amount>: raise a controller's position by an amount, limited to 65535"
-    params: { controller: *controller, amount: &amount { type: int, min: 0, max: 65535, required: true } }
+    params: { controller: *controller, amount: &amount { type: int, min: 0, max: 65535, required: true, label: Amount, description: "Amount to move the controller position by, in the same 0-65535 scale; the result stops at 0 or 65535." } }
     send: "CC {controller} 1 {amount}"
     expect: *ack
     returns: ack
@@ -142,14 +142,14 @@ commands:
     summary: "GSB2: read up to 256 consecutive controllers into controllers.<n>.value (answered as #nnnnn=vvvvv lines, -0001 for a controller that does not exist)"
     params:
       controller: *controller
-      count: { type: int, min: 1, max: 256, required: true }
+      count: { type: int, min: 1, max: 256, required: true, label: Count, description: "Number of consecutive controllers to read, starting at the controller given, up to 256." }
     send: "GSB2 {controller} {count}"
     returns: none
   set_fader_db:
     summary: "CS with a level in dB for a volume fader whose range is -72 to +12 dB (most are, p.5); -72 is off"
     params:
       controller: *controller
-      level_db: { type: float, min: -72, max: 12, required: true }
+      level_db: { type: float, min: -72, max: 12, required: true, label: Level, description: "Fader level in dB from -72 (off) to +12, for a fader with that range; a fader with another range must be set by position." }
     send: "CS {controller} {level_db:to.symetrix_fader:.0f}"
     expect: *ack
     returns: ack
@@ -176,7 +176,7 @@ commands:
   load_preset:
     summary: "LP: load a preset, 1-1000; NAK when the preset is not defined"
     params:
-      preset: { type: int, min: 1, max: 1000, required: true }
+      preset: { type: int, min: 1, max: 1000, required: true, label: Preset, description: "Preset number from 1 to 1000, as in Composer; the preset must be defined." }
     send: "LP {preset}"
     expect: *ack
     returns: ack
@@ -188,7 +188,7 @@ commands:
   flash_unit:
     summary: "FU: flash the front-panel LEDs for a number of cycles (8 by default)"
     params:
-      cycles: { type: int, min: 1, max: 255, default: 8 }
+      cycles: { type: int, min: 1, max: 255, default: 8, label: Cycles, description: "Number of times to flash the front-panel LEDs; 8 when not given." }
     send: "FU {cycles}"
     expect: *ack
     returns: ack
@@ -216,12 +216,12 @@ commands:
   set_system_string:
     summary: "SSYSS <unit>.<resource>.<enum>.<card>.<channel>=<value>: set a system string (1000 speed-dial number, 1001 speed-dial name, 1004 number to dial)"
     params:
-      unit: &unit { type: int, min: 1, max: 255, required: true }
-      resource: { type: enum, values: ["1000", "1001", "1004"], required: true }
-      entry: &entry { type: int, min: 0, max: 19, default: 0 }
-      card: &card { type: int, min: 0, max: 3, required: true }
-      channel: &tchannel { type: int, min: 0, max: 15, default: 0 }
-      value: { type: string, max_length: 63, required: true }
+      unit: &unit { type: int, min: 1, max: 255, required: true, label: Unit, description: "The unit's number in the Composer site, as the protocol document addresses it, from 1." }
+      resource: { type: enum, values: ["1000", "1001", "1004"], required: true, label: String, description: "Which system string to set: 1000 a speed dial's number, 1001 a speed dial's name, 1004 the number to dial next." }
+      entry: &entry { type: int, min: 0, max: 19, default: 0, label: Entry, description: "Speed-dial entry from 0 to 19 for speed dials 1 to 20; 0 for strings without entries." }
+      card: &card { type: int, min: 0, max: 3, required: true, label: Card, description: "The VoIP or telephony card's slot, numbered from 0 as the protocol addresses it." }
+      channel: &tchannel { type: int, min: 0, max: 15, default: 0, label: Channel, description: "Channel or call appearance on the card, numbered from 0; 0 for speed dials and the number to dial." }
+      value: { type: string, max_length: 63, required: true, label: Text, description: "The string to store, up to 63 characters." }
     send: "SSYSS {unit}.{resource}.{entry}.{card}.{channel}={value}"
     expect: *ack
     returns: ack
@@ -229,7 +229,7 @@ commands:
     summary: "GSYSS <unit>.<resource>.<enum>.<card>.<channel>: read a system string (1000-1006)"
     params:
       unit: *unit
-      resource: { type: enum, values: ["1000", "1001", "1002", "1003", "1004", "1005", "1006"], required: true }
+      resource: { type: enum, values: ["1000", "1001", "1002", "1003", "1004", "1005", "1006"], required: true, label: String, description: "Which system string to read: 1000 speed-dial number, 1001 speed-dial name, 1002 number dialed, 1003 caller ID, 1004 number to dial, 1005 call status, 1006 call time." }
       entry: *entry
       card: *card
       channel: *tchannel
@@ -241,7 +241,7 @@ commands:
     params:
       unit: *unit
       card: *card
-      number: { type: string, max_length: 63, pattern: "^[0-9#*.A-Za-z@:_-]+$", required: true }
+      number: { type: string, max_length: 63, pattern: "^[0-9#*.A-Za-z@:_-]+$", required: true, label: Number, description: "Number the VoIP card dials when its connect button is pressed, up to 63 of 0-9, #, *, . and letters." }
     send: "SSYSS {unit}.1004.0.{card}.0={number}"
     expect: *ack
     returns: ack
@@ -250,8 +250,8 @@ commands:
     params:
       unit: *unit
       card: *card
-      entry: { type: int, min: 0, max: 19, required: true }
-      number: { type: string, max_length: 63, required: true }
+      entry: { type: int, min: 0, max: 19, required: true, label: Speed dial, description: "Speed-dial entry from 0 to 19, for speed dials 1 to 20." }
+      number: { type: string, max_length: 63, required: true, label: Number, description: "The speed dial's number, up to 63 characters." }
     send: "SSYSS {unit}.1000.{entry}.{card}.0={number}"
     expect: *ack
     returns: ack
@@ -260,20 +260,20 @@ commands:
     params:
       unit: *unit
       card: *card
-      entry: { type: int, min: 0, max: 19, required: true }
-      name: { type: string, max_length: 63, required: true }
+      entry: { type: int, min: 0, max: 19, required: true, label: Speed dial, description: "Speed-dial entry from 0 to 19, for speed dials 1 to 20." }
+      name: { type: string, max_length: 63, required: true, label: Name, description: "The speed dial's name, up to 63 characters." }
     send: "SSYSS {unit}.1001.{entry}.{card}.0={name}"
     expect: *ack
     returns: ack
   get_speed_dial_number:
     summary: "GSYSS <unit>.1000.<entry>.<card>.0: a speed dial's number"
-    params: { unit: *unit, card: *card, entry: { type: int, min: 0, max: 19, required: true } }
+    params: { unit: *unit, card: *card, entry: { type: int, min: 0, max: 19, required: true, label: Speed dial, description: "Speed-dial entry from 0 to 19, for speed dials 1 to 20." } }
     send: "GSYSS {unit}.1000.{entry}.{card}.0"
     expect: *string
     returns: value
   get_speed_dial_name:
     summary: "GSYSS <unit>.1001.<entry>.<card>.0: a speed dial's name"
-    params: { unit: *unit, card: *card, entry: { type: int, min: 0, max: 19, required: true } }
+    params: { unit: *unit, card: *card, entry: { type: int, min: 0, max: 19, required: true, label: Speed dial, description: "Speed-dial entry from 0 to 19, for speed dials 1 to 20." } }
     send: "GSYSS {unit}.1001.{entry}.{card}.0"
     expect: *string
     returns: value
@@ -306,7 +306,7 @@ commands:
   set_push_global:
     summary: "PU 1 / PU 0: turn pushing on or off for the whole unit (and every control system using it)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Push, description: "On turns pushing of changed values on for the whole unit, off turns it off for every control system using it." }
     send: "PU {enabled:bool01}"
     expect: *ack
     returns: ack
@@ -317,7 +317,7 @@ commands:
     returns: ack
   push_enable_range:
     summary: "PUE <low> <high>: enable push for a range of controllers (additive)"
-    params: { low: *controller, high: *controller }
+    params: { low: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "First controller number of the range, from 1 to 10000." }, high: { type: int, min: 1, max: 10000, required: true, label: Last controller, description: "Last controller number of the range, from 1 to 10000, included." } }
     send: "PUE {low} {high}"
     expect: *ack
     returns: ack
@@ -328,7 +328,7 @@ commands:
     returns: ack
   push_disable_range:
     summary: "PUD <low> <high>: disable push for a range of controllers"
-    params: { low: *controller, high: *controller }
+    params: { low: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "First controller number of the range, from 1 to 10000." }, high: { type: int, min: 1, max: 10000, required: true, label: Last controller, description: "Last controller number of the range, from 1 to 10000, included." } }
     send: "PUD {low} {high}"
     expect: *ack
     returns: ack
@@ -339,7 +339,7 @@ commands:
     returns: ack
   push_refresh_range:
     summary: "PUR <low> <high>: push a range of controllers now"
-    params: { low: *controller, high: *controller }
+    params: { low: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "First controller number of the range, from 1 to 10000." }, high: { type: int, min: 1, max: 10000, required: true, label: Last controller, description: "Last controller number of the range, from 1 to 10000, included." } }
     send: "PUR {low} {high}"
     expect: *ack
     returns: ack
@@ -351,15 +351,15 @@ commands:
   set_push_interval:
     summary: "PUI: the minimum time between pushes, 20-30000 ms (100 at power-up)"
     params:
-      interval_ms: { type: int, min: 20, max: 30000, required: true }
+      interval_ms: { type: int, min: 20, max: 30000, required: true, label: Push interval, description: "Minimum time between pushes in milliseconds, from 20 to 30000; 100 at power-up." }
     send: "PUI {interval_ms}"
     expect: *ack
     returns: ack
   set_push_threshold:
     summary: "PUT: how far a value must move before it is pushed again, for parameters and for meters (1 at power-up)"
     params:
-      parameter_threshold: { type: int, min: 0, max: 65535, required: true }
-      meter_threshold: { type: int, min: 0, max: 65535, required: true }
+      parameter_threshold: { type: int, min: 0, max: 65535, required: true, label: Parameter threshold, description: "How far a parameter's position must move, on the 0-65535 scale, before it is pushed again; 1 at power-up." }
+      meter_threshold: { type: int, min: 0, max: 65535, required: true, label: Meter threshold, description: "How far a meter's position must move, on the 0-65535 scale, before it is pushed again; 1 at power-up." }
     send: "PUT {parameter_threshold} {meter_threshold}"
     expect: *ack
     returns: ack
@@ -368,11 +368,11 @@ commands:
   matrix_set:
     summary: "CMV Set: set a Super Matrix parameter in its native unit (dB for gains, 0/1 for switches, ms for delay, % for pan); enumerator I3O6, I2, O1, or a {range,set}"
     params:
-      unit: &cmvunit { type: int, min: 0, max: 255, default: 0 }
-      module: &module { type: int, min: 1, max: 255, default: 1 }
-      feature: &feature { type: enum, values: [CPGain, CPConnect, CPDelay, IMute, IGain, ISolo, IPan, OMute, OGain, OPre], required: true }
-      enumerator: &enumerator { type: string, max_length: 128, pattern: "^(I[0-9]+O[0-9]+|I[0-9]+|O[0-9]+|\\{[IO0-9:, ]+\\})$", required: true }
-      value: { type: float, min: -1000, max: 10000, required: true }
+      unit: &cmvunit { type: int, min: 0, max: 255, default: 0, label: Unit, description: "Unit number of the Super Matrix's unit as the CMV commands address it; 0 when not given." }
+      module: &module { type: int, min: 1, max: 255, default: 1, label: Matrix module, description: "The Super Matrix Mixer module's number in the design; 1 when not given." }
+      feature: &feature { type: enum, values: [CPGain, CPConnect, CPDelay, IMute, IGain, ISolo, IPan, OMute, OGain, OPre], required: true, label: Parameter, description: "Super Matrix parameter: crosspoint gain, connect or delay; input mute, gain, solo or pan; output mute, gain or pre/post." }
+      enumerator: &enumerator { type: string, max_length: 128, pattern: "^(I[0-9]+O[0-9]+|I[0-9]+|O[0-9]+|\\{[IO0-9:, ]+\\})$", required: true, label: Enumerator, description: "Which crosspoint, input or output: I3O6 for input 3 to output 6, I2 for input 2, O1 for output 1, or a set in braces." }
+      value: { type: float, min: -1000, max: 10000, required: true, label: Value, description: "New value in the parameter's native unit: dB for gains, 0 or 1 for switches, ms for delay, % for pan." }
     send: "CMV Set {unit}.{module}.{feature}.{enumerator} {value:.2f}"
     expect: *ack
     returns: ack
@@ -389,7 +389,7 @@ commands:
       module: *module
       feature: *feature
       enumerator: *enumerator
-      offset: { type: float, min: -1000, max: 1000, required: true }
+      offset: { type: float, min: -1000, max: 1000, required: true, label: Offset, description: "Amount to change the parameter by in its native unit; for a switch, positive turns it on and negative off." }
     send: "CMV Modify {unit}.{module}.{feature}.{enumerator} {offset:.2f}"
     expect: *ack
     returns: ack

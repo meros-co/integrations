@@ -3287,7 +3287,7 @@ commands:
   ping:
     summary: "Ping Eos; the reply on /eos/out/ping echoes the argument sent"
     params:
-      text: { type: string, max_length: 64, default: "meros" }
+      text: { type: string, max_length: 64, default: "meros", label: Ping text, description: "Text Eos echoes back on /eos/out/ping, which confirms the reply belongs to this ping." }
     send: { address: "/eos/ping", args: [ { value: "{text}", type: string } ] }
     expect: { address: "/eos/out/ping", arg: 0 }
     returns: value
@@ -3300,7 +3300,7 @@ commands:
   set_osc_user:
     summary: "Set the Eos user ID this device's OSC commands act as: 0 is the background user, -1 the console's current user"
     params:
-      user: { type: int, min: -1, max: 99, required: true }
+      user: { type: int, min: -1, max: 99, required: true, label: OSC user, description: "Eos user ID from 1 to 99 for this device's OSC commands; 0 is the background user, whose commands appear on no command line, and -1 follows the console's current user." }
     send: { address: "/eos/user", args: [ { value: "{user}", type: int } ] }
     returns: none
 
@@ -3312,29 +3312,29 @@ commands:
   subscribe:
     summary: "Subscribe to (or unsubscribe from) /eos/out/notify show data change notifications"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Subscribed, description: "On asks Eos to send notifications whenever show data changes, off stops them." }
     send: { address: "/eos/subscribe", args: [ { value: "{enabled:bool01}", type: int } ] }
     returns: none
 
   subscribe_param:
     summary: "Subscribe to (or unsubscribe from) /eos/out/param updates for one or more parameters (param1/param2/...)"
     params:
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      enabled: { type: bool, default: true }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameters, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      enabled: { type: bool, default: true, label: Subscribed, description: "On asks Eos to send updates for these parameters, off stops them." }
     send: { address: "/eos/subscribe/param/{param}", args: [ { value: "{enabled:bool01}", type: int } ] }
     returns: none
 
   add_filter:
     summary: "Add an output filter: Eos then sends this device only messages matching its filters (* wildcards allowed)"
     params:
-      filter: { type: string, max_length: 256, pattern: "^/[^ ]*$", required: true }
+      filter: { type: string, max_length: 256, pattern: "^/[^ ]*$", required: true, label: Filter, description: "OSC address pattern starting with /, with * as a wildcard; once any filter is set, Eos sends this device only matching messages, including the outputs that keep state current." }
     send: { address: "/eos/filter/add", args: [ { value: "{filter}", type: string } ] }
     returns: none
 
   remove_filter:
     summary: "Remove an output filter from this device"
     params:
-      filter: { type: string, max_length: 256, pattern: "^/[^ ]*$", required: true }
+      filter: { type: string, max_length: 256, pattern: "^/[^ ]*$", required: true, label: Filter, description: "Output filter to remove, written exactly as it was added." }
     send: { address: "/eos/filter/remove", args: [ { value: "{filter}", type: string } ] }
     returns: none
 
@@ -3346,35 +3346,35 @@ commands:
   command:
     summary: "Add text to the OSC user's command line; end it with # or Enter to execute"
     params:
-      text: { type: string, max_length: 256, required: true }
+      text: { type: string, max_length: 256, required: true, label: Command text, description: "Text added to the OSC user's command line, in Eos command syntax; end it with # or Enter to execute it." }
     send: { address: "/eos/cmd", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   new_command:
     summary: "Clear the OSC user's command line, then add text to it; end with # or Enter to execute"
     params:
-      text: { type: string, max_length: 256, required: true }
+      text: { type: string, max_length: 256, required: true, label: Command text, description: "Text that replaces the OSC user's command line, in Eos command syntax; end it with # or Enter to execute it." }
     send: { address: "/eos/newcmd", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   command_event:
     summary: "Execute command line text as a console event (like a macro running outside the command line)"
     params:
-      text: { type: string, max_length: 256, required: true }
+      text: { type: string, max_length: 256, required: true, label: Command text, description: "Eos command line text executed as a console event, like a macro running outside the operator's command line." }
     send: { address: "/eos/event", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   new_command_event:
     summary: "Clear the internal command line, then execute text as a console event"
     params:
-      text: { type: string, max_length: 256, required: true }
+      text: { type: string, max_length: 256, required: true, label: Command text, description: "Eos command line text executed as a console event after the internal command line is cleared." }
     send: { address: "/eos/newevent", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   fire_show_control_event:
     summary: "Fire the event whose input string matches, on a show control list of type Network Inputs (case-sensitive)"
     params:
-      input: { type: string, max_length: 128, pattern: "^[^/ #*,?\\[\\]{}]+$", required: true }
+      input: { type: string, max_length: 128, pattern: "^[^/ #*,?\\[\\]{}]+$", required: true, label: Input string, description: "Input string of the event to fire, matched exactly including case, on a show control list of type Network Inputs." }
     send: { address: "/eos/sc/{input}" }
     returns: none
 
@@ -3388,7 +3388,7 @@ commands:
   press_key:
     summary: "Press and release a console key by its OSC key name (for the slash key use a backslash)"
     params:
-      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ .@+%\\\\-]+$", required: true }
+      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ .@+%\\\\-]+$", required: true, label: Key, description: "Console key by its OSC key name from the OSC Eos Keys list (e.g. go_0); for the slash key use a backslash." }
     send:
       - { address: "/eos/key/{key}", args: [ { value: "1.0", type: float } ] }
       - { address: "/eos/key/{key}", args: [ { value: "0.0", type: float } ] }
@@ -3397,21 +3397,21 @@ commands:
   key_down:
     summary: "Hold a console key down until key_up"
     params:
-      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ .@+%\\\\-]+$", required: true }
+      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ .@+%\\\\-]+$", required: true, label: Key, description: "Console key by its OSC key name from the OSC Eos Keys list; it stays held until key_up releases it." }
     send: { address: "/eos/key/{key}", args: [ { value: "1.0", type: float } ] }
     returns: none
 
   key_up:
     summary: "Release a console key"
     params:
-      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ .@+%\\\\-]+$", required: true }
+      key: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_ .@+%\\\\-]+$", required: true, label: Key, description: "OSC key name of the held console key to release." }
     send: { address: "/eos/key/{key}", args: [ { value: "0.0", type: float } ] }
     returns: none
 
   press_softkey:
     summary: "Press and release a softkey (6 softkeys on 2 pages: 1-12)"
     params:
-      softkey: { type: int, min: 1, max: 12, required: true }
+      softkey: { type: int, min: 1, max: 12, required: true, label: Softkey, description: "Softkey number from 1 to 12: 1-6 on the first page and 7-12 on the second." }
     send:
       - { address: "/eos/softkey/{softkey}", args: [ { value: "1.0", type: float } ] }
       - { address: "/eos/softkey/{softkey}", args: [ { value: "0.0", type: float } ] }
@@ -3420,24 +3420,24 @@ commands:
   fire_cue:
     summary: "Fire a specific cue in a cue list"
     params:
-      cue_list: { type: int, min: 1, max: 999, default: 1 }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+      cue_list: { type: int, min: 1, max: 999, default: 1, label: Cue list, description: "Cue list number from 1 to 999, 1 if omitted; Element 2 and Element Classic have only cue list 1." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
     send: { address: "/eos/cue/{cue_list}/{cue}/fire" }
     returns: none
 
   fire_cue_part:
     summary: "Fire a part of a cue in a cue list"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      part:     { type: int, min: 1, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      part:     { type: int, min: 1, required: true, label: Part, description: "Cue part number, from 1." }
     send: { address: "/eos/cue/{cue_list}/{cue}/{part}/fire" }
     returns: none
 
   fire_cue_current_list:
     summary: "Fire a cue in the current cue list"
     params:
-      cue: { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+      cue: { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number in the current cue list as text, which may contain a point (1 or 1.5)." }
     send: { address: "/eos/cue/{cue}/fire" }
     returns: none
 
@@ -3454,88 +3454,88 @@ commands:
   go_cue_list:
     summary: "Play back a cue list, like [Go] on its playback"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
     send: { address: "/eos/cues/{cue_list}/fire" }
     returns: none
 
   stop_back_cue_list:
     summary: "Stop an active fade in a cue list, or go back a cue if it is not fading"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
     send: { address: "/eos/cues/{cue_list}/stop" }
     returns: none
 
   select_cue_list:
     summary: "Select a cue list"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
     send: { address: "/eos/cues/{cue_list}" }
     returns: none
 
   configure_cue_list_bank:
     summary: "Create an OSC cue list bank showing a cue list (0 follows the current list) with rows before and after the current cue"
     params:
-      bank:     { type: int, min: 1, required: true }
-      cue_list: { type: int, min: 0, max: 999, required: true }
-      previous: { type: int, min: 0, required: true }
-      pending:  { type: int, min: 0, required: true }
+      bank:     { type: int, min: 1, required: true, label: Cue list bank, description: "OSC cue list bank number, from 1, as given when the bank was configured." }
+      cue_list: { type: int, min: 0, max: 999, required: true, label: Cue list, description: "Cue list the bank shows, from 1 to 999; 0 follows the current cue list." }
+      previous: { type: int, min: 0, required: true, label: Previous cues, description: "Number of cues shown before the current cue." }
+      pending:  { type: int, min: 0, required: true, label: Pending cues, description: "Number of cues shown after the current cue." }
     send: { address: "/eos/cuelist/{bank}/config/{cue_list}/{previous}/{pending}" }
     returns: none
 
   configure_cue_list_bank_offset:
     summary: "Create an OSC cue list bank starting at a 0-based offset into the cue list"
     params:
-      bank:     { type: int, min: 1, required: true }
-      cue_list: { type: int, min: 0, max: 999, required: true }
-      previous: { type: int, min: 0, required: true }
-      pending:  { type: int, min: 0, required: true }
-      offset:   { type: int, min: 0, required: true }
+      bank:     { type: int, min: 1, required: true, label: Cue list bank, description: "OSC cue list bank number, from 1, as given when the bank was configured." }
+      cue_list: { type: int, min: 0, max: 999, required: true, label: Cue list, description: "Cue list the bank shows, from 1 to 999; 0 follows the current cue list." }
+      previous: { type: int, min: 0, required: true, label: Previous cues, description: "Number of cues shown before the current cue." }
+      pending:  { type: int, min: 0, required: true, label: Pending cues, description: "Number of cues shown after the current cue." }
+      offset:   { type: int, min: 0, required: true, label: Offset, description: "Row of the cue list the bank starts at, counted from 0." }
     send: { address: "/eos/cuelist/{bank}/config/{cue_list}/{previous}/{pending}/{offset}" }
     returns: none
 
   page_cue_list_bank:
     summary: "Scroll an OSC cue list bank by rows (0 jumps back to the current cue and follows it); does not play cues"
     params:
-      bank:  { type: int, min: 1, required: true }
-      delta: { type: int, required: true }
+      bank:  { type: int, min: 1, required: true, label: Cue list bank, description: "OSC cue list bank number, from 1, as given when the bank was configured." }
+      delta: { type: int, required: true, label: Rows, description: "Rows to scroll the bank by, either way; 0 jumps back to the current cue and follows it again." }
     send: { address: "/eos/cuelist/{bank}/page/{delta}" }
     returns: none
 
   select_cue_list_bank_cue:
     summary: "Jump an OSC cue list bank's view to a cue"
     params:
-      bank: { type: int, min: 1, required: true }
-      cue:  { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+      bank: { type: int, min: 1, required: true, label: Cue list bank, description: "OSC cue list bank number, from 1, as given when the bank was configured." }
+      cue:  { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue to show in the bank, as text that may contain a point (1 or 1.5); the cue is not played." }
     send: { address: "/eos/cuelist/{bank}/select/{cue}" }
     returns: none
 
   reset_cue_list_bank:
     summary: "Reset an OSC cue list bank"
     params:
-      bank: { type: int, min: 1, required: true }
+      bank: { type: int, min: 1, required: true, label: Cue list bank, description: "OSC cue list bank number, from 1, as given when the bank was configured." }
     send: { address: "/eos/cuelist/{bank}/reset" }
     returns: none
 
   set_submaster:
     summary: "Set a submaster's level (0.0-1.0)"
     params:
-      submaster: { type: int, min: 1, max: 999, required: true }
-      level:     { type: float, min: 0.0, max: 1.0, required: true }
+      submaster: { type: int, min: 1, max: 999, required: true, label: Submaster, description: "Submaster number from 1 to 999." }
+      level:     { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Submaster level from 0.0 (out) to 1.0 (full)." }
     send: { address: "/eos/sub/{submaster}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_submaster_to:
     summary: "Set a submaster to Full, Out, Home, Min, Max, or the Level value from Setup"
     params:
-      submaster: { type: int, min: 1, max: 999, required: true }
-      action:    { type: enum, values: ["full", "out", "home", "min", "max", "level"], required: true }
+      submaster: { type: int, min: 1, max: 999, required: true, label: Submaster, description: "Submaster number from 1 to 999." }
+      action:    { type: enum, values: ["full", "out", "home", "min", "max", "level"], required: true, label: Action, description: "Full, Out, Home, Min or Max sets the submaster to that value; Level sets it to the Level value from Setup." }
     send: { address: "/eos/sub/{submaster}/{action}" }
     returns: none
 
   bump_submaster:
     summary: "Bump a submaster on and off (press and release its bump button)"
     params:
-      submaster: { type: int, min: 1, max: 999, required: true }
+      submaster: { type: int, min: 1, max: 999, required: true, label: Submaster, description: "Submaster number from 1 to 999." }
     send:
       - { address: "/eos/sub/{submaster}/fire", args: [ { value: "1.0", type: float } ] }
       - { address: "/eos/sub/{submaster}/fire", args: [ { value: "0.0", type: float } ] }
@@ -3544,408 +3544,408 @@ commands:
   bump_submaster_down:
     summary: "Hold a submaster's bump down until bump_submaster_up"
     params:
-      submaster: { type: int, min: 1, max: 999, required: true }
+      submaster: { type: int, min: 1, max: 999, required: true, label: Submaster, description: "Submaster number from 1 to 999." }
     send: { address: "/eos/sub/{submaster}/fire", args: [ { value: "1.0", type: float } ] }
     returns: none
 
   bump_submaster_up:
     summary: "Release a submaster's bump"
     params:
-      submaster: { type: int, min: 1, max: 999, required: true }
+      submaster: { type: int, min: 1, max: 999, required: true, label: Submaster, description: "Submaster number from 1 to 999." }
     send: { address: "/eos/sub/{submaster}/fire", args: [ { value: "0.0", type: float } ] }
     returns: none
 
   select_submaster:
     summary: "Select a submaster"
     params:
-      submaster: { type: int, min: 1, max: 999, required: true }
+      submaster: { type: int, min: 1, max: 999, required: true, label: Submaster, description: "Submaster number from 1 to 999." }
     send: { address: "/eos/sub", args: [ { value: "{submaster}", type: int } ] }
     returns: none
 
   fire_macro:
     summary: "Run a macro"
     params:
-      macro: { type: int, min: 1, max: 99999, required: true }
+      macro: { type: int, min: 1, max: 99999, required: true, label: Macro, description: "Macro number from 1 to 99,999." }
     send: { address: "/eos/macro/fire", args: [ { value: "{macro}", type: int } ] }
     returns: none
 
   select_macro:
     summary: "Select a macro"
     params:
-      macro: { type: int, min: 1, max: 99999, required: true }
+      macro: { type: int, min: 1, max: 99999, required: true, label: Macro, description: "Macro number from 1 to 99,999." }
     send: { address: "/eos/macro", args: [ { value: "{macro}", type: int } ] }
     returns: none
 
   select_channel:
     summary: "Select a channel"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
     send: { address: "/eos/chan", args: [ { value: "{channel}", type: int } ] }
     returns: none
 
   set_channel_intensity:
     summary: "Set a channel's intensity (0-100)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      level:   { type: float, min: 0.0, max: 100.0, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      level:   { type: float, min: 0.0, max: 100.0, required: true, label: Intensity, description: "Intensity in percent, from 0 (out) to 100 (full)." }
     send: { address: "/eos/chan/{channel}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_channel_dmx:
     summary: "Set a channel's intensity as a DMX output value (0-255)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      dmx:     { type: int, min: 0, max: 255, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      dmx:     { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Intensity as a DMX output value, from 0 to 255." }
     send: { address: "/eos/chan/{channel}/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   set_channel_to:
     summary: "Set a channel's intensity to Full, Out, Home, Min, Max, Level or by +% / -%"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      action:  { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      action:  { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true, label: Action, description: "Full, Out, Home, Min, Max or Level sets the channel's intensity to that value; +% and -% raise or lower it by one step." }
     send: { address: "/eos/chan/{channel}/{action}" }
     returns: none
 
   channel_remainder_dim:
     summary: "Dim every channel except this one (RemDim)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
     send: { address: "/eos/chan/{channel}/remdim" }
     returns: none
 
   set_channel_param:
     summary: "Set a channel's parameter(s) (param1/param2/...) to a level in the parameter's own units"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      level:   { type: float, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      level:   { type: float, required: true, label: Level, description: "Level in the parameter's own units (e.g. 270 for pan); Eos documents 0-100 but its examples use the parameter's units, so it is not limited." }
     send: { address: "/eos/chan/{channel}/param/{param}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_channel_param_dmx:
     summary: "Set a channel's parameter(s) as a DMX output value (0-255)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      dmx:     { type: int, min: 0, max: 255, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      dmx:     { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Output value from 0 to 255, as sent on DMX." }
     send: { address: "/eos/chan/{channel}/param/{param}/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   set_channel_param_to:
     summary: "Set a channel's parameter(s) to Full, Out, Home, Min, Max, Level or by +% / -%"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      action:  { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      action:  { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true, label: Action, description: "Full, Out, Home, Min, Max or Level sets the parameter to that value; +% and -% raise or lower it by one step." }
     send: { address: "/eos/chan/{channel}/param/{param}/{action}" }
     returns: none
 
   set_channel_color_hs:
     summary: "Set a channel's colour from hue (0-360) and saturation (0-100)"
     params:
-      channel:    { type: int, min: 1, max: 99999, required: true }
-      hue:        { type: float, min: 0.0, max: 360.0, required: true }
-      saturation: { type: float, min: 0.0, max: 100.0, required: true }
+      channel:    { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      hue:        { type: float, min: 0.0, max: 360.0, required: true, label: Hue, description: "Hue in degrees around the colour wheel, from 0 to 360." }
+      saturation: { type: float, min: 0.0, max: 100.0, required: true, label: Saturation, description: "Saturation in percent, from 0 (white) to 100 (fully saturated)." }
     send: { address: "/eos/chan/{channel}/color/hs", args: [ { value: "{hue}", type: float }, { value: "{saturation}", type: float } ] }
     returns: none
 
   set_color_hs:
     summary: "Set the current selection's colour from hue (0-360) and saturation (0-100)"
     params:
-      hue:        { type: float, min: 0.0, max: 360.0, required: true }
-      saturation: { type: float, min: 0.0, max: 100.0, required: true }
+      hue:        { type: float, min: 0.0, max: 360.0, required: true, label: Hue, description: "Hue in degrees around the colour wheel, from 0 to 360." }
+      saturation: { type: float, min: 0.0, max: 100.0, required: true, label: Saturation, description: "Saturation in percent, from 0 (white) to 100 (fully saturated)." }
     send: { address: "/eos/color/hs", args: [ { value: "{hue}", type: float }, { value: "{saturation}", type: float } ] }
     returns: none
 
   set_channel_color_hsxy:
     summary: "Set a channel's colour from a point on the hue/saturation wheel as a 0-1 XY graph"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      x:       { type: float, min: 0.0, max: 1.0, required: true }
-      y:       { type: float, min: 0.0, max: 1.0, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      x:       { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "Horizontal position on the hue/saturation wheel drawn as a graph, from 0 (left) to 1 (right)." }
+      y:       { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "Vertical position on the hue/saturation wheel drawn as a graph, from 0 (bottom) to 1 (top)." }
     send: { address: "/eos/chan/{channel}/color/hsxy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
     returns: none
 
   set_color_hsxy:
     summary: "Set the current selection's colour from a point on the hue/saturation wheel as a 0-1 XY graph"
     params:
-      x: { type: float, min: 0.0, max: 1.0, required: true }
-      y: { type: float, min: 0.0, max: 1.0, required: true }
+      x: { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "Horizontal position on the hue/saturation wheel drawn as a graph, from 0 (left) to 1 (right)." }
+      y: { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "Vertical position on the hue/saturation wheel drawn as a graph, from 0 (bottom) to 1 (top)." }
     send: { address: "/eos/color/hsxy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
     returns: none
 
   set_channel_color_rgb:
     summary: "Set a channel's colour from red, green and blue (0-1)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      red:     { type: float, min: 0.0, max: 1.0, required: true }
-      green:   { type: float, min: 0.0, max: 1.0, required: true }
-      blue:    { type: float, min: 0.0, max: 1.0, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      red:     { type: float, min: 0.0, max: 1.0, required: true, label: Red, description: "Red component from 0 (none) to 1 (full)." }
+      green:   { type: float, min: 0.0, max: 1.0, required: true, label: Green, description: "Green component from 0 (none) to 1 (full)." }
+      blue:    { type: float, min: 0.0, max: 1.0, required: true, label: Blue, description: "Blue component from 0 (none) to 1 (full)." }
     send: { address: "/eos/chan/{channel}/color/rgb", args: [ { value: "{red}", type: float }, { value: "{green}", type: float }, { value: "{blue}", type: float } ] }
     returns: none
 
   set_color_rgb:
     summary: "Set the current selection's colour from red, green and blue (0-1)"
     params:
-      red:   { type: float, min: 0.0, max: 1.0, required: true }
-      green: { type: float, min: 0.0, max: 1.0, required: true }
-      blue:  { type: float, min: 0.0, max: 1.0, required: true }
+      red:   { type: float, min: 0.0, max: 1.0, required: true, label: Red, description: "Red component from 0 (none) to 1 (full)." }
+      green: { type: float, min: 0.0, max: 1.0, required: true, label: Green, description: "Green component from 0 (none) to 1 (full)." }
+      blue:  { type: float, min: 0.0, max: 1.0, required: true, label: Blue, description: "Blue component from 0 (none) to 1 (full)." }
     send: { address: "/eos/color/rgb", args: [ { value: "{red}", type: float }, { value: "{green}", type: float }, { value: "{blue}", type: float } ] }
     returns: none
 
   set_channel_color_xy:
     summary: "Set a channel's colour from a CIE 1931 xy chromaticity point"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      x:       { type: float, min: 0.0, max: 1.0, required: true }
-      y:       { type: float, min: 0.0, max: 1.0, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      x:       { type: float, min: 0.0, max: 1.0, required: true, label: x, description: "CIE 1931 x chromaticity coordinate, from 0 to 1." }
+      y:       { type: float, min: 0.0, max: 1.0, required: true, label: "y", description: "CIE 1931 y chromaticity coordinate, from 0 to 1." }
     send: { address: "/eos/chan/{channel}/color/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
     returns: none
 
   set_color_xy:
     summary: "Set the current selection's colour from a CIE 1931 xy chromaticity point"
     params:
-      x: { type: float, min: 0.0, max: 1.0, required: true }
-      y: { type: float, min: 0.0, max: 1.0, required: true }
+      x: { type: float, min: 0.0, max: 1.0, required: true, label: x, description: "CIE 1931 x chromaticity coordinate, from 0 to 1." }
+      y: { type: float, min: 0.0, max: 1.0, required: true, label: "y", description: "CIE 1931 y chromaticity coordinate, from 0 to 1." }
     send: { address: "/eos/color/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
     returns: none
 
   set_channel_color_xyz:
     summary: "Set a channel's colour from a CIE XYZ colour point (0-1)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      x:       { type: float, min: 0.0, max: 1.0, required: true }
-      y:       { type: float, min: 0.0, max: 1.0, required: true }
-      z:       { type: float, min: 0.0, max: 1.0, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      x:       { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "CIE X tristimulus value, from 0 to 1." }
+      y:       { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "CIE Y tristimulus value, from 0 to 1." }
+      z:       { type: float, min: 0.0, max: 1.0, required: true, label: Z, description: "CIE Z tristimulus value, from 0 to 1." }
     send: { address: "/eos/chan/{channel}/color/xyz", args: [ { value: "{x}", type: float }, { value: "{y}", type: float }, { value: "{z}", type: float } ] }
     returns: none
 
   set_color_xyz:
     summary: "Set the current selection's colour from a CIE XYZ colour point (0-1)"
     params:
-      x: { type: float, min: 0.0, max: 1.0, required: true }
-      y: { type: float, min: 0.0, max: 1.0, required: true }
-      z: { type: float, min: 0.0, max: 1.0, required: true }
+      x: { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "CIE X tristimulus value, from 0 to 1." }
+      y: { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "CIE Y tristimulus value, from 0 to 1." }
+      z: { type: float, min: 0.0, max: 1.0, required: true, label: Z, description: "CIE Z tristimulus value, from 0 to 1." }
     send: { address: "/eos/color/xyz", args: [ { value: "{x}", type: float }, { value: "{y}", type: float }, { value: "{z}", type: float } ] }
     returns: none
 
   set_channel_pan_tilt_xy:
     summary: "Set a channel's pan and tilt from a 2D graph point (0-1, bottom-left 0,0)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      x:       { type: float, min: 0.0, max: 1.0, required: true }
-      y:       { type: float, min: 0.0, max: 1.0, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      x:       { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "Horizontal position on the pan/tilt graph, from 0 (left) to 1 (right)." }
+      y:       { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "Vertical position on the pan/tilt graph, from 0 (bottom) to 1 (top)." }
     send: { address: "/eos/chan/{channel}/pantilt/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
     returns: none
 
   set_channel_xyz:
     summary: "Focus a channel to Augment3d XYZ coordinates in metres"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      x:       { type: float, required: true }
-      y:       { type: float, required: true }
-      z:       { type: float, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      x:       { type: float, required: true, label: X, description: "X coordinate in metres in the Augment3d space." }
+      y:       { type: float, required: true, label: "Y", description: "Y coordinate in metres in the Augment3d space." }
+      z:       { type: float, required: true, label: Z, description: "Z coordinate in metres in the Augment3d space." }
     send: { address: "/eos/chan/{channel}/xyz", args: [ { value: "{x}", type: float }, { value: "{y}", type: float }, { value: "{z}", type: float } ] }
     returns: none
 
   select_group:
     summary: "Select a group"
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
     send: { address: "/eos/group", args: [ { value: "{group}", type: int } ] }
     returns: none
 
   set_group_intensity:
     summary: "Set a group's intensity (0-100)"
     params:
-      group: { type: int, min: 1, required: true }
-      level: { type: float, min: 0.0, max: 100.0, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      level: { type: float, min: 0.0, max: 100.0, required: true, label: Intensity, description: "Intensity in percent, from 0 (out) to 100 (full)." }
     send: { address: "/eos/group/{group}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_group_dmx:
     summary: "Set a group's intensity as a DMX output value (0-255)"
     params:
-      group: { type: int, min: 1, required: true }
-      dmx:   { type: int, min: 0, max: 255, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      dmx:   { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Intensity as a DMX output value, from 0 to 255." }
     send: { address: "/eos/group/{group}/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   set_group_to:
     summary: "Set a group's intensity to Full, Out, Home, Min, Max, Level or by +% / -%"
     params:
-      group:  { type: int, min: 1, required: true }
-      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true }
+      group:  { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true, label: Action, description: "Full, Out, Home, Min, Max or Level sets the group's intensity to that value; +% and -% raise or lower it by one step." }
     send: { address: "/eos/group/{group}/{action}" }
     returns: none
 
   group_remainder_dim:
     summary: "Dim everything except this group (RemDim)"
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
     send: { address: "/eos/group/{group}/remdim" }
     returns: none
 
   set_group_param:
     summary: "Set a group's parameter(s) to a level in the parameter's own units"
     params:
-      group: { type: int, min: 1, required: true }
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      level: { type: float, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      level: { type: float, required: true, label: Level, description: "Level in the parameter's own units (e.g. 270 for pan); Eos documents 0-100 but its examples use the parameter's units, so it is not limited." }
     send: { address: "/eos/group/{group}/param/{param}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_group_param_dmx:
     summary: "Set a group's parameter(s) as a DMX output value (0-255)"
     params:
-      group: { type: int, min: 1, required: true }
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      dmx:   { type: int, min: 0, max: 255, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      dmx:   { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Output value from 0 to 255, as sent on DMX." }
     send: { address: "/eos/group/{group}/param/{param}/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   set_group_param_to:
     summary: "Set a group's parameter(s) to Full, Out, Home, Min, Max, Level or by +% / -%"
     params:
-      group:  { type: int, min: 1, required: true }
-      param:  { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true }
+      group:  { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      param:  { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true, label: Action, description: "Full, Out, Home, Min, Max or Level sets the parameter to that value; +% and -% raise or lower it by one step." }
     send: { address: "/eos/group/{group}/param/{param}/{action}" }
     returns: none
 
   set_selection_intensity:
     summary: "Set the current selection to a level (0-100)"
     params:
-      level: { type: float, min: 0.0, max: 100.0, required: true }
+      level: { type: float, min: 0.0, max: 100.0, required: true, label: Intensity, description: "Intensity in percent, from 0 (out) to 100 (full)." }
     send: { address: "/eos/at", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_selection_dmx:
     summary: "Set the current selection to a DMX output value (0-255)"
     params:
-      dmx: { type: int, min: 0, max: 255, required: true }
+      dmx: { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Intensity as a DMX output value, from 0 to 255." }
     send: { address: "/eos/at/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   set_selection_to:
     summary: "Set the current selection to Full, Out, Home, Min, Max, Level, by +% / -%, or RemDim"
     params:
-      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%", "remdim"], required: true }
+      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%", "remdim"], required: true, label: Action, description: "Full, Out, Home, Min, Max or Level sets the selection's intensity to that value; +% and -% raise or lower it by one step; RemDim dims every other channel." }
     send: { address: "/eos/at/{action}" }
     returns: none
 
   set_param:
     summary: "Set the current selection's parameter(s) to a level in the parameter's own units"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      level: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      level: { type: float, required: true, label: Level, description: "Level in the parameter's own units (e.g. 270 for pan); Eos documents 0-100 but its examples use the parameter's units, so it is not limited." }
     send: { address: "/eos/param/{param}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_param_dmx:
     summary: "Set the current selection's parameter(s) as a DMX output value (0-255)"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      dmx:   { type: int, min: 0, max: 255, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      dmx:   { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Output value from 0 to 255, as sent on DMX." }
     send: { address: "/eos/param/{param}/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   set_param_to:
     summary: "Set the current selection's parameter(s) to Full, Out, Home, Min, Max, Level or by +% / -%"
     params:
-      param:  { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true }
+      param:  { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      action: { type: enum, values: ["full", "out", "home", "min", "max", "level", "+%", "-%"], required: true, label: Action, description: "Full, Out, Home, Min, Max or Level sets the parameter to that value; +% and -% raise or lower it by one step." }
     send: { address: "/eos/param/{param}/{action}" }
     returns: none
 
   set_pan_tilt_xy:
     summary: "Set the current selection's pan and tilt from a 2D graph point (0-1, bottom-left 0,0)"
     params:
-      x: { type: float, min: 0.0, max: 1.0, required: true }
-      y: { type: float, min: 0.0, max: 1.0, required: true }
+      x: { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "Horizontal position on the pan/tilt graph, from 0 (left) to 1 (right)." }
+      y: { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "Vertical position on the pan/tilt graph, from 0 (bottom) to 1 (top)." }
     send: { address: "/eos/pantilt/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
     returns: none
 
   set_xyz:
     summary: "Focus the current selection to Augment3d XYZ coordinates in metres"
     params:
-      x: { type: float, required: true }
-      y: { type: float, required: true }
-      z: { type: float, required: true }
+      x: { type: float, required: true, label: X, description: "X coordinate in metres in the Augment3d space." }
+      y: { type: float, required: true, label: "Y", description: "Y coordinate in metres in the Augment3d space." }
+      z: { type: float, required: true, label: Z, description: "Z coordinate in metres in the Augment3d space." }
     send: { address: "/eos/xyz", args: [ { value: "{x}", type: float }, { value: "{y}", type: float }, { value: "{z}", type: float } ] }
     returns: none
 
   select_address:
     summary: "Select an absolute output address (parked while on the OSC command line)"
     params:
-      address: { type: int, min: 1, required: true }
+      address: { type: int, min: 1, required: true, label: Output address, description: "Absolute output address from 1, as Eos numbers addresses across universes; the address is parked." }
     send: { address: "/eos/addr", args: [ { value: "{address}", type: int } ] }
     returns: none
 
   set_address_level:
     summary: "Set an absolute output address to a level (0-100); the address is parked"
     params:
-      address: { type: int, min: 1, required: true }
-      level:   { type: float, min: 0.0, max: 100.0, required: true }
+      address: { type: int, min: 1, required: true, label: Output address, description: "Absolute output address from 1, as Eos numbers addresses across universes; the address is parked." }
+      level:   { type: float, min: 0.0, max: 100.0, required: true, label: Level, description: "Output level in percent, from 0 to 100." }
     send: { address: "/eos/addr/{address}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_address_dmx:
     summary: "Set an absolute output address to a DMX value (0-255); the address is parked"
     params:
-      address: { type: int, min: 1, required: true }
-      dmx:     { type: int, min: 0, max: 255, required: true }
+      address: { type: int, min: 1, required: true, label: Output address, description: "Absolute output address from 1, as Eos numbers addresses across universes; the address is parked." }
+      dmx:     { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Output value from 0 to 255, as sent on DMX." }
     send: { address: "/eos/addr/{address}/dmx", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   override_selection:
     summary: "Override the current selection to a level (pink, highest priority, not recorded)"
     params:
-      level: { type: int, required: true }
+      level: { type: int, required: true, label: Level, description: "Override level as a whole number, for the selection's intensity; Eos documents it only as an integer." }
     send: { address: "/eos/at/override", args: [ { value: "{level}", type: int } ] }
     returns: none
 
   override_channel:
     summary: "Override a channel's intensity to a level"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      level:   { type: int, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      level:   { type: int, required: true, label: Level, description: "Override level as a whole number, for the channel's intensity; Eos documents it only as an integer." }
     send: { address: "/eos/chan/{channel}/override", args: [ { value: "{level}", type: int } ] }
     returns: none
 
   override_channel_param:
     summary: "Override a channel's parameter to a level"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      level:   { type: int, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      level:   { type: int, required: true, label: Level, description: "Override level as a whole number, in the parameter's own units; Eos documents it only as an integer." }
     send: { address: "/eos/chan/{channel}/param/{param}/override", args: [ { value: "{level}", type: int } ] }
     returns: none
 
   override_channel_param_dmx:
     summary: "Override a channel's parameter to a DMX value (0-255)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      dmx:     { type: int, min: 0, max: 255, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      dmx:     { type: int, min: 0, max: 255, required: true, label: DMX value, description: "Output value from 0 to 255, as sent on DMX." }
     send: { address: "/eos/chan/{channel}/param/{param}/dmx/override", args: [ { value: "{dmx}", type: int } ] }
     returns: none
 
   override_group:
     summary: "Override a group's intensity to a level"
     params:
-      group: { type: int, min: 1, required: true }
-      level: { type: int, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      level: { type: int, required: true, label: Level, description: "Override level as a whole number, for the group's intensity; Eos documents it only as an integer." }
     send: { address: "/eos/group/{group}/override", args: [ { value: "{level}", type: int } ] }
     returns: none
 
   override_group_param:
     summary: "Override a group's parameter to a level"
     params:
-      group: { type: int, min: 1, required: true }
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      level: { type: int, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      level: { type: int, required: true, label: Level, description: "Override level as a whole number, in the parameter's own units; Eos documents it only as an integer." }
     send: { address: "/eos/group/{group}/param/{param}/override", args: [ { value: "{level}", type: int } ] }
     returns: none
 
@@ -3962,352 +3962,352 @@ commands:
   release_param_overrides:
     summary: "Release a parameter's overrides"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter whose overrides are released, named as Eos names it (e.g. pan), case-insensitive, with a backslash for a slash." }
     send: { address: "/eos/param/{param}/release" }
     returns: none
 
   release_channel_overrides:
     summary: "Release a channel's overrides"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
     send: { address: "/eos/chan/{channel}/release" }
     returns: none
 
   release_channel_param_overrides:
     summary: "Release one parameter override on a channel"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      param:   { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
     send: { address: "/eos/chan/{channel}/param/{param}/release" }
     returns: none
 
   release_group_overrides:
     summary: "Release a group's overrides"
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
     send: { address: "/eos/group/{group}/release" }
     returns: none
 
   release_group_param_overrides:
     summary: "Release one parameter override on a group"
     params:
-      group: { type: int, min: 1, required: true }
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
     send: { address: "/eos/group/{group}/param/{param}/release" }
     returns: none
 
   set_wheel_mode:
     summary: "Set the OSC wheel mode: coarse or fine"
     params:
-      fine: { type: bool, default: false }
+      fine: { type: bool, default: false, label: Fine, description: "On makes OSC wheel ticks fine, off coarse." }
     send: { address: "/eos/wheel", args: [ { value: "{fine:bool01}", type: int } ] }
     returns: none
 
   wheel_level:
     summary: "Turn the level wheel by a number of ticks (negative decreases)"
     params:
-      ticks: { type: float, required: true }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/wheel/level", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   wheel_param:
     summary: "Turn the selection's parameter(s) by wheel ticks in the current wheel mode"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      ticks: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/wheel/{param}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   wheel_param_fine:
     summary: "Turn the selection's parameter(s) by fine wheel ticks"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      ticks: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/wheel/fine/{param}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   wheel_param_coarse:
     summary: "Turn the selection's parameter(s) by coarse wheel ticks"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      ticks: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/wheel/coarse/{param}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   set_switch_mode:
     summary: "Set the OSC switch mode: coarse or fine"
     params:
-      fine: { type: bool, default: false }
+      fine: { type: bool, default: false, label: Fine, description: "On makes OSC switch ticks fine, off coarse." }
     send: { address: "/eos/switch", args: [ { value: "{fine:bool01}", type: int } ] }
     returns: none
 
   switch_level:
     summary: "Turn the level wheel continuously by ticks until a 0 is sent"
     params:
-      ticks: { type: float, required: true }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/switch/level", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   switch_param:
     summary: "Turn the selection's parameter(s) continuously by ticks until a 0 is sent"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      ticks: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/switch/{param}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   switch_param_fine:
     summary: "Turn the selection's parameter(s) continuously by fine ticks until a 0 is sent"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      ticks: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/switch/fine/{param}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   switch_param_coarse:
     summary: "Turn the selection's parameter(s) continuously by coarse ticks until a 0 is sent"
     params:
-      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true }
-      ticks: { type: float, required: true }
+      param: { type: string, max_length: 128, pattern: "^[A-Za-z0-9_ \\\\]+(/[A-Za-z0-9_ \\\\]+)*$", required: true, label: Parameter, description: "Parameter name as Eos names it (e.g. pan, tilt, red), case-insensitive and abbreviable, with underscores or spaces for spaces and a backslash for a slash; give several as param1/param2." }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/switch/coarse/{param}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   active_wheel:
     summary: "Turn the active parameter at a 1-based wheel index by ticks"
     params:
-      wheel: { type: int, min: 1, required: true }
-      ticks: { type: float, required: true }
+      wheel: { type: int, min: 1, required: true, label: Wheel, description: "Position of the parameter in the console's list of active wheels, numbered from 1." }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/active/wheel/{wheel}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   active_wheel_fine:
     summary: "Turn the active parameter at a wheel index by ticks, in fine ticks"
     params:
-      wheel: { type: int, min: 1, required: true }
-      ticks: { type: float, required: true }
+      wheel: { type: int, min: 1, required: true, label: Wheel, description: "Position of the parameter in the console's list of active wheels, numbered from 1." }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/active/wheel/fine/{wheel}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   active_wheel_coarse:
     summary: "Turn the active parameter at a wheel index by ticks, in coarse ticks"
     params:
-      wheel: { type: int, min: 1, required: true }
-      ticks: { type: float, required: true }
+      wheel: { type: int, min: 1, required: true, label: Wheel, description: "Position of the parameter in the console's list of active wheels, numbered from 1." }
+      ticks: { type: float, required: true, label: Ticks, description: "Wheel ticks to turn by: positive increases, negative decreases, and a fraction turns slowly (0.25 for a slow increase)." }
     send: { address: "/eos/active/wheel/coarse/{wheel}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   active_switch:
     summary: "Turn the active parameter at a 1-based wheel index continuously by ticks until a 0 is sent"
     params:
-      wheel: { type: int, min: 1, required: true }
-      ticks: { type: float, required: true }
+      wheel: { type: int, min: 1, required: true, label: Wheel, description: "Position of the parameter in the console's list of active wheels, numbered from 1." }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/active/switch/{wheel}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   active_switch_fine:
     summary: "Turn the active parameter at a wheel index continuously by ticks until a 0 is sent, in fine ticks"
     params:
-      wheel: { type: int, min: 1, required: true }
-      ticks: { type: float, required: true }
+      wheel: { type: int, min: 1, required: true, label: Wheel, description: "Position of the parameter in the console's list of active wheels, numbered from 1." }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/active/switch/fine/{wheel}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   active_switch_coarse:
     summary: "Turn the active parameter at a wheel index continuously by ticks until a 0 is sent, in coarse ticks"
     params:
-      wheel: { type: int, min: 1, required: true }
-      ticks: { type: float, required: true }
+      wheel: { type: int, min: 1, required: true, label: Wheel, description: "Position of the parameter in the console's list of active wheels, numbered from 1." }
+      ticks: { type: float, required: true, label: Ticks, description: "Ticks to keep turning by: positive increases, negative decreases, a fraction turns slowly, and 0 stops." }
     send: { address: "/eos/active/switch/coarse/{wheel}", args: [ { value: "{ticks}", type: float } ] }
     returns: none
 
   fire_palette:
     summary: "Fire (recall) a palette: ip intensity, fp focus, cp color, bp beam"
     params:
-      palette_type: { type: enum, values: ["ip", "fp", "cp", "bp"], required: true }
-      palette:      { type: int, min: 1, required: true }
+      palette_type: { type: enum, values: ["ip", "fp", "cp", "bp"], required: true, label: Palette type, description: "Kind of palette: ip intensity, fp focus, cp colour or bp beam." }
+      palette:      { type: int, min: 1, required: true, label: Palette, description: "Palette number within its kind, from 1, as in the show." }
     send: { address: "/eos/{palette_type}/{palette}/fire" }
     returns: none
 
   select_palette:
     summary: "Select a palette: ip intensity, fp focus, cp color, bp beam"
     params:
-      palette_type: { type: enum, values: ["ip", "fp", "cp", "bp"], required: true }
-      palette:      { type: int, min: 1, required: true }
+      palette_type: { type: enum, values: ["ip", "fp", "cp", "bp"], required: true, label: Palette type, description: "Kind of palette: ip intensity, fp focus, cp colour or bp beam." }
+      palette:      { type: int, min: 1, required: true, label: Palette, description: "Palette number within its kind, from 1, as in the show." }
     send: { address: "/eos/{palette_type}", args: [ { value: "{palette}", type: int } ] }
     returns: none
 
   fire_preset:
     summary: "Fire (recall) a preset"
     params:
-      preset: { type: int, min: 1, required: true }
+      preset: { type: int, min: 1, required: true, label: Preset, description: "Preset number as in the show, from 1." }
     send: { address: "/eos/preset/{preset}/fire" }
     returns: none
 
   select_preset:
     summary: "Select a preset"
     params:
-      preset: { type: int, min: 1, required: true }
+      preset: { type: int, min: 1, required: true, label: Preset, description: "Preset number as in the show, from 1." }
     send: { address: "/eos/preset", args: [ { value: "{preset}", type: int } ] }
     returns: none
 
   fire_snapshot:
     summary: "Fire (recall) a snapshot"
     params:
-      snapshot: { type: int, min: 1, required: true }
+      snapshot: { type: int, min: 1, required: true, label: Snapshot, description: "Snapshot number as in the show, from 1." }
     send: { address: "/eos/snap/{snapshot}/fire" }
     returns: none
 
   select_snapshot:
     summary: "Select a snapshot"
     params:
-      snapshot: { type: int, min: 1, required: true }
+      snapshot: { type: int, min: 1, required: true, label: Snapshot, description: "Snapshot number as in the show, from 1." }
     send: { address: "/eos/snap", args: [ { value: "{snapshot}", type: int } ] }
     returns: none
 
   fire_magic_sheet:
     summary: "Fire a magic sheet"
     params:
-      magic_sheet: { type: int, min: 1, required: true }
+      magic_sheet: { type: int, min: 1, required: true, label: Magic sheet, description: "Magic sheet number as in the show, from 1." }
     send: { address: "/eos/ms/{magic_sheet}/fire" }
     returns: none
 
   open_magic_sheet:
     summary: "Open (select) a magic sheet"
     params:
-      magic_sheet: { type: int, min: 1, required: true }
+      magic_sheet: { type: int, min: 1, required: true, label: Magic sheet, description: "Magic sheet number as in the show, from 1." }
     send: { address: "/eos/ms", args: [ { value: "{magic_sheet}", type: int } ] }
     returns: none
 
   open_magic_sheet_view:
     summary: "Open a view of a magic sheet"
     params:
-      magic_sheet: { type: int, min: 1, required: true }
-      view:        { type: int, min: 1, required: true }
+      magic_sheet: { type: int, min: 1, required: true, label: Magic sheet, description: "Magic sheet number as in the show, from 1." }
+      view:        { type: int, min: 1, required: true, label: View, description: "View number of the magic sheet, from 1." }
     send: { address: "/eos/ms/{magic_sheet}", args: [ { value: "{view}", type: int } ] }
     returns: none
 
   select_effect:
     summary: "Select an effect"
     params:
-      effect: { type: int, min: 1, required: true }
+      effect: { type: int, min: 1, required: true, label: Effect, description: "Effect number as in the show, from 1." }
     send: { address: "/eos/fx", args: [ { value: "{effect}", type: int } ] }
     returns: none
 
   select_curve:
     summary: "Select a curve"
     params:
-      curve: { type: int, min: 1, required: true }
+      curve: { type: int, min: 1, required: true, label: Curve, description: "Curve number as in the show, from 1." }
     send: { address: "/eos/curve", args: [ { value: "{curve}", type: int } ] }
     returns: none
 
   select_pixel_map:
     summary: "Select a pixel map"
     params:
-      pixel_map: { type: int, min: 1, required: true }
+      pixel_map: { type: int, min: 1, required: true, label: Pixel map, description: "Pixel map number as in the show, from 1." }
     send: { address: "/eos/pixmap", args: [ { value: "{pixel_map}", type: int } ] }
     returns: none
 
   configure_fader_bank:
     summary: "Create an OSC fader bank with a number of faders per page (bank 0 is the master fader)"
     params:
-      bank:   { type: int, min: 0, required: true }
-      faders: { type: int, min: 1, required: true }
+      bank:   { type: int, min: 0, required: true, label: Fader bank, description: "OSC fader bank number as given to configure_fader_bank; bank 0 is the master fader." }
+      faders: { type: int, min: 1, required: true, label: Faders per page, description: "Number of faders the bank shows on each page." }
     send: { address: "/eos/fader/{bank}/config/{faders}" }
     returns: none
 
   configure_fader_bank_page:
     summary: "Create an OSC fader bank on a page, or jump an existing bank to that page"
     params:
-      bank:   { type: int, min: 0, required: true }
-      page:   { type: int, min: 1, required: true }
-      faders: { type: int, min: 1, required: true }
+      bank:   { type: int, min: 0, required: true, label: Fader bank, description: "OSC fader bank number as given to configure_fader_bank; bank 0 is the master fader." }
+      page:   { type: int, min: 1, required: true, label: Page, description: "Fader page the bank shows, from 1." }
+      faders: { type: int, min: 1, required: true, label: Faders per page, description: "Number of faders the bank shows on each page." }
     send: { address: "/eos/fader/{bank}/config/{page}/{faders}" }
     returns: none
 
   page_fader_bank:
     summary: "Page an OSC fader bank up (negative) or down by pages"
     params:
-      bank:  { type: int, min: 0, required: true }
-      delta: { type: int, required: true }
+      bank:  { type: int, min: 0, required: true, label: Fader bank, description: "OSC fader bank number as given to configure_fader_bank; bank 0 is the master fader." }
+      delta: { type: int, required: true, label: Pages, description: "Pages to move the bank by: negative pages up, positive pages down." }
     send: { address: "/eos/fader/{bank}/page/{delta}" }
     returns: none
 
   reset_fader_bank:
     summary: "Reset an OSC fader bank"
     params:
-      bank: { type: int, min: 0, required: true }
+      bank: { type: int, min: 0, required: true, label: Fader bank, description: "OSC fader bank number as given to configure_fader_bank; bank 0 is the master fader." }
     send: { address: "/eos/fader/{bank}/reset" }
     returns: none
 
   set_fader:
     summary: "Set a fader in an OSC fader bank to a level (0.0-1.0)"
     params:
-      bank:  { type: int, min: 0, required: true }
-      fader: { type: int, min: 1, required: true }
-      level: { type: float, min: 0.0, max: 1.0, required: true }
+      bank:  { type: int, min: 0, required: true, label: Fader bank, description: "OSC fader bank number as given to configure_fader_bank; bank 0 is the master fader." }
+      fader: { type: int, min: 1, required: true, label: Fader, description: "Fader number on the bank's current page, from 1." }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Fader level from 0.0 (bottom) to 1.0 (full)." }
     send: { address: "/eos/fader/{bank}/{fader}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   set_fader_to:
     summary: "Fire, stop, load or unload a fader in an OSC fader bank, or set it to Full, Max, Min, Out, Home, Level, +% / -%"
     params:
-      bank:   { type: int, min: 0, required: true }
-      fader:  { type: int, min: 1, required: true }
-      action: { type: enum, values: ["fire", "stop", "load", "unload", "full", "max", "min", "out", "home", "level", "+%", "-%"], required: true }
+      bank:   { type: int, min: 0, required: true, label: Fader bank, description: "OSC fader bank number as given to configure_fader_bank; bank 0 is the master fader." }
+      fader:  { type: int, min: 1, required: true, label: Fader, description: "Fader number on the bank's current page, from 1." }
+      action: { type: enum, values: ["fire", "stop", "load", "unload", "full", "max", "min", "out", "home", "level", "+%", "-%"], required: true, label: Action, description: "Fire, stop, load or unload the fader's target, or set the fader to Full, Max, Min, Out, Home or the Level value, or raise or lower it by +% or -%." }
     send: { address: "/eos/fader/{bank}/{fader}/{action}" }
     returns: none
 
   configure_direct_select_bank:
     summary: "Create an OSC direct select bank of one target type with a number of buttons"
     params:
-      bank:        { type: int, min: 1, required: true }
-      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true }
-      buttons:     { type: int, min: 1, required: true }
+      bank:        { type: int, min: 1, required: true, label: Direct select bank, description: "OSC direct select bank number, from 1, as given when the bank was configured." }
+      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true, label: Target type, description: "Kind of target the bank's buttons select: chan channel, group, macro, sub submaster, preset, ip, fp, cp, bp palettes, ms magic sheet, curve, snap snapshot, fx effect, pixmap pixel map or scene." }
+      buttons:     { type: int, min: 1, required: true, label: Buttons, description: "Number of buttons the bank shows on each page." }
     send: { address: "/eos/ds/{bank}/{target_type}/{buttons}" }
     returns: none
 
   configure_direct_select_bank_flexi:
     summary: "Create an OSC direct select bank in Flexi mode"
     params:
-      bank:        { type: int, min: 1, required: true }
-      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true }
-      buttons:     { type: int, min: 1, required: true }
+      bank:        { type: int, min: 1, required: true, label: Direct select bank, description: "OSC direct select bank number, from 1, as given when the bank was configured." }
+      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true, label: Target type, description: "Kind of target the bank's buttons select: chan channel, group, macro, sub submaster, preset, ip, fp, cp, bp palettes, ms magic sheet, curve, snap snapshot, fx effect, pixmap pixel map or scene." }
+      buttons:     { type: int, min: 1, required: true, label: Buttons, description: "Number of buttons the bank shows on each page." }
     send: { address: "/eos/ds/{bank}/{target_type}/flexi/{buttons}" }
     returns: none
 
   configure_direct_select_bank_page:
     summary: "Create an OSC direct select bank on a page, or jump an existing bank to that page"
     params:
-      bank:        { type: int, min: 1, required: true }
-      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true }
-      page:        { type: int, min: 1, required: true }
-      buttons:     { type: int, min: 1, required: true }
+      bank:        { type: int, min: 1, required: true, label: Direct select bank, description: "OSC direct select bank number, from 1, as given when the bank was configured." }
+      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true, label: Target type, description: "Kind of target the bank's buttons select: chan channel, group, macro, sub submaster, preset, ip, fp, cp, bp palettes, ms magic sheet, curve, snap snapshot, fx effect, pixmap pixel map or scene." }
+      page:        { type: int, min: 1, required: true, label: Page, description: "Page of targets the bank shows, from 1." }
+      buttons:     { type: int, min: 1, required: true, label: Buttons, description: "Number of buttons the bank shows on each page." }
     send: { address: "/eos/ds/{bank}/{target_type}/{page}/{buttons}" }
     returns: none
 
   configure_direct_select_bank_flexi_page:
     summary: "Create an OSC direct select bank in Flexi mode on a page"
     params:
-      bank:        { type: int, min: 1, required: true }
-      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true }
-      page:        { type: int, min: 1, required: true }
-      buttons:     { type: int, min: 1, required: true }
+      bank:        { type: int, min: 1, required: true, label: Direct select bank, description: "OSC direct select bank number, from 1, as given when the bank was configured." }
+      target_type: { type: enum, values: ["chan", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "ms", "curve", "snap", "fx", "pixmap", "scene"], required: true, label: Target type, description: "Kind of target the bank's buttons select: chan channel, group, macro, sub submaster, preset, ip, fp, cp, bp palettes, ms magic sheet, curve, snap snapshot, fx effect, pixmap pixel map or scene." }
+      page:        { type: int, min: 1, required: true, label: Page, description: "Page of targets the bank shows, from 1." }
+      buttons:     { type: int, min: 1, required: true, label: Buttons, description: "Number of buttons the bank shows on each page." }
     send: { address: "/eos/ds/{bank}/{target_type}/flexi/{page}/{buttons}" }
     returns: none
 
   page_direct_select_bank:
     summary: "Page an OSC direct select bank up (negative) or down by buttons"
     params:
-      bank:  { type: int, min: 1, required: true }
-      delta: { type: int, required: true }
+      bank:  { type: int, min: 1, required: true, label: Direct select bank, description: "OSC direct select bank number, from 1, as given when the bank was configured." }
+      delta: { type: int, required: true, label: Buttons, description: "Buttons to page the bank by: negative pages up, positive pages down." }
     send: { address: "/eos/ds/{bank}/page/{delta}" }
     returns: none
 
   press_direct_select:
     summary: "Press and release a button in an OSC direct select bank"
     params:
-      bank:   { type: int, min: 1, required: true }
-      button: { type: int, min: 1, required: true }
+      bank:   { type: int, min: 1, required: true, label: Direct select bank, description: "OSC direct select bank number, from 1, as given when the bank was configured." }
+      button: { type: int, min: 1, required: true, label: Button, description: "Button number within the bank, from 1." }
     send:
       - { address: "/eos/ds/{bank}/{button}", args: [ { value: "1.0", type: float } ] }
       - { address: "/eos/ds/{bank}/{button}", args: [ { value: "0.0", type: float } ] }
@@ -4316,102 +4316,102 @@ commands:
   set_label:
     summary: "Set the label of a cue list, group, macro, submaster, preset, palette, curve, effect, snapshot, pixel map, magic sheet or event list"
     params:
-      target_type: { type: enum, values: ["cuelist", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "curve", "fx", "snap", "pixmap", "ms", "eventlist"], required: true }
-      number:      { type: int, min: 1, required: true }
-      label:       { type: string, max_length: 256, required: true }
+      target_type: { type: enum, values: ["cuelist", "group", "macro", "sub", "preset", "ip", "fp", "cp", "bp", "curve", "fx", "snap", "pixmap", "ms", "eventlist"], required: true, label: Target type, description: "Kind of target to label: cuelist, group, macro, sub submaster, preset, ip, fp, cp, bp palettes, curve, fx effect, snap snapshot, pixmap pixel map, ms magic sheet or eventlist." }
+      number:      { type: int, min: 1, required: true, label: Number, description: "Number of the target to label, as in the show." }
+      label:       { type: string, max_length: 256, required: true, label: Label, description: "New label text for the target." }
     send: { address: "/eos/set/{target_type}/{number}/label", args: [ { value: "{label}", type: string } ] }
     returns: none
 
   set_cue_label:
     summary: "Set a cue's label"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      text:     { type: string, max_length: 256, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      text:     { type: string, max_length: 256, required: true, label: Label, description: "New label text for the cue." }
     send: { address: "/eos/set/cue/{cue_list}/{cue}/label", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_cue_part_label:
     summary: "Set a cue part's label"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      part:     { type: int, min: 1, required: true }
-      text:     { type: string, max_length: 256, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      part:     { type: int, min: 1, required: true, label: Part, description: "Cue part number, from 1." }
+      text:     { type: string, max_length: 256, required: true, label: Label, description: "New label text for the cue part." }
     send: { address: "/eos/set/cue/{cue_list}/{cue}/{part}/label", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_cue_notes:
     summary: "Set a cue's notes"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      text:     { type: string, max_length: 256, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      text:     { type: string, max_length: 256, required: true, label: Notes, description: "New notes text for the cue." }
     send: { address: "/eos/set/cue/{cue_list}/{cue}/notes", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_cue_part_notes:
     summary: "Set a cue part's notes"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      part:     { type: int, min: 1, required: true }
-      text:     { type: string, max_length: 256, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      part:     { type: int, min: 1, required: true, label: Part, description: "Cue part number, from 1." }
+      text:     { type: string, max_length: 256, required: true, label: Notes, description: "New notes text for the cue part." }
     send: { address: "/eos/set/cue/{cue_list}/{cue}/{part}/notes", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_cue_scene:
     summary: "Set a cue's scene"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      text:     { type: string, max_length: 256, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      text:     { type: string, max_length: 256, required: true, label: Scene, description: "Scene text for the cue." }
     send: { address: "/eos/set/cue/{cue_list}/{cue}/scene", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_cue_part_scene:
     summary: "Set a cue part's scene"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      part:     { type: int, min: 1, required: true }
-      text:     { type: string, max_length: 256, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      part:     { type: int, min: 1, required: true, label: Part, description: "Cue part number, from 1." }
+      text:     { type: string, max_length: 256, required: true, label: Scene, description: "Scene text for the cue part." }
     send: { address: "/eos/set/cue/{cue_list}/{cue}/{part}/scene", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_event_label:
     summary: "Set the label of an event in an event list"
     params:
-      event_list: { type: int, min: 1, required: true }
-      event:      { type: int, min: 1, required: true }
-      label:      { type: string, max_length: 256, required: true }
+      event_list: { type: int, min: 1, required: true, label: Event list, description: "Event list number as in the show, from 1." }
+      event:      { type: int, min: 1, required: true, label: Event, description: "Event number within the event list, from 1." }
+      label:      { type: string, max_length: 256, required: true, label: Label, description: "New label text for the event." }
     send: { address: "/eos/set/event/{event_list}/{event}/label", args: [ { value: "{label}", type: string } ] }
     returns: none
 
   set_group_channels:
     summary: "Set a group's channels, written as in the Group List (ranges as \"x > y\")"
     params:
-      group:    { type: int, min: 1, required: true }
-      channels: { type: string, max_length: 256, required: true }
+      group:    { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
+      channels: { type: string, max_length: 256, required: true, label: Channels, description: "Channels in the group, written as in the Group List with ranges as \"x > y\" (e.g. \"1 > 10\")." }
     send: { address: "/eos/set/group/{group}/chans", args: [ { value: "{channels}", type: string } ] }
     returns: none
 
   set_patch_field:
     summary: "Set a patched channel's label, text1-text10, notes or gel (gels as manufacturer abbreviation and number, e.g. L2)"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      field:   { type: enum, values: ["label", "text1", "text2", "text3", "text4", "text5", "text6", "text7", "text8", "text9", "text10", "notes", "gel"], required: true }
-      text:    { type: string, max_length: 256, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      field:   { type: enum, values: ["label", "text1", "text2", "text3", "text4", "text5", "text6", "text7", "text8", "text9", "text10", "notes", "gel"], required: true, label: Field, description: "Patch field to set: label, text1 to text10, notes or gel." }
+      text:    { type: string, max_length: 256, required: true, label: Text, description: "New text for the field; a gel is the manufacturer abbreviation and number, e.g. L2." }
     send: { address: "/eos/set/patch/{channel}/{field}", args: [ { value: "{text}", type: string } ] }
     returns: none
 
   set_patch_part_field:
     summary: "Set a patched channel part's label, text1-text10, notes or gel"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      part:    { type: int, min: 1, required: true }
-      field:   { type: enum, values: ["label", "text1", "text2", "text3", "text4", "text5", "text6", "text7", "text8", "text9", "text10", "notes", "gel"], required: true }
-      text:    { type: string, max_length: 256, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      part:    { type: int, min: 1, required: true, label: Part, description: "Part number of the multi-part channel, from 1." }
+      field:   { type: enum, values: ["label", "text1", "text2", "text3", "text4", "text5", "text6", "text7", "text8", "text9", "text10", "notes", "gel"], required: true, label: Field, description: "Patch field to set: label, text1 to text10, notes or gel." }
+      text:    { type: string, max_length: 256, required: true, label: Text, description: "New text for the field; a gel is the manufacturer abbreviation and number, e.g. L2." }
     send: { address: "/eos/set/patch/{channel}/{part}/{field}", args: [ { value: "{text}", type: string } ] }
     returns: none
 
@@ -4442,7 +4442,7 @@ commands:
   get_count:
     summary: "Number of targets of a type in the show"
     params:
-      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist", "patch", "fpe"], required: true }
+      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist", "patch", "fpe"], required: true, label: Target type, description: "Kind of target to count: bp, cp, fp, ip palettes, preset, cuelist, curve, fx effect, group, macro, ms magic sheet, pixmap pixel map, snap snapshot, sub submaster, eventlist, patch (patched channels) or fpe (focus point sets)." }
     send: { address: "/eos/get/{target_type}/count" }
     expect: { address: "/eos/out/get/{target_type}/count", arg: 0 }
     returns: value
@@ -4450,7 +4450,7 @@ commands:
   get_cue_count:
     summary: "Number of cues in a cue list, including parts"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
     send: { address: "/eos/get/cue/{cue_list}/count" }
     expect: { address: "/eos/out/get/cue/{cue_list}/count", arg: 0 }
     returns: value
@@ -4458,7 +4458,7 @@ commands:
   get_cue_count_no_parts:
     summary: "Number of cues in a cue list, excluding parts"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
     send: { address: "/eos/get/cue/{cue_list}/noparts/count" }
     expect: { address: "/eos/out/get/cue/{cue_list}/noparts/count", arg: 0 }
     returns: value
@@ -4466,8 +4466,8 @@ commands:
   get_cue_part_count:
     summary: "Number of parts of a cue"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
     send: { address: "/eos/get/cue/{cue_list}/{cue}/count" }
     expect: { address: "/eos/out/get/cue/{cue_list}/{cue}/count", arg: 0 }
     returns: value
@@ -4475,7 +4475,7 @@ commands:
   get_event_count:
     summary: "Number of events in an event list"
     params:
-      event_list: { type: int, min: 1, required: true }
+      event_list: { type: int, min: 1, required: true, label: Event list, description: "Event list number as in the show, from 1." }
     send: { address: "/eos/get/event/{event_list}/count" }
     expect: { address: "/eos/out/get/event/{event_list}/count", arg: 0 }
     returns: value
@@ -4483,7 +4483,7 @@ commands:
   get_fpe_point_count:
     summary: "Number of points in a focus point (FPE) set"
     params:
-      fpe_set: { type: int, min: 1, required: true }
+      fpe_set: { type: int, min: 1, required: true, label: Focus point set, description: "Focus point (FPE) set number, from 1." }
     send: { address: "/eos/get/fpe/{fpe_set}/count" }
     expect: { address: "/eos/out/get/fpe/{fpe_set}/count", arg: 1 }
     returns: value
@@ -4491,123 +4491,123 @@ commands:
   get_target:
     summary: "Request a target's details; the replies (/eos/out/get/...) update state"
     params:
-      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist"], required: true }
-      number:      { type: int, min: 1, required: true }
+      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist"], required: true, label: Target type, description: "Kind of target: bp, cp, fp, ip palettes, preset, cuelist, curve, fx effect, group, macro, ms magic sheet, pixmap pixel map, snap snapshot, sub submaster or eventlist." }
+      number:      { type: int, min: 1, required: true, label: Number, description: "Number of the target as in the show; a target whose number has a decimal is not matched into state." }
     send: { address: "/eos/get/{target_type}/{number}" }
     returns: none
 
   get_target_by_index:
     summary: "Request the details of the target at a 0-based index in its list"
     params:
-      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist", "patch"], required: true }
-      index:       { type: int, min: 0, required: true }
+      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist", "patch"], required: true, label: Target type, description: "Kind of target: bp, cp, fp, ip palettes, preset, cuelist, curve, fx effect, group, macro, ms magic sheet, pixmap pixel map, snap snapshot, sub submaster, eventlist or patch (patched channels)." }
+      index:       { type: int, min: 0, required: true, label: Index, description: "Position of the target in its list, counted from 0." }
     send: { address: "/eos/get/{target_type}/index/{index}" }
     returns: none
 
   get_target_by_uid:
     summary: "Request a target's details by its UID"
     params:
-      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist", "patch"], required: true }
-      uid:         { type: string, max_length: 36, pattern: "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", required: true }
+      target_type: { type: enum, values: ["bp", "cp", "fp", "ip", "preset", "cuelist", "curve", "fx", "group", "macro", "ms", "pixmap", "snap", "sub", "eventlist", "patch"], required: true, label: Target type, description: "Kind of target: bp, cp, fp, ip palettes, preset, cuelist, curve, fx effect, group, macro, ms magic sheet, pixmap pixel map, snap snapshot, sub submaster, eventlist or patch (patched channels)." }
+      uid:         { type: string, max_length: 36, pattern: "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", required: true, label: UID, description: "Unique ID Eos reports for the target, in 8-4-4-4-12 hexadecimal form." }
     send: { address: "/eos/get/{target_type}/uid/{uid}" }
     returns: none
 
   get_group_displayed:
     summary: "Request a group's details with its channels as command line text"
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Group, description: "Group number as in the show, from 1; Eos refuses a group that does not exist." }
     send: { address: "/eos/get/group/displayed/{group}" }
     returns: none
 
   get_cue:
     summary: "Request a cue's details (the base cue and all its parts)"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
     send: { address: "/eos/get/cue/{cue_list}/{cue}" }
     returns: none
 
   get_cue_part:
     summary: "Request one cue part's details"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
-      part:     { type: int, min: 1, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      cue:      { type: string, max_length: 16, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true, label: Cue, description: "Cue number as text, which may contain a point (1 or 1.5); kept as text so trailing zeros are not lost." }
+      part:     { type: int, min: 1, required: true, label: Part, description: "Cue part number, from 1." }
     send: { address: "/eos/get/cue/{cue_list}/{cue}/{part}" }
     returns: none
 
   get_cue_by_index:
     summary: "Request the details of the cue at a 0-based index in a cue list"
     params:
-      cue_list: { type: int, min: 1, max: 999, required: true }
-      index:    { type: int, min: 0, required: true }
+      cue_list: { type: int, min: 1, max: 999, required: true, label: Cue list, description: "Cue list number from 1 to 999; Element 2 and Element Classic have one cue list, so use 1 there." }
+      index:    { type: int, min: 0, required: true, label: Index, description: "Position of the cue in the cue list, counted from 0." }
     send: { address: "/eos/get/cue/{cue_list}/index/{index}" }
     returns: none
 
   get_cue_by_uid:
     summary: "Request a cue's details by its UID"
     params:
-      uid: { type: string, max_length: 36, pattern: "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", required: true }
+      uid: { type: string, max_length: 36, pattern: "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", required: true, label: UID, description: "Unique ID Eos reports for the cue, in 8-4-4-4-12 hexadecimal form." }
     send: { address: "/eos/get/cue/uid/{uid}" }
     returns: none
 
   get_event:
     summary: "Request an event's details"
     params:
-      event_list: { type: int, min: 1, required: true }
-      event:      { type: int, min: 1, required: true }
+      event_list: { type: int, min: 1, required: true, label: Event list, description: "Event list number as in the show, from 1." }
+      event:      { type: int, min: 1, required: true, label: Event, description: "Event number within the event list, from 1." }
     send: { address: "/eos/get/event/{event_list}/{event}" }
     returns: none
 
   get_event_by_index:
     summary: "Request the details of the event at a 0-based index in an event list"
     params:
-      event_list: { type: int, min: 1, required: true }
-      index:      { type: int, min: 0, required: true }
+      event_list: { type: int, min: 1, required: true, label: Event list, description: "Event list number as in the show, from 1." }
+      index:      { type: int, min: 0, required: true, label: Index, description: "Position of the event in the event list, counted from 0." }
     send: { address: "/eos/get/event/{event_list}/index/{index}" }
     returns: none
 
   get_patch:
     summary: "Request a patched channel's details"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
     send: { address: "/eos/get/patch/{channel}" }
     returns: none
 
   get_patch_part:
     summary: "Request a patched channel part's details"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      part:    { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
+      part:    { type: int, min: 1, required: true, label: Part, description: "Part number of the multi-part channel, from 1." }
     send: { address: "/eos/get/patch/{channel}/{part}" }
     returns: none
 
   get_params:
     summary: "Request a channel's parameters with current, minimum and maximum levels"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
     send: { address: "/eos/get/params/{channel}" }
     returns: none
 
   get_emitters:
     summary: "Request a channel's emitters with current, minimum and maximum levels"
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true, label: Channel, description: "Channel number from 1 to 99,999, as in the show's patch." }
     send: { address: "/eos/get/emitters/{channel}" }
     returns: none
 
   get_fpe_set:
     summary: "Request a focus point (FPE) set's details"
     params:
-      index: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, required: true, label: Index, description: "Position of the focus point (FPE) set in its list, counted from 0." }
     send: { address: "/eos/get/fpe/index/{index}" }
     returns: none
 
   get_fpe_point:
     summary: "Request one point of a focus point (FPE) set"
     params:
-      fpe_set: { type: int, min: 1, required: true }
-      point:   { type: int, min: 0, required: true }
+      fpe_set: { type: int, min: 1, required: true, label: Focus point set, description: "Focus point (FPE) set number, from 1." }
+      point:   { type: int, min: 0, required: true, label: Point, description: "Point within the focus point set, numbered from 0 as Eos accepts it." }
     send: { address: "/eos/get/fpe/{fpe_set}/{point}" }
     returns: none
 

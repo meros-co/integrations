@@ -35,7 +35,7 @@ source:
 settings:
   # The mixer's MIDI channel (Setup / Control / MIDI). Required: a wrong
   # channel makes every message miss.
-  midi_channel: { type: int, min: 1, max: 16, required: true }
+  midi_channel: { type: int, min: 1, max: 16, required: true, label: MIDI channel, description: "The mixer's MIDI channel from 1 to 16, as set in Setup > Control > MIDI; a wrong channel makes every message miss." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control }
@@ -81,49 +81,51 @@ commands:
         type: enum
         values: [input, stereo_input, fx_send, fx_return, mix, main, group, matrix, dca, mute_group]
         required: true
-      channel: &channel { type: int, min: 1, max: 32, required: true }
-      muted: { type: bool, default: true }
+        label: Channel type
+        description: "Kind of channel or master: input, stereo input, FX send, FX return, mix, main LR, group, matrix, DCA or mute group."
+      channel: &channel { type: int, min: 1, max: 32, required: true, label: Channel, description: "Number within the chosen type, from 1 as on the mixer (inputs up to 32); stereo mixes, groups and matrices are given by their odd number, so mix 5 is Mix 5-6." }
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the channel, off unmutes it." }
     returns: none
   set_level:
     summary: "Set a channel's fader (NRPN 17, index 07, p.5): level_db -45 to +10 by the p.13 table, or level_raw 0-127 where 0 is -inf"
     params:
       channel_type: *channel_type
       channel: *channel
-      level_db: &level_db { type: float, min: -45, max: 10 }
-      level_raw: &level_raw { type: int, min: 0, max: 127 }
+      level_db: &level_db { type: float, min: -45, max: 10, label: Level, description: "Level in dB from -45 to +10, following the mixer's level table; give this or the raw value." }
+      level_raw: &level_raw { type: int, min: 0, max: 127, label: Raw level, description: "Level as the mixer's 7-bit value from 0 (-inf) to 127; give this or the level in dB." }
     returns: none
   set_pan:
     summary: "Set a channel's pan to main (LR), a stereo mix, a group or a matrix (NRPN 16, p.5): pan -100 (left) to 100 (right) over 00-4A, or pan_raw"
     params:
       channel_type: *channel_type
       channel: *channel
-      destination_type: { type: enum, values: [main, mix, group, matrix], required: true }
-      destination: &destination { type: int, min: 1, max: 10, required: true }
-      pan: { type: float, min: -100, max: 100 }
-      pan_raw: { type: int, min: 0, max: 74 }
+      destination_type: { type: enum, values: [main, mix, group, matrix], required: true, label: Pan destination type, description: "Which pan to set: to main LR, or to a stereo mix, group or matrix." }
+      destination: &destination { type: int, min: 1, max: 10, required: true, label: Destination, description: "Mix, group, matrix or FX send number, from 1 as on the mixer; stereo destinations by their odd number (mix 5 is Mix 5-6); ignored for main LR." }
+      pan: { type: float, min: -100, max: 100, label: Pan, description: "Pan from -100 (fully left) through 0 (centre) to 100 (fully right); give this or the raw value." }
+      pan_raw: { type: int, min: 0, max: 74, label: Raw pan, description: "Pan as the mixer's value from 0 (left) through 37 (centre) to 74 (right); give this or the pan from -100 to 100." }
     returns: none
   set_main_assign:
     summary: "Assign a channel to LR or not (NRPN 18, p.5)"
     params:
       channel_type: *channel_type
       channel: *channel
-      assigned: { type: bool, default: true }
+      assigned: { type: bool, default: true, label: Assigned to LR, description: "On assigns the channel to main LR, off removes it." }
     returns: none
   set_send_assign:
     summary: "Assign a channel to a mix, LR, group, matrix or FX send (NRPN 55, p.5)"
     params:
       channel_type: *channel_type
       channel: *channel
-      destination_type: { type: enum, values: [mix, main, group, matrix, fx_send], required: true }
+      destination_type: { type: enum, values: [mix, main, group, matrix, fx_send], required: true, label: Destination type, description: "Where the channel is assigned: a mix, main LR, a group, a matrix or an FX send." }
       destination: *destination
-      assigned: { type: bool, default: true }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the destination, off removes it." }
     returns: none
   set_send_level:
     summary: "Set a send level to a mix, group (in mix mode), matrix or FX send (NRPN 20, p.6), as set_level"
     params:
       channel_type: *channel_type
       channel: *channel
-      destination_type: &send_destination { type: enum, values: [mix, group, matrix, fx_send], required: true }
+      destination_type: &send_destination { type: enum, values: [mix, group, matrix, fx_send], required: true, label: Destination type, description: "Where the send goes: a mix, a group (in mix mode), a matrix or an FX send." }
       destination: *destination
       level_db: *level_db
       level_raw: *level_raw
@@ -135,75 +137,75 @@ commands:
       channel: *channel
       destination_type: *send_destination
       destination: *destination
-      pre: { type: bool, required: true }
+      pre: { type: bool, required: true, label: Pre-fader, description: "On makes the send pre-fader, off makes it post-fader." }
     returns: none
   set_mute_group_assign:
     summary: "Assign a channel to mute group 1-4 or not (NRPN 5C: on 40-43, off 00-03, p.5)"
     params:
       channel_type: *channel_type
       channel: *channel
-      mute_group: { type: int, min: 1, max: 4, required: true }
-      assigned: { type: bool, default: true }
+      mute_group: { type: int, min: 1, max: 4, required: true, label: Mute group, description: "Mute group number from 1 to 4." }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the mute group, off removes it." }
     returns: none
   set_dca_assign:
     summary: "Assign a channel to DCA 1-4 or not (NRPN 40: on 40-43, off 00-03, p.6)"
     params:
       channel_type: *channel_type
       channel: *channel
-      dca: { type: int, min: 1, max: 4, required: true }
-      assigned: { type: bool, default: true }
+      dca: { type: int, min: 1, max: 4, required: true, label: DCA, description: "DCA number from 1 to 4." }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the DCA, off removes it." }
     returns: none
   set_pafl:
     summary: "Select a channel's PAFL (NRPN 51, p.6)"
-    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true } }
+    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true, label: PAFL, description: "On selects the channel's PAFL (listen), off clears it." } }
     returns: none
   set_usb_source:
     summary: "Switch a channel between its preamp (false) and its USB source (NRPN 12, p.6)"
-    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true } }
+    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true, label: USB source, description: "On feeds the channel from its USB source, off from its preamp." } }
     returns: none
   set_preamp_source:
     summary: "Switch a channel's preamp between the rear panel (local) and a remote AR rack (dsnake) (NRPN 57, p.6)"
     params:
       channel_type: *channel_type
       channel: *channel
-      source: { type: enum, values: [local, dsnake], required: true }
+      source: { type: enum, values: [local, dsnake], required: true, label: Preamp source, description: "local uses the mixer's rear-panel preamp; dsnake uses a remote AR rack preamp." }
     returns: none
   set_preamp_gain:
     summary: "Set a local preamp's gain (NRPN 19, index 07, p.6): gain_db -5 to +60 by the p.13 table, or gain_raw"
     params:
       channel_type: *channel_type
       channel: *channel
-      gain_db: { type: float, min: -5, max: 60 }
-      gain_raw: { type: int, min: 0, max: 127 }
+      gain_db: { type: float, min: -5, max: 60, label: Gain, description: "Local preamp gain in dB from -5 to +60, following the mixer's gain table; give this or the raw value." }
+      gain_raw: { type: int, min: 0, max: 127, label: Raw gain, description: "Local preamp gain as the mixer's value from 0 to 127; give this or the gain in dB." }
     returns: none
   set_phantom_power:
     summary: "Switch a local preamp's 48V (NRPN 69, p.6)"
-    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true } }
+    params: { channel_type: *channel_type, channel: *channel, enabled: { type: bool, default: true, label: "48V", description: "On switches the local preamp's 48V phantom power on, off switches it off." } }
     returns: none
   set_dsnake_gain:
     summary: "Set a dSNAKE (AR rack) preamp's gain (NRPN 58, index = socket 1-40 as 00-27, p.6): gain_db +5 to +60 by the p.13 table, or gain_raw"
     params:
       channel_type: *channel_type
       channel: *channel
-      socket: &socket { type: int, min: 1, max: 40, required: true }
-      gain_db: { type: float, min: 5, max: 60 }
-      gain_raw: { type: int, min: 0, max: 127 }
+      socket: &socket { type: int, min: 1, max: 40, required: true, label: dSNAKE socket, description: "Socket number on the AR rack (dSNAKE), from 1 to 40." }
+      gain_db: { type: float, min: 5, max: 60, label: Gain, description: "dSNAKE preamp gain in dB from +5 to +60, following the mixer's gain table; give this or the raw value." }
+      gain_raw: { type: int, min: 0, max: 127, label: Raw gain, description: "dSNAKE preamp gain as the mixer's value from 0 to 127; give this or the gain in dB." }
     returns: none
   set_dsnake_pad:
     summary: "Switch a dSNAKE preamp's pad (NRPN 59, p.6)"
-    params: { channel_type: *channel_type, channel: *channel, socket: *socket, enabled: { type: bool, default: true } }
+    params: { channel_type: *channel_type, channel: *channel, socket: *socket, enabled: { type: bool, default: true, label: Pad, description: "On switches the dSNAKE preamp's pad in, off switches it out." } }
     returns: none
   set_dsnake_phantom_power:
     summary: "Switch a dSNAKE preamp's 48V (NRPN 5A, p.6)"
-    params: { channel_type: *channel_type, channel: *channel, socket: *socket, enabled: { type: bool, default: true } }
+    params: { channel_type: *channel_type, channel: *channel, socket: *socket, enabled: { type: bool, default: true, label: "48V", description: "On switches the dSNAKE preamp's 48V phantom power on, off switches it off." } }
     returns: none
   set_trim:
     summary: "Set the digital trim of an input's USB source (NRPN 52) or a stereo input's trim (NRPN 54) (p.7): trim_db -24 to +24, or trim_raw (0 dB is 40)"
     params:
-      channel_type: { type: enum, values: [input, stereo_input], required: true }
+      channel_type: { type: enum, values: [input, stereo_input], required: true, label: Channel type, description: "input sets the digital trim of an input's USB source; stereo_input sets a stereo input's trim." }
       channel: *channel
-      trim_db: { type: float, min: -24, max: 24 }
-      trim_raw: { type: int, min: 0, max: 127 }
+      trim_db: { type: float, min: -24, max: 24, label: Trim, description: "Trim in dB from -24 to +24, spaced evenly between the documented ends; give this or the raw value." }
+      trim_raw: { type: int, min: 0, max: 127, label: Raw trim, description: "Trim as the mixer's value from 0 (-24 dB) to 127 (+24 dB), 64 being 0 dB; give this or the trim in dB." }
     returns: none
   set_processing:
     summary: "Set a processing parameter to its raw value 0-127 (p.7-8): PEQ, HPF, gate, compressor, delay, polarity, insert and GEQ in/out; the document gives each range by its ends"
@@ -218,40 +220,42 @@ commands:
           compressor_type, compressor_attack, compressor_release, compressor_knee, compressor_ratio,
           compressor_threshold, compressor_gain, compressor_in, polarity, insert_in, delay_time, delay_in, geq_in]
         required: true
-      value: { type: int, min: 0, max: 127, required: true }
+        label: Processing parameter
+        description: "Which processing control to set: a PEQ band's gain, frequency, width or type, the HPF, gate, compressor, polarity, insert, delay, or an in/out switch."
+      value: { type: int, min: 0, max: 127, required: true, label: Raw value, description: "The control's raw value from 0 to 127; the mixer's document gives only each control's ends, so values between are not mapped to units." }
     returns: none
   set_geq_band:
     summary: "Set a GEQ band's gain, raw 0-127 for -12 to +12 dB (NRPN 70, index = band 1-28, 31.5 Hz to 16 kHz, p.7, p.13)"
     params:
       channel_type: *channel_type
       channel: *channel
-      band: { type: int, min: 1, max: 28, required: true }
-      value: { type: int, min: 0, max: 127, required: true }
+      band: { type: int, min: 1, max: 28, required: true, label: GEQ band, description: "GEQ band from 1 (31.5 Hz) to 28 (16 kHz)." }
+      value: { type: int, min: 0, max: 127, required: true, label: Raw gain, description: "Band gain as a raw value from 0 (-12 dB) to 127 (+12 dB)." }
     returns: none
   set_fx_delay_time:
     summary: "Set an FX delay tap time (NRPN 49 fine then 48 coarse, index 05 left or 07 right, p.9); examples p.13: 5 ms 00 00, 100 ms 44 31, 1.36 s 7F 7F (coarse, fine)"
     params:
       channel_type: *channel_type
       channel: *channel
-      tap: { type: enum, values: [left, right], required: true }
-      coarse: { type: int, min: 0, max: 127, required: true }
-      fine: { type: int, min: 0, max: 127 }
+      tap: { type: enum, values: [left, right], required: true, label: Tap, description: "Which delay tap to set, left or right." }
+      coarse: { type: int, min: 0, max: 127, required: true, label: Coarse time, description: "Coarse part of the delay time as a raw value from 0 to 127; with fine, 0 0 is 5 ms and 127 127 is 1.36 s." }
+      fine: { type: int, min: 0, max: 127, label: Fine time, description: "Fine part of the delay time as a raw value from 0 to 127, added to the coarse part." }
     returns: none
   set_fx_delay_link:
     summary: "Link or unlink an FX delay's left and right taps (NRPN 48, index 06: 7F linked, 00 unlinked, p.9)"
-    params: { channel_type: *channel_type, channel: *channel, linked: { type: bool, required: true } }
+    params: { channel_type: *channel_type, channel: *channel, linked: { type: bool, required: true, label: Linked, description: "On links the delay's left and right taps, off unlinks them." } }
     returns: none
   recall_scene:
     summary: "Recall scene 1-100 (Bank 1 select BN 00 00 BN 20 00, then CN SS, p.9)"
     params:
-      scene: { type: int, min: 1, max: 100, required: true }
+      scene: { type: int, min: 1, max: 100, required: true, label: Scene, description: "Scene number from 1 to 100, as on the mixer." }
     returns: none
   set_channel_name:
     summary: "Name a channel (SysEx 03 CH Name, printable ASCII, p.11)"
     params:
       channel_type: *channel_type
       channel: *channel
-      name: { type: string, pattern: "^[ -~]*$", required: true }
+      name: { type: string, pattern: "^[ -~]*$", required: true, label: Name, description: "Channel name in printable ASCII, as shown on the mixer." }
     returns: none
   get_channel_name:
     summary: "Read a channel's name (SysEx 01 CH, reply 02 CH Name, p.11)"
@@ -263,7 +267,7 @@ commands:
   raw_midi:
     summary: "Send MIDI bytes given as hex, for messages not modelled here"
     params:
-      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true, label: MIDI bytes, description: "MIDI bytes as hexadecimal pairs, spaces allowed, for messages this integration does not model." }
     returns: none
   refresh:
     summary: "Ask for the mixer's whole state again (Get System State) and every channel's name"
