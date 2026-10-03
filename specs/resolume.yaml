@@ -85,7 +85,7 @@ settings:
   # A safety re-read of the composition over REST, in seconds (0 for none),
   # restarted by every composition Resolume sends. Only for what the
   # websocket cannot report: a deck closed or opened from Resolume itself.
-  composition_refresh_s: { type: int, min: 0, max: 3600, default: 60 }
+  composition_refresh_s: { type: int, min: 0, max: 3600, default: 60, label: Composition refresh, description: "Seconds without a composition from Resolume before it is read again, to catch a deck closed or opened in Resolume; 0 turns it off." }
 
 ports:
   - { port: 8080, protocol: http, role: control }
@@ -156,7 +156,7 @@ commands:
   set_composition_master:
     summary: Set the composition master level, 0.0 to 1.0 (replace_composition, master RangeParameter)
     params:
-      level: { type: float, min: 0.0, max: 1.0, required: true }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Master, description: "Composition master level from 0.0 (off) to 1.0 (full)." }
     send: { method: PUT, path: /api/v1/composition, body: '{"master":{"value":{level:.3f}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -164,7 +164,7 @@ commands:
   set_composition_opacity:
     summary: Set the composition video opacity, 0.0 to 1.0 (replace_composition, video.opacity RangeParameter)
     params:
-      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+      opacity: { type: float, min: 0.0, max: 1.0, required: true, label: Opacity, description: "Composition video opacity from 0.0 (transparent) to 1.0 (opaque)." }
     send: { method: PUT, path: /api/v1/composition, body: '{"video":{"opacity":{"value":{opacity:.3f}}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -172,7 +172,7 @@ commands:
   set_composition_speed:
     summary: Set the composition speed RangeParameter value (replace_composition, speed); the document gives no range, see quirks
     params:
-      speed: { type: float, required: true }
+      speed: { type: float, required: true, label: Speed, description: "Speed value; the range is the parameter's own min and max, which Resolume reports and the document does not give." }
     send: { method: PUT, path: /api/v1/composition, body: '{"speed":{"value":{speed:.3f}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -180,7 +180,7 @@ commands:
   set_composition_bypassed:
     summary: Bypass or un-bypass the composition (replace_composition, bypassed BooleanParameter)
     params:
-      bypassed: { type: bool, default: true }
+      bypassed: { type: bool, default: true, label: Bypass, description: "On bypasses the composition, off returns it to the output." }
     send: { method: PUT, path: /api/v1/composition, body: '{"bypassed":{"value":{bypassed}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -188,7 +188,7 @@ commands:
   set_crossfader:
     summary: Set the crossfader phase RangeParameter value (replace_composition, crossfader.phase); the document gives no range, see quirks
     params:
-      phase: { type: float, required: true }
+      phase: { type: float, required: true, label: Crossfader phase, description: "Crossfader position; the range is the parameter's own min and max, which Resolume reports and the document does not give." }
     send: { method: PUT, path: /api/v1/composition, body: '{"crossfader":{"phase":{"value":{phase:.3f}}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -196,7 +196,7 @@ commands:
   set_tempo:
     summary: Set the composition tempo in BPM (replace_composition, tempocontroller.tempo RangeParameter); the document gives no range, see quirks
     params:
-      bpm: { type: float, required: true }
+      bpm: { type: float, required: true, label: Tempo, description: "Composition tempo in BPM; the allowed range is not documented." }
     send: { method: PUT, path: /api/v1/composition, body: '{"tempocontroller":{"tempo":{"value":{bpm:.2f}}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -208,7 +208,7 @@ commands:
       This is how tempo tap, resync, tempo push and pull, and crossfader side A
       and B are pressed; their ids are in the state under tempo.* and crossfader.*.
     params:
-      parameter_id: { type: int, min: 1, required: true }
+      parameter_id: { type: int, min: 1, required: true, label: Parameter ID, description: "Unique id of the button-type parameter, such as the tempo tap or crossfader side ids held in the state." }
     send: { method: POST, path: "/api/v1/parameter/by-id/{parameter_id}/trigger" }
     expect: { status: 204 }
     returns: ack
@@ -216,7 +216,7 @@ commands:
   get_parameter:
     summary: The value of any parameter, by its unique id (get_parameter_by_id)
     params:
-      parameter_id: { type: int, min: 1, required: true }
+      parameter_id: { type: int, min: 1, required: true, label: Parameter ID, description: "Unique parameter id from the composition reply, which stays the same across sessions and reordering." }
     send: { method: GET, path: "/api/v1/parameter/by-id/{parameter_id}" }
     expect: { status: 200, json_path: "$.value" }
     returns: value
@@ -227,8 +227,8 @@ commands:
       JSON in the shape of the document's parameter schema for that parameter's
       type, such as {"value": 0.5} for a RangeParameter.
     params:
-      parameter_id: { type: int, min: 1, required: true }
-      body: { type: json, required: true }
+      parameter_id: { type: int, min: 1, required: true, label: Parameter ID, description: "Unique parameter id from the composition reply, which stays the same across sessions and reordering." }
+      body: { type: json, required: true, label: Value, description: "JSON in the shape of the document's parameter schema for that parameter's type, such as {\"value\": 0.5} for a RangeParameter." }
     send: { method: PUT, path: "/api/v1/parameter/by-id/{parameter_id}", body: "{body}", content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -236,7 +236,7 @@ commands:
   reset_parameter:
     summary: Reset a parameter to its default value, by its unique id (reset_parameter_by_id)
     params:
-      parameter_id: { type: int, min: 1, required: true }
+      parameter_id: { type: int, min: 1, required: true, label: Parameter ID, description: "Unique parameter id from the composition reply, which stays the same across sessions and reordering." }
     send: { method: POST, path: "/api/v1/parameter/by-id/{parameter_id}/reset" }
     expect: { status: 204 }
     returns: ack
@@ -265,7 +265,7 @@ commands:
       Open a composition file (open_composition). The file is a percent-encoded
       file:/// URL, such as file:///C:/Shows/Main%20Show.avc.
     params:
-      file_url: { type: string, pattern: "^file:///", required: true }
+      file_url: { type: string, pattern: "^file:///", required: true, label: Composition file, description: "Percent-encoded file:/// URL with forward slashes, such as file:///C:/Shows/Main%20Show.avc." }
     send: { method: POST, path: /api/v1/composition/open, body: "{file_url}", content_type: text/plain }
     expect: { status: 204 }
     returns: ack
@@ -298,7 +298,7 @@ commands:
   trigger_column:
     summary: Connect a column, as a short click (column_connect with no body sends press and release)
     params:
-      column: { type: int, min: 1, required: true }
+      column: { type: int, min: 1, required: true, label: Column, description: "Column position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/columns/{column}/connect" }
     expect: { status: 204 }
     returns: ack
@@ -306,8 +306,8 @@ commands:
   press_column:
     summary: Press (true) or release (false) a column's connect button, as the mouse would (column_connect with a boolean body)
     params:
-      column:  { type: int, min: 1, required: true }
-      pressed: { type: bool, default: true }
+      column:  { type: int, min: 1, required: true, label: Column, description: "Column position, numbered from 1; positions change when items are reordered, added or removed." }
+      pressed: { type: bool, default: true, label: Pressed, description: "On presses the column's connect button and off releases it; a press must be followed by a release." }
     send: { method: POST, path: "/api/v1/composition/columns/{column}/connect", body: "{pressed}", content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -315,7 +315,7 @@ commands:
   select_column:
     summary: Select a column (column_select)
     params:
-      column: { type: int, min: 1, required: true }
+      column: { type: int, min: 1, required: true, label: Column, description: "Column position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/columns/{column}/select" }
     expect: { status: 204 }
     returns: ack
@@ -323,7 +323,7 @@ commands:
   get_column:
     summary: A column's properties (get_column)
     params:
-      column: { type: int, min: 1, required: true }
+      column: { type: int, min: 1, required: true, label: Column, description: "Column position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/columns/{column}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -331,7 +331,7 @@ commands:
   get_column_name:
     summary: A column's name (get_column, name.value)
     params:
-      column: { type: int, min: 1, required: true }
+      column: { type: int, min: 1, required: true, label: Column, description: "Column position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/columns/{column}" }
     expect: { status: 200, json_path: "$.name.value" }
     returns: value
@@ -339,8 +339,8 @@ commands:
   set_column_name:
     summary: Rename a column (replace_column, name StringParameter)
     params:
-      column: { type: int, min: 1, required: true }
-      name:   { type: string, required: true }
+      column: { type: int, min: 1, required: true, label: Column, description: "Column position, numbered from 1; positions change when items are reordered, added or removed." }
+      name:   { type: string, required: true, label: Name, description: "New column name as shown in Resolume." }
     send: { method: PUT, path: "/api/v1/composition/columns/{column}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -349,7 +349,7 @@ commands:
   clear_layer:
     summary: Disconnect the playing clip in a layer (layer_clear); the clip itself is kept
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clear" }
     expect: { status: 204 }
     returns: ack
@@ -363,7 +363,7 @@ commands:
   clear_layer_clips:
     summary: Remove every clip's tracks and settings from a layer (layer_clear_clips); this empties the clip slots
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clearclips" }
     expect: { status: 204 }
     returns: ack
@@ -371,7 +371,7 @@ commands:
   select_layer:
     summary: Select a layer (layer_select)
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/select" }
     expect: { status: 204 }
     returns: ack
@@ -379,8 +379,8 @@ commands:
   set_layer_opacity:
     summary: Set a layer's video opacity, 0.0 to 1.0 (replace_layer, video.opacity RangeParameter)
     params:
-      layer:   { type: int, min: 1, required: true }
-      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+      layer:   { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      opacity: { type: float, min: 0.0, max: 1.0, required: true, label: Opacity, description: "Layer video opacity from 0.0 (transparent) to 1.0 (opaque)." }
     send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"video":{"opacity":{"value":{opacity:.3f}}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -388,8 +388,8 @@ commands:
   set_layer_master:
     summary: Set a layer's master level, 0.0 to 1.0 (replace_layer, master RangeParameter)
     params:
-      layer: { type: int, min: 1, required: true }
-      level: { type: float, min: 0.0, max: 1.0, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Master, description: "Layer master level from 0.0 (off) to 1.0 (full)." }
     send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"master":{"value":{level:.3f}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -397,8 +397,8 @@ commands:
   set_layer_bypassed:
     summary: Bypass or un-bypass a layer (replace_layer, bypassed BooleanParameter)
     params:
-      layer:    { type: int, min: 1, required: true }
-      bypassed: { type: bool, default: true }
+      layer:    { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      bypassed: { type: bool, default: true, label: Bypass, description: "On bypasses the layer, off returns it to the output." }
     send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"bypassed":{"value":{bypassed}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -406,8 +406,8 @@ commands:
   set_layer_solo:
     summary: Solo or un-solo a layer (replace_layer, solo BooleanParameter)
     params:
-      layer: { type: int, min: 1, required: true }
-      solo:  { type: bool, default: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      solo:  { type: bool, default: true, label: Solo, description: "On solos the layer, off releases the solo." }
     send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"solo":{"value":{solo}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -415,8 +415,8 @@ commands:
   set_layer_name:
     summary: Rename a layer (replace_layer, name StringParameter)
     params:
-      layer: { type: int, min: 1, required: true }
-      name:  { type: string, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      name:  { type: string, required: true, label: Name, description: "New layer name as shown in Resolume." }
     send: { method: PUT, path: "/api/v1/composition/layers/{layer}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -424,7 +424,7 @@ commands:
   get_layer:
     summary: A layer's properties and all of its clips (get_layer)
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -432,7 +432,7 @@ commands:
   get_layer_name:
     summary: A layer's name (get_layer, name.value)
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}" }
     expect: { status: 200, json_path: "$.name.value" }
     returns: value
@@ -440,7 +440,7 @@ commands:
   get_active_clip:
     summary: The clip playing in a layer (get_layer_active_clip)
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/active" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -448,7 +448,7 @@ commands:
   get_active_clip_name:
     summary: The name of the clip playing in a layer (get_layer_active_clip, name.value)
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/active" }
     expect: { status: 200, json_path: "$.name.value" }
     returns: value
@@ -457,8 +457,8 @@ commands:
   trigger_clip:
     summary: Connect a clip, as a short click (clip_connect with no body sends press and release)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/connect" }
     expect: { status: 204 }
     returns: ack
@@ -466,9 +466,9 @@ commands:
   press_clip:
     summary: Press (true) or release (false) a clip, as the mouse would (clip_connect with a boolean body)
     params:
-      layer:   { type: int, min: 1, required: true }
-      clip:    { type: int, min: 1, required: true }
-      pressed: { type: bool, default: true }
+      layer:   { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:    { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
+      pressed: { type: bool, default: true, label: Pressed, description: "On presses the clip and off releases it; a press must be followed by a release." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/connect", body: "{pressed}", content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -482,8 +482,8 @@ commands:
   select_clip:
     summary: Select a clip (clip_select)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/select" }
     expect: { status: 204 }
     returns: ack
@@ -491,8 +491,8 @@ commands:
   get_clip:
     summary: A clip's properties and effects (get_clip_by_position)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/{clip}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -500,8 +500,8 @@ commands:
   get_clip_name:
     summary: A clip's name (get_clip_by_position, name.value)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/{clip}" }
     expect: { status: 200, json_path: "$.name.value" }
     returns: value
@@ -509,8 +509,8 @@ commands:
   get_clip_connected:
     summary: A clip's connection state, such as Connected or Empty (get_clip_by_position, connected.value)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layers/{layer}/clips/{clip}" }
     expect: { status: 200, json_path: "$.connected.value" }
     returns: value
@@ -518,9 +518,9 @@ commands:
   set_clip_name:
     summary: Rename a clip (replace_clip_by_position, name StringParameter)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
-      name:  { type: string, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
+      name:  { type: string, required: true, label: Name, description: "New clip name as shown in Resolume." }
     send: { method: PUT, path: "/api/v1/composition/layers/{layer}/clips/{clip}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -530,9 +530,9 @@ commands:
       Load a file or source into a clip slot (clip_open). The body is a
       percent-encoded file:/// URL, or source:///video/<source name>.
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
-      url:   { type: string, pattern: "^(file|source):///", required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
+      url:   { type: string, pattern: "^(file|source):///", required: true, label: File or source, description: "Percent-encoded file:/// URL with forward slashes, or source:///video/ followed by a source name." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/open", body: "{url}", content_type: text/plain }
     expect: { status: 204 }
     returns: ack
@@ -540,8 +540,8 @@ commands:
   clear_clip:
     summary: Empty a clip slot, removing its tracks and settings (clip_clear)
     params:
-      layer: { type: int, min: 1, required: true }
-      clip:  { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true, label: Layer, description: "Layer position in the active deck, numbered from 1; positions change when items are reordered, added or removed." }
+      clip:  { type: int, min: 1, required: true, label: Clip, description: "Clip position in the layer, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layers/{layer}/clips/{clip}/clear" }
     expect: { status: 204 }
     returns: ack
@@ -550,7 +550,7 @@ commands:
   select_deck:
     summary: Select a deck (deck_select)
     params:
-      deck: { type: int, min: 1, required: true }
+      deck: { type: int, min: 1, required: true, label: Deck, description: "Deck position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/decks/{deck}/select" }
     expect: { status: 204 }
     returns: ack
@@ -558,7 +558,7 @@ commands:
   get_deck:
     summary: A deck's properties (get_deck)
     params:
-      deck: { type: int, min: 1, required: true }
+      deck: { type: int, min: 1, required: true, label: Deck, description: "Deck position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/decks/{deck}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -566,7 +566,7 @@ commands:
   get_deck_name:
     summary: A deck's name (get_deck, name.value)
     params:
-      deck: { type: int, min: 1, required: true }
+      deck: { type: int, min: 1, required: true, label: Deck, description: "Deck position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/decks/{deck}" }
     expect: { status: 200, json_path: "$.name.value" }
     returns: value
@@ -574,8 +574,8 @@ commands:
   set_deck_name:
     summary: Rename a deck (replace_deck, name StringParameter)
     params:
-      deck: { type: int, min: 1, required: true }
-      name: { type: string, required: true }
+      deck: { type: int, min: 1, required: true, label: Deck, description: "Deck position, numbered from 1; positions change when items are reordered, added or removed." }
+      name: { type: string, required: true, label: Name, description: "New deck name as shown in Resolume." }
     send: { method: PUT, path: "/api/v1/composition/decks/{deck}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -583,7 +583,7 @@ commands:
   open_deck:
     summary: Re-open a closed deck (composition_open_deck)
     params:
-      deck: { type: int, min: 1, required: true }
+      deck: { type: int, min: 1, required: true, label: Deck, description: "Deck position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/decks/{deck}/open" }
     expect: { status: 204 }
     returns: ack
@@ -591,7 +591,7 @@ commands:
   close_deck:
     summary: Close a deck (composition_close_deck)
     params:
-      deck: { type: int, min: 1, required: true }
+      deck: { type: int, min: 1, required: true, label: Deck, description: "Deck position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/decks/{deck}/close" }
     expect: { status: 204 }
     returns: ack
@@ -600,7 +600,7 @@ commands:
   clear_group:
     summary: Disconnect the playing clips in a layer group, as a short click (layer_group_clear, no body)
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layergroups/{group}/clear" }
     expect: { status: 204 }
     returns: ack
@@ -608,7 +608,7 @@ commands:
   select_group:
     summary: Select a layer group (layergroup_select)
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layergroups/{group}/select" }
     expect: { status: 204 }
     returns: ack
@@ -616,8 +616,8 @@ commands:
   trigger_group_column:
     summary: Connect a column within a layer group, as a short click (layer_group_column_connect, no body)
     params:
-      group:  { type: int, min: 1, required: true }
-      column: { type: int, min: 1, required: true }
+      group:  { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      column: { type: int, min: 1, required: true, label: Column, description: "Column position within the layer group, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: POST, path: "/api/v1/composition/layergroups/{group}/columns/{column}/connect" }
     expect: { status: 204 }
     returns: ack
@@ -625,8 +625,8 @@ commands:
   set_group_master:
     summary: Set a layer group's master level, 0.0 to 1.0 (replace_layergroup, master RangeParameter)
     params:
-      group: { type: int, min: 1, required: true }
-      level: { type: float, min: 0.0, max: 1.0, required: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Master, description: "Layer group master level from 0.0 (off) to 1.0 (full)." }
     send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"master":{"value":{level:.3f}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -634,8 +634,8 @@ commands:
   set_group_opacity:
     summary: Set a layer group's video opacity, 0.0 to 1.0 (replace_layergroup, video.opacity RangeParameter)
     params:
-      group:   { type: int, min: 1, required: true }
-      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+      group:   { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      opacity: { type: float, min: 0.0, max: 1.0, required: true, label: Opacity, description: "Layer group video opacity from 0.0 (transparent) to 1.0 (opaque)." }
     send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"video":{"opacity":{"value":{opacity:.3f}}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -643,8 +643,8 @@ commands:
   set_group_speed:
     summary: Set a layer group's speed RangeParameter value (replace_layergroup, speed); the document gives no range, see quirks
     params:
-      group: { type: int, min: 1, required: true }
-      speed: { type: float, required: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      speed: { type: float, required: true, label: Speed, description: "Speed value; the range is the parameter's own min and max, which Resolume reports and the document does not give." }
     send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"speed":{"value":{speed:.3f}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -652,8 +652,8 @@ commands:
   set_group_bypassed:
     summary: Bypass or un-bypass a layer group (replace_layergroup, bypassed BooleanParameter)
     params:
-      group:    { type: int, min: 1, required: true }
-      bypassed: { type: bool, default: true }
+      group:    { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      bypassed: { type: bool, default: true, label: Bypass, description: "On bypasses the layer group, off returns it to the output." }
     send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"bypassed":{"value":{bypassed}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -661,8 +661,8 @@ commands:
   set_group_solo:
     summary: Solo or un-solo a layer group (replace_layergroup, solo BooleanParameter)
     params:
-      group: { type: int, min: 1, required: true }
-      solo:  { type: bool, default: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      solo:  { type: bool, default: true, label: Solo, description: "On solos the layer group, off releases the solo." }
     send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"solo":{"value":{solo}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -670,8 +670,8 @@ commands:
   set_group_name:
     summary: Rename a layer group (replace_layergroup, name StringParameter)
     params:
-      group: { type: int, min: 1, required: true }
-      name:  { type: string, required: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
+      name:  { type: string, required: true, label: Name, description: "New layer group name as shown in Resolume." }
     send: { method: PUT, path: "/api/v1/composition/layergroups/{group}", body: '{"name":{"value":{name:json}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -679,7 +679,7 @@ commands:
   get_group:
     summary: A layer group's properties and its layers (get_layergroup)
     params:
-      group: { type: int, min: 1, required: true }
+      group: { type: int, min: 1, required: true, label: Layer group, description: "Layer group position, numbered from 1; positions change when items are reordered, added or removed." }
     send: { method: GET, path: "/api/v1/composition/layergroups/{group}" }
     expect: { status: 200, json_path: "$" }
     returns: value

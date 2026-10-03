@@ -69,66 +69,66 @@ commands:
   set_controller:
     summary: "CS: move a controller to an absolute position, 0-65535"
     params:
-      controller: &controller { type: int, min: 1, max: 10000, required: true }
-      position: &position { type: int, min: 0, max: 65535, required: true }
+      controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number as fixed by the Jupiter app, read from the Custom Preset Parameter Browser." }
+      position: { type: int, min: 0, max: 65535, required: true, label: Position, description: "Absolute controller position from 0 (minimum) to 65535 (maximum)." }
     send: "CS {controller} {position}"
     expect: &ack { matches: "^ACK\\s*$" }
     returns: ack
   increment_controller:
     summary: "CC <n> 1 <amount>: raise a controller's position, limited to 65535"
-    params: { controller: *controller, amount: &amount { type: int, min: 0, max: 65535, required: true } }
+    params: { controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number as fixed by the Jupiter app, read from the Custom Preset Parameter Browser." }, amount: { type: int, min: 0, max: 65535, required: true, label: Amount, description: "How far to raise the position, in steps of the 0 to 65535 range; the result stops at 65535." } }
     send: "CC {controller} 1 {amount}"
     expect: *ack
     returns: ack
   decrement_controller:
     summary: "CC <n> 0 <amount>: lower a controller's position, limited to 0"
-    params: { controller: *controller, amount: *amount }
+    params: { controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number as fixed by the Jupiter app, read from the Custom Preset Parameter Browser." }, amount: { type: int, min: 0, max: 65535, required: true, label: Amount, description: "How far to lower the position, in steps of the 0 to 65535 range; the result stops at 0." } }
     send: "CC {controller} 0 {amount}"
     expect: *ack
     returns: ack
   get_controller:
     summary: "GS: a controller's position (0-65535)"
-    params: { controller: *controller }
+    params: { controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number as fixed by the Jupiter app, read from the Custom Preset Parameter Browser." } }
     send: "GS {controller}"
     expect: { matches: "^\\s*(\\d+)\\s*$" }
     returns: value
   read_controller_block:
     summary: "GSB2: read up to 256 consecutive controllers into controllers.<n>.value (answered as #nnnnn=vvvvv lines)"
     params:
-      controller: *controller
-      count: { type: int, min: 1, max: 256, required: true }
+      controller: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "First controller number of the block, as fixed by the Jupiter app." }
+      count: { type: int, min: 1, max: 256, required: true, label: Count, description: "How many consecutive controllers to read, starting at the first controller." }
     send: "GSB2 {controller} {count}"
     returns: none
   set_fader_db:
     summary: "CS with a level in dB for a -72 to +12 dB volume fader"
     params:
-      controller: *controller
-      level_db: { type: float, min: -72, max: 12, required: true }
+      controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number of a -72 to +12 dB volume fader, as fixed by the Jupiter app." }
+      level_db: { type: float, min: -72, max: 12, required: true, label: Level, description: "Fader level in dB, from -72 to +12." }
     send: "CS {controller} {level_db:to.symetrix_fader:.0f}"
     expect: *ack
     returns: ack
   get_fader_db:
     summary: "GS: a -72 to +12 dB volume fader's level in dB"
-    params: { controller: *controller }
+    params: { controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number of a -72 to +12 dB volume fader, as fixed by the Jupiter app." } }
     send: "GS {controller}"
     expect: { matches: "^\\s*(\\d+)\\s*$", convert: symetrix_fader }
     returns: value
   button_on:
     summary: "CS <n> 65535: press a button (some Jupiter buttons are negative logic: see the app's appendix)"
-    params: { controller: *controller }
+    params: { controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number of the button, as fixed by the Jupiter app; some buttons use negative logic, so this turns them off." } }
     send: "CS {controller} 65535"
     expect: *ack
     returns: ack
   button_off:
     summary: "CS <n> 0: release a button"
-    params: { controller: *controller }
+    params: { controller: { type: int, min: 1, max: 10000, required: true, label: Controller, description: "Controller number of the button, as fixed by the Jupiter app; some buttons use negative logic, so this turns them on." } }
     send: "CS {controller} 0"
     expect: *ack
     returns: ack
   load_preset:
     summary: "LP: load a preset, 1-50"
     params:
-      preset: { type: int, min: 1, max: 50, required: true }
+      preset: { type: int, min: 1, max: 50, required: true, label: Preset, description: "Preset to load, numbered from 1 as in the Jupiter software; it changes every parameter it holds." }
     send: "LP {preset}"
     expect: *ack
     returns: ack
@@ -145,7 +145,7 @@ commands:
   set_push_global:
     summary: "PU 1 / PU 0: turn pushing on or off for the whole unit"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Push, description: "On lets the unit push changed values, off stops all pushing." }
     send: "PU {enabled:bool01}"
     expect: *ack
     returns: ack
@@ -156,7 +156,7 @@ commands:
     returns: ack
   push_enable_range:
     summary: "PUE <low> <high>: enable push for a range of controllers"
-    params: { low: *controller, high: *controller }
+    params: { low: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "Lowest controller number in the range, inclusive." }, high: { type: int, min: 1, max: 10000, required: true, label: Last controller, description: "Highest controller number in the range, inclusive." } }
     send: "PUE {low} {high}"
     expect: *ack
     returns: ack
@@ -167,7 +167,7 @@ commands:
     returns: ack
   push_disable_range:
     summary: "PUD <low> <high>: disable push for a range of controllers"
-    params: { low: *controller, high: *controller }
+    params: { low: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "Lowest controller number in the range, inclusive." }, high: { type: int, min: 1, max: 10000, required: true, label: Last controller, description: "Highest controller number in the range, inclusive." } }
     send: "PUD {low} {high}"
     expect: *ack
     returns: ack
@@ -178,7 +178,7 @@ commands:
     returns: ack
   push_refresh_range:
     summary: "PUR <low> <high>: push a range of controllers now"
-    params: { low: *controller, high: *controller }
+    params: { low: { type: int, min: 1, max: 10000, required: true, label: First controller, description: "Lowest controller number in the range, inclusive." }, high: { type: int, min: 1, max: 10000, required: true, label: Last controller, description: "Highest controller number in the range, inclusive." } }
     send: "PUR {low} {high}"
     expect: *ack
     returns: ack
@@ -190,15 +190,15 @@ commands:
   set_push_interval:
     summary: "PUI: the minimum time between pushes, 20-30000 ms (100 at power-up)"
     params:
-      interval_ms: { type: int, min: 20, max: 30000, required: true }
+      interval_ms: { type: int, min: 20, max: 30000, required: true, label: Push interval, description: "Minimum time between pushes in milliseconds; the unit starts at 100 ms." }
     send: "PUI {interval_ms}"
     expect: *ack
     returns: ack
   set_push_threshold:
     summary: "PUT: how far a value must move before it is pushed again, for parameters and meters"
     params:
-      parameter_threshold: { type: int, min: 0, max: 65535, required: true }
-      meter_threshold: { type: int, min: 0, max: 65535, required: true }
+      parameter_threshold: { type: int, min: 0, max: 65535, required: true, label: Parameter threshold, description: "How far a parameter must move, in steps of the 0 to 65535 range, before it is pushed again." }
+      meter_threshold: { type: int, min: 0, max: 65535, required: true, label: Meter threshold, description: "How far a meter must move, in steps of the 0 to 65535 range, before it is pushed again." }
     send: "PUT {parameter_threshold} {meter_threshold}"
     expect: *ack
     returns: ack

@@ -37,8 +37,8 @@ transport:
 
 settings:
   # The Live Panel password; the guide gives admin / admin as the default.
-  username: { type: string, default: admin }
-  password: { type: string, secret: true, default: admin }
+  username: { type: string, default: admin, label: Username, description: "The user name for the TriCaster's web interface, admin unless changed." }
+  password: { type: string, secret: true, default: admin, label: Password, description: "The password for the TriCaster's web interface, admin unless changed." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -89,7 +89,7 @@ commands:
       Select a source on the program row by its internal name, such as input1,
       ddr1, gfx1 or bfr2
     params:
-      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true }
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Internal source name, such as input1, ddr1, gfx1 or bfr2." }
     send:
       method: GET
       path: /v1/shortcut
@@ -100,7 +100,7 @@ commands:
   set_preview:
     summary: Select a source on the preview row by its internal name
     params:
-      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true }
+      source: { type: string, pattern: "^[a-z0-9_]+$", max_length: 32, required: true, label: Source, description: "Internal source name, such as input1, ddr1, gfx1 or bfr2." }
     send:
       method: GET
       path: /v1/shortcut
@@ -111,7 +111,7 @@ commands:
   dsk_take:
     summary: Take a downstream key layer on or off
     params:
-      dsk: { type: int, min: 1, max: 4, required: true }
+      dsk: { type: int, min: 1, max: 4, required: true, label: DSK, description: "Downstream key layer, numbered from 1 as on the switcher." }
     send: { method: GET, path: /v1/shortcut, query: { name: "main_dsk{dsk}_take" } }
     expect: { status: 200 }
     returns: ack
@@ -119,7 +119,7 @@ commands:
   dsk_auto:
     summary: Auto-transition a downstream key layer on or off
     params:
-      dsk: { type: int, min: 1, max: 4, required: true }
+      dsk: { type: int, min: 1, max: 4, required: true, label: DSK, description: "Downstream key layer, numbered from 1 as on the switcher." }
     send: { method: GET, path: /v1/shortcut, query: { name: "main_dsk{dsk}_auto" } }
     expect: { status: 200 }
     returns: ack
@@ -151,7 +151,7 @@ commands:
   ddr_play:
     summary: Play a DDR media player
     params:
-      ddr: { type: int, min: 1, max: 4, required: true }
+      ddr: { type: int, min: 1, max: 4, required: true, label: DDR, description: "DDR media player, numbered from 1 as on the TriCaster." }
     send: { method: GET, path: /v1/shortcut, query: { name: "ddr{ddr}_play" } }
     expect: { status: 200 }
     returns: ack
@@ -159,7 +159,7 @@ commands:
   ddr_stop:
     summary: Stop a DDR media player
     params:
-      ddr: { type: int, min: 1, max: 4, required: true }
+      ddr: { type: int, min: 1, max: 4, required: true, label: DDR, description: "DDR media player, numbered from 1 as on the TriCaster." }
     send: { method: GET, path: /v1/shortcut, query: { name: "ddr{ddr}_stop" } }
     expect: { status: 200 }
     returns: ack
@@ -167,7 +167,7 @@ commands:
   play_macro:
     summary: Run a macro by name
     params:
-      name: { type: string, max_length: 128, required: true }
+      name: { type: string, max_length: 128, required: true, label: Macro, description: "Macro name as shown in the TriCaster's macro list." }
     send:
       method: GET
       path: /v1/shortcut
@@ -188,7 +188,7 @@ commands:
       list is in its shortcuts_cfg.xml and on the LivePanel Shortcut Commands
       page (guide p.16-18).
     params:
-      name: { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true }
+      name: { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true, label: Shortcut, description: "Shortcut name, a prefix such as main, v1 or ddr1 joined to an action, as listed on the LivePanel Shortcut Commands page." }
     send: { method: GET, path: /v1/shortcut, query: { name: "{name}" } }
     expect: { status: 200 }
     returns: ack
@@ -196,8 +196,8 @@ commands:
   shortcut_with_value:
     summary: Run a shortcut that takes a value, such as main_a_row with a source index
     params:
-      name:  { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true }
-      value: { type: string, max_length: 256, required: true }
+      name:  { type: string, pattern: "^[a-z0-9_]+$", max_length: 128, required: true, label: Shortcut, description: "Shortcut name that takes a value, such as main_a_row." }
+      value: { type: string, max_length: 256, required: true, label: Value, description: "Value the shortcut takes, such as a source index for main_a_row." }
     send: { method: GET, path: /v1/shortcut, query: { name: "{name}", value: "{value}" } }
     expect: { status: 200 }
     returns: ack
@@ -205,7 +205,7 @@ commands:
   trigger:
     summary: Fire a named trigger (guide p.63)
     params:
-      name: { type: string, max_length: 128, required: true }
+      name: { type: string, max_length: 128, required: true, label: Trigger, description: "Name of the trigger to fire, as defined on the TriCaster." }
     send: { method: GET, path: /v1/trigger, query: { name: "{name}" } }
     expect: { status: 200 }
     returns: ack
@@ -213,8 +213,8 @@ commands:
   set_datalink:
     summary: Set a DataLink key's value, for titles and graphics (guide p.63-64)
     params:
-      key:   { type: string, max_length: 128, required: true }
-      value: { type: string, max_length: 4096, required: true }
+      key:   { type: string, max_length: 128, required: true, label: DataLink key, description: "DataLink key name as used in titles and graphics." }
+      value: { type: string, max_length: 4096, required: true, label: Value, description: "Text to give the DataLink key." }
     send: { method: GET, path: /v1/datalink, query: { key: "{key}", value: "{value}" } }
     expect: { status: 200 }
     returns: ack
