@@ -397,6 +397,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:269](specs/newtek-tricaster.yaml#L269))
 - [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:262](specs/newtek-tricaster.yaml#L262))
 
+## novastar-coex — NovaStar COEX
+
+- [ ] Check which API generation each model and firmware answers: the current OpenAPI paths (/api/v1/screen/..., /api/v1/preset/...) or the 2023 manual's (/api/v1/device/screen/..., /api/v1/device/currentpreset). ([specs/novastar-coex.yaml:854](specs/novastar-coex.yaml#L854))
+- [ ] Confirm that the endpoints the OpenAPI pages list without /api/v1 (internal source, colour correction, 3D emitter, sync source, identify, controller name, no-signal image, thermal amount) answer with the prefix. ([specs/novastar-coex.yaml:1024](specs/novastar-coex.yaml#L1024))
+- [ ] Record the displayMode numbers the display state read reports for blackout and freeze. ([specs/novastar-coex.yaml:1032](specs/novastar-coex.yaml#L1032))
+- [ ] Check whether requests need the Device-Key header shown in the OpenAPI examples. ([specs/novastar-coex.yaml:1064](specs/novastar-coex.yaml#L1064))
+- [ ] Record the screenID format (the examples here assume a braced GUID-like string) and that a one-element screenIdList acts on that screen only. ([specs/novastar-coex.yaml:234](specs/novastar-coex.yaml#L234))
+- [ ] Check switch_layer_source in send-only and all-in-one modes, and what layer IDs each mode uses. ([specs/novastar-coex.yaml:381](specs/novastar-coex.yaml#L381))
+- [ ] Record the colour component range of set_test_pattern (0-4095 in the 2023 example, gray 0-255 in OpenAPI) and how to return from a test pattern to the input. ([specs/novastar-coex.yaml:489](specs/novastar-coex.yaml#L489))
+- [ ] Confirm identify_controller takes a JSON body (the OpenAPI page names application/xml). ([specs/novastar-coex.yaml:625](specs/novastar-coex.yaml#L625))
+- [ ] Check whether set_working_mode to all-in-one (3) works through the API. ([specs/novastar-coex.yaml:700](specs/novastar-coex.yaml#L700))
+- [ ] Confirm MX30 and MX20 answer the same API as the MX40 Pro. ([specs/novastar-coex.yaml:65](specs/novastar-coex.yaml#L65))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))
