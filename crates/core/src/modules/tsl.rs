@@ -12,6 +12,11 @@
 //!   INDEX, CONTROL (RH tally bits 0-1, text 2-3, LH 4-5, brightness 6-7,
 //!   bit 15 control data) and LENGTH-prefixed text. Over TCP, each packet is
 //!   preceded by DLE STX (0xFE 0x02) and a DLE in the packet is doubled.
+//!
+//! Opening for commands only changes nothing here. The listener only receives,
+//! which is its whole purpose, and asks nothing of the switcher; the sender
+//! sends only what commands ask. TSL is one-way, so no request is answered and
+//! no latency is measured.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
@@ -816,5 +821,37 @@ mod tests {
             })
             .unwrap();
         assert_eq!(&sent[..2], &[DLE, STX]);
+    }
+
+    #[test]
+    fn opened_for_commands_only_the_sender_is_unchanged() {
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            port: Some(8900),
+            model: "tsl-5-0".into(),
+            channels: None,
+            settings: Params::new(),
+            monitor: false,
+        };
+        let mut s = Sender::new(&ctx, 8900);
+        let mut cx = Cx::new(0);
+        s.start(&mut cx);
+        let a = cx.take();
+        // Nothing is ever asked of a display: only the socket opens.
+        assert!(!a.iter().any(|x| matches!(x, Action::UdpSend { .. })));
+        let params = json!({"index": 1, "text": "CAM 2"})
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut cx = Cx::new(1);
+        s.command(&mut cx, 1, "set_display", &params);
+        let a = cx.take();
+        assert!(a.iter().any(|x| matches!(x, Action::UdpSend { .. })));
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Ok(Outcome::Unverified)
+        }));
+        // One-way: no reply, so no round trip.
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
     }
 }
