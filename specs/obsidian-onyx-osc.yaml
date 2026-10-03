@@ -1,0 +1,1181 @@
+spec: 1
+id: obsidian-onyx-osc
+name: Obsidian Control Systems ONYX (OSC)
+vendor: Obsidian Control Systems
+category: lighting
+
+source:
+  - title: ONYX OSC MAPPING V1.20, Revision 5
+    author: Obsidian Control Systems
+    url: https://files.obsidiancontrol.com/s/yndNn7FsaB9Fyay
+    note: >
+      PDF linked from the ONYX manual's OSC page as "All supported OSC commands" (retrieved
+      2026-10-02), 22 pages. Update (feedback) and Execute addresses with type, name and example
+      for: Commandline (/Mx/commandLine/0001 and 0002 color, text, text/color); Playback, "For
+      playback execute messages a license is required", main playbacks 1-10 at /Mx/button/42n1
+      (PFA), 42n2 (PFB), /Mx/fader/42n3 (LEVEL PLAYBACK, float 0 to 255), 42n4 (PFC, with the
+      cuelist name as text), 42n5 (PFD) for n = playback-1, and playbacks 11-20 at 46n1-46n5; LED
+      updates /led (int 0 or 1), /led/color (blue or red), /led/blink (int); execute up/down 0 or
+      1; FADE 4321, DELAY 4322, SNAPSHOT 4331, BANK 4332, Bank Page Up/Down 4412/4413, PLAYBACK
+      BANK 1-5 4421-4425 (text), Fader Swap 4600, /Mx/label/4401 playback bank number,
+      /Mx/scroll/4110 and 4411 up/down; Playback Pages, "/Mx/playback/page<pageIndex>/<buttonIndex>/<action>"
+      with page 1-100 (one based), button 0-99 (zero based), action PLAY or GO, PAUSE, RELEASE,
+      SELECT, SNAPGO, TOGGLE, BACK, not case sensitive, examples "/Mx/playback/page1/0/go 1" and
+      "/Mx/playback/page5/9/release 1", "No update messages exist for the playback pages"; Master
+      Faders (GRAND MASTER 2202, FLASH MASTER 2212, GROUP MASTER A 2222 and B 2232, float 0 to
+      255, flash LEDs 2201-2231); Screens (VIEW 1-8 1101-1108, VIEW 9-16 3101-3108); Keypad (MACRO
+      2001, PREVIEW 2002, MENU 2003, EDIT 5101, UNDO 5102, CLEAR 5103, COPY 5104, MOVE 5106,
+      DELETE 5107, RECORD 5401, UPDATE 5402, LOAD 5411, GROUP 5412, CUE 5413, 0-9 5200-5209, -
+      5210, + 5211, . 5212, Enter 5213, / 5214, Backspace 5215, @ 5216, Full 5301, Through 5302);
+      Programmable Function-Keys (F1-F12 5601, 56A1, 5602, 56A2, 5603, 56A3, 2101, 21A1, 2102,
+      21A2, 2103, 21A3; PF GROUP 1-5 5701-5705 with text, the table printing 5701 for groups 1 and
+      2; scroll 5706); Programmer (Last 6401, Next 6402, Swap Programmer 6411, HIGHLIGHT 6001, CV
+      6003, Link 6108, base and effect channel groups 6101-6105 and 6201-6205, base and effect
+      channels 6111-6141 and 6211-6241, belts /Mx/belt/6112-6142 and 6212-6242 channelName and
+      channelValue strings, SELECT 5502, RELEASE 5503, BEAT 5504, SNAP 5511, ||/Back 5512, GO 5513,
+      View 4121, TRACKFUNC P/T 7001, MODE 7004, NAVIGATE UP/LEFT/DOWN/RIGHT 7301-7304);
+      Configuration (/Mx/configuration/deviceSpace string, and its up and down).
+  - title: ONYX Manual 4.32, Networking > OSC; ONYX PC Modes; Network Settings
+    author: Obsidian Control Systems
+    url: https://support.obsidiancontrol.com/Content/Onyx_Manual/Networking/OSC.htm
+    note: >
+      Retrieved 2026-10-02. OSC "offers full control of ONYX's main playbacks, playback buttons,
+      F-Keys, command keys, and more"; restrictions in FREE and NOVA mode ("OSC is locked", with
+      a trial); setup: enable OSC on the network interface under Network Settings, Interfaces;
+      on the OSC page activate an OSC device with a name, its IP address and "the Incoming Port
+      used by the OSC device", then Update and Apply. Network_Settings.htm lists OSC among the
+      per-interface protocols.
+  - title: Bitfocus Companion module companion-module-obsidiancontrol-onyx-osc (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-obsidiancontrol-onyx-osc
+    note: >
+      Community code, read for corroboration only (MIT at the top level). Tested with ONYX 4.8;
+      sends buttons as int 1 (press) and 0 (release), playback levels as float 0-255, playback
+      page actions with int 1 only; uses 5702 for PF GROUP 2; listens for updates on the port
+      configured as the OSC device's incoming port; its target port must match "Port number for
+      outgoing data" in ONYX's global OSC settings.
+
+# OSC 1.0 over UDP to the port ONYX listens on (its global OSC settings). Obsidian documents no
+# default port; 8000 is a placeholder the host overrides. ONYX acknowledges nothing, so every
+# command reports unverified. Updates go to the IP address and incoming port configured for an
+# OSC device in ONYX, not to the sender: configure this host as an OSC device with feedback_port
+# as its incoming port, and the core receives there (shared by every console sending to it,
+# routed by source address). With feedback_port empty nothing is read back.
+transport:
+  type: osc-udp
+  port: 8000
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535 }
+
+models:
+  - id: nx4
+    name: Obsidian NX 4
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+  - id: nx2
+    name: Obsidian NX 2
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+  - id: nx1
+    name: Obsidian NX 1
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+  - id: nx-touch
+    name: Obsidian NX Touch
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+  - id: nx-k
+    name: Obsidian NX K
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+  - id: onyx-pc
+    name: ONYX on a PC (Windows), with an NX Wing or alone
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+  - id: m-series
+    name: Martin M-Series consoles running ONYX (M1, M2GO, M6, M-Touch, M-Play)
+    supports: [
+      playback_a, playback_a_press, playback_b, playback_b_press, playback_c, playback_c_press,
+      playback_d, playback_d_press, playback_level, upper_playback_a, upper_playback_a_press,
+      upper_playback_b, upper_playback_b_press, upper_playback_c, upper_playback_c_press,
+      upper_playback_d, upper_playback_d_press, upper_playback_level, playback_page_action,
+      grand_master_level, flash_master_level, group_master_a_level, group_master_b_level, button,
+      button_press, press_select, press_release, press_beat, press_snap, press_pause_back,
+      press_go, press_view, press_bank_page_up, press_bank_page_down, press_fader_swap, press_fade,
+      press_delay, press_snapshot, press_bank, press_macro, press_preview, press_menu, press_edit,
+      press_undo, press_clear, press_copy, press_move, press_delete, press_record, press_update,
+      press_load, press_group, press_cue, press_minus, press_plus, press_dot, press_enter,
+      press_slash, press_backspace, press_at, press_full, press_through, press_f1, press_f2,
+      press_f3, press_f4, press_f5, press_f6, press_f7, press_f8, press_f9, press_f10, press_f11,
+      press_f12, press_last, press_next, press_swap_programmer, press_highlight, press_cv,
+      press_link, press_trackfunc_pan_tilt, press_mode, press_navigate_up, press_navigate_left,
+      press_navigate_down, press_navigate_right, press_playback_bank, press_view_key,
+      press_view_key_9_16, press_digit, press_pf_group, press_base_channel_group,
+      press_effect_channel_group, press_base_channel, press_effect_channel, bank_scroll_up,
+      bank_scroll_down, bank_page_scroll_up, bank_page_scroll_down, pf_group_scroll_up,
+      pf_group_scroll_down, device_space_up, device_space_down
+    ]
+    verification: none
+
+commands:
+  playback_a:
+    summary: "Press (true, 1) or release (false, 0) the PFA button of main playback 1-10 (/Mx/button/42<n-1>1)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/42{playback:-1}1", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  playback_a_press:
+    summary: "Press and release the PFA button of main playback 1-10 (1 then 0)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send:
+      - { address: "/Mx/button/42{playback:-1}1", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/42{playback:-1}1", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  playback_b:
+    summary: "Press (true, 1) or release (false, 0) the PFB button of main playback 1-10 (/Mx/button/42<n-1>2)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/42{playback:-1}2", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  playback_b_press:
+    summary: "Press and release the PFB button of main playback 1-10 (1 then 0)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send:
+      - { address: "/Mx/button/42{playback:-1}2", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/42{playback:-1}2", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  playback_c:
+    summary: "Press (true, 1) or release (false, 0) the PFC button of main playback 1-10 (/Mx/button/42<n-1>4)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/42{playback:-1}4", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  playback_c_press:
+    summary: "Press and release the PFC button of main playback 1-10 (1 then 0)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send:
+      - { address: "/Mx/button/42{playback:-1}4", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/42{playback:-1}4", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  playback_d:
+    summary: "Press (true, 1) or release (false, 0) the PFD button of main playback 1-10 (/Mx/button/42<n-1>5)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/42{playback:-1}5", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  playback_d_press:
+    summary: "Press and release the PFD button of main playback 1-10 (1 then 0)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+    send:
+      - { address: "/Mx/button/42{playback:-1}5", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/42{playback:-1}5", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  playback_level:
+    summary: "Set the level of main playback 1-10, 0-255 (/Mx/fader/42<n-1>3, float)"
+    params:
+      playback: { type: int, min: 1, max: 10, required: true }
+      level: { type: float, min: 0, max: 255, required: true }
+    send: { address: "/Mx/fader/42{playback:-1}3", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  upper_playback_a:
+    summary: "Press (true, 1) or release (false, 0) the PFA button of main playback 11-20 (/Mx/button/46<n-11>1)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/46{playback:-11}1", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  upper_playback_a_press:
+    summary: "Press and release the PFA button of main playback 11-20 (1 then 0)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+    send:
+      - { address: "/Mx/button/46{playback:-11}1", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/46{playback:-11}1", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  upper_playback_b:
+    summary: "Press (true, 1) or release (false, 0) the PFB button of main playback 11-20 (/Mx/button/46<n-11>2)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/46{playback:-11}2", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  upper_playback_b_press:
+    summary: "Press and release the PFB button of main playback 11-20 (1 then 0)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+    send:
+      - { address: "/Mx/button/46{playback:-11}2", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/46{playback:-11}2", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  upper_playback_c:
+    summary: "Press (true, 1) or release (false, 0) the PFC button of main playback 11-20 (/Mx/button/46<n-11>4)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/46{playback:-11}4", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  upper_playback_c_press:
+    summary: "Press and release the PFC button of main playback 11-20 (1 then 0)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+    send:
+      - { address: "/Mx/button/46{playback:-11}4", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/46{playback:-11}4", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  upper_playback_d:
+    summary: "Press (true, 1) or release (false, 0) the PFD button of main playback 11-20 (/Mx/button/46<n-11>5)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/46{playback:-11}5", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  upper_playback_d_press:
+    summary: "Press and release the PFD button of main playback 11-20 (1 then 0)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+    send:
+      - { address: "/Mx/button/46{playback:-11}5", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/46{playback:-11}5", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  upper_playback_level:
+    summary: "Set the level of main playback 11-20, 0-255 (/Mx/fader/46<n-11>3, float)"
+    params:
+      playback: { type: int, min: 11, max: 20, required: true }
+      level: { type: float, min: 0, max: 255, required: true }
+    send: { address: "/Mx/fader/46{playback:-11}3", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  playback_page_action:
+    summary: "Go, pause, release, select, snap go, toggle or back on a button of a playback page (/Mx/playback/page<page>/<button-1>/<action>, int 1, a key down)"
+    params:
+      page:   { type: int, min: 1, max: 100, required: true }
+      button: { type: int, min: 1, max: 100, required: true }
+      action: { type: enum, values: [go, play, pause, release, select, snapgo, toggle, back], required: true }
+    send: { address: "/Mx/playback/page{page}/{button:-1}/{action}", args: [ { value: "1", type: int } ] }
+    returns: none
+
+  grand_master_level:
+    summary: "Set the grand master level, 0-255 (/Mx/fader/2202, float)"
+    params:
+      level: { type: float, min: 0, max: 255, required: true }
+    send: { address: /Mx/fader/2202, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  flash_master_level:
+    summary: "Set the flash master level, 0-255 (/Mx/fader/2212, float)"
+    params:
+      level: { type: float, min: 0, max: 255, required: true }
+    send: { address: /Mx/fader/2212, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  group_master_a_level:
+    summary: "Set the group master a level, 0-255 (/Mx/fader/2222, float)"
+    params:
+      level: { type: float, min: 0, max: 255, required: true }
+    send: { address: /Mx/fader/2222, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  group_master_b_level:
+    summary: "Set the group master b level, 0-255 (/Mx/fader/2232, float)"
+    params:
+      level: { type: float, min: 0, max: 255, required: true }
+    send: { address: /Mx/fader/2232, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  button:
+    summary: "Press (true, 1) or release (false, 0) any button by its four-character OSC id from the mapping (/Mx/button/<id>), e.g. 5513 GO"
+    params:
+      id:      { type: string, pattern: '^[0-9A-F]{4}$', required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/Mx/button/{id}", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  button_press:
+    summary: "Press and release any button by its OSC id (1 then 0 on /Mx/button/<id>)"
+    params:
+      id: { type: string, pattern: '^[0-9A-F]{4}$', required: true }
+    send:
+      - { address: "/Mx/button/{id}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/{id}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_select:
+    summary: "Press and release SELECT (/Mx/button/5502, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5502", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5502", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_release:
+    summary: "Press and release RELEASE (/Mx/button/5503, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5503", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5503", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_beat:
+    summary: "Press and release BEAT (/Mx/button/5504, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5504", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5504", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_snap:
+    summary: "Press and release SNAP (/Mx/button/5511, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5511", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5511", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_pause_back:
+    summary: "Press and release ||/Back (/Mx/button/5512, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5512", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5512", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_go:
+    summary: "Press and release GO (/Mx/button/5513, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5513", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5513", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_view:
+    summary: "Press and release View (/Mx/button/4121, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4121", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4121", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_bank_page_up:
+    summary: "Press and release Bank Page Up (/Mx/button/4412, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4412", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4412", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_bank_page_down:
+    summary: "Press and release Bank Page Down (/Mx/button/4413, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4413", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4413", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_fader_swap:
+    summary: "Press and release Fader Swap (/Mx/button/4600, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4600", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4600", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_fade:
+    summary: "Press and release FADE (/Mx/button/4321, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4321", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4321", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_delay:
+    summary: "Press and release DELAY (/Mx/button/4322, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4322", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4322", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_snapshot:
+    summary: "Press and release SNAPSHOT (/Mx/button/4331, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4331", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4331", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_bank:
+    summary: "Press and release BANK (/Mx/button/4332, 1 then 0)"
+    send:
+      - { address: "/Mx/button/4332", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/4332", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_macro:
+    summary: "Press and release MACRO (/Mx/button/2001, 1 then 0)"
+    send:
+      - { address: "/Mx/button/2001", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/2001", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_preview:
+    summary: "Press and release PREVIEW (/Mx/button/2002, 1 then 0)"
+    send:
+      - { address: "/Mx/button/2002", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/2002", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_menu:
+    summary: "Press and release MENU (/Mx/button/2003, 1 then 0)"
+    send:
+      - { address: "/Mx/button/2003", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/2003", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_edit:
+    summary: "Press and release EDIT (/Mx/button/5101, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5101", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5101", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_undo:
+    summary: "Press and release UNDO (/Mx/button/5102, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5102", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5102", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_clear:
+    summary: "Press and release CLEAR (/Mx/button/5103, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5103", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5103", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_copy:
+    summary: "Press and release COPY (/Mx/button/5104, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5104", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5104", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_move:
+    summary: "Press and release MOVE (/Mx/button/5106, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5106", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5106", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_delete:
+    summary: "Press and release DELETE (/Mx/button/5107, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5107", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5107", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_record:
+    summary: "Press and release RECORD (/Mx/button/5401, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5401", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5401", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_update:
+    summary: "Press and release UPDATE (/Mx/button/5402, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5402", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5402", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_load:
+    summary: "Press and release LOAD (/Mx/button/5411, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5411", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5411", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_group:
+    summary: "Press and release GROUP (/Mx/button/5412, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5412", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5412", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_cue:
+    summary: "Press and release CUE (/Mx/button/5413, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5413", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5413", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_minus:
+    summary: "Press and release - (/Mx/button/5210, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5210", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5210", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_plus:
+    summary: "Press and release + (/Mx/button/5211, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5211", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5211", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_dot:
+    summary: "Press and release . (/Mx/button/5212, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5212", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5212", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_enter:
+    summary: "Press and release Enter (/Mx/button/5213, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5213", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5213", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_slash:
+    summary: "Press and release / (/Mx/button/5214, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5214", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5214", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_backspace:
+    summary: "Press and release Backspace (/Mx/button/5215, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5215", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5215", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_at:
+    summary: "Press and release @ (/Mx/button/5216, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5216", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5216", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_full:
+    summary: "Press and release Full (/Mx/button/5301, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5301", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5301", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_through:
+    summary: "Press and release Through (/Mx/button/5302, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5302", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5302", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f1:
+    summary: "Press and release F1 (/Mx/button/5601, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5601", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5601", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f2:
+    summary: "Press and release F2 (/Mx/button/56A1, 1 then 0)"
+    send:
+      - { address: "/Mx/button/56A1", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/56A1", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f3:
+    summary: "Press and release F3 (/Mx/button/5602, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5602", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5602", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f4:
+    summary: "Press and release F4 (/Mx/button/56A2, 1 then 0)"
+    send:
+      - { address: "/Mx/button/56A2", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/56A2", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f5:
+    summary: "Press and release F5 (/Mx/button/5603, 1 then 0)"
+    send:
+      - { address: "/Mx/button/5603", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/5603", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f6:
+    summary: "Press and release F6 (/Mx/button/56A3, 1 then 0)"
+    send:
+      - { address: "/Mx/button/56A3", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/56A3", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f7:
+    summary: "Press and release F7 (/Mx/button/2101, 1 then 0)"
+    send:
+      - { address: "/Mx/button/2101", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/2101", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f8:
+    summary: "Press and release F8 (/Mx/button/21A1, 1 then 0)"
+    send:
+      - { address: "/Mx/button/21A1", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/21A1", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f9:
+    summary: "Press and release F9 (/Mx/button/2102, 1 then 0)"
+    send:
+      - { address: "/Mx/button/2102", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/2102", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f10:
+    summary: "Press and release F10 (/Mx/button/21A2, 1 then 0)"
+    send:
+      - { address: "/Mx/button/21A2", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/21A2", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f11:
+    summary: "Press and release F11 (/Mx/button/2103, 1 then 0)"
+    send:
+      - { address: "/Mx/button/2103", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/2103", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_f12:
+    summary: "Press and release F12 (/Mx/button/21A3, 1 then 0)"
+    send:
+      - { address: "/Mx/button/21A3", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/21A3", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_last:
+    summary: "Press and release Last (/Mx/button/6401, 1 then 0)"
+    send:
+      - { address: "/Mx/button/6401", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/6401", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_next:
+    summary: "Press and release Next (/Mx/button/6402, 1 then 0)"
+    send:
+      - { address: "/Mx/button/6402", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/6402", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_swap_programmer:
+    summary: "Press and release Swap Programmer (/Mx/button/6411, 1 then 0)"
+    send:
+      - { address: "/Mx/button/6411", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/6411", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_highlight:
+    summary: "Press and release HIGHLIGHT (/Mx/button/6001, 1 then 0)"
+    send:
+      - { address: "/Mx/button/6001", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/6001", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_cv:
+    summary: "Press and release CV (/Mx/button/6003, 1 then 0)"
+    send:
+      - { address: "/Mx/button/6003", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/6003", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_link:
+    summary: "Press and release Link (/Mx/button/6108, 1 then 0)"
+    send:
+      - { address: "/Mx/button/6108", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/6108", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_trackfunc_pan_tilt:
+    summary: "Press and release TRACKFUNC P/T (/Mx/button/7001, 1 then 0)"
+    send:
+      - { address: "/Mx/button/7001", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/7001", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_mode:
+    summary: "Press and release MODE (/Mx/button/7004, 1 then 0)"
+    send:
+      - { address: "/Mx/button/7004", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/7004", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_navigate_up:
+    summary: "Press and release NAVIGATE UP (/Mx/button/7301, 1 then 0)"
+    send:
+      - { address: "/Mx/button/7301", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/7301", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_navigate_left:
+    summary: "Press and release NAVIGATE LEFT (/Mx/button/7302, 1 then 0)"
+    send:
+      - { address: "/Mx/button/7302", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/7302", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_navigate_down:
+    summary: "Press and release NAVIGATE DOWN (/Mx/button/7303, 1 then 0)"
+    send:
+      - { address: "/Mx/button/7303", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/7303", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_navigate_right:
+    summary: "Press and release NAVIGATE RIGHT (/Mx/button/7304, 1 then 0)"
+    send:
+      - { address: "/Mx/button/7304", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/7304", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_playback_bank:
+    summary: "Press and release PLAYBACK BANK 1-5 (/Mx/button/442<n>, 1 then 0)"
+    params:
+      bank: { type: int, min: 1, max: 5, required: true }
+    send:
+      - { address: "/Mx/button/442{bank}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/442{bank}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_view_key:
+    summary: "Press and release VIEW 1-8 (/Mx/button/110<n>, 1 then 0)"
+    params:
+      view: { type: int, min: 1, max: 8, required: true }
+    send:
+      - { address: "/Mx/button/110{view}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/110{view}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_view_key_9_16:
+    summary: "Press and release VIEW 9-16 (/Mx/button/310<n-8>, 1 then 0)"
+    params:
+      view: { type: int, min: 9, max: 16, required: true }
+    send:
+      - { address: "/Mx/button/310{view:-8}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/310{view:-8}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_digit:
+    summary: "Press and release keypad 0-9 (/Mx/button/520<n>, 1 then 0)"
+    params:
+      digit: { type: int, min: 0, max: 9, required: true }
+    send:
+      - { address: "/Mx/button/520{digit}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/520{digit}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_pf_group:
+    summary: "Press and release PF GROUP 1-5 (/Mx/button/570<n>, 1 then 0)"
+    params:
+      group: { type: int, min: 1, max: 5, required: true }
+    send:
+      - { address: "/Mx/button/570{group}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/570{group}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_base_channel_group:
+    summary: "Press and release BASE CHANNEL GROUP 1-5 (/Mx/button/610<n>, 1 then 0)"
+    params:
+      group: { type: int, min: 1, max: 5, required: true }
+    send:
+      - { address: "/Mx/button/610{group}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/610{group}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_effect_channel_group:
+    summary: "Press and release EFFECT CHANNEL GROUP 1-5 (/Mx/button/620<n>, 1 then 0)"
+    params:
+      group: { type: int, min: 1, max: 5, required: true }
+    send:
+      - { address: "/Mx/button/620{group}", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/620{group}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_base_channel:
+    summary: "Press and release BASE CHANNEL 1-4 (/Mx/button/61<n>1, 1 then 0)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      - { address: "/Mx/button/61{channel}1", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/61{channel}1", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_effect_channel:
+    summary: "Press and release EFFECT CHANNEL 1-4 (/Mx/button/62<n>1, 1 then 0)"
+    params:
+      channel: { type: int, min: 1, max: 4, required: true }
+    send:
+      - { address: "/Mx/button/62{channel}1", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/button/62{channel}1", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  bank_scroll_up:
+    summary: "Bank Scroll up (/Mx/scroll/4110/up, 1 then 0)"
+    send:
+      - { address: "/Mx/scroll/4110/up", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/scroll/4110/up", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  bank_scroll_down:
+    summary: "Bank Scroll down (/Mx/scroll/4110/down, 1 then 0)"
+    send:
+      - { address: "/Mx/scroll/4110/down", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/scroll/4110/down", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  bank_page_scroll_up:
+    summary: "Bank Page Scroll up (/Mx/scroll/4411/up, 1 then 0)"
+    send:
+      - { address: "/Mx/scroll/4411/up", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/scroll/4411/up", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  bank_page_scroll_down:
+    summary: "Bank Page Scroll down (/Mx/scroll/4411/down, 1 then 0)"
+    send:
+      - { address: "/Mx/scroll/4411/down", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/scroll/4411/down", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  pf_group_scroll_up:
+    summary: "PF GROUP Scroll up (/Mx/scroll/5706/up, 1 then 0)"
+    send:
+      - { address: "/Mx/scroll/5706/up", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/scroll/5706/up", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  pf_group_scroll_down:
+    summary: "PF GROUP Scroll down (/Mx/scroll/5706/down, 1 then 0)"
+    send:
+      - { address: "/Mx/scroll/5706/down", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/scroll/5706/down", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  device_space_up:
+    summary: "Device Space ID Number up (/Mx/configuration/deviceSpace/up, 1 then 0)"
+    send:
+      - { address: "/Mx/configuration/deviceSpace/up", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/configuration/deviceSpace/up", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  device_space_down:
+    summary: "Device Space ID Number down (/Mx/configuration/deviceSpace/down, 1 then 0)"
+    send:
+      - { address: "/Mx/configuration/deviceSpace/down", args: [ { value: "1", type: int } ] }
+      - { address: "/Mx/configuration/deviceSpace/down", args: [ { value: "0", type: int } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      ONYX acknowledges nothing over OSC, so every command reports unverified. Use the update
+      telemetry (LEDs, levels, names) to confirm playback changes. Playback pages have no update
+      messages at all.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Updates go to the IP address and incoming port of an OSC device configured in ONYX, not to
+      the sender. Add this host as an OSC device in ONYX's OSC settings with feedback_port as its
+      incoming port, and send commands to the port in ONYX's global OSC settings. Obsidian
+      documents no default for either port; this spec's 8000 is a placeholder.
+
+  - models: [all]
+    severity: warning
+    text: >
+      "For playback execute messages a license is required", as for playback pages. ONYX PC in
+      FREE or NOVA mode has OSC locked (a trial can be started). Commands sent without the licence
+      are ignored, and with no acknowledgement nothing reports it.
+
+  - models: [all]
+    severity: info
+    text: >
+      Main playbacks map to button ids by position: playback n (1-10) uses 42(n-1)1 PFA, 42(n-1)2
+      PFB, fader 42(n-1)3, 42(n-1)4 PFC and 42(n-1)5 PFD; playbacks 11-20 use 46(n-11)1-5. They are
+      the playbacks of the current bank, so what they control changes with the bank; use
+      playback_page_action to address a page and button directly. Playback state is kept by
+      position (playbacks.<n>) as ONYX reports it for the current bank.
+
+  - models: [all]
+    severity: info
+    text: >
+      Named key commands press and release (int 1 then 0, two datagrams); button sends a single
+      press or release for keys that must be held (flash, shift-style use). playback_page_action
+      sends only the key down (int 1) the mapping's examples show; whether ONYX expects a release
+      is not documented.
+
+  - models: [all]
+    severity: info
+    text: >
+      The mapping prints /Mx/button/5701 for both PF GROUP 1 and PF GROUP 2; 5702 is used for PF
+      GROUP 2 here, following the numbering of groups 3-5 and the community Companion module.
+      F-key ids are not sequential (F1 5601, F2 56A1, F3 5602, ...) and are separate commands.
+      Belt encoders (/Mx/belt/<id>/) are read but not driven: their execute address ends in "/"
+      and its meaning is not documented.
+
+  - models: [all]
+    severity: info
+    text: >
+      Update arguments are stored as sent: LEDs and blink as int 0 or 1, levels as float 0-255,
+      colours ("color" in the mapping, examples blue, red, green, gray, white) and texts as
+      strings. The mapping's colour type is not an OSC type tag; a colour sent as anything but a
+      string is stored as its text form.
+
+  - models: [m-series]
+    severity: info
+    text: >
+      Martin M-Series consoles run ONYX (the successor of M-PC); the mapping does not list models,
+      and smaller surfaces (M-Play, M2GO) have fewer physical playbacks than the 20 addressable
+      ones.
+
+state:
+  "playbacks.*.a.led": { type: int, description: "PFA button LED of main playback 1-20, 0 off or 1 on, from /Mx/button/<id>/led" }
+  "playbacks.*.a.blink": { type: int, description: "PFA button LED blinking of main playback 1-20, 0 or 1, from /Mx/button/<id>/led/blink" }
+  "playbacks.*.a.color": { type: string, description: "PFA button LED colour of main playback 1-20 as sent (the mapping's examples: blue, red, green), from /Mx/button/<id>/led/color" }
+  "playbacks.*.b.led": { type: int, description: "PFB button LED of main playback 1-20, 0 off or 1 on, from /Mx/button/<id>/led" }
+  "playbacks.*.b.blink": { type: int, description: "PFB button LED blinking of main playback 1-20, 0 or 1, from /Mx/button/<id>/led/blink" }
+  "playbacks.*.b.color": { type: string, description: "PFB button LED colour of main playback 1-20 as sent (the mapping's examples: blue, red, green), from /Mx/button/<id>/led/color" }
+  "playbacks.*.c.led": { type: int, description: "PFC button LED of main playback 1-20, 0 off or 1 on, from /Mx/button/<id>/led" }
+  "playbacks.*.c.blink": { type: int, description: "PFC button LED blinking of main playback 1-20, 0 or 1, from /Mx/button/<id>/led/blink" }
+  "playbacks.*.c.color": { type: string, description: "PFC button LED colour of main playback 1-20 as sent (the mapping's examples: blue, red, green), from /Mx/button/<id>/led/color" }
+  "playbacks.*.d.led": { type: int, description: "PFD button LED of main playback 1-20, 0 off or 1 on, from /Mx/button/<id>/led" }
+  "playbacks.*.d.blink": { type: int, description: "PFD button LED blinking of main playback 1-20, 0 or 1, from /Mx/button/<id>/led/blink" }
+  "playbacks.*.d.color": { type: string, description: "PFD button LED colour of main playback 1-20 as sent (the mapping's examples: blue, red, green), from /Mx/button/<id>/led/color" }
+  "playbacks.*.name": { type: string, description: "Main playback 1-20 cuelist name, from the PFC button text /Mx/button/<id>/text" }
+  "playbacks.*.level": { type: float, description: "Main playback 1-20 fader level, 0-255, from /Mx/fader/<id>" }
+  "buttons.*.led": { type: int, description: "Button LED by OSC id (e.g. 5513 GO), 0 off or 1 on, from /Mx/button/<id>/led" }
+  "buttons.*.blink": { type: int, description: "Button LED blinking by OSC id, 0 or 1, from /Mx/button/<id>/led/blink" }
+  "buttons.*.led_color": { type: string, description: "Button LED colour by OSC id as sent, from /Mx/button/<id>/led/color" }
+  "buttons.*.text": { type: string, description: "Button text by OSC id (playback, bank, PF group and channel group names), from /Mx/button/<id>/text" }
+  command_line.status: { type: string, description: "Command line status text (example FREE), from /Mx/commandLine/0001/text" }
+  command_line.command: { type: string, description: "Command line command text, from /Mx/commandLine/0002/text" }
+  playback_bank: { type: string, description: "Playback bank number label, from /Mx/label/4401/text" }
+  device_space: { type: string, description: "Device Space ID number, from /Mx/configuration/deviceSpace" }
+  "belts.*.name": { type: string, description: "Encoder belt attribute name by OSC id (6112-6142 base, 6212-6242 effect), from /Mx/belt/<id>/channelName" }
+  "belts.*.value": { type: string, description: "Encoder belt attribute value as displayed, from /Mx/belt/<id>/channelValue" }
+
+telemetry:
+  updates:
+    - address: '^/Mx/button/42([0-9])1/led$'
+      state: { "playbacks.{1:+1}.a.led": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])1/led/blink$'
+      state: { "playbacks.{1:+1}.a.blink": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])1/led/color$'
+      state: { "playbacks.{1:+1}.a.color": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])2/led$'
+      state: { "playbacks.{1:+1}.b.led": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])2/led/blink$'
+      state: { "playbacks.{1:+1}.b.blink": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])2/led/color$'
+      state: { "playbacks.{1:+1}.b.color": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])4/led$'
+      state: { "playbacks.{1:+1}.c.led": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])4/led/blink$'
+      state: { "playbacks.{1:+1}.c.blink": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])4/led/color$'
+      state: { "playbacks.{1:+1}.c.color": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])5/led$'
+      state: { "playbacks.{1:+1}.d.led": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])5/led/blink$'
+      state: { "playbacks.{1:+1}.d.blink": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])5/led/color$'
+      state: { "playbacks.{1:+1}.d.color": "{arg0}" }
+    - address: '^/Mx/button/42([0-9])4/text$'
+      state: { "playbacks.{1:+1}.name": "{arg0}" }
+    - address: '^/Mx/fader/42([0-9])3$'
+      state: { "playbacks.{1:+1}.level": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])1/led$'
+      state: { "playbacks.{1:+11}.a.led": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])1/led/blink$'
+      state: { "playbacks.{1:+11}.a.blink": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])1/led/color$'
+      state: { "playbacks.{1:+11}.a.color": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])2/led$'
+      state: { "playbacks.{1:+11}.b.led": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])2/led/blink$'
+      state: { "playbacks.{1:+11}.b.blink": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])2/led/color$'
+      state: { "playbacks.{1:+11}.b.color": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])4/led$'
+      state: { "playbacks.{1:+11}.c.led": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])4/led/blink$'
+      state: { "playbacks.{1:+11}.c.blink": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])4/led/color$'
+      state: { "playbacks.{1:+11}.c.color": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])5/led$'
+      state: { "playbacks.{1:+11}.d.led": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])5/led/blink$'
+      state: { "playbacks.{1:+11}.d.blink": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])5/led/color$'
+      state: { "playbacks.{1:+11}.d.color": "{arg0}" }
+    - address: '^/Mx/button/46([0-9])4/text$'
+      state: { "playbacks.{1:+11}.name": "{arg0}" }
+    - address: '^/Mx/fader/46([0-9])3$'
+      state: { "playbacks.{1:+11}.level": "{arg0}" }
+    - address: '^/Mx/button/([0-9A-F]{4})/led$'
+      state: { "buttons.{1}.led": "{arg0}" }
+    - address: '^/Mx/button/([0-9A-F]{4})/led/blink$'
+      state: { "buttons.{1}.blink": "{arg0}" }
+    - address: '^/Mx/button/([0-9A-F]{4})/led/color$'
+      state: { "buttons.{1}.led_color": "{arg0}" }
+    - address: '^/Mx/button/([0-9A-F]{4})/text$'
+      state: { "buttons.{1}.text": "{arg0}" }
+    - address: '^/Mx/commandLine/0001/text$'
+      state: { "command_line.status": "{arg0}" }
+    - address: '^/Mx/commandLine/0002/text$'
+      state: { "command_line.command": "{arg0}" }
+    - address: '^/Mx/label/4401/text$'
+      state: { "playback_bank": "{arg0}" }
+    - address: '^/Mx/configuration/deviceSpace$'
+      state: { "device_space": "{arg0}" }
+    - address: '^/Mx/belt/(6[12][1-4]2)/channelName$'
+      state: { "belts.{1}.name": "{arg0}" }
+    - address: '^/Mx/belt/(6[12][1-4]2)/channelValue$'
+      state: { "belts.{1}.value": "{arg0}" }

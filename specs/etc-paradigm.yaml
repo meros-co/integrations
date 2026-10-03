@@ -1,0 +1,1082 @@
+spec: 1
+id: etc-paradigm
+name: ETC Paradigm architectural control (PSAP)
+vendor: ETC
+category: lighting
+
+source:
+  - title: ETC Configuration Guide, Paradigm Serial Access Protocol (PSAP)
+    author: Electronic Theatre Controls
+    url: https://www.etcconnect.com/workarea/DownloadAsset.aspx?id=10737460789
+    note: >
+      7180M1250-4.0.0 Rev B, released 2019-07 (retrieved 2026-10-02), 7 pages; PSAP software
+      version 4.0 and later. LightDesigner's RS232 Serial Config, UDP Serial Config and ACN Serial
+      Config on the processor; UDP Input UDP Port defaults to 0 with Input Handler [None], ETC
+      recommends 4703-4727, "The P-ACP will automatically send any response to the sending
+      device's output UDP port"; no more than 512 bytes per packet; Input Handler PSAP 4.0 with
+      End of Message Char CR (default), CR+LF or LF, also ending everything the P-ACP sends;
+      UString 1-20. Conventions: names case sensitive and matching LightDesigner, avoiding commas
+      and colons; levels 0-255 or 0-100 with %; priorities 1-200; [ ] optional clauses; fade times
+      in x.y seconds and needing a space name; ? or help lists the commands. Command tables:
+      chan int/ras/low/tog/min/max, grp int/ras/low/tog, pst act[:priority]/dact/tog[:priority]/
+      acth[:priority]/dacth/togh[:priority]/rec, seq start[:priority]/stop/pause/resume/ras/low/
+      rate, spc off/ras/low/master, wall open/close/tog, macro on/off/tog/cancel, ovr
+      enab/disab/tog; status commands chan/pst/grp/macro/wall/seq/ovr get with their returned
+      strings (space name always included, levels always 0-255); PSAP triggers sending the same
+      strings as objects change (LightDesigner user access Advanced).
+  - title: Bitfocus Companion module companion-module-etc-paradigm (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-etc-paradigm
+    note: >
+      Read for corroboration only (MIT at the top level). It drives the processor's web interface
+      instead and notes that "Support using the UDP Serial connection could not be implemented in
+      testing"; nothing in this spec comes from it.
+
+# PSAP text over UDP to the processor's Input UDP Port (LightDesigner, UDP Serial Config; 0 =
+# disabled by default, ETC recommends 4703-4727), each command ended by CR (the default End of
+# Message Char). Responses go back to the sending port. Changes reported by PSAP triggers go
+# where LightDesigner's trigger sends them; set feedback_port to receive them on a fixed local
+# port (shared, routed by source address). Action commands have no documented reply.
+transport:
+  type: line-udp
+  port: 4703
+  terminator: cr
+  reply: to-source
+  timeout_ms: 1000
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535 }
+
+models:
+  - id: p-acp
+    name: Paradigm Architectural Control Processor (P-ACP)
+    supports: [
+      channel_set, channel_set_in_space, channel_set_in_space_fade, channel_set_percent,
+      channel_set_percent_in_space, channel_set_percent_in_space_fade, channel_raise,
+      channel_raise_in_space, channel_raise_in_space_fade, channel_lower, channel_lower_in_space,
+      channel_lower_in_space_fade, channel_toggle, channel_toggle_in_space,
+      channel_toggle_in_space_fade, channel_set_minimum, channel_set_minimum_in_space,
+      channel_set_maximum, channel_set_maximum_in_space, group_set, group_set_in_space,
+      group_set_in_space_fade, group_set_percent, group_set_percent_in_space,
+      group_set_percent_in_space_fade, group_raise, group_raise_in_space,
+      group_raise_in_space_fade, group_lower, group_lower_in_space, group_lower_in_space_fade,
+      group_toggle, group_toggle_in_space, group_toggle_in_space_fade, preset_activate,
+      preset_activate_in_space, preset_activate_in_space_fade, preset_activate_priority,
+      preset_activate_priority_in_space, preset_activate_priority_in_space_fade, preset_toggle,
+      preset_toggle_in_space, preset_toggle_in_space_fade, preset_toggle_priority,
+      preset_toggle_priority_in_space, preset_toggle_priority_in_space_fade, preset_activate_htp,
+      preset_activate_htp_in_space, preset_activate_htp_in_space_fade,
+      preset_activate_htp_priority, preset_activate_htp_priority_in_space,
+      preset_activate_htp_priority_in_space_fade, preset_toggle_htp, preset_toggle_htp_in_space,
+      preset_toggle_htp_in_space_fade, preset_toggle_htp_priority,
+      preset_toggle_htp_priority_in_space, preset_toggle_htp_priority_in_space_fade,
+      preset_deactivate, preset_deactivate_in_space, preset_deactivate_in_space_fade,
+      preset_deactivate_htp, preset_deactivate_htp_in_space, preset_deactivate_htp_in_space_fade,
+      preset_record, preset_record_in_space, sequence_start, sequence_start_in_space,
+      sequence_start_priority, sequence_start_priority_in_space, sequence_stop,
+      sequence_stop_in_space, sequence_pause, sequence_resume, sequence_raise, sequence_lower,
+      sequence_rate, space_off, space_off_fade, space_raise, space_raise_fade, space_lower,
+      space_lower_fade, space_master, space_master_fade, wall_open, wall_open_in_space, wall_close,
+      wall_close_in_space, wall_toggle, wall_toggle_in_space, macro_on, macro_off, macro_toggle,
+      macro_cancel, override_enable, override_disable, override_toggle, channel_get,
+      channel_get_in_space, group_get, group_get_in_space, preset_get, preset_get_in_space,
+      wall_get, wall_get_in_space, sequence_get, sequence_get_in_space, macro_get, override_get,
+      help
+    ]
+    verification: none
+
+commands:
+  channel_set:
+    summary: "Set a channel's intensity to 0-255 (chan int:level)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "chan int:{level} {channel}"
+    returns: none
+
+  channel_set_in_space:
+    summary: "Set a channel's intensity to 0-255 (chan int:level), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan int:{level} {channel}, {space}"
+    returns: none
+
+  channel_set_in_space_fade:
+    summary: "Set a channel's intensity to 0-255 (chan int:level), in a named space, over a fade time in seconds (tenths)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "chan int:{level} {channel}, {space}, {fade:.1f}"
+    returns: none
+
+  channel_set_percent:
+    summary: "Set a channel's intensity to 0-100 % (chan int:level%)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      percent: { type: int, min: 0, max: 100, required: true }
+    send: "chan int:{percent}% {channel}"
+    returns: none
+
+  channel_set_percent_in_space:
+    summary: "Set a channel's intensity to 0-100 % (chan int:level%), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      percent: { type: int, min: 0, max: 100, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan int:{percent}% {channel}, {space}"
+    returns: none
+
+  channel_set_percent_in_space_fade:
+    summary: "Set a channel's intensity to 0-100 % (chan int:level%), in a named space, over a fade time in seconds (tenths)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      percent: { type: int, min: 0, max: 100, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "chan int:{percent}% {channel}, {space}, {fade:.1f}"
+    returns: none
+
+  channel_raise:
+    summary: "Raise a channel's intensity by 0-255 (chan ras:amount)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "chan ras:{amount} {channel}"
+    returns: none
+
+  channel_raise_in_space:
+    summary: "Raise a channel's intensity by 0-255 (chan ras:amount), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan ras:{amount} {channel}, {space}"
+    returns: none
+
+  channel_raise_in_space_fade:
+    summary: "Raise a channel's intensity by 0-255 (chan ras:amount), in a named space, over a fade time in seconds (tenths)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "chan ras:{amount} {channel}, {space}, {fade:.1f}"
+    returns: none
+
+  channel_lower:
+    summary: "Lower a channel's intensity by 0-255 (chan low:amount)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "chan low:{amount} {channel}"
+    returns: none
+
+  channel_lower_in_space:
+    summary: "Lower a channel's intensity by 0-255 (chan low:amount), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan low:{amount} {channel}, {space}"
+    returns: none
+
+  channel_lower_in_space_fade:
+    summary: "Lower a channel's intensity by 0-255 (chan low:amount), in a named space, over a fade time in seconds (tenths)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "chan low:{amount} {channel}, {space}, {fade:.1f}"
+    returns: none
+
+  channel_toggle:
+    summary: "Toggle a channel's intensity (chan tog)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan tog {channel}"
+    returns: none
+
+  channel_toggle_in_space:
+    summary: "Toggle a channel's intensity (chan tog), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan tog {channel}, {space}"
+    returns: none
+
+  channel_toggle_in_space_fade:
+    summary: "Toggle a channel's intensity (chan tog), in a named space, over a fade time in seconds (tenths)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "chan tog {channel}, {space}, {fade:.1f}"
+    returns: none
+
+  channel_set_minimum:
+    summary: "Set a channel's minimum level, 0-255 (chan min:level)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "chan min:{level} {channel}"
+    returns: none
+
+  channel_set_minimum_in_space:
+    summary: "Set a channel's minimum level, 0-255 (chan min:level), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan min:{level} {channel}, {space}"
+    returns: none
+
+  channel_set_maximum:
+    summary: "Set a channel's maximum level, 0-255 (chan max:level)"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "chan max:{level} {channel}"
+    returns: none
+
+  channel_set_maximum_in_space:
+    summary: "Set a channel's maximum level, 0-255 (chan max:level), in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan max:{level} {channel}, {space}"
+    returns: none
+
+  group_set:
+    summary: "Set a group's intensity to 0-255 (grp int:level)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "grp int:{level} {group}"
+    returns: none
+
+  group_set_in_space:
+    summary: "Set a group's intensity to 0-255 (grp int:level), in a named space"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp int:{level} {group}, {space}"
+    returns: none
+
+  group_set_in_space_fade:
+    summary: "Set a group's intensity to 0-255 (grp int:level), in a named space, over a fade time in seconds (tenths)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "grp int:{level} {group}, {space}, {fade:.1f}"
+    returns: none
+
+  group_set_percent:
+    summary: "Set a group's intensity to 0-100 % (grp int:level%)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      percent: { type: int, min: 0, max: 100, required: true }
+    send: "grp int:{percent}% {group}"
+    returns: none
+
+  group_set_percent_in_space:
+    summary: "Set a group's intensity to 0-100 % (grp int:level%), in a named space"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      percent: { type: int, min: 0, max: 100, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp int:{percent}% {group}, {space}"
+    returns: none
+
+  group_set_percent_in_space_fade:
+    summary: "Set a group's intensity to 0-100 % (grp int:level%), in a named space, over a fade time in seconds (tenths)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      percent: { type: int, min: 0, max: 100, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "grp int:{percent}% {group}, {space}, {fade:.1f}"
+    returns: none
+
+  group_raise:
+    summary: "Raise a group's intensity by 0-255 (grp ras:amount)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "grp ras:{amount} {group}"
+    returns: none
+
+  group_raise_in_space:
+    summary: "Raise a group's intensity by 0-255 (grp ras:amount), in a named space"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp ras:{amount} {group}, {space}"
+    returns: none
+
+  group_raise_in_space_fade:
+    summary: "Raise a group's intensity by 0-255 (grp ras:amount), in a named space, over a fade time in seconds (tenths)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "grp ras:{amount} {group}, {space}, {fade:.1f}"
+    returns: none
+
+  group_lower:
+    summary: "Lower a group's intensity by 0-255 (grp low:amount)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "grp low:{amount} {group}"
+    returns: none
+
+  group_lower_in_space:
+    summary: "Lower a group's intensity by 0-255 (grp low:amount), in a named space"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp low:{amount} {group}, {space}"
+    returns: none
+
+  group_lower_in_space_fade:
+    summary: "Lower a group's intensity by 0-255 (grp low:amount), in a named space, over a fade time in seconds (tenths)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "grp low:{amount} {group}, {space}, {fade:.1f}"
+    returns: none
+
+  group_toggle:
+    summary: "Toggle a group's intensity (grp tog)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp tog {group}"
+    returns: none
+
+  group_toggle_in_space:
+    summary: "Toggle a group's intensity (grp tog), in a named space"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp tog {group}, {space}"
+    returns: none
+
+  group_toggle_in_space_fade:
+    summary: "Toggle a group's intensity (grp tog), in a named space, over a fade time in seconds (tenths)"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "grp tog {group}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_activate:
+    summary: "Activate a preset (LTP playback) (pst act)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst act {preset}"
+    returns: none
+
+  preset_activate_in_space:
+    summary: "Activate a preset (LTP playback) (pst act), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst act {preset}, {space}"
+    returns: none
+
+  preset_activate_in_space_fade:
+    summary: "Activate a preset (LTP playback) (pst act), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst act {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_activate_priority:
+    summary: "Activate a preset (LTP playback) at a control priority 1-200, persisting beneath higher priorities (pst act:priority)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+    send: "pst act:{priority} {preset}"
+    returns: none
+
+  preset_activate_priority_in_space:
+    summary: "Activate a preset (LTP playback) at a control priority 1-200, persisting beneath higher priorities (pst act:priority), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst act:{priority} {preset}, {space}"
+    returns: none
+
+  preset_activate_priority_in_space_fade:
+    summary: "Activate a preset (LTP playback) at a control priority 1-200, persisting beneath higher priorities (pst act:priority), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst act:{priority} {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_toggle:
+    summary: "Invert a preset's state (LTP playback) (pst tog)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst tog {preset}"
+    returns: none
+
+  preset_toggle_in_space:
+    summary: "Invert a preset's state (LTP playback) (pst tog), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst tog {preset}, {space}"
+    returns: none
+
+  preset_toggle_in_space_fade:
+    summary: "Invert a preset's state (LTP playback) (pst tog), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst tog {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_toggle_priority:
+    summary: "Invert a preset's state (LTP playback) at a control priority 1-200, persisting beneath higher priorities (pst tog:priority)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+    send: "pst tog:{priority} {preset}"
+    returns: none
+
+  preset_toggle_priority_in_space:
+    summary: "Invert a preset's state (LTP playback) at a control priority 1-200, persisting beneath higher priorities (pst tog:priority), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst tog:{priority} {preset}, {space}"
+    returns: none
+
+  preset_toggle_priority_in_space_fade:
+    summary: "Invert a preset's state (LTP playback) at a control priority 1-200, persisting beneath higher priorities (pst tog:priority), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst tog:{priority} {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_activate_htp:
+    summary: "Activate a preset (HTP playback) (pst acth)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst acth {preset}"
+    returns: none
+
+  preset_activate_htp_in_space:
+    summary: "Activate a preset (HTP playback) (pst acth), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst acth {preset}, {space}"
+    returns: none
+
+  preset_activate_htp_in_space_fade:
+    summary: "Activate a preset (HTP playback) (pst acth), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst acth {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_activate_htp_priority:
+    summary: "Activate a preset (HTP playback) at a control priority 1-200, persisting beneath higher priorities (pst acth:priority)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+    send: "pst acth:{priority} {preset}"
+    returns: none
+
+  preset_activate_htp_priority_in_space:
+    summary: "Activate a preset (HTP playback) at a control priority 1-200, persisting beneath higher priorities (pst acth:priority), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst acth:{priority} {preset}, {space}"
+    returns: none
+
+  preset_activate_htp_priority_in_space_fade:
+    summary: "Activate a preset (HTP playback) at a control priority 1-200, persisting beneath higher priorities (pst acth:priority), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst acth:{priority} {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_toggle_htp:
+    summary: "Invert a preset's state (HTP playback) (pst togh)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst togh {preset}"
+    returns: none
+
+  preset_toggle_htp_in_space:
+    summary: "Invert a preset's state (HTP playback) (pst togh), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst togh {preset}, {space}"
+    returns: none
+
+  preset_toggle_htp_in_space_fade:
+    summary: "Invert a preset's state (HTP playback) (pst togh), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst togh {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_toggle_htp_priority:
+    summary: "Invert a preset's state (HTP playback) at a control priority 1-200, persisting beneath higher priorities (pst togh:priority)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+    send: "pst togh:{priority} {preset}"
+    returns: none
+
+  preset_toggle_htp_priority_in_space:
+    summary: "Invert a preset's state (HTP playback) at a control priority 1-200, persisting beneath higher priorities (pst togh:priority), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst togh:{priority} {preset}, {space}"
+    returns: none
+
+  preset_toggle_htp_priority_in_space_fade:
+    summary: "Invert a preset's state (HTP playback) at a control priority 1-200, persisting beneath higher priorities (pst togh:priority), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst togh:{priority} {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_deactivate:
+    summary: "Deactivate a preset (from LTP playback) (pst dact)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst dact {preset}"
+    returns: none
+
+  preset_deactivate_in_space:
+    summary: "Deactivate a preset (from LTP playback) (pst dact), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst dact {preset}, {space}"
+    returns: none
+
+  preset_deactivate_in_space_fade:
+    summary: "Deactivate a preset (from LTP playback) (pst dact), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst dact {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_deactivate_htp:
+    summary: "Deactivate a preset (from HTP playback) (pst dacth)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst dacth {preset}"
+    returns: none
+
+  preset_deactivate_htp_in_space:
+    summary: "Deactivate a preset (from HTP playback) (pst dacth), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst dacth {preset}, {space}"
+    returns: none
+
+  preset_deactivate_htp_in_space_fade:
+    summary: "Deactivate a preset (from HTP playback) (pst dacth), in a named space, over a fade time in seconds (tenths)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "pst dacth {preset}, {space}, {fade:.1f}"
+    returns: none
+
+  preset_record:
+    summary: "Record a preset (pst rec)"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst rec {preset}"
+    returns: none
+
+  preset_record_in_space:
+    summary: "Record a preset (pst rec), in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst rec {preset}, {space}"
+    returns: none
+
+  sequence_start:
+    summary: "Start a sequence's playback (seq start)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq start {sequence}"
+    returns: none
+
+  sequence_start_in_space:
+    summary: "Start a sequence's playback (seq start), in a named space"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq start {sequence}, {space}"
+    returns: none
+
+  sequence_start_priority:
+    summary: "Start a sequence at a control priority 1-200 (seq start:priority)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+    send: "seq start:{priority} {sequence}"
+    returns: none
+
+  sequence_start_priority_in_space:
+    summary: "Start a sequence at a control priority 1-200 (seq start:priority), in a named space"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      priority: { type: int, min: 1, max: 200, required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq start:{priority} {sequence}, {space}"
+    returns: none
+
+  sequence_stop:
+    summary: "Stop a sequence's playback (seq stop)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq stop {sequence}"
+    returns: none
+
+  sequence_stop_in_space:
+    summary: "Stop a sequence's playback (seq stop), in a named space"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq stop {sequence}, {space}"
+    returns: none
+
+  sequence_pause:
+    summary: "Pause a sequence (seq pause)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq pause {sequence}"
+    returns: none
+
+  sequence_resume:
+    summary: "Resume a paused sequence (seq resume)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq resume {sequence}"
+    returns: none
+
+  sequence_raise:
+    summary: "Raise an active sequence by 0-255 (seq ras:amount)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "seq ras:{amount} {sequence}"
+    returns: none
+
+  sequence_lower:
+    summary: "Lower an active sequence by 0-255 (seq low:amount)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "seq low:{amount} {sequence}"
+    returns: none
+
+  sequence_rate:
+    summary: "Set a sequence's playback rate, 1 being its default timing (seq rate:faderate)"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      rate: { type: float, min: 0, max: 100, required: true }
+    send: "seq rate:{rate:.2f} {sequence}"
+    returns: none
+
+  space_off:
+    summary: "Activate Off in a space (spc off)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "spc off {space}"
+    returns: none
+
+  space_off_fade:
+    summary: "Activate Off in a space over a fade time in seconds (spc off)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "spc off {space}, {fade:.1f}"
+    returns: none
+
+  space_raise:
+    summary: "Raise all intensities in a space by 0-255 (spc ras:amount)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "spc ras:{amount} {space}"
+    returns: none
+
+  space_raise_fade:
+    summary: "Raise all intensities in a space by 0-255, over a fade time in seconds (spc ras:amount)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "spc ras:{amount} {space}, {fade:.1f}"
+    returns: none
+
+  space_lower:
+    summary: "Lower all intensities in a space by 0-255 (spc low:amount)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: "spc low:{amount} {space}"
+    returns: none
+
+  space_lower_fade:
+    summary: "Lower all intensities in a space by 0-255, over a fade time in seconds (spc low:amount)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "spc low:{amount} {space}, {fade:.1f}"
+    returns: none
+
+  space_master:
+    summary: "Set a space's master level to 0-255 (spc master:level)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    send: "spc master:{level} {space}"
+    returns: none
+
+  space_master_fade:
+    summary: "Set a space's master level to 0-255, over a fade time in seconds (spc master:level)"
+    params:
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+      fade: { type: float, min: 0, max: 3600, required: true }
+    send: "spc master:{level} {space}, {fade:.1f}"
+    returns: none
+
+  wall_open:
+    summary: "Open a wall (wall open); the space is the wall's parent space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall open {wall}"
+    returns: none
+
+  wall_open_in_space:
+    summary: "Open a wall (wall open); the space is the wall's parent space, in a named space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall open {wall}, {space}"
+    returns: none
+
+  wall_close:
+    summary: "Close a wall (wall close); the space is the wall's parent space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall close {wall}"
+    returns: none
+
+  wall_close_in_space:
+    summary: "Close a wall (wall close); the space is the wall's parent space, in a named space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall close {wall}, {space}"
+    returns: none
+
+  wall_toggle:
+    summary: "Toggle a wall (wall tog); the space is the wall's parent space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall tog {wall}"
+    returns: none
+
+  wall_toggle_in_space:
+    summary: "Toggle a wall (wall tog); the space is the wall's parent space, in a named space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall tog {wall}, {space}"
+    returns: none
+
+  macro_on:
+    summary: "Run the On steps of a macro (macro on)"
+    params:
+      macro: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "macro on {macro}"
+    returns: none
+
+  macro_off:
+    summary: "Run the Off steps of a macro (macro off)"
+    params:
+      macro: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "macro off {macro}"
+    returns: none
+
+  macro_toggle:
+    summary: "Toggle a macro's state (macro tog)"
+    params:
+      macro: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "macro tog {macro}"
+    returns: none
+
+  macro_cancel:
+    summary: "Cancel a macro's execution (macro cancel)"
+    params:
+      macro: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "macro cancel {macro}"
+    returns: none
+
+  override_enable:
+    summary: "Enable an override (ovr enab)"
+    params:
+      override: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "ovr enab {override}"
+    returns: none
+
+  override_disable:
+    summary: "Disable an override (ovr disab)"
+    params:
+      override: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "ovr disab {override}"
+    returns: none
+
+  override_toggle:
+    summary: "Toggle an override's state (ovr tog)"
+    params:
+      override: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "ovr tog {override}"
+    returns: none
+
+  channel_get:
+    summary: "Ask a channel's level (… get); the reply also updates the state"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan get {channel}"
+    expect: { matches: '^chan int:([0-9]+) ' }
+    returns: value
+
+  channel_get_in_space:
+    summary: "Ask a channel's level in a named space"
+    params:
+      channel: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "chan get {channel}, {space}"
+    expect: { matches: '^chan int:([0-9]+) ' }
+    returns: value
+
+  group_get:
+    summary: "Ask a group's level (… get); the reply also updates the state"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp get {group}"
+    expect: { matches: '^grp int:([0-9]+) ' }
+    returns: value
+
+  group_get_in_space:
+    summary: "Ask a group's level in a named space"
+    params:
+      group: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "grp get {group}, {space}"
+    expect: { matches: '^grp int:([0-9]+) ' }
+    returns: value
+
+  preset_get:
+    summary: "Ask a preset's state (act, dact or alt) (… get); the reply also updates the state"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst get {preset}"
+    expect: { matches: '^pst (act|dact|alt) ' }
+    returns: value
+
+  preset_get_in_space:
+    summary: "Ask a preset's state (act, dact or alt) in a named space"
+    params:
+      preset: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "pst get {preset}, {space}"
+    expect: { matches: '^pst (act|dact|alt) ' }
+    returns: value
+
+  wall_get:
+    summary: "Ask a wall's state (open or close) (… get); the reply also updates the state"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall get {wall}"
+    expect: { matches: '^wall (open|close) ' }
+    returns: value
+
+  wall_get_in_space:
+    summary: "Ask a wall's state (open or close) in a named space"
+    params:
+      wall: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "wall get {wall}, {space}"
+    expect: { matches: '^wall (open|close) ' }
+    returns: value
+
+  sequence_get:
+    summary: "Ask a sequence's state (start, stop or pause) (… get); the reply also updates the state"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq get {sequence}"
+    expect: { matches: '^seq (start|stop|pause) ' }
+    returns: value
+
+  sequence_get_in_space:
+    summary: "Ask a sequence's state (start, stop or pause) in a named space"
+    params:
+      sequence: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+      space: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "seq get {sequence}, {space}"
+    expect: { matches: '^seq (start|stop|pause) ' }
+    returns: value
+
+  macro_get:
+    summary: "Ask a macro's state (on, off or running)"
+    params:
+      macro: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "macro get {macro}"
+    expect: { matches: '^macro (on|off|running) ' }
+    returns: value
+
+  override_get:
+    summary: "Ask an override's state (enab or disab)"
+    params:
+      override: { type: string, pattern: '^[^,:]{1,64}$', required: true }
+    send: "ovr get {override}"
+    expect: { matches: '^ovr (enab|disab) ' }
+    returns: value
+
+  help:
+    summary: "List the commands PSAP supports (help); the reply's first line is returned"
+    send: "help"
+    returns: text
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      UDP serial is off until LightDesigner sets an Input UDP Port (default 0) and the PSAP 4.0
+      Input Handler on the processor; the transport's 4703 is ETC's first recommended port, and the
+      host's port overrides it. The End of Message Char must stay CR, which this spec sends.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ETC documents no reply to action commands, so they report unverified; only the get commands
+      are answered. Changes arrive only for objects with a PSAP trigger configured in LightDesigner
+      (one trigger per object), and the triggers send to the destination LightDesigner names:
+      point them at this host and feedback_port, or poll with the get commands.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A get reply has the same form as a trigger update, so an update for another object that
+      arrives while a get is outstanding can be taken as its reply. Every message, reply or not,
+      also updates the state, so the state stays right either way.
+
+  - models: [all]
+    severity: info
+    text: >
+      The documented optional clauses are separate commands: *_in_space adds the space name and
+      *_in_space_fade a fade time in seconds with tenths (ETC: a fade time needs a space name);
+      *_priority adds a control priority 1-200, which makes the preset or sequence persist beneath
+      higher priority actions. Levels are 0-255 except the *_percent commands (0-100 %). Names must
+      match LightDesigner exactly (case sensitive) and cannot contain commas or colons.
+
+  - models: [all]
+    severity: info
+    text: >
+      State is keyed by the names in the replies (spaces.<space>.channels.<channel>.level and
+      so on). A name containing a full stop splits the state path at it. The status strings for HTP
+      presets are the same as for LTP ones, so the preset state does not say which playback it is.
+
+  - models: [all]
+    severity: critical
+    text: >
+      preset_record and preset_record_in_space record a preset over the existing one from the live
+      levels, and space_off turns a space off; neither can be undone from here.
+
+  - models: [all]
+    severity: info
+    text: >
+      Only the UDP serial input is supported. PSAP is also available on the processor's RS232 port
+      and over ACN Serial Config, which this transport does not carry. ETC Echo uses a different
+      string protocol and is not covered.
+
+state:
+  "spaces.*.channels.*.level": { type: int, description: "Channel level 0-255, by space and channel name, from chan get replies and triggers" }
+  "spaces.*.groups.*.level": { type: int, description: "Group level 0-255, by space and group name" }
+  "spaces.*.presets.*.state": { type: string, description: "Preset state, by space and preset name: active, inactive or altered (pst act, dact, alt)" }
+  "spaces.*.sequences.*.state": { type: string, description: "Sequence state, by space and sequence name: running, stopped or paused (seq start, stop, pause)" }
+  "spaces.*.walls.*.state": { type: string, description: "Wall state, by parent space and wall name: open or closed" }
+  "macros.*.state": { type: string, description: "Macro state by name: on, off or running" }
+  "overrides.*.enabled": { type: bool, description: "Override enabled, by override name" }
+
+telemetry:
+  updates:
+    - match: '^chan int:([0-9]+) ([^,]+), ([^,]+)$'
+      state: { "spaces.{3}.channels.{2}.level": "{1}" }
+    - match: '^grp int:([0-9]+) ([^,]+), ([^,]+)$'
+      state: { "spaces.{3}.groups.{2}.level": "{1}" }
+    - match: '^pst (act|dact|alt) ([^,]+), ([^,]+)$'
+      state: { "spaces.{3}.presets.{2}.state": { value: "{1}", map: { act: active, dact: inactive, alt: altered } } }
+    - match: '^seq (start|stop|pause) ([^,]+), ([^,]+)$'
+      state: { "spaces.{3}.sequences.{2}.state": { value: "{1}", map: { start: running, stop: stopped, pause: paused } } }
+    - match: '^wall (open|close) ([^,]+), ([^,]+)$'
+      state: { "spaces.{3}.walls.{2}.state": { value: "{1}", map: { open: open, close: closed } } }
+    - match: '^macro (on|off|running) (.+)$'
+      state: { "macros.{2}.state": "{1}" }
+    - match: '^ovr (enab|disab) (.+)$'
+      state: { "overrides.{2}.enabled": { value: "{1}", map: { enab: true, disab: false } } }

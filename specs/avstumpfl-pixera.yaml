@@ -1,0 +1,703 @@
+spec: 1
+id: avstumpfl-pixera
+name: AV Stumpfl PIXERA (Native API, JSON/TCP (dl))
+vendor: AV Stumpfl
+category: playback
+
+# PIXERA's Native API is JSON-RPC 2.0 with named parameters. This spec uses an
+# API access point set to the protocol "JSON/TCP (dl)", which the help centre
+# suggests: each message, request or reply, is the JSON followed by the four
+# characters 0xPX. It is also the only kind of access point besides
+# size-prefixed JSON/TCP that carries monitoring, which PIXERA pushes here as
+# monEvent messages (id -1) once the event mode is set to all.
+#
+# Most commands use the Compound namespace, which names timelines, cues,
+# layers and parameters in a single call. Objects without a Compound method
+# take a handle, which get_timeline_handle (and the monitoring state) gives.
+# Every request carries id 1: replies come in the order of the requests, one
+# at a time, and the monEvent pushes (id -1) are told apart by their id.
+
+source:
+  - title: PIXERA API Commands (combined Control, TCP/UDP and OSC reference, PIXERA 26.1 R 1)
+    author: AV Stumpfl
+    url: https://help.pixera.one/api-commands
+    note: >
+      Manufacturer document, retrieved 2026-10-02. Every method here with its
+      exact JSON request: Pixera.Compound setTransportModeOnTimeline,
+      toggleTransport, getTransportModeOnTimeline,
+      setTransportModeOnTimelineAtIndex, start/pause/stopFirstTimeline,
+      set/getOpacityOnTimeline, applyCueOnTimeline,
+      applyCueAtIndexOnTimelineAtIndex, setCurrentTimeOfTimeline(InSeconds),
+      setCurrentTimeAndTransportModeOfTimelineInSeconds, getFpsOfTimeline,
+      getCurrentTimeOfTimeline(InSeconds), getCurrentHMSFOfTimeline,
+      getCurrentCountdown(HMSF)OfTimeline (all keyed "name"), set/getParamValue,
+      set/getTransportModeOnLayer, assignResourceToLayer,
+      getResourceAssignedToLayer, setPauseSmpteInput; Pixera.Timelines
+      getTimelineNames, getTimelineFromName; Timeline getAttributes,
+      moveToNextCue, moveToPreviousCue, applyCueWithNumberString, blendToTime,
+      getCueNames; Screens getScreenNames; Screen and Projector setBlackout
+      (isActive); Utility getApiRevision, getHasFunction, noop,
+      (un)subscribeMonitoringSubject, setMonitoringEventMode,
+      setMonitoringHasDelimiter; Session saveProject, loadProject (path),
+      closeApp (saveProject).
+  - title: Pixera Native API Introduction (help centre, PIXERA 26.1, 19 May 2026)
+    author: AV Stumpfl
+    url: https://help.pixera.one/api/pixera-native-api-introduction-
+    note: >
+      Manufacturer document. API access points in Settings > API (protocol,
+      adapter, port) and a restart after changing them; JSON/TCP (dl) framing,
+      the JSON followed by 0xPX, with the example
+      {"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.getApiRevision"}0xPX;
+      the transport capability matrix (monitoring over JSON/TCP only, not
+      HTTP, UDP or OSC); request ids.
+  - title: Pixera API Documentation, document revision 5 (API revision 147, 2021)
+    author: AV Stumpfl
+    url: https://pixera.one/fileadmin/user_upload/products/Media_Control/Pixera/api/pixera_api_documentation_5.pdf
+    note: >
+      Manufacturer document. Section 4: replies in delimiter mode start with
+      the JSON and end with the delimiter. Sections 6 and 7: monitoring subjects
+      clip and cue added/changed/removed, cueApplied, timelineAdded/Removed,
+      timelineTransport ({handle, value} with 1 play, 2 pause, 3 stop),
+      timelinePositions ({handle, value} in frames) and timelineCountdowns
+      ({handle, value, flag}); setMonitoringEventMode none, all or
+      onlyDiscrete; pushed messages {"jsonrpc":"2.0","id":-1,"type":"monEvent","name":...,"entries":[...]}.
+  - title: pixera_api_examples_rev204.txt (API revision 204, 2022)
+    author: AV Stumpfl
+    url: https://pixera.one/fileadmin/user_upload/products/Media_Control/Pixera/api/pixera_api_examples_rev204.txt
+    note: >
+      Manufacturer document. The Compound time methods keyed "timelineName"
+      before PIXERA 26.1 renamed the key "name" (the _legacy commands).
+  - title: API Quick Start Guide (PIXERA 25.1 RC 9) and Allowlist (PIXERA 25.2 R 3)
+    author: AV Stumpfl
+    url: https://help.pixera.one/api/allowlist
+    note: >
+      Manufacturer documents. From 25.2 all API communication is off by default;
+      the allowlist and the refusal {"error":{"code":-32602,"message":"Access is
+      not authorized."}}; names are not unique, and a lookup by name takes the
+      first match.
+  - title: companion-module-avstumpfl-pixera (Bitfocus Companion module, MIT licence)
+    author: Bitfocus
+    url: https://github.com/bitfocus/companion-module-avstumpfl-pixera
+    note: >
+      Corroboration only, licence checked: port 1400, monitoring entries read as
+      result[i].name and entries[j].handle/value. No code taken.
+
+transport:
+  type: line-tcp
+  port: 1400
+  framing: delimited
+  open: ""
+  close: "0xPX"
+  encoding: utf-8
+  timeout_ms: 3000
+  # Replies carry the request's id (1 here); pushed monitoring events carry -1.
+  reply_match: '"id":\s*[0-9]'
+  probe: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.noop"}'
+
+models:
+  - id: pixera-26
+    name: PIXERA 26.1 and later
+    supports: [play_timeline, pause_timeline, stop_timeline, toggle_timeline, get_timeline_transport,
+                play_timeline_index, pause_timeline_index, stop_timeline_index, start_first_timeline,
+                pause_first_timeline, stop_first_timeline, set_timeline_opacity, get_timeline_opacity,
+                apply_cue, apply_cue_blend, apply_cue_index, set_timeline_time_s, set_timeline_time_frames,
+                set_timeline_time_and_mode, get_timeline_time_s, get_timeline_time_frames,
+                get_timeline_timecode, get_timeline_countdown, get_timeline_countdown_timecode,
+                get_timeline_fps, set_param_value, get_param_value, set_layer_transport, get_layer_transport,
+                assign_resource_to_layer, get_layer_resource, pause_smpte_input, get_timeline_names,
+                get_timeline_handle, get_timeline_attributes, next_cue, previous_cue, apply_cue_number,
+                blend_to_time, get_cue_names, get_screen_names, set_screen_blackout, set_projector_blackout,
+                get_api_revision, has_function, noop, subscribe_monitoring, unsubscribe_monitoring,
+                save_project, load_project, close_app]
+    verification: none
+  - id: pixera-legacy
+    name: PIXERA before 26.1 (API revision 204 and later)
+    supports: [play_timeline, pause_timeline, stop_timeline, get_timeline_transport, play_timeline_index,
+                pause_timeline_index, stop_timeline_index, start_first_timeline, pause_first_timeline,
+                stop_first_timeline, set_timeline_opacity, get_timeline_opacity, apply_cue, apply_cue_blend,
+                apply_cue_index, set_timeline_time_s_legacy, set_timeline_time_frames_legacy,
+                set_timeline_time_and_mode_legacy, get_timeline_time_s_legacy, get_timeline_time_frames_legacy,
+                get_timeline_timecode_legacy, get_timeline_countdown_legacy,
+                get_timeline_countdown_timecode_legacy, get_timeline_fps_legacy, set_param_value,
+                get_param_value, set_layer_transport, get_layer_transport, assign_resource_to_layer,
+                get_layer_resource, pause_smpte_input, get_timeline_handle, get_timeline_attributes, next_cue,
+                previous_cue, blend_to_time, get_screen_names, set_screen_blackout, set_projector_blackout,
+                get_api_revision, has_function, noop, subscribe_monitoring, unsubscribe_monitoring,
+                save_project, load_project, close_app]
+    verification: none
+    notes: >
+      The Compound time methods take "timelineName" (the _legacy commands);
+      toggleTransport, getTimelineNames, getCueNames and applyCueWithNumberString
+      are not in revision 204.
+
+commands:
+  play_timeline:
+    summary: Play a timeline, by name (Compound.setTransportModeOnTimeline, mode 1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnTimeline","params":{"timelineName":{timeline:json},"mode":1}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  pause_timeline:
+    summary: Pause a timeline, by name (Compound.setTransportModeOnTimeline, mode 2)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnTimeline","params":{"timelineName":{timeline:json},"mode":2}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  stop_timeline:
+    summary: Stop a timeline, by name (Compound.setTransportModeOnTimeline, mode 3)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnTimeline","params":{"timelineName":{timeline:json},"mode":3}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  toggle_timeline:
+    summary: Toggle a timeline between play and pause, by name (Compound.toggleTransport)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.toggleTransport","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_timeline_transport:
+    summary: "A timeline's transport mode, by name: 1 play, 2 pause, 3 stop (Compound.getTransportModeOnTimeline)"
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getTransportModeOnTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  play_timeline_index:
+    summary: Play a timeline by its index in the timeline library, from 0 (Compound.setTransportModeOnTimelineAtIndex, mode 1)
+    params:
+      index: { type: int, min: 0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnTimelineAtIndex","params":{"index":{index},"mode":1}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  pause_timeline_index:
+    summary: Pause a timeline by its index in the timeline library, from 0 (Compound.setTransportModeOnTimelineAtIndex, mode 2)
+    params:
+      index: { type: int, min: 0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnTimelineAtIndex","params":{"index":{index},"mode":2}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  stop_timeline_index:
+    summary: Stop a timeline by its index in the timeline library, from 0 (Compound.setTransportModeOnTimelineAtIndex, mode 3)
+    params:
+      index: { type: int, min: 0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnTimelineAtIndex","params":{"index":{index},"mode":3}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  start_first_timeline:
+    summary: Play the first timeline (Compound.startFirstTimeline)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.startFirstTimeline"}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  pause_first_timeline:
+    summary: Pause the first timeline (Compound.pauseFirstTimeline)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.pauseFirstTimeline"}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  stop_first_timeline:
+    summary: Stop the first timeline (Compound.stopFirstTimeline)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.stopFirstTimeline"}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_timeline_opacity:
+    summary: Set a timeline's opacity, 0.0 to 1.0, by name (Compound.setOpacityOnTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      opacity:  { type: float, min: 0.0, max: 1.0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setOpacityOnTimeline","params":{"timelineName":{timeline:json},"opacity":{opacity:.3f}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_timeline_opacity:
+    summary: A timeline's opacity, by name (Compound.getOpacityOnTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getOpacityOnTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  apply_cue:
+    summary: Jump to and run a cue, by timeline and cue name, with the cue's own blend (Compound.applyCueOnTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      cue:      { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.applyCueOnTimeline","params":{"timelineName":{timeline:json},"cueName":{cue:json}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  apply_cue_blend:
+    summary: Jump to and run a cue, by timeline and cue name, blending over a time in seconds (Compound.applyCueOnTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      cue:      { type: string, max_length: 256, required: true }
+      blend_s:  { type: float, min: 0.0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.applyCueOnTimeline","params":{"timelineName":{timeline:json},"cueName":{cue:json},"blendDuration":{blend_s:.3f}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  apply_cue_index:
+    summary: Jump to and run a cue by its index on a timeline, both by index from 0 (Compound.applyCueAtIndexOnTimelineAtIndex)
+    params:
+      timeline_index: { type: int, min: 0, required: true }
+      cue_index:      { type: int, min: 0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.applyCueAtIndexOnTimelineAtIndex","params":{"cueIndex":{cue_index},"timelineIndex":{timeline_index}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_timeline_time_s:
+    summary: Move a timeline to a time in seconds, by name (Compound.setCurrentTimeOfTimelineInSeconds)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      time_s:   { type: float, min: 0.0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setCurrentTimeOfTimelineInSeconds","params":{"name":{timeline:json},"time":{time_s:.3f}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_timeline_time_frames:
+    summary: Move a timeline to a time in frames, by name (Compound.setCurrentTimeOfTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      frame:    { type: int, min: 0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setCurrentTimeOfTimeline","params":{"name":{timeline:json},"time":{frame}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_timeline_time_and_mode:
+    summary: Move a timeline to a time in seconds and set its transport (1 play, 2 pause, 3 stop), by name (Compound.setCurrentTimeAndTransportModeOfTimelineInSeconds)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      time_s:   { type: float, min: 0.0, required: true }
+      mode:     { type: int, min: 1, max: 3, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setCurrentTimeAndTransportModeOfTimelineInSeconds","params":{"name":{timeline:json},"time":{time_s:.3f},"mode":{mode}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_timeline_time_s:
+    summary: A timeline's current time in seconds, by name (Compound.getCurrentTimeOfTimelineInSeconds)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentTimeOfTimelineInSeconds","params":{"name":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_time_frames:
+    summary: A timeline's current time in frames, by name (Compound.getCurrentTimeOfTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentTimeOfTimeline","params":{"name":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_timecode:
+    summary: "A timeline's current time as hours:minutes:seconds:frames, by name (Compound.getCurrentHMSFOfTimeline)"
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentHMSFOfTimeline","params":{"name":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_countdown:
+    summary: Frames to a timeline's next countdown cue, by name (Compound.getCurrentCountdownOfTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentCountdownOfTimeline","params":{"name":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_countdown_timecode:
+    summary: "Time to a timeline's next countdown cue as hours:minutes:seconds:frames, by name (Compound.getCurrentCountdownHMSFOfTimeline)"
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentCountdownHMSFOfTimeline","params":{"name":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_fps:
+    summary: A timeline's frame rate, by name (Compound.getFpsOfTimeline)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getFpsOfTimeline","params":{"name":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  set_timeline_time_s_legacy:
+    summary: Move a timeline to a time in seconds, by name (Compound.setCurrentTimeOfTimelineInSeconds; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      time_s:   { type: float, min: 0.0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setCurrentTimeOfTimelineInSeconds","params":{"timelineName":{timeline:json},"time":{time_s:.3f}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_timeline_time_frames_legacy:
+    summary: Move a timeline to a time in frames, by name (Compound.setCurrentTimeOfTimeline; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      frame:    { type: int, min: 0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setCurrentTimeOfTimeline","params":{"timelineName":{timeline:json},"time":{frame}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_timeline_time_and_mode_legacy:
+    summary: Move a timeline to a time in seconds and set its transport (1 play, 2 pause, 3 stop), by name (Compound.setCurrentTimeAndTransportModeOfTimelineInSeconds; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+      time_s:   { type: float, min: 0.0, required: true }
+      mode:     { type: int, min: 1, max: 3, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setCurrentTimeAndTransportModeOfTimelineInSeconds","params":{"timelineName":{timeline:json},"time":{time_s:.3f},"mode":{mode}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_timeline_time_s_legacy:
+    summary: A timeline's current time in seconds, by name (Compound.getCurrentTimeOfTimelineInSeconds; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentTimeOfTimelineInSeconds","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_time_frames_legacy:
+    summary: A timeline's current time in frames, by name (Compound.getCurrentTimeOfTimeline; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentTimeOfTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_timecode_legacy:
+    summary: "A timeline's current time as hours:minutes:seconds:frames, by name (Compound.getCurrentHMSFOfTimeline; PIXERA before 26.1)"
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentHMSFOfTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_countdown_legacy:
+    summary: Frames to a timeline's next countdown cue, by name (Compound.getCurrentCountdownOfTimeline; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentCountdownOfTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_countdown_timecode_legacy:
+    summary: "Time to a timeline's next countdown cue as hours:minutes:seconds:frames, by name (Compound.getCurrentCountdownHMSFOfTimeline; PIXERA before 26.1)"
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getCurrentCountdownHMSFOfTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_fps_legacy:
+    summary: A timeline's frame rate, by name (Compound.getFpsOfTimeline; PIXERA before 26.1)
+    params:
+      timeline: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getFpsOfTimeline","params":{"timelineName":{timeline:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  set_param_value:
+    summary: Set a parameter by its dotted path, such as Timeline 1.Layer 1.Opacity (Compound.setParamValue)
+    params:
+      path:  { type: string, max_length: 512, required: true }
+      value: { type: float, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setParamValue","params":{"path":{path:json},"value":{value:.4f}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_param_value:
+    summary: A parameter's value, by its dotted path (Compound.getParamValue)
+    params:
+      path: { type: string, max_length: 512, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getParamValue","params":{"path":{path:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  set_layer_transport:
+    summary: Set a layer's transport, by its path such as Timeline 1.Layer 1, with looping (Compound.setTransportModeOnLayer)
+    params:
+      layer: { type: string, max_length: 512, required: true }
+      mode:  { type: int, min: 1, max: 3, required: true }
+      loop:  { type: bool, default: false }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setTransportModeOnLayer","params":{"layerPath":{layer:json},"mode":{mode},"loop":{loop}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_layer_transport:
+    summary: "A layer's transport mode, by path: 1 play, 2 pause, 3 stop (Compound.getTransportModeOnLayer)"
+    params:
+      layer: { type: string, max_length: 512, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getTransportModeOnLayer","params":{"layerPath":{layer:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  assign_resource_to_layer:
+    summary: Assign a resource, by its path such as Media/Folder/video.mov, to a layer (Compound.assignResourceToLayer)
+    params:
+      resource: { type: string, max_length: 1024, required: true }
+      layer:    { type: string, max_length: 512, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.assignResourceToLayer","params":{"resourcePath":{resource:json},"layerPath":{layer:json}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_layer_resource:
+    summary: The path of the resource assigned to a layer (Compound.getResourceAssignedToLayer)
+    params:
+      layer: { type: string, max_length: 512, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.getResourceAssignedToLayer","params":{"layerPath":{layer:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  pause_smpte_input:
+    summary: Pause (true) or resume (false) incoming SMPTE timecode (Compound.setPauseSmpteInput)
+    params:
+      paused: { type: bool, default: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Compound.setPauseSmpteInput","params":{"doPause":{paused}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_timeline_names:
+    summary: The names of every timeline (Timelines.getTimelineNames)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.getTimelineNames"}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_handle:
+    summary: A timeline's handle, by name, for the commands taking a handle (Timelines.getTimelineFromName)
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.getTimelineFromName","params":{"name":{name:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_timeline_attributes:
+    summary: A timeline's index, name, frame rate and mode, by handle (Timeline.getAttributes)
+    params:
+      handle: { type: int, min: 1, max: 9007199254740991, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.Timeline.getAttributes","params":{"handle":{handle}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  next_cue:
+    summary: Move a timeline to its next cue, by handle (Timeline.moveToNextCue)
+    params:
+      handle: { type: int, min: 1, max: 9007199254740991, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.Timeline.moveToNextCue","params":{"handle":{handle}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  previous_cue:
+    summary: Move a timeline to its previous cue, by handle (Timeline.moveToPreviousCue)
+    params:
+      handle: { type: int, min: 1, max: 9007199254740991, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.Timeline.moveToPreviousCue","params":{"handle":{handle}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  apply_cue_number:
+    summary: Jump to and run a cue by its number, such as 1.2.3, on a timeline given by handle (Timeline.applyCueWithNumberString)
+    params:
+      handle: { type: int, min: 1, max: 9007199254740991, required: true }
+      number: { type: string, pattern: "^[0-9]+(\\.[0-9]+){0,2}$", required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.Timeline.applyCueWithNumberString","params":{"handle":{handle},"numberStr":"{number}"}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  blend_to_time:
+    summary: Blend a timeline, by handle, to a time over a duration, both in frames (Timeline.blendToTime)
+    params:
+      handle:       { type: int, min: 1, max: 9007199254740991, required: true }
+      goal_frame:   { type: float, min: 0.0, required: true }
+      blend_frames: { type: float, min: 0.0, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.Timeline.blendToTime","params":{"handle":{handle},"goalTime":{goal_frame:.3f},"blendDuration":{blend_frames:.3f}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_cue_names:
+    summary: The names of a timeline's cues, by handle (Timeline.getCueNames)
+    params:
+      handle: { type: int, min: 1, max: 9007199254740991, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Timelines.Timeline.getCueNames","params":{"handle":{handle}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  get_screen_names:
+    summary: The names of every screen (Screens.getScreenNames)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Screens.getScreenNames"}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  set_screen_blackout:
+    summary: Black out a screen, or restore it, by handle (Screen.setBlackout)
+    params:
+      handle:   { type: int, min: 1, max: 9007199254740991, required: true }
+      blackout: { type: bool, default: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Screens.Screen.setBlackout","params":{"handle":{handle},"isActive":{blackout}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  set_projector_blackout:
+    summary: Black out a projector, or restore it, by handle (Projector.setBlackout)
+    params:
+      handle:   { type: int, min: 1, max: 9007199254740991, required: true }
+      blackout: { type: bool, default: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Projectors.Projector.setBlackout","params":{"handle":{handle},"isActive":{blackout}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  get_api_revision:
+    summary: The API revision, even for releases and odd for betas (Utility.getApiRevision)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.getApiRevision"}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  has_function:
+    summary: Whether this PIXERA has an API function, by its full name (Utility.getHasFunction)
+    params:
+      function: { type: string, max_length: 256, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.getHasFunction","params":{"functionName":{function:json}}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  noop:
+    summary: Do nothing and reply, to know every earlier request was handled (Utility.noop)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.noop"}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  subscribe_monitoring:
+    summary: Receive a monitoring subject on this connection again (Utility.subscribeMonitoringSubject)
+    params:
+      subject: { type: enum, values: [clipAdded, clipChanged, clipRemoved, cueAdded, cueChanged, cueRemoved, cueApplied, timelineAdded, timelineRemoved, timelineTransport, timelinePositions, timelineCountdowns], required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.subscribeMonitoringSubject","params":{"subject":"{subject}"}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  unsubscribe_monitoring:
+    summary: Stop a monitoring subject on this connection, such as timelinePositions (Utility.unsubscribeMonitoringSubject)
+    params:
+      subject: { type: enum, values: [clipAdded, clipChanged, clipRemoved, cueAdded, cueChanged, cueRemoved, cueApplied, timelineAdded, timelineRemoved, timelineTransport, timelinePositions, timelineCountdowns], required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.unsubscribeMonitoringSubject","params":{"subject":"{subject}"}}'
+    expect: { not_contains: '"error":', json_path: "$.result" }
+    returns: value
+
+  save_project:
+    summary: Save the project to its file (Session.saveProject)
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Session.saveProject"}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  load_project:
+    summary: Open a project file, replacing the open project (Session.loadProject)
+    params:
+      path: { type: string, max_length: 1024, required: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Session.loadProject","params":{"path":{path:json}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+  close_app:
+    summary: Quit PIXERA, saving the project first or not (Session.closeApp)
+    params:
+      save: { type: bool, default: true }
+    send: '{"jsonrpc":"2.0","id":1,"method":"Pixera.Session.closeApp","params":{"saveProject":{save}}}'
+    expect: { not_contains: '"error":' }
+    returns: ack
+
+telemetry:
+  # Monitoring is per connection and every subject is subscribed by default;
+  # the event mode all makes PIXERA push each entry as it happens, instead of
+  # holding it for Utility.pollMonitoring. The delimiter is asked for on the
+  # pushed messages too (26.1).
+  subscribe:
+    send:
+      - '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.setMonitoringHasDelimiter","params":{"hasDelimiter":true}}'
+      - '{"jsonrpc":"2.0","id":1,"method":"Pixera.Utility.setMonitoringEventMode","params":{"mode":"all"}}'
+  updates:
+    - json_match: { "$.type": "^monEvent$", "$.name": "^timelineTransport$" }
+      json_each: "$.entries"
+      json: { handle: "$.handle", mode: "$.value" }
+      state:
+        timelines.{handle}.transport: { value: "{mode}", map: { "1": play, "2": pause, "3": stop } }
+    - json_match: { "$.type": "^monEvent$", "$.name": "^timelinePositions$" }
+      json_each: "$.entries"
+      json: { handle: "$.handle", frame: "$.value" }
+      state:
+        timelines.{handle}.position_frames: "{frame}"
+    - json_match: { "$.type": "^monEvent$", "$.name": "^timelineCountdowns$" }
+      json_each: "$.entries"
+      json: { handle: "$.handle", frames: "$.value", flag: "$.flag" }
+      state:
+        timelines.{handle}.countdown_frames: "{frames}"
+        timelines.{handle}.countdown: { value: "{flag}", map: { "1": to_next_cue, "2": waiting_at_cue } }
+    - json_match: { "$.type": "^monEvent$", "$.name": "^([A-Za-z]+)$" }
+      state: { monitoring.last_event: "{1}" }
+
+state:
+  timelines.*.transport:        { type: string, description: "Transport of a timeline, keyed by its handle: play, pause or stop" }
+  timelines.*.position_frames:  { type: int, unit: frames, description: "Current time of a timeline, in frames" }
+  timelines.*.countdown_frames: { type: int, unit: frames, description: "Frames to the next cue, or left of the wait at a cue" }
+  timelines.*.countdown:        { type: string, description: "What the countdown counts: to_next_cue while moving, waiting_at_cue while paused at a cue" }
+  monitoring.last_event:        { type: string, description: "Subject of the last monitoring event, such as cueApplied or timelineAdded" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      An API access point has to be set to JSON/TCP (dl) in Settings > API, with
+      its adapter and port (1400 here, as in AV Stumpfl's examples; no default is
+      documented), and PIXERA restarted. From 25.2 every API access is off by
+      default, and the allowlist can refuse calls with error -32602 "Access is not
+      authorized.". There is no authentication or encryption.
+  - models: [all]
+    severity: info
+    text: >
+      Messages are delimited by the text 0xPX, with no escaping: a name or path
+      containing 0xPX would split a message in two. Timeline, cue and layer names
+      are not unique in PIXERA; a name finds the first match.
+  - models: [all]
+    severity: info
+    text: >
+      Timeline times are in frames, except the _s commands (seconds); cue blends
+      (apply_cue_blend) are in seconds; blend_to_time takes frames. Transport modes
+      are 1 play, 2 pause, 3 stop. PIXERA 26.1 renamed the key of the Compound time
+      methods from timelineName to name; the _legacy commands use the old key.
+  - models: [all]
+    severity: info
+    text: >
+      Monitoring state is keyed by handle; get_timeline_handle gives a timeline's
+      handle and get_timeline_attributes its name. With the event mode all,
+      timelinePositions and timelineCountdowns are pushed as they change, about
+      once a frame per running timeline; unsubscribe_monitoring stops a subject on
+      this connection. Whether handles survive reloading the project is not
+      documented.
+  - models: [all]
+    severity: info
+    text: >
+      setMonitoringHasDelimiter, asked for on connecting, is listed without a
+      description in the 26.1 reference; earlier versions answer it with an error
+      and are taken to end pushed messages with 0xPX as they do replies.
+  - models: [all]
+    severity: critical
+    text: >
+      load_project replaces the open project, close_app quits PIXERA (saving
+      first unless save is false), and save_project overwrites the project file.
+      None can be undone over the API.
+  - models: [all]
+    severity: warning
+    text: >
+      set_screen_blackout and set_projector_blackout, and pause_smpte_input, take
+      effect on the output at once.

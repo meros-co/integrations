@@ -1,0 +1,2728 @@
+spec: 1
+id: digico-sd
+name: DiGiCo SD and Quantum consoles (External Control, Other OSC)
+vendor: DiGiCo
+category: mixer
+
+# DiGiCo's general-purpose OSC input: in Setup > External Control the console
+# adds an "Other OSC" device with this host's IP address and a Send and a
+# Receive port, and then takes the /sd/... messages of DiGiCo's OSC command
+# list on its Receive port, over UDP. Every value is an OSC int, float or
+# string; continuous controls are normalised 0.0-1.0. The console does not
+# acknowledge, and DiGiCo documents no feedback to an Other OSC device, so the
+# spec has no state and every write reports unverified. The iPad/Pixel
+# ("DiGiCo Pad") command set, which does send feedback, is not publicly
+# documented and is not included.
+
+source:
+  - title: "DiGiCo OSC Command List for Other OSC (17/11/2014)"
+    author: DiGiCo (UK) Ltd
+    url: https://raw.githubusercontent.com/bitfocus/companion-module-digico-osc/HEAD/api/DiGiCo_OTHER_OSC_List_17_11_14.pdf
+    note: >
+      Manufacturer document, distributed by DiGiCo dealers and mirrored in the MIT-licensed Bitfocus
+      Companion module repository (api/), which is where it was read; DiGiCo publishes no copy on
+      digico.biz. Page 1: message format (address, type tag, value) with examples for an input
+      channel's name (s), mute (i 1 = on) and fader (f 1 = maximum); the /sd/ prefix; "*" standing
+      for the channel, aux output, group, matrix, graphic EQ or multi number. The table (pages 1-12)
+      gives every address with its type (Int, Float, String) and OSC minimum and maximum: Input_Channels
+      (Channel_Input, Aux_Send, Group_Send, EQ, Dynamics, Filters, Insert, Channel_Delay, CGs_level,
+      solo, CGs_mute, fader, mute, Panner), Aux_Outputs, Group_Outputs and Matrix_Outputs (EQ with
+      eight bands, Dynamics, Insert, Channel_Delay, Buss_Trim, solo, fader, mute), Control_Groups
+      (solo, fader, mute, name), Matrix_Inputs (Matrix_Send), Graphic_EQ (geq_in, geq_gain_1-32),
+      Multis, Filing/Save_current_Session, Snapshots (Fire_Snapshot_number 0-9999,
+      Fire_Prev_Snapshot, Fire_Next_Snapshot) and Macros/Buttons/press (0-255).
+  - title: "TN324: Use of SD Series External Control for iPad (Oct 2014, rev 5 May 2018)"
+    author: DiGiCo (UK) Ltd
+    url: https://digico.biz/wp-content/uploads/2020/02/TN324-SD-Series-iPad-External-Control.pdf
+    note: >
+      Manufacturer technical note. The External Control panel (Master Screen > Setup > External
+      Control): enable External Control, Add device, device name, the device's IP address, Send and
+      Receive port numbers (example Send 9000, Receive 8000), unique ports per device, the Enable
+      column (p.2); the console's Local IP address shown at the bottom of the panel (p.1); general
+      purpose OSC "available in v987 onwards" (p.1). Default subnet masks (p.1).
+  - title: "SD Series V987 Release Notes (April 2018)"
+    author: DiGiCo (UK) Ltd
+    url: http://www.digico.org/downloads/support/SD%20Series%20V987%20Release%20Notes.pdf
+    note: >
+      Manufacturer document. External Control Panel: Add Device, "Other OSC" from the drop-down
+      list with IP address and Send/Receive ports (p.4-5); Generic OSC and L-ISA controls are
+      messages the console sends, not commands it receives.
+  - title: "SD & Quantum V1742 Release Notes (April 2024)"
+    author: DiGiCo (UK) Ltd
+    url: https://digico.biz/wp-content/uploads/2024/04/SD-and-Quantum-V1742_Release_Notes.pdf
+    note: >
+      Manufacturer document: current SD and Quantum software; "Add device" and "other OSC", then the
+      IP address and Send/Rcv port numbers, in Setup > External Control (Spacemap Go and AFM
+      sections).
+  - title: "Quantum852 data sheet (2023)"
+    author: DiGiCo (UK) Ltd
+    url: https://digico.biz/wp-content/uploads/2023/05/DiGiCo-Quantum-852-Data-Sheet-Web.pdf
+    note: >
+      Manufacturer document: 384 input channels, 192 aux/sub-group busses, 64 x 64 matrix and 36
+      control groups, the largest counts in the range and the parameter limits used here.
+  - title: companion-module-digico-osc (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-digico-osc
+    note: >
+      Read for corroboration only (index.js, actions.js, HELP.md). It sends the list's /sd/ addresses
+      to the console's Other OSC port with int mutes, float faders 0.0-1.0, snapshot numbers as ints,
+      int 0 for next/previous snapshot, and macro numbers 1-256 sent as 0-255. Its help says feedback
+      needs the device added as a DiGiCo Pad (the iPad command set), and that an Other OSC device
+      gets none.
+
+# The port is the Receive (Rcv) port entered for this device in the console's
+# External Control panel. DiGiCo documents no default; 8000 is TN324's example
+# Receive port, and the host's configured port overrides it.
+transport:
+  type: osc-udp
+  port: 8000
+  reply: none
+
+models:
+  - id: sd5
+    name: DiGiCo SD5
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: sd7
+    name: DiGiCo SD7
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: sd8
+    name: DiGiCo SD8
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: sd9
+    name: DiGiCo SD9
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: sd10
+    name: DiGiCo SD10
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: sd11
+    name: DiGiCo SD11
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: sd12
+    name: DiGiCo SD12
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: quantum225
+    name: DiGiCo Quantum225
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: quantum338
+    name: DiGiCo Quantum338
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: quantum5
+    name: DiGiCo Quantum5
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: quantum7
+    name: DiGiCo SD7 Quantum / Quantum7
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+  - id: quantum852
+    name: DiGiCo Quantum852
+    supports:
+      [set_input_trim, set_input_phase, set_input_phantom, set_input_alt_phantom, set_input_analog_gain,
+      set_input_alt_analog_gain, set_input_pad, set_input_alt_pad, set_input_name, set_input_eq_in,
+      set_input_eq_on, set_input_eq_curve, set_input_eq_freq, set_input_eq_q, set_input_eq_gain,
+      set_input_eq_over_under, set_input_eq_thresh, set_input_eq_ratio, set_input_eq_attack,
+      set_input_eq_release, set_input_eq_symm_q, set_input_dynamic_eq_on, set_input_comp_in,
+      set_input_gate_in, set_input_comp_band_in, set_input_comp_lp_crossover, set_input_comp_hp_crossover,
+      set_input_comp_gain, set_input_gate_range, set_input_comp_thresh, set_input_gate_thresh,
+      set_input_comp_knee, set_input_comp_ratio, set_input_comp_attack, set_input_gate_attack,
+      set_input_comp_release, set_input_gate_release, set_input_gate_hold, set_input_key_solo,
+      set_input_comp_listen, set_input_comp_all_gain, set_input_comp_all_thresh, set_input_comp_auto_gain,
+      set_input_desser_centre_freq, set_input_gate_centre_freq, set_input_desser_freq_width,
+      set_input_gate_freq_width, set_input_hi_filter_in, set_input_lo_filter_in, set_input_hi_filter_freq,
+      set_input_lo_filter_freq, set_input_insert_a_in, set_input_insert_b_in, set_input_delay_on,
+      set_input_delay, set_input_fine_delay, solo_input, set_input_fader, mute_input, set_input_front_back,
+      set_input_pan, set_aux_eq_in, set_aux_eq_on, set_aux_eq_curve, set_aux_eq_freq, set_aux_eq_q,
+      set_aux_eq_gain, set_aux_eq_over_under, set_aux_eq_thresh, set_aux_eq_ratio, set_aux_eq_attack,
+      set_aux_eq_release, set_aux_eq_pre_ins, set_aux_eq_symm_q, set_aux_dynamic_eq_on, set_aux_comp_in,
+      set_aux_gate_in, set_aux_comp_band_in, set_aux_comp_lp_crossover, set_aux_comp_hp_crossover,
+      set_aux_comp_gain, set_aux_gate_range, set_aux_comp_thresh, set_aux_gate_thresh, set_aux_comp_knee,
+      set_aux_comp_ratio, set_aux_comp_attack, set_aux_gate_attack, set_aux_comp_release,
+      set_aux_gate_release, set_aux_gate_hold, set_aux_key_solo, set_aux_comp_listen, set_aux_comp_all_gain,
+      set_aux_comp_all_thresh, set_aux_comp_auto_gain, set_aux_desser_centre_freq, set_aux_gate_centre_freq,
+      set_aux_desser_freq_width, set_aux_gate_freq_width, set_aux_insert_a_in, set_aux_insert_b_in,
+      set_aux_delay_on, set_aux_delay, set_aux_fine_delay, set_aux_buss_trim, set_aux_buss_phase,
+      set_aux_name, solo_aux, set_aux_fader, mute_aux, set_group_eq_in, set_group_eq_on, set_group_eq_curve,
+      set_group_eq_freq, set_group_eq_q, set_group_eq_gain, set_group_eq_over_under, set_group_eq_thresh,
+      set_group_eq_ratio, set_group_eq_attack, set_group_eq_release, set_group_eq_pre_ins,
+      set_group_eq_symm_q, set_group_dynamic_eq_on, set_group_comp_in, set_group_gate_in,
+      set_group_comp_band_in, set_group_comp_lp_crossover, set_group_comp_hp_crossover, set_group_comp_gain,
+      set_group_gate_range, set_group_comp_thresh, set_group_gate_thresh, set_group_comp_knee,
+      set_group_comp_ratio, set_group_comp_attack, set_group_gate_attack, set_group_comp_release,
+      set_group_gate_release, set_group_gate_hold, set_group_key_solo, set_group_comp_listen,
+      set_group_comp_all_gain, set_group_comp_all_thresh, set_group_comp_auto_gain,
+      set_group_desser_centre_freq, set_group_gate_centre_freq, set_group_desser_freq_width,
+      set_group_gate_freq_width, set_group_insert_a_in, set_group_insert_b_in, set_group_delay_on,
+      set_group_delay, set_group_fine_delay, set_group_buss_trim, set_group_buss_phase, set_group_name,
+      solo_group, set_group_fader, mute_group, solo_control_group, set_control_group_fader,
+      mute_control_group, set_control_group_name, set_matrix_eq_in, set_matrix_eq_on, set_matrix_eq_curve,
+      set_matrix_eq_freq, set_matrix_eq_q, set_matrix_eq_gain, set_matrix_eq_over_under,
+      set_matrix_eq_thresh, set_matrix_eq_ratio, set_matrix_eq_attack, set_matrix_eq_release,
+      set_matrix_eq_pre_ins, set_matrix_eq_symm_q, set_matrix_dynamic_eq_on, set_matrix_comp_in,
+      set_matrix_gate_in, set_matrix_comp_band_in, set_matrix_comp_lp_crossover,
+      set_matrix_comp_hp_crossover, set_matrix_comp_gain, set_matrix_gate_range, set_matrix_comp_thresh,
+      set_matrix_gate_thresh, set_matrix_comp_knee, set_matrix_comp_ratio, set_matrix_comp_attack,
+      set_matrix_gate_attack, set_matrix_comp_release, set_matrix_gate_release, set_matrix_gate_hold,
+      set_matrix_key_solo, set_matrix_comp_listen, set_matrix_comp_all_gain, set_matrix_comp_all_thresh,
+      set_matrix_comp_auto_gain, set_matrix_desser_centre_freq, set_matrix_gate_centre_freq,
+      set_matrix_desser_freq_width, set_matrix_gate_freq_width, set_matrix_insert_a_in,
+      set_matrix_insert_b_in, set_matrix_delay_on, set_matrix_delay, set_matrix_fine_delay,
+      set_matrix_buss_trim, set_matrix_buss_phase, set_matrix_name, solo_matrix, set_matrix_fader,
+      mute_matrix, set_input_aux_send_level, set_input_aux_send_on, set_input_aux_send_pan,
+      set_input_group_send, set_group_group_send, set_geq_in, set_geq_band_gain, save_session, fire_snapshot,
+      fire_next_snapshot, fire_previous_snapshot, press_macro]
+    verification: none
+
+commands:
+  set_input_trim:
+    summary: "Set the input trim of an input channel, normalised 0.0-1.0 (Input_Channels/*/Channel_Input/trim, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/trim", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_phase:
+    summary: "Set the phase (polarity) setting of an input channel, 0-3 as the console numbers it (Input_Channels/*/Channel_Input/phase, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: int, min: 0, max: 3, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/phase", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_input_phantom:
+    summary: "Switch the 48 V phantom power of an input channel on or off (Input_Channels/*/Channel_Input/phantom, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/phantom", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_alt_phantom:
+    summary: "Switch the 48 V phantom power of the alternate input of an input channel on or off (Input_Channels/*/Channel_Input/alt_phantom, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/alt_phantom", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_analog_gain:
+    summary: "Set the analogue gain of an input channel, normalised 0.0-1.0 (Input_Channels/*/Channel_Input/analog_gain, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/analog_gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_alt_analog_gain:
+    summary: "Set the analogue gain of the alternate input of an input channel, normalised 0.0-1.0 (Input_Channels/*/Channel_Input/alt_analog_gain, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/alt_analog_gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_pad:
+    summary: "Switch the input pad of an input channel on or off (Input_Channels/*/Channel_Input/input_pad, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/input_pad", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_alt_pad:
+    summary: "Switch the pad of the alternate input of an input channel on or off (Input_Channels/*/Channel_Input/alt_input_pad, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/alt_input_pad", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_name:
+    summary: "Name an input channel (Input_Channels/*/Channel_Input/name, s)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      name:    { type: string, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Input/name", args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  set_input_eq_in:
+    summary: "Switch the EQ in of an input channel on or off (Input_Channels/*/EQ/eq_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_eq_on:
+    summary: "Switch the EQ band on of an input channel on or off (band 1-4) (Input_Channels/*/EQ/eq_on_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_eq_curve:
+    summary: "Set the EQ band curve of an input channel, 1-4 as the console numbers it (band 1-4) (Input_Channels/*/EQ/eq_curve_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: int, min: 1, max: 4, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_curve_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_input_eq_freq:
+    summary: "Set the EQ band frequency of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_freq_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_freq_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_q:
+    summary: "Set the EQ band Q of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_Q_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_Q_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_gain:
+    summary: "Set the EQ band gain of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_gain_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_over_under:
+    summary: "Set the dynamic EQ band over/under of an input channel, 0-1 as the console numbers it (band 1-4) (Input_Channels/*/EQ/eq_over-under_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: int, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_over-under_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_input_eq_thresh:
+    summary: "Set the dynamic EQ band threshold of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_thresh_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_ratio:
+    summary: "Set the dynamic EQ band ratio of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_ratio_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_attack:
+    summary: "Set the dynamic EQ band attack of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_attack_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_release:
+    summary: "Set the dynamic EQ band release of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/EQ/eq_release_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_eq_symm_q:
+    summary: "Switch the EQ band symmetrical Q of an input channel on or off (band 1-4) (Input_Channels/*/EQ/eq_symm_Q_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/eq_symm_Q_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_dynamic_eq_on:
+    summary: "Switch the dynamic EQ band on of an input channel on or off (band 1-4) (Input_Channels/*/EQ/dynamic_eq_on_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/EQ/dynamic_eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_comp_in:
+    summary: "Switch the compressor in of an input channel on or off (Input_Channels/*/Dynamics/comp_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_gate_in:
+    summary: "Switch the gate in of an input channel on or off (Input_Channels/*/Dynamics/gate_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_comp_band_in:
+    summary: "Switch the compressor band in of an input channel on or off (band 1-3) (Input_Channels/*/Dynamics/comp_band_in_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_band_in_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_comp_lp_crossover:
+    summary: "Set the compressor low-pass crossover of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/comp_LP_crossover, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_LP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_hp_crossover:
+    summary: "Set the compressor high-pass crossover of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/comp_HP_crossover, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_HP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_gain:
+    summary: "Set the compressor band gain of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/Dynamics/comp_gain_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_range:
+    summary: "Set the gate range of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_range, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_range", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_thresh:
+    summary: "Set the compressor band threshold of an input channel, normalised 0.0-1.0 (band 1-3) (Input_Channels/*/Dynamics/comp_thresh_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_thresh:
+    summary: "Set the gate threshold of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_thresh, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_knee:
+    summary: "Set the compressor band knee of an input channel, 0-2 as the console numbers it (band 1-4) (Input_Channels/*/Dynamics/comp_knee_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: int, min: 0, max: 2, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_knee_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_input_comp_ratio:
+    summary: "Set the compressor band ratio of an input channel, normalised 0.0-1.0 (band 1-4) (Input_Channels/*/Dynamics/comp_ratio_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_attack:
+    summary: "Set the compressor band attack of an input channel, normalised 0.0-1.0 (band 1-3) (Input_Channels/*/Dynamics/comp_attack_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_attack:
+    summary: "Set the gate attack of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_attack, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_attack", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_release:
+    summary: "Set the compressor band release of an input channel, normalised 0.0-1.0 (band 1-3) (Input_Channels/*/Dynamics/comp_release_N, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_release:
+    summary: "Set the gate release of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_release, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_release", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_hold:
+    summary: "Set the gate hold of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_hold, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_hold", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_key_solo:
+    summary: "Switch the dynamics key solo of an input channel on or off (Input_Channels/*/Dynamics/key_solo, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/key_solo", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_comp_listen:
+    summary: "Switch the compressor band listen of an input channel on or off (band 1-3) (Input_Channels/*/Dynamics/comp_listen_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_listen_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_comp_all_gain:
+    summary: "Set the compressor overall gain of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/comp_all_gain, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_all_gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_all_thresh:
+    summary: "Set the compressor overall threshold of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/comp_all_thresh, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_all_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_comp_auto_gain:
+    summary: "Switch the compressor band auto gain of an input channel on or off (band 1-4) (Input_Channels/*/Dynamics/comp_auto-gain_N, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/comp_auto-gain_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_desser_centre_freq:
+    summary: "Set the de-esser centre frequency of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/desser_centre_freq, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/desser_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_centre_freq:
+    summary: "Set the gate key filter centre frequency of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_centre_freq, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_desser_freq_width:
+    summary: "Set the de-esser frequency width of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/desser_freq_width, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/desser_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_gate_freq_width:
+    summary: "Set the gate key filter frequency width of an input channel, normalised 0.0-1.0 (Input_Channels/*/Dynamics/gate_freq_width, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Dynamics/gate_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_hi_filter_in:
+    summary: "Switch the high-cut filter in of an input channel on or off (Input_Channels/*/Filters/hi_filter_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Filters/hi_filter_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_lo_filter_in:
+    summary: "Switch the low-cut filter in of an input channel on or off (Input_Channels/*/Filters/lo_filter_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Filters/lo_filter_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_hi_filter_freq:
+    summary: "Set the high-cut filter frequency of an input channel, normalised 0.0-1.0 (Input_Channels/*/Filters/hi_filter_freq, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Filters/hi_filter_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_lo_filter_freq:
+    summary: "Set the low-cut filter frequency of an input channel, normalised 0.0-1.0 (Input_Channels/*/Filters/lo_filter_freq, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Filters/lo_filter_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_insert_a_in:
+    summary: "Switch the insert A in of an input channel on or off (Input_Channels/*/Insert/insert_A_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Insert/insert_A_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_insert_b_in:
+    summary: "Switch the insert B in of an input channel on or off (Input_Channels/*/Insert/insert_B_in, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Insert/insert_B_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_delay_on:
+    summary: "Switch the channel delay on of an input channel on or off (Input_Channels/*/Channel_Delay/delay_on, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Delay/delay_on", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_delay:
+    summary: "Set the channel delay time of an input channel, normalised 0.0-1.0 (Input_Channels/*/Channel_Delay/delay, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Delay/delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_fine_delay:
+    summary: "Set the fine channel delay of an input channel, normalised 0.0-1.0 (Input_Channels/*/Channel_Delay/fine_delay, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Channel_Delay/fine_delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  solo_input:
+    summary: "Solo an input channel or clear its solo (Input_Channels/*/solo, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      soloed:  { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/solo", args: [ { value: "{soloed:bool01}", type: int } ] }
+    returns: none
+
+  set_input_fader:
+    summary: "Set the fader of an input channel, normalised 0.0-1.0 (Input_Channels/*/fader, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      level:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/fader", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  mute_input:
+    summary: "Mute or unmute an input channel (Input_Channels/*/mute, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      muted:   { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_input_front_back:
+    summary: "Set the front/back pan of an input channel, normalised 0.0-1.0 (Input_Channels/*/Panner/f-b, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Panner/f-b", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_pan:
+    summary: "Set the pan of an input channel, normalised 0.0-1.0 (Input_Channels/*/Panner/pan, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Panner/pan", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_in:
+    summary: "Switch the EQ in of an aux output on or off (Aux_Outputs/*/EQ/eq_in, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_eq_on:
+    summary: "Switch the EQ band on of an aux output on or off (band 1-8) (Aux_Outputs/*/EQ/eq_on_N, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_eq_curve:
+    summary: "Set the EQ band curve of an aux output, 1-4 as the console numbers it (band 1-8) (Aux_Outputs/*/EQ/eq_curve_N, i)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_curve_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_aux_eq_freq:
+    summary: "Set the EQ band frequency of an aux output, normalised 0.0-1.0 (band 1-8) (Aux_Outputs/*/EQ/eq_freq_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_freq_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_q:
+    summary: "Set the EQ band Q of an aux output, normalised 0.0-1.0 (band 1-8) (Aux_Outputs/*/EQ/eq_Q_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_Q_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_gain:
+    summary: "Set the EQ band gain of an aux output, normalised 0.0-1.0 (band 1-8) (Aux_Outputs/*/EQ/eq_gain_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_over_under:
+    summary: "Set the dynamic EQ band over/under of an aux output, 0-1 as the console numbers it (band 1-4) (Aux_Outputs/*/EQ/eq_over-under_N, i)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: int, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_over-under_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_aux_eq_thresh:
+    summary: "Set the dynamic EQ band threshold of an aux output, normalised 0.0-1.0 (band 1-4) (Aux_Outputs/*/EQ/eq_thresh_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_ratio:
+    summary: "Set the dynamic EQ band ratio of an aux output, normalised 0.0-1.0 (band 1-4) (Aux_Outputs/*/EQ/eq_ratio_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_attack:
+    summary: "Set the dynamic EQ band attack of an aux output, normalised 0.0-1.0 (band 1-4) (Aux_Outputs/*/EQ/eq_attack_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_release:
+    summary: "Set the dynamic EQ band release of an aux output, normalised 0.0-1.0 (band 1-4) (Aux_Outputs/*/EQ/eq_release_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_eq_pre_ins:
+    summary: "Switch the EQ pre-insert of an aux output on or off (Aux_Outputs/*/EQ/eq_pre-ins, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_pre-ins", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_eq_symm_q:
+    summary: "Switch the EQ band symmetrical Q of an aux output on or off (band 1-8) (Aux_Outputs/*/EQ/eq_symm_Q_N, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/eq_symm_Q_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_dynamic_eq_on:
+    summary: "Switch the dynamic EQ band on of an aux output on or off (band 1-4) (Aux_Outputs/*/EQ/dynamic_eq_on_N, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/EQ/dynamic_eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_comp_in:
+    summary: "Switch the compressor in of an aux output on or off (Aux_Outputs/*/Dynamics/comp_in, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_gate_in:
+    summary: "Switch the gate in of an aux output on or off (Aux_Outputs/*/Dynamics/gate_in, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_comp_band_in:
+    summary: "Switch the compressor band in of an aux output on or off (band 1-3) (Aux_Outputs/*/Dynamics/comp_band_in_N, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_band_in_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_comp_lp_crossover:
+    summary: "Set the compressor low-pass crossover of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/comp_LP_crossover, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_LP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_hp_crossover:
+    summary: "Set the compressor high-pass crossover of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/comp_HP_crossover, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_HP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_gain:
+    summary: "Set the compressor band gain of an aux output, normalised 0.0-1.0 (band 1-4) (Aux_Outputs/*/Dynamics/comp_gain_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_range:
+    summary: "Set the gate range of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_range, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_range", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_thresh:
+    summary: "Set the compressor band threshold of an aux output, normalised 0.0-1.0 (band 1-3) (Aux_Outputs/*/Dynamics/comp_thresh_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 3, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_thresh:
+    summary: "Set the gate threshold of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_thresh, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_knee:
+    summary: "Set the compressor band knee of an aux output, 0-2 as the console numbers it (band 1-4) (Aux_Outputs/*/Dynamics/comp_knee_N, i)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: int, min: 0, max: 2, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_knee_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_aux_comp_ratio:
+    summary: "Set the compressor band ratio of an aux output, normalised 0.0-1.0 (band 1-4) (Aux_Outputs/*/Dynamics/comp_ratio_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_attack:
+    summary: "Set the compressor band attack of an aux output, normalised 0.0-1.0 (band 1-3) (Aux_Outputs/*/Dynamics/comp_attack_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 3, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_attack:
+    summary: "Set the gate attack of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_attack, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_attack", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_release:
+    summary: "Set the compressor band release of an aux output, normalised 0.0-1.0 (band 1-3) (Aux_Outputs/*/Dynamics/comp_release_N, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 3, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_release:
+    summary: "Set the gate release of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_release, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_release", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_hold:
+    summary: "Set the gate hold of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_hold, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_hold", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_key_solo:
+    summary: "Switch the dynamics key solo of an aux output on or off (Aux_Outputs/*/Dynamics/key_solo, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/key_solo", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_comp_listen:
+    summary: "Switch the compressor band listen of an aux output on or off (band 1-3) (Aux_Outputs/*/Dynamics/comp_listen_N, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_listen_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_comp_all_gain:
+    summary: "Set the compressor overall gain of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/comp_all_gain, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_all_gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_all_thresh:
+    summary: "Set the compressor overall threshold of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/comp_all_thresh, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_all_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_comp_auto_gain:
+    summary: "Switch the compressor band auto gain of an aux output on or off (band 1-4) (Aux_Outputs/*/Dynamics/comp_auto-gain_N, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/comp_auto-gain_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_desser_centre_freq:
+    summary: "Set the de-esser centre frequency of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/desser_centre_freq, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/desser_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_centre_freq:
+    summary: "Set the gate key filter centre frequency of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_centre_freq, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_desser_freq_width:
+    summary: "Set the de-esser frequency width of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/desser_freq_width, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/desser_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_gate_freq_width:
+    summary: "Set the gate key filter frequency width of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Dynamics/gate_freq_width, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Dynamics/gate_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_insert_a_in:
+    summary: "Switch the insert A in of an aux output on or off (Aux_Outputs/*/Insert/insert_A_in, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Insert/insert_A_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_insert_b_in:
+    summary: "Switch the insert B in of an aux output on or off (Aux_Outputs/*/Insert/insert_B_in, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Insert/insert_B_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_delay_on:
+    summary: "Switch the channel delay on of an aux output on or off (Aux_Outputs/*/Channel_Delay/delay_on, i)"
+    params:
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Channel_Delay/delay_on", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_delay:
+    summary: "Set the channel delay time of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Channel_Delay/delay, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Channel_Delay/delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_fine_delay:
+    summary: "Set the fine channel delay of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Channel_Delay/fine_delay, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Channel_Delay/fine_delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_buss_trim:
+    summary: "Set the buss trim of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/Buss_Trim/trim, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Buss_Trim/trim", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_aux_buss_phase:
+    summary: "Set the buss phase (polarity) setting of an aux output, 0-3 as the console numbers it (Aux_Outputs/*/Buss_Trim/phase, i)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      value: { type: int, min: 0, max: 3, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Buss_Trim/phase", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_aux_name:
+    summary: "Name an aux output (Aux_Outputs/*/Buss_Trim/name, s)"
+    params:
+      aux:  { type: int, min: 1, max: 192, required: true }
+      name: { type: string, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/Buss_Trim/name", args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  solo_aux:
+    summary: "Solo an aux output or clear its solo (Aux_Outputs/*/solo, i)"
+    params:
+      aux:    { type: int, min: 1, max: 192, required: true }
+      soloed: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/solo", args: [ { value: "{soloed:bool01}", type: int } ] }
+    returns: none
+
+  set_aux_fader:
+    summary: "Set the fader of an aux output, normalised 0.0-1.0 (Aux_Outputs/*/fader, f)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/fader", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  mute_aux:
+    summary: "Mute or unmute an aux output (Aux_Outputs/*/mute, i)"
+    params:
+      aux:   { type: int, min: 1, max: 192, required: true }
+      muted: { type: bool, default: true }
+    send: { address: "/sd/Aux_Outputs/{aux}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_group_eq_in:
+    summary: "Switch the EQ in of a group output on or off (Group_Outputs/*/EQ/eq_in, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_eq_on:
+    summary: "Switch the EQ band on of a group output on or off (band 1-8) (Group_Outputs/*/EQ/eq_on_N, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_eq_curve:
+    summary: "Set the EQ band curve of a group output, 1-4 as the console numbers it (band 1-8) (Group_Outputs/*/EQ/eq_curve_N, i)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: int, min: 1, max: 4, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_curve_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_group_eq_freq:
+    summary: "Set the EQ band frequency of a group output, normalised 0.0-1.0 (band 1-8) (Group_Outputs/*/EQ/eq_freq_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_freq_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_q:
+    summary: "Set the EQ band Q of a group output, normalised 0.0-1.0 (band 1-8) (Group_Outputs/*/EQ/eq_Q_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_Q_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_gain:
+    summary: "Set the EQ band gain of a group output, normalised 0.0-1.0 (band 1-8) (Group_Outputs/*/EQ/eq_gain_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 8, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_over_under:
+    summary: "Set the dynamic EQ band over/under of a group output, 0-1 as the console numbers it (band 1-4) (Group_Outputs/*/EQ/eq_over-under_N, i)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: int, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_over-under_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_group_eq_thresh:
+    summary: "Set the dynamic EQ band threshold of a group output, normalised 0.0-1.0 (band 1-4) (Group_Outputs/*/EQ/eq_thresh_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_ratio:
+    summary: "Set the dynamic EQ band ratio of a group output, normalised 0.0-1.0 (band 1-4) (Group_Outputs/*/EQ/eq_ratio_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_attack:
+    summary: "Set the dynamic EQ band attack of a group output, normalised 0.0-1.0 (band 1-4) (Group_Outputs/*/EQ/eq_attack_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_release:
+    summary: "Set the dynamic EQ band release of a group output, normalised 0.0-1.0 (band 1-4) (Group_Outputs/*/EQ/eq_release_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_eq_pre_ins:
+    summary: "Switch the EQ pre-insert of a group output on or off (Group_Outputs/*/EQ/eq_pre-ins, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_pre-ins", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_eq_symm_q:
+    summary: "Switch the EQ band symmetrical Q of a group output on or off (band 1-8) (Group_Outputs/*/EQ/eq_symm_Q_N, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/eq_symm_Q_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_dynamic_eq_on:
+    summary: "Switch the dynamic EQ band on of a group output on or off (band 1-4) (Group_Outputs/*/EQ/dynamic_eq_on_N, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/EQ/dynamic_eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_comp_in:
+    summary: "Switch the compressor in of a group output on or off (Group_Outputs/*/Dynamics/comp_in, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_gate_in:
+    summary: "Switch the gate in of a group output on or off (Group_Outputs/*/Dynamics/gate_in, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_comp_band_in:
+    summary: "Switch the compressor band in of a group output on or off (band 1-3) (Group_Outputs/*/Dynamics/comp_band_in_N, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_band_in_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_comp_lp_crossover:
+    summary: "Set the compressor low-pass crossover of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/comp_LP_crossover, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_LP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_hp_crossover:
+    summary: "Set the compressor high-pass crossover of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/comp_HP_crossover, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_HP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_gain:
+    summary: "Set the compressor band gain of a group output, normalised 0.0-1.0 (band 1-4) (Group_Outputs/*/Dynamics/comp_gain_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_range:
+    summary: "Set the gate range of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_range, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_range", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_thresh:
+    summary: "Set the compressor band threshold of a group output, normalised 0.0-1.0 (band 1-3) (Group_Outputs/*/Dynamics/comp_thresh_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 3, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_thresh:
+    summary: "Set the gate threshold of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_thresh, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_knee:
+    summary: "Set the compressor band knee of a group output, 0-2 as the console numbers it (band 1-4) (Group_Outputs/*/Dynamics/comp_knee_N, i)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: int, min: 0, max: 2, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_knee_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_group_comp_ratio:
+    summary: "Set the compressor band ratio of a group output, normalised 0.0-1.0 (band 1-4) (Group_Outputs/*/Dynamics/comp_ratio_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_attack:
+    summary: "Set the compressor band attack of a group output, normalised 0.0-1.0 (band 1-3) (Group_Outputs/*/Dynamics/comp_attack_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 3, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_attack:
+    summary: "Set the gate attack of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_attack, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_attack", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_release:
+    summary: "Set the compressor band release of a group output, normalised 0.0-1.0 (band 1-3) (Group_Outputs/*/Dynamics/comp_release_N, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      band:  { type: int, min: 1, max: 3, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_release:
+    summary: "Set the gate release of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_release, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_release", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_hold:
+    summary: "Set the gate hold of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_hold, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_hold", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_key_solo:
+    summary: "Switch the dynamics key solo of a group output on or off (Group_Outputs/*/Dynamics/key_solo, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/key_solo", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_comp_listen:
+    summary: "Switch the compressor band listen of a group output on or off (band 1-3) (Group_Outputs/*/Dynamics/comp_listen_N, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_listen_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_comp_all_gain:
+    summary: "Set the compressor overall gain of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/comp_all_gain, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_all_gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_all_thresh:
+    summary: "Set the compressor overall threshold of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/comp_all_thresh, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_all_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_comp_auto_gain:
+    summary: "Switch the compressor band auto gain of a group output on or off (band 1-4) (Group_Outputs/*/Dynamics/comp_auto-gain_N, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/comp_auto-gain_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_desser_centre_freq:
+    summary: "Set the de-esser centre frequency of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/desser_centre_freq, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/desser_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_centre_freq:
+    summary: "Set the gate key filter centre frequency of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_centre_freq, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_desser_freq_width:
+    summary: "Set the de-esser frequency width of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/desser_freq_width, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/desser_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_gate_freq_width:
+    summary: "Set the gate key filter frequency width of a group output, normalised 0.0-1.0 (Group_Outputs/*/Dynamics/gate_freq_width, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Dynamics/gate_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_insert_a_in:
+    summary: "Switch the insert A in of a group output on or off (Group_Outputs/*/Insert/insert_A_in, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Insert/insert_A_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_insert_b_in:
+    summary: "Switch the insert B in of a group output on or off (Group_Outputs/*/Insert/insert_B_in, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Insert/insert_B_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_delay_on:
+    summary: "Switch the channel delay on of a group output on or off (Group_Outputs/*/Channel_Delay/delay_on, i)"
+    params:
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Channel_Delay/delay_on", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_delay:
+    summary: "Set the channel delay time of a group output, normalised 0.0-1.0 (Group_Outputs/*/Channel_Delay/delay, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Channel_Delay/delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_fine_delay:
+    summary: "Set the fine channel delay of a group output, normalised 0.0-1.0 (Group_Outputs/*/Channel_Delay/fine_delay, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Channel_Delay/fine_delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_buss_trim:
+    summary: "Set the buss trim of a group output, normalised 0.0-1.0 (Group_Outputs/*/Buss_Trim/trim, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Buss_Trim/trim", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_group_buss_phase:
+    summary: "Set the buss phase (polarity) setting of a group output, 0-3 as the console numbers it (Group_Outputs/*/Buss_Trim/phase, i)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      value: { type: int, min: 0, max: 3, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Buss_Trim/phase", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_group_name:
+    summary: "Name a group output (Group_Outputs/*/Buss_Trim/name, s)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      name:  { type: string, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/Buss_Trim/name", args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  solo_group:
+    summary: "Solo a group output or clear its solo (Group_Outputs/*/solo, i)"
+    params:
+      group:  { type: int, min: 1, max: 192, required: true }
+      soloed: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/solo", args: [ { value: "{soloed:bool01}", type: int } ] }
+    returns: none
+
+  set_group_fader:
+    summary: "Set the fader of a group output, normalised 0.0-1.0 (Group_Outputs/*/fader, f)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Group_Outputs/{group}/fader", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  mute_group:
+    summary: "Mute or unmute a group output (Group_Outputs/*/mute, i)"
+    params:
+      group: { type: int, min: 1, max: 192, required: true }
+      muted: { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  solo_control_group:
+    summary: "Solo a control group or clear its solo (Control_Groups/*/solo, i)"
+    params:
+      control_group: { type: int, min: 1, max: 36, required: true }
+      soloed:        { type: bool, default: true }
+    send: { address: "/sd/Control_Groups/{control_group}/solo", args: [ { value: "{soloed:bool01}", type: int } ] }
+    returns: none
+
+  set_control_group_fader:
+    summary: "Set the fader of a control group, normalised 0.0-1.0 (Control_Groups/*/fader, f)"
+    params:
+      control_group: { type: int, min: 1, max: 36, required: true }
+      level:         { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Control_Groups/{control_group}/fader", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  mute_control_group:
+    summary: "Mute or unmute a control group (Control_Groups/*/mute, i)"
+    params:
+      control_group: { type: int, min: 1, max: 36, required: true }
+      muted:         { type: bool, default: true }
+    send: { address: "/sd/Control_Groups/{control_group}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_control_group_name:
+    summary: "Name a control group (Control_Groups/*/name, s)"
+    params:
+      control_group: { type: int, min: 1, max: 36, required: true }
+      name:          { type: string, required: true }
+    send: { address: "/sd/Control_Groups/{control_group}/name", args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  set_matrix_eq_in:
+    summary: "Switch the EQ in of a matrix output on or off (Matrix_Outputs/*/EQ/eq_in, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_eq_on:
+    summary: "Switch the EQ band on of a matrix output on or off (band 1-8) (Matrix_Outputs/*/EQ/eq_on_N, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      band:    { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_eq_curve:
+    summary: "Set the EQ band curve of a matrix output, 1-4 as the console numbers it (band 1-8) (Matrix_Outputs/*/EQ/eq_curve_N, i)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 8, required: true }
+      value:  { type: int, min: 1, max: 4, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_curve_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_matrix_eq_freq:
+    summary: "Set the EQ band frequency of a matrix output, normalised 0.0-1.0 (band 1-8) (Matrix_Outputs/*/EQ/eq_freq_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 8, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_freq_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_q:
+    summary: "Set the EQ band Q of a matrix output, normalised 0.0-1.0 (band 1-8) (Matrix_Outputs/*/EQ/eq_Q_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 8, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_Q_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_gain:
+    summary: "Set the EQ band gain of a matrix output, normalised 0.0-1.0 (band 1-8) (Matrix_Outputs/*/EQ/eq_gain_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 8, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_over_under:
+    summary: "Set the dynamic EQ band over/under of a matrix output, 0-1 as the console numbers it (band 1-4) (Matrix_Outputs/*/EQ/eq_over-under_N, i)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: int, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_over-under_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_matrix_eq_thresh:
+    summary: "Set the dynamic EQ band threshold of a matrix output, normalised 0.0-1.0 (band 1-4) (Matrix_Outputs/*/EQ/eq_thresh_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_ratio:
+    summary: "Set the dynamic EQ band ratio of a matrix output, normalised 0.0-1.0 (band 1-4) (Matrix_Outputs/*/EQ/eq_ratio_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_attack:
+    summary: "Set the dynamic EQ band attack of a matrix output, normalised 0.0-1.0 (band 1-4) (Matrix_Outputs/*/EQ/eq_attack_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_release:
+    summary: "Set the dynamic EQ band release of a matrix output, normalised 0.0-1.0 (band 1-4) (Matrix_Outputs/*/EQ/eq_release_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_eq_pre_ins:
+    summary: "Switch the EQ pre-insert of a matrix output on or off (Matrix_Outputs/*/EQ/eq_pre-ins, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_pre-ins", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_eq_symm_q:
+    summary: "Switch the EQ band symmetrical Q of a matrix output on or off (band 1-8) (Matrix_Outputs/*/EQ/eq_symm_Q_N, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      band:    { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/eq_symm_Q_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_dynamic_eq_on:
+    summary: "Switch the dynamic EQ band on of a matrix output on or off (band 1-4) (Matrix_Outputs/*/EQ/dynamic_eq_on_N, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/EQ/dynamic_eq_on_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_comp_in:
+    summary: "Switch the compressor in of a matrix output on or off (Matrix_Outputs/*/Dynamics/comp_in, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_gate_in:
+    summary: "Switch the gate in of a matrix output on or off (Matrix_Outputs/*/Dynamics/gate_in, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_comp_band_in:
+    summary: "Switch the compressor band in of a matrix output on or off (band 1-3) (Matrix_Outputs/*/Dynamics/comp_band_in_N, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_band_in_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_comp_lp_crossover:
+    summary: "Set the compressor low-pass crossover of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/comp_LP_crossover, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_LP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_hp_crossover:
+    summary: "Set the compressor high-pass crossover of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/comp_HP_crossover, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_HP_crossover", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_gain:
+    summary: "Set the compressor band gain of a matrix output, normalised 0.0-1.0 (band 1-4) (Matrix_Outputs/*/Dynamics/comp_gain_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_range:
+    summary: "Set the gate range of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_range, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_range", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_thresh:
+    summary: "Set the compressor band threshold of a matrix output, normalised 0.0-1.0 (band 1-3) (Matrix_Outputs/*/Dynamics/comp_thresh_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 3, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_thresh_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_thresh:
+    summary: "Set the gate threshold of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_thresh, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_knee:
+    summary: "Set the compressor band knee of a matrix output, 0-2 as the console numbers it (band 1-4) (Matrix_Outputs/*/Dynamics/comp_knee_N, i)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: int, min: 0, max: 2, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_knee_{band}", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_matrix_comp_ratio:
+    summary: "Set the compressor band ratio of a matrix output, normalised 0.0-1.0 (band 1-4) (Matrix_Outputs/*/Dynamics/comp_ratio_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 4, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_ratio_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_attack:
+    summary: "Set the compressor band attack of a matrix output, normalised 0.0-1.0 (band 1-3) (Matrix_Outputs/*/Dynamics/comp_attack_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 3, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_attack_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_attack:
+    summary: "Set the gate attack of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_attack, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_attack", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_release:
+    summary: "Set the compressor band release of a matrix output, normalised 0.0-1.0 (band 1-3) (Matrix_Outputs/*/Dynamics/comp_release_N, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      band:   { type: int, min: 1, max: 3, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_release_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_release:
+    summary: "Set the gate release of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_release, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_release", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_hold:
+    summary: "Set the gate hold of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_hold, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_hold", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_key_solo:
+    summary: "Switch the dynamics key solo of a matrix output on or off (Matrix_Outputs/*/Dynamics/key_solo, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/key_solo", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_comp_listen:
+    summary: "Switch the compressor band listen of a matrix output on or off (band 1-3) (Matrix_Outputs/*/Dynamics/comp_listen_N, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      band:    { type: int, min: 1, max: 3, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_listen_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_comp_all_gain:
+    summary: "Set the compressor overall gain of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/comp_all_gain, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_all_gain", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_all_thresh:
+    summary: "Set the compressor overall threshold of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/comp_all_thresh, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_all_thresh", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_comp_auto_gain:
+    summary: "Switch the compressor band auto gain of a matrix output on or off (band 1-4) (Matrix_Outputs/*/Dynamics/comp_auto-gain_N, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      band:    { type: int, min: 1, max: 4, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/comp_auto-gain_{band}", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_desser_centre_freq:
+    summary: "Set the de-esser centre frequency of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/desser_centre_freq, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/desser_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_centre_freq:
+    summary: "Set the gate key filter centre frequency of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_centre_freq, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_centre_freq", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_desser_freq_width:
+    summary: "Set the de-esser frequency width of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/desser_freq_width, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/desser_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_gate_freq_width:
+    summary: "Set the gate key filter frequency width of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Dynamics/gate_freq_width, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Dynamics/gate_freq_width", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_insert_a_in:
+    summary: "Switch the insert A in of a matrix output on or off (Matrix_Outputs/*/Insert/insert_A_in, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Insert/insert_A_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_insert_b_in:
+    summary: "Switch the insert B in of a matrix output on or off (Matrix_Outputs/*/Insert/insert_B_in, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Insert/insert_B_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_delay_on:
+    summary: "Switch the channel delay on of a matrix output on or off (Matrix_Outputs/*/Channel_Delay/delay_on, i)"
+    params:
+      matrix:  { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Channel_Delay/delay_on", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_delay:
+    summary: "Set the channel delay time of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Channel_Delay/delay, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Channel_Delay/delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_fine_delay:
+    summary: "Set the fine channel delay of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Channel_Delay/fine_delay, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Channel_Delay/fine_delay", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_buss_trim:
+    summary: "Set the buss trim of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/Buss_Trim/trim, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Buss_Trim/trim", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_matrix_buss_phase:
+    summary: "Set the buss phase (polarity) setting of a matrix output, 0-3 as the console numbers it (Matrix_Outputs/*/Buss_Trim/phase, i)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      value:  { type: int, min: 0, max: 3, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Buss_Trim/phase", args: [ { value: "{value}", type: int } ] }
+    returns: none
+
+  set_matrix_name:
+    summary: "Name a matrix output (Matrix_Outputs/*/Buss_Trim/name, s)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      name:   { type: string, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/Buss_Trim/name", args: [ { value: "{name}", type: string } ] }
+    returns: none
+
+  solo_matrix:
+    summary: "Solo a matrix output or clear its solo (Matrix_Outputs/*/solo, i)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      soloed: { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/solo", args: [ { value: "{soloed:bool01}", type: int } ] }
+    returns: none
+
+  set_matrix_fader:
+    summary: "Set the fader of a matrix output, normalised 0.0-1.0 (Matrix_Outputs/*/fader, f)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      level:  { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/fader", args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  mute_matrix:
+    summary: "Mute or unmute a matrix output (Matrix_Outputs/*/mute, i)"
+    params:
+      matrix: { type: int, min: 1, max: 64, required: true }
+      muted:  { type: bool, default: true }
+    send: { address: "/sd/Matrix_Outputs/{matrix}/mute", args: [ { value: "{muted:bool01}", type: int } ] }
+    returns: none
+
+  set_input_aux_send_level:
+    summary: "Set an input channel's send level to an aux output, normalised 0.0-1.0 (Input_Channels/*/Aux_Send/*/send_level, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      aux:     { type: int, min: 1, max: 192, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Aux_Send/{aux}/send_level", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_aux_send_on:
+    summary: "Switch an input channel's send to an aux output on or off (Input_Channels/*/Aux_Send/*/send_on, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      aux:     { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Aux_Send/{aux}/send_on", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_input_aux_send_pan:
+    summary: "Set an input channel's send pan to a stereo aux output, normalised 0.0-1.0 (Input_Channels/*/Aux_Send/*/send_pan, f)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      aux:     { type: int, min: 1, max: 192, required: true }
+      value:   { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Input_Channels/{channel}/Aux_Send/{aux}/send_pan", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  set_input_group_send:
+    summary: "Route an input channel to a group output, or remove it (Input_Channels/*/Group_Send/*/group, i)"
+    params:
+      channel: { type: int, min: 1, max: 384, required: true }
+      group:   { type: int, min: 1, max: 192, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Input_Channels/{channel}/Group_Send/{group}/group", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_group_group_send:
+    summary: "Route a group output to another group output, or remove it (Group_Outputs/*/Group_Send/*/group, i)"
+    params:
+      group:       { type: int, min: 1, max: 192, required: true }
+      destination: { type: int, min: 1, max: 192, required: true }
+      enabled:     { type: bool, default: true }
+    send: { address: "/sd/Group_Outputs/{group}/Group_Send/{destination}/group", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_geq_in:
+    summary: "Switch a graphic EQ in or out (Graphic_EQ/*/geq_in, i)"
+    params:
+      geq:     { type: int, min: 1, max: 64, required: true }
+      enabled: { type: bool, default: true }
+    send: { address: "/sd/Graphic_EQ/{geq}/geq_in", args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  set_geq_band_gain:
+    summary: "Set the gain of one graphic EQ band, normalised 0.0-1.0 (band 1-32) (Graphic_EQ/*/geq_gain_N, f)"
+    params:
+      geq:   { type: int, min: 1, max: 64, required: true }
+      band:  { type: int, min: 1, max: 32, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { address: "/sd/Graphic_EQ/{geq}/geq_gain_{band}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  save_session:
+    summary: "Save the current session on the console (Filing/Save_current_Session, i 0)"
+    send: { address: "/sd/Filing/Save_current_Session", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  fire_snapshot:
+    summary: "Fire (recall) a snapshot by its number, 0-9999 (Snapshots/Fire_Snapshot_number, i)"
+    params:
+      snapshot: { type: int, min: 0, max: 9999, required: true }
+    send: { address: "/sd/Snapshots/Fire_Snapshot_number", args: [ { value: "{snapshot}", type: int } ] }
+    returns: none
+
+  fire_next_snapshot:
+    summary: "Fire the next snapshot in the list (Snapshots/Fire_Next_Snapshot, i 0)"
+    send: { address: "/sd/Snapshots/Fire_Next_Snapshot", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  fire_previous_snapshot:
+    summary: "Fire the previous snapshot in the list (Snapshots/Fire_Prev_Snapshot, i 0)"
+    send: { address: "/sd/Snapshots/Fire_Prev_Snapshot", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  press_macro:
+    summary: "Press a macro button, numbered from 1; sent 0-based, 0-255 (Macros/Buttons/press, i)"
+    params:
+      macro: { type: int, min: 1, max: 256, required: true }
+    send: { address: "/sd/Macros/Buttons/press", args: [ { value: "{macro:-1}", type: int } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      fire_snapshot, fire_next_snapshot and fire_previous_snapshot recall a snapshot on the live
+      console at once: every parameter in the snapshot's recall scope changes, faders and mutes
+      included, and nothing undoes it except firing another snapshot. fire_next_snapshot and
+      fire_previous_snapshot act relative to the console's current snapshot, which this spec cannot
+      read back.
+
+  - models: [all]
+    severity: critical
+    text: >
+      Nothing is accepted until the console is set up for it (TN324 p.2; V987 release notes): Setup >
+      External Control enabled, Add device > Other OSC with this host's IP address and a Send and a
+      Receive port unique among the devices, and the device's Enable box ticked. Register the device
+      here with the console's address and that Receive port; DiGiCo documents no default port. With
+      no acknowledgement on Other OSC, a console that is not set up drops every message while each
+      command still reports unverified.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Other OSC is one-way. DiGiCo documents no feedback or query to an Other OSC device, and the
+      Companion module's help says feedback needs the device added as a DiGiCo Pad, whose command set
+      is not public. This spec therefore keeps no state: a fader moved on the surface, or a snapshot
+      fired there, is not seen.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Faders, sends, trims, gains, frequencies, Q, thresholds, ratios, times and pans are sent as
+      the list gives them, a float from 0.0 to 1.0 across the control's travel. The list does not
+      give the dB, Hz or millisecond value of any position, so the spec does not convert; the
+      Companion module's dB labels for fader positions (0.75 = 0 dB) are not from DiGiCo and are
+      not used.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Strip numbers are limited to the largest console in the range (Quantum852: 384 input
+      channels, 192 aux and group outputs together, 64 matrix outputs, 36 control groups; graphic EQ
+      up to 64). How many exist depends on the console and on the session's channel configuration;
+      DiGiCo does not document what happens to a message for a strip the session does not have.
+
+  - models: [all]
+    severity: warning
+    text: >
+      press_macro takes the macro number from 1, as the console shows it, and sends it 0-based: the
+      list's range for Macros/Buttons/press is 0-255, and the Companion module sends macro N as N-1.
+      A macro can run any console action, including snapshot recalls.
+
+  - models: [all]
+    severity: warning
+    text: >
+      save_session overwrites the session file on the console with its current state, replacing
+      what was saved before. It does not change the audio.
+
+  - models: [all]
+    severity: info
+    text: >
+      Left out of the list: Input_Channels/*/Channel_Input/main/alt_in (the table's row is garbled,
+      so its address is uncertain), CGs_level and CGs_mute (their meaning is not explained),
+      Matrix_Inputs/*/Matrix_Send (matrix input numbering is not explained), and Multis (the
+      "multis" are not explained). The list dates from 2014; parameters added to the consoles since
+      have no published address.

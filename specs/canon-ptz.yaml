@@ -1,0 +1,1293 @@
+spec: 1
+id: canon-ptz
+name: Canon PTZ and pro video cameras (XC protocol)
+vendor: Canon
+category: camera
+
+# Canon's XC protocol: HTTP GETs under /-wvhttp-01-/ on the camera's web port.
+# control.cgi takes key=value settings and moves (pan, tilt, zoom, focus,
+# c.1.<setting>), standby.cgi powers the camera, preset/set stores presets,
+# trace/control plays traces, and info.cgi answers every setting as
+# key:=value lines, which the poll below reads into state. Canon's
+# specification (XC Protocol Specifications, BPE-7216) is available only
+# through Canon's developer programmes and was not used: the two public
+# Canon answers below give control.cgi and info.cgi, and every other path,
+# key and value comes from the MIT-licensed Bitfocus Companion module, which
+# follows BPE-7216-011. VISCA over IP on these cameras is the visca spec's
+# canon model.
+
+source:
+  - title: "How do you control the Pan, Tilt and Zoom? (Canon Developer Community, PTZ & Remote Cameras, 2022-09-28)"
+    author: Canon U.S.A.
+    url: https://developercommunity.usa.canon.com/s/article/How-do-you-control-the-Pan-Tilt-and-Zoom
+    note: >
+      Manufacturer answer: GET /-wvhttp-01-/control.cgi?pan=&tilt=&zoom= moves to an absolute
+      position, with the ranges read from info.cgi first.
+  - title: "How do you retrieve camera settings? (Canon Developer Community, 2022-09-26)"
+    author: Canon U.S.A.
+    url: https://developercommunity.usa.canon.com/s/article/How-do-you-retrieve-camera-settings
+    note: >
+      Manufacturer answer: GET /-wvhttp-01-/info.cgi returns the camera settings. "What is the XC
+      Protocol?" (2022-05-06) calls it a Canon proprietary RESTful API for Canon video products;
+      "Who is eligible to download development tools files" (2026-05-29) says the development tools
+      go only to registered developers in each Canon region.
+  - title: companion-module-canon-ptz (Bitfocus Companion module, MIT licence)
+    author: Joseph Adams and contributors
+    url: https://github.com/bitfocus/companion-module-canon-ptz
+    note: >
+      Read for corroboration and as the only public source for most keys (src/api.js, src/actions.js,
+      src/polling.js, src/models.js, src/choices.js, companion/HELP.md); its HELP says model
+      capabilities follow BPE-7216-011. From it: the /-wvhttp-01-/ base with Digest (or Basic)
+      authentication and guest access (api.js); control.cgi, standby.cgi?cmd=standby|idle,
+      preset/set, trace/control?t=&cmd=prepare|start|stop and maintain?cmd=platform_reset (index.js,
+      actions.js); each control.cgi key and value used below; info.cgi's key:=value lines and the
+      keys read into state (polling.js); per-model features and value lists (models.js,
+      choices.js): pan/tilt speeds 10-10000, zoom speed 0-127, focus speed 0-2, shutter as 1/N,
+      iris as f-number times 100, gain in tenths of a dB, ND densities times 100, pedestal and
+      white balance gains -50 to 50, sharpness -10 to 50, noise reduction 0-12, presets 1-100,
+      preset times 2-99 s and speeds 1-100, traces 1-10.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  # The cameras answer a request from a user without guest access with a
+  # Digest challenge (the Companion module's api.js), which the core answers
+  # with the username and password settings.
+  auth: digest
+  timeout_ms: 4000
+  probe: { method: GET, path: /-wvhttp-01-/info.cgi }
+
+settings:
+  username: { type: string, default: "" }
+  password: { type: string, secret: true, default: "" }
+
+models:
+  - id: cr-n100
+    name: Canon CR-N100
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, pan_left, pan_right,
+      tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home, pan_tilt_zoom_to,
+      pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, set_soft_zoom, focus_near, focus_far, focus_stop,
+      set_focus_speed, set_focus_mode, one_shot_af, set_face_detection, set_shooting_mode, set_exposure_mode,
+      set_scene, set_ae_gain_limit, set_ae_brightness, set_ae_photometry, set_ae_flicker_reduction,
+      set_shutter_mode, set_shutter, set_iris_mode, set_iris, set_gain_mode, set_gain, set_nd_mode,
+      set_pedestal, set_sharpness, set_noise_reduction, set_white_balance_mode, white_balance_one_shot,
+      set_kelvin, set_wb_r_gain, set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed,
+      save_preset, save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+    notes: >
+      ND filter value is read-only; ND mode (assist/fixed) is what is set. Scene mode exists.
+  - id: cr-n300
+    name: Canon CR-N300
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, pan_left, pan_right,
+      tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home, pan_tilt_zoom_to,
+      pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, focus_near, focus_far, focus_stop,
+      set_focus_speed, set_focus_mode, one_shot_af, set_face_detection, set_shooting_mode, set_exposure_mode,
+      set_ae_gain_limit, set_ae_brightness, set_ae_photometry, set_ae_flicker_reduction, set_shutter_mode,
+      set_shutter, set_iris_mode, set_iris, set_gain_mode, set_gain, set_nd_filter, set_pedestal,
+      set_sharpness, set_noise_reduction, set_white_balance_mode, white_balance_one_shot, set_kelvin,
+      set_wb_r_gain, set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed, save_preset,
+      save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+    notes: >
+      ND filter is on/off (0 or 1).
+  - id: cr-n350
+    name: Canon CR-N350
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      advanced_zoom_on, digital_magnification_on, set_digital_magnification, set_image_stabilization,
+      pan_left, pan_right, tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home,
+      pan_tilt_zoom_to, pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, set_soft_zoom, focus_near,
+      focus_far, focus_stop, set_focus_speed, set_focus_mode, one_shot_af, spot_af, set_face_detection,
+      set_shooting_mode, set_exposure_mode, set_ae_gain_limit, set_ae_brightness, set_ae_photometry,
+      set_ae_flicker_reduction, set_shutter_mode, set_shutter, set_iris_mode, set_iris, set_iris_increment,
+      set_iris_fine, set_gain_mode, set_gain, set_gain_increment, set_nd_mode, set_pedestal, set_sharpness,
+      set_white_balance_mode, white_balance_one_shot, set_kelvin, set_wb_r_gain, set_wb_b_gain,
+      recall_preset, recall_preset_time, recall_preset_speed, save_preset, save_preset_selective,
+      trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+    notes: >
+      No scene mode and no Av/Tv exposure; gain to 30.0 dB; ND filter read-only.
+  - id: cr-n400
+    name: Canon CR-N400
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      advanced_zoom_on, digital_magnification_on, set_digital_magnification, set_image_stabilization,
+      pan_left, pan_right, tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home,
+      pan_tilt_zoom_to, pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, set_soft_zoom, focus_near,
+      focus_far, focus_stop, set_focus_speed, set_focus_mode, one_shot_af, spot_af, set_face_detection,
+      set_shooting_mode, set_exposure_mode, set_ae_gain_limit, set_ae_brightness, set_ae_photometry,
+      set_ae_flicker_reduction, set_shutter_mode, set_shutter, set_iris_mode, set_iris, set_iris_increment,
+      set_iris_fine, set_gain_mode, set_gain, set_gain_increment, set_nd_mode, set_pedestal, set_sharpness,
+      set_white_balance_mode, white_balance_one_shot, set_kelvin, set_wb_r_gain, set_wb_b_gain,
+      recall_preset, recall_preset_time, recall_preset_speed, save_preset, save_preset_selective,
+      trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+    notes: >
+      No scene mode and no Av/Tv exposure; gain to 30.0 dB; ND filter read-only.
+  - id: cr-n500
+    name: Canon CR-N500
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, set_color_bars, pan_left,
+      pan_right, tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home,
+      pan_tilt_zoom_to, pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, focus_near, focus_far,
+      focus_stop, set_focus_speed, set_focus_mode, one_shot_af, set_face_detection, set_shooting_mode,
+      set_exposure_mode, set_ae_gain_limit, set_ae_brightness, set_ae_photometry, set_ae_flicker_reduction,
+      set_shutter_mode, set_shutter, set_iris_mode, set_iris, set_gain_mode, set_gain, set_nd_filter,
+      set_pedestal, set_sharpness, set_noise_reduction, set_white_balance_mode, white_balance_one_shot,
+      set_kelvin, set_wb_r_gain, set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed,
+      save_preset, save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+  - id: cr-n700
+    name: Canon CR-N700
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, pan_left, pan_right,
+      tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home, pan_tilt_zoom_to,
+      pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, focus_near, focus_far, focus_stop,
+      set_focus_speed, set_focus_mode, one_shot_af, set_face_detection, set_shooting_mode, set_exposure_mode,
+      set_ae_gain_limit, set_ae_brightness, set_ae_photometry, set_ae_flicker_reduction, set_shutter_mode,
+      set_shutter, set_iris_mode, set_iris, set_gain_mode, set_gain, set_nd_filter, set_pedestal,
+      set_sharpness, set_white_balance_mode, white_balance_one_shot, set_kelvin, set_wb_r_gain,
+      set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed, save_preset,
+      save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+  - id: cr-x300
+    name: Canon CR-X300
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, pan_left, pan_right,
+      tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home, pan_tilt_zoom_to,
+      pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, zoom_to, focus_near, focus_far, focus_stop,
+      set_focus_speed, set_focus_mode, one_shot_af, set_face_detection, set_shooting_mode, set_exposure_mode,
+      set_ae_gain_limit, set_ae_brightness, set_ae_photometry, set_ae_flicker_reduction, set_shutter_mode,
+      set_shutter, set_iris_mode, set_iris, set_gain_mode, set_gain, set_nd_filter, set_pedestal,
+      set_sharpness, set_noise_reduction, set_white_balance_mode, white_balance_one_shot, set_kelvin,
+      set_wb_r_gain, set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed, save_preset,
+      save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+  - id: cr-x500
+    name: Canon CR-X500
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, pan_left, pan_right,
+      tilt_up, tilt_down, pan_tilt, pan_tilt_stop, pan_stop, tilt_stop, pan_tilt_home, pan_tilt_zoom_to,
+      pan_tilt_initialize, zoom_tele, zoom_wide, zoom_stop, zoom_to, focus_near, focus_far, focus_stop,
+      set_focus_speed, set_focus_mode, one_shot_af, set_face_detection, set_shooting_mode, set_exposure_mode,
+      set_ae_gain_limit, set_ae_brightness, set_ae_photometry, set_ae_flicker_reduction, set_shutter_mode,
+      set_shutter, set_iris_mode, set_iris, set_gain_mode, set_gain, set_nd_filter, set_pedestal,
+      set_sharpness, set_white_balance_mode, white_balance_one_shot, set_kelvin, set_wb_r_gain,
+      set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed, save_preset,
+      save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+  - id: eos-c80
+    name: Canon EOS C80
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_magnification_on,
+      set_digital_magnification, set_image_stabilization, zoom_tele, zoom_wide, zoom_stop, zoom_to,
+      focus_near, focus_far, focus_stop, set_focus_speed, set_focus_mode, one_shot_af, set_subject_detection,
+      set_shooting_mode, set_exposure_mode, set_ae_gain_limit, set_ae_brightness, set_ae_photometry,
+      set_ae_flicker_reduction, set_shutter_mode, set_shutter, set_iris_mode, set_iris, set_gain_mode,
+      set_gain, set_nd_filter, set_pedestal, set_sharpness, set_white_balance_mode, white_balance_one_shot,
+      set_kelvin, set_wb_r_gain, set_wb_b_gain, recall_preset, recall_preset_time, recall_preset_speed,
+      save_preset, save_preset_selective, trace_prepare, trace_start, trace_stop, get_info]
+    verification: none
+    notes: >
+      No pan/tilt; manual exposure only (shooting and exp lists are manual); gain -6.0 to 54.0 dB; no digital zoom, only digital magnification (teleconverter).
+  - id: xf605
+    name: Canon XF605
+    supports:
+      [power_on, power_standby, set_camera_name, set_tally, digital_zoom_off, digital_zoom_on,
+      digital_magnification_on, set_digital_magnification, set_image_stabilization, zoom_tele, zoom_wide,
+      zoom_stop, zoom_to, focus_near, focus_far, focus_stop, set_focus_speed, set_focus_mode, one_shot_af,
+      set_face_detection, set_shooting_mode, set_exposure_mode, set_ae_gain_limit, set_ae_brightness,
+      set_ae_photometry, set_ae_flicker_reduction, set_shutter_mode, set_shutter, set_iris_mode, set_iris,
+      set_gain_mode, set_gain, set_nd_filter, set_pedestal, set_sharpness, set_white_balance_mode,
+      white_balance_one_shot, set_kelvin, set_wb_r_gain, set_wb_b_gain, recall_preset, recall_preset_time,
+      recall_preset_speed, save_preset, save_preset_selective, trace_prepare, trace_start, trace_stop,
+      get_info]
+    verification: none
+    notes: >
+      No pan/tilt; gain -6 to 21 dB in 3 dB steps.
+
+commands:
+  power_on:
+    summary: "Wake the camera from standby (standby.cgi cmd=idle)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/standby.cgi
+      query:
+        cmd: "idle"
+    expect: { status: 200 }
+    returns: ack
+
+  power_standby:
+    summary: "Put the camera into standby (standby.cgi cmd=standby)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/standby.cgi
+      query:
+        cmd: "standby"
+    expect: { status: 200 }
+    returns: ack
+
+  set_camera_name:
+    summary: "Set the camera name (c.1.name.utf8)"
+    params:
+      name: { type: string, max_length: 64, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.name.utf8: "{name}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_tally:
+    summary: "Switch the program (red) or preview (green) tally lamp on or off (tally, tally.mode)"
+    params:
+      mode:  { type: enum, values: [program, preview], required: true }
+      state: { type: enum, values: ["on", "off"], default: "on" }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        tally: "{state}"
+        tally.mode: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  digital_zoom_off:
+    summary: "Turn digital zoom, advanced zoom and digital magnification off (c.1.zoom.mode=off)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.zoom.mode: "off"
+    expect: { status: 200 }
+    returns: ack
+
+  digital_zoom_on:
+    summary: "Turn digital zoom on (c.1.zoom.mode=dzoom)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.zoom.mode: "dzoom"
+    expect: { status: 200 }
+    returns: ack
+
+  advanced_zoom_on:
+    summary: "Turn advanced zoom on (c.1.zoom.mode=advanced)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.zoom.mode: "advanced"
+    expect: { status: 200 }
+    returns: ack
+
+  digital_magnification_on:
+    summary: "Turn digital magnification (the digital teleconverter) on (c.1.zoom.mode=mag)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.zoom.mode: "mag"
+    expect: { status: 200 }
+    returns: ack
+
+  set_digital_magnification:
+    summary: "Set the digital magnification in percent, one of the camera's c.1.zoom.mag.list values such as 100, 150, 300 or 600 (c.1.zoom.mag)"
+    params:
+      percent: { type: int, min: 100, max: 1000, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.zoom.mag: "{percent}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_image_stabilization:
+    summary: "Turn image stabilisation on (on1) or off (c.1.is)"
+    params:
+      mode: { type: enum, values: [on1, "off"], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.is: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_color_bars:
+    summary: "Show or hide colour bars (c.1.colorbar)"
+    params:
+      state: { type: enum, values: ["on", "off"], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.colorbar: "{state}"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_left:
+    summary: "Start panning left at a speed (pan=left, pan.speed.dir)"
+    params:
+      speed: { type: int, min: 10, max: 10000, default: 625 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "left"
+        pan.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_right:
+    summary: "Start panning right at a speed (pan=right, pan.speed.dir)"
+    params:
+      speed: { type: int, min: 10, max: 10000, default: 625 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "right"
+        pan.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  tilt_up:
+    summary: "Start tilting up at a speed (tilt=up, tilt.speed.dir)"
+    params:
+      speed: { type: int, min: 10, max: 10000, default: 625 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        tilt: "up"
+        tilt.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  tilt_down:
+    summary: "Start tilting down at a speed (tilt=down, tilt.speed.dir)"
+    params:
+      speed: { type: int, min: 10, max: 10000, default: 625 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        tilt: "down"
+        tilt.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_tilt:
+    summary: "Start panning and tilting together, diagonally, at a speed (pan, tilt, pan.speed.dir, tilt.speed.dir)"
+    params:
+      pan:   { type: enum, values: [left, right], required: true }
+      tilt:  { type: enum, values: [up, down], required: true }
+      speed: { type: int, min: 10, max: 10000, default: 625 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "{pan}"
+        pan.speed.dir: "{speed}"
+        tilt: "{tilt}"
+        tilt.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_tilt_stop:
+    summary: "Stop panning and tilting (pan=stop, tilt=stop)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "stop"
+        tilt: "stop"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_stop:
+    summary: "Stop panning (pan=stop)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "stop"
+    expect: { status: 200 }
+    returns: ack
+
+  tilt_stop:
+    summary: "Stop tilting (tilt=stop)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        tilt: "stop"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_tilt_home:
+    summary: "Move to the home position, pan 0 and tilt 0 (pan=0, tilt=0)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "0"
+        tilt: "0"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_tilt_zoom_to:
+    summary: "Move to an absolute pan, tilt and zoom position, in the camera's units; info.cgi gives the ranges (pan, tilt, zoom)"
+    params:
+      pan:  { type: int, required: true }
+      tilt: { type: int, required: true }
+      zoom: { type: int, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        pan: "{pan}"
+        tilt: "{tilt}"
+        zoom: "{zoom}"
+    expect: { status: 200 }
+    returns: ack
+
+  pan_tilt_initialize:
+    summary: "Initialise the pan/tilt mechanism, which moves the head through its range (maintain cmd=platform_reset)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/maintain
+      query:
+        cmd: "platform_reset"
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_tele:
+    summary: "Start zooming in (zoom=tele, zoom.speed.dir)"
+    params:
+      speed: { type: int, min: 0, max: 127, default: 8 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        zoom: "tele"
+        zoom.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_wide:
+    summary: "Start zooming out (zoom=wide, zoom.speed.dir)"
+    params:
+      speed: { type: int, min: 0, max: 127, default: 8 }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        zoom: "wide"
+        zoom.speed.dir: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_stop:
+    summary: "Stop zooming (zoom=stop)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        zoom: "stop"
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_to:
+    summary: "Zoom to an absolute position, in the camera's units (zoom)"
+    params:
+      position: { type: int, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        zoom: "{position}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_soft_zoom:
+    summary: "Set soft (ramped) zoom start and stop (c.1.zoom.accel)"
+    params:
+      mode: { type: enum, values: ["off", start, stop, both], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.zoom.accel: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  focus_near:
+    summary: "Start focusing nearer (focus.action=near)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        focus.action: "near"
+    expect: { status: 200 }
+    returns: ack
+
+  focus_far:
+    summary: "Start focusing farther (focus.action=far)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        focus.action: "far"
+    expect: { status: 200 }
+    returns: ack
+
+  focus_stop:
+    summary: "Stop focusing (focus.action=stop)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        focus.action: "stop"
+    expect: { status: 200 }
+    returns: ack
+
+  set_focus_speed:
+    summary: "Set the manual focus speed: 0 low, 1 medium, 2 high (focus.speed)"
+    params:
+      speed: { type: int, min: 0, max: 2, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        focus.speed: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_focus_mode:
+    summary: "Set auto or manual focus (focus)"
+    params:
+      mode: { type: enum, values: [auto, manual], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        focus: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  one_shot_af:
+    summary: "Run one-shot auto focus (c.1.focus.action=one_shot)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.focus.action: "one_shot"
+    expect: { status: 200 }
+    returns: ack
+
+  spot_af:
+    summary: "Run spot (touch) auto focus (c.1.focus.action=spot)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.focus.action: "spot"
+    expect: { status: 200 }
+    returns: ack
+
+  set_face_detection:
+    summary: "Set face detection AF: off, face only or face catch (c.1.focus.detect)"
+    params:
+      mode: { type: enum, values: ["off", faceonly, facecatch], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.focus.detect: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_subject_detection:
+    summary: "Set subject detection AF: off, people or animals, only or catch (c.1.focus.detect)"
+    params:
+      mode: { type: enum, values: ["off", ppl_only, ppl_catch, anml_only, anml_catch], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.focus.detect: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_shooting_mode:
+    summary: "Set the shooting mode: full auto, manual or scene (c.1.shooting)"
+    params:
+      mode: { type: enum, values: [fullauto, manual, scene], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.shooting: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_exposure_mode:
+    summary: "Set the exposure mode within manual shooting: auto (P), Tv, Av or manual (c.1.exp)"
+    params:
+      mode: { type: enum, values: [auto, tv, av, manual], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.exp: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_scene:
+    summary: "Set the scene mode (c.1.scene)"
+    params:
+      scene: { type: enum, values: [portrait, sports, lowlight, spotlight], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.scene: "{scene}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_ae_gain_limit:
+    summary: "Set the AE gain limit in tenths of a dB, within c.1.ae.gainlimit.max.min/.max (c.1.ae.gainlimit.max)"
+    params:
+      tenths_db: { type: int, min: -60, max: 540, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.ae.gainlimit.max: "{tenths_db}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_ae_brightness:
+    summary: "Set the AE brightness shift, -8 to 8 in the camera's steps (c.1.ae.brightness)"
+    params:
+      value: { type: int, min: -8, max: 8, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.ae.brightness: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_ae_photometry:
+    summary: "Set the AE metering: center, spotlight or backlight (c.1.ae.photometry)"
+    params:
+      mode: { type: enum, values: [center, spotlight, backlight], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.ae.photometry: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_ae_flicker_reduction:
+    summary: "Set AE flicker reduction off or auto (c.1.ae.flickerreduct)"
+    params:
+      mode: { type: enum, values: ["off", auto], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.ae.flickerreduct: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_shutter_mode:
+    summary: "Set the shutter to auto or to a set speed (c.1.me.shutter.mode)"
+    params:
+      mode: { type: enum, values: [auto, speed], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.shutter.mode: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_shutter:
+    summary: "Set the shutter speed as the denominator of 1/N s, one of c.1.me.shutter.list (c.1.me.shutter)"
+    params:
+      denominator: { type: int, min: 1, max: 20000, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.shutter: "{denominator}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_iris_mode:
+    summary: "Set the iris to auto or manual (c.1.me.diaphragm.mode)"
+    params:
+      mode: { type: enum, values: [auto, manual], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.diaphragm.mode: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_iris:
+    summary: "Set the iris as the f-number times 100 (280 is F2.8), one of c.1.me.diaphragm.list (c.1.me.diaphragm)"
+    params:
+      f_number_x100: { type: int, min: 100, max: 3200, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.diaphragm: "{f_number_x100}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_iris_increment:
+    summary: "Set the manual iris step to 1/3 or 1/4 stop (c.1.me.diaphragm.increment)"
+    params:
+      step: { type: enum, values: ["3", "4"], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.diaphragm.increment: "{step}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_iris_fine:
+    summary: "Turn fine iris control on or off (c.1.me.diaphragm.fine)"
+    params:
+      state: { type: enum, values: ["on", "off"], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.diaphragm.fine: "{state}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_gain_mode:
+    summary: "Set the gain to auto or manual (c.1.me.gain.mode)"
+    params:
+      mode: { type: enum, values: [auto, manual], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.gain.mode: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_gain:
+    summary: "Set the manual gain in tenths of a dB (120 is 12.0 dB), within c.1.me.gain.min/.max (c.1.me.gain)"
+    params:
+      tenths_db: { type: int, min: -60, max: 540, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.gain: "{tenths_db}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_gain_increment:
+    summary: "Set the manual gain step: normal (1.0 dB) or fine (0.5 dB) (c.1.me.gain.increment)"
+    params:
+      step: { type: enum, values: [normal, fine], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.me.gain.increment: "{step}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_nd_filter:
+    summary: "Set the ND filter: 0 off, or the density times 100 (400 is ND 1/4), one of c.1.nd.filter.list; 1 is on for the CR-N300 (c.1.nd.filter)"
+    params:
+      value: { type: enum, values: ["0", "1", "400", "1600", "6400", "25600", "102400"], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.nd.filter: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_nd_mode:
+    summary: "Set the ND filter to follow the iris (assist) or stay put (fixed) (c.1.nd.mode)"
+    params:
+      mode: { type: enum, values: [assist, fixed], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.nd.mode: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_pedestal:
+    summary: "Set the pedestal (black level), -50 to 50 (c.1.blacklevel)"
+    params:
+      value: { type: int, min: -50, max: 50, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.blacklevel: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_sharpness:
+    summary: "Set the sharpness, -10 to 50 (c.1.ac)"
+    params:
+      value: { type: int, min: -10, max: 50, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.ac: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_noise_reduction:
+    summary: "Set the noise reduction, 0 to 12 (c.1.nr)"
+    params:
+      value: { type: int, min: 0, max: 12, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.nr: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_white_balance_mode:
+    summary: "Set the white balance mode (c.1.wb)"
+    params:
+      mode: { type: enum, values: [auto, manual, wb_a, wb_b, daylight, tungsten, kelvin], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.wb: "{mode}"
+    expect: { status: 200 }
+    returns: ack
+
+  white_balance_one_shot:
+    summary: "Run a one-shot white balance into memory A or B (c.1.wb.action=one_shot_a / one_shot_b)"
+    params:
+      memory: { type: enum, values: [a, b], required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.wb.action: "one_shot_{memory}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_kelvin:
+    summary: "Set the colour temperature in kelvin, one of c.1.wb.kelvin.list (c.1.wb.kelvin)"
+    params:
+      kelvin: { type: int, min: 2000, max: 15000, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.wb.kelvin: "{kelvin}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_wb_r_gain:
+    summary: "Set the white balance red gain shift, -50 to 50 (c.1.wb.shift.rgain)"
+    params:
+      value: { type: int, min: -50, max: 50, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.wb.shift.rgain: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  set_wb_b_gain:
+    summary: "Set the white balance blue gain shift, -50 to 50 (c.1.wb.shift.bgain)"
+    params:
+      value: { type: int, min: -50, max: 50, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        c.1.wb.shift.bgain: "{value}"
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset:
+    summary: "Recall a preset at its stored speed (p)"
+    params:
+      preset: { type: int, min: 1, max: 100, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        p: "{preset}"
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset_time:
+    summary: "Recall a preset, the move taking a set time in milliseconds (p, p.ptztime)"
+    params:
+      preset:  { type: int, min: 1, max: 100, required: true }
+      time_ms: { type: int, min: 2000, max: 99000, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        p: "{preset}"
+        p.ptztime: "{time_ms}"
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset_speed:
+    summary: "Recall a preset at a set speed, 1 to 100 (p, p.ptzspeed)"
+    params:
+      preset: { type: int, min: 1, max: 100, required: true }
+      speed:  { type: int, min: 1, max: 100, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/control.cgi
+      query:
+        p: "{preset}"
+        p.ptzspeed: "{speed}"
+    expect: { status: 200 }
+    returns: ack
+
+  save_preset:
+    summary: "Store the current position and settings as a preset, with a name, saving everything (preset/set p, name, all=enabled)"
+    params:
+      preset: { type: int, min: 1, max: 100, required: true }
+      name:   { type: string, max_length: 64, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/preset/set
+      query:
+        p: "{preset}"
+        name: "{name}"
+        all: "enabled"
+    expect: { status: 200 }
+    returns: ack
+
+  save_preset_selective:
+    summary: "Store a preset, choosing what it saves: position (ptz), focus, exposure (exp), white balance (wb), image stabilisation (is) and cp (preset/set)"
+    params:
+      preset:              { type: int, min: 1, max: 100, required: true }
+      name:                { type: string, max_length: 64, required: true }
+      ptz:                 { type: enum, values: [enabled, disabled], default: enabled }
+      focus:               { type: enum, values: [enabled, disabled], default: enabled }
+      exposure:            { type: enum, values: [enabled, disabled], default: enabled }
+      white_balance:       { type: enum, values: [enabled, disabled], default: enabled }
+      image_stabilization: { type: enum, values: [enabled, disabled], default: enabled }
+      cp:                  { type: enum, values: [enabled, disabled], default: enabled }
+    send:
+      method: GET
+      path: /-wvhttp-01-/preset/set
+      query:
+        p: "{preset}"
+        name: "{name}"
+        ptz: "{ptz}"
+        focus: "{focus}"
+        exp: "{exposure}"
+        wb: "{white_balance}"
+        is: "{image_stabilization}"
+        cp: "{cp}"
+    expect: { status: 200 }
+    returns: ack
+
+  trace_prepare:
+    summary: "Move to a trace's starting point, ready to play it (trace/control t, cmd=prepare)"
+    params:
+      trace: { type: int, min: 1, max: 10, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/trace/control
+      query:
+        t: "{trace}"
+        cmd: "prepare"
+    expect: { status: 200 }
+    returns: ack
+
+  trace_start:
+    summary: "Play a trace (trace/control t, cmd=start)"
+    params:
+      trace: { type: int, min: 1, max: 10, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/trace/control
+      query:
+        t: "{trace}"
+        cmd: "start"
+    expect: { status: 200 }
+    returns: ack
+
+  trace_stop:
+    summary: "Stop a trace (trace/control t, cmd=stop)"
+    params:
+      trace: { type: int, min: 1, max: 10, required: true }
+    send:
+      method: GET
+      path: /-wvhttp-01-/trace/control
+      query:
+        t: "{trace}"
+        cmd: "stop"
+    expect: { status: 200 }
+    returns: ack
+
+  get_info:
+    summary: "Read every camera setting info.cgi reports, as key:=value lines (info.cgi)"
+    send:
+      method: GET
+      path: /-wvhttp-01-/info.cgi
+    expect: { status: 200 }
+    returns: text
+
+state:
+  power: { type: string, description: "Power state: idle (on), standby, or switch_idle / switch_standby while changing" }
+  name: { type: string, description: "Camera name" }
+  model: { type: string, description: "Camera model, as the camera names itself" }
+  firmware: { type: string, description: "Firmware version" }
+  protocol_version: { type: string, description: "XC protocol version" }
+  mac_address: { type: string, description: "MAC address" }
+  tally.state: { type: string, description: "Tally lamp state as the camera reports it (on or off), for tally.mode" }
+  tally.mode: { type: string, description: "Which tally the reported tally state is (program or preview)" }
+  zoom.mode: { type: string, description: "Digital zoom mode: off, dzoom, advanced or mag" }
+  zoom.magnification: { type: int, unit: "%", description: "Digital magnification in percent" }
+  zoom.position: { type: int, description: "Zoom position, in the camera's units" }
+  zoom.soft: { type: string, description: "Soft zoom setting: off, start, stop or both" }
+  image_stabilization: { type: string, description: "Image stabilisation: off, or on1 for on" }
+  focus.mode: { type: string, description: "Focus mode: auto or manual" }
+  focus.speed: { type: int, description: "Manual focus speed: 0 low, 1 medium, 2 high" }
+  focus.position: { type: int, description: "Focus position, in the camera's units" }
+  focus.detection: { type: string, description: "Face or subject detection AF mode" }
+  exposure.shooting: { type: string, description: "Shooting mode: fullauto, manual or scene" }
+  exposure.mode: { type: string, description: "Exposure mode: auto, tv, av or manual" }
+  exposure.scene: { type: string, description: "Scene mode" }
+  exposure.gain_limit: { type: int, unit: "0.1 dB", description: "AE gain limit, tenths of a dB" }
+  exposure.brightness: { type: int, description: "AE brightness shift" }
+  exposure.photometry: { type: string, description: "AE metering mode" }
+  exposure.flicker_reduction: { type: string, description: "AE flicker reduction" }
+  shutter.mode: { type: string, description: "Shutter mode: auto or speed" }
+  shutter.value: { type: string, description: "Shutter value as the camera reports it" }
+  iris.mode: { type: string, description: "Iris mode: auto or manual" }
+  iris.value: { type: string, description: "Iris value as the camera reports it (f-number times 100)" }
+  gain.mode: { type: string, description: "Gain mode: auto or manual" }
+  gain.value: { type: string, description: "Gain value as the camera reports it (tenths of a dB)" }
+  nd.filter: { type: string, description: "ND filter value as the camera reports it" }
+  nd.mode: { type: string, description: "ND filter mode: assist or fixed" }
+  pedestal: { type: int, description: "Pedestal (black level)" }
+  sharpness: { type: int, description: "Sharpness" }
+  noise_reduction: { type: int, description: "Noise reduction" }
+  white_balance.mode: { type: string, description: "White balance mode" }
+  white_balance.kelvin: { type: int, unit: "K", description: "Colour temperature" }
+  white_balance.r_gain: { type: int, description: "Red gain shift" }
+  white_balance.b_gain: { type: int, description: "Blue gain shift" }
+  color_bars: { type: bool, description: "Colour bars shown" }
+  pan_tilt.status: { type: string, description: "Pan/tilt platform status as the camera reports it" }
+  preset.last: { type: int, description: "The preset recalled last" }
+  preset.count: { type: int, description: "How many presets the camera has" }
+
+telemetry:
+  # info.cgi answers every setting as key:=value lines. Each rule picks one
+  # key out of the whole reply ((?m) makes ^ and $ match at each line).
+  poll:
+    send:
+      - { method: GET, path: /-wvhttp-01-/info.cgi }
+    every_ms: 2000
+  updates:
+    - match: "(?m)^f\\.standby:=([a-z_]+)\\r?$"
+      state: { "power": "{1}" }
+    - match: "(?m)^c\\.1\\.name\\.utf8:=([^\\r\\n]*)\\r?$"
+      state: { "name": "{1}" }
+    - match: "(?m)^c\\.1\\.type:=([^\\r\\n]+)\\r?$"
+      state: { "model": "{1}" }
+    - match: "(?m)^s\\.firmware:=([^\\r\\n]+)\\r?$"
+      state: { "firmware": "{1}" }
+    - match: "(?m)^s\\.protocol:=([^\\r\\n]+)\\r?$"
+      state: { "protocol_version": "{1}" }
+    - match: "(?m)^s\\.hardware\\.address:=([^\\r\\n]+)\\r?$"
+      state: { "mac_address": "{1}" }
+    - match: "(?m)^f\\.tally:=(on|off)\\r?$"
+      state: { "tally.state": "{1}" }
+    - match: "(?m)^f\\.tally\\.mode:=(program|preview)\\r?$"
+      state: { "tally.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.zoom\\.mode:=([a-z]+)\\r?$"
+      state: { "zoom.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.zoom\\.mag:=(\\d+)\\r?$"
+      state: { "zoom.magnification": "{1}" }
+    - match: "(?m)^c\\.1\\.zoom:=(-?\\d+)\\r?$"
+      state: { "zoom.position": "{1}" }
+    - match: "(?m)^c\\.1\\.zoom\\.accel:=([a-z]+)\\r?$"
+      state: { "zoom.soft": "{1}" }
+    - match: "(?m)^c\\.1\\.is:=([a-z0-9]+)\\r?$"
+      state: { "image_stabilization": "{1}" }
+    - match: "(?m)^c\\.1\\.focus:=(auto|manual)\\r?$"
+      state: { "focus.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.focus\\.speed:=(\\d+)\\r?$"
+      state: { "focus.speed": "{1}" }
+    - match: "(?m)^c\\.1\\.focus\\.value:=(-?\\d+)\\r?$"
+      state: { "focus.position": "{1}" }
+    - match: "(?m)^c\\.1\\.focus\\.detect:=([a-z_]+)\\r?$"
+      state: { "focus.detection": "{1}" }
+    - match: "(?m)^c\\.1\\.shooting:=([a-z]+)\\r?$"
+      state: { "exposure.shooting": "{1}" }
+    - match: "(?m)^c\\.1\\.exp:=([a-z]+)\\r?$"
+      state: { "exposure.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.scene:=([a-z]+)\\r?$"
+      state: { "exposure.scene": "{1}" }
+    - match: "(?m)^c\\.1\\.ae\\.gainlimit\\.max:=(-?\\d+)\\r?$"
+      state: { "exposure.gain_limit": "{1}" }
+    - match: "(?m)^c\\.1\\.ae\\.brightness:=(-?\\d+)\\r?$"
+      state: { "exposure.brightness": "{1}" }
+    - match: "(?m)^c\\.1\\.ae\\.photometry:=([a-z]+)\\r?$"
+      state: { "exposure.photometry": "{1}" }
+    - match: "(?m)^c\\.1\\.ae\\.flickerreduct:=([a-z0-9]+)\\r?$"
+      state: { "exposure.flicker_reduction": "{1}" }
+    - match: "(?m)^c\\.1\\.me\\.shutter\\.mode:=([a-z]+)\\r?$"
+      state: { "shutter.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.me\\.shutter:=([^\\r\\n]+)\\r?$"
+      state: { "shutter.value": "{1}" }
+    - match: "(?m)^c\\.1\\.me\\.diaphragm\\.mode:=([a-z]+)\\r?$"
+      state: { "iris.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.me\\.diaphragm:=([^\\r\\n]+)\\r?$"
+      state: { "iris.value": "{1}" }
+    - match: "(?m)^c\\.1\\.me\\.gain\\.mode:=([a-z]+)\\r?$"
+      state: { "gain.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.me\\.gain:=([^\\r\\n]+)\\r?$"
+      state: { "gain.value": "{1}" }
+    - match: "(?m)^c\\.1\\.nd\\.filter:=([^\\r\\n]+)\\r?$"
+      state: { "nd.filter": "{1}" }
+    - match: "(?m)^c\\.1\\.nd\\.mode:=([a-z]+)\\r?$"
+      state: { "nd.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.blacklevel:=(-?\\d+)\\r?$"
+      state: { "pedestal": "{1}" }
+    - match: "(?m)^c\\.1\\.ac:=(-?\\d+)\\r?$"
+      state: { "sharpness": "{1}" }
+    - match: "(?m)^c\\.1\\.nr:=(\\d+)\\r?$"
+      state: { "noise_reduction": "{1}" }
+    - match: "(?m)^c\\.1\\.wb:=([a-z_]+)\\r?$"
+      state: { "white_balance.mode": "{1}" }
+    - match: "(?m)^c\\.1\\.wb\\.kelvin:=(\\d+)\\r?$"
+      state: { "white_balance.kelvin": "{1}" }
+    - match: "(?m)^c\\.1\\.wb\\.shift\\.rgain:=(-?\\d+)\\r?$"
+      state: { "white_balance.r_gain": "{1}" }
+    - match: "(?m)^c\\.1\\.wb\\.shift\\.bgain:=(-?\\d+)\\r?$"
+      state: { "white_balance.b_gain": "{1}" }
+    - match: "(?m)^c\\.1\\.colorbar:=(on|off)\\r?$"
+      state: { "color_bars": { value: "{1}", map: { "on": true, "off": false } } }
+    - match: "(?m)^c\\.1\\.platform\\.status:=([^\\r\\n]+)\\r?$"
+      state: { "pan_tilt.status": "{1}" }
+    - match: "(?m)^p:=(\\d+)\\r?$"
+      state: { "preset.last": "{1}" }
+    - match: "(?m)^p\\.count:=(\\d+)\\r?$"
+      state: { "preset.count": "{1}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      save_preset and save_preset_selective overwrite the preset at once with the camera's current
+      position and settings; the preset that was there cannot be recovered.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Canon's XC Protocol Specifications (BPE-7216) are available only to registered developers
+      through Canon's regional developer programmes, and were not used. Apart from control.cgi's
+      pan, tilt and zoom and info.cgi, which Canon describes publicly, every path, key, value and
+      range here comes from the Bitfocus Companion module (which follows BPE-7216-011), so all of it
+      needs checking against a camera.
+
+  - models: [all]
+    severity: warning
+    text: >
+      pan_left, pan_right, tilt_up, tilt_down, pan_tilt, zoom_tele, zoom_wide, focus_near and
+      focus_far start a movement that lasts until the matching stop command. A stop that is lost
+      or refused leaves the camera moving; send pan_tilt_stop, zoom_stop or focus_stop as a
+      separate command.
+
+  - models: [all]
+    severity: warning
+    text: >
+      recall_preset (and its time and speed forms), pan_tilt_home, pan_tilt_zoom_to, zoom_to and the
+      trace commands move the camera on air. pan_tilt_initialize drives the head through its whole
+      range to recalibrate it.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Value lists differ by model and firmware, and the camera reports each one in info.cgi (for
+      example c.1.me.shutter.list, c.1.me.diaphragm.list, c.1.me.gain.min and .max, c.1.nd.filter.list,
+      c.1.wb.kelvin.list, c.1.zoom.mag.list, c.1.shooting.list, c.1.exp.list). The ranges here are the
+      widest the Companion module offers across models; a value a model does not list is for the
+      camera to refuse.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_exposure_mode applies within manual shooting: the Companion module sends
+      c.1.shooting=manual before c.1.exp, so send set_shooting_mode manual first.
+
+  - models: [cr-n100, cr-n300, cr-n350, cr-n400]
+    severity: warning
+    text: >
+      The Companion module sends the iris value to these models as me.diaphragm, without the c.1.
+      prefix it uses for every other model and for the iris mode; this spec sends
+      c.1.me.diaphragm to every model.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Authentication is HTTP Digest (or Basic) with the camera's user accounts; a camera with guest
+      access needs none and the username and password settings can stay empty. A refused
+      credential is terminal until the device is opened again, so that repeated failures cannot
+      lock the account.
+
+  - models: [all]
+    severity: info
+    text: >
+      info.cgi reports one tally state (f.tally) together with the tally it refers to
+      (f.tally.mode), so tally.state and tally.mode describe whichever tally was set last, not
+      program and preview separately. Values in state are as the camera writes them (shutter,
+      iris, gain and ND as text); the camera's units for pan, tilt, zoom and focus positions are not
+      public.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not covered: the Auto Tracking add-on (RA-AT001, a separate licence under /cgi-addon/), the
+      ae response setting (its range comes from the camera), live view and recording control, and
+      the Cinema EOS C70, C300 Mark III, C400 and C500 Mark II, which Canon lists as XC protocol
+      cameras but whose command set is only in the gated specification. The visca spec's canon
+      model covers Standard Communication (VISCA over IP) on the CR-N and CR-X cameras.

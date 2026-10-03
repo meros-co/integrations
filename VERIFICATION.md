@@ -154,6 +154,31 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:246](specs/analogway-picturall.yaml#L246))
 - [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:251](specs/analogway-picturall.yaml#L251))
 
+## avolites-titan — Avolites Titan
+
+- [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1353](specs/avolites-titan.yaml#L1353))
+- [ ] Confirm the handle record field names on Titan 19 (Active or active, Legend or legend, userNumber.hashCode) and that `active` reflects a running playback. ([specs/avolites-titan.yaml:1377](specs/avolites-titan.yaml#L1377))
+- [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1385](specs/avolites-titan.yaml#L1385))
+- [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1387](specs/avolites-titan.yaml#L1387))
+- [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1395](specs/avolites-titan.yaml#L1395))
+- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1345](specs/avolites-titan.yaml#L1345))
+- [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1369](specs/avolites-titan.yaml#L1369))
+- [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1210](specs/avolites-titan.yaml#L1210))
+
+## avstumpfl-pixera — AV Stumpfl PIXERA
+
+- [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:690](specs/avstumpfl-pixera.yaml#L690))
+- [ ] Check how a PIXERA before 26.1 answers setMonitoringHasDelimiter (an error reply is assumed) and that monitoring still works there. ([specs/avstumpfl-pixera.yaml:691](specs/avstumpfl-pixera.yaml#L691))
+- [ ] Confirm that setMonitoringEventMode all pushes timelineTransport, timelinePositions and timelineCountdowns with the same entry shapes as pollMonitoring, with id -1, and how often positions arrive. ([specs/avstumpfl-pixera.yaml:682](specs/avstumpfl-pixera.yaml#L682))
+- [ ] Check that a reply carries the request's id (1) as "id":1, so that pushed messages (id -1) are not taken as replies. ([specs/avstumpfl-pixera.yaml:94](specs/avstumpfl-pixera.yaml#L94))
+- [ ] Check the error object PIXERA sends for an unknown method, wrong parameter names, an unknown timeline or cue name, and an invalid handle. ([specs/avstumpfl-pixera.yaml:139](specs/avstumpfl-pixera.yaml#L139))
+- [ ] Check what a name or path containing the text 0xPX does to framing. ([specs/avstumpfl-pixera.yaml:668](specs/avstumpfl-pixera.yaml#L668))
+- [ ] Confirm the default API port (1400 assumed from AV Stumpfl's examples; none is documented) and whether a disabled API (25.2 default) refuses the connection or answers -32602. ([specs/avstumpfl-pixera.yaml:660](specs/avstumpfl-pixera.yaml#L660))
+- [ ] Check whether handles stay valid after reloading the project or restarting PIXERA. ([specs/avstumpfl-pixera.yaml:685](specs/avstumpfl-pixera.yaml#L685))
+- [ ] Confirm the Compound time methods take "name" in 26.1 and "timelineName" before it, and which revision changed it. ([specs/avstumpfl-pixera.yaml:69](specs/avstumpfl-pixera.yaml#L69))
+- [ ] Check whether load_project discards unsaved changes silently. ([specs/avstumpfl-pixera.yaml:696](specs/avstumpfl-pixera.yaml#L696))
+- [ ] Check the format of getCurrentHMSFOfTimeline (hh:mm:ss:ff assumed) and what getCurrentCountdownOfTimeline returns when no cue is ahead. ([specs/avstumpfl-pixera.yaml:305](specs/avstumpfl-pixera.yaml#L305))
+
 ## barco-eventmaster — Barco Event Master
 
 - [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1257](specs/barco-eventmaster.yaml#L1257))
@@ -282,6 +307,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check how the tree reports the test pattern type after a frame store user number was set (a number or a string). ([specs/brompton-tessera.yaml:5560](specs/brompton-tessera.yaml#L5560))
 - [ ] Check that request_failover with an empty string hands over to the partner, and what it answers with no partner present. ([specs/brompton-tessera.yaml:1556](specs/brompton-tessera.yaml#L1556))
 - [ ] On 3.6 or later, confirm the TrueLight endpoints and their ranges. ([specs/brompton-tessera.yaml:5584](specs/brompton-tessera.yaml#L5584))
+## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
+
+- [ ] Confirm every control.cgi key and value against a camera: they come from the Companion module, not from Canon's gated XC specification. ([specs/canon-ptz.yaml:1226](specs/canon-ptz.yaml#L1226))
+- [ ] Record what control.cgi, standby.cgi, preset/set and trace/control answer on success and on a refused value (status 200 assumed for success). ([specs/canon-ptz.yaml:219](specs/canon-ptz.yaml#L219))
+- [ ] Record a full info.cgi reply: the key:=value line format, line endings, and the values of f.standby, f.tally/f.tally.mode, shutter, iris, gain and ND. ([specs/canon-ptz.yaml:1129](specs/canon-ptz.yaml#L1129))
+- [ ] Check whether info.cgi reports program and preview tally separately, or only the last-set tally with its mode. ([specs/canon-ptz.yaml:1141](specs/canon-ptz.yaml#L1141))
+- [ ] On CR-N100, CR-N300, CR-N350 and CR-N400, check whether the iris value key is c.1.me.diaphragm (sent here) or me.diaphragm (sent by the Companion module). ([specs/canon-ptz.yaml:1265](specs/canon-ptz.yaml#L1265))
+- [ ] Check the pan/tilt speed scale for pan.speed.dir and tilt.speed.dir (10-10000 assumed) and zoom.speed.dir (0-127). ([specs/canon-ptz.yaml:341](specs/canon-ptz.yaml#L341))
+- [ ] Check the units and ranges of the absolute pan, tilt and zoom positions in pan_tilt_zoom_to and zoom_to. ([specs/canon-ptz.yaml:452](specs/canon-ptz.yaml#L452))
+- [ ] Check that p.ptztime is in milliseconds (2000-99000) and p.ptzspeed 1-100. ([specs/canon-ptz.yaml:960](specs/canon-ptz.yaml#L960))
+- [ ] Check save_preset_selective's option keys (ptz, focus, exp, wb, is, cp) and what cp saves. ([specs/canon-ptz.yaml:1003](specs/canon-ptz.yaml#L1003))
+- [ ] Check whether set_exposure_mode needs manual shooting first, and the per-model value lists (shutter, iris, gain, ND, kelvin, digital magnification). ([specs/canon-ptz.yaml:648](specs/canon-ptz.yaml#L648))
+- [ ] Check that on1 is the only "on" value of c.1.is. ([specs/canon-ptz.yaml:317](specs/canon-ptz.yaml#L317))
+- [ ] Check Digest authentication with an administrator account and with guest access, on firmware with HTTPS enabled. ([specs/canon-ptz.yaml:57](specs/canon-ptz.yaml#L57))
+- [ ] On the EOS C80 and XF605, confirm the XC protocol is enabled over the network the same way, and which commands they accept. ([specs/canon-ptz.yaml:305](specs/canon-ptz.yaml#L305))
 
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
@@ -312,6 +352,49 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what learn_command_key answers (command key ID and script ID) on X20 and X80. ([specs/christie-spyder.yaml:146](specs/christie-spyder.yaml#L146))
 - [ ] Check whether an X20 accepts ILA with the fifth (gamma) argument, which only the X80 reference lists. ([specs/christie-spyder.yaml:384](specs/christie-spyder.yaml#L384))
 - [ ] Check how often UDP commands or answers are lost on a busy network, and whether a repeated command is harmless. ([specs/christie-spyder.yaml:890](specs/christie-spyder.yaml#L890))
+## dataton-watchout6 — Dataton WATCHOUT 6
+
+- [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))
+- [ ] Check the reply to authenticate 1 on a production computer and a display cluster, and which Error 8 sub-codes a refused login gives (1, 4, 5 and 6 are taken as refusals). ([specs/dataton-watchout6.yaml:81](specs/dataton-watchout6.yaml#L81))
+- [ ] Confirm the field order of the general Status push after getStatus 1 (taken from Bitfocus's Companion module) and how often it is sent. ([specs/dataton-watchout6.yaml:533](specs/dataton-watchout6.yaml#L533))
+- [ ] Check that the timeline Status line for a timeline in a folder has a space before :mItemList, as the knowledge base article shows. ([specs/dataton-watchout6.yaml:537](specs/dataton-watchout6.yaml#L537))
+- [ ] Check the exact keyword of the information message (Information is assumed from the guide's heading). ([specs/dataton-watchout6.yaml:445](specs/dataton-watchout6.yaml#L445))
+- [ ] Check the syntax and reply of powerDown on a WATCHOUT 6 display cluster; only WATCHOUT 7's compatibility page gives it. ([specs/dataton-watchout6.yaml:507](specs/dataton-watchout6.yaml#L507))
+- [ ] Check whether getAuxTimelines, getControlCues and getInputs exist on WATCHOUT 6 (documented only for WATCHOUT 7's compatibility layer), and their JSON. ([specs/dataton-watchout6.yaml:544](specs/dataton-watchout6.yaml#L544))
+- [ ] Check how load_display reports progress and completion: the command takes the first tagged reply, which may be a Busy line. ([specs/dataton-watchout6.yaml:501](specs/dataton-watchout6.yaml#L501))
+- [ ] On WATCHOUT 7, check the show name in the getStatus reply (the show file's name, or its id as an older page says). ([specs/dataton-watchout6.yaml:542](specs/dataton-watchout6.yaml#L542))
+- [ ] Confirm that spontaneous messages go only to the most recently connected controller. ([specs/dataton-watchout6.yaml:493](specs/dataton-watchout6.yaml#L493))
+
+## dataton-watchout7 — Dataton WATCHOUT 7
+
+- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:347](specs/dataton-watchout7.yaml#L347))
+- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:355](specs/dataton-watchout7.yaml#L355))
+- [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:154](specs/dataton-watchout7.yaml#L154))
+- [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:33](specs/dataton-watchout7.yaml#L33))
+- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:322](specs/dataton-watchout7.yaml#L322))
+- [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:237](specs/dataton-watchout7.yaml#L237))
+
+## digico-sd — DiGiCo SD and Quantum consoles
+
+- [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
+- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:2684](specs/digico-sd.yaml#L2684))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:2692](specs/digico-sd.yaml#L2692))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:2701](specs/digico-sd.yaml#L2701))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:2709](specs/digico-sd.yaml#L2709))
+- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:2639](specs/digico-sd.yaml#L2639))
+- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:776](specs/digico-sd.yaml#L776))
+- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:832](specs/digico-sd.yaml#L832))
+- [ ] Check the addresses left out (Channel_Input/main/alt_in, CGs_level, CGs_mute, Matrix_Inputs sends, Multis) and what they do. ([specs/digico-sd.yaml:2722](specs/digico-sd.yaml#L2722))
+
+## disguise — disguise Designer
+
+- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:608](specs/disguise.yaml#L608))
+- [ ] Check that a Locator with only a name (no uid key) is accepted by every transport and failover command. ([specs/disguise.yaml:573](specs/disguise.yaml#L573))
+- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:582](specs/disguise.yaml#L582))
+- [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:568](specs/disguise.yaml#L568))
+- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:584](specs/disguise.yaml#L584))
+- [ ] Check which Designer release added each endpoint used here; the Swagger documents carry no version markers. ([specs/disguise.yaml:107](specs/disguise.yaml#L107))
+- [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:540](specs/disguise.yaml#L540))
 
 ## emberplus — Ember+
 
@@ -336,6 +419,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the reply shape of get_session, which is not documented. ([specs/etc-eos.yaml:4817](specs/etc-eos.yaml#L4817))
 - [ ] Confirm macro text arrives on /eos/out/get/macro/<n>/text/list/... ([specs/etc-eos.yaml:4807](specs/etc-eos.yaml#L4807))
 - [ ] Confirm the console uses the default /eos cue OSC strings, or note the configured ones. ([specs/etc-eos.yaml:4801](specs/etc-eos.yaml#L4801))
+
+## etc-paradigm — ETC Paradigm (PSAP)
+
+- [ ] Check whether action commands get any reply over UDP (they report unverified here). ([specs/etc-paradigm.yaml:1017](specs/etc-paradigm.yaml#L1017))
+- [ ] Check whether a fade time without a space name works: the guide's example "grp int:128 Group 1, 3" contradicts its rule that a fade time needs a space name. ([specs/etc-paradigm.yaml:1032](specs/etc-paradigm.yaml#L1032))
+- [ ] Confirm that a get reply always includes the space name and levels as 0-255, and record the reply to a get for an unknown name. ([specs/etc-paradigm.yaml:1025](specs/etc-paradigm.yaml#L1025))
+- [ ] Check where PSAP trigger output is sent (the destination set in LightDesigner) and that it reaches feedback_port. ([specs/etc-paradigm.yaml:1018](specs/etc-paradigm.yaml#L1018))
+- [ ] Confirm that fade times with one decimal (2.5) and the sequence rate with two (1.50) are accepted. ([specs/etc-paradigm.yaml:732](specs/etc-paradigm.yaml#L732))
+
+## freeshow — FreeShow
+
+- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1482](specs/freeshow.yaml#L1482))
+- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1490](specs/freeshow.yaml#L1490))
+- [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:59](specs/freeshow.yaml#L59))
+- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1474](specs/freeshow.yaml#L1474))
+- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:314](specs/freeshow.yaml#L314))
+- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:761](specs/freeshow.yaml#L761))
+- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:208](specs/freeshow.yaml#L208))
+- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1198](specs/freeshow.yaml#L1198))
 
 ## grandma2 — MA Lighting grandMA2
 
@@ -362,6 +464,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the fader_fade fade argument (two integers) and any upper bound on fade time. ([specs/grandma3.yaml:1807](specs/grandma3.yaml#L1807))
 - [ ] Check the upper bounds of cue and pool numbers (four digits, 9999, 99999 assumed). ([specs/grandma3.yaml:1831](specs/grandma3.yaml#L1831))
 
+## greenhippo-hippotizer — Green Hippo Hippotizer
+
+- [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:656](specs/greenhippo-hippotizer.yaml#L656))
+- [ ] Check the single preset number of load_mix_preset and load_layer_preset (bank * 256 + slot per the Companion module). ([specs/greenhippo-hippotizer.yaml:654](specs/greenhippo-hippotizer.yaml#L654))
+- [ ] Check the body of a level reply (a bare integer is assumed) and of the action endpoints. ([specs/greenhippo-hippotizer.yaml:240](specs/greenhippo-hippotizer.yaml#L240))
+- [ ] Capture the JSON wrapper of GET /timelines, which the Swagger document leaves empty. ([specs/greenhippo-hippotizer.yaml:672](specs/greenhippo-hippotizer.yaml#L672))
+- [ ] Check that the Web Callbacks websocket on 40513 accepts the subscription array sent on opening, with the path /, and whether it acknowledges it. ([specs/greenhippo-hippotizer.yaml:492](specs/greenhippo-hippotizer.yaml#L492))
+- [ ] Check whether the presets-reset event is PRESETS_RESET or PRESES_RESET (the manual's example). ([specs/greenhippo-hippotizer.yaml:685](specs/greenhippo-hippotizer.yaml#L685))
+- [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:626](specs/greenhippo-hippotizer.yaml#L626))
+- [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:649](specs/greenhippo-hippotizer.yaml#L649))
+- [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:663](specs/greenhippo-hippotizer.yaml#L663))
+- [ ] Capture the 4.9.x REST additions (media encoding settings, strata folder, user name and colour) from the API help served at port 40512. ([specs/greenhippo-hippotizer.yaml:57](specs/greenhippo-hippotizer.yaml#L57))
+
 ## h2r-graphics — H2R Graphics
 
 - [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:352](specs/h2r-graphics.yaml#L352))
@@ -369,6 +484,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the update_score team and level ranges. ([specs/h2r-graphics.yaml:398](specs/h2r-graphics.yaml#L398))
 - [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:401](specs/h2r-graphics.yaml#L401))
 - [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:383](specs/h2r-graphics.yaml#L383))
+
+## highend-hog4 — High End Systems Hog 4 / Hog OS
+
+- [ ] Confirm that playback commands take the object number as the argument (/hog/playback/go/0 with 15), as the manual says, and not in the address as the Companion module sends it. ([specs/highend-hog4.yaml:507](specs/highend-hog4.yaml#L507))
+- [ ] Check how goto_cue's float list.cue is read (15.2 sent as 15.19999981; cue 2 versus 20; point cues). ([specs/highend-hog4.yaml:516](specs/highend-hog4.yaml#L516))
+- [ ] Record the argument types of the status outputs (LED value, LED colour, command line, encoder and H-key labels, chat lines). ([specs/highend-hog4.yaml:497](specs/highend-hog4.yaml#L497))
+- [ ] Find the address the console uses for fader level status after consolefaderrefresh. ([specs/highend-hog4.yaml:491](specs/highend-hog4.yaml#L491))
+- [ ] Check the real ranges of H keys, U keys, encoder wheels and the trackball values per model. ([specs/highend-hog4.yaml:524](specs/highend-hog4.yaml#L524))
+- [ ] Check which keys of the Hog OS 5 table work on Hog 4 OS 3.x and 4.x. ([specs/highend-hog4.yaml:534](specs/highend-hog4.yaml#L534))
+- [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
+- [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
 
 ## kramer-p3000 — Kramer Protocol 3000
 
@@ -391,6 +517,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:2900](specs/megapixel-helios.yaml#L2900))
 - [ ] Check that a receiver's x, y and groupId can be written by MAC address. ([specs/megapixel-helios.yaml:426](specs/megapixel-helios.yaml#L426))
 - [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:458](specs/megapixel-helios.yaml#L458))
+## millumin — Millumin
+
+- [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:722](specs/millumin.yaml#L722))
+- [ ] Check that changes made through the OSC API send no feedback, and which side effects (a column's media starting) still do. ([specs/millumin.yaml:689](specs/millumin.yaml#L689))
+- [ ] Check where /? and /ping answers go (the configured senders are assumed) and what /ping sends. ([specs/millumin.yaml:692](specs/millumin.yaml#L692))
+- [ ] Check the light intensity scale on input (0-255 in the documentation's example) and feedback (0 to 1), and the master levels' range. ([specs/millumin.yaml:709](specs/millumin.yaml#L709))
+- [ ] Check the rate of /millumin/layer:<name>/media/time feedback and whether it is sent for every layer. ([specs/millumin.yaml:638](specs/millumin.yaml#L638))
+- [ ] Check whether Millumin 5 still has a global API feedback switch beside each sender's send feedback. ([specs/millumin.yaml:682](specs/millumin.yaml#L682))
+- [ ] Check which of the dashboard and the edited timeline play, pause and go_to_time act on. ([specs/millumin.yaml:703](specs/millumin.yaml#L703))
+- [ ] Check that stop_column takes no column in Millumin 5. ([specs/millumin.yaml:705](specs/millumin.yaml#L705))
+- [ ] Check that floats are accepted where the documentation shows whole numbers (positions, rotation, media time). ([specs/millumin.yaml:398](specs/millumin.yaml#L398))
 
 ## newtek-tricaster — NewTek TriCaster
 
@@ -425,6 +562,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:801](specs/novastar-h.yaml#L801))
 - [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off). ([specs/novastar-h.yaml:152](specs/novastar-h.yaml#L152))
 - [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:280](specs/novastar-h.yaml#L280))
+## obsidian-onyx — Obsidian ONYX (Telnet)
+
+- [ ] Record ONYX's own Telnet server's replies (banner, success, error) for GQL, SQL and an unknown command, which Obsidian does not document. ([specs/obsidian-onyx.yaml:296](specs/obsidian-onyx.yaml#L296))
+- [ ] Check which ONYX Manager queries ONYX's own server answers (QLList, QLActive, IsMxRun, WhoIAm) and its default port. ([specs/obsidian-onyx.yaml:305](specs/obsidian-onyx.yaml#L305))
+- [ ] Check whether action commands (GQL, RQL) reply with "200 Ok" then ".", or something else, and whether 300 ms is enough to wait for a ".". ([specs/obsidian-onyx.yaml:299](specs/obsidian-onyx.yaml#L299))
+- [ ] Check whether QLActive lines have the same form as QLList lines on ONYX Manager 4.x. ([specs/obsidian-onyx.yaml:304](specs/obsidian-onyx.yaml#L304))
+- [ ] Check whether QLName answers on current versions. ([specs/obsidian-onyx.yaml:322](specs/obsidian-onyx.yaml#L322))
+
+## obsidian-onyx-osc — Obsidian ONYX (OSC)
+
+- [ ] Find ONYX's default OSC ports (the port ONYX listens on and the device's incoming port). ([specs/obsidian-onyx-osc.yaml:1027](specs/obsidian-onyx-osc.yaml#L1027))
+- [ ] Confirm that PF GROUP 2 is /Mx/button/5702 (the mapping prints 5701 twice). ([specs/obsidian-onyx-osc.yaml:1057](specs/obsidian-onyx-osc.yaml#L1057))
+- [ ] Record the OSC types ONYX sends for LED colour, blink and fader updates. ([specs/obsidian-onyx-osc.yaml:1066](specs/obsidian-onyx-osc.yaml#L1066))
+- [ ] Check whether playback page actions need a release (0) after the key down. ([specs/obsidian-onyx-osc.yaml:1050](specs/obsidian-onyx-osc.yaml#L1050))
+- [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
+- [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
 
 ## panasonic-ptz — Panasonic PTZ
 

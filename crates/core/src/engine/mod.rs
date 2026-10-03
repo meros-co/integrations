@@ -38,6 +38,8 @@ const SOCKET: Key = "device";
 /// (`telemetry.websocket`).
 const PUSH: Key = "push";
 const PUSH_RECONNECT: Key = "push-reconnect";
+/// Engine.IO v3: the client's ping on the push websocket.
+const PUSH_PING: Key = "push-ping";
 /// The server-sent event stream (`telemetry.sse`).
 const EVENTS: Key = "events";
 const EVENTS_RECONNECT: Key = "events-reconnect";
@@ -109,6 +111,24 @@ struct Push {
     request: WsRequest,
     /// Messages sent each time it opens: the subscriptions.
     send: Vec<Value>,
+    /// Socket.IO over Engine.IO, when the device speaks it.
+    socketio: Option<SocketIo>,
+}
+
+/// `telemetry.websocket.socketio`: Socket.IO's framing over the websocket.
+/// Engine.IO packets are a digit then a payload: `0` open, `2` ping, `3`
+/// pong, `4` message; a Socket.IO message is `4` then `0` connect, `1`
+/// disconnect or `2` event, with an optional `/namespace,` before the
+/// payload, so an event arrives as `42["name",{...}]`.
+#[derive(Debug, Clone)]
+struct SocketIo {
+    /// Engine.IO protocol version: 4 (Socket.IO 3 and 4), where the server
+    /// pings, or 3 (Socket.IO 2), where the client does.
+    version: u8,
+    /// The namespace prefix, `/name,`, or empty for the main namespace.
+    namespace: String,
+    /// Engine.IO v3: the ping interval the server's open packet gave.
+    ping_every: Option<Millis>,
 }
 
 /// How an HTTP or websocket device authenticates (SPEC.md §2).
@@ -533,7 +553,40 @@ impl SpecEngine {
                     Transport::Http { auth, .. } | Transport::Ws { auth, .. } => *auth,
                     _ => HttpAuth::None,
                 };
+                let socketio = match w.get("socketio") {
+                    None | Some(Value::Bool(false)) => None,
+                    Some(Value::Bool(true)) => Some(SocketIo {
+                        version: 4,
+                        namespace: String::new(),
+                        ping_every: None,
+                    }),
+                    Some(Value::Object(o)) => Some(SocketIo {
+                        version: match o.get("engine_io").and_then(Value::as_u64) {
+                            None | Some(4) => 4,
+                            Some(3) => 3,
+                            Some(v) => return Err(format!("socketio.engine_io {v} is not 3 or 4")),
+                        },
+                        namespace: match o.get("namespace").and_then(Value::as_str) {
+                            None | Some("/") => String::new(),
+                            Some(ns) if ns.starts_with('/') => format!("{ns},"),
+                            Some(ns) => {
+                                return Err(format!("socketio.namespace '{ns}' starts with /"))
+                            }
+                        },
+                        ping_every: None,
+                    }),
+                    Some(_) => {
+                        return Err("telemetry.websocket.socketio is true or an object".into())
+                    }
+                };
                 let mut request = ws_request(w, ctx.host, push_port, &ctx.settings, auth)?;
+                if let Some(sio) = &socketio {
+                    // Engine.IO's query.
+                    let sep = if request.url.contains('?') { '&' } else { '?' };
+                    request
+                        .url
+                        .push_str(&format!("{sep}EIO={}&transport=websocket", sio.version));
+                }
                 // A device serving HTTPS with a self-signed certificate
                 // serves wss with it too, unless the websocket says otherwise.
                 if let (
@@ -553,6 +606,7 @@ impl SpecEngine {
                         Some(one) => vec![one.clone()],
                         None => Vec::new(),
                     },
+                    socketio,
                 })
             }
         };
@@ -1470,28 +1524,19 @@ impl SpecEngine {
         match input {
             WsInput::Opened => {
                 self.push_backoff = RECONNECT_MIN;
-                let items = self
-                    .push
-                    .as_ref()
-                    .map(|p| p.send.clone())
-                    .unwrap_or_default();
-                let empty = Params::new();
-                let empty_specs = BTreeMap::new();
-                let values = self.values(&empty, &empty_specs);
-                for item in items {
-                    match item.as_str().map(|t| render(t, &values, no_escape)) {
-                        Some(Ok(text)) => cx.ws_send(PUSH, text),
-                        Some(Err(e)) => {
-                            cx.log(Level::Warning, format!("websocket message not sent: {e}"))
-                        }
-                        None => cx.log(Level::Warning, "a websocket message must be a string"),
-                    }
+                // Over Socket.IO the subscriptions wait for the namespace to
+                // be joined.
+                if self.push.as_ref().is_none_or(|p| p.socketio.is_none()) {
+                    self.send_push_items(cx, "");
                 }
                 self.last_heard = cx.now();
                 cx.alive();
             }
             WsInput::Text(text) => {
-                self.apply_message(cx, &text);
+                match self.push.as_ref().and_then(|p| p.socketio.clone()) {
+                    Some(sio) => self.socketio_input(cx, &sio, &text),
+                    None => self.apply_message(cx, &text),
+                }
                 self.last_heard = cx.now();
                 cx.alive();
             }
@@ -1500,6 +1545,7 @@ impl SpecEngine {
                 cx.alive();
             }
             WsInput::Closed { reason, .. } => {
+                cx.cancel_timer(PUSH_PING);
                 let credentialed = !auth_headers_empty(&self.push);
                 if credentialed && handshake_refused(&reason) {
                     self.refuse(
@@ -1515,6 +1561,82 @@ impl SpecEngine {
                 cx.set_timer(PUSH_RECONNECT, self.push_backoff);
                 self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
             }
+        }
+    }
+
+    /// The push websocket's `send` items, each prefixed (`42` plus the
+    /// namespace over Socket.IO, where each item is an event's JSON array).
+    fn send_push_items(&mut self, cx: &mut Cx, prefix: &str) {
+        let items = self
+            .push
+            .as_ref()
+            .map(|p| p.send.clone())
+            .unwrap_or_default();
+        let empty = Params::new();
+        let empty_specs = BTreeMap::new();
+        let values = self.values(&empty, &empty_specs);
+        for item in items {
+            match item.as_str().map(|t| render(t, &values, no_escape)) {
+                Some(Ok(text)) => cx.ws_send(PUSH, format!("{prefix}{text}")),
+                Some(Err(e)) => cx.log(Level::Warning, format!("websocket message not sent: {e}")),
+                None => cx.log(Level::Warning, "a websocket message must be a string"),
+            }
+        }
+    }
+
+    /// One Engine.IO packet on the push websocket.
+    fn socketio_input(&mut self, cx: &mut Cx, sio: &SocketIo, text: &str) {
+        let (kind, payload) = text.split_at(text.len().min(1));
+        match kind {
+            // Open: join the namespace (Engine.IO v3 also starts pinging).
+            "0" => {
+                if sio.version == 3 {
+                    let every = serde_json::from_str::<Value>(payload)
+                        .ok()
+                        .and_then(|v| v.get("pingInterval").and_then(Value::as_u64))
+                        .unwrap_or(25_000);
+                    if let Some(p) = self.push.as_mut().and_then(|p| p.socketio.as_mut()) {
+                        p.ping_every = Some(every);
+                    }
+                    cx.set_timer(PUSH_PING, every);
+                }
+                cx.ws_send(PUSH, format!("40{}", sio.namespace));
+            }
+            // The server's ping (v4), answered with a pong.
+            "2" => cx.ws_send(PUSH, format!("3{payload}")),
+            "4" => {
+                let (sio_kind, rest) = payload.split_at(payload.len().min(1));
+                let rest = rest.strip_prefix(sio.namespace.as_str()).unwrap_or(rest);
+                match sio_kind {
+                    // Joined: now the subscriptions.
+                    "0" => self.send_push_items(cx, &format!("42{}", sio.namespace)),
+                    "1" => cx.ws_close(PUSH),
+                    "2" => {
+                        // An optional ack id before the array.
+                        let array = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+                        if let Ok(Value::Array(args)) = serde_json::from_str::<Value>(array) {
+                            let event = args.first().cloned().unwrap_or(Value::Null);
+                            let data = args.get(1).cloned().unwrap_or(Value::Null);
+                            let doc = serde_json::json!({
+                                "event": event,
+                                "data": data,
+                                "args": args.get(1..).map(<[Value]>::to_vec).unwrap_or_default(),
+                            });
+                            if let Some(patch) =
+                                self.telemetry.apply(&telemetry::Inbound::Json(&doc))
+                            {
+                                cx.state(patch);
+                            }
+                        }
+                    }
+                    "4" => cx.log(
+                        Level::Warning,
+                        format!("socket.io refused the namespace: {rest}"),
+                    ),
+                    _ => {}
+                }
+            }
+            _ => {}
         }
     }
 
@@ -1815,6 +1937,18 @@ impl Module for SpecEngine {
             }
             RECONNECT => self.connect(cx),
             PUSH_RECONNECT => self.open_push(cx),
+            PUSH_PING => {
+                // Engine.IO v3: the client pings while the websocket is open.
+                let every = self
+                    .push
+                    .as_ref()
+                    .and_then(|p| p.socketio.as_ref())
+                    .and_then(|s| s.ping_every);
+                if let Some(every) = every {
+                    cx.ws_send(PUSH, "2".to_string());
+                    cx.set_timer(PUSH_PING, every);
+                }
+            }
             EVENTS_RECONNECT => self.open_events(cx),
             PROMPT => {
                 if self.prompt_wait.take().is_some() {
@@ -2962,5 +3096,67 @@ mod tests {
             panic!("an HTTP request");
         };
         assert_eq!(request.method, "PATCH");
+    }
+
+    #[test]
+    fn a_socketio_push_channel_joins_pings_and_applies_events() {
+        let telemetry = json!({
+            "websocket": {"path": "/socket.io/", "socketio": true,
+                          "send": [r#"["subscribe",{"topic":"slides"}]"#]},
+            "updates": [{
+                "json_match": {"$.event": "^slide$"},
+                "json": {"index": "$.data.index"},
+                "state": {"slide.index": "{index}"},
+            }],
+        });
+        let state = json!({"slide.index": {"type": "int", "description": "x"}});
+        let mut e = http_with(telemetry, state, true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let url = cx.take().into_iter().find_map(|a| match a {
+            Action::WsOpen {
+                socket: PUSH,
+                request,
+            } => Some(request.url),
+            _ => None,
+        });
+        assert!(url
+            .as_deref()
+            .is_some_and(|u| u.ends_with("/socket.io/?EIO=4&transport=websocket")));
+
+        let sent = |cx: Cx| -> Vec<String> {
+            cx.take()
+                .into_iter()
+                .filter_map(|a| match a {
+                    Action::WsSend { socket: PUSH, text } => Some(text),
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        assert!(sent(cx).is_empty());
+        let mut cx = Cx::new(2);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Text(r#"0{"sid":"a","pingInterval":25000}"#.into()),
+        );
+        assert_eq!(sent(cx), ["40"]);
+        let mut cx = Cx::new(3);
+        e.ws(&mut cx, PUSH, WsInput::Text(r#"40{"sid":"b"}"#.into()));
+        assert_eq!(sent(cx), [r#"42["subscribe",{"topic":"slides"}]"#]);
+        let mut cx = Cx::new(4);
+        e.ws(&mut cx, PUSH, WsInput::Text("2".into()));
+        assert_eq!(sent(cx), ["3"]);
+        let mut cx = Cx::new(5);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Text(r#"42["slide",{"index":4}]"#.into()),
+        );
+        assert!(cx
+            .take()
+            .contains(&Action::State(json!({"slide": {"index": 4}}))));
     }
 }

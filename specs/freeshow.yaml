@@ -1,0 +1,1517 @@
+spec: 1
+id: freeshow
+name: FreeShow (REST API)
+vendor: ChurchApps (Live Church Solutions)
+category: playback
+
+# FreeShow's API (Settings > Connections, "WebSocket/REST API") takes every
+# action as an HTTP POST to / on port 5506 with the JSON body
+# {"action": ACTION_ID, ...data}; the same actions go over a Socket.IO
+# websocket and OSC on port 5505. Actions answer 204 with no body; the get_
+# actions answer with the data. FreeShow reports state changes only to
+# Socket.IO clients (the Companion module's variables), which the format has
+# no transport for (Engine.IO handshake and ping/pong), so this spec has no
+# telemetry. FreeShow's source is GPL-3 and was not read.
+
+source:
+  - title: FreeShow API Documentation
+    author: ChurchApps / Live Church Solutions (FreeShow, Kristoffer Vassbø)
+    url: https://freeshow.app/api
+    note: >
+      Manufacturer document, retrieved 2026-10-02. Every action id with its JSON data, grouped as
+      Project, Shows, Presentation, Clear, Media, Overlays, Visual, Stage, Audio, Timers, Functions,
+      Other, Action, Edit and Get ("?" marks an optional value); the Examples section: enable the
+      WebSocket/REST API in Settings > Connections; an optional password (auth key) makes requests
+      without it answer 401; HTTP GET to port 5506 with ?action=&data=&auth=; REST "must be a POST"
+      to port 5506 with an "Authorization: Bearer <key>" header and the body {action, ...data};
+      Socket.IO on port 5505 (emit "data" with the JSON text); OSC to /freeshow/<ACTION_ID> with
+      the JSON as argument.
+  - title: FreeShow Docs, Bitfocus Companion and Connecting
+    author: ChurchApps / Live Church Solutions
+    url: https://freeshow.app/docs/companion
+    note: >
+      Manufacturer documents: the Connection settings and the default API port 5505 for Companion;
+      remote and stage web interfaces on other ports (5510 and up), which are not this API.
+  - title: "FreeShow issues #1280 (API Issues), #853 (API Endpoint Overview), #3700 (start_scripture) and #3785 (API authentication)"
+    author: ChurchApps/FreeShow issue tracker (maintainer replies by vassbo)
+    url: https://github.com/ChurchApps/FreeShow/issues/853
+    note: >
+      Issue discussions, not code. #853 and #1280: REST is a POST to the REST port with the body
+      {action, ...data}, and get_shows answers over it. #3700: the API answers HTTP 204 to
+      start_scripture (POST to 127.0.0.1:5506 with Content-Type application/json), and from 1.6.6-beta.1
+      a single verse reference selects that verse. #3785: the WebSocket and OSC servers are on 5505
+      and REST on 5506; the optional API token with "Authorization: Bearer" and 401 arrived in
+      v1.6.6-beta.4.
+  - title: companion-module-churchapps-freeshow (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-churchapps-freeshow
+    note: >
+      Read for corroboration only (main.js, src/connect.js, src/actions.js, src/variables.js,
+      companion/HELP.md). It connects over Socket.IO to port 5505 and sends the same action ids; its
+      indexes start at 1, its transition types are none, blur, fade, crossfade, fly, scale and spin
+      with easing "sine" by default, and its volume is 0-1. It reads state by emitting
+      {isVariable: true, keys: [...]} every second and receiving variables on the "data" event, an
+      exchange the FreeShow API page does not document.
+
+# REST on 5506 (the WebSocket/OSC port is 5505). With an API password set in
+# Connections, the token setting holds it and is sent as Authorization:
+# Bearer; empty sends none.
+transport:
+  type: http
+  port: 5506
+  scheme: http
+  auth: bearer
+  timeout_ms: 4000
+  probe:
+    method: POST
+    path: /
+    body: '{"action":"get_cleared"}'
+    content_type: application/json
+
+settings:
+  token: { type: string, secret: true }
+
+models:
+  - id: freeshow
+    name: FreeShow 1.x (WebSocket/REST API enabled)
+    supports:
+      [select_project, select_project_by_index, select_project_by_name, next_project_item,
+      previous_project_item, select_project_item, select_show_by_name, start_show, change_layout,
+      set_plain_text, rearrange_groups, add_group, set_template, transpose_show_up, transpose_show_down,
+      next_slide, previous_slide, random_slide, select_slide, select_slide_in_layout, select_slide_by_name,
+      select_group, start_slide_recording, restore_output, clear_all, clear_background, clear_slide,
+      clear_overlays, clear_overlay, clear_audio, clear_next_timer, clear_drawing, start_camera,
+      start_screen, play_media, toggle_playing_media, video_seek, start_effect, select_overlay_by_index,
+      select_overlay_by_name, select_overlay, start_scripture, scripture_next, scripture_previous,
+      toggle_output_lock, set_output_lock, toggle_output_windows, toggle_output, select_output_style,
+      change_output_style, change_stage_output_layout, change_transition, select_stage_layout, play_audio,
+      pause_audio, stop_audio, audio_seek, set_volume, start_audio_stream, start_playlist,
+      start_playlist_by_name, playlist_next, start_metronome, start_audio_effect, start_timer_by_name,
+      start_timer, start_slide_timers, pause_timers, stop_timers, timer_seek, pause_timer,
+      pause_timer_by_name, stop_timer, stop_timer_by_name, set_variable, increment_variable,
+      decrement_variable, start_trigger, sync_drive, sync_content_provider, emit_action,
+      toggle_log_song_usage, set_log_song_usage, run_action_by_name, run_action, toggle_action,
+      set_action_enabled, add_to_project, create_show, create_show_named, create_project, delete_project,
+      remove_project_item, rename_project, get_shows, get_show, get_show_layout, get_projects, get_project,
+      get_plain_text, get_groups, get_output, get_output_slide_text, get_output_group_name,
+      get_dynamic_value, get_playing_video_duration, get_playing_video_time, get_playing_video_time_left,
+      get_playing_audio_duration, get_playing_audio_time, get_playing_audio_time_left,
+      get_playing_audio_data, get_variables, get_timers, get_playlists, get_playlist, get_slide, get_cleared]
+    verification: none
+
+commands:
+  select_project:
+    summary: "Select a project by its id (id_select_project)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_select_project","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_project_by_index:
+    summary: "Select a project by its position in the project list (index_select_project)"
+    params:
+      index: { type: int, min: 1, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"index_select_project","index":{index}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_project_by_name:
+    summary: "Select a project by its name (name_select_project)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_select_project","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  next_project_item:
+    summary: "Go to the next item in the active project (next_project_item)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"next_project_item"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  previous_project_item:
+    summary: "Go to the previous item in the active project (previous_project_item)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"previous_project_item"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_project_item:
+    summary: "Select an item of the active project by its position (index_select_project_item)"
+    params:
+      index: { type: int, min: 1, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"index_select_project_item","index":{index}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_show_by_name:
+    summary: "Select a show by its name (name_select_show)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_select_show","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_show:
+    summary: "Start a show by its id, showing its first slide (start_show)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_show","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  change_layout:
+    summary: "Change a show's active layout (change_layout)"
+    params:
+      show:   { type: string, max_length: 256, required: true }
+      layout: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_layout","showId":{show:json},"layoutId":{layout:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_plain_text:
+    summary: "Replace a show's text with plain text (the show editor's plain-text form); text is a JSON string, so it can hold the line breaks between lines and slides (set_plain_text)"
+    params:
+      id:   { type: string, max_length: 256, required: true }
+      text: { type: json, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"set_plain_text","id":{id:json},"value":{text}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  rearrange_groups:
+    summary: "Move a group in a show's layout from one position to another (rearrange_groups)"
+    params:
+      show: { type: string, max_length: 256, required: true }
+      from: { type: int, min: 0, max: 100000, required: true }
+      to:   { type: int, min: 0, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"rearrange_groups","showId":{show:json},"from":{from},"to":{to}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  add_group:
+    summary: "Add a group (by its id) to a show's layout (add_group)"
+    params:
+      show:  { type: string, max_length: 256, required: true }
+      group: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"add_group","showId":{show:json},"groupId":{group:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_template:
+    summary: "Apply a template, by its id, to the active show (set_template)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"set_template","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  transpose_show_up:
+    summary: "Transpose a show's chords up a semitone (transpose_show_up)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"transpose_show_up","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  transpose_show_down:
+    summary: "Transpose a show's chords down a semitone (transpose_show_down)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"transpose_show_down","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  next_slide:
+    summary: "Go to the next slide (next_slide)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"next_slide"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  previous_slide:
+    summary: "Go to the previous slide (previous_slide)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"previous_slide"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  random_slide:
+    summary: "Go to a random slide of the active show (random_slide)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"random_slide"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_slide:
+    summary: "Go to a slide of the active show by its position (index_select_slide)"
+    params:
+      index: { type: int, min: 1, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"index_select_slide","index":{index}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_slide_in_layout:
+    summary: "Go to a slide by its position in a given show and layout (index_select_slide)"
+    params:
+      show:   { type: string, max_length: 256, required: true }
+      layout: { type: string, max_length: 256, required: true }
+      index:  { type: int, min: 1, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"index_select_slide","showId":{show:json},"layoutId":{layout:json},"index":{index}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_slide_by_name:
+    summary: "Go to a slide of the active show by its group name (name_select_slide)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_select_slide","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_group:
+    summary: "Go to a slide group by its id (id_select_group)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_select_group","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_slide_recording:
+    summary: "Start playing the active show's slide recording (start_slide_recording)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_slide_recording"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  restore_output:
+    summary: "Restore the output cleared last (restore_output)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"restore_output"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_all:
+    summary: "Clear every output layer (clear_all)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_all"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_background:
+    summary: "Clear the background (media) layer (clear_background)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_background"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_slide:
+    summary: "Clear the slide layer (clear_slide)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_slide"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_overlays:
+    summary: "Clear every overlay (clear_overlays)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_overlays"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_overlay:
+    summary: "Clear one overlay by its id (clear_overlay)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_overlay","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_audio:
+    summary: "Stop all audio (clear_audio)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_audio"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_next_timer:
+    summary: "Clear the next-slide timer (clear_next_timer)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_next_timer"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  clear_drawing:
+    summary: "Clear the drawing on the output (clear_drawing)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"clear_drawing"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_camera:
+    summary: "Show a camera (video input) by its device id (start_camera)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_camera","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_screen:
+    summary: "Show a screen or window capture by its id (start_screen)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_screen","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  play_media:
+    summary: "Play a media file by its path on the FreeShow computer (play_media)"
+    params:
+      path: { type: string, max_length: 1024, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"play_media","path":{path:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  toggle_playing_media:
+    summary: "Pause or resume the playing background media (toggle_playing_media)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_playing_media"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  video_seek:
+    summary: "Seek the playing video to a time in seconds (video_seekto)"
+    params:
+      seconds: { type: float, min: 0, max: 86400, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"video_seekto","seconds":{seconds:.3f}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_effect:
+    summary: "Start an effect by its id (id_start_effect)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_start_effect","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_overlay_by_index:
+    summary: "Toggle an overlay by its position (index_select_overlay)"
+    params:
+      index: { type: int, min: 1, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"index_select_overlay","index":{index}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_overlay_by_name:
+    summary: "Toggle an overlay by its name (name_select_overlay)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_select_overlay","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_overlay:
+    summary: "Toggle an overlay by its id (id_select_overlay)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_select_overlay","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_scripture:
+    summary: "Show a scripture passage by reference, such as \"John 3:16\" (start_scripture)"
+    params:
+      reference: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_scripture","reference":{reference:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  scripture_next:
+    summary: "Go to the next scripture verse (scripture_next)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"scripture_next"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  scripture_previous:
+    summary: "Go to the previous scripture verse (scripture_previous)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"scripture_previous"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  toggle_output_lock:
+    summary: "Toggle the output lock (lock_output)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"lock_output"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_output_lock:
+    summary: "Lock or unlock the outputs (lock_output)"
+    params:
+      locked: { type: bool, default: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"lock_output","value":{locked}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  toggle_output_windows:
+    summary: "Show or hide the output windows (toggle_output_windows)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_output_windows"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  toggle_output:
+    summary: "Enable or disable one output by its id (toggle_output)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_output","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_output_style:
+    summary: "Apply an output style, by its id, to the outputs (id_select_output_style)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_select_output_style","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  change_output_style:
+    summary: "Apply an output style to one output (change_output_style)"
+    params:
+      output: { type: string, max_length: 256, required: true }
+      style:  { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_output_style","outputId":{output:json},"styleId":{style:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  change_stage_output_layout:
+    summary: "Show a stage layout on one output (change_stage_output_layout)"
+    params:
+      output:       { type: string, max_length: 256, required: true }
+      stage_layout: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_stage_output_layout","outputId":{output:json},"stageLayoutId":{stage_layout:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  change_transition:
+    summary: "Set the text or media transition: type, duration in milliseconds and easing (change_transition)"
+    params:
+      target:   { type: enum, values: [text, media], required: true }
+      type:     { type: enum, values: [none, blur, fade, crossfade, fly, scale, spin], required: true }
+      duration: { type: int, min: 0, max: 60000, required: true }
+      easing:   { type: string, max_length: 64, default: sine }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_transition","id":{target:json},"type":{type:json},"duration":{duration},"easing":{easing:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  select_stage_layout:
+    summary: "Show a stage layout by its id (id_select_stage_layout)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_select_stage_layout","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  play_audio:
+    summary: "Play an audio file by its path (play_audio)"
+    params:
+      path: { type: string, max_length: 1024, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"play_audio","path":{path:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  pause_audio:
+    summary: "Pause an audio file by its path (pause_audio)"
+    params:
+      path: { type: string, max_length: 1024, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"pause_audio","path":{path:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  stop_audio:
+    summary: "Stop an audio file by its path (stop_audio)"
+    params:
+      path: { type: string, max_length: 1024, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"stop_audio","path":{path:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  audio_seek:
+    summary: "Seek the playing audio to a time in seconds (audio_seekto)"
+    params:
+      seconds: { type: float, min: 0, max: 86400, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"audio_seekto","seconds":{seconds:.3f}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_volume:
+    summary: "Set the audio volume, 0.0-1.0 (change_volume)"
+    params:
+      volume: { type: float, min: 0, max: 1, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_volume","volume":{volume:.2f}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_audio_stream:
+    summary: "Start an audio stream by its id (start_audio_stream)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_audio_stream","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_playlist:
+    summary: "Start an audio playlist by its id (start_playlist)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_playlist","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_playlist_by_name:
+    summary: "Start an audio playlist by its name (name_start_playlist)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_start_playlist","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  playlist_next:
+    summary: "Go to the next track of the playing playlist (playlist_next)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"playlist_next"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_metronome:
+    summary: "Start the metronome with its current settings (start_metronome)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_metronome"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_audio_effect:
+    summary: "Play an audio effect file by its path (start_audio_effect)"
+    params:
+      path: { type: string, max_length: 1024, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_audio_effect","path":{path:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_timer_by_name:
+    summary: "Start a timer by its name (name_start_timer)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_start_timer","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_timer:
+    summary: "Start a timer by its id (id_start_timer)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_start_timer","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_slide_timers:
+    summary: "Start the timers on the active slide (start_slide_timers)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_slide_timers"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  pause_timers:
+    summary: "Pause the running timers (pause_timers)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"pause_timers"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  stop_timers:
+    summary: "Stop the running timers (stop_timers)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"stop_timers"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  timer_seek:
+    summary: "Seek the running timer to a time in seconds (timer_seekto)"
+    params:
+      seconds: { type: float, min: 0, max: 86400, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"timer_seekto","seconds":{seconds:.3f}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  pause_timer:
+    summary: "Pause a timer by its id (id_pause_timer)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_pause_timer","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  pause_timer_by_name:
+    summary: "Pause a timer by its name (name_pause_timer)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_pause_timer","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  stop_timer:
+    summary: "Stop a timer by its id (id_stop_timer)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"id_stop_timer","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  stop_timer_by_name:
+    summary: "Stop a timer by its name (name_stop_timer)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_stop_timer","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_variable:
+    summary: "Set a variable's value by the variable's name (text, or a number as text) (change_variable)"
+    params:
+      name:  { type: string, max_length: 256, required: true }
+      value: { type: string, max_length: 4096, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_variable","name":{name:json},"value":{value:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  increment_variable:
+    summary: "Increment a number variable by its name, by its step (change_variable)"
+    params:
+      name:            { type: string, max_length: 256, required: true }
+      variable_action: { type: enum, values: [increment], default: increment }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_variable","name":{name:json},"variableAction":{variable_action:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  decrement_variable:
+    summary: "Decrement a number variable by its name, by its step (change_variable)"
+    params:
+      name:            { type: string, max_length: 256, required: true }
+      variable_action: { type: enum, values: [decrement], default: decrement }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"change_variable","name":{name:json},"variableAction":{variable_action:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  start_trigger:
+    summary: "Run a trigger by its id (start_trigger)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"start_trigger","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  sync_drive:
+    summary: "Synchronise with the configured cloud drive (sync_drive)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"sync_drive"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  sync_content_provider:
+    summary: "Synchronise with the connected content providers (sync_content_provider)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"sync_content_provider"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  emit_action:
+    summary: "Send an emitter's message (OSC, HTTP or MIDI) by the emitter's id (emit_action)"
+    params:
+      emitter: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"emit_action","emitter":{emitter:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  toggle_log_song_usage:
+    summary: "Toggle logging of song usage (toggle_log_song_usage)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_log_song_usage"}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_log_song_usage:
+    summary: "Turn logging of song usage on or off (toggle_log_song_usage)"
+    params:
+      enabled: { type: bool, default: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_log_song_usage","value":{enabled}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  run_action_by_name:
+    summary: "Run a FreeShow action by its name (name_run_action)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"name_run_action","value":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  run_action:
+    summary: "Run a FreeShow action by its id (run_action)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"run_action","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  toggle_action:
+    summary: "Toggle a FreeShow action's enabled state by its id (toggle_action)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_action","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  set_action_enabled:
+    summary: "Enable or disable a FreeShow action by its id (toggle_action)"
+    params:
+      id:      { type: string, max_length: 256, required: true }
+      enabled: { type: bool, default: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"toggle_action","id":{id:json},"value":{enabled}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  add_to_project:
+    summary: "Add a show, by its id, to a project (add_to_project)"
+    params:
+      project: { type: string, max_length: 256, required: true }
+      id:      { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"add_to_project","projectId":{project:json},"id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  create_show:
+    summary: "Create a show from text; text is a JSON string, in which a blank line separates slides (create_show)"
+    params:
+      text: { type: json, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"create_show","text":{text}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  create_show_named:
+    summary: "Create a named show from text, in a category; text is a JSON string, in which a blank line separates slides (create_show)"
+    params:
+      text:     { type: json, required: true }
+      name:     { type: string, max_length: 256, required: true }
+      category: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"create_show","text":{text},"name":{name:json},"category":{category:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  create_project:
+    summary: "Create a project (create_project)"
+    params:
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"create_project","name":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  delete_project:
+    summary: "Delete a project by its id (delete_project)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"delete_project","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  remove_project_item:
+    summary: "Remove an item, by its position, from a project (remove_project_item)"
+    params:
+      id:    { type: string, max_length: 256, required: true }
+      index: { type: int, min: 0, max: 100000, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"remove_project_item","id":{id:json},"index":{index}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  rename_project:
+    summary: "Rename a project (rename_project)"
+    params:
+      id:   { type: string, max_length: 256, required: true }
+      name: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"rename_project","id":{id:json},"name":{name:json}}'
+      content_type: application/json
+    expect: { status: 204 }
+    returns: ack
+
+  get_shows:
+    summary: "The list of shows, as FreeShow returns it (JSON) (get_shows)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_shows"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_show:
+    summary: "A show, by its id, as FreeShow returns it (JSON) (get_show)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_show","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_show_layout:
+    summary: "A show's active layout, by the show's id, as FreeShow returns it (JSON) (get_show_layout)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_show_layout","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_projects:
+    summary: "The list of projects, as FreeShow returns it (JSON) (get_projects)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_projects"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_project:
+    summary: "A project, by its id, as FreeShow returns it (JSON) (get_project)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_project","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_plain_text:
+    summary: "A show's text as plain text, by the show's id, as FreeShow returns it (JSON) (get_plain_text)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_plain_text","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_groups:
+    summary: "A show's slide groups, by the show's id, as FreeShow returns it (JSON) (get_groups)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_groups","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_output:
+    summary: "The current output, as FreeShow returns it (JSON) (get_output)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_output"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_output_slide_text:
+    summary: "The text of the slide on output, as FreeShow returns it (JSON) (get_output_slide_text)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_output_slide_text"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_output_group_name:
+    summary: "The group name of the slide on output, as FreeShow returns it (JSON) (get_output_group_name)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_output_group_name"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_dynamic_value:
+    summary: "The value of a dynamic value, such as {time_}, as FreeShow returns it (JSON) (get_dynamic_value)"
+    params:
+      value: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_dynamic_value","value":{value:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_video_duration:
+    summary: "The playing video's duration, as FreeShow returns it (JSON) (get_playing_video_duration)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_video_duration"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_video_time:
+    summary: "The playing video's position, as FreeShow returns it (JSON) (get_playing_video_time)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_video_time"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_video_time_left:
+    summary: "The playing video's time left, as FreeShow returns it (JSON) (get_playing_video_time_left)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_video_time_left"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_audio_duration:
+    summary: "The playing audio's duration, as FreeShow returns it (JSON) (get_playing_audio_duration)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_audio_duration"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_audio_time:
+    summary: "The playing audio's position, as FreeShow returns it (JSON) (get_playing_audio_time)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_audio_time"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_audio_time_left:
+    summary: "The playing audio's time left, as FreeShow returns it (JSON) (get_playing_audio_time_left)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_audio_time_left"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playing_audio_data:
+    summary: "The playing audio's details, as FreeShow returns it (JSON) (get_playing_audio_data)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playing_audio_data"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_variables:
+    summary: "The variables, as FreeShow returns it (JSON) (get_variables)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_variables"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_timers:
+    summary: "The timers, as FreeShow returns it (JSON) (get_timers)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_timers"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playlists:
+    summary: "The audio playlists, as FreeShow returns it (JSON) (get_playlists)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playlists"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_playlist:
+    summary: "An audio playlist, by its id, as FreeShow returns it (JSON) (get_playlist)"
+    params:
+      id: { type: string, max_length: 256, required: true }
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_playlist","id":{id:json}}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_slide:
+    summary: "The slide on output, as FreeShow returns it (JSON) (get_slide)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_slide"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+
+  get_cleared:
+    summary: "Which output layers are cleared, as FreeShow returns it (JSON) (get_cleared)"
+    send:
+      method: POST
+      path: /
+      body: '{"action":"get_cleared"}'
+      content_type: application/json
+    expect: { status: 200 }
+    returns: text
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      delete_project deletes a project at once, with no confirmation and no undo through the API.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_plain_text, rearrange_groups, add_group, set_template, transpose_show_up and
+      transpose_show_down change a saved show, and create_show, create_project, rename_project,
+      add_to_project and remove_project_item change the library. They are saved as FreeShow saves
+      any edit, and only FreeShow's own undo reverses them.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The API is off until "WebSocket/REST API" is enabled in Settings > Connections, and the port
+      can be changed there (REST 5506 by default; 5505 is the WebSocket and OSC port). The
+      Companion module uses 5505 because it speaks Socket.IO; register this device with the REST
+      port.
+
+  - models: [all]
+    severity: warning
+    text: >
+      With an API password (auth key) set in Connections, requests without it are answered 401, a
+      terminal refusal here: set the token setting to the same key. The password exists from
+      1.6.6-beta.4 (issue #3785); older versions accept every request, and a token sent to them is
+      ignored.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Success is taken as HTTP 204 for an action and 200 for a get_ query. The API page documents
+      neither; 204 is what the API answered in issue #3700, and get_ replies carrying data is
+      inferred from issue #1280. The get_ replies are returned as FreeShow sends them, since their
+      shapes are not documented.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Positions (index) are passed through as FreeShow numbers them, which the API page does not
+      state; the Companion module offers them from 1. remove_project_item and rearrange_groups
+      take 0 as well, as the page gives no lower bound for them.
+
+  - models: [all]
+    severity: warning
+    text: >
+      FreeShow pushes state only to Socket.IO clients on the WebSocket port (Engine.IO framing with
+      its own ping and pong), which the spec format cannot carry, so this spec keeps no state. Use
+      the get_ queries to read the output, timers and playing media on demand.
+
+  - models: [all]
+    severity: info
+    text: >
+      start_scripture before 1.6.6-beta.1 showed the whole chapter on the first call into a chapter
+      not yet loaded, and a single verse had to be written as a range (Psalms 23:3-3); the API
+      still answered 204 (issue #3700).
+
+  - models: [all]
+    severity: info
+    text: >
+      Left out: set_show and edit_timer (their value is undocumented "any" or free-form),
+      send_rest_command (makes FreeShow send an arbitrary HTTP request), the thumbnail queries
+      (image data), change_draw_zoom, get_variable (documented without parameters), and the
+      optional-field forms of start_camera, start_metronome, start_slide_timers, get_slide and the
+      seek actions' "id".

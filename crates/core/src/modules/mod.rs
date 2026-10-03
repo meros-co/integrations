@@ -60,6 +60,8 @@ mod novastar_h;
 mod novastar_h_commands;
 #[cfg(feature = "obs-studio")]
 mod obs;
+#[cfg(feature = "obsidian-onyx")]
+mod onyx;
 #[cfg(feature = "panasonic-ptz")]
 mod panasonic_notify;
 #[cfg(feature = "pjlink")]
@@ -146,6 +148,8 @@ pub(crate) fn construct(
         "novastar-h" => Ok(Box::new(novastar_h::NovastarH::new(context))),
         #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
+        #[cfg(feature = "obsidian-onyx")]
+        "obsidian-onyx" => Ok(Box::new(onyx::Onyx::new(context))),
         #[cfg(feature = "shure-wireless")]
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
         #[cfg(feature = "sony-camera")]

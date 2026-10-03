@@ -1,0 +1,329 @@
+spec: 1
+id: obsidian-onyx
+name: Obsidian Control Systems ONYX and ONYX Manager (Telnet)
+vendor: Obsidian Control Systems
+category: lighting
+implementation: native
+reason: >
+  A reply's extent depends on its form: a status line followed by data lines ended by a line holding
+  only ".", or "NNN-" continuation lines ended by a line without the dash, as on the connection banner
+  and for errors. What the data lines mean depends on the query that was sent (QLList and QLActive both
+  answer "00002 - House Lights"), so cuelist names and active flags can only be kept from replies matched
+  to their request, and a connection must wait out the banner before its first command. The spec
+  format's line rules cannot attribute data lines to a request.
+
+source:
+  - title: ONYX Manual 4.32, Networking > Telnet; Telnet and UDP Commands
+    author: Obsidian Control Systems
+    url: https://support.obsidiancontrol.com/Content/Onyx_Manual/Networking/Telnet_and_UDP_Commands.htm
+    note: >
+      Retrieved 2026-10-02. Telnet.htm: ONYX accepts Telnet (UDP or TCP) commands for triggering
+      playback and command line operations, ONYX 4.10 or later. Telnet_and_UDP_Commands.htm: the
+      server must be enabled and given a TCP port (example 2323); "Telnet commands will return a
+      response"; UDP commands are a string and a carriage return with no response. Commands: CLRCLR,
+      GQL #, RQL #, PQL #, GTQ #,# ("full cue and point cue numbers supported", examples GTQ 14,3 and
+      GTQ 14,4.1), RAO, RAQLDF, RAQLO, RAQL, SQL #,# (level 0-255, example SQL 12,255). Network
+      Settings: Telnet is enabled per network interface.
+  - title: onyx_lighting (Dart package), README and lib/onyx/model.dart (community, MIT)
+    author: Jeff Mikels
+    url: https://github.com/jeffmikels/onyx_lighting_dart
+    note: >
+      Community code and documentation, read for corroboration only (MIT at the top level). The README
+      reproduces the server's Help output on ONYX Manager's Telnet port 2323: ACT, ActList, ActName,
+      BYE, CLRCLR, CMD, CmdList, CmdName, GQL, GSC, GTQ, Help, IsMxRun, IsQLActive, IsSchRun, LastLog
+      (300 lines max), PQL, QLActive, QLList, QLName, RAO, RAQL, RAQLDF, RAQLO, RAQLODF, RQL, SchList,
+      SchName, SchUseCalendar, SetDate (YYYY,MM,DD), SetPosDec, SetPosDMS, SetQLLevel (#,# level 0-255),
+      SetTime (HH,MM,SS), SetTimepreset, Status, TimePresetList, WhoIAm. model.dart describes the
+      replies: a banner of "200-" lines ending "200"; errors as "400-" lines ending "400 <command>";
+      data replies "200 Ok", data lines such as "00002 - House Lights", then "."; QLActive with no
+      active cuelist answering "No Active Qlist in List"; Yes or No for the Is commands; CRLF line
+      endings; QLName timing out on some versions.
+  - title: Bitfocus Companion module companion-module-obsidiancontrol-onyx (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-obsidiancontrol-onyx
+    note: >
+      Read for corroboration only (MIT at the top level). Sends commands ended by CRLF; describes ONYX's
+      built-in Telnet server and ONYX Manager's (default port 2323, needed for the scheduler), enabled
+      under Menu > Network-Remote > Telnet (TCP) and in ONYX Manager under Setup > Net Remote; polls
+      QLActive only through ONYX Manager.
+
+settings: {}
+
+models:
+  - id: nx4
+    name: Obsidian NX 4 (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: nx2
+    name: Obsidian NX 2 (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: nx1
+    name: Obsidian NX 1 (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: nx-touch
+    name: Obsidian NX Touch (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: nx-k
+    name: Obsidian NX K (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: onyx-pc
+    name: ONYX on a PC (Windows) (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: m-series
+    name: Martin M-Series consoles running ONYX (M1, M2GO, M6, M-Touch, M-Play) (ONYX's Telnet server)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue, set_cuelist_level,
+      release_all_cuelists, release_all_cuelists_dimmer_first, release_all_overrides,
+      release_all_cuelists_and_overrides, help, send_raw
+    ]
+    verification: none
+  - id: onyx-manager
+    name: ONYX Manager's Telnet server (on the console or PC running ONYX)
+    supports: [
+      clear_programmer, go_cuelist, pause_cuelist, release_cuelist, go_to_cue,
+      set_cuelist_level_manager, release_all_cuelists, release_all_cuelists_dimmer_first,
+      release_all_overrides, release_all_cuelists_and_overrides,
+      release_all_cuelists_and_overrides_dimmer_first, list_cuelists, list_active_cuelists,
+      is_cuelist_active, cuelist_name, is_onyx_running, action_group, list_action_groups,
+      action_group_name, run_command, list_commands, command_name, go_schedule, use_calendar_rules,
+      list_schedules, schedule_name, is_scheduler_running, list_time_presets, status, last_log,
+      who_am_i, set_date, set_time, set_position, help, send_raw
+    ]
+    verification: none
+    notes: >
+      ONYX Manager runs beside ONYX and adds the scheduler, action groups and cuelist queries.
+
+commands:
+  clear_programmer:
+    summary: "Press Clear twice to clear the programmer (CLRCLR)"
+    returns: ack
+  go_cuelist:
+    summary: "Go on a cuelist by number (GQL #)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+    returns: ack
+  pause_cuelist:
+    summary: "Pause a cuelist (PQL #)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+    returns: ack
+  release_cuelist:
+    summary: "Release a cuelist (RQL #)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+    returns: ack
+  go_to_cue:
+    summary: "Go to a cue of a cuelist, whole or point cue such as 4.1 (GTQ #,#)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+      cue: { type: string, pattern: '^[0-9]{1,5}(\.[0-9]{1,3})?$', required: true }
+    returns: ack
+  set_cuelist_level:
+    summary: "Set a cuelist's fader level 0-255 (SQL #,#; ONYX's own Telnet server)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  set_cuelist_level_manager:
+    summary: "Set a cuelist's level 0-255 through ONYX Manager (SetQLLevel #,#)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+      level: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  release_all_cuelists:
+    summary: "Release all cuelists (RAQL)"
+    returns: ack
+  release_all_cuelists_dimmer_first:
+    summary: "Release all cuelists, dimmers first (RAQLDF)"
+    returns: ack
+  release_all_overrides:
+    summary: "Release all override cuelists (RAO)"
+    returns: ack
+  release_all_cuelists_and_overrides:
+    summary: "Release all cuelists and overrides (RAQLO)"
+    returns: ack
+  release_all_cuelists_and_overrides_dimmer_first:
+    summary: "Release all cuelists and overrides, dimmers first (RAQLODF)"
+    returns: ack
+  list_cuelists:
+    summary: "List the available cuelists (QLList); returns [{number, name}] and updates the state"
+    returns: value
+  list_active_cuelists:
+    summary: "List the active cuelists (QLActive); returns [{number, name}] and updates the state"
+    returns: value
+  is_cuelist_active:
+    summary: "Whether a cuelist is active (IsQLActive #); returns true or false"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+    returns: value
+  cuelist_name:
+    summary: "A cuelist's name (QLName #)"
+    params:
+      cuelist: { type: int, min: 1, max: 99999, required: true }
+    returns: value
+  is_onyx_running:
+    summary: "Whether ONYX is running (IsMxRun); returns true or false"
+    returns: value
+  action_group:
+    summary: "Run an ONYX Manager action group (ACT #)"
+    params:
+      group: { type: int, min: 1, max: 99999, required: true }
+    returns: ack
+  list_action_groups:
+    summary: "List the ONYX Manager action groups (ActList); returns [{number, name}]"
+    returns: value
+  action_group_name:
+    summary: "An action group's name (ActName #)"
+    params:
+      group: { type: int, min: 1, max: 99999, required: true }
+    returns: value
+  run_command:
+    summary: "Run an ONYX Manager internal command by number (CMD #)"
+    params:
+      command: { type: int, min: 1, max: 99999, required: true }
+    returns: ack
+  list_commands:
+    summary: "List the ONYX Manager commands (CmdList); returns [{number, name}]"
+    returns: value
+  command_name:
+    summary: "A command's name (CmdName #)"
+    params:
+      command: { type: int, min: 1, max: 99999, required: true }
+    returns: value
+  go_schedule:
+    summary: "Make a schedule the default schedule (GSC #); see use_calendar_rules to return"
+    params:
+      schedule: { type: int, min: 1, max: 99999, required: true }
+    returns: ack
+  use_calendar_rules:
+    summary: "Set the scheduler back to its calendar rules (SchUseCalendar)"
+    returns: ack
+  list_schedules:
+    summary: "List the schedules (SchList); returns [{number, name}]"
+    returns: value
+  schedule_name:
+    summary: "A schedule's name (SchName #)"
+    params:
+      schedule: { type: int, min: 1, max: 99999, required: true }
+    returns: value
+  is_scheduler_running:
+    summary: "Whether the scheduler is running (IsSchRun); returns true or false"
+    returns: value
+  list_time_presets:
+    summary: "List the time presets (TimePresetList); returns [{number, name}] where the lines have that form, else the lines"
+    returns: value
+  status:
+    summary: "ONYX Manager's status report (Status); returns the text"
+    returns: value
+  last_log:
+    summary: "The last 1-300 log lines (LastLog #); returns the text"
+    params:
+      lines: { type: int, min: 1, max: 300, default: 10 }
+    returns: value
+  who_am_i:
+    summary: "The address the server sees this connection from (WhoIAm)"
+    returns: value
+  set_date:
+    summary: "Set the date of the computer running ONYX Manager (SetDate YYYY,MM,DD)"
+    params:
+      year: { type: int, min: 2000, max: 2099, required: true }
+      month: { type: int, min: 1, max: 12, required: true }
+      day: { type: int, min: 1, max: 31, required: true }
+    returns: ack
+  set_time:
+    summary: "Set the time of the computer running ONYX Manager, 24-hour (SetTime HH,MM,SS)"
+    params:
+      hour: { type: int, min: 0, max: 23, required: true }
+      minute: { type: int, min: 0, max: 59, required: true }
+      second: { type: int, min: 0, max: 59, required: true }
+    returns: ack
+  set_position:
+    summary: "Set the geographical position for astronomical schedule rules, in decimal degrees (SetPosDec lat,N|S,long,E|W)"
+    params:
+      latitude: { type: float, min: 0, max: 90, required: true }
+      north: { type: bool, required: true }
+      longitude: { type: float, min: 0, max: 180, required: true }
+      east: { type: bool, required: true }
+    returns: ack
+  help:
+    summary: "The server's list of commands (Help); returns the text"
+    returns: value
+  send_raw:
+    summary: "Send any command line and return the reply's text (data lines, or the message for a reply without data)"
+    params:
+      text: { type: string, pattern: '^[ -~]{1,200}$', required: true }
+    returns: value
+
+state:
+  "cuelists.*.name": { type: string, description: "Cuelist name by cuelist number, from QLList (and QLActive) replies" }
+  "cuelists.*.active": { type: bool, description: "Whether the cuelist is active, from QLActive replies; numbers QLList lists and QLActive does not are false" }
+  onyx_running: { type: bool, description: "ONYX running, from IsMxRun (ONYX Manager)" }
+  scheduler_running: { type: bool, description: "Scheduler running, from IsSchRun (ONYX Manager)" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Obsidian documents the commands of ONYX's own Telnet server but not its replies; the reply forms
+      (banner, "200 Ok" with data lines ended by ".", "NNN-" continuation lines, 4xx errors) are those
+      of ONYX Manager's server as the community library records them, and are assumed for both. A
+      reply with a status line and no "." is taken as complete after 300 ms without more lines.
+
+  - models: [all]
+    severity: info
+    text: >
+      Opened for monitoring, the module asks QLList on connecting and every 30 s, QLActive every 2 s
+      (and 300 ms after a cuelist command), and IsMxRun and IsSchRun every 10 s. A query the server
+      refuses (a 4xx reply, as ONYX's own server may for ONYX Manager queries) is not asked again on
+      that connection. Commands go ahead of queued queries; one request is in flight at a time.
+      Opened for commands only, it asks WhoIAm every 10 s as the liveness check and reads no state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is sent until the connection banner has ended (a line of only a status code) or 1 s has
+      passed, so the banner is never taken as a reply. Commands end with CRLF. The port is the host's,
+      2323 when none is given (ONYX Manager's default and the manual's example; ONYX's own server's
+      port is set in its Telnet settings).
+
+  - models: [onyx-manager]
+    severity: warning
+    text: >
+      set_date and set_time change the clock of the computer running ONYX Manager, which the scheduler
+      runs from; go_schedule overrides the calendar rules until use_calendar_rules. QLName times out on
+      some versions (community report).
+
+  - models: [all]
+    severity: info
+    text: >
+      UDP Telnet commands (no reply) are not used; TCP gives replies and errors. Cuelist numbers are
+      sent without leading zeros; ONYX Manager lists them with five digits (00002), read as numbers.
