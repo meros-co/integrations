@@ -49,12 +49,16 @@ settings:
     default: ""
     max_length: 8
     pattern: '^([\x21-\x7e]{4,8})?$'
+    label: User ID
+    description: The 4-8 character user ID set under User Account on the P-20HD; empty skips the login.
   password:
     type: string
     secret: true
     default: ""
     max_length: 12
     pattern: '^([\x21-\x7e]{8,12})?$'
+    label: Password
+    description: The 8-12 character password set under User Account on the P-20HD; empty skips it.
 
 # "Transmit the user ID command ... Transmit the password command ... Once
 # the ACK (06H) response is verified, the connection is established" (p.53).
@@ -170,7 +174,7 @@ commands:
   jog:
     summary: "Jog one step: 1 forward, -1 reverse (JOG)"
     params:
-      direction: { type: int, min: -1, max: 1, required: true }
+      direction: { type: int, min: -1, max: 1, required: true, label: Direction, description: "1 jogs one step forward, -1 one step in reverse, 0 does not move." }
     send: "JOG:{direction}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -178,7 +182,7 @@ commands:
   shuttle:
     summary: "Shuttle: -8 (x-128) to 8 (x128) in powers of two, 0 stopped (SHT)"
     params:
-      speed: { type: int, min: -8, max: 8, required: true }
+      speed: { type: int, min: -8, max: 8, required: true, label: Shuttle speed, description: "-8 to 8 in powers of two, from x-128 in reverse to x128 forward; 0 stops." }
     send: "SHT:{speed}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -186,7 +190,7 @@ commands:
   set_playback_speed:
     summary: "Change the playback speed, 0-100 (SPC)"
     params:
-      speed: { type: int, min: 0, max: 100, required: true }
+      speed: { type: int, min: 0, max: 100, required: true, label: Speed, description: "Playback speed on the unit's 0-100 scale; the unit reports reverse playback as negative speeds." }
     send: "SPC:{speed}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -194,7 +198,7 @@ commands:
   set_speed_range:
     summary: "Switch the playback speed range: false [SPEED RANGE] unlit, true lit (SPR)"
     params:
-      lit: { type: bool, required: true }
+      lit: { type: bool, required: true, label: Speed range, description: "On lights the SPEED RANGE button, off unlights it, switching the playback speed range." }
     send: "SPR:{lit:bool01}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -202,7 +206,7 @@ commands:
   set_in_point:
     summary: "Set the IN point: false replay video, true live in video (MIN)"
     params:
-      live: { type: bool, required: true }
+      live: { type: bool, required: true, label: Live in, description: "On uses the live input video, off the replay video." }
     send: "MIN:{live:bool01}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -210,7 +214,7 @@ commands:
   set_out_point:
     summary: "Set the OUT point: false replay video, true live in video (MOT)"
     params:
-      live: { type: bool, required: true }
+      live: { type: bool, required: true, label: Live in, description: "On uses the live input video, off the replay video." }
     send: "MOT:{live:bool01}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -218,7 +222,7 @@ commands:
   create_clip:
     summary: "Create a clip: false replay video, true live in video (MCL)"
     params:
-      live: { type: bool, required: true }
+      live: { type: bool, required: true, label: Live in, description: "On uses the live input video, off the replay video." }
     send: "MCL:{live:bool01}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -226,7 +230,7 @@ commands:
   select_clip:
     summary: "Select a clip in the clip list (1-512) or a palette (1-64) (CLS)"
     params:
-      clip: { type: int, min: 1, max: 512, required: true }
+      clip: { type: int, min: 1, max: 512, required: true, label: Clip, description: "Clip number, 1-512 in the clip list or 1-64 in a palette; the unit refuses a number past a palette's end." }
     send: "CLS:{clip}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -240,7 +244,7 @@ commands:
   cue_clip:
     summary: "Cue up a clip in the clip list (1-512) or a palette (1-64) (CLQ)"
     params:
-      clip: { type: int, min: 1, max: 512, required: true }
+      clip: { type: int, min: 1, max: 512, required: true, label: Clip, description: "Clip number, 1-512 in the clip list or 1-64 in a palette; the unit refuses a number past a palette's end." }
     send: "CLQ:{clip}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -248,7 +252,7 @@ commands:
   delete_clip:
     summary: "Delete a clip in the clip list (1-512) or a palette (1-64) (CLD)"
     params:
-      clip: { type: int, min: 1, max: 512, required: true }
+      clip: { type: int, min: 1, max: 512, required: true, label: Clip, description: "Clip number, 1-512 in the clip list or 1-64 in a palette; the unit refuses a number past a palette's end." }
     send: "CLD:{clip}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -256,7 +260,7 @@ commands:
   set_bookmark:
     summary: "Set a bookmark: false replay video, true live in video (BMK)"
     params:
-      live: { type: bool, required: true }
+      live: { type: bool, required: true, label: Live in, description: "On uses the live input video, off the replay video." }
     send: "BMK:{live:bool01}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -270,7 +274,7 @@ commands:
   select_input:
     summary: "Switch input: 1 LIVE IN 1, 2 LIVE IN 2, 3 PinP, 4 SPLIT (SLI)"
     params:
-      input: { type: int, min: 1, max: 4, required: true }
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "1 LIVE IN 1, 2 LIVE IN 2, 3 PinP, 4 SPLIT." }
     send: "SLI:{input}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -278,7 +282,7 @@ commands:
   select_output:
     summary: "Switch output: false replay video, true live in video (SLO)"
     params:
-      live: { type: bool, required: true }
+      live: { type: bool, required: true, label: Live in, description: "On outputs the live input video, off the replay video." }
     send: "SLO:{live:bool01}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -310,7 +314,7 @@ commands:
   select_playlist:
     summary: "Select a playlist: 0 clip list, 1-8 palettes 1-8 (PLS)"
     params:
-      playlist: { type: int, min: 0, max: 8, required: true }
+      playlist: { type: int, min: 0, max: 8, required: true, label: Playlist, description: "0 is the clip list, 1-8 are palettes 1-8." }
     send: "PLS:{playlist}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -318,7 +322,7 @@ commands:
   play_playlist:
     summary: "Start playlist playback from a clip in the clip list (1-512) or a palette (1-64) (APL)"
     params:
-      clip: { type: int, min: 1, max: 512, required: true }
+      clip: { type: int, min: 1, max: 512, required: true, label: Clip, description: "Clip to start playback from, 1-512 in the clip list or 1-64 in a palette." }
     send: "APL:{clip}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -332,7 +336,7 @@ commands:
   add_clip_to_palette:
     summary: "Add the current clip to palette 1-8 (ATP)"
     params:
-      palette: { type: int, min: 1, max: 8, required: true }
+      palette: { type: int, min: 1, max: 8, required: true, label: Palette, description: "Palette to add the current clip to, 1-8." }
     send: "ATP:{palette}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -340,7 +344,7 @@ commands:
   play_still:
     summary: "Play still image clip 1-16 (STP)"
     params:
-      still: { type: int, min: 1, max: 16, required: true }
+      still: { type: int, min: 1, max: 16, required: true, label: Still image, description: "Still image clip, 1-16." }
     send: "STP:{still}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -354,7 +358,7 @@ commands:
   play_audio:
     summary: "Play audio clip 1-16 (AUP)"
     params:
-      audio: { type: int, min: 1, max: 16, required: true }
+      audio: { type: int, min: 1, max: 16, required: true, label: Audio clip, description: "Audio clip, 1-16." }
     send: "AUP:{audio}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -368,7 +372,7 @@ commands:
   set_audio_level:
     summary: "Set the audio level, -800 to 100 (-80.0 to 10.0 dB), or -801 for -INF (VOL)"
     params:
-      level: { type: int, min: -801, max: 100, required: true }
+      level: { type: int, min: -801, max: 100, required: true, label: Audio level, description: "Level in tenths of a dB, -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -inf." }
     send: "VOL:{level}"
     expect: { contains: "\u0006" }
     returns: ack
@@ -478,8 +482,8 @@ commands:
   get_clip_available:
     summary: "Whether a clip exists at a position: playlist 0 clip list (1-512) or 1-8 palette (1-64); 0 no, 1 yes (QCX)"
     params:
-      playlist: { type: int, min: 0, max: 8, required: true }
-      clip: { type: int, min: 1, max: 512, required: true }
+      playlist: { type: int, min: 0, max: 8, required: true, label: Playlist, description: "0 is the clip list, 1-8 are palettes 1-8." }
+      clip: { type: int, min: 1, max: 512, required: true, label: Clip, description: "Clip position, 1-512 in the clip list or 1-64 in a palette." }
     send: "QCX:{playlist},{clip}"
     expect: { matches: '^[\x02\x11\x13]*QCX:(-?\d+);' }
     returns: value
@@ -487,7 +491,7 @@ commands:
   get_audio_clip_available:
     summary: "Whether audio clip 1-16 exists: 0 no, 1 yes (QAX)"
     params:
-      audio: { type: int, min: 1, max: 16, required: true }
+      audio: { type: int, min: 1, max: 16, required: true, label: Audio clip, description: "Audio clip, 1-16." }
     send: "QAX:{audio}"
     expect: { matches: '^[\x02\x11\x13]*QAX:(-?\d+);' }
     returns: value
@@ -495,7 +499,7 @@ commands:
   get_still_available:
     summary: "Whether still image clip 1-16 exists: 0 no, 1 yes (QSX)"
     params:
-      still: { type: int, min: 1, max: 16, required: true }
+      still: { type: int, min: 1, max: 16, required: true, label: Still image, description: "Still image clip, 1-16." }
     send: "QSX:{still}"
     expect: { matches: '^[\x02\x11\x13]*QSX:(-?\d+);' }
     returns: value
@@ -503,7 +507,7 @@ commands:
   get_clip_count:
     summary: "Number of clips in a playlist: 0 clip list (0-512), 1-8 palette (0-64) (QNC)"
     params:
-      playlist: { type: int, min: 0, max: 8, required: true }
+      playlist: { type: int, min: 0, max: 8, required: true, label: Playlist, description: "0 is the clip list, 1-8 are palettes 1-8." }
     send: "QNC:{playlist}"
     expect: { matches: '^[\x02\x11\x13]*QNC:(-?\d+);' }
     returns: value

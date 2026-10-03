@@ -49,6 +49,8 @@ settings:
     default: ""
     max_length: 8
     pattern: '^([\x21-\x7e]{8})?$'
+    label: Password
+    description: The eight-character password set on the mixer under Setup, System, Password; empty sends none.
 
 on_connect:
   - when_set: password
@@ -108,7 +110,7 @@ commands:
   select_program_scene:
     summary: "Select the program scene (PGM1 in DUAL mode), 1-64 for 1-1 to 8-8 (set,97,46,0)"
     params:
-      scene: { type: int, min: 1, max: 64, required: true }
+      scene: { type: int, min: 1, max: 64, required: true, label: Scene, description: "Scene 1-64, standing for 1-1 to 8-8 (bank b, number n is (b-1)*8+n)." }
     send: "set,97,46,0,{scene:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -116,7 +118,7 @@ commands:
   select_preset_scene:
     summary: "Select the preset scene (PGM2 in DUAL mode), 1-64 for 1-1 to 8-8 (set,97,46,1)"
     params:
-      scene: { type: int, min: 1, max: 64, required: true }
+      scene: { type: int, min: 1, max: 64, required: true, label: Scene, description: "Scene 1-64, standing for 1-1 to 8-8 (bank b, number n is (b-1)*8+n)." }
     send: "set,97,46,1,{scene:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -136,8 +138,8 @@ commands:
   set_output_fade:
     summary: "Set [OUTPUT FADE] on or off for PGM (1; PGM1 in DUAL mode) or PGM2 in DUAL mode (2) (set,97,25)"
     params:
-      program: { type: int, min: 1, max: 2, required: true }
-      enabled: { type: bool, required: true }
+      program: { type: int, min: 1, max: 2, required: true, label: Program, description: "1 for PGM (PGM1 in DUAL mode), 2 for PGM2 in DUAL mode." }
+      enabled: { type: bool, required: true, label: Output fade, description: "On turns OUTPUT FADE on for that program output, off turns it off." }
     send: "set,97,25,{program:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -145,7 +147,7 @@ commands:
   set_dsk:
     summary: "Set the [DSK] button on or off (set,97,79,0)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: DSK, description: "On turns the DSK button on, off turns it off." }
     send: "set,97,79,0,{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -153,7 +155,7 @@ commands:
   set_logo:
     summary: "Set the [LOGO] button on or off (set,97,63,0)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Logo, description: "On turns the LOGO button on, off turns it off." }
     send: "set,97,63,0,{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -161,7 +163,7 @@ commands:
   set_transition_type:
     summary: "Switch between MIX (0) and WIPE (1) (set,97,48,0)"
     params:
-      type: { type: int, min: 0, max: 1, required: true }
+      type: { type: int, min: 0, max: 1, required: true, label: Transition type, description: "0 MIX, 1 WIPE." }
     send: "set,97,48,0,{type}"
     expect: { contains: "ack," }
     returns: ack
@@ -169,7 +171,7 @@ commands:
   set_wipe_pattern:
     summary: "Change the WIPE pattern, 1-4 (set,97,49,0)"
     params:
-      pattern: { type: int, min: 1, max: 4, required: true }
+      pattern: { type: int, min: 1, max: 4, required: true, label: Wipe pattern, description: "WIPE pattern 1-4, numbered from 1 as on the mixer." }
     send: "set,97,49,0,{pattern:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -177,7 +179,7 @@ commands:
   set_transition_time:
     summary: "Set the transition time, 0-20 tenths of a second (set,97,18,0)"
     params:
-      time: { type: int, min: 0, max: 20, required: true }
+      time: { type: int, min: 0, max: 20, required: true, label: Transition time, description: "Transition time in tenths of a second, 0 to 20 (2.0 s)." }
     send: "set,97,18,0,{time}"
     expect: { contains: "ack," }
     returns: ack
@@ -185,7 +187,7 @@ commands:
   set_auto_transition:
     summary: "Set the [AUTO TRANSITION] button on or off (set,97,19,0)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Auto transition, description: "On turns the AUTO TRANSITION button on, off turns it off." }
     send: "set,97,19,0,{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -193,8 +195,8 @@ commands:
   set_mic_level:
     summary: "Adjust a MIC channel volume, 0-127; MIC1-MIC6 (set,97,139)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,139,{channel:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -202,8 +204,8 @@ commands:
   set_mic_solo:
     summary: "Turn a MIC channel solo on or off; MIC1-MIC6 (set,97,138)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      enabled: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      enabled: { type: bool, required: true, label: Solo, description: "On solos it, off cancels the solo." }
     send: "set,97,138,{channel:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -211,8 +213,8 @@ commands:
   set_mic_mute:
     summary: "Turn a MIC channel mute on or off; MIC1-MIC6 (set,97,137)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      enabled: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      enabled: { type: bool, required: true, label: Mute, description: "On mutes it, off unmutes it." }
     send: "set,97,137,{channel:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -220,8 +222,8 @@ commands:
   set_mic_aux_send:
     summary: "Adjust a MIC channel AUX send level, 0-127; MIC1-MIC6 (set,97,144)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      level: { type: int, min: 0, max: 127, required: true, label: AUX send level, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,144,{channel:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -229,8 +231,8 @@ commands:
   set_mic_pan:
     summary: "Adjust a MIC channel pan, -50 (L) to 0 (C) to 50 (R); MIC1-MIC6 (set,97,140)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      pan: { type: int, min: -50, max: 50, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      pan: { type: int, min: -50, max: 50, required: true, label: Pan, description: "-50 is full left, 0 centre, 50 full right." }
     send: "set,97,140,{channel:-1},{pan}"
     expect: { contains: "ack," }
     returns: ack
@@ -238,8 +240,8 @@ commands:
   set_mic_reverb_send:
     summary: "Adjust a MIC channel reverb send level, 0-127; MIC1-MIC6 (set,97,141)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      level: { type: int, min: 0, max: 127, required: true, label: Reverb send level, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,141,{channel:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -247,8 +249,8 @@ commands:
   set_mic_usb_send:
     summary: "Turn a MIC channel USB send on or off; MIC1-MIC6 (set,97,143)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      enabled: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      enabled: { type: bool, required: true, label: USB send, description: "On sends it to USB, off stops the send." }
     send: "set,97,143,{channel:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -256,8 +258,8 @@ commands:
   set_mic_aux_post:
     summary: "Set a MIC channel AUX send PRE (false) or POST (true); MIC1-MIC6 (set,97,145)"
     params:
-      channel: { type: int, min: 1, max: 6, required: true }
-      post: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 6, required: true, label: Channel, description: "MIC channel 1-6, as MIC1 to MIC6 on the mixer." }
+      post: { type: bool, required: true, label: AUX post, description: "On takes the AUX send post-fader, off pre-fader." }
     send: "set,97,145,{channel:-1},{post:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -265,8 +267,8 @@ commands:
   set_line_level:
     summary: "Adjust a channel volume, 0-127; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,173)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,173,{channel:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -274,8 +276,8 @@ commands:
   set_line_solo:
     summary: "Turn a channel solo on or off; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,172)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      enabled: { type: bool, required: true, label: Solo, description: "On solos it, off cancels the solo." }
     send: "set,97,172,{channel:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -283,8 +285,8 @@ commands:
   set_line_mute:
     summary: "Turn a channel mute on or off; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,171)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      enabled: { type: bool, required: true, label: Mute, description: "On mutes it, off unmutes it." }
     send: "set,97,171,{channel:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -292,8 +294,8 @@ commands:
   set_line_aux_send:
     summary: "Adjust a channel AUX send level, 0-127; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,178)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      level: { type: int, min: 0, max: 127, required: true, label: AUX send level, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,178,{channel:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -301,8 +303,8 @@ commands:
   set_line_pan:
     summary: "Adjust a channel pan, -50 (L) to 0 (C) to 50 (R); channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,174)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      pan: { type: int, min: -50, max: 50, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      pan: { type: int, min: -50, max: 50, required: true, label: Pan, description: "-50 is full left, 0 centre, 50 full right." }
     send: "set,97,174,{channel:-1},{pan}"
     expect: { contains: "ack," }
     returns: ack
@@ -310,8 +312,8 @@ commands:
   set_line_reverb_send:
     summary: "Adjust a channel reverb send level, 0-127; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,175)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      level: { type: int, min: 0, max: 127, required: true, label: Reverb send level, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,175,{channel:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -319,8 +321,8 @@ commands:
   set_line_usb_send:
     summary: "Turn a channel USB send on or off; channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,177)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      enabled: { type: bool, required: true, label: USB send, description: "On sends it to USB, off stops the send." }
     send: "set,97,177,{channel:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -328,8 +330,8 @@ commands:
   set_line_aux_post:
     summary: "Set a channel AUX send PRE (false) or POST (true); channels 1 LINE1, 2 LINE2, 3 HDMI, 4 USB (set,97,179)"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      post: { type: bool, required: true }
+      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "1 LINE1, 2 LINE2, 3 HDMI, 4 USB." }
+      post: { type: bool, required: true, label: AUX post, description: "On takes the AUX send post-fader, off pre-fader." }
     send: "set,97,179,{channel:-1},{post:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -337,8 +339,8 @@ commands:
   set_output_level:
     summary: "Adjust an output volume, 0-127; outputs 1 MAIN, 2 AUX, 3 USB, 4 HDMI (set,97,182)"
     params:
-      output: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "1 MAIN, 2 AUX, 3 USB, 4 HDMI." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Level from 0 to 127; Roland gives no dB scale." }
     send: "set,97,182,{output:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -346,8 +348,8 @@ commands:
   set_output_solo:
     summary: "Turn an output solo on or off; outputs 1 MAIN, 2 AUX, 3 USB, 4 HDMI (set,97,181)"
     params:
-      output: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "1 MAIN, 2 AUX, 3 USB, 4 HDMI." }
+      enabled: { type: bool, required: true, label: Solo, description: "On solos it, off cancels the solo." }
     send: "set,97,181,{output:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -355,8 +357,8 @@ commands:
   set_output_mute:
     summary: "Turn an output mute on or off; outputs 1 MAIN, 2 AUX, 3 USB, 4 HDMI (set,97,180)"
     params:
-      output: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      output: { type: int, min: 1, max: 4, required: true, label: Output, description: "1 MAIN, 2 AUX, 3 USB, 4 HDMI." }
+      enabled: { type: bool, required: true, label: Mute, description: "On mutes it, off unmutes it." }
     send: "set,97,180,{output:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -364,7 +366,7 @@ commands:
   set_auto_mixing:
     summary: "Turn the auto mixing function on or off (set,97,265,0)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Auto mixing, description: "On turns the auto mixing function on, off turns it off." }
     send: "set,97,265,0,{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -372,7 +374,7 @@ commands:
   set_audio_follow_video:
     summary: "Audio follow video: 0 OFF, 1 VFA, 2 AFV (set,97,217,0)"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true, label: Mode, description: "0 OFF, 1 VFA (video follows audio), 2 AFV (audio follows video)." }
     send: "set,97,217,0,{mode}"
     expect: { contains: "ack," }
     returns: ack
@@ -380,7 +382,7 @@ commands:
   set_reverb:
     summary: "Adjust the reverb, 0-127 (set,97,216,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true, label: Reverb, description: "Reverb amount from 0 to 127; Roland gives no dB scale." }
     send: "set,97,216,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -388,10 +390,10 @@ commands:
   set_parameter:
     summary: "Set any parameter by category, ID and sub-ID (set)"
     params:
-      category: { type: int, min: 0, max: 999, required: true }
-      id: { type: int, min: 0, max: 999, required: true }
-      sub_id: { type: int, min: 0, max: 999, required: true }
-      value: { type: int, min: -9999, max: 9999, required: true }
+      category: { type: int, min: 0, max: 999, required: true, label: Category, description: "Parameter category number as in the mixer's set and get commands; Roland publishes no table." }
+      id: { type: int, min: 0, max: 999, required: true, label: ID, description: "Parameter ID within the category; Roland publishes no table." }
+      sub_id: { type: int, min: 0, max: 999, required: true, label: Sub-ID, description: "Parameter sub-ID within the ID; Roland publishes no table." }
+      value: { type: int, min: -9999, max: 9999, required: true, label: Value, description: "The raw value as the mixer takes it for this parameter." }
     send: "set,{category},{id},{sub_id},{value}"
     expect: { contains: "ack," }
     returns: ack
@@ -399,9 +401,9 @@ commands:
   get_parameter:
     summary: "Read any parameter by category, ID and sub-ID; the value arrives as a set line (get)"
     params:
-      category: { type: int, min: 0, max: 999, required: true }
-      id: { type: int, min: 0, max: 999, required: true }
-      sub_id: { type: int, min: 0, max: 999, required: true }
+      category: { type: int, min: 0, max: 999, required: true, label: Category, description: "Parameter category number as in the mixer's set and get commands; Roland publishes no table." }
+      id: { type: int, min: 0, max: 999, required: true, label: ID, description: "Parameter ID within the category; Roland publishes no table." }
+      sub_id: { type: int, min: 0, max: 999, required: true, label: Sub-ID, description: "Parameter sub-ID within the ID; Roland publishes no table." }
     send: "get,{category},{id},{sub_id}"
     expect: { contains: "ack," }
     returns: ack

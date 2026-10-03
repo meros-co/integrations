@@ -75,20 +75,20 @@ source:
 settings:
   # The matrix and how many of its levels (1..levels) are read on connecting: tally dump, protects and
   # names. Commands may address any matrix and level.
-  matrix: { type: int, min: 1, max: 256, default: 1 }
-  levels: { type: int, min: 1, max: 256, default: 1 }
+  matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "The matrix whose routing, protects and names are read on connecting, numbered from 1; commands may still address any matrix." }
+  levels: { type: int, min: 1, max: 256, default: 1, label: Levels, description: "How many levels of that matrix, from level 1, are read on connecting." }
   # auto: the general (normal) commands, and the extended ones when a number is above 1023 or a matrix or
   # level above 16, as Issue 30 §3.3 has the controller choose. extended: always the extended commands where
   # one exists (routers that answer only those, see quirks). general: never the extended commands.
-  command_set: { type: enum, values: [auto, general, extended], default: auto }
+  command_set: { type: enum, values: [auto, general, extended], default: auto, label: Command set, description: "auto uses the extended commands only for numbers above 1023 or matrices and levels above 16; extended always uses them where they exist; general never does." }
   # Characters per name asked for in name requests: 4, 8 or 12 (§3.1.18).
-  name_length: { type: enum, values: ["4", "8", "12"], default: "8" }
+  name_length: { type: enum, values: ["4", "8", "12"], default: "8", label: Name length, description: "Characters per name asked for in name requests: 4, 8 or 12." }
   # Read source and destination names on connecting and when the controller says names changed.
-  read_names: { type: bool, default: true }
+  read_names: { type: bool, default: true, label: Read names, description: "On reads source and destination names on connecting and when the controller says names changed." }
   # Read the protect table on connecting.
-  read_protects: { type: bool, default: true }
+  read_protects: { type: bool, default: true, label: Read protects, description: "On reads the protect table on connecting." }
   # The device number this client protects destinations as (§3.1.7).
-  protect_device: { type: int, min: 0, max: 1023, default: 0 }
+  protect_device: { type: int, min: 0, max: 1023, default: 0, label: Protect device, description: "The device number this client protects destinations as; choose one the controller's configuration leaves free." }
 
 ports:
   - { port: 2008, protocol: tcp, role: control, note: "SW-P-08 over IP has no fixed port: 2008 is a common choice" }
@@ -194,160 +194,160 @@ commands:
   connect:
     summary: "Route a source to a destination on one matrix and level (CROSSPOINT CONNECT 02, or extended 130); succeeds when the controller reports the route made (CONNECTED 04 / 132)"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
-      source: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
+      source: { type: int, min: 1, max: 65536, required: true, label: Source, description: "Source number, numbered from 1 as on the router's panels (wire 0 is source 1)." }
     returns: ack
   interrogate:
     summary: "Read which source is routed to a destination (CROSSPOINT INTERROGATE 01 / extended 129, answered by TALLY 03 / 131); returns the source number"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
     returns: value
   get_tally_dump:
     summary: "Ask for the whole routing table of a matrix and level (CROSSPOINT TALLY DUMP REQUEST 21 / extended 149); the dump messages that follow update state"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
     returns: ack
   protect:
     summary: "Protect a destination as this client's device (setting protect_device) (PROTECT CONNECT 12 / extended 140); succeeds when PROTECT CONNECTED reports it protected by that device"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
     returns: ack
   master_protect:
     summary: "Protect a destination as this client's device, taking over any protect a panel holds, as a master panel can (MASTER PROTECT CONNECT 29)"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
     returns: ack
   unprotect:
     summary: "Remove this client's protect from a destination (PROTECT DIS-CONNECT 14 / extended 142); succeeds when PROTECT DIS-CONNECTED reports it unprotected"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
     returns: ack
   get_protect:
     summary: "Read a destination's protect (PROTECT INTERROGATE 10 / extended 138); returns {state, device}, state none, panel, panel_override or remote"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
     returns: value
   get_protect_dump:
     summary: "Ask for the protect table of a matrix and level (PROTECT TALLY DUMP REQUEST 19 / extended 147); the dump messages that follow update state"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
     returns: ack
   get_protect_device_name:
     summary: "Read the name of the device (panel) a protect belongs to (PROTECT DEVICE NAME REQUEST 17, answered by 18 with 8 characters)"
     params:
-      device: { type: int, min: 0, max: 1023, required: true }
+      device: { type: int, min: 0, max: 1023, required: true, label: Device, description: "Device number the protect belongs to, as get_protect reports it." }
     returns: value
   get_source_names:
     summary: "Ask for every source name of a matrix and level at the name_length setting (ALL SOURCE NAMES REQUEST 100 / extended 228); the responses update state"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
     returns: ack
   get_source_name:
     summary: "Read one source's name (SINGLE SOURCE NAME REQUEST 101 / extended 229)"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      source: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      source: { type: int, min: 1, max: 65536, required: true, label: Source, description: "Source number, numbered from 1 as on the router's panels (wire 0 is source 1)." }
     returns: value
   get_destination_names:
     summary: "Ask for every destination (destination association) name of a matrix (ALL DESTINATIONS ASSOCIATION NAMES REQUEST 102 / extended 230); the responses update state"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
     returns: ack
   get_destination_name:
     summary: "Read one destination (destination association) name (SINGLE DESTINATION ASSOCIATION NAMES REQUEST 103 / extended 231)"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination (destination association) number, numbered from 1." }
     returns: value
   get_source_association_names:
     summary: "Ask for every source association name of a matrix (ALL SOURCE ASSOCIATION NAMES REQUEST 114); the responses update state"
     params:
-      matrix: { type: int, min: 1, max: 16, default: 1 }
+      matrix: { type: int, min: 1, max: 16, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
     returns: ack
   get_source_association_name:
     summary: "Read one source association name (SINGLE SOURCE ASSOCIATION NAME REQUEST 115)"
     params:
-      matrix: { type: int, min: 1, max: 16, default: 1 }
-      source_association: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 16, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      source_association: { type: int, min: 1, max: 65536, required: true, label: Source association, description: "Source association number, numbered from 1." }
     returns: value
   get_umd_labels:
     summary: "Ask for every alternative UMD label of a matrix's sources (ALL UMD LABELS REQUEST 104 / extended 232); the responses update state"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      length: { type: enum, values: ["4", "8", "12", "16"], default: "8" }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      length: { type: enum, values: ["4", "8", "12", "16"], default: "8", label: Label length, description: "Characters per UMD label: 4, 8, 12 or 16." }
     returns: ack
   get_umd_label:
     summary: "Read one source's alternative UMD label (SINGLE UMD LABEL REQUEST 105 / extended 233)"
     params:
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      source: { type: int, min: 1, max: 65536, required: true }
-      length: { type: enum, values: ["4", "8", "12", "16"], default: "8" }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      source: { type: int, min: 1, max: 65536, required: true, label: Source, description: "Source number, numbered from 1 as on the router's panels (wire 0 is source 1)." }
+      length: { type: enum, values: ["4", "8", "12", "16"], default: "8", label: Label length, description: "Characters per UMD label: 4, 8, 12 or 16." }
     returns: value
   update_name:
     summary: "Change a name in the controller's database (UPDATE NAME REQUEST 117), padded with spaces to the given length; the controller sends no reply"
     params:
-      kind: { type: enum, values: [source, source_association, destination_association, umd_label], required: true }
-      matrix: { type: int, min: 1, max: 20, default: 1 }
-      level: { type: int, min: 1, max: 16, default: 1 }
-      number: { type: int, min: 1, max: 65536, required: true }
-      length: { type: enum, values: ["4", "8", "12", "16"], default: "8" }
-      name: { type: string, max_length: 16, pattern: "^[ -~]*$", required: true }
+      kind: { type: enum, values: [source, source_association, destination_association, umd_label], required: true, label: Name type, description: "Which name to change: a source, a source association, a destination association or a UMD label." }
+      matrix: { type: int, min: 1, max: 20, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 16, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      number: { type: int, min: 1, max: 65536, required: true, label: Number, description: "Number of the source, association or label to rename, numbered from 1." }
+      length: { type: enum, values: ["4", "8", "12", "16"], default: "8", label: Name length, description: "Characters the name is padded to: 4, 8, 12 or 16." }
+      name: { type: string, max_length: 16, pattern: "^[ -~]*$", required: true, label: Name, description: "The new name in printable ASCII, padded with spaces to the length." }
     returns: none
   salvo_add:
     summary: "Store a route in a group salvo to be made on salvo_fire (CROSSPOINT CONNECT ON GO GROUP SALVO 120 / extended 248, acknowledged by 122 / 250)"
     params:
-      salvo: { type: int, min: 1, max: 128, required: true }
-      matrix: { type: int, min: 1, max: 256, default: 1 }
-      level: { type: int, min: 1, max: 256, default: 1 }
-      destination: { type: int, min: 1, max: 65536, required: true }
-      source: { type: int, min: 1, max: 65536, required: true }
+      salvo: { type: int, min: 1, max: 128, required: true, label: Salvo, description: "Group salvo number, numbered from 1." }
+      matrix: { type: int, min: 1, max: 256, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      level: { type: int, min: 1, max: 256, default: 1, label: Level, description: "Level number within the matrix, numbered from 1 (wire level 0 is level 1)." }
+      destination: { type: int, min: 1, max: 65536, required: true, label: Destination, description: "Destination number, numbered from 1 as on the router's panels (wire 0 is destination 1)." }
+      source: { type: int, min: 1, max: 65536, required: true, label: Source, description: "Source number, numbered from 1 as on the router's panels (wire 0 is source 1)." }
     returns: ack
   salvo_fire:
     summary: "Make every route stored in a group salvo (CROSSPOINT GO GROUP SALVO 121 with 00); fails when the salvo holds nothing (GO DONE 123 status 02)"
     params:
-      salvo: { type: int, min: 1, max: 128, required: true }
+      salvo: { type: int, min: 1, max: 128, required: true, label: Salvo, description: "Group salvo number, numbered from 1." }
     returns: ack
   salvo_clear:
     summary: "Discard the routes stored in a group salvo without making them (CROSSPOINT GO GROUP SALVO 121 with 01)"
     params:
-      salvo: { type: int, min: 1, max: 128, required: true }
+      salvo: { type: int, min: 1, max: 128, required: true, label: Salvo, description: "Group salvo number, numbered from 1." }
     returns: ack
   get_salvo:
     summary: "Read every route stored in a group salvo, index by index (CROSSPOINT GROUP SALVO INTERROGATE 124 / extended 252); returns [{matrix, level, destination, source}]"
     params:
-      salvo: { type: int, min: 1, max: 128, required: true }
+      salvo: { type: int, min: 1, max: 128, required: true, label: Salvo, description: "Group salvo number, numbered from 1." }
     returns: value
   connect_tie_line:
     summary: "Make a multi-stage route from a source association to a destination association on the levels given as bitmaps, bit 0 = level 1 (CROSSPOINT TIE-LINE CONNECT 111); the controller sends no reply"
     params:
-      destination_matrix: { type: int, min: 1, max: 20, default: 1 }
-      destination_association: { type: int, min: 1, max: 65536, required: true }
-      destination_levels: { type: int, min: 1, max: 65535, required: true }
-      source_matrix: { type: int, min: 1, max: 20, default: 1 }
-      source_association: { type: int, min: 1, max: 65536, required: true }
-      source_levels: { type: int, min: 1, max: 65535, required: true }
+      destination_matrix: { type: int, min: 1, max: 20, default: 1, label: Destination matrix, description: "Matrix of the destination association, numbered from 1." }
+      destination_association: { type: int, min: 1, max: 65536, required: true, label: Destination association, description: "Destination association number, numbered from 1." }
+      destination_levels: { type: int, min: 1, max: 65535, required: true, label: Destination levels, description: "Levels to route on the destination side, as a bitmap: bit 0 is level 1, so 3 is levels 1 and 2." }
+      source_matrix: { type: int, min: 1, max: 20, default: 1, label: Source matrix, description: "Matrix of the source association, numbered from 1." }
+      source_association: { type: int, min: 1, max: 65536, required: true, label: Source association, description: "Source association number, numbered from 1." }
+      source_levels: { type: int, min: 1, max: 65535, required: true, label: Source levels, description: "Levels to route from on the source side, as a bitmap: bit 0 is level 1, so 3 is levels 1 and 2." }
     returns: none
   get_tie_line:
     summary: "Read the sources routed to every level of a destination association (CROSSPOINT TIE-LINE INTERROGATE 112, answered by 113); returns [{matrix, level, source}]"
     params:
-      matrix: { type: int, min: 1, max: 20, default: 1 }
-      destination_association: { type: int, min: 1, max: 65536, required: true }
+      matrix: { type: int, min: 1, max: 20, default: 1, label: Matrix, description: "Matrix number, numbered from 1 (wire matrix 0 is matrix 1)." }
+      destination_association: { type: int, min: 1, max: 65536, required: true, label: Destination association, description: "Destination association number, numbered from 1." }
     returns: value
   get_controller_status:
     summary: "Read which card of a dual controller is active and whether the idle one is healthy (DUAL CONTROLLER STATUS REQUEST 08, answered by 09); returns {active_card, active, idle_ok}"
@@ -358,14 +358,14 @@ commands:
   clear_protects:
     summary: "Clear every protect on a level, on every level of a matrix, or everywhere, whoever set it (MAINTENANCE 07, clear protects)"
     params:
-      scope: { type: enum, values: [level, matrix, all], default: level }
-      matrix: { type: int, min: 1, max: 20, default: 1 }
-      level: { type: int, min: 1, max: 16, default: 1 }
+      scope: { type: enum, values: [level, matrix, all], default: level, label: Scope, description: "level clears one level, matrix every level of the matrix, all every protect on the router." }
+      matrix: { type: int, min: 1, max: 20, default: 1, label: Matrix, description: "Matrix to clear, numbered from 1; ignored when the scope is all." }
+      level: { type: int, min: 1, max: 16, default: 1, label: Level, description: "Level to clear, numbered from 1; used only when the scope is level." }
     returns: ack
   reset:
     summary: "Restart the controller: soft (software restart) or hard (as at power-on) (MAINTENANCE 07)"
     params:
-      kind: { type: enum, values: [soft, hard], required: true }
+      kind: { type: enum, values: [soft, hard], required: true, label: Restart type, description: "soft restarts the controller's software; hard restarts it as at power-on." }
     returns: ack
   refresh:
     summary: "Read the routing, protects and names of the configured matrix and levels again"
