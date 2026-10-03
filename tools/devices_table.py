@@ -42,6 +42,7 @@ NATIVE = {
     "generic-tcp-udp": "Text or bytes over TCP or UDP",
     "http-snapshot": "HTTP JPEG snapshots",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
+    "obsidian-onyx": "Telnet over TCP 2323",
     "pjlink": "PJLink over TCP 4352",
     "qsys": "QRC JSON-RPC over TCP 1710",
     "sennheiser-digital-6000": "SSC over UDP 45",

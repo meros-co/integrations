@@ -154,6 +154,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:246](specs/analogway-picturall.yaml#L246))
 - [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:251](specs/analogway-picturall.yaml#L251))
 
+## avolites-titan — Avolites Titan
+
+- [ ] Check the status code and body Titan returns for an invalid request (unknown handle, bad parameter), since any 200 counts as success here. ([specs/avolites-titan.yaml:1353](specs/avolites-titan.yaml#L1353))
+- [ ] Confirm the handle record field names on Titan 19 (Active or active, Legend or legend, userNumber.hashCode) and that `active` reflects a running playback. ([specs/avolites-titan.yaml:1377](specs/avolites-titan.yaml#L1377))
+- [ ] Confirm that times sent with two decimals (fadeTime=5.00) and levels with three (level_level=1.000) are accepted like the documentation's whole numbers. ([specs/avolites-titan.yaml:1385](specs/avolites-titan.yaml#L1385))
+- [ ] Check the grand master value range (0-100 as sent here, or 0-1). ([specs/avolites-titan.yaml:1387](specs/avolites-titan.yaml#L1387))
+- [ ] Check that an empty panelTimeStamp works for tap tempo and an empty oldValue for the grand master. ([specs/avolites-titan.yaml:1395](specs/avolites-titan.yaml#L1395))
+- [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1345](specs/avolites-titan.yaml#L1345))
+- [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1369](specs/avolites-titan.yaml#L1369))
+- [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1210](specs/avolites-titan.yaml#L1210))
+
 ## barco-eventmaster — Barco Event Master
 
 - [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1257](specs/barco-eventmaster.yaml#L1257))
@@ -313,6 +324,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm macro text arrives on /eos/out/get/macro/<n>/text/list/... ([specs/etc-eos.yaml:4807](specs/etc-eos.yaml#L4807))
 - [ ] Confirm the console uses the default /eos cue OSC strings, or note the configured ones. ([specs/etc-eos.yaml:4801](specs/etc-eos.yaml#L4801))
 
+## etc-paradigm — ETC Paradigm (PSAP)
+
+- [ ] Check whether action commands get any reply over UDP (they report unverified here). ([specs/etc-paradigm.yaml:1017](specs/etc-paradigm.yaml#L1017))
+- [ ] Check whether a fade time without a space name works: the guide's example "grp int:128 Group 1, 3" contradicts its rule that a fade time needs a space name. ([specs/etc-paradigm.yaml:1032](specs/etc-paradigm.yaml#L1032))
+- [ ] Confirm that a get reply always includes the space name and levels as 0-255, and record the reply to a get for an unknown name. ([specs/etc-paradigm.yaml:1025](specs/etc-paradigm.yaml#L1025))
+- [ ] Check where PSAP trigger output is sent (the destination set in LightDesigner) and that it reaches feedback_port. ([specs/etc-paradigm.yaml:1018](specs/etc-paradigm.yaml#L1018))
+- [ ] Confirm that fade times with one decimal (2.5) and the sequence rate with two (1.50) are accepted. ([specs/etc-paradigm.yaml:732](specs/etc-paradigm.yaml#L732))
+
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))
@@ -346,6 +365,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether select_list_row counts rows from 1 or 0. ([specs/h2r-graphics.yaml:401](specs/h2r-graphics.yaml#L401))
 - [ ] On version 2, check how an older version answers commands it predates. ([specs/h2r-graphics.yaml:383](specs/h2r-graphics.yaml#L383))
 
+## highend-hog4 — High End Systems Hog 4 / Hog OS
+
+- [ ] Confirm that playback commands take the object number as the argument (/hog/playback/go/0 with 15), as the manual says, and not in the address as the Companion module sends it. ([specs/highend-hog4.yaml:507](specs/highend-hog4.yaml#L507))
+- [ ] Check how goto_cue's float list.cue is read (15.2 sent as 15.19999981; cue 2 versus 20; point cues). ([specs/highend-hog4.yaml:516](specs/highend-hog4.yaml#L516))
+- [ ] Record the argument types of the status outputs (LED value, LED colour, command line, encoder and H-key labels, chat lines). ([specs/highend-hog4.yaml:497](specs/highend-hog4.yaml#L497))
+- [ ] Find the address the console uses for fader level status after consolefaderrefresh. ([specs/highend-hog4.yaml:491](specs/highend-hog4.yaml#L491))
+- [ ] Check the real ranges of H keys, U keys, encoder wheels and the trackball values per model. ([specs/highend-hog4.yaml:524](specs/highend-hog4.yaml#L524))
+- [ ] Check which keys of the Hog OS 5 table work on Hog 4 OS 3.x and 4.x. ([specs/highend-hog4.yaml:534](specs/highend-hog4.yaml#L534))
+- [ ] Confirm that refreshall makes the console send every status, and whether repeating it every 60 s is noticeable on the console. ([specs/highend-hog4.yaml:489](specs/highend-hog4.yaml#L489))
+- [ ] Check whether the HPU acts on front panel keys, encoders and faders sent over OSC. ([specs/highend-hog4.yaml:556](specs/highend-hog4.yaml#L556))
+
 ## kramer-p3000 — Kramer Protocol 3000
 
 - [ ] Check whether ROUTE with source 0 disconnects, as the legacy commands do. ([specs/kramer-p3000.yaml:1135](specs/kramer-p3000.yaml#L1135))
@@ -359,6 +389,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:269](specs/newtek-tricaster.yaml#L269))
 - [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:262](specs/newtek-tricaster.yaml#L262))
+
+## obsidian-onyx — Obsidian ONYX (Telnet)
+
+- [ ] Record ONYX's own Telnet server's replies (banner, success, error) for GQL, SQL and an unknown command, which Obsidian does not document. ([specs/obsidian-onyx.yaml:296](specs/obsidian-onyx.yaml#L296))
+- [ ] Check which ONYX Manager queries ONYX's own server answers (QLList, QLActive, IsMxRun, WhoIAm) and its default port. ([specs/obsidian-onyx.yaml:305](specs/obsidian-onyx.yaml#L305))
+- [ ] Check whether action commands (GQL, RQL) reply with "200 Ok" then ".", or something else, and whether 300 ms is enough to wait for a ".". ([specs/obsidian-onyx.yaml:299](specs/obsidian-onyx.yaml#L299))
+- [ ] Check whether QLActive lines have the same form as QLList lines on ONYX Manager 4.x. ([specs/obsidian-onyx.yaml:304](specs/obsidian-onyx.yaml#L304))
+- [ ] Check whether QLName answers on current versions. ([specs/obsidian-onyx.yaml:322](specs/obsidian-onyx.yaml#L322))
+
+## obsidian-onyx-osc — Obsidian ONYX (OSC)
+
+- [ ] Find ONYX's default OSC ports (the port ONYX listens on and the device's incoming port). ([specs/obsidian-onyx-osc.yaml:1027](specs/obsidian-onyx-osc.yaml#L1027))
+- [ ] Confirm that PF GROUP 2 is /Mx/button/5702 (the mapping prints 5701 twice). ([specs/obsidian-onyx-osc.yaml:1057](specs/obsidian-onyx-osc.yaml#L1057))
+- [ ] Record the OSC types ONYX sends for LED colour, blink and fader updates. ([specs/obsidian-onyx-osc.yaml:1066](specs/obsidian-onyx-osc.yaml#L1066))
+- [ ] Check whether playback page actions need a release (0) after the key down. ([specs/obsidian-onyx-osc.yaml:1050](specs/obsidian-onyx-osc.yaml#L1050))
+- [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
+- [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
 
 ## panasonic-ptz — Panasonic PTZ
 
