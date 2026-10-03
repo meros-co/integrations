@@ -72,7 +72,7 @@ commands:
   recall_basic_preset:
     summary: "Recall a basic preset at its default 60-frame duration (BPR)"
     params:
-      preset: { type: int, min: 0, required: true }
+      preset: { type: int, min: 0, required: true, label: Preset, description: "Basic preset ID as shown in Spyder." }
     send: "spyder\0\0\0\0BPR {preset}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -80,8 +80,8 @@ commands:
   recall_basic_preset_duration:
     summary: "Recall a basic preset over this duration in frames (BPR)"
     params:
-      preset: { type: int, min: 0, required: true }
-      duration: { type: int, min: 0, required: true }
+      preset: { type: int, min: 0, required: true, label: Preset, description: "Basic preset ID as shown in Spyder." }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames." }
     send: "spyder\0\0\0\0BPR {preset} {duration}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -89,7 +89,7 @@ commands:
   learn_basic_preset:
     summary: "Store the current screen layout as this basic preset (BPL)"
     params:
-      preset: { type: int, min: 0, required: true }
+      preset: { type: int, min: 0, required: true, label: Preset, description: "Basic preset ID as shown in Spyder." }
     send: "spyder\0\0\0\0BPL {preset}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -97,8 +97,8 @@ commands:
   learn_basic_preset_duration:
     summary: "Store the current layout as this basic preset with a recall duration in frames (BPL)"
     params:
-      preset: { type: int, min: 0, required: true }
-      duration: { type: int, min: 0, required: true }
+      preset: { type: int, min: 0, required: true, label: Preset, description: "Basic preset ID as shown in Spyder." }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames." }
     send: "spyder\0\0\0\0BPL {preset} {duration}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -106,8 +106,8 @@ commands:
   recall_script_cue:
     summary: "Recall a script (command key) at a cue, by script ID (RSC)"
     params:
-      script: { type: int, min: 0, required: true }
-      cue: { type: int, min: 0, required: true }
+      script: { type: int, min: 0, required: true, label: Script, description: "Script ID of the command key; unlike a register ID it does not change when the list is reordered." }
+      cue: { type: int, min: 0, required: true, label: Cue, description: "Cue number within the script." }
     send: "spyder\0\0\0\0RSC {script} {cue} S"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -115,8 +115,8 @@ commands:
   recall_register_cue:
     summary: "Recall the command key in a register at a cue; registers on page n are n*1000 + register (RSC ... R)"
     params:
-      register: { type: int, min: 0, required: true }
-      cue: { type: int, min: 0, required: true }
+      register: { type: int, min: 0, required: true, label: Register, description: "Register ID; registers on page n are n*1000 + register, so register 2 on page 3 is 3002." }
+      cue: { type: int, min: 0, required: true, label: Cue, description: "Cue number within the script." }
     send: "spyder\0\0\0\0RSC {register} {cue} R"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -124,7 +124,7 @@ commands:
   function_key_recall:
     summary: "Recall a function key by its ID (FKR)"
     params:
-      key: { type: int, min: 0, required: true }
+      key: { type: int, min: 0, required: true, label: Function key, description: "Function key ID." }
     send: "spyder\0\0\0\0FKR {key}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -132,8 +132,8 @@ commands:
   function_key_recall_layers:
     summary: "Recall a relative function key onto these layers (FKR)"
     params:
-      key: { type: int, min: 0, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      key: { type: int, min: 0, required: true, label: Function key, description: "Function key ID." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0FKR {key} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -141,7 +141,7 @@ commands:
   function_key_recall_register:
     summary: "Recall the function key in a register (FKR ... R)"
     params:
-      register: { type: int, min: 0, required: true }
+      register: { type: int, min: 0, required: true, label: Register, description: "Register ID; registers on page n are n*1000 + register, so register 2 on page 3 is 3002." }
     send: "spyder\0\0\0\0FKR {register} R"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -149,11 +149,11 @@ commands:
   learn_command_key:
     summary: "Learn a command key from the current layers into a register (LCK); answers the command key and script IDs"
     params:
-      relative: { type: bool, default: false }
-      name: { type: string, max_length: 128, required: true }
-      register: { type: int, min: 0, required: true }
-      learn_from: { type: int, min: 1, max: 3, default: 3 }
-      as_mixers: { type: bool, default: false }
+      relative: { type: bool, default: false, label: Relative, description: "On adjusts the current values by these amounts, off sets them absolutely." }
+      name: { type: string, max_length: 128, required: true, label: Name, description: "Name to give the command key." }
+      register: { type: int, min: 0, required: true, label: Register, description: "Register ID; registers on page n are n*1000 + register, so register 2 on page 3 is 3002." }
+      learn_from: { type: int, min: 1, max: 3, default: 3, label: Learn from, description: "The LCK learn-from argument, 1 to 3, as the Spyder manual defines it; 3 by default." }
+      as_mixers: { type: bool, default: false, label: As mixers, description: "On learns the layers as mixers, off as plain layers." }
     send: "spyder\0\0\0\0LCK {relative:bool01} {name:url} {register} {learn_from} {as_mixers:bool01}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -161,7 +161,7 @@ commands:
   delete_command_key:
     summary: "Delete a command key by script ID (DCK)"
     params:
-      script: { type: int, min: 0, required: true }
+      script: { type: int, min: 0, required: true, label: Script, description: "Script ID of the command key; unlike a register ID it does not change when the list is reordered." }
     send: "spyder\0\0\0\0DCK {script} S"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -169,7 +169,7 @@ commands:
   delete_command_key_register:
     summary: "Delete the command key in a register (DCK ... R)"
     params:
-      register: { type: int, min: 0, required: true }
+      register: { type: int, min: 0, required: true, label: Register, description: "Register ID; registers on page n are n*1000 + register, so register 2 on page 3 is 3002." }
     send: "spyder\0\0\0\0DCK {register} R"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -177,9 +177,9 @@ commands:
   apply_register:
     summary: "Apply a register to layers: type 0 effect, 1 playitem, 4 command key, 5 treatment, 6 source, 7 function key, 10 still (ARL)"
     params:
-      type: { type: int, min: 0, max: 10, required: true }
-      register: { type: int, min: 0, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      type: { type: int, min: 0, max: 10, required: true, label: Register type, description: "0 effect, 1 playitem, 4 command key, 5 treatment, 6 source, 7 function key, 10 still." }
+      register: { type: int, min: 0, required: true, label: Register, description: "Register ID; registers on page n are n*1000 + register, so register 2 on page 3 is 3002." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0ARL {type} {register} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -187,9 +187,9 @@ commands:
   transition_layers:
     summary: "Mix layers on (true) or off their PixelSpace over a duration in frames (TRN)"
     params:
-      mix_on: { type: bool, default: true }
-      duration: { type: int, min: 0, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      mix_on: { type: bool, default: true, label: Mix on, description: "On mixes the layers on to their PixelSpace, off mixes them off." }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0TRN {mix_on:bool01} {duration} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -197,8 +197,8 @@ commands:
   freeze_layers:
     summary: "Freeze or unfreeze layers (FRZ)"
     params:
-      frozen: { type: bool, default: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      frozen: { type: bool, default: true, label: Frozen, description: "On freezes the layers, off unfreezes them." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0FRZ {frozen:bool01} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -206,8 +206,8 @@ commands:
   source_apply:
     summary: "Apply a source (input configuration plus router input) to layers by name (SRA)"
     params:
-      source: { type: string, max_length: 128, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      source: { type: string, max_length: 128, required: true, label: Source, description: "Source name as defined in Spyder." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0SRA {source:url} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -215,9 +215,9 @@ commands:
   layer_assign_pixelspace:
     summary: "Assign layers to a PixelSpace, optionally making them visible (LAP)"
     params:
-      pixelspace: { type: int, min: 0, required: true }
-      visible: { type: bool, default: false }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      pixelspace: { type: int, min: 0, required: true, label: PixelSpace, description: "PixelSpace ID as shown in Spyder." }
+      visible: { type: bool, default: false, label: Visible, description: "On makes the layers visible on the PixelSpace, off leaves them hidden." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0LAP {pixelspace} {visible:bool01} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -225,8 +225,8 @@ commands:
   layer_size:
     summary: "Set layers' horizontal size in pixels; height follows the aspect ratio (KSZ)"
     params:
-      width: { type: int, min: 1, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      width: { type: int, min: 1, required: true, label: Width, description: "Horizontal size in pixels; the height follows the aspect ratio." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0KSZ {width} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -234,10 +234,10 @@ commands:
   layer_position:
     summary: "Set layers' position in pixels, absolute or relative (KPS)"
     params:
-      relative: { type: bool, default: false }
-      x: { type: int, required: true }
-      y: { type: int, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      relative: { type: bool, default: false, label: Relative, description: "On adjusts the current values by these amounts, off sets them absolutely." }
+      x: { type: int, required: true, label: X, description: "Horizontal position in pixels." }
+      y: { type: int, required: true, label: Y, description: "Vertical position in pixels." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0KPS {relative:bool01} {x} {y} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -245,11 +245,11 @@ commands:
   layer_size_position:
     summary: "Set layers' position and horizontal size together (LSP)"
     params:
-      relative: { type: bool, default: false }
-      x: { type: int, required: true }
-      y: { type: int, required: true }
-      width: { type: int, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      relative: { type: bool, default: false, label: Relative, description: "On adjusts the current values by these amounts, off sets them absolutely." }
+      x: { type: int, required: true, label: X, description: "Horizontal position in pixels." }
+      y: { type: int, required: true, label: Y, description: "Vertical position in pixels." }
+      width: { type: int, required: true, label: Width, description: "Horizontal size in pixels; the height follows the aspect ratio." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0LSP {relative:bool01} {x} {y} {width} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -257,11 +257,11 @@ commands:
   layer_crop:
     summary: "Crop layers' left, right, top and bottom, each 0.0 to 1.0 (CRP)"
     params:
-      left: { type: float, min: 0, max: 1, required: true }
-      right: { type: float, min: 0, max: 1, required: true }
-      top: { type: float, min: 0, max: 1, required: true }
-      bottom: { type: float, min: 0, max: 1, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      left: { type: float, min: 0, max: 1, required: true, label: Left crop, description: "Fraction cropped from the left, 0.0 (none) to 1.0." }
+      right: { type: float, min: 0, max: 1, required: true, label: Right crop, description: "Fraction cropped from the right, 0.0 (none) to 1.0." }
+      top: { type: float, min: 0, max: 1, required: true, label: Top crop, description: "Fraction cropped from the top, 0.0 (none) to 1.0." }
+      bottom: { type: float, min: 0, max: 1, required: true, label: Bottom crop, description: "Fraction cropped from the bottom, 0.0 (none) to 1.0." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0CRP {left:.3f} {right:.3f} {top:.3f} {bottom:.3f} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -269,9 +269,9 @@ commands:
   layer_aspect_ratio:
     summary: "Aspect ratio: t sets the total, o sets the keyframe offset, a adjusts the offset (ARO)"
     params:
-      type: { type: enum, values: [t, o, a], required: true }
-      ratio: { type: float, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      type: { type: enum, values: [t, o, a], required: true, label: Adjustment, description: "t sets the total aspect ratio, o sets the keyframe offset, a adjusts the offset." }
+      ratio: { type: float, required: true, label: Aspect ratio, description: "Aspect ratio, or offset for o and a, as width divided by height." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0ARO {type} {ratio:.3f} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -279,8 +279,8 @@ commands:
   layer_border:
     summary: "Set a layer's border thickness, -255 to 255, negative for outside softness (KBD)"
     params:
-      layer: { type: int, min: 2, required: true }
-      thickness: { type: int, min: -255, max: 255, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
+      thickness: { type: int, min: -255, max: 255, required: true, label: Border thickness, description: "Border thickness, 0 to 255; negative values give outside softness instead." }
     send: "spyder\0\0\0\0KBD {layer} {thickness}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -288,14 +288,14 @@ commands:
   layer_border_full:
     summary: "Set a layer's border thickness, colour, bevel offsets and inside softness (KBD)"
     params:
-      layer: { type: int, min: 2, required: true }
-      thickness: { type: int, min: -255, max: 255, required: true }
-      red: { type: int, min: 0, max: 255, required: true }
-      green: { type: int, min: 0, max: 255, required: true }
-      blue: { type: int, min: 0, max: 255, required: true }
-      h_bevel: { type: int, min: 0, max: 255, required: true }
-      v_bevel: { type: int, min: 0, max: 255, required: true }
-      inside_softness: { type: int, min: 0, max: 255, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
+      thickness: { type: int, min: -255, max: 255, required: true, label: Border thickness, description: "Border thickness, 0 to 255; negative values give outside softness instead." }
+      red: { type: int, min: 0, max: 255, required: true, label: Border red, description: "Red of the border colour, 0 to 255." }
+      green: { type: int, min: 0, max: 255, required: true, label: Border green, description: "Green of the border colour, 0 to 255." }
+      blue: { type: int, min: 0, max: 255, required: true, label: Border blue, description: "Blue of the border colour, 0 to 255." }
+      h_bevel: { type: int, min: 0, max: 255, required: true, label: Horizontal bevel, description: "Horizontal bevel offset, 0 to 255." }
+      v_bevel: { type: int, min: 0, max: 255, required: true, label: Vertical bevel, description: "Vertical bevel offset, 0 to 255." }
+      inside_softness: { type: int, min: 0, max: 255, required: true, label: Inside softness, description: "Softness inside the border, 0 to 255." }
     send: "spyder\0\0\0\0KBD {layer} {thickness} {red} {green} {blue} {h_bevel} {v_bevel} {inside_softness}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -303,12 +303,12 @@ commands:
   layer_shadow:
     summary: "Set a layer's shadow position, size, transparency and softness, each 0 to 255 (KSH)"
     params:
-      layer: { type: int, min: 2, required: true }
-      x: { type: int, min: 0, max: 255, required: true }
-      y: { type: int, min: 0, max: 255, required: true }
-      size: { type: int, min: 0, max: 255, required: true }
-      transparency: { type: int, min: 0, max: 255, required: true }
-      softness: { type: int, min: 0, max: 255, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
+      x: { type: int, min: 0, max: 255, required: true, label: Shadow X, description: "Horizontal shadow offset, 0 to 255." }
+      y: { type: int, min: 0, max: 255, required: true, label: Shadow Y, description: "Vertical shadow offset, 0 to 255." }
+      size: { type: int, min: 0, max: 255, required: true, label: Shadow size, description: "Shadow size, 0 to 255." }
+      transparency: { type: int, min: 0, max: 255, required: true, label: Shadow transparency, description: "Shadow transparency, 0 (opaque) to 255." }
+      softness: { type: int, min: 0, max: 255, required: true, label: Shadow softness, description: "Shadow softness, 0 to 255." }
     send: "spyder\0\0\0\0KSH {layer} {x} {y} {size} {transparency} {softness}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -316,11 +316,11 @@ commands:
   layer_zoom_pan:
     summary: "Set or adjust a layer's zoom (0 to 20) and pan (-2048 to 2048) (ZPA)"
     params:
-      relative: { type: bool, default: false }
-      zoom: { type: float, min: 0, max: 20, required: true }
-      h_pan: { type: float, min: -2048, max: 2048, required: true }
-      v_pan: { type: float, min: -2048, max: 2048, required: true }
-      layer: { type: int, min: 2, required: true }
+      relative: { type: bool, default: false, label: Relative, description: "On adjusts the current values by these amounts, off sets them absolutely." }
+      zoom: { type: float, min: 0, max: 20, required: true, label: Zoom, description: "Zoom factor, 0 to 20." }
+      h_pan: { type: float, min: -2048, max: 2048, required: true, label: Horizontal pan, description: "Horizontal pan, -2048 to 2048." }
+      v_pan: { type: float, min: -2048, max: 2048, required: true, label: Vertical pan, description: "Vertical pan, -2048 to 2048." }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0ZPA {relative:bool01} {zoom:.3f} {h_pan:.3f} {v_pan:.3f} {layer}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -328,8 +328,8 @@ commands:
   layer_clone:
     summary: "Set a layer's clone mode: 0 off, 1 offset, 2 mirror (LCC)"
     params:
-      layer: { type: int, min: 2, required: true }
-      mode: { type: int, min: 0, max: 2, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Clone mode, description: "0 off, 1 offset, 2 mirror." }
     send: "spyder\0\0\0\0LCC {layer} {mode}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -337,9 +337,9 @@ commands:
   layer_clone_offset:
     summary: "Set a layer's clone mode with an offset in relative coordinates (LCC)"
     params:
-      layer: { type: int, min: 2, required: true }
-      mode: { type: int, min: 0, max: 2, required: true }
-      offset: { type: float, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Clone mode, description: "0 off, 1 offset, 2 mirror." }
+      offset: { type: float, required: true, label: Clone offset, description: "Offset of the clone, in relative coordinates." }
     send: "spyder\0\0\0\0LCC {layer} {mode} {offset:.3f}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -347,9 +347,9 @@ commands:
   layer_alignment:
     summary: "Apply an alignment effect, 0 to 24 (align, centre, size, snap, stack, swap), over a duration in frames (LAC)"
     params:
-      effect: { type: int, min: 0, max: 24, required: true }
-      duration: { type: int, min: 0, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      effect: { type: int, min: 0, max: 24, required: true, label: Alignment effect, description: "Alignment effect number 0-24 from the Spyder table (align, centre, size, snap, stack, swap)." }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0LAC {effect} {duration} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -357,8 +357,8 @@ commands:
   treatment_recall:
     summary: "Recall a treatment onto layers (KTR)"
     params:
-      treatment: { type: int, min: 0, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      treatment: { type: int, min: 0, required: true, label: Treatment, description: "Treatment ID as shown in Spyder." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0KTR {treatment} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -366,8 +366,8 @@ commands:
   treatment_learn:
     summary: "Learn a treatment from a layer, -1 for the next free ID (KTL)"
     params:
-      treatment: { type: int, min: -1, required: true }
-      layer: { type: int, min: 2, required: true }
+      treatment: { type: int, min: -1, required: true, label: Treatment, description: "Treatment ID to store under, or -1 for the next free ID." }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0KTL {treatment} {layer}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -375,11 +375,11 @@ commands:
   input_levels:
     summary: "Set layers' input brightness (0-2), contrast (0-2.5), hue (-180-180) and saturation (0-2) (ILA)"
     params:
-      brightness: { type: float, min: 0, max: 2, required: true }
-      contrast: { type: float, min: 0, max: 2.5, required: true }
-      hue: { type: float, min: -180, max: 180, required: true }
-      saturation: { type: float, min: 0, max: 2, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      brightness: { type: float, min: 0, max: 2, required: true, label: Brightness, description: "Input brightness as in Spyder's input levels, 0 to 2." }
+      contrast: { type: float, min: 0, max: 2.5, required: true, label: Contrast, description: "Input contrast as in Spyder's input levels, 0 to 2.5." }
+      hue: { type: float, min: -180, max: 180, required: true, label: Hue, description: "Hue shift in degrees, -180 to 180." }
+      saturation: { type: float, min: 0, max: 2, required: true, label: Saturation, description: "Input saturation as in Spyder's input levels, 0 to 2." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0ILA {brightness:.3f} {contrast:.3f} {hue:.3f} {saturation:.3f} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -387,12 +387,12 @@ commands:
   input_levels_gamma:
     summary: "As input_levels, with gamma 0 to 3 (ILA, X80 reference)"
     params:
-      brightness: { type: float, min: 0, max: 2, required: true }
-      contrast: { type: float, min: 0, max: 2.5, required: true }
-      hue: { type: float, min: -180, max: 180, required: true }
-      saturation: { type: float, min: 0, max: 2, required: true }
-      gamma: { type: float, min: 0, max: 3, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      brightness: { type: float, min: 0, max: 2, required: true, label: Brightness, description: "Input brightness as in Spyder's input levels, 0 to 2." }
+      contrast: { type: float, min: 0, max: 2.5, required: true, label: Contrast, description: "Input contrast as in Spyder's input levels, 0 to 2.5." }
+      hue: { type: float, min: -180, max: 180, required: true, label: Hue, description: "Hue shift in degrees, -180 to 180." }
+      saturation: { type: float, min: 0, max: 2, required: true, label: Saturation, description: "Input saturation as in Spyder's input levels, 0 to 2." }
+      gamma: { type: float, min: 0, max: 3, required: true, label: Gamma, description: "Input gamma as in Spyder's input levels, 0 to 3 (X80)." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0ILA {brightness:.3f} {contrast:.3f} {hue:.3f} {saturation:.3f} {gamma:.3f} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -400,10 +400,10 @@ commands:
   luminance_key:
     summary: "Turn layers' luminance key on with clip and gain, 0 to 512, or off with both 0 (ILK)"
     params:
-      enabled: { type: bool, default: true }
-      clip: { type: int, min: 0, max: 512, default: 0 }
-      gain: { type: int, min: 0, max: 512, default: 0 }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      enabled: { type: bool, default: true, label: Enabled, description: "On turns the key on, off turns it off." }
+      clip: { type: int, min: 0, max: 512, default: 0, label: Clip, description: "Luminance key clip, 0 to 512." }
+      gain: { type: int, min: 0, max: 512, default: 0, label: Gain, description: "Key gain, 0 to 512." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0ILK {enabled:bool01} {clip} {gain} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -411,15 +411,15 @@ commands:
   color_key:
     summary: "Turn layers' colour key on with colour and range (0-255) and gain (0-512), or off with zeros (ICK)"
     params:
-      enabled: { type: bool, default: true }
-      red: { type: int, min: 0, max: 255, default: 0 }
-      green: { type: int, min: 0, max: 255, default: 0 }
-      blue: { type: int, min: 0, max: 255, default: 0 }
-      range_red: { type: int, min: 0, max: 255, default: 0 }
-      range_green: { type: int, min: 0, max: 255, default: 0 }
-      range_blue: { type: int, min: 0, max: 255, default: 0 }
-      gain: { type: int, min: 0, max: 512, default: 0 }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      enabled: { type: bool, default: true, label: Enabled, description: "On turns the key on, off turns it off." }
+      red: { type: int, min: 0, max: 255, default: 0, label: Key red, description: "Red of the key colour, 0 to 255." }
+      green: { type: int, min: 0, max: 255, default: 0, label: Key green, description: "Green of the key colour, 0 to 255." }
+      blue: { type: int, min: 0, max: 255, default: 0, label: Key blue, description: "Blue of the key colour, 0 to 255." }
+      range_red: { type: int, min: 0, max: 255, default: 0, label: Red range, description: "Range around the key colour's red, 0 to 255." }
+      range_green: { type: int, min: 0, max: 255, default: 0, label: Green range, description: "Range around the key colour's green, 0 to 255." }
+      range_blue: { type: int, min: 0, max: 255, default: 0, label: Blue range, description: "Range around the key colour's blue, 0 to 255." }
+      gain: { type: int, min: 0, max: 512, default: 0, label: Gain, description: "Key gain, 0 to 512." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0ICK {enabled:bool01} {red} {green} {blue} {range_red} {range_green} {range_blue} {gain} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -427,8 +427,8 @@ commands:
   input_config_recall:
     summary: "Load a saved input configuration onto a layer's source (ICR)"
     params:
-      config: { type: int, min: 0, required: true }
-      layer: { type: int, min: 2, required: true }
+      config: { type: int, min: 0, required: true, label: Input configuration, description: "Saved input configuration ID as shown in Spyder." }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0ICR {config} {layer}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -436,8 +436,8 @@ commands:
   input_auto_sync:
     summary: "Switch a layer's input to a connector and auto-sync it: 0 HD15, 1 DVI, 2 SDI, 3 composite, 4 S-Video (ICR -1)"
     params:
-      layer: { type: int, min: 2, required: true }
-      connector: { type: int, min: 0, max: 4, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID whose input to switch, from 2." }
+      connector: { type: int, min: 0, max: 4, required: true, label: Connector, description: "0 HD15, 1 DVI, 2 SDI, 3 composite, 4 S-Video." }
     send: "spyder\0\0\0\0ICR -1 {layer} {connector}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -445,8 +445,8 @@ commands:
   input_config_learn:
     summary: "Save a layer's input configuration under an ID (ICL)"
     params:
-      config: { type: int, min: 0, required: true }
-      layer: { type: int, min: 2, required: true }
+      config: { type: int, min: 0, required: true, label: Input configuration, description: "Saved input configuration ID as shown in Spyder." }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0ICL {config} {layer}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -454,9 +454,9 @@ commands:
   input_raster:
     summary: "Move one edge of a layer's input video by pixels, negative inward (IRA)"
     params:
-      layer: { type: int, min: 2, required: true }
-      edge: { type: enum, values: [L, R, T, B], required: true }
-      pixels: { type: int, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
+      edge: { type: enum, values: [L, R, T, B], required: true, label: Edge, description: "L left, R right, T top, B bottom." }
+      pixels: { type: int, required: true, label: Pixels, description: "How far to move the edge in pixels, negative inward." }
     send: "spyder\0\0\0\0IRA {layer} {edge} {pixels}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -464,7 +464,7 @@ commands:
   input_auto_raster:
     summary: "Auto-raster a layer's analog input (IRA ... A)"
     params:
-      layer: { type: int, min: 2, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0IRA {layer} A"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -472,8 +472,8 @@ commands:
   still_load_layers:
     summary: "Load a still from the Stills directory onto layers (SLD)"
     params:
-      file: { type: string, max_length: 128, required: true }
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      file: { type: string, max_length: 128, required: true, label: Still, description: "Still file name in the Stills directory." }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0SLD {file:url} {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -481,7 +481,7 @@ commands:
   still_clear_layers:
     summary: "Clear stills from layers (SCL)"
     params:
-      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true }
+      layers: { type: string, pattern: "^(\\d+|<DVCE\\d+:(PGM|PVW)>)( (\\d+|<DVCE\\d+:(PGM|PVW)>))*$", required: true, label: Layers, description: "Layer IDs separated by spaces, from 2 (0 and 1 are the backgrounds), or a control device's bus such as <DVCE2:PGM>." }
     send: "spyder\0\0\0\0SCL {layers}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -489,9 +489,9 @@ commands:
   background_load:
     summary: "Load a still as a PixelSpace's next (false) or current (true) background (BLD)"
     params:
-      file: { type: string, max_length: 128, required: true }
-      pixelspace: { type: int, min: 0, required: true }
-      current: { type: bool, default: false }
+      file: { type: string, max_length: 128, required: true, label: Still, description: "Still file name in the Stills directory, used as the background." }
+      pixelspace: { type: int, min: 0, required: true, label: PixelSpace, description: "PixelSpace whose background to load, by its ID." }
+      current: { type: bool, default: false, label: Current, description: "On loads it as the current background, off as the next." }
     send: "spyder\0\0\0\0BLD {file:url} {pixelspace} {current:bool01}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -505,7 +505,7 @@ commands:
   background_transition_duration:
     summary: "Transition the backgrounds of every PixelSpace over a duration in frames (BTR)"
     params:
-      duration: { type: int, min: 0, required: true }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames." }
     send: "spyder\0\0\0\0BTR {duration}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -513,8 +513,8 @@ commands:
   still_load_output:
     summary: "Load an unscaled still straight onto an output, as a test pattern (LSO)"
     params:
-      file: { type: string, max_length: 128, required: true }
-      output: { type: int, min: 0, required: true }
+      file: { type: string, max_length: 128, required: true, label: Still, description: "Still file name in the Stills directory." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
     send: "spyder\0\0\0\0LSO {file:url} {output}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -522,9 +522,9 @@ commands:
   still_load_output_channel:
     summary: "Load an unscaled still onto one channel, 0 to 3, of a DX4 output (LSO)"
     params:
-      file: { type: string, max_length: 128, required: true }
-      output: { type: int, min: 0, required: true }
-      channel: { type: int, min: 0, max: 3, required: true }
+      file: { type: string, max_length: 128, required: true, label: Still, description: "Still file name in the Stills directory." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      channel: { type: int, min: 0, max: 3, required: true, label: Channel, description: "DX4 output channel, 0 to 3." }
     send: "spyder\0\0\0\0LSO {file:url} {output} {channel}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -532,7 +532,7 @@ commands:
   still_clear_output:
     summary: "Clear the still on an output, every channel of a DX4 (CSO)"
     params:
-      output: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
     send: "spyder\0\0\0\0CSO {output}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -540,8 +540,8 @@ commands:
   still_clear_output_channel:
     summary: "Clear the still on one channel, 0 to 3, of a DX4 output (CSO)"
     params:
-      output: { type: int, min: 0, required: true }
-      channel: { type: int, min: 0, max: 3, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      channel: { type: int, min: 0, max: 3, required: true, label: Channel, description: "DX4 output channel, 0 to 3." }
     send: "spyder\0\0\0\0CSO {output} {channel}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -549,8 +549,8 @@ commands:
   device_mixer_transition:
     summary: "Auto-transition mixer devices (zero-based) over a duration in frames; 1 is a cut (DMT)"
     params:
-      duration: { type: int, min: 0, required: true }
-      devices: { type: string, pattern: "^\\d+( \\d+)*$", required: true }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames; 1 is a cut." }
+      devices: { type: string, pattern: "^\\d+( \\d+)*$", required: true, label: Devices, description: "Mixer device numbers separated by spaces, counted from 0." }
     send: "spyder\0\0\0\0DMT {duration} {devices}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -558,9 +558,9 @@ commands:
   device_mixer_bus:
     summary: "Select mixer devices' bus: OFF, PVW or PGM (DMB)"
     params:
-      duration: { type: int, min: 0, required: true }
-      bus: { type: enum, values: ["OFF", PVW, PGM], required: true }
-      devices: { type: string, pattern: "^\\d+( \\d+)*$", required: true }
+      duration: { type: int, min: 0, required: true, label: Duration, description: "Duration in frames of the change." }
+      bus: { type: enum, values: ["OFF", PVW, PGM], required: true, label: Bus, description: "OFF, PVW (preview) or PGM (program)." }
+      devices: { type: string, pattern: "^\\d+( \\d+)*$", required: true, label: Devices, description: "Mixer device numbers separated by spaces, counted from 0." }
     send: "spyder\0\0\0\0DMB {duration} {bus} {devices}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -568,8 +568,8 @@ commands:
   freeze_outputs:
     summary: "Freeze or unfreeze outputs; universal outputs only (OFZ)"
     params:
-      frozen: { type: bool, default: true }
-      outputs: { type: string, pattern: "^\\d+( \\d+)*$", required: true }
+      frozen: { type: bool, default: true, label: Frozen, description: "On freezes the outputs, off unfreezes them." }
+      outputs: { type: string, pattern: "^\\d+( \\d+)*$", required: true, label: Outputs, description: "Output numbers separated by spaces, counted from 0; universal outputs only." }
     send: "spyder\0\0\0\0OFZ {frozen:bool01} {outputs}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -577,11 +577,11 @@ commands:
   output_format:
     summary: "Set an output's VESA format: active size, refresh rate and interlace (OCF)"
     params:
-      output: { type: int, min: 0, required: true }
-      width: { type: int, min: 1, required: true }
-      height: { type: int, min: 1, required: true }
-      rate: { type: float, min: 1, required: true }
-      interlaced: { type: bool, default: false }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      width: { type: int, min: 1, required: true, label: Width, description: "Active width in pixels." }
+      height: { type: int, min: 1, required: true, label: Height, description: "Active height in pixels." }
+      rate: { type: float, min: 1, required: true, label: Refresh rate, description: "Refresh rate in Hz, such as 59.94." }
+      interlaced: { type: bool, default: false, label: Interlaced, description: "On for an interlaced format, off for progressive." }
     send: "spyder\0\0\0\0OCF {output} {width} {height} {rate:.2f} {interlaced:bool01}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -589,12 +589,12 @@ commands:
   output_format_timing:
     summary: "As output_format, choosing standard (false) or reduced blanking (true) timing (OCF)"
     params:
-      output: { type: int, min: 0, required: true }
-      width: { type: int, min: 1, required: true }
-      height: { type: int, min: 1, required: true }
-      rate: { type: float, min: 1, required: true }
-      interlaced: { type: bool, default: false }
-      reduced_blanking: { type: bool, default: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      width: { type: int, min: 1, required: true, label: Width, description: "Active width in pixels." }
+      height: { type: int, min: 1, required: true, label: Height, description: "Active height in pixels." }
+      rate: { type: float, min: 1, required: true, label: Refresh rate, description: "Refresh rate in Hz, such as 59.94." }
+      interlaced: { type: bool, default: false, label: Interlaced, description: "On for an interlaced format, off for progressive." }
+      reduced_blanking: { type: bool, default: true, label: Reduced blanking, description: "On uses reduced blanking timing, off standard timing." }
     send: "spyder\0\0\0\0OCF {output} {width} {height} {rate:.2f} {interlaced:bool01} {reduced_blanking:bool01}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -602,7 +602,7 @@ commands:
   output_mode_normal:
     summary: "Set an output to Normal mode (OCM)"
     params:
-      output: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
     send: "spyder\0\0\0\0OCM {output} Normal"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -610,9 +610,9 @@ commands:
   output_mode_normal_start:
     summary: "Set an output to Normal mode starting at this position on the canvas (OCM)"
     params:
-      output: { type: int, min: 0, required: true }
-      h_start: { type: int, min: 0, required: true }
-      v_start: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      h_start: { type: int, min: 0, required: true, label: Horizontal start, description: "Horizontal position on the canvas the output starts at, in pixels." }
+      v_start: { type: int, min: 0, required: true, label: Vertical start, description: "Vertical position on the canvas the output starts at, in pixels." }
     send: "spyder\0\0\0\0OCM {output} Normal {h_start} {v_start}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -620,8 +620,8 @@ commands:
   output_mode_opmon:
     summary: "Set an output to OpMon of a program PixelSpace (OCM)"
     params:
-      output: { type: int, min: 0, required: true }
-      pixelspace: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      pixelspace: { type: int, min: 0, required: true, label: PixelSpace, description: "Program PixelSpace to monitor, by its ID." }
     send: "spyder\0\0\0\0OCM {output} OpMon {pixelspace}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -629,8 +629,8 @@ commands:
   output_mode_scaled:
     summary: "Set an output to Scaled mode on a program PixelSpace (OCM)"
     params:
-      output: { type: int, min: 0, required: true }
-      pixelspace: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      pixelspace: { type: int, min: 0, required: true, label: PixelSpace, description: "Program PixelSpace to scale to the output, by its ID." }
     send: "spyder\0\0\0\0OCM {output} Scaled {pixelspace}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -638,8 +638,8 @@ commands:
   output_rotation:
     summary: "Rotate an output by 0, 90, 180 or 270 degrees (OCR)"
     params:
-      output: { type: int, min: 0, required: true }
-      angle: { type: enum, values: ["0", "90", "180", "270"], required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      angle: { type: enum, values: ["0", "90", "180", "270"], required: true, label: Rotation, description: "Rotation in degrees: 0, 90, 180 or 270." }
     send: "spyder\0\0\0\0OCR {output} {angle}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -647,13 +647,13 @@ commands:
   output_blend:
     summary: "Set an output edge's blend: width in pixels, mode and two curve parameters 0 to 1 (OCB)"
     params:
-      output: { type: int, min: 0, required: true }
-      edge: { type: enum, values: [L, R], required: true }
-      enabled: { type: bool, default: true }
-      width: { type: int, min: 0, required: true }
-      mode: { type: enum, values: [Bezier, Gamma, Velocity], required: true }
-      curve1: { type: float, min: 0, max: 1, required: true }
-      curve2: { type: float, min: 0, max: 1, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      edge: { type: enum, values: [L, R], required: true, label: Edge, description: "L left or R right edge of the output." }
+      enabled: { type: bool, default: true, label: Blend, description: "On turns the edge blend on, off turns it off." }
+      width: { type: int, min: 0, required: true, label: Blend width, description: "Blend width in pixels." }
+      mode: { type: enum, values: [Bezier, Gamma, Velocity], required: true, label: Blend mode, description: "Blend curve: Bezier, Gamma or Velocity." }
+      curve1: { type: float, min: 0, max: 1, required: true, label: Curve 1, description: "First blend curve parameter, 0 to 1." }
+      curve2: { type: float, min: 0, max: 1, required: true, label: Curve 2, description: "Second blend curve parameter, 0 to 1." }
     send: "spyder\0\0\0\0OCB {output} {edge} {enabled:bool01} {width} {mode} {curve1:.3f} {curve2:.3f}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -661,9 +661,9 @@ commands:
   output_blend_enabled:
     summary: "Turn an output edge's blend on or off (OCB)"
     params:
-      output: { type: int, min: 0, required: true }
-      edge: { type: enum, values: [L, R], required: true }
-      enabled: { type: bool, default: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
+      edge: { type: enum, values: [L, R], required: true, label: Edge, description: "L left or R right edge of the output." }
+      enabled: { type: bool, default: true, label: Blend, description: "On turns the edge blend on, off turns it off." }
     send: "spyder\0\0\0\0OCB {output} {edge} {enabled:bool01}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -671,7 +671,7 @@ commands:
   output_save:
     summary: "Save an output's configuration to persistent storage (OCS)"
     params:
-      output: { type: int, min: 0, required: true }
+      output: { type: int, min: 0, required: true, label: Output, description: "Output number as Spyder numbers it, from 0." }
     send: "spyder\0\0\0\0OCS {output}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -679,9 +679,9 @@ commands:
   router_switch:
     summary: "Switch a router's logical output (zero-based) to an input (RCR ... L)"
     params:
-      router: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
-      input: { type: int, min: 0, required: true }
+      router: { type: int, min: 0, required: true, label: Router, description: "Router ID as configured in Spyder." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Logical router output, counted from 0." }
+      input: { type: int, min: 0, required: true, label: Input, description: "Router input number as Spyder numbers it, from 0." }
     send: "spyder\0\0\0\0RCR {router} L {output} {input}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -689,9 +689,9 @@ commands:
   router_switch_physical:
     summary: "Switch a router's physical output (zero-based) to an input (RCR ... P)"
     params:
-      router: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
-      input: { type: int, min: 0, required: true }
+      router: { type: int, min: 0, required: true, label: Router, description: "Router ID as configured in Spyder." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Physical router output, counted from 0." }
+      input: { type: int, min: 0, required: true, label: Input, description: "Router input number as Spyder numbers it, from 0." }
     send: "spyder\0\0\0\0RCR {router} P {output} {input}"
     expect: { matches: "^0( |$)" }
     returns: ack
@@ -699,7 +699,7 @@ commands:
   router_query:
     summary: "Every output's input on a router, as output:input pairs, -1 when none (QRC)"
     params:
-      router: { type: int, min: 0, required: true }
+      router: { type: int, min: 0, required: true, label: Router, description: "Router ID as configured in Spyder." }
     send: "spyder\0\0\0\0QRC {router}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -707,8 +707,8 @@ commands:
   router_query_output:
     summary: "One router output's input (QRC)"
     params:
-      router: { type: int, min: 0, required: true }
-      output: { type: int, min: 0, required: true }
+      router: { type: int, min: 0, required: true, label: Router, description: "Router ID as configured in Spyder." }
+      output: { type: int, min: 0, required: true, label: Output, description: "Router output, counted from 0." }
     send: "spyder\0\0\0\0QRC {router} {output}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -752,7 +752,7 @@ commands:
   get_register_count:
     summary: "Number of registers of a type (RRC)"
     params:
-      type: { type: int, min: 0, max: 10, required: true }
+      type: { type: int, min: 0, max: 10, required: true, label: Register type, description: "0 effect, 1 playitem, 4 command key, 5 treatment, 6 source, 7 function key, 10 still." }
     send: "spyder\0\0\0\0RRC {type}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -760,7 +760,7 @@ commands:
   get_registers:
     summary: "Registers of a type on every page: count, then ID and name pairs (RRL ... -1)"
     params:
-      type: { type: int, min: 0, max: 10, required: true }
+      type: { type: int, min: 0, max: 10, required: true, label: Register type, description: "0 effect, 1 playitem, 4 command key, 5 treatment, 6 source, 7 function key, 10 still." }
     send: "spyder\0\0\0\0RRL {type} -1"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -768,7 +768,7 @@ commands:
   get_script_cue:
     summary: "Current cue of a script by script ID, -1 when not running (SCR ... S)"
     params:
-      script: { type: int, min: 0, required: true }
+      script: { type: int, min: 0, required: true, label: Script, description: "Script ID of the command key; unlike a register ID it does not change when the list is reordered." }
     send: "spyder\0\0\0\0SCR {script} S"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -776,7 +776,7 @@ commands:
   get_register_cue:
     summary: "Current cue of the script in a register, -1 when not running (SCR ... R)"
     params:
-      register: { type: int, min: 0, required: true }
+      register: { type: int, min: 0, required: true, label: Register, description: "Register ID; registers on page n are n*1000 + register, so register 2 on page 3 is 3002." }
     send: "spyder\0\0\0\0SCR {register} R"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -784,7 +784,7 @@ commands:
   get_layer_keyframe:
     summary: "A layer's keyframe values: position, size, border, shadow, clone, crop, aspect, zoom, pan, PixelSpace, transparency (RLK)"
     params:
-      layer: { type: int, min: 2, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0RLK {layer}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -792,7 +792,7 @@ commands:
   get_layer_source:
     summary: "A layer's source name and source register ID (RLS)"
     params:
-      layer: { type: int, min: 2, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0RLS {layer}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -800,7 +800,7 @@ commands:
   get_connection_status:
     summary: "A layer's input connector type and connection status: 0 disconnected, 1 connected, 2 unknown (RCS; at most once a second)"
     params:
-      layer: { type: int, min: 2, required: true }
+      layer: { type: int, min: 2, required: true, label: Layer, description: "Layer ID, from 2; 0 and 1 are the backgrounds." }
     send: "spyder\0\0\0\0RCS {layer}"
     expect: { matches: "^0 (.*)$" }
     returns: value
@@ -820,7 +820,7 @@ commands:
   get_aspect_ratio:
     summary: "A source's aspect ratio, by source name or layer ID (RAR)"
     params:
-      source: { type: string, pattern: "^[A-Za-z0-9_.%-]{1,128}$", required: true }
+      source: { type: string, pattern: "^[A-Za-z0-9_.%-]{1,128}$", required: true, label: Source, description: "Source name, or a layer ID." }
     send: "spyder\0\0\0\0RAR {source}"
     expect: { matches: "^0 (.*)$" }
     returns: value

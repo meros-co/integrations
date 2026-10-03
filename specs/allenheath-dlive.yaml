@@ -61,16 +61,16 @@ source:
 settings:
   # The console's base MIDI channel N (Utility / Control / MIDI); the console
   # uses N to N+4. Required: a wrong channel makes every message miss.
-  midi_channel: { type: int, min: 1, max: 12, required: true }
+  midi_channel: { type: int, min: 1, max: 12, required: true, label: MIDI channel, description: "The console's base MIDI channel N, set under Utility, Control, MIDI; the console uses N to N+4, and a wrong channel makes every message miss." }
   # Read every preamp's gain, pad and 48V on connecting (MixRack only).
-  sync_preamps: { type: bool, default: true }
+  sync_preamps: { type: bool, default: true, label: Read preamps, description: "On reads every socket preamp's gain, pad and 48V on connecting (dLive only)." }
   # Connect with TLS/SSL encryption (MixRack 51327, Surface 51329, p.1) and
   # log in as user_profile with password. MIDI/TCP must be in Secure mode on
   # the console.
-  tls: { type: bool, default: false }
+  tls: { type: bool, default: false, label: TLS, description: "On connects with TLS and logs in with the user profile and password; MIDI/TCP must be set to Secure on the console." }
   # UserProfile, 00 to 1F (p.1), sent as that byte.
-  user_profile: { type: int, min: 0, max: 31, default: 0 }
-  password: { type: string, secret: true, default: "" }
+  user_profile: { type: int, min: 0, max: 31, default: 0, label: User profile, description: "User profile number sent in the TLS login, 0 to 31; the document does not say how it maps to the console's profiles." }
+  password: { type: string, secret: true, default: "", label: Password, description: "The user profile's password, sent in the TLS login; unused without TLS." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control, when: "model dlive-mixrack or avantis" }
@@ -122,8 +122,10 @@ commands:
         values: [input, mono_group, stereo_group, mono_aux, stereo_aux, mono_matrix, stereo_matrix, mono_fx_send,
           stereo_fx_send, fx_return, main, dca, mute_group, ufx_send, ufx_return]
         required: true
-      channel: &channel { type: int, min: 1, max: 128, required: true }
-      muted: { type: bool, default: true }
+        label: Channel type
+        description: "Kind of channel or master: input, group, aux, matrix, FX send or return, main, DCA, mute group, UFX send or return."
+      channel: &channel { type: int, min: 1, max: 128, required: true, label: Channel, description: "Channel number within its type, numbered from 1 as on the console." }
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the channel, off unmutes it." }
     returns: none
   get_mute:
     summary: "Read a channel's mute (SysEx 0N 05 09 CH, answered by the mute Note On, p.2)"
@@ -134,8 +136,8 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      level_db: &level_db { type: float, min: -54, max: 10 }
-      level_raw: &level_raw { type: int, min: 0, max: 127 }
+      level_db: &level_db { type: float, min: -54, max: 10, label: Level, description: "Level in dB from -54 to +10, in steps of about 0.5 dB; give this or the raw level." }
+      level_raw: &level_raw { type: int, min: 0, max: 127, label: Raw level, description: "Raw level 0-127 as the console sends it, 0 being -inf; give this or the level in dB." }
     returns: none
   get_level:
     summary: "Read a channel's fader (SysEx 0N 05 0B 17 CH, p.2); returns {level_db, level_raw}, level_db null at -inf"
@@ -146,7 +148,7 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      assigned: { type: bool, default: true }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the main mix, off removes it." }
     returns: none
   get_main_assign:
     summary: "Read a channel's main mix assignment (SysEx 0N 05 0B 18 CH, p.3)"
@@ -161,7 +163,9 @@ commands:
         type: enum
         values: [mono_aux, stereo_aux, mono_matrix, stereo_matrix, mono_fx_send, stereo_fx_send, ufx_send]
         required: true
-      destination: &destination { type: int, min: 1, max: 62, required: true }
+        label: Destination type
+        description: Kind of aux, matrix, FX send or group the send goes to.
+      destination: &destination { type: int, min: 1, max: 62, required: true, label: Destination, description: "Destination number within its type, numbered from 1 as on the console." }
       level_db: *level_db
       level_raw: *level_raw
     returns: none
@@ -182,8 +186,10 @@ commands:
         type: enum
         values: [mono_group, stereo_group, mono_aux, stereo_aux]
         required: true
+        label: Destination type
+        description: Kind of aux, matrix, FX send or group the send goes to.
       destination: *destination
-      assigned: { type: bool, default: true }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the group or aux, off removes it." }
     returns: none
   get_send_assign:
     summary: "Read a group or aux assignment (SysEx 0N 05 0F 0E CH SndN SndCH, p.3)"
@@ -198,23 +204,23 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      dca: { type: int, min: 1, max: 24, required: true }
-      assigned: { type: bool, default: true }
+      dca: { type: int, min: 1, max: 24, required: true, label: DCA, description: "DCA number, from 1; dLive has 24, Avantis 16." }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the DCA, off removes it." }
     returns: none
   set_mute_group_assign:
     summary: "Assign a channel to a mute group or not (NRPN 40; dLive on 58-5F off 18-1F, Avantis on 50-57 off 10-17)"
     params:
       channel_type: *channel_type
       channel: *channel
-      mute_group: { type: int, min: 1, max: 8, required: true }
-      assigned: { type: bool, default: true }
+      mute_group: { type: int, min: 1, max: 8, required: true, label: Mute group, description: "Mute group number, 1 to 8." }
+      assigned: { type: bool, default: true, label: Assigned, description: "On assigns the channel to the mute group, off removes it." }
     returns: none
   set_preamp_gain:
     summary: "Set a MixRack socket preamp's gain (Pitch Bend EN MP GV, p.4): gain_db +5 to +60 by the p.9 table, or gain_raw 0-127. Socket 1-64 MixRack, 65-96 DX 1/2, 97-128 DX 3/4"
     params:
-      socket: &socket { type: int, min: 1, max: 128, required: true }
-      gain_db: { type: float, min: 5, max: 60 }
-      gain_raw: { type: int, min: 0, max: 127 }
+      socket: &socket { type: int, min: 1, max: 128, required: true, label: Socket, description: "Preamp socket: 1-64 on the MixRack, 65-96 on DX 1/2, 97-128 on DX 3/4." }
+      gain_db: { type: float, min: 5, max: 60, label: Gain, description: "Preamp gain in dB, +5 to +60; give this or the raw gain." }
+      gain_raw: { type: int, min: 0, max: 127, label: Raw gain, description: "Raw preamp gain 0-127 as the console sends it, 0 being +5 dB and 127 +60 dB; give this or the gain in dB." }
     returns: none
   get_preamp_gain:
     summary: "Read a socket preamp's gain (SysEx 0N 05 0B 19 MP, p.4); returns {gain_db, gain_raw}"
@@ -222,7 +228,7 @@ commands:
     returns: value
   set_preamp_pad:
     summary: "Switch a socket preamp's pad (SysEx 0N 09 MP 7F/00, p.4)"
-    params: { socket: *socket, enabled: { type: bool, default: true } }
+    params: { socket: *socket, enabled: { type: bool, default: true, label: Pad, description: "On switches the preamp's pad in, off switches it out." } }
     returns: none
   get_preamp_pad:
     summary: "Read a socket preamp's pad (SysEx 0N 07 MP, reply 0N 08 MP Pad, p.4)"
@@ -230,7 +236,7 @@ commands:
     returns: value
   set_phantom_power:
     summary: "Switch a socket preamp's 48V (SysEx 0N 0C MP 7F/00, p.4)"
-    params: { socket: *socket, enabled: { type: bool, default: true } }
+    params: { socket: *socket, enabled: { type: bool, default: true, label: 48V, description: "On switches the preamp's 48V phantom power on, off switches it off." } }
     returns: none
   get_phantom_power:
     summary: "Read a socket preamp's 48V (SysEx 0N 0A MP, reply 0N 0B MP 48V, p.4)"
@@ -241,7 +247,7 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      name: { type: string, pattern: "^[ -~]*$", required: true }
+      name: { type: string, pattern: "^[ -~]*$", required: true, label: Name, description: "Channel name in printable ASCII, as shown on the console; Avantis takes up to 8 characters." }
     returns: none
   get_channel_name:
     summary: "Read a channel's name (SysEx 0N 01 CH, reply 0N 02 CH Name, p.4)"
@@ -256,6 +262,8 @@ commands:
         type: enum
         values: ["off", red, green, yellow, blue, purple, light_blue, white]
         required: true
+        label: Colour
+        description: Channel colour as on the console, or off.
     returns: none
   get_channel_colour:
     summary: "Read a channel's colour (SysEx 0N 04 CH, reply 0N 05 CH Col, p.4)"
@@ -264,20 +272,20 @@ commands:
   recall_scene:
     summary: "Recall scene 1-500 (CC 00 bank 00-03, Program Change, on channel N, p.4-5). MixRack and Avantis"
     params:
-      scene: { type: int, min: 1, max: 500, required: true }
+      scene: { type: int, min: 1, max: 500, required: true, label: Scene, description: "Scene number, 1 to 500, as on the console." }
     returns: none
   recall_cue:
     summary: "Recall a cue by Recall Id 0-1999 (CC 00 bank 00-0F, Program Change, p.5). dLive Surface only"
     params:
-      recall_id: { type: int, min: 0, max: 1999, required: true }
+      recall_id: { type: int, min: 0, max: 1999, required: true, label: Recall ID, description: "The cue's Recall Id as set on the Surface, 0 to 1999." }
     returns: none
   set_peq_type:
     summary: "Set a PEQ band's type (NRPN 1A/1E/22/26, p.6). Band 1-4 is the document's band 0-3; bell on bands 1 and 4, lf_shelf and high_pass band 1, hf_shelf and low_pass band 4"
     params:
       channel_type: *channel_type
       channel: *channel
-      band: &band { type: int, min: 1, max: 4, required: true }
-      type: { type: enum, values: [bell, lf_shelf, hf_shelf, low_pass, high_pass], required: true }
+      band: &band { type: int, min: 1, max: 4, required: true, label: Band, description: "PEQ band 1 to 4, from the lowest." }
+      type: { type: enum, values: [bell, lf_shelf, hf_shelf, low_pass, high_pass], required: true, label: Band type, description: "Bell on any band; lf_shelf and high_pass on band 1 only, hf_shelf and low_pass on band 4 only." }
     returns: none
   set_peq_frequency:
     summary: "Set a PEQ band's frequency, 20 Hz to 20 kHz (NRPN 1B/1F/23/27, p.6: INT(127 * ((4608 * log2(F / 4)) - 10699) / 45922))"
@@ -285,7 +293,7 @@ commands:
       channel_type: *channel_type
       channel: *channel
       band: *band
-      frequency_hz: { type: float, min: 20, max: 20000, required: true }
+      frequency_hz: { type: float, min: 20, max: 20000, required: true, label: Frequency, description: "Frequency in Hz, stored as the nearest of 128 steps the console takes." }
     returns: none
   set_peq_width:
     summary: "Set a PEQ band's width in octaves (NRPN 1C/20/24/28, table p.6-7)"
@@ -298,6 +306,8 @@ commands:
         values: ["1.5", "1.4", "1.3", "1.2", "1.1", "1", "0.95", "0.9", "0.85", "0.8", "3/4", "0.7", "2/3", "0.6",
           "0.55", "0.5", "0.45", "0.4", "1/3", "0.3", "1/4", "0.2", "1/6", "0.13", "1/9"]
         required: true
+        label: Width
+        description: Bandwidth in octaves, one of the values in the console's table, from 1.5 (wide) to 1/9 (narrow).
     returns: none
   set_peq_gain:
     summary: "Set a PEQ band's gain (NRPN 1D/21/25/29, p.6): gain_db -15 to +15 by (dB + 15) * 126 / 30, or gain_raw 0-126"
@@ -305,8 +315,8 @@ commands:
       channel_type: *channel_type
       channel: *channel
       band: *band
-      gain_db: { type: float, min: -15, max: 15 }
-      gain_raw: { type: int, min: 0, max: 126 }
+      gain_db: { type: float, min: -15, max: 15, label: Gain, description: "Band gain in dB, -15 to +15; give this or the raw gain." }
+      gain_raw: { type: int, min: 0, max: 126, label: Raw gain, description: "Raw band gain 0-126 as the console sends it, 63 being 0 dB; give this or the gain in dB." }
     returns: none
   get_peq:
     summary: "Read a PEQ band parameter (SysEx 0N 05 0B nn CH, p.7)"
@@ -314,14 +324,14 @@ commands:
       channel_type: *channel_type
       channel: *channel
       band: *band
-      parameter: { type: enum, values: [type, frequency, width, gain], required: true }
+      parameter: { type: enum, values: [type, frequency, width, gain], required: true, label: Parameter, description: "Which band setting to read: type, frequency, width or gain." }
     returns: value
   set_hpf_frequency:
     summary: "Set the HPF frequency (NRPN 30, p.7: the PEQ formula with 41314, which reaches 7F near 10 kHz)"
     params:
       channel_type: *channel_type
       channel: *channel
-      frequency_hz: { type: float, min: 20, max: 10000, required: true }
+      frequency_hz: { type: float, min: 20, max: 10000, required: true, label: Frequency, description: "HPF frequency in Hz, up to about 10 kHz, stored as the nearest of 128 steps the console takes." }
     returns: none
   get_hpf_frequency:
     summary: "Read the HPF frequency (SysEx 0N 05 0B 30 CH, p.7); returns {frequency_hz, frequency_raw}"
@@ -332,7 +342,7 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: HPF, description: "On switches the high-pass filter in, off switches it out." }
     returns: none
   get_hpf:
     summary: "Read whether the HPF is in (SysEx 0N 05 0B 31 CH, p.7)"
@@ -341,24 +351,24 @@ commands:
   set_ufx_global_key:
     summary: "Set the UFX global key (CC 0C on channel N, p.7)"
     params:
-      key: { type: enum, values: [C, "C#", D, "D#", E, F, "F#", G, "G#", A, "A#", B], required: true }
+      key: { type: enum, values: [C, "C#", D, "D#", E, F, "F#", G, "G#", A, "A#", B], required: true, label: Key, description: "Musical key for the UFX units, C to B." }
     returns: none
   set_ufx_global_scale:
     summary: "Set the UFX global scale (CC 0D on channel N, p.7). Chromatic is Avantis only"
     params:
-      scale: { type: enum, values: [major, minor, chromatic], required: true }
+      scale: { type: enum, values: [major, minor, chromatic], required: true, label: Scale, description: "Musical scale for the UFX units; chromatic is Avantis only." }
     returns: none
   control_change:
     summary: "Send a Control Change: the user-defined Scene Go / Next / Previous CCs (Surface, p.5) or a UFX unit parameter on its MIDI channel M (p.8)"
     params:
-      midi_channel: { type: int, min: 1, max: 16, required: true }
-      controller: { type: int, min: 0, max: 127, required: true }
-      value: { type: int, min: 0, max: 127, required: true }
+      midi_channel: { type: int, min: 1, max: 16, required: true, label: MIDI channel, description: "MIDI channel 1-16 to send on, as the CCs or the UFX unit are set to on the console." }
+      controller: { type: int, min: 0, max: 127, required: true, label: Controller, description: "MIDI controller number, 0 to 127, as configured on the console." }
+      value: { type: int, min: 0, max: 127, required: true, label: Value, description: "MIDI controller value, 0 to 127." }
     returns: none
   raw_midi:
     summary: "Send MIDI bytes given as hex, such as 'B0 63 00', for messages not modelled here (MIDI strips, custom SoftKey messages)"
     params:
-      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true, label: MIDI bytes, description: "Raw MIDI bytes as hex pairs separated by spaces, such as B0 63 00." }
     returns: none
   refresh:
     summary: "Read the console's state again: every channel's name and colour, and on dLive its mute, fader and main assignment, and the preamps"

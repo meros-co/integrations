@@ -41,7 +41,7 @@ transport:
 extension: panasonic-update-notification
 
 settings:
-  notify_port: { type: int, min: 1, max: 65535, default: 31004 }
+  notify_port: { type: int, min: 1, max: 65535, default: 31004, label: Notification port, description: "TCP port on this host that the camera connects to, once registered, to push each changed setting." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -595,7 +595,7 @@ commands:
   scene:
     summary: "Select the scene file: 1-3 Scene1-3, 4 Full Auto"
     params:
-      scene: { type: int, min: 1, max: 4, required: true }
+      scene: { type: int, min: 1, max: 4, required: true, label: Scene file, description: "1-3 Scene1 to Scene3, 4 Full Auto." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "XSF:{scene}", res: "1" } }
     expect: { status: 200, matches: "^XSF:[1-4]$" }
     returns: ack
@@ -607,15 +607,15 @@ commands:
   scene_copy:
     summary: "Copy one scene file's settings to another (1-3 Scene1-3, 4 Full Auto)"
     params:
-      from_scene: { type: int, min: 1, max: 4, required: true }
-      to_scene: { type: int, min: 1, max: 4, required: true }
+      from_scene: { type: int, min: 1, max: 4, required: true, label: From scene, description: "Scene file to copy from: 1-3 Scene1 to Scene3, 4 Full Auto." }
+      to_scene: { type: int, min: 1, max: 4, required: true, label: To scene, description: "Scene file to copy to: 1-3 Scene1 to Scene3, 4 Full Auto." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D6:{from_scene}:{to_scene}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D6:[1-4]:[1-4]$" }
     returns: ack
   picture_level:
     summary: "Set the picture level (auto exposure target)"
     params:
-      level: { type: string, pattern: "^(?:[0-5][0-9A-F]|6[0-4])$", required: true }
+      level: { type: string, pattern: "^(?:[0-5][0-9A-F]|6[0-4])$", required: true, label: Picture level, description: "Auto exposure target as two-digit hex 00-64 for 0 to 100." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:48:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSD:48:[0-9A-F]{2}$" }
     returns: ack
@@ -627,7 +627,7 @@ commands:
   iris_mode:
     summary: "Set the iris to auto or manual"
     params:
-      auto: { type: bool, required: true }
+      auto: { type: bool, required: true, label: Auto iris, description: "On sets the iris to auto, off to manual." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "ORS:{auto:bool01}", res: "1" } }
     expect: { status: 200, matches: "^ORS:[01]$" }
     returns: ack
@@ -639,7 +639,7 @@ commands:
   auto_iris:
     summary: "Set the iris to auto or manual (pan-tilt head command)"
     params:
-      auto: { type: bool, required: true }
+      auto: { type: bool, required: true, label: Auto iris, description: "On sets the iris to auto, off to manual." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#D3{auto:bool01}", res: "1" } }
     expect: { status: 200, matches: "^d3[01]$" }
     returns: ack
@@ -651,7 +651,7 @@ commands:
   auto_iris_speed:
     summary: "Set the auto iris speed: 0 slow, 1 normal, 2 fast"
     params:
-      speed: { type: int, min: 0, max: 2, required: true }
+      speed: { type: int, min: 0, max: 2, required: true, label: Auto iris speed, description: "0 slow, 1 normal, 2 fast." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:01:{speed}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:01:[0-2]$" }
     returns: ack
@@ -663,7 +663,7 @@ commands:
   auto_iris_window:
     summary: "Set the auto iris metering window: 0 normal1, 1 normal2, 2 center, 4 full"
     params:
-      window: { type: enum, values: ["0", "1", "2", "4"], required: true }
+      window: { type: enum, values: ["0", "1", "2", "4"], required: true, label: Metering window, description: "0 normal1, 1 normal2, 2 center, 4 full." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:02:{window}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:02:(?:0|1|2|4)$" }
     returns: ack
@@ -675,7 +675,7 @@ commands:
   iris_limit:
     summary: "Set the iris limit on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Iris limit, description: "On turns the iris limit on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:90:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:90:[01]$" }
     returns: ack
@@ -687,7 +687,7 @@ commands:
   shutter_mode:
     summary: "Set the shutter mode: 0 off, 1 step, 2 synchro, 3 elc"
     params:
-      mode: { type: int, min: 0, max: 3, required: true }
+      mode: { type: int, min: 0, max: 3, required: true, label: Shutter mode, description: "0 off, 1 step, 2 synchro, 3 ELC." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:03:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:03:[0-3]$" }
     returns: ack
@@ -699,21 +699,21 @@ commands:
   shutter_step_up:
     summary: "Move the step shutter up by a number of selectable steps (hex 01-64 for 1-100)"
     params:
-      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
+      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Steps, description: "Number of selectable steps as two-digit hex, 01-64 for 1 to 100." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:04:{steps}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:04:[0-9A-F]{2}$" }
     returns: ack
   shutter_step_down:
     summary: "Move the step shutter down by a number of selectable steps (hex 01-64 for 1-100)"
     params:
-      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
+      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Steps, description: "Number of selectable steps as two-digit hex, 01-64 for 1 to 100." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:05:{steps}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:05:[0-9A-F]{2}$" }
     returns: ack
   shutter_step:
     summary: "Set the step shutter speed by its denominator in 4-digit hex (003C is 1/60)"
     params:
-      denominator: { type: string, pattern: "^(?:000[1-9A-F]|00[1-9A-F][0-9A-F]|0[1-9A-F][0-9A-F]{2}|1[0-9A-F]{3}|2[0-6][0-9A-F]{2}|270[0-9A-F]|2710)$", required: true }
+      denominator: { type: string, pattern: "^(?:000[1-9A-F]|00[1-9A-F][0-9A-F]|0[1-9A-F][0-9A-F]{2}|1[0-9A-F]{3}|2[0-6][0-9A-F]{2}|270[0-9A-F]|2710)$", required: true, label: Shutter speed, description: "Denominator of the shutter speed as four-digit hex, such as 003C for 1/60." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:06:{denominator}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:06:[0-9A-F]{4}$" }
     returns: ack
@@ -725,21 +725,21 @@ commands:
   synchro_scan_up:
     summary: "Move synchro scan up by a number of selectable steps (hex 01-64 for 1-100)"
     params:
-      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
+      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Steps, description: "Number of selectable steps as two-digit hex, 01-64 for 1 to 100." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:07:{steps}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:07:[0-9A-F]{2}$" }
     returns: ack
   synchro_scan_down:
     summary: "Move synchro scan down by a number of selectable steps (hex 01-64 for 1-100)"
     params:
-      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
+      steps: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Steps, description: "Number of selectable steps as two-digit hex, 01-64 for 1 to 100." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:08:{steps}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:08:[0-9A-F]{2}$" }
     returns: ack
   synchro_scan:
     summary: "Set synchro scan in tenths of a hertz, 5-digit hex (00258 is 60.0 Hz)"
     params:
-      tenths_hz: { type: string, pattern: "^(?:0[0-9A-F]{4}|1[0-7][0-9A-F]{3}|18[0-5][0-9A-F]{2}|186[0-9][0-9A-F]|186A0)$", required: true }
+      tenths_hz: { type: string, pattern: "^(?:0[0-9A-F]{4}|1[0-7][0-9A-F]{3}|18[0-5][0-9A-F]{2}|186[0-9][0-9A-F]|186A0)$", required: true, label: Synchro scan, description: "Frequency in tenths of a hertz as five-digit hex, such as 00258 for 60.0 Hz." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:09:{tenths_hz}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:09:[0-9A-F]{5}$" }
     returns: ack
@@ -751,7 +751,7 @@ commands:
   elc_limit:
     summary: "Set the ELC (auto shutter) limit: 2 1/100, 3 1/120, 4 1/250, 5 1/500, 6 1/1000, 7 1/2000"
     params:
-      limit: { type: int, min: 2, max: 7, required: true }
+      limit: { type: int, min: 2, max: 7, required: true, label: ELC limit, description: "Slowest auto shutter: 2 1/100, 3 1/120, 4 1/250, 5 1/500, 6 1/1000, 7 1/2000." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:BF:{limit}", res: "1" } }
     expect: { status: 200, matches: "^OSD:BF:[2-7]$" }
     returns: ack
@@ -763,7 +763,7 @@ commands:
   gain:
     summary: "Set the gain: hex 08-32 for 0-42 dB in 1 dB steps (above 36 dB needs super gain), 80 AGC"
     params:
-      gain: { type: string, pattern: "^(?:(?:0[89A-F]|[12][0-9A-F]|3[0-2])|80)$", required: true }
+      gain: { type: string, pattern: "^(?:(?:0[89A-F]|[12][0-9A-F]|3[0-2])|80)$", required: true, label: Gain, description: "Two-digit hex 08-32 for 0 to 42 dB in 1 dB steps (above 36 dB needs super gain), or 80 for AGC." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OGU:{gain}", res: "1" } }
     expect: { status: 200, matches: "^OGU:[0-9A-F]{2}$" }
     returns: ack
@@ -775,7 +775,7 @@ commands:
   super_gain:
     summary: "Set super gain on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Super gain, description: "On turns super gain, needed above 36 dB on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSI:28:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSI:28:[01]$" }
     returns: ack
@@ -787,7 +787,7 @@ commands:
   agc_max_gain:
     summary: "Set the AGC maximum gain: 01 6dB, 02 12dB, 03 18dB, 04 24dB, 05 30dB, 06 36dB"
     params:
-      max_gain: { type: int, min: 1, max: 6, required: true }
+      max_gain: { type: int, min: 1, max: 6, required: true, label: AGC maximum gain, description: "1 6 dB, 2 12 dB, 3 18 dB, 4 24 dB, 5 30 dB, 6 36 dB." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:69:{max_gain:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSD:69:(?:01|02|03|04|05|06)$" }
     returns: ack
@@ -799,7 +799,7 @@ commands:
   frame_mix:
     summary: "Set frame mix: 00 off, 06 +6dB, 0C +12dB, 12 +18dB, 18 +24dB, 80 auto"
     params:
-      frame_mix: { type: enum, values: ["00", "06", "0C", "12", "18", "80"], required: true }
+      frame_mix: { type: enum, values: ["00", "06", "0C", "12", "18", "80"], required: true, label: Frame mix, description: "00 off, 06 +6 dB, 0C +12 dB, 12 +18 dB, 18 +24 dB, 80 auto." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:65:{frame_mix}", res: "1" } }
     expect: { status: 200, matches: "^OSA:65:(?:00|06|0C|12|18|80)$" }
     returns: ack
@@ -811,7 +811,7 @@ commands:
   auto_frame_mix_max_gain:
     summary: "Set the auto frame mix maximum gain: 00 off, 01 6dB, 02 12dB, 03 18dB"
     params:
-      max_gain: { type: int, min: 0, max: 3, required: true }
+      max_gain: { type: int, min: 0, max: 3, required: true, label: Maximum gain, description: "0 off, 1 6 dB, 2 12 dB, 3 18 dB." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:74:{max_gain:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSE:74:(?:00|01|02|03)$" }
     returns: ack
@@ -823,7 +823,7 @@ commands:
   backlight_compensation:
     summary: "Set backlight compensation on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Backlight compensation, description: "On turns backlight compensation on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:73:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSE:73:[01]$" }
     returns: ack
@@ -835,7 +835,7 @@ commands:
   backlight_compensation_level:
     summary: "Set the backlight compensation level: 0 low, 1 mid, 2 high"
     params:
-      level: { type: int, min: 0, max: 2, required: true }
+      level: { type: int, min: 0, max: 2, required: true, label: Level, description: "0 low, 1 mid, 2 high." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSM:40:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSM:40:[0-2]$" }
     returns: ack
@@ -847,7 +847,7 @@ commands:
   spotlight_compensation:
     summary: "Set spotlight compensation on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Spotlight compensation, description: "On turns spotlight compensation on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D0:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D0:[01]$" }
     returns: ack
@@ -859,7 +859,7 @@ commands:
   flicker_suppression:
     summary: "Set flicker suppression on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Flicker suppression, description: "On turns flicker suppression on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D1:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D1:[01]$" }
     returns: ack
@@ -871,7 +871,7 @@ commands:
   nd_filter:
     summary: "Set the ND filter: 0 through, 1 1/4, 2 1/16, 3 1/64, 8 auto"
     params:
-      filter: { type: enum, values: ["0", "1", "2", "3", "8"], required: true }
+      filter: { type: enum, values: ["0", "1", "2", "3", "8"], required: true, label: ND filter, description: "0 through, 1 1/4, 2 1/16, 3 1/64, 8 auto." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OFT:{filter}", res: "1" } }
     expect: { status: 200, matches: "^OFT:(?:0|1|2|3|8)$" }
     returns: ack
@@ -888,7 +888,7 @@ commands:
   day_night:
     summary: "Set night mode on or off"
     params:
-      night: { type: bool, required: true }
+      night: { type: bool, required: true, label: Night mode, description: "On switches to night mode, off to day mode." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#D6{night:bool01}", res: "1" } }
     expect: { status: 200, matches: "^d6[01]$" }
     returns: ack
@@ -900,7 +900,7 @@ commands:
   white_balance_mode:
     summary: "Set the white balance mode: 0 ATW, 1 AWB A, 2 AWB B, 4 3200K, 5 5600K, 9 VAR"
     params:
-      mode: { type: enum, values: ["0", "1", "2", "4", "5", "9"], required: true }
+      mode: { type: enum, values: ["0", "1", "2", "4", "5", "9"], required: true, label: White balance, description: "0 ATW, 1 AWB A, 2 AWB B, 4 3200K, 5 5600K, 9 VAR." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OAW:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OAW:[0-9]$" }
     returns: ack
@@ -922,21 +922,21 @@ commands:
   color_temperature_up:
     summary: "Raise the VAR colour temperature by 1-10 selectable steps (hex 1-A)"
     params:
-      steps: { type: string, pattern: "^[1-9A]$", required: true }
+      steps: { type: string, pattern: "^[1-9A]$", required: true, label: Steps, description: "Number of selectable steps, hex 1-A for 1 to 10." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSI:1E:{steps}", res: "1" } }
     expect: { status: 200, matches: "^OSI:1E:[0-9A-F]$" }
     returns: ack
   color_temperature_down:
     summary: "Lower the VAR colour temperature by 1-10 selectable steps (hex 1-A)"
     params:
-      steps: { type: string, pattern: "^[1-9A]$", required: true }
+      steps: { type: string, pattern: "^[1-9A]$", required: true, label: Steps, description: "Number of selectable steps, hex 1-A for 1 to 10." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSI:1F:{steps}", res: "1" } }
     expect: { status: 200, matches: "^OSI:1F:[0-9A-F]$" }
     returns: ack
   color_temperature:
     summary: "Set the VAR colour temperature in kelvin, 5-digit hex 007D0-03A98 (2000-15000 K)"
     params:
-      kelvin: { type: string, pattern: "^(?:007[D-F][0-9A-F]|00[89A-F][0-9A-F]{2}|0[12][0-9A-F]{3}|03[0-9][0-9A-F]{2}|03A[0-8][0-9A-F]|03A9[0-8])$", required: true }
+      kelvin: { type: string, pattern: "^(?:007[D-F][0-9A-F]|00[89A-F][0-9A-F]{2}|0[12][0-9A-F]{3}|03[0-9][0-9A-F]{2}|03A[0-8][0-9A-F]|03A9[0-8])$", required: true, label: Colour temperature, description: "VAR colour temperature in kelvin as five-digit hex, 007D0 to 03A98 for 2000 to 15000 K." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSI:20:{kelvin}", res: "1" } }
     expect: { status: 200, matches: "^OSI:20:[0-9A-F]{5}(?::[0-2])?$" }
     returns: ack
@@ -948,7 +948,7 @@ commands:
   r_gain:
     summary: "Set R gain, hex 738-8C8 for -200 to +200 (800 is 0)"
     params:
-      gain: { type: string, pattern: "^(?:73[89A-F]|7[4-9A-F][0-9A-F]|8[0-9AB][0-9A-F]|8C[0-8])$", required: true }
+      gain: { type: string, pattern: "^(?:73[89A-F]|7[4-9A-F][0-9A-F]|8[0-9AB][0-9A-F]|8C[0-8])$", required: true, label: R gain, description: "Three-digit hex 738-8C8 for -200 to +200, 800 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSG:39:{gain}", res: "1" } }
     expect: { status: 200, matches: "^OSG:39:[0-9A-F]{3}$" }
     returns: ack
@@ -960,7 +960,7 @@ commands:
   b_gain:
     summary: "Set B gain, hex 738-8C8 for -200 to +200 (800 is 0)"
     params:
-      gain: { type: string, pattern: "^(?:73[89A-F]|7[4-9A-F][0-9A-F]|8[0-9AB][0-9A-F]|8C[0-8])$", required: true }
+      gain: { type: string, pattern: "^(?:73[89A-F]|7[4-9A-F][0-9A-F]|8[0-9AB][0-9A-F]|8C[0-8])$", required: true, label: B gain, description: "Three-digit hex 738-8C8 for -200 to +200, 800 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSG:3A:{gain}", res: "1" } }
     expect: { status: 200, matches: "^OSG:3A:[0-9A-F]{3}$" }
     returns: ack
@@ -977,7 +977,7 @@ commands:
   awb_gain_offset:
     summary: "Set AWB gain offset on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: AWB gain offset, description: "On turns the AWB gain offset on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:0C:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:0C:[01]$" }
     returns: ack
@@ -989,7 +989,7 @@ commands:
   atw_speed:
     summary: "Set the ATW speed: 0 normal, 1 slow, 2 fast"
     params:
-      speed: { type: int, min: 0, max: 2, required: true }
+      speed: { type: int, min: 0, max: 2, required: true, label: ATW speed, description: "0 normal, 1 slow, 2 fast." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSI:25:{speed}", res: "1" } }
     expect: { status: 200, matches: "^OSI:25:[0-2]$" }
     returns: ack
@@ -1001,7 +1001,7 @@ commands:
   atw_target_r:
     summary: "Set the ATW R target, hex 76-8A for -10 to +10 (80 is 0)"
     params:
-      target: { type: string, pattern: "^(?:7[6-9A-F]|8[0-9A])$", required: true }
+      target: { type: string, pattern: "^(?:7[6-9A-F]|8[0-9A])$", required: true, label: ATW R target, description: "Two-digit hex 76-8A for -10 to +10, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:0D:{target}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:0D:[0-9A-F]{2}$" }
     returns: ack
@@ -1013,7 +1013,7 @@ commands:
   atw_target_b:
     summary: "Set the ATW B target, hex 76-8A for -10 to +10 (80 is 0)"
     params:
-      target: { type: string, pattern: "^(?:7[6-9A-F]|8[0-9A])$", required: true }
+      target: { type: string, pattern: "^(?:7[6-9A-F]|8[0-9A])$", required: true, label: ATW B target, description: "Two-digit hex 76-8A for -10 to +10, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:0E:{target}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:0E:[0-9A-F]{2}$" }
     returns: ack
@@ -1025,7 +1025,7 @@ commands:
   chroma_level:
     summary: "Set the chroma level: 00 off, hex 1D-E3 for -99% to +99% (80 is 0%)"
     params:
-      level: { type: string, pattern: "^(?:00|(?:1[D-F]|[2-9A-D][0-9A-F]|E[0-3]))$", required: true }
+      level: { type: string, pattern: "^(?:00|(?:1[D-F]|[2-9A-D][0-9A-F]|E[0-3]))$", required: true, label: Chroma level, description: "00 off, or two-digit hex 1D-E3 for -99% to +99%, 80 being 0%." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:B0:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSD:B0:[0-9A-F]{2}$" }
     returns: ack
@@ -1037,7 +1037,7 @@ commands:
   chroma_phase:
     summary: "Set the chroma phase, hex 61-9F for -31 to +31 (80 is 0)"
     params:
-      phase: { type: string, pattern: "^(?:6[1-9A-F]|[7-9][0-9A-F])$", required: true }
+      phase: { type: string, pattern: "^(?:6[1-9A-F]|[7-9][0-9A-F])$", required: true, label: Chroma phase, description: "Two-digit hex 61-9F for -31 to +31, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:0B:{phase}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:0B:[0-9A-F]{2}$" }
     returns: ack
@@ -1049,7 +1049,7 @@ commands:
   master_pedestal:
     summary: "Set the master pedestal, hex 738-8C8 for -200 to +200 (800 is 0)"
     params:
-      pedestal: { type: string, pattern: "^(?:73[89A-F]|7[4-9A-F][0-9A-F]|8[0-9AB][0-9A-F]|8C[0-8])$", required: true }
+      pedestal: { type: string, pattern: "^(?:73[89A-F]|7[4-9A-F][0-9A-F]|8[0-9AB][0-9A-F]|8C[0-8])$", required: true, label: Master pedestal, description: "Three-digit hex 738-8C8 for -200 to +200, 800 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:0F:{pedestal}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:0F:[0-9A-F]{3}$" }
     returns: ack
@@ -1061,7 +1061,7 @@ commands:
   detail:
     summary: "Set detail on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Detail, description: "On turns detail on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "ODT:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^ODT:[0-2]$" }
     returns: ack
@@ -1073,7 +1073,7 @@ commands:
   master_detail:
     summary: "Set the master detail level, hex 61-9F for -31 to +31 (80 is 0)"
     params:
-      level: { type: string, pattern: "^(?:6[1-9A-F]|[7-9][0-9A-F])$", required: true }
+      level: { type: string, pattern: "^(?:6[1-9A-F]|[7-9][0-9A-F])$", required: true, label: Master detail, description: "Two-digit hex 61-9F for -31 to +31, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:30:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSA:30:[0-9A-F]{2}$" }
     returns: ack
@@ -1085,7 +1085,7 @@ commands:
   detail_coring:
     summary: "Set detail coring, hex 00-3C for 0-60"
     params:
-      coring: { type: string, pattern: "^(?:[0-2][0-9A-F]|3[0-9A-C])$", required: true }
+      coring: { type: string, pattern: "^(?:[0-2][0-9A-F]|3[0-9A-C])$", required: true, label: Detail coring, description: "Two-digit hex 00-3C for 0 to 60." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:12:{coring}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:12:[0-9A-F]{2}$" }
     returns: ack
@@ -1097,7 +1097,7 @@ commands:
   v_detail_level:
     summary: "Set the vertical detail level, hex 79-87 for -7 to +7 (80 is 0)"
     params:
-      level: { type: string, pattern: "^(?:7[9A-F]|8[0-7])$", required: true }
+      level: { type: string, pattern: "^(?:7[9A-F]|8[0-7])$", required: true, label: V detail level, description: "Two-digit hex 79-87 for -7 to +7, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A1:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A1:[0-9A-F]{2}$" }
     returns: ack
@@ -1109,7 +1109,7 @@ commands:
   skin_detail:
     summary: "Set skin tone detail on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Skin detail, description: "On turns skin tone detail on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:40:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSA:40:[01]$" }
     returns: ack
@@ -1121,7 +1121,7 @@ commands:
   skin_detail_effect:
     summary: "Set the skin detail effect, hex 80-9F for 0 to +31"
     params:
-      effect: { type: string, pattern: "^[89][0-9A-F]$", required: true }
+      effect: { type: string, pattern: "^[89][0-9A-F]$", required: true, label: Skin detail effect, description: "Two-digit hex 80-9F for 0 to +31." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A3:{effect}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A3:[0-9A-F]{2}$" }
     returns: ack
@@ -1133,7 +1133,7 @@ commands:
   gamma_mode:
     summary: "Set the gamma mode: 00 hd, 01 normal, 02 cinema1, 03 cinema2, 04 still_like"
     params:
-      mode: { type: int, min: 0, max: 4, required: true }
+      mode: { type: int, min: 0, max: 4, required: true, label: Gamma mode, description: "0 HD, 1 normal, 2 cinema1, 3 cinema2, 4 still-like." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D7:{mode:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D7:(?:00|01|02|03|04)$" }
     returns: ack
@@ -1145,7 +1145,7 @@ commands:
   gamma:
     summary: "Set gamma, hex 67-94 for 0.30-0.75 in 0.01 steps"
     params:
-      gamma: { type: string, pattern: "^(?:6[7-9A-F]|[78][0-9A-F]|9[0-4])$", required: true }
+      gamma: { type: string, pattern: "^(?:6[7-9A-F]|[78][0-9A-F]|9[0-4])$", required: true, label: Gamma, description: "Two-digit hex 67-94 for 0.30 to 0.75 in 0.01 steps." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:6A:{gamma}", res: "1" } }
     expect: { status: 200, matches: "^OSA:6A:[0-9A-F]{2}$" }
     returns: ack
@@ -1157,7 +1157,7 @@ commands:
   drs:
     summary: "Set DRS: 0 off, 1 low, 2 mid, 3 high"
     params:
-      level: { type: int, min: 0, max: 3, required: true }
+      level: { type: int, min: 0, max: 3, required: true, label: DRS, description: "0 off, 1 low, 2 mid, 3 high." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:33:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSE:33:[0-3]$" }
     returns: ack
@@ -1169,7 +1169,7 @@ commands:
   knee_mode:
     summary: "Set the knee mode: 0 off, 2 auto, 3 low, 4 mid, 5 high"
     params:
-      mode: { type: enum, values: ["0", "2", "3", "4", "5"], required: true }
+      mode: { type: enum, values: ["0", "2", "3", "4", "5"], required: true, label: Knee mode, description: "0 off, 2 auto, 3 low, 4 mid, 5 high." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:2D:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OSA:2D:(?:0|2|3|4|5)$" }
     returns: ack
@@ -1181,7 +1181,7 @@ commands:
   white_clip:
     summary: "Set white clip on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: White clip, description: "On turns white clip on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:2E:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSA:2E:[01]$" }
     returns: ack
@@ -1193,7 +1193,7 @@ commands:
   white_clip_level:
     summary: "Set the white clip level, hex 00-13 for 90-109%"
     params:
-      level: { type: string, pattern: "^(?:0[0-9A-F]|1[0-3])$", required: true }
+      level: { type: string, pattern: "^(?:0[0-9A-F]|1[0-3])$", required: true, label: White clip level, description: "Two-digit hex 00-13 for 90% to 109%." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:2A:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSA:2A:[0-9A-F]{2}$" }
     returns: ack
@@ -1205,7 +1205,7 @@ commands:
   dnr:
     summary: "Set digital noise reduction: 00 off, 01 low, 02 high"
     params:
-      level: { type: int, min: 0, max: 2, required: true }
+      level: { type: int, min: 0, max: 2, required: true, label: DNR, description: "Digital noise reduction: 0 off, 1 low, 2 high." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:3A:{level:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSD:3A:(?:00|01|02)$" }
     returns: ack
@@ -1217,7 +1217,7 @@ commands:
   matrix_type:
     summary: "Set the matrix type: 0 normal, 3 user, 4 professional"
     params:
-      type: { type: enum, values: ["0", "3", "4"], required: true }
+      type: { type: enum, values: ["0", "3", "4"], required: true, label: Matrix type, description: "0 normal, 3 user, 4 professional." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:31:{type}", res: "1" } }
     expect: { status: 200, matches: "^OSE:31:(?:0|3|4)$" }
     returns: ack
@@ -1229,7 +1229,7 @@ commands:
   adaptive_matrix:
     summary: "Set adaptive matrix on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Adaptive matrix, description: "On turns the adaptive matrix on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:4F:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:4F:[01]$" }
     returns: ack
@@ -1241,7 +1241,7 @@ commands:
   matrix_r_g:
     summary: "Set the linear matrix R-G value, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-G value, description: "Linear matrix value as two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A4:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A4:[0-9A-F]{2}$" }
     returns: ack
@@ -1253,7 +1253,7 @@ commands:
   matrix_r_b:
     summary: "Set the linear matrix R-B value, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-B value, description: "Linear matrix value as two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A5:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A5:[0-9A-F]{2}$" }
     returns: ack
@@ -1265,7 +1265,7 @@ commands:
   matrix_g_r:
     summary: "Set the linear matrix G-R value, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: G-R value, description: "Linear matrix value as two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A6:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A6:[0-9A-F]{2}$" }
     returns: ack
@@ -1277,7 +1277,7 @@ commands:
   matrix_g_b:
     summary: "Set the linear matrix G-B value, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: G-B value, description: "Linear matrix value as two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A7:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A7:[0-9A-F]{2}$" }
     returns: ack
@@ -1289,7 +1289,7 @@ commands:
   matrix_b_r:
     summary: "Set the linear matrix B-R value, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: B-R value, description: "Linear matrix value as two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A8:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A8:[0-9A-F]{2}$" }
     returns: ack
@@ -1301,7 +1301,7 @@ commands:
   matrix_b_g:
     summary: "Set the linear matrix B-G value, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: B-G value, description: "Linear matrix value as two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:A9:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:A9:[0-9A-F]{2}$" }
     returns: ack
@@ -1313,7 +1313,7 @@ commands:
   color_correction_b_mg_saturation:
     summary: "Set the colour correction B-Mg saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: B-Mg saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:80:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:80:[0-9A-F]{2}$" }
     returns: ack
@@ -1325,7 +1325,7 @@ commands:
   color_correction_b_mg_phase:
     summary: "Set the colour correction B-Mg phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: B-Mg phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:81:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:81:[0-9A-F]{2}$" }
     returns: ack
@@ -1337,7 +1337,7 @@ commands:
   color_correction_mg_saturation:
     summary: "Set the colour correction Mg saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Mg saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:82:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:82:[0-9A-F]{2}$" }
     returns: ack
@@ -1349,7 +1349,7 @@ commands:
   color_correction_mg_phase:
     summary: "Set the colour correction Mg phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Mg phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:83:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:83:[0-9A-F]{2}$" }
     returns: ack
@@ -1361,7 +1361,7 @@ commands:
   color_correction_mg_r_saturation:
     summary: "Set the colour correction Mg-R saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Mg-R saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:84:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:84:[0-9A-F]{2}$" }
     returns: ack
@@ -1373,7 +1373,7 @@ commands:
   color_correction_mg_r_phase:
     summary: "Set the colour correction Mg-R phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Mg-R phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:85:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:85:[0-9A-F]{2}$" }
     returns: ack
@@ -1385,7 +1385,7 @@ commands:
   color_correction_mg_r_r_saturation:
     summary: "Set the colour correction Mg-R-R saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Mg-R-R saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:9A:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:9A:[0-9A-F]{2}$" }
     returns: ack
@@ -1397,7 +1397,7 @@ commands:
   color_correction_mg_r_r_phase:
     summary: "Set the colour correction Mg-R-R phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Mg-R-R phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:9B:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:9B:[0-9A-F]{2}$" }
     returns: ack
@@ -1409,7 +1409,7 @@ commands:
   color_correction_r_saturation:
     summary: "Set the colour correction R saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:86:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:86:[0-9A-F]{2}$" }
     returns: ack
@@ -1421,7 +1421,7 @@ commands:
   color_correction_r_phase:
     summary: "Set the colour correction R phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:87:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:87:[0-9A-F]{2}$" }
     returns: ack
@@ -1433,7 +1433,7 @@ commands:
   color_correction_r_r_yl_saturation:
     summary: "Set the colour correction R-R-Yl saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-R-Yl saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:9C:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:9C:[0-9A-F]{2}$" }
     returns: ack
@@ -1445,7 +1445,7 @@ commands:
   color_correction_r_r_yl_phase:
     summary: "Set the colour correction R-R-Yl phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-R-Yl phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:9D:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:9D:[0-9A-F]{2}$" }
     returns: ack
@@ -1457,7 +1457,7 @@ commands:
   color_correction_r_yl_saturation:
     summary: "Set the colour correction R-Yl saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-Yl saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:88:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:88:[0-9A-F]{2}$" }
     returns: ack
@@ -1469,7 +1469,7 @@ commands:
   color_correction_r_yl_phase:
     summary: "Set the colour correction R-Yl phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-Yl phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:89:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:89:[0-9A-F]{2}$" }
     returns: ack
@@ -1481,7 +1481,7 @@ commands:
   color_correction_r_yl_yl_saturation:
     summary: "Set the colour correction R-Yl-Yl saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-Yl-Yl saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:9E:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:9E:[0-9A-F]{2}$" }
     returns: ack
@@ -1493,7 +1493,7 @@ commands:
   color_correction_r_yl_yl_phase:
     summary: "Set the colour correction R-Yl-Yl phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: R-Yl-Yl phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:9F:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:9F:[0-9A-F]{2}$" }
     returns: ack
@@ -1505,7 +1505,7 @@ commands:
   color_correction_yl_saturation:
     summary: "Set the colour correction Yl saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Yl saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:8A:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:8A:[0-9A-F]{2}$" }
     returns: ack
@@ -1517,7 +1517,7 @@ commands:
   color_correction_yl_phase:
     summary: "Set the colour correction Yl phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Yl phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:8B:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:8B:[0-9A-F]{2}$" }
     returns: ack
@@ -1529,7 +1529,7 @@ commands:
   color_correction_yl_yl_g_saturation:
     summary: "Set the colour correction Yl-Yl-G saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Yl-Yl-G saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:1C:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:1C:[0-9A-F]{2}$" }
     returns: ack
@@ -1541,7 +1541,7 @@ commands:
   color_correction_yl_yl_g_phase:
     summary: "Set the colour correction Yl-Yl-G phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Yl-Yl-G phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:1D:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:1D:[0-9A-F]{2}$" }
     returns: ack
@@ -1553,7 +1553,7 @@ commands:
   color_correction_yl_g_saturation:
     summary: "Set the colour correction Yl-G saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Yl-G saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:8C:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:8C:[0-9A-F]{2}$" }
     returns: ack
@@ -1565,7 +1565,7 @@ commands:
   color_correction_yl_g_phase:
     summary: "Set the colour correction Yl-G phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Yl-G phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:8D:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:8D:[0-9A-F]{2}$" }
     returns: ack
@@ -1577,7 +1577,7 @@ commands:
   color_correction_g_saturation:
     summary: "Set the colour correction G saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: G saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:8E:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:8E:[0-9A-F]{2}$" }
     returns: ack
@@ -1589,7 +1589,7 @@ commands:
   color_correction_g_phase:
     summary: "Set the colour correction G phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: G phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:8F:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:8F:[0-9A-F]{2}$" }
     returns: ack
@@ -1601,7 +1601,7 @@ commands:
   color_correction_g_cy_saturation:
     summary: "Set the colour correction G-Cy saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: G-Cy saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:90:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:90:[0-9A-F]{2}$" }
     returns: ack
@@ -1613,7 +1613,7 @@ commands:
   color_correction_g_cy_phase:
     summary: "Set the colour correction G-Cy phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: G-Cy phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:91:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:91:[0-9A-F]{2}$" }
     returns: ack
@@ -1625,7 +1625,7 @@ commands:
   color_correction_cy_saturation:
     summary: "Set the colour correction Cy saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Cy saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:92:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:92:[0-9A-F]{2}$" }
     returns: ack
@@ -1637,7 +1637,7 @@ commands:
   color_correction_cy_phase:
     summary: "Set the colour correction Cy phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Cy phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:93:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:93:[0-9A-F]{2}$" }
     returns: ack
@@ -1649,7 +1649,7 @@ commands:
   color_correction_cy_b_saturation:
     summary: "Set the colour correction Cy-B saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Cy-B saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:94:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:94:[0-9A-F]{2}$" }
     returns: ack
@@ -1661,7 +1661,7 @@ commands:
   color_correction_cy_b_phase:
     summary: "Set the colour correction Cy-B phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: Cy-B phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:95:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:95:[0-9A-F]{2}$" }
     returns: ack
@@ -1673,7 +1673,7 @@ commands:
   color_correction_b_saturation:
     summary: "Set the colour correction B saturation, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: B saturation, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:96:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:96:[0-9A-F]{2}$" }
     returns: ack
@@ -1685,7 +1685,7 @@ commands:
   color_correction_b_phase:
     summary: "Set the colour correction B phase, hex 41-BF for -63 to +63 (80 is 0)"
     params:
-      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:4[1-9A-F]|[5-9AB][0-9A-F])$", required: true, label: B phase, description: "Two-digit hex 41-BF for -63 to +63, 80 being 0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:97:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSD:97:[0-9A-F]{2}$" }
     returns: ack
@@ -1697,7 +1697,7 @@ commands:
   focus_mode:
     summary: "Set focus to auto or manual"
     params:
-      auto: { type: bool, required: true }
+      auto: { type: bool, required: true, label: Auto focus, description: "On sets focus to auto, off to manual." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OAF:{auto:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OAF:[01]$" }
     returns: ack
@@ -1709,7 +1709,7 @@ commands:
   auto_focus:
     summary: "Set focus to auto or manual (pan-tilt head command)"
     params:
-      auto: { type: bool, required: true }
+      auto: { type: bool, required: true, label: Auto focus, description: "On sets focus to auto, off to manual." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#D1{auto:bool01}", res: "1" } }
     expect: { status: 200, matches: "^d1[01]$" }
     returns: ack
@@ -1721,7 +1721,7 @@ commands:
   af_sensitivity:
     summary: "Set the auto focus sensitivity: 0 normal, 1 stable, 2 stable2"
     params:
-      sensitivity: { type: int, min: 0, max: 2, required: true }
+      sensitivity: { type: int, min: 0, max: 2, required: true, label: AF sensitivity, description: "0 normal, 1 stable, 2 stable2." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D8:{sensitivity}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D8:[0-2]$" }
     returns: ack
@@ -1733,7 +1733,7 @@ commands:
   digital_zoom:
     summary: "Enable digital zoom (D.Zoom). Optical zoom is digital zoom and i.Zoom both off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Digital zoom, description: "On turns digital zoom (D.Zoom) on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:70:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSE:70:[01]$" }
     returns: ack
@@ -1745,7 +1745,7 @@ commands:
   i_zoom:
     summary: "Enable i.Zoom"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: i.Zoom, description: "On turns i.Zoom on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:B3:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSD:B3:[01]$" }
     returns: ack
@@ -1757,7 +1757,7 @@ commands:
   max_digital_zoom:
     summary: "Set the maximum digital zoom, x2-x10"
     params:
-      factor: { type: int, min: 2, max: 10, required: true }
+      factor: { type: int, min: 2, max: 10, required: true, label: Maximum digital zoom, description: "Largest digital zoom factor, x2 to x10." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:7A:{factor:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSE:7A:[0-9]{2}$" }
     returns: ack
@@ -1769,7 +1769,7 @@ commands:
   digital_extender:
     summary: "Set the digital extender: 0 off, 1 x1.4, 2 x2.0"
     params:
-      extender: { type: int, min: 0, max: 2, required: true }
+      extender: { type: int, min: 0, max: 2, required: true, label: Digital extender, description: "0 off, 1 x1.4, 2 x2.0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:4E:{extender}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:4E:[0-2]$" }
     returns: ack
@@ -1786,7 +1786,7 @@ commands:
   digital_zoom_magnification:
     summary: "Set the digital zoom magnification, 0100-9999 for x1.00-x99.99"
     params:
-      magnification: { type: int, min: 100, max: 9999, required: true }
+      magnification: { type: int, min: 100, max: 9999, required: true, label: Magnification, description: "Digital zoom in hundredths, 100 for x1.00 to 9999 for x99.99." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:76:{magnification:04d}", res: "1" } }
     expect: { status: 200, matches: "^OSE:76:[0-9]{4}$" }
     returns: ack
@@ -1798,7 +1798,7 @@ commands:
   ois:
     summary: "Set image stabilisation (AW-UE30/UE40/UE50 take 0-1; on AW-UE80 1 is stable): 0 off, 1 on, 2 pan_tilt"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true, label: Image stabilisation, description: "0 off, 1 on, 2 pan_tilt; AW-UE30/UE40/UE50 take 0-1, and on the AW-UE80 1 is stable." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OIS:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OIS:[0-2]$" }
     returns: ack
@@ -1810,14 +1810,14 @@ commands:
   zoom_speed:
     summary: "Zoom at a speed: 01 wide fastest, 49 wide slowest, 50 stop, 51 tele slowest, 99 tele fastest"
     params:
-      speed: { type: int, min: 1, max: 99, required: true }
+      speed: { type: int, min: 1, max: 99, required: true, label: Zoom speed, description: "01 wide fastest, 49 wide slowest, 50 stop, 51 tele slowest, 99 tele fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#Z{speed:02d}", res: "1" } }
     expect: { status: 200, matches: "^zS[0-9]{2}$" }
     returns: ack
   zoom_position:
     summary: "Zoom to a position, hex 555 (wide) to FFF (tele)"
     params:
-      position: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true }
+      position: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true, label: Zoom position, description: "Three-digit hex, 555 wide to FFF tele." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#AXZ{position}", res: "1" } }
     expect: { status: 200, matches: "^axz[0-9A-F]{3}$" }
     returns: ack
@@ -1829,14 +1829,14 @@ commands:
   focus_speed:
     summary: "Focus at a speed: 01 near fastest, 50 stop, 99 far fastest. Manual focus only"
     params:
-      speed: { type: int, min: 1, max: 99, required: true }
+      speed: { type: int, min: 1, max: 99, required: true, label: Focus speed, description: "01 near fastest, 50 stop, 99 far fastest; manual focus only." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#F{speed:02d}", res: "1" } }
     expect: { status: 200, matches: "^fS[0-9]{2}$" }
     returns: ack
   focus_position:
     summary: "Focus to a position, hex 555 (near) to FFF (far). Manual focus only"
     params:
-      position: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true }
+      position: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true, label: Focus position, description: "Three-digit hex, 555 near to FFF far; manual focus only." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#AXF{position}", res: "1" } }
     expect: { status: 200, matches: "^axf[0-9A-F]{3}$" }
     returns: ack
@@ -1853,15 +1853,15 @@ commands:
   touch_af:
     summary: "Focus on a point of the picture: horizontal and vertical position, hex 00-64 for 0-100%"
     params:
-      h: { type: string, pattern: "^(?:[0-5][0-9A-F]|6[0-4])$", required: true }
-      v: { type: string, pattern: "^(?:[0-5][0-9A-F]|6[0-4])$", required: true }
+      h: { type: string, pattern: "^(?:[0-5][0-9A-F]|6[0-4])$", required: true, label: Horizontal, description: "Horizontal position as two-digit hex 00-64 for 0% (left) to 100%." }
+      v: { type: string, pattern: "^(?:[0-5][0-9A-F]|6[0-4])$", required: true, label: Vertical, description: "Vertical position as two-digit hex 00-64 for 0% (top) to 100%." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:28:{h}:{v}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:28:[0-9A-F]{2}:[0-9A-F]{2}$" }
     returns: ack
   iris_position:
     summary: "Set the iris position, hex 555 (closed) to FFF (open). Manual iris only"
     params:
-      position: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true }
+      position: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true, label: Iris position, description: "Three-digit hex, 555 closed to FFF open; manual iris only." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#AXI{position}", res: "1" } }
     expect: { status: 200, matches: "^axi[0-9A-F]{3}$" }
     returns: ack
@@ -1873,7 +1873,7 @@ commands:
   iris_level:
     summary: "Set the iris on a 01-99 scale, 01 closed to 99 open. Manual iris only"
     params:
-      level: { type: int, min: 1, max: 99, required: true }
+      level: { type: int, min: 1, max: 99, required: true, label: Iris, description: "01 closed to 99 open; manual iris only." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#I{level:02d}", res: "1" } }
     expect: { status: 200, matches: "^iC[0-9]{2}$" }
     returns: ack
@@ -1885,7 +1885,7 @@ commands:
   iris_volume:
     summary: "Set the iris, hex 000 (closed) to 3FF (open). Manual iris only"
     params:
-      volume: { type: string, pattern: "^[0-3][0-9A-F]{2}$", required: true }
+      volume: { type: string, pattern: "^[0-3][0-9A-F]{2}$", required: true, label: Iris, description: "Three-digit hex, 000 closed to 3FF open; manual iris only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "ORV:{volume}", res: "1" } }
     expect: { status: 200, matches: "^ORV:[0-9A-F]{3}$" }
     returns: ack
@@ -1907,7 +1907,7 @@ commands:
   lens_position_notification:
     summary: "Turn the 300 ms lens position notification (lPI) on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Lens position notification, description: "On turns the 300 ms lens position notification on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#LPC{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^lPC[01]$" }
     returns: ack
@@ -1939,7 +1939,7 @@ commands:
   frequency:
     summary: "Set the system frequency. The camera restarts after a change: 0 59.94Hz, 1 50Hz, 2 24Hz, 3 23.98Hz"
     params:
-      frequency: { type: int, min: 0, max: 3, required: true }
+      frequency: { type: int, min: 0, max: 3, required: true, label: Frequency, description: "0 59.94 Hz, 1 50 Hz, 2 24 Hz, 3 23.98 Hz; the camera restarts after a change." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:77:{frequency}", res: "1" } }
     expect: { status: 200, matches: "^OSE:77:[0-3]$" }
     returns: ack
@@ -1951,7 +1951,7 @@ commands:
   format:
     summary: "Set the video format (hex code; which apply depends on frequency and model): 1 720/59.94p, 2 720/50p, 4 1080/59.94i, 5 1080/50i, 7 1080/29.97PsF, 8 1080/25PsF, A 1080/23.98PsF, 10 1080/59.94p, 11 1080/50p, 14 1080/29.97p, 15 1080/25p, 16 1080/23.98p(59.94i), 17 2160/29.97p, 18 2160/25p, 19 2160/59.94p, 1A 2160/50p, 1B 2160/23.98p, 21 2160/24p, 22 1080/24p, 23 1080/23.98p"
     params:
-      format: { type: enum, values: ["1", "2", "4", "5", "7", "8", "A", "10", "11", "14", "15", "16", "17", "18", "19", "1A", "1B", "21", "22", "23"], required: true }
+      format: { type: enum, values: ["1", "2", "4", "5", "7", "8", "A", "10", "11", "14", "15", "16", "17", "18", "19", "1A", "1B", "21", "22", "23"], required: true, label: Video format, description: "Video format by its hex code, such as 10 for 1080/59.94p or 19 for 2160/59.94p; which formats apply depends on the frequency and model." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:87:{format}", res: "1" } }
     expect: { status: 200, matches: "^OSA:87:(?:1|2|4|5|7|8|A|10|11|14|15|16|17|18|19|1A|1B|21|22|23)$" }
     returns: ack
@@ -1963,7 +1963,7 @@ commands:
   horizontal_phase:
     summary: "Set the genlock horizontal phase, hex 000-3FF for -206 to +49"
     params:
-      phase: { type: string, pattern: "^[0-3][0-9A-F]{2}$", required: true }
+      phase: { type: string, pattern: "^[0-3][0-9A-F]{2}$", required: true, label: Horizontal phase, description: "Genlock horizontal phase as three-digit hex, 000-3FF for -206 to +49." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OHP:{phase}", res: "1" } }
     expect: { status: 200, matches: "^OHP:[0-9A-F]{3}$" }
     returns: ack
@@ -1975,7 +1975,7 @@ commands:
   tracking_data_serial:
     summary: "Turn tracking data output over serial on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Tracking data (serial), description: "On turns tracking data output over serial on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:54:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:54:[01]$" }
     returns: ack
@@ -1987,7 +1987,7 @@ commands:
   tracking_data_ip:
     summary: "Turn tracking data output over IP on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Tracking data (IP), description: "On turns tracking data output over IP on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:55:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:55:[01]$" }
     returns: ack
@@ -1999,7 +1999,7 @@ commands:
   tracking_data_invert_pan_tilt:
     summary: "Invert the pan/tilt axes in tracking data"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Invert pan/tilt, description: "On turns inversion of the pan and tilt axes in tracking data on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:C1:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:C1:[01]$" }
     returns: ack
@@ -2011,7 +2011,7 @@ commands:
   tracking_data_camera_id:
     summary: "Set the camera ID in tracking data, hex 00-FF"
     params:
-      camera_id: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true }
+      camera_id: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true, label: Camera ID, description: "Camera ID carried in tracking data, two-digit hex 00-FF." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:F4:{camera_id}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:F4:[0-9A-F]{2}$" }
     returns: ack
@@ -2023,7 +2023,7 @@ commands:
   wireless_control:
     summary: "Enable or disable the wireless remote control"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Wireless control, description: "On turns the wireless remote control on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#WLC{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^wLC[01]$" }
     returns: ack
@@ -2035,7 +2035,7 @@ commands:
   wireless_id:
     summary: "Set the wireless remote control ID, 1-4 for CAM1-CAM4 (sent as 0-3)"
     params:
-      camera: { type: int, min: 1, max: 4, required: true }
+      camera: { type: int, min: 1, max: 4, required: true, label: Wireless ID, description: "Wireless remote control ID 1-4, as CAM1 to CAM4." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#RID{camera:-1}", res: "1" } }
     expect: { status: 200, matches: "^rID[0-9]+$" }
     returns: ack
@@ -2047,7 +2047,7 @@ commands:
   fan:
     summary: "Set the fan: 0 auto, 1 high, 2 mid, 3 low"
     params:
-      mode: { type: int, min: 0, max: 3, required: true }
+      mode: { type: int, min: 0, max: 3, required: true, label: Fan, description: "0 auto, 1 high, 2 mid, 3 low." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#FAN{mode}", res: "1" } }
     expect: { status: 200, matches: "^fAN[0-3]$" }
     returns: ack
@@ -2064,7 +2064,7 @@ commands:
   usb_mode:
     summary: "Turn USB mode on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: USB mode, description: "On turns USB mode on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D3:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D3:[01]$" }
     returns: ack
@@ -2076,7 +2076,7 @@ commands:
   usb_auto_active:
     summary: "Turn USB auto active on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: USB auto active, description: "On turns USB auto active on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D4:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D4:[01]$" }
     returns: ack
@@ -2088,7 +2088,7 @@ commands:
   usb_auto_standby:
     summary: "Turn USB auto standby on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: USB auto standby, description: "On turns USB auto standby on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:DC:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:DC:[01]$" }
     returns: ack
@@ -2100,7 +2100,7 @@ commands:
   video_conference_mode:
     summary: "Turn video conference mode on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Video conference mode, description: "On turns video conference mode on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:F3:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:F3:[01]$" }
     returns: ack
@@ -2112,7 +2112,7 @@ commands:
   auto_tracking:
     summary: "Turn auto tracking on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Auto tracking, description: "On turns auto tracking on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:B6:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSL:B6:[01]$" }
     returns: ack
@@ -2124,7 +2124,7 @@ commands:
   auto_tracking_angle:
     summary: "Set the auto tracking framing: 0 off, 1 full_body, 2 upper_body"
     params:
-      angle: { type: int, min: 0, max: 2, required: true }
+      angle: { type: int, min: 0, max: 2, required: true, label: Framing, description: "0 off, 1 full body, 2 upper body." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:B7:{angle}", res: "1" } }
     expect: { status: 200, matches: "^OSL:B7:[0-2]$" }
     returns: ack
@@ -2136,7 +2136,7 @@ commands:
   auto_tracking_target_marker:
     summary: "Show the auto tracking target marker"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Target marker, description: "On turns the auto tracking target marker on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:B8:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSL:B8:[01]$" }
     returns: ack
@@ -2153,14 +2153,14 @@ commands:
   tracking:
     summary: "Start or stop tracking (start needs status not tracking; stop needs tracking or lost)"
     params:
-      start: { type: bool, required: true }
+      start: { type: bool, required: true, label: Start, description: "On starts tracking (when not already tracking), off stops it (when tracking or lost)." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:BC:{start:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSL:BC:[01]$" }
     returns: ack
   tracking_auto_start:
     summary: "Enable or disable automatic tracking start"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Auto start, description: "On turns automatic tracking start on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:BD:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSL:BD:[01]$" }
     returns: ack
@@ -2172,7 +2172,7 @@ commands:
   tracking_mask_top:
     summary: "Set the auto tracking top mask in pixels, hex 000-438 for 0-1080"
     params:
-      pixels: { type: string, pattern: "^(?:[0-3][0-9A-F]{2}|4[0-2][0-9A-F]|43[0-8])$", required: true }
+      pixels: { type: string, pattern: "^(?:[0-3][0-9A-F]{2}|4[0-2][0-9A-F]|43[0-8])$", required: true, label: Top mask, description: "Height of the mask in pixels as three-digit hex, 000-438 for 0 to 1080." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:BE:{pixels}", res: "1" } }
     expect: { status: 200, matches: "^OSL:BE:[0-9A-F]{3}$" }
     returns: ack
@@ -2184,7 +2184,7 @@ commands:
   tracking_mask_bottom:
     summary: "Set the auto tracking bottom mask in pixels, hex 000-438 for 0-1080"
     params:
-      pixels: { type: string, pattern: "^(?:[0-3][0-9A-F]{2}|4[0-2][0-9A-F]|43[0-8])$", required: true }
+      pixels: { type: string, pattern: "^(?:[0-3][0-9A-F]{2}|4[0-2][0-9A-F]|43[0-8])$", required: true, label: Bottom mask, description: "Height of the mask in pixels as three-digit hex, 000-438 for 0 to 1080." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:BF:{pixels}", res: "1" } }
     expect: { status: 200, matches: "^OSL:BF:[0-9A-F]{3}$" }
     returns: ack
@@ -2196,7 +2196,7 @@ commands:
   tracking_mask_left:
     summary: "Set the auto tracking left mask in pixels, hex 000-780 for 0-1920"
     params:
-      pixels: { type: string, pattern: "^(?:[0-6][0-9A-F]{2}|7[0-7][0-9A-F]|780)$", required: true }
+      pixels: { type: string, pattern: "^(?:[0-6][0-9A-F]{2}|7[0-7][0-9A-F]|780)$", required: true, label: Left mask, description: "Width of the mask in pixels as three-digit hex, 000-780 for 0 to 1920." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:C0:{pixels}", res: "1" } }
     expect: { status: 200, matches: "^OSL:C0:[0-9A-F]{3}$" }
     returns: ack
@@ -2208,7 +2208,7 @@ commands:
   tracking_mask_right:
     summary: "Set the auto tracking right mask in pixels, hex 000-780 for 0-1920"
     params:
-      pixels: { type: string, pattern: "^(?:[0-6][0-9A-F]{2}|7[0-7][0-9A-F]|780)$", required: true }
+      pixels: { type: string, pattern: "^(?:[0-6][0-9A-F]{2}|7[0-7][0-9A-F]|780)$", required: true, label: Right mask, description: "Width of the mask in pixels as three-digit hex, 000-780 for 0 to 1920." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:C1:{pixels}", res: "1" } }
     expect: { status: 200, matches: "^OSL:C1:[0-9A-F]{3}$" }
     returns: ack
@@ -2220,7 +2220,7 @@ commands:
   tracking_home_position:
     summary: "Set the auto tracking home position: 0 preset1, 1 preset2, 2 preset3, 3 none, 4 wide"
     params:
-      position: { type: int, min: 0, max: 4, required: true }
+      position: { type: int, min: 0, max: 4, required: true, label: Home position, description: "0 preset1, 1 preset2, 2 preset3, 3 none, 4 wide." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSL:C2:{position}", res: "1" } }
     expect: { status: 200, matches: "^OSL:C2:[0-4]$" }
     returns: ack
@@ -2232,7 +2232,7 @@ commands:
   auto_tracking_tally:
     summary: "Enable or disable the auto tracking tally"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Auto tracking tally, description: "On turns the auto tracking tally on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSM:3D:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSM:3D:[01]$" }
     returns: ack
@@ -2244,7 +2244,7 @@ commands:
   auto_tracking_amber_led:
     summary: "Turn the auto tracking amber LED on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Amber LED, description: "On turns the auto tracking amber LED on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSM:3E:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSM:3E:[01]$" }
     returns: ack
@@ -2256,7 +2256,7 @@ commands:
   sdi_format:
     summary: "Set the 3G-SDI output format (hex code): 1 720/59.94p, 2 720/50p, 4 1080/59.94i, 5 1080/50i, 7 1080/29.97PsF, 8 1080/25PsF, A 1080/23.98PsF, 10 1080/59.94p, 11 1080/50p, 14 1080/29.97p, 15 1080/25p, 16 1080/23.98p(59.94i), 22 1080/24p, 23 1080/23.98p"
     params:
-      format: { type: enum, values: ["1", "2", "4", "5", "7", "8", "A", "10", "11", "14", "15", "16", "22", "23"], required: true }
+      format: { type: enum, values: ["1", "2", "4", "5", "7", "8", "A", "10", "11", "14", "15", "16", "22", "23"], required: true, label: SDI format, description: "3G-SDI output format by its hex code, such as 10 for 1080/59.94p; which apply depends on the frequency." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:21:{format}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:21:(?:1|2|4|5|7|8|A|10|11|14|15|16|22|23)$" }
     returns: ack
@@ -2268,7 +2268,7 @@ commands:
   sdi_3g_level:
     summary: "Set the 3G-SDI output level: 0 level_a, 1 level_b"
     params:
-      level: { type: int, min: 0, max: 1, required: true }
+      level: { type: int, min: 0, max: 1, required: true, label: 3G-SDI level, description: "0 level A, 1 level B." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSI:29:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSI:29:[0-1]$" }
     returns: ack
@@ -2280,7 +2280,7 @@ commands:
   hdmi_format:
     summary: "Set the HDMI output format (hex code): 1 720/59.94p, 2 720/50p, 4 1080/59.94i, 5 1080/50i, 10 1080/59.94p, 11 1080/50p, 14 1080/29.97p, 15 1080/25p, 16 1080/23.98p(59.94i), 17 2160/29.97p, 18 2160/25p, 19 2160/59.94p, 1A 2160/50p, 1B 2160/23.98p, 21 2160/24p, 22 1080/24p, 23 1080/23.98p"
     params:
-      format: { type: enum, values: ["1", "2", "4", "5", "10", "11", "14", "15", "16", "17", "18", "19", "1A", "1B", "21", "22", "23"], required: true }
+      format: { type: enum, values: ["1", "2", "4", "5", "10", "11", "14", "15", "16", "17", "18", "19", "1A", "1B", "21", "22", "23"], required: true, label: HDMI format, description: "HDMI output format by its hex code, such as 10 for 1080/59.94p; which apply depends on the frequency." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:25:{format}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:25:(?:1|2|4|5|10|11|14|15|16|17|18|19|1A|1B|21|22|23)$" }
     returns: ack
@@ -2292,7 +2292,7 @@ commands:
   hdmi_video_sampling:
     summary: "Set the HDMI video sampling: 2 ypbpr422, 4 ypbpr420"
     params:
-      sampling: { type: enum, values: ["2", "4"], required: true }
+      sampling: { type: enum, values: ["2", "4"], required: true, label: Video sampling, description: "2 YPbPr 4:2:2, 4 YPbPr 4:2:0." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:68:{sampling}", res: "1" } }
     expect: { status: 200, matches: "^OSE:68:(?:2|4)$" }
     returns: ack
@@ -2304,7 +2304,7 @@ commands:
   color_bar:
     summary: "Show colour bars or the camera picture"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Colour bars, description: "On turns colour bars in place of the camera picture on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "DCB:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^DCB:[01]$" }
     returns: ack
@@ -2316,7 +2316,7 @@ commands:
   color_bar_type:
     summary: "Set the colour bar type: 0 type2_full_bar_ebu, 1 type1_smpte"
     params:
-      type: { type: int, min: 0, max: 1, required: true }
+      type: { type: int, min: 0, max: 1, required: true, label: Colour bar type, description: "0 type 2 full bar (EBU), 1 type 1 (SMPTE)." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSD:BA:{type}", res: "1" } }
     expect: { status: 200, matches: "^OSD:BA:[0-1]$" }
     returns: ack
@@ -2328,7 +2328,7 @@ commands:
   color_bar_tone:
     summary: "Set the colour bar test tone: 0 off, 1 low, 2 normal"
     params:
-      tone: { type: int, min: 0, max: 2, required: true }
+      tone: { type: int, min: 0, max: 2, required: true, label: Test tone, description: "0 off, 1 low, 2 normal." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:27:{tone}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:27:[0-2]$" }
     returns: ack
@@ -2340,7 +2340,7 @@ commands:
   audio:
     summary: "Turn audio on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Audio, description: "On turns audio on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:D0:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSA:D0:[01]$" }
     returns: ack
@@ -2352,7 +2352,7 @@ commands:
   audio_input_type:
     summary: "Set the audio input type: 0 mic, 3 line"
     params:
-      input: { type: enum, values: ["0", "3"], required: true }
+      input: { type: enum, values: ["0", "3"], required: true, label: Audio input, description: "0 mic, 3 line." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:D1:{input}", res: "1" } }
     expect: { status: 200, matches: "^OSA:D1:(?:0|3)$" }
     returns: ack
@@ -2364,22 +2364,22 @@ commands:
   audio_volume:
     summary: "Set an audio channel's volume, hex 5C-8C for -36 to +12 dB (80 is 0 dB)"
     params:
-      channel: { type: int, min: 1, max: 2, required: true }
-      level: { type: string, pattern: "^(?:5[C-F]|[67][0-9A-F]|8[0-9A-C])$", required: true }
+      channel: { type: int, min: 1, max: 2, required: true, label: Channel, description: "Audio channel 1 or 2." }
+      level: { type: string, pattern: "^(?:5[C-F]|[67][0-9A-F]|8[0-9A-C])$", required: true, label: Volume, description: "Two-digit hex 5C-8C for -36 to +12 dB, 80 being 0 dB." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:D5:{channel:-1}:{level}", res: "1" } }
     expect: { status: 200, matches: "^OSA:D5:[01]:[0-9A-F]{2}$" }
     returns: ack
   get_audio_volume:
     summary: "Query an audio channel's volume, hex 5C-8C for -36 to +12 dB"
     params:
-      channel: { type: int, min: 1, max: 2, required: true }
+      channel: { type: int, min: 1, max: 2, required: true, label: Channel, description: "Audio channel 1 or 2." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "QSA:D5:{channel:-1}", res: "1" } }
     expect: { status: 200, matches: "^OSA:D5:[01]:([0-9A-F]{2})$" }
     returns: value
   audio_plugin_power:
     summary: "Turn microphone plug-in power on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Plug-in power, description: "On turns microphone plug-in power on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:D2:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSA:D2:[01]$" }
     returns: ack
@@ -2391,7 +2391,7 @@ commands:
   osd_mix:
     summary: "Set which outputs carry the OSD: a hex bit mask, bit0 3G-SDI, bit1 HDMI, bit4 IP/NDI|HX, bit5 12G-SDI, bit7 NDI"
     params:
-      outputs: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true }
+      outputs: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true, label: Outputs, description: "Two-digit hex bit mask of outputs carrying the OSD: bit 0 3G-SDI, bit 1 HDMI, bit 4 IP/NDI|HX, bit 5 12G-SDI, bit 7 NDI." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:7B:{outputs}", res: "1" } }
     expect: { status: 200, matches: "^OSE:7B:[0-9A-F]{2}$" }
     returns: ack
@@ -2403,7 +2403,7 @@ commands:
   osd_off_with_tally:
     summary: "Hide the OSD while tally is on"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: OSD off with tally, description: "On turns hiding the OSD while tally is on on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:75:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSE:75:[01]$" }
     returns: ack
@@ -2415,7 +2415,7 @@ commands:
   osd_status:
     summary: "Show status (such as AWB results) on screen"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: OSD status, description: "On turns status display (such as AWB results) on screen on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:88:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSA:88:[01]$" }
     returns: ack
@@ -2427,7 +2427,7 @@ commands:
   tally_enable:
     summary: "Enable or disable tally"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Tally, description: "On turns tally on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#TAE{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^tAE[01]$" }
     returns: ack
@@ -2439,7 +2439,7 @@ commands:
   tally_led_limit_red:
     summary: "Limit the red tally LED"
     params:
-      limited: { type: bool, required: true }
+      limited: { type: bool, required: true, label: Limit, description: "On limits the red tally LED, off does not." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D9:{limited:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D9:[01]$" }
     returns: ack
@@ -2451,7 +2451,7 @@ commands:
   tally_led_limit_green:
     summary: "Limit the green tally LED"
     params:
-      limited: { type: bool, required: true }
+      limited: { type: bool, required: true, label: Limit, description: "On limits the green tally LED, off does not." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:DA:{limited:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:DA:[01]$" }
     returns: ack
@@ -2463,7 +2463,7 @@ commands:
   tally_led_limit_blue:
     summary: "Limit the blue tally LED"
     params:
-      limited: { type: bool, required: true }
+      limited: { type: bool, required: true, label: Limit, description: "On limits the blue tally LED, off does not." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:DB:{limited:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:DB:[01]$" }
     returns: ack
@@ -2475,7 +2475,7 @@ commands:
   tally_brightness:
     summary: "Set the tally lamp brightness: 0 low, 1 mid, 2 high"
     params:
-      brightness: { type: int, min: 0, max: 2, required: true }
+      brightness: { type: int, min: 0, max: 2, required: true, label: Brightness, description: "0 low, 1 mid, 2 high." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSA:D3:{brightness}", res: "1" } }
     expect: { status: 200, matches: "^OSA:D3:[0-2]$" }
     returns: ack
@@ -2487,7 +2487,7 @@ commands:
   tally_red:
     summary: "Turn the red tally on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Red tally, description: "On turns the red tally on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "TLR:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^TLR:[01]$" }
     returns: ack
@@ -2499,7 +2499,7 @@ commands:
   tally_green:
     summary: "Turn the green tally on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Green tally, description: "On turns the green tally on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "TLG:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^TLG:[01]$" }
     returns: ack
@@ -2511,7 +2511,7 @@ commands:
   tally_ptz:
     summary: "Turn the (red) tally on or off with the pan-tilt head command"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Tally, description: "On turns the (red) tally on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#DA{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^dA[01]$" }
     returns: ack
@@ -2528,7 +2528,7 @@ commands:
   status_lamp:
     summary: "Enable or disable the status lamp"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Status lamp, description: "On turns the status lamp on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#LMP{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^lMP[01]$" }
     returns: ack
@@ -2540,7 +2540,7 @@ commands:
   external_output_1:
     summary: "Set what external output 1 signals: 0 off, 1 r_tally, 2 g_tally"
     params:
-      signal: { type: int, min: 0, max: 2, required: true }
+      signal: { type: int, min: 0, max: 2, required: true, label: Signal, description: "0 off, 1 red tally, 2 green tally." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:41:{signal}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:41:[0-2]$" }
     returns: ack
@@ -2552,7 +2552,7 @@ commands:
   external_output_2:
     summary: "Set what external output 2 signals: 0 off, 1 r_tally, 2 g_tally"
     params:
-      signal: { type: int, min: 0, max: 2, required: true }
+      signal: { type: int, min: 0, max: 2, required: true, label: Signal, description: "0 off, 1 red tally, 2 green tally." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:42:{signal}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:42:[0-2]$" }
     returns: ack
@@ -2564,7 +2564,7 @@ commands:
   install_position:
     summary: "Set the installation position: 0 desktop, 1 hanging"
     params:
-      position: { type: int, min: 0, max: 1, required: true }
+      position: { type: int, min: 0, max: 1, required: true, label: Installation, description: "0 desktop, 1 hanging." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#INS{position}", res: "1" } }
     expect: { status: 200, matches: "^iNS[0-1]$" }
     returns: ack
@@ -2576,7 +2576,7 @@ commands:
   pan_tilt_speed_mode:
     summary: "Set the pan/tilt speed mode: 0 normal_60, 1 fast1_90, 2 fast2_180"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true, label: Speed mode, description: "0 normal (60), 1 fast1 (90), 2 fast2 (180)." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:2D:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:2D:[0-2]$" }
     returns: ack
@@ -2588,7 +2588,7 @@ commands:
   pan_tilt_acceleration:
     summary: "Set pan/tilt acceleration to auto or manual"
     params:
-      auto: { type: bool, required: true }
+      auto: { type: bool, required: true, label: Auto acceleration, description: "On sets pan/tilt acceleration to auto, off to manual." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A2:{auto:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A2:[01]$" }
     returns: ack
@@ -2600,7 +2600,7 @@ commands:
   pan_tilt_rise_s_curve:
     summary: "Set the pan/tilt rise s curve, hex 00-1E for 0-30. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true }
+      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true, label: Rise S-curve, description: "Two-digit hex 00-1E for 0 to 30; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A3:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A3:[0-9A-F]{2}$" }
     returns: ack
@@ -2612,7 +2612,7 @@ commands:
   pan_tilt_fall_s_curve:
     summary: "Set the pan/tilt fall s curve, hex 00-1E for 0-30. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true }
+      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true, label: Fall S-curve, description: "Two-digit hex 00-1E for 0 to 30; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A4:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A4:[0-9A-F]{2}$" }
     returns: ack
@@ -2624,7 +2624,7 @@ commands:
   pan_tilt_rise_acceleration:
     summary: "Set the pan/tilt rise acceleration, hex 01-FF for 1-255. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Rise acceleration, description: "Two-digit hex 01-FF for 1 to 255; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A5:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A5:[0-9A-F]{2}$" }
     returns: ack
@@ -2636,7 +2636,7 @@ commands:
   pan_tilt_fall_acceleration:
     summary: "Set the pan/tilt fall acceleration, hex 01-FF for 1-255. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Fall acceleration, description: "Two-digit hex 01-FF for 1 to 255; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A6:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A6:[0-9A-F]{2}$" }
     returns: ack
@@ -2648,7 +2648,7 @@ commands:
   speed_with_zoom:
     summary: "Slow pan/tilt as the lens zooms toward tele"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Speed with zoom, description: "On turns slowing pan and tilt as the lens zooms toward tele on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#SWZ{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^sWZ[01]$" }
     returns: ack
@@ -2660,7 +2660,7 @@ commands:
   focus_adjust_with_ptz:
     summary: "Adjust focus with pan/tilt/zoom. Manual focus only"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Focus adjust with PTZ, description: "On turns focus adjustment with pan, tilt and zoom (manual focus only) on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OAZ:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OAZ:[01]$" }
     returns: ack
@@ -2672,7 +2672,7 @@ commands:
   privacy_mode:
     summary: "Turn privacy mode on or off"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Privacy mode, description: "On turns privacy mode on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A7:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A7:[01]$" }
     returns: ack
@@ -2684,7 +2684,7 @@ commands:
   power_on_position:
     summary: "Set where the camera goes when it powers on: 1 standby, 2 home, 3 preset"
     params:
-      position: { type: int, min: 1, max: 3, required: true }
+      position: { type: int, min: 1, max: 3, required: true, label: Power-on position, description: "1 standby, 2 home, 3 preset." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:45:{position}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:45:[1-3]$" }
     returns: ack
@@ -2696,7 +2696,7 @@ commands:
   power_on_preset:
     summary: "Set the preset recalled at power on, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:46:{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:46:[0-9]{2}$" }
     returns: ack
@@ -2708,30 +2708,30 @@ commands:
   pan_speed:
     summary: "Pan at a speed: 01 left fastest, 50 stop, 99 right fastest"
     params:
-      speed: { type: int, min: 1, max: 99, required: true }
+      speed: { type: int, min: 1, max: 99, required: true, label: Pan speed, description: "01 left fastest, 50 stop, 99 right fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#P{speed:02d}", res: "1" } }
     expect: { status: 200, matches: "^pS[0-9]{2}$" }
     returns: ack
   tilt_speed:
     summary: "Tilt at a speed: 01 down fastest, 50 stop, 99 up fastest"
     params:
-      speed: { type: int, min: 1, max: 99, required: true }
+      speed: { type: int, min: 1, max: 99, required: true, label: Tilt speed, description: "01 down fastest, 50 stop, 99 up fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#T{speed:02d}", res: "1" } }
     expect: { status: 200, matches: "^tS[0-9]{2}$" }
     returns: ack
   pan_tilt_speed:
     summary: "Pan and tilt at a speed each: 01 left/down fastest, 50 stop, 99 right/up fastest"
     params:
-      pan_speed: { type: int, min: 1, max: 99, required: true }
-      tilt_speed: { type: int, min: 1, max: 99, required: true }
+      pan_speed: { type: int, min: 1, max: 99, required: true, label: Pan speed, description: "01 left fastest, 50 stop, 99 right fastest." }
+      tilt_speed: { type: int, min: 1, max: 99, required: true, label: Tilt speed, description: "01 down fastest, 50 stop, 99 up fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#PTS{pan_speed:02d}{tilt_speed:02d}", res: "1" } }
     expect: { status: 200, matches: "^pTS[0-9]{4}$" }
     returns: ack
   pan_tilt_position:
     summary: "Move to an absolute pan/tilt position, 4-digit hex each (8000 centre)"
     params:
-      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
+      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Pan, description: "Four-digit hex absolute position, 8000 being the centre." }
+      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Tilt, description: "Four-digit hex absolute position, 8000 being the centre." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#APC{pan}{tilt}", res: "1" } }
     expect: { status: 200, matches: "^aPC[0-9A-F]{8}$" }
     returns: ack
@@ -2743,93 +2743,93 @@ commands:
   pan_tilt_position_relative:
     summary: "Move by a relative pan/tilt amount, 4-digit hex each (8000 no move)"
     params:
-      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
+      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Pan, description: "Four-digit hex amount to move, 8000 being no movement; above 8000 moves one way, below the other." }
+      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Tilt, description: "Four-digit hex amount to move, 8000 being no movement; above 8000 moves one way, below the other." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#RPC{pan}{tilt}", res: "1" } }
     expect: { status: 200, matches: "^rPC[0-9A-F]{8}$" }
     returns: ack
   pan_tilt_position_with_speed:
     summary: "Move to an absolute pan/tilt position at a preset speed (hex 00-1D for 1-30) from a speed table (0 slow, 1 mid, 2 fast)"
     params:
-      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      speed: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-D])$", required: true }
-      table: { type: int, min: 0, max: 2, required: true }
+      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Pan, description: "Four-digit hex absolute position, 8000 being the centre." }
+      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Tilt, description: "Four-digit hex absolute position, 8000 being the centre." }
+      speed: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-D])$", required: true, label: Preset speed, description: "Two-digit hex 00-1D for preset speed 1 to 30 from the chosen speed table." }
+      table: { type: int, min: 0, max: 2, required: true, label: Speed table, description: "0 slow, 1 mid, 2 fast." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#APS{pan}{tilt}{speed}{table}", res: "1" } }
     expect: { status: 200, matches: "^aPS[0-9A-F]{10}[0-2]$" }
     returns: ack
   pan_tilt_position_relative_with_speed:
     summary: "Move by a relative pan/tilt amount at a preset speed (hex 00-1D for 1-30) from a speed table (0 slow, 1 mid, 2 fast)"
     params:
-      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      speed: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-D])$", required: true }
-      table: { type: int, min: 0, max: 2, required: true }
+      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Pan, description: "Four-digit hex amount to move, 8000 being no movement; above 8000 moves one way, below the other." }
+      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Tilt, description: "Four-digit hex amount to move, 8000 being no movement; above 8000 moves one way, below the other." }
+      speed: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-D])$", required: true, label: Preset speed, description: "Two-digit hex 00-1D for preset speed 1 to 30 from the chosen speed table." }
+      table: { type: int, min: 0, max: 2, required: true, label: Speed table, description: "0 slow, 1 mid, 2 fast." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#RPS{pan}{tilt}{speed}{table}", res: "1" } }
     expect: { status: 200, matches: "^rPS[0-9A-F]{10}[0-2]$" }
     returns: ack
   movement_limit:
     summary: "Set or release a movement limit at the current position: direction 1 up, 2 down, 3 left, 4 right"
     params:
-      direction: { type: int, min: 1, max: 4, required: true }
-      set: { type: bool, required: true }
+      direction: { type: int, min: 1, max: 4, required: true, label: Direction, description: "1 up, 2 down, 3 left, 4 right." }
+      set: { type: bool, required: true, label: Set, description: "On sets the limit at the current position, off releases it." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#LC{direction}{set:bool01}", res: "1" } }
     expect: { status: 200, matches: "^lC[1-4][01]$" }
     returns: ack
   get_movement_limit:
     summary: "Query a movement limit: direction 1 up, 2 down, 3 left, 4 right"
     params:
-      direction: { type: int, min: 1, max: 4, required: true }
+      direction: { type: int, min: 1, max: 4, required: true, label: Direction, description: "1 up, 2 down, 3 left, 4 right." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#LC{direction}", res: "1" } }
     expect: { status: 200, matches: "^lC[1-4]([01])$" }
     returns: value
   movement_limit_toggle:
     summary: "Toggle a movement limit: direction 1 up, 2 down, 3 left, 4 right"
     params:
-      direction: { type: int, min: 1, max: 4, required: true }
+      direction: { type: int, min: 1, max: 4, required: true, label: Direction, description: "1 up, 2 down, 3 left, 4 right." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#L{direction}", res: "1" } }
     expect: { status: 200, matches: "^l[0-9]$" }
     returns: ack
   pan_speed_fine:
     summary: "Pan at a fine speed, 4-digit hex 7F00 (left fastest) - 8000 (stop) - 8100 (right fastest)"
     params:
-      speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true }
+      speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true, label: Pan speed, description: "Four-digit hex, 7F00 left fastest, 8000 stop, 8100 right fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HP{speed}", res: "1" } }
     expect: { status: 200, matches: "^hP[0-9A-F]{4}$" }
     returns: ack
   tilt_speed_fine:
     summary: "Tilt at a fine speed, 4-digit hex 7F00 (down fastest) - 8000 (stop) - 8100 (up fastest)"
     params:
-      speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true }
+      speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true, label: Tilt speed, description: "Four-digit hex, 7F00 down fastest, 8000 stop, 8100 up fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HT{speed}", res: "1" } }
     expect: { status: 200, matches: "^hT[0-9A-F]{4}$" }
     returns: ack
   pan_tilt_speed_fine:
     summary: "Pan and tilt at fine speeds, 4-digit hex each, 7F00-8000 (stop)-8100"
     params:
-      pan_speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true }
-      tilt_speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true }
+      pan_speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true, label: Pan speed, description: "Four-digit hex, 7F00 left fastest, 8000 stop, 8100 right fastest." }
+      tilt_speed: { type: string, pattern: "^(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100)$", required: true, label: Tilt speed, description: "Four-digit hex, 7F00 down fastest, 8000 stop, 8100 up fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HPT{pan_speed}{tilt_speed}", res: "1" } }
     expect: { status: 200, matches: "^hPT[0-9A-F]{8}$" }
     returns: ack
   pan_tilt_position_independent:
     summary: "Move to an absolute pan/tilt position with separate speeds (hex 00-FF, 00 stop) and rise/fall accelerations (hex 01-FF) for each axis"
     params:
-      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      pan_speed: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true }
-      tilt_speed: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true }
-      pan_rise: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
-      tilt_rise: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
-      pan_fall: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
-      tilt_fall: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
+      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Pan, description: "Four-digit hex absolute position, 8000 being the centre." }
+      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Tilt, description: "Four-digit hex absolute position, 8000 being the centre." }
+      pan_speed: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true, label: Pan speed, description: "Two-digit hex 00-FF, 00 being stop." }
+      tilt_speed: { type: string, pattern: "^[0-9A-F][0-9A-F]$", required: true, label: Tilt speed, description: "Two-digit hex 00-FF, 00 being stop." }
+      pan_rise: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Pan rise, description: "Pan rise acceleration, two-digit hex 01-FF." }
+      tilt_rise: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Tilt rise, description: "Tilt rise acceleration, two-digit hex 01-FF." }
+      pan_fall: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Pan fall, description: "Pan fall acceleration, two-digit hex 01-FF." }
+      tilt_fall: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Tilt fall, description: "Tilt fall acceleration, two-digit hex 01-FF." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HAC{pan}{tilt}{pan_speed}{tilt_speed}{pan_rise}{tilt_rise}{pan_fall}{tilt_fall}", res: "1" } }
     expect: { status: 200, matches: "^hAC[0-9A-F]{20}$" }
     returns: ack
   preset_speed_unit:
     summary: "Set whether preset speed is a speed or a time: 0 speed, 1 time"
     params:
-      unit: { type: int, min: 0, max: 1, required: true }
+      unit: { type: int, min: 0, max: 1, required: true, label: Speed unit, description: "0 preset speed is a speed, 1 a travel time." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:29:{unit}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:29:[0-1]$" }
     returns: ack
@@ -2841,7 +2841,7 @@ commands:
   preset_speed_table:
     summary: "Set the preset speed table: 0 slow, 1 mid, 2 fast"
     params:
-      table: { type: int, min: 0, max: 2, required: true }
+      table: { type: int, min: 0, max: 2, required: true, label: Speed table, description: "0 slow, 1 mid, 2 fast." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#PST{table}", res: "1" } }
     expect: { status: 200, matches: "^pST[0-2]$" }
     returns: ack
@@ -2853,14 +2853,14 @@ commands:
   preset_speed:
     summary: "Set the preset speed (speed unit): 001-999, steps of about 25 map to speed 1-30, 000 and 999 fastest"
     params:
-      speed: { type: int, min: 0, max: 999, required: true }
+      speed: { type: int, min: 0, max: 999, required: true, label: Preset speed, description: "001-999, steps of about 25 for speed 1 to 30; 000 and 999 are fastest." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#UPVS{speed:03d}", res: "1" } }
     expect: { status: 200, matches: "^uPVS[0-9A-F]{3}$" }
     returns: ack
   preset_time:
     summary: "Set the preset travel time (time unit), 3-digit hex 001-063 for 1-99 s"
     params:
-      seconds: { type: string, pattern: "^(?:00[1-9A-F]|0[1-5][0-9A-F]|06[0-3])$", required: true }
+      seconds: { type: string, pattern: "^(?:00[1-9A-F]|0[1-5][0-9A-F]|06[0-3])$", required: true, label: Travel time, description: "Preset travel time in seconds as three-digit hex, 001-063 for 1 to 99 s." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#UPVS{seconds}", res: "1" } }
     expect: { status: 200, matches: "^uPVS[0-9A-F]{3}$" }
     returns: ack
@@ -2872,7 +2872,7 @@ commands:
   preset_acceleration:
     summary: "Set preset acceleration to auto or manual"
     params:
-      auto: { type: bool, required: true }
+      auto: { type: bool, required: true, label: Auto acceleration, description: "On sets preset acceleration to auto, off to manual." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A8:{auto:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A8:[01]$" }
     returns: ack
@@ -2884,7 +2884,7 @@ commands:
   preset_rise_s_curve:
     summary: "Set the preset rise s curve, hex 00-1E for 0-30. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true }
+      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true, label: Rise S-curve, description: "Two-digit hex 00-1E for 0 to 30; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:A9:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:A9:[0-9A-F]{2}$" }
     returns: ack
@@ -2896,7 +2896,7 @@ commands:
   preset_fall_s_curve:
     summary: "Set the preset fall s curve, hex 00-1E for 0-30. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true }
+      value: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-E])$", required: true, label: Fall S-curve, description: "Two-digit hex 00-1E for 0 to 30; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:AA:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:AA:[0-9A-F]{2}$" }
     returns: ack
@@ -2908,7 +2908,7 @@ commands:
   preset_rise_acceleration:
     summary: "Set the preset rise acceleration, hex 01-FF for 1-255. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Rise acceleration, description: "Two-digit hex 01-FF for 1 to 255; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:AB:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:AB:[0-9A-F]{2}$" }
     returns: ack
@@ -2920,7 +2920,7 @@ commands:
   preset_fall_acceleration:
     summary: "Set the preset fall acceleration, hex 01-FF for 1-255. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true }
+      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-9A-F][0-9A-F])$", required: true, label: Fall acceleration, description: "Two-digit hex 01-FF for 1 to 255; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:AC:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:AC:[0-9A-F]{2}$" }
     returns: ack
@@ -2932,7 +2932,7 @@ commands:
   preset_rise_ramp_time:
     summary: "Set the preset rise ramp time, hex 01-64 for 0.1-10.0 s. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
+      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Rise ramp time, description: "Two-digit hex 01-64 for 0.1 to 10.0 s; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:AD:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:AD:[0-9A-F]{2}$" }
     returns: ack
@@ -2944,7 +2944,7 @@ commands:
   preset_fall_ramp_time:
     summary: "Set the preset fall ramp time, hex 01-64 for 0.1-10.0 s. Manual acceleration only"
     params:
-      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
+      value: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Fall ramp time, description: "Two-digit hex 01-64 for 0.1 to 10.0 s; manual acceleration only." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:AE:{value}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:AE:[0-9A-F]{2}$" }
     returns: ack
@@ -2956,7 +2956,7 @@ commands:
   preset_scope:
     summary: "Set what a preset stores: 0 mode_a, 1 mode_b, 2 mode_c"
     params:
-      scope: { type: int, min: 0, max: 2, required: true }
+      scope: { type: int, min: 0, max: 2, required: true, label: Preset scope, description: "What a preset stores: 0 mode A, 1 mode B, 2 mode C, as the camera's menu defines them." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:71:{scope}", res: "1" } }
     expect: { status: 200, matches: "^OSE:71:[0-2]$" }
     returns: ack
@@ -2968,7 +2968,7 @@ commands:
   preset_digital_extender:
     summary: "Store the digital extender in presets"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Store digital extender, description: "On turns storing the digital extender in presets on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:7C:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSE:7C:[01]$" }
     returns: ack
@@ -2980,7 +2980,7 @@ commands:
   preset_thumbnail_update:
     summary: "Update a preset's thumbnail when it is saved"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Thumbnail update, description: "On turns updating a preset's thumbnail when it is saved on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:2B:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:2B:[01]$" }
     returns: ack
@@ -2992,7 +2992,7 @@ commands:
   preset_name_mode:
     summary: "Set whether a preset's name is reset or held when it is saved: 0 reset, 1 hold"
     params:
-      mode: { type: int, min: 0, max: 1, required: true }
+      mode: { type: int, min: 0, max: 1, required: true, label: Name mode, description: "0 resets a preset's name when it is saved, 1 holds it." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:2C:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:2C:[0-1]$" }
     returns: ack
@@ -3004,7 +3004,7 @@ commands:
   preset_iris:
     summary: "Store the iris in presets"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Store iris, description: "On turns storing the iris in presets on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:5B:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:5B:[01]$" }
     returns: ack
@@ -3016,7 +3016,7 @@ commands:
   preset_shutter:
     summary: "Store the shutter in presets"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Store shutter, description: "On turns storing the shutter in presets on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:D5:{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:D5:[01]$" }
     returns: ack
@@ -3028,7 +3028,7 @@ commands:
   preset_zoom_mode:
     summary: "Set the preset zoom mode: 0 mode_a, 1 mode_b"
     params:
-      mode: { type: int, min: 0, max: 1, required: true }
+      mode: { type: int, min: 0, max: 1, required: true, label: Zoom mode, description: "0 mode A, 1 mode B, as the camera's menu defines them." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSE:7D:{mode}", res: "1" } }
     expect: { status: 200, matches: "^OSE:7D:[0-1]$" }
     returns: ack
@@ -3040,7 +3040,7 @@ commands:
   freeze_during_preset:
     summary: "Freeze the picture while a preset is recalled"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Freeze during preset, description: "On turns freezing the picture while a preset is recalled on, off turns it off." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#PRF{enabled:bool01}", res: "1" } }
     expect: { status: 200, matches: "^pRF[01]$" }
     returns: ack
@@ -3052,28 +3052,28 @@ commands:
   recall_preset:
     summary: "Recall a preset, 1-100. Completion is notified as q<preset-1>"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#R{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^s[0-9]{2}$" }
     returns: ack
   save_preset:
     summary: "Save the current position to a preset, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#M{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^s[0-9]{2}$" }
     returns: ack
   delete_preset:
     summary: "Delete a preset, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#C{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^s[0-9]{2}$" }
     returns: ack
   get_preset_entries:
     summary: "Query which presets are stored, 40 at a time: block 0 presets 1-40, 1 41-80, 2 81-100. The reply is pE<block><10-digit hex bit mask>, bit0 the block's first preset"
     params:
-      block: { type: int, min: 0, max: 2, required: true }
+      block: { type: int, min: 0, max: 2, required: true, label: Block, description: "0 presets 1-40, 1 presets 41-80, 2 presets 81-100." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#PE{block:02d}", res: "1" } }
     expect: { status: 200, matches: "^pE[0-9]{2}([0-9A-F]{10})$" }
     returns: value
@@ -3085,22 +3085,22 @@ commands:
   preset_name:
     summary: "Name a preset, 1-100; up to 15 characters"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
-      name: { type: string, max_length: 15, pattern: "^[ -~]{1,15}$", required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
+      name: { type: string, max_length: 15, pattern: "^[ -~]{1,15}$", required: true, label: Name, description: "Preset name, 1 to 15 printable ASCII characters." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:35:{preset:-1:02d}:{name}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:35:[0-9]{2}:.*$" }
     returns: ack
   get_preset_name:
     summary: "Query a preset's name, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "QSJ:35:{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:35:[0-9]{2}:(.*)$" }
     returns: value
   delete_preset_name:
     summary: "Delete a preset's name, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:36:{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:36:[0-9]{2}$" }
     returns: ack
@@ -3112,14 +3112,14 @@ commands:
   update_preset_thumbnail:
     summary: "Update a preset's thumbnail, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:39:{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:39:[0-9]{2}$" }
     returns: ack
   delete_preset_thumbnail:
     summary: "Delete a preset's thumbnail, 1-100"
     params:
-      preset: { type: int, min: 1, max: 100, required: true }
+      preset: { type: int, min: 1, max: 100, required: true, label: Preset, description: "Preset number 1-100, as on the camera." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:3A:{preset:-1:02d}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:3A:[0-9]{2}$" }
     returns: ack
@@ -3131,7 +3131,7 @@ commands:
   get_preset_counter:
     summary: "Query the name/thumbnail change counters for nine presets: block hex 00-0B (00 presets 1-9 ... 0B preset 100); the reply is OSJ:3C:<block>:<9-digit hex>"
     params:
-      block: { type: string, pattern: "^0[0-9AB]$", required: true }
+      block: { type: string, pattern: "^0[0-9AB]$", required: true, label: Block, description: "Two-digit hex 00-0B, each nine presets: 00 presets 1-9 up to 0B preset 100." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "QSJ:3C:{block}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:3C:[0-9A-F]{2}:([0-9A-F]{9})$" }
     returns: value
@@ -3153,40 +3153,40 @@ commands:
   ptzf_speed:
     summary: "Pan, tilt, zoom and focus at a speed each: 00 no change, 01-49 one way, 50 stop, 51-99 the other"
     params:
-      pan: { type: int, min: 0, max: 99, required: true }
-      tilt: { type: int, min: 0, max: 99, required: true }
-      zoom: { type: int, min: 0, max: 99, required: true }
-      focus: { type: int, min: 0, max: 99, required: true }
+      pan: { type: int, min: 0, max: 99, required: true, label: Pan speed, description: "00 no change, 01-49 left, 50 stop, 51-99 right; further from 50 is faster." }
+      tilt: { type: int, min: 0, max: 99, required: true, label: Tilt speed, description: "00 no change, 01-49 down, 50 stop, 51-99 up; further from 50 is faster." }
+      zoom: { type: int, min: 0, max: 99, required: true, label: Zoom speed, description: "00 no change, 01-49 wide, 50 stop, 51-99 tele; further from 50 is faster." }
+      focus: { type: int, min: 0, max: 99, required: true, label: Focus speed, description: "00 no change, 01-49 near, 50 stop, 51-99 far; further from 50 is faster." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HV1{pan:02d}{tilt:02d}{zoom:02d}{focus:02d}", res: "1" } }
     expect: { status: 200, matches: "^hV1[0-9]{8}$" }
     returns: ack
   ptzf_speed_fine:
     summary: "Pan, tilt and zoom at fine speeds (4-digit hex: 0000 no change, 7F00-8000 (stop)-8100) and focus at a speed (00 no change, 01-99, 50 stop)"
     params:
-      pan: { type: string, pattern: "^(?:0000|(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100))$", required: true }
-      tilt: { type: string, pattern: "^(?:0000|(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100))$", required: true }
-      zoom: { type: string, pattern: "^(?:0000|(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100))$", required: true }
-      focus: { type: int, min: 0, max: 99, required: true }
+      pan: { type: string, pattern: "^(?:0000|(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100))$", required: true, label: Pan speed, description: "Four-digit hex: 0000 no change, 7F00 left fastest, 8000 stop, 8100 right fastest." }
+      tilt: { type: string, pattern: "^(?:0000|(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100))$", required: true, label: Tilt speed, description: "Four-digit hex: 0000 no change, 7F00 down fastest, 8000 stop, 8100 up fastest." }
+      zoom: { type: string, pattern: "^(?:0000|(?:7F[0-9A-F][0-9A-F]|80[0-9A-F]{2}|8100))$", required: true, label: Zoom speed, description: "Four-digit hex: 0000 no change, 7F00 wide fastest, 8000 stop, 8100 tele fastest." }
+      focus: { type: int, min: 0, max: 99, required: true, label: Focus speed, description: "00 no change, 01-49 near, 50 stop, 51-99 far; further from 50 is faster." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HV2{pan}{tilt}{zoom}{focus:02d}", res: "1" } }
     expect: { status: 200, matches: "^hV2[0-9A-F]{14}$" }
     returns: ack
   ptzf_position:
     summary: "Move pan, tilt, zoom and focus to absolute positions: pan and tilt 4-digit hex, preset speed hex 00-1D, speed table 0-2, zoom 3-digit hex 555-FFF, zoom speed hex 01-64, focus 3-digit hex 555-FFF"
     params:
-      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true }
-      speed: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-D])$", required: true }
-      table: { type: int, min: 0, max: 2, required: true }
-      zoom: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true }
-      zoom_speed: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true }
-      focus: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true }
+      pan: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Pan, description: "Four-digit hex absolute position, 8000 being the centre." }
+      tilt: { type: string, pattern: "^[0-9A-F][0-9A-F]{3}$", required: true, label: Tilt, description: "Four-digit hex absolute position, 8000 being the centre." }
+      speed: { type: string, pattern: "^(?:0[0-9A-F]|1[0-9A-D])$", required: true, label: Preset speed, description: "Two-digit hex 00-1D for preset speed 1 to 30 from the chosen speed table." }
+      table: { type: int, min: 0, max: 2, required: true, label: Speed table, description: "0 slow, 1 mid, 2 fast." }
+      zoom: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true, label: Zoom position, description: "Three-digit hex, 555 wide to FFF tele." }
+      zoom_speed: { type: string, pattern: "^(?:0[1-9A-F]|[1-5][0-9A-F]|6[0-4])$", required: true, label: Zoom speed, description: "Two-digit hex 01-64." }
+      focus: { type: string, pattern: "^(?:55[5-9A-F]|5[6-9A-F][0-9A-F]|[6-9A-F][0-9A-F]{2})$", required: true, label: Focus position, description: "Three-digit hex, 555 near to FFF far." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#HA1{pan}{tilt}{speed}{table}{zoom}{zoom_speed}{focus}", res: "1" } }
     expect: { status: 200, matches: "^hA1[0-9A-F]{19}$" }
     returns: ack
   menu:
     summary: "Open or close the camera menu"
     params:
-      open: { type: bool, required: true }
+      open: { type: bool, required: true, label: Open, description: "On opens the camera menu, off closes it." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "DUS:{open:bool01}", res: "1" } }
     expect: { status: 200, matches: "^DUS:[01]$" }
     returns: ack
@@ -3228,7 +3228,7 @@ commands:
   operation_lock:
     summary: "Lock operation from other controllers, with up to 40 characters of information"
     params:
-      info: { type: string, max_length: 40, pattern: "^[ -~]{1,40}$", required: true }
+      info: { type: string, max_length: 40, pattern: "^[ -~]{1,40}$", required: true, label: Information, description: "Text up to 40 printable ASCII characters shown to other controllers, such as who holds the lock." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:3E:{info}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:3E:.*$" }
     returns: ack
@@ -3270,14 +3270,14 @@ commands:
   get_component_version:
     summary: "Query one component's software version: 0 servo CPU, 1 camera CPU, ... (the numbering differs by model); the reply is qSV<component>V<version>"
     params:
-      component: { type: int, min: 0, max: 9, required: true }
+      component: { type: int, min: 0, max: 9, required: true, label: Component, description: "Component number, such as 0 servo CPU or 1 camera CPU; the numbering differs by model." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#QSV{component}", res: "1" } }
     expect: { status: 200, matches: "^qSV[0-9](V.*)$" }
     returns: value
   power:
     summary: "Power on, or go to standby"
     params:
-      power_on: { type: bool, required: true }
+      power_on: { type: bool, required: true, label: Power on, description: "On powers the camera on, off puts it in standby." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#O{power_on:bool01}", res: "1" } }
     expect: { status: 200, matches: "^p[01]$" }
     returns: ack
@@ -3289,7 +3289,7 @@ commands:
   stream_resolution:
     summary: "Set the streaming resolution: 0 640x360, 1 320x180, 2 1280x720, 3 1920x1080"
     params:
-      resolution: { type: int, min: 0, max: 3, required: true }
+      resolution: { type: int, min: 0, max: 3, required: true, label: Resolution, description: "0 640x360, 1 320x180, 2 1280x720, 3 1920x1080." }
     send: { method: GET, path: /cgi-bin/aw_ptz, query: { cmd: "#RZL{resolution}", res: "1" } }
     expect: { status: 200, matches: "^rZL[0-3]$" }
     returns: ack
@@ -3301,7 +3301,7 @@ commands:
   camera_title:
     summary: "Set the camera title, up to 40 ASCII characters"
     params:
-      title: { type: string, max_length: 40, pattern: "^[ -~]{1,40}$", required: true }
+      title: { type: string, max_length: 40, pattern: "^[ -~]{1,40}$", required: true, label: Camera title, description: "Title up to 40 printable ASCII characters." }
     send: { method: GET, path: /cgi-bin/aw_cam, query: { cmd: "OSJ:5C:{title}", res: "1" } }
     expect: { status: 200, matches: "^OSJ:5C:.*$" }
     returns: ack

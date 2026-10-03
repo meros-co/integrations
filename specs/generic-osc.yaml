@@ -39,17 +39,17 @@ source:
 
 settings:
   # udp: one datagram per packet. tcp: a persistent connection, reconnected with backoff.
-  transport: { type: enum, values: [udp, tcp], default: udp }
+  transport: { type: enum, values: [udp, tcp], default: udp, label: Transport, description: "udp sends one datagram per packet; tcp keeps a persistent connection, reconnected after a failure." }
   # TCP only. slip: OSC 1.1 (double-ended SLIP). length-prefixed: OSC 1.0 (int32 size before each packet).
-  tcp_framing: { type: enum, values: [slip, length-prefixed], default: slip }
+  tcp_framing: { type: enum, values: [slip, length-prefixed], default: slip, label: TCP framing, description: "How packets are framed over TCP: slip as in OSC 1.1, length-prefixed (an int32 size before each packet) as in OSC 1.0; ignored over UDP." }
   # UDP only. Receive on, and send from, this fixed local port instead of an ephemeral one, for a device that
   # sends to a destination configured on it. Shared with other devices using the same port; each datagram
   # goes to the device it came from. Empty: an ephemeral port, hearing only replies sent to the sender.
-  listen_port: { type: int, min: 1, max: 65535 }
+  listen_port: { type: int, min: 1, max: 65535, label: Listen port, description: "UDP only: a fixed local port to receive on and send from, for a device that sends to a destination configured on it; empty uses an ephemeral port that hears only replies." }
   # Keep received messages in state. Off, queries still see their replies.
-  record_messages: { type: bool, default: true }
+  record_messages: { type: bool, default: true, label: Record messages, description: "On keeps the last message received on each address in state; off, queries still see their replies." }
   # The most addresses kept under 'messages'; the least recently received is dropped first.
-  max_addresses: { type: int, min: 1, max: 10000, default: 256 }
+  max_addresses: { type: int, min: 1, max: 10000, default: 256, label: Maximum addresses, description: "The most addresses kept in state; the least recently received address is dropped first." }
 
 ports:
   - { port: null, protocol: udp, role: control, note: "OSC has no standard port: the port is given when the device is opened; TCP when the transport setting is tcp" }
@@ -69,8 +69,8 @@ commands:
       {type, value} with type int, float, string, blob (value as hex, such as "01 ff"), true, false, nil,
       impulse, int64 or double. Returns unverified: OSC has no acknowledgement
     params:
-      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true }
-      args: { type: json, default: [] }
+      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true, label: Address, description: "OSC address to send to, starting with /, such as /ch/01/mix/fader." }
+      args: { type: json, default: [], label: Arguments, description: "A list of arguments: bare values (integer as int32, other number as float32, string, true, false, null) or {type, value} objects for blob, int64, double, impulse and the rest." }
     returns: none
   query:
     summary: >
@@ -78,10 +78,10 @@ commands:
       address when not given) within timeout_ms, as {address, types, args}; fails with timeout otherwise.
       The address is compared exactly, without pattern matching
     params:
-      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true }
-      args: { type: json, default: [] }
-      reply_address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024 }
-      timeout_ms: { type: int, min: 1, max: 25000, default: 1000 }
+      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true, label: Address, description: "OSC address to send to, starting with /, such as /ch/01/mix/fader." }
+      args: { type: json, default: [], label: Arguments, description: "A list of arguments: bare values (integer as int32, other number as float32, string, true, false, null) or {type, value} objects for blob, int64, double, impulse and the rest." }
+      reply_address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, label: Reply address, description: "The address the reply is expected on, compared exactly; empty uses the address sent to." }
+      timeout_ms: { type: int, min: 1, max: 25000, default: 1000, label: Timeout, description: "How long to wait for the reply, in milliseconds, before the query fails." }
     returns: value
   clear_messages:
     summary: "Forget the received messages kept in state"

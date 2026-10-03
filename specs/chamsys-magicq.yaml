@@ -112,7 +112,7 @@ transport:
   listen_port: { setting: feedback_port }
 
 settings:
-  feedback_port: { type: int, min: 1, max: 65535, default: 9000 }
+  feedback_port: { type: int, min: 1, max: 65535, default: 9000, label: Feedback port, description: "The console's OSC Tx Port, on which this host receives playback and execute feedback; on QuickQ it is fixed at 9000." }
 
 ports:
   - { port: 8000, protocol: udp, role: control }
@@ -417,187 +417,187 @@ commands:
   pb_level:
     summary: "Set the fader level of playback 1-10, in percent (/pb/<playback>, int 0-100)"
     params:
-      playback: { type: int, min: 1, max: 10, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      playback: { type: int, min: 1, max: 10, required: true, label: Playback, description: "Playback number 1-10, as on the console; only the first 10 can be reached over OSC." }
+      level:    { type: int, min: 0, max: 100, required: true, label: Level, description: "Level in percent, 0 to 100." }
     send: { address: "/pb/{playback}", args: [ { value: "{level}", type: int } ] }
     returns: none
 
   pb_go:
     summary: "Go on playback 1-10 (/pb/<playback>/go, sent without the optional argument)"
     params:
-      playback: { type: int, min: 1, max: 10, required: true }
+      playback: { type: int, min: 1, max: 10, required: true, label: Playback, description: "Playback number 1-10, as on the console; only the first 10 can be reached over OSC." }
     send: { address: "/pb/{playback}/go" }
     returns: none
 
   pb_flash:
     summary: "Flash playback 1-10: enabled true sets its level to 100%, false to 0% (/pb/<playback>/flash, int 1 or 0)"
     params:
-      playback: { type: int, min: 1, max: 10, required: true }
-      enabled:  { type: bool, default: true }
+      playback: { type: int, min: 1, max: 10, required: true, label: Playback, description: "Playback number 1-10, as on the console; only the first 10 can be reached over OSC." }
+      enabled:  { type: bool, default: true, label: Flash, description: "On flashes the playback to 100%, off returns it to 0%." }
     send: { address: "/pb/{playback}/flash", args: [ { value: "{enabled:bool01}", type: int } ] }
     returns: none
 
   pb_pause:
     summary: "Pause playback 1-10 (/pb/<playback>/pause, sent without the optional argument)"
     params:
-      playback: { type: int, min: 1, max: 10, required: true }
+      playback: { type: int, min: 1, max: 10, required: true, label: Playback, description: "Playback number 1-10, as on the console; only the first 10 can be reached over OSC." }
     send: { address: "/pb/{playback}/pause" }
     returns: none
 
   pb_release:
     summary: "Release playback 1-10 (/pb/<playback>/release, sent without the optional argument)"
     params:
-      playback: { type: int, min: 1, max: 10, required: true }
+      playback: { type: int, min: 1, max: 10, required: true, label: Playback, description: "Playback number 1-10, as on the console; only the first 10 can be reached over OSC." }
     send: { address: "/pb/{playback}/release" }
     returns: none
 
   pb_jump_cue:
     summary: "Jump to a cue on playback 1-10 (/pb/<playback>/<cue>; the cue is a number with an optional decimal, e.g. 2.5)"
     params:
-      playback: { type: int, min: 1, max: 10, required: true }
-      cue:      { type: string, pattern: '^[0-9]{1,5}(\.[0-9]{1,2})?$', required: true }
+      playback: { type: int, min: 1, max: 10, required: true, label: Playback, description: "Playback number 1-10, as on the console; only the first 10 can be reached over OSC." }
+      cue:      { type: string, pattern: '^[0-9]{1,5}(\.[0-9]{1,2})?$', required: true, label: Cue, description: "Cue id, a number with an optional decimal such as 2.5." }
     send: { address: "/pb/{playback}/{cue}" }
     returns: none
 
   set_blackout:
     summary: "Desk blackout (/dbo). The manual's table reads \"0 turns on, non-zero turns off\": blackout true sends int 0, false sends int 1 (see quirks)"
     params:
-      blackout: { type: bool, required: true }
+      blackout: { type: bool, required: true, label: Blackout, description: "On blacks out the desk, off restores it; ChamSys's table and the Companion module disagree on which value does which." }
     send: { address: "/dbo", args: [ { value: "{blackout:bool10}", type: int } ] }
     returns: none
 
   set_swap_mode:
     summary: "Set the playback flash button mode: swap true sends int 1 (swap), false sends int 0 (add) (/swap)"
     params:
-      swap: { type: bool, required: true }
+      swap: { type: bool, required: true, label: Swap, description: "On sets the flash buttons to swap, off to add." }
     send: { address: "/swap", args: [ { value: "{swap:bool01}", type: int } ] }
     returns: none
 
   exec_activate_page:
     summary: "Activate a button or fader in an Execute Window grid (/exec/<page>/<item>, no argument). page: grid number 1-10 or grid name; item: box number, grid reference such as 4x3, or item name"
     params:
-      page: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      item: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      page: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Grid, description: "Execute Window grid, by number 1-10 or by name." }
+      item: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Item, description: "Execute item by box number, grid reference such as 4x3, or name." }
     send: { address: "/exec/{page}/{item}" }
     returns: none
 
   exec_set_page:
     summary: "Activate (true, int 1) or release (false, int 0) an Execute Window button or fader; on an encoder 1 raises and 0 lowers (/exec/<page>/<item>)"
     params:
-      page:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      item:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      active: { type: bool, required: true }
+      page:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Grid, description: "Execute Window grid, by number 1-10 or by name." }
+      item:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Item, description: "Execute item by box number, grid reference such as 4x3, or name." }
+      active: { type: bool, required: true, label: Active, description: "On activates the button or fader, off releases it; on an encoder on raises and off lowers." }
     send: { address: "/exec/{page}/{item}", args: [ { value: "{active:bool01}", type: int } ] }
     returns: none
 
   exec_level_page:
     summary: "Set an Execute Window fader level as a fraction 0.0-1.0 (/exec/<page>/<item>, float)"
     params:
-      page:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      item:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      level: { type: float, min: 0, max: 1, required: true }
+      page:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Grid, description: "Execute Window grid, by number 1-10 or by name." }
+      item:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Item, description: "Execute item by box number, grid reference such as 4x3, or name." }
+      level: { type: float, min: 0, max: 1, required: true, label: Level, description: "Fader level as a fraction, 0.0 to 1.0." }
     send: { address: "/exec/{page}/{item}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   exec_activate:
     summary: "Activate a button or fader in the current Execute Window grid (/exec/<item>, no argument). item: box number, grid reference such as 4x3, or item name"
     params:
-      item: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
+      item: { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Item, description: "Execute item by box number, grid reference such as 4x3, or name." }
     send: { address: "/exec/{item}" }
     returns: none
 
   exec_set:
     summary: "Activate (true, int 1) or release (false, int 0) a button or fader in the current Execute Window grid; on an encoder 1 raises and 0 lowers (/exec/<item>)"
     params:
-      item:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      active: { type: bool, required: true }
+      item:   { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Item, description: "Execute item by box number, grid reference such as 4x3, or name." }
+      active: { type: bool, required: true, label: Active, description: "On activates the button or fader, off releases it; on an encoder on raises and off lowers." }
     send: { address: "/exec/{item}", args: [ { value: "{active:bool01}", type: int } ] }
     returns: none
 
   exec_level:
     summary: "Set a fader level in the current Execute Window grid as a fraction 0.0-1.0 (/exec/<item>, float)"
     params:
-      item:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true }
-      level: { type: float, min: 0, max: 1, required: true }
+      item:  { type: string, pattern: '^[A-Za-z0-9_+.-]{1,32}$', required: true, label: Item, description: "Execute item by box number, grid reference such as 4x3, or name." }
+      level: { type: float, min: 0, max: 1, required: true, label: Level, description: "Fader level as a fraction, 0.0 to 1.0." }
     send: { address: "/exec/{item}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   tenscene_activate_zone:
     summary: "Activate 10Scene button 1-10 in a zone (/10Scene/<item>/<zone>, no argument)"
     params:
-      item: { type: int, min: 1, max: 10, required: true }
-      zone: { type: int, min: 1, max: 100, required: true }
+      item: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      zone: { type: int, min: 1, max: 100, required: true, label: Zone, description: "10Scene zone number, from 1." }
     send: { address: "/10Scene/{item}/{zone}" }
     returns: none
 
   tenscene_set_zone:
     summary: "Activate (true, int 1) or release (false, int 0) 10Scene button 1-10 in a zone (/10Scene/<item>/<zone>)"
     params:
-      item:   { type: int, min: 1, max: 10, required: true }
-      zone:   { type: int, min: 1, max: 100, required: true }
-      active: { type: bool, required: true }
+      item:   { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      zone:   { type: int, min: 1, max: 100, required: true, label: Zone, description: "10Scene zone number, from 1." }
+      active: { type: bool, required: true, label: Active, description: "On activates the button or fader, off releases it; on an encoder on raises and off lowers." }
     send: { address: "/10Scene/{item}/{zone}", args: [ { value: "{active:bool01}", type: int } ] }
     returns: none
 
   tenscene_toggle_zone:
     summary: "Toggle 10Scene button 1-10 in a zone (/10Scene/<item>/<zone>/toggle)"
     params:
-      item: { type: int, min: 1, max: 10, required: true }
-      zone: { type: int, min: 1, max: 100, required: true }
+      item: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      zone: { type: int, min: 1, max: 100, required: true, label: Zone, description: "10Scene zone number, from 1." }
     send: { address: "/10Scene/{item}/{zone}/toggle" }
     returns: none
 
   tenscene_activate:
     summary: "Activate 10Scene button 1-10 without a zone (/10Scene/<item>, no argument)"
     params:
-      item: { type: int, min: 1, max: 10, required: true }
+      item: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
     send: { address: "/10Scene/{item}" }
     returns: none
 
   tenscene_set:
     summary: "Activate (true, int 1) or release (false, int 0) 10Scene button 1-10 without a zone (/10Scene/<item>)"
     params:
-      item:   { type: int, min: 1, max: 10, required: true }
-      active: { type: bool, required: true }
+      item:   { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      active: { type: bool, required: true, label: Active, description: "On activates the button or fader, off releases it; on an encoder on raises and off lowers." }
     send: { address: "/10Scene/{item}", args: [ { value: "{active:bool01}", type: int } ] }
     returns: none
 
   tenscene_toggle:
     summary: "Toggle 10Scene button 1-10 without a zone (/10Scene/<item>/toggle)"
     params:
-      item: { type: int, min: 1, max: 10, required: true }
+      item: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
     send: { address: "/10Scene/{item}/toggle" }
     returns: none
 
   quickq_tenscene_activate_zone:
     summary: "QuickQ: activate 10Scene button 1-10 in zone 1-10 (/10scene/<item>/<zone>, no argument)"
     params:
-      item: { type: int, min: 1, max: 10, required: true }
-      zone: { type: int, min: 1, max: 10, required: true }
+      item: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      zone: { type: int, min: 1, max: 10, required: true, label: Zone, description: "10Scene zone number, from 1." }
     send: { address: "/10scene/{item}/{zone}" }
     returns: none
 
   quickq_tenscene_set_zone:
     summary: "QuickQ: activate (true, int 1) or release (false, int 0) 10Scene button 1-10 in zone 1-10 (/10scene/<item>/<zone>)"
     params:
-      item:   { type: int, min: 1, max: 10, required: true }
-      zone:   { type: int, min: 1, max: 10, required: true }
-      active: { type: bool, required: true }
+      item:   { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      zone:   { type: int, min: 1, max: 10, required: true, label: Zone, description: "10Scene zone number, from 1." }
+      active: { type: bool, required: true, label: Active, description: "On activates the button or fader, off releases it; on an encoder on raises and off lowers." }
     send: { address: "/10scene/{item}/{zone}", args: [ { value: "{active:bool01}", type: int } ] }
     returns: none
 
   quickq_tenscene_activate:
     summary: "QuickQ: activate 10Scene button 1-10 (/10scene/<item>, no argument)"
     params:
-      item: { type: int, min: 1, max: 10, required: true }
+      item: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
     send: { address: "/10scene/{item}" }
     returns: none
 
   quickq_tenscene_set:
     summary: "QuickQ: activate (true, int 1) or release (false, int 0) 10Scene button 1-10 (/10scene/<item>)"
     params:
-      item:   { type: int, min: 1, max: 10, required: true }
-      active: { type: bool, required: true }
+      item:   { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      active: { type: bool, required: true, label: Active, description: "On activates the button or fader, off releases it; on an encoder on raises and off lowers." }
     send: { address: "/10scene/{item}", args: [ { value: "{active:bool01}", type: int } ] }
     returns: none
 
@@ -624,149 +624,149 @@ commands:
   rpc:
     summary: "Send ChamSys Remote Protocol commands as text (/rpc, string), e.g. \"1A2A1S2G3,4I\": comma-separated values each ended by a letter A-Z"
     params:
-      commands: { type: string, pattern: '^[0-9A-Za-z, ]{1,256}$', required: true }
+      commands: { type: string, pattern: '^[0-9A-Za-z, ]{1,256}$', required: true, label: Commands, description: "ChamSys Remote Protocol commands as text, values separated by commas and each command ended by a letter, such as 1A2A1S2G3,4I." }
     send: { address: "/rpc", args: [ { value: "{commands}", type: string } ] }
     returns: none
 
   rpc_activate:
     summary: "Remote protocol: Activate playback (/rpc \"<playback>A\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}A", type: string } ] }
     returns: none
 
   rpc_release:
     summary: "Remote protocol: Release playback (/rpc \"<playback>R\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}R", type: string } ] }
     returns: none
 
   rpc_test:
     summary: "Remote protocol: Test playback (activate with level 100%) (/rpc \"<playback>T\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}T", type: string } ] }
     returns: none
 
   rpc_untest:
     summary: "Remote protocol: Un-test playback (release with level 0%) (/rpc \"<playback>U\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}U", type: string } ] }
     returns: none
 
   rpc_go:
     summary: "Remote protocol: Go on playback (/rpc \"<playback>G\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}G", type: string } ] }
     returns: none
 
   rpc_stop:
     summary: "Remote protocol: Stop (go back) on playback (/rpc \"<playback>S\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}S", type: string } ] }
     returns: none
 
   rpc_fast_back:
     summary: "Remote protocol: Fast back on playback (no fade) (/rpc \"<playback>B\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}B", type: string } ] }
     returns: none
 
   rpc_fast_forward:
     summary: "Remote protocol: Fast forward on playback (no fade) (/rpc \"<playback>F\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
     send: { address: "/rpc", args: [ { value: "{playback}F", type: string } ] }
     returns: none
 
   rpc_level:
     summary: "Remote protocol: set playback fader level in percent (/rpc \"<playback>,<level>L\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
+      level:    { type: int, min: 0, max: 100, required: true, label: Level, description: "Level in percent, 0 to 100." }
     send: { address: "/rpc", args: [ { value: "{playback},{level}L", type: string } ] }
     returns: none
 
   rpc_jump_cue:
     summary: "Remote protocol: jump to cue id <cue>.<cue_dec> on a playback (cue 2.5 is cue 2, cue_dec 50) (/rpc \"<playback>,<cue>,<cue_dec>J\")"
     params:
-      playback: { type: int, min: 1, max: 202, required: true }
-      cue:      { type: int, min: 1, max: 65536, required: true }
-      cue_dec:  { type: int, min: 0, max: 99, default: 0 }
+      playback: { type: int, min: 1, max: 202, required: true, label: Playback, description: "Playback number from 1, as on the console; consoles may ignore numbers above 34 and MagicQ PC above 10." }
+      cue:      { type: int, min: 1, max: 65536, required: true, label: Cue, description: "Whole part of the cue id, from 1; cue 2.5 is cue 2 with decimal 50." }
+      cue_dec:  { type: int, min: 0, max: 99, default: 0, label: Cue decimal, description: "Decimal part of the cue id as hundredths; cue 2.5 is cue 2 with decimal 50." }
     send: { address: "/rpc", args: [ { value: "{playback},{cue},{cue_dec}J", type: string } ] }
     returns: none
 
   rpc_page:
     summary: "Remote protocol: change playback page (/rpc \"<page>P\")"
     params:
-      page: { type: int, min: 0, max: 100, required: true }
+      page: { type: int, min: 0, max: 100, required: true, label: Page, description: "Playback page number, as on the console." }
     send: { address: "/rpc", args: [ { value: "{page}P", type: string } ] }
     returns: none
 
   rpc_channel_intensity:
     summary: "Remote protocol: set a DMX intensity channel to a level in percent (/rpc \"<channel>,<level>I\")"
     params:
-      channel: { type: int, min: 1, max: 32769, required: true }
-      level:   { type: int, min: 0, max: 100, required: true }
+      channel: { type: int, min: 1, max: 32769, required: true, label: Channel, description: "Intensity channel number, from 1." }
+      level:   { type: int, min: 0, max: 100, required: true, label: Level, description: "Intensity in percent, 0 to 100." }
     send: { address: "/rpc", args: [ { value: "{channel},{level}I", type: string } ] }
     returns: none
 
   rpc_tenscene_button:
     summary: "Remote protocol: 10Scene zone 1 button 1-10 (/rpc \"<button>X\")"
     params:
-      button: { type: int, min: 1, max: 10, required: true }
+      button: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
     send: { address: "/rpc", args: [ { value: "{button}X", type: string } ] }
     returns: none
 
   rpc_tenscene_button_state:
     summary: "Remote protocol: 10Scene zone 1 button press or release; state 1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease (/rpc \"<button>,<state>X\")"
     params:
-      button: { type: int, min: 1, max: 10, required: true }
-      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true }
+      button: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true, label: State, description: "1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease." }
     send: { address: "/rpc", args: [ { value: "{button},{state}X", type: string } ] }
     returns: none
 
   rpc_tenscene_zone_button_state:
     summary: "Remote protocol: 10Scene button press or release in zone 1-20; state 1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease (/rpc \"<zone>,<button>,<state>X\")"
     params:
-      zone:   { type: int, min: 1, max: 20, required: true }
-      button: { type: int, min: 1, max: 10, required: true }
-      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true }
+      zone:   { type: int, min: 1, max: 20, required: true, label: Zone, description: "10Scene zone number, from 1." }
+      button: { type: int, min: 1, max: 10, required: true, label: Button, description: "10Scene button 1-10." }
+      state:  { type: enum, values: ["1", "2", "3", "4", "7", "9", "10"], required: true, label: State, description: "1 pressed, 2 activate, 3 release, 4 toggle, 7 cycle, 9 increase, 10 decrease." }
     send: { address: "/rpc", args: [ { value: "{zone},{button},{state}X", type: string } ] }
     returns: none
 
   rpc_select_head:
     summary: "Remote programming 01: select a head (/rpc \"01,<head>H\")"
     params:
-      head: { type: int, min: 1, max: 6145, required: true }
+      head: { type: int, min: 1, max: 6145, required: true, label: Head, description: "Head number, from 1, as patched on the console." }
     send: { address: "/rpc", args: [ { value: "01,{head}H", type: string } ] }
     returns: none
 
   rpc_select_head_range:
     summary: "Remote programming 01: select a range of heads (/rpc \"01,<start>,<end>H\")"
     params:
-      start: { type: int, min: 1, max: 6145, required: true }
-      end:   { type: int, min: 1, max: 6145, required: true }
+      start: { type: int, min: 1, max: 6145, required: true, label: First head, description: "First head of the range, from 1." }
+      end:   { type: int, min: 1, max: 6145, required: true, label: Last head, description: "Last head of the range, from 1." }
     send: { address: "/rpc", args: [ { value: "01,{start},{end}H", type: string } ] }
     returns: none
 
   rpc_deselect_head:
     summary: "Remote programming 02: deselect a head (/rpc \"02,<head>H\")"
     params:
-      head: { type: int, min: 1, max: 6145, required: true }
+      head: { type: int, min: 1, max: 6145, required: true, label: Head, description: "Head number, from 1, as patched on the console." }
     send: { address: "/rpc", args: [ { value: "02,{head}H", type: string } ] }
     returns: none
 
   rpc_deselect_head_range:
     summary: "Remote programming 02: deselect a range of heads (/rpc \"02,<start>,<end>H\")"
     params:
-      start: { type: int, min: 1, max: 6145, required: true }
-      end:   { type: int, min: 1, max: 6145, required: true }
+      start: { type: int, min: 1, max: 6145, required: true, label: First head, description: "First head of the range, from 1." }
+      end:   { type: int, min: 1, max: 6145, required: true, label: Last head, description: "Last head of the range, from 1." }
     send: { address: "/rpc", args: [ { value: "02,{start},{end}H", type: string } ] }
     returns: none
 
@@ -778,73 +778,73 @@ commands:
   rpc_select_group:
     summary: "Remote programming 04: select group 1-200 (/rpc \"04,<group>H\")"
     params:
-      group: { type: int, min: 1, max: 200, required: true }
+      group: { type: int, min: 1, max: 200, required: true, label: Group, description: "Group number, 1 to 200." }
     send: { address: "/rpc", args: [ { value: "04,{group}H", type: string } ] }
     returns: none
 
   rpc_set_intensity:
     summary: "Remote programming 05: set the intensity of the selected heads, in percent (/rpc \"05,<level>H\")"
     params:
-      level: { type: int, min: 0, max: 100, required: true }
+      level: { type: int, min: 0, max: 100, required: true, label: Intensity, description: "Intensity of the selected heads in percent, 0 to 100." }
     send: { address: "/rpc", args: [ { value: "05,{level}H", type: string } ] }
     returns: none
 
   rpc_set_intensity_timed:
     summary: "Remote programming 05: set the intensity of the selected heads, in percent, over a time in seconds (/rpc \"05,<level>,<time>H\")"
     params:
-      level: { type: int, min: 0, max: 100, required: true }
-      time:  { type: int, min: 0, max: 3600, required: true }
+      level: { type: int, min: 0, max: 100, required: true, label: Intensity, description: "Intensity of the selected heads in percent, 0 to 100." }
+      time:  { type: int, min: 0, max: 3600, required: true, label: Time, description: "Fade time in seconds." }
     send: { address: "/rpc", args: [ { value: "05,{level},{time}H", type: string } ] }
     returns: none
 
   rpc_set_attribute:
     summary: "Remote programming 06: set an attribute value of the selected heads (/rpc \"06,<attribute>,<value>H\")"
     params:
-      attribute: { type: int, min: 0, max: 51, required: true }
-      value:     { type: int, min: 0, max: 65535, required: true }
+      attribute: { type: int, min: 0, max: 51, required: true, label: Attribute, description: "Attribute number from the ChamSys table, such as 0 intensity, 4 pan, 5 tilt, 16 cyan." }
+      value:     { type: int, min: 0, max: 65535, required: true, label: Value, description: "Attribute value, 0-255 in 8-bit or 0-65535 in 16-bit resolution." }
     send: { address: "/rpc", args: [ { value: "06,{attribute},{value}H", type: string } ] }
     returns: none
 
   rpc_set_attribute_timed:
     summary: "Remote programming 06: set an attribute value of the selected heads over a time in seconds (/rpc \"06,<attribute>,<value>,<time>H\")"
     params:
-      attribute: { type: int, min: 0, max: 51, required: true }
-      value:     { type: int, min: 0, max: 65535, required: true }
-      time:      { type: int, min: 0, max: 3600, required: true }
+      attribute: { type: int, min: 0, max: 51, required: true, label: Attribute, description: "Attribute number from the ChamSys table, such as 0 intensity, 4 pan, 5 tilt, 16 cyan." }
+      value:     { type: int, min: 0, max: 65535, required: true, label: Value, description: "Attribute value, 0-255 in 8-bit or 0-65535 in 16-bit resolution." }
+      time:      { type: int, min: 0, max: 3600, required: true, label: Time, description: "Fade time in seconds." }
     send: { address: "/rpc", args: [ { value: "06,{attribute},{value},{time}H", type: string } ] }
     returns: none
 
   rpc_increase_attribute:
     summary: "Remote programming 07: increase an attribute of the selected heads (/rpc \"07,<attribute>,<value>H\")"
     params:
-      attribute: { type: int, min: 0, max: 51, required: true }
-      value:     { type: int, min: 0, max: 65535, required: true }
+      attribute: { type: int, min: 0, max: 51, required: true, label: Attribute, description: "Attribute number from the ChamSys table, such as 0 intensity, 4 pan, 5 tilt, 16 cyan." }
+      value:     { type: int, min: 0, max: 65535, required: true, label: Amount, description: "How much to increase the attribute by." }
     send: { address: "/rpc", args: [ { value: "07,{attribute},{value}H", type: string } ] }
     returns: none
 
   rpc_increase_attribute_res:
     summary: "Remote programming 07: increase an attribute of the selected heads; high_res true changes in 16-bit resolution (1), false in 8-bit (0) (/rpc \"07,<attribute>,<value>,<high_res>H\")"
     params:
-      attribute: { type: int, min: 0, max: 51, required: true }
-      value:     { type: int, min: 0, max: 65535, required: true }
-      high_res:  { type: bool, required: true }
+      attribute: { type: int, min: 0, max: 51, required: true, label: Attribute, description: "Attribute number from the ChamSys table, such as 0 intensity, 4 pan, 5 tilt, 16 cyan." }
+      value:     { type: int, min: 0, max: 65535, required: true, label: Amount, description: "How much to increase the attribute by, in the chosen resolution." }
+      high_res:  { type: bool, required: true, label: 16-bit, description: "On changes the value in 16-bit resolution, off in 8-bit." }
     send: { address: "/rpc", args: [ { value: "07,{attribute},{value},{high_res:bool01}H", type: string } ] }
     returns: none
 
   rpc_decrease_attribute:
     summary: "Remote programming 08: decrease an attribute of the selected heads (/rpc \"08,<attribute>,<value>H\")"
     params:
-      attribute: { type: int, min: 0, max: 51, required: true }
-      value:     { type: int, min: 0, max: 65535, required: true }
+      attribute: { type: int, min: 0, max: 51, required: true, label: Attribute, description: "Attribute number from the ChamSys table, such as 0 intensity, 4 pan, 5 tilt, 16 cyan." }
+      value:     { type: int, min: 0, max: 65535, required: true, label: Amount, description: "How much to decrease the attribute by." }
     send: { address: "/rpc", args: [ { value: "08,{attribute},{value}H", type: string } ] }
     returns: none
 
   rpc_decrease_attribute_res:
     summary: "Remote programming 08: decrease an attribute of the selected heads; high_res true changes in 16-bit resolution (1), false in 8-bit (0) (/rpc \"08,<attribute>,<value>,<high_res>H\")"
     params:
-      attribute: { type: int, min: 0, max: 51, required: true }
-      value:     { type: int, min: 0, max: 65535, required: true }
-      high_res:  { type: bool, required: true }
+      attribute: { type: int, min: 0, max: 51, required: true, label: Attribute, description: "Attribute number from the ChamSys table, such as 0 intensity, 4 pan, 5 tilt, 16 cyan." }
+      value:     { type: int, min: 0, max: 65535, required: true, label: Amount, description: "How much to decrease the attribute by, in the chosen resolution." }
+      high_res:  { type: bool, required: true, label: 16-bit, description: "On changes the value in 16-bit resolution, off in 8-bit." }
     send: { address: "/rpc", args: [ { value: "08,{attribute},{value},{high_res:bool01}H", type: string } ] }
     returns: none
 
@@ -856,28 +856,28 @@ commands:
   rpc_include_position_palette:
     summary: "Remote programming 10: include a position palette (/rpc \"10,<palette>H\")"
     params:
-      palette: { type: int, min: 1, max: 1024, required: true }
+      palette: { type: int, min: 1, max: 1024, required: true, label: Palette, description: "Palette number, from 1, as in the console's palette window." }
     send: { address: "/rpc", args: [ { value: "10,{palette}H", type: string } ] }
     returns: none
 
   rpc_include_colour_palette:
     summary: "Remote programming 11: include a colour palette (/rpc \"11,<palette>H\")"
     params:
-      palette: { type: int, min: 1, max: 1024, required: true }
+      palette: { type: int, min: 1, max: 1024, required: true, label: Palette, description: "Palette number, from 1, as in the console's palette window." }
     send: { address: "/rpc", args: [ { value: "11,{palette}H", type: string } ] }
     returns: none
 
   rpc_include_beam_palette:
     summary: "Remote programming 12: include a beam palette (/rpc \"12,<palette>H\")"
     params:
-      palette: { type: int, min: 1, max: 1024, required: true }
+      palette: { type: int, min: 1, max: 1024, required: true, label: Palette, description: "Palette number, from 1, as in the console's palette window." }
     send: { address: "/rpc", args: [ { value: "12,{palette}H", type: string } ] }
     returns: none
 
   rpc_include_cue:
     summary: "Remote programming 13: include a cue (/rpc \"13,<cue>H\")"
     params:
-      cue: { type: int, min: 1, max: 65536, required: true }
+      cue: { type: int, min: 1, max: 65536, required: true, label: Cue, description: "Cue id in the Cue Store, from 1." }
     send: { address: "/rpc", args: [ { value: "13,{cue}H", type: string } ] }
     returns: none
 
@@ -889,28 +889,28 @@ commands:
   rpc_record_position_palette:
     summary: "Remote programming 20: record a position palette (/rpc \"20,<palette>H\")"
     params:
-      palette: { type: int, min: 1, max: 1024, required: true }
+      palette: { type: int, min: 1, max: 1024, required: true, label: Palette, description: "Palette number, from 1, as in the console's palette window." }
     send: { address: "/rpc", args: [ { value: "20,{palette}H", type: string } ] }
     returns: none
 
   rpc_record_colour_palette:
     summary: "Remote programming 21: record a colour palette (/rpc \"21,<palette>H\")"
     params:
-      palette: { type: int, min: 1, max: 1024, required: true }
+      palette: { type: int, min: 1, max: 1024, required: true, label: Palette, description: "Palette number, from 1, as in the console's palette window." }
     send: { address: "/rpc", args: [ { value: "21,{palette}H", type: string } ] }
     returns: none
 
   rpc_record_beam_palette:
     summary: "Remote programming 22: record a beam palette (/rpc \"22,<palette>H\")"
     params:
-      palette: { type: int, min: 1, max: 1024, required: true }
+      palette: { type: int, min: 1, max: 1024, required: true, label: Palette, description: "Palette number, from 1, as in the console's palette window." }
     send: { address: "/rpc", args: [ { value: "22,{palette}H", type: string } ] }
     returns: none
 
   rpc_record_cue:
     summary: "Remote programming 23: record a cue (/rpc \"23,<cue>H\")"
     params:
-      cue: { type: int, min: 1, max: 65536, required: true }
+      cue: { type: int, min: 1, max: 65536, required: true, label: Cue, description: "Cue id in the Cue Store, from 1." }
     send: { address: "/rpc", args: [ { value: "23,{cue}H", type: string } ] }
     returns: none
 
@@ -952,94 +952,94 @@ commands:
   rpc_remote_trigger:
     summary: "Remote programming 71: remote trigger; state 0 off, 1 on, 2 toggle (/rpc \"71,<state>H\")"
     params:
-      state: { type: enum, values: ["0", "1", "2"], required: true }
+      state: { type: enum, values: ["0", "1", "2"], required: true, label: State, description: "0 off, 1 on, 2 toggle." }
     send: { address: "/rpc", args: [ { value: "71,{state}H", type: string } ] }
     returns: none
 
   rpc_test_cue:
     summary: "Remote programming 80: test cue Q 1-10000 in the Cue Store (/rpc \"80,<cue>H\")"
     params:
-      cue: { type: int, min: 1, max: 10000, required: true }
+      cue: { type: int, min: 1, max: 10000, required: true, label: Cue, description: "Cue Q in the Cue Store, 1 to 10000." }
     send: { address: "/rpc", args: [ { value: "80,{cue}H", type: string } ] }
     returns: none
 
   rpc_untest_cue:
     summary: "Remote programming 81: untest cue Q 1-10000 in the Cue Store (/rpc \"81,<cue>H\")"
     params:
-      cue: { type: int, min: 1, max: 10000, required: true }
+      cue: { type: int, min: 1, max: 10000, required: true, label: Cue, description: "Cue Q in the Cue Store, 1 to 10000." }
     send: { address: "/rpc", args: [ { value: "81,{cue}H", type: string } ] }
     returns: none
 
   rpc_test_cue_stack:
     summary: "Remote programming 82: test a cue stack at 100% from its first cue (/rpc \"82,<stack>H\")"
     params:
-      stack: { type: int, min: 1, max: 10000, required: true }
+      stack: { type: int, min: 1, max: 10000, required: true, label: Cue stack, description: "Cue stack id, from 1." }
     send: { address: "/rpc", args: [ { value: "82,{stack}H", type: string } ] }
     returns: none
 
   rpc_test_cue_stack_level:
     summary: "Remote programming 82: test a cue stack at a level in percent from its first cue (/rpc \"82,<stack>,<level>H\")"
     params:
-      stack: { type: int, min: 1, max: 10000, required: true }
-      level: { type: int, min: 0, max: 100, required: true }
+      stack: { type: int, min: 1, max: 10000, required: true, label: Cue stack, description: "Cue stack id, from 1." }
+      level: { type: int, min: 0, max: 100, required: true, label: Level, description: "Level in percent to test the stack at, 0 to 100." }
     send: { address: "/rpc", args: [ { value: "82,{stack},{level}H", type: string } ] }
     returns: none
 
   rpc_test_cue_stack_level_cue:
     summary: "Remote programming 82: test a cue stack at a level in percent from a cue id (/rpc \"82,<stack>,<level>,<cue>H\")"
     params:
-      stack: { type: int, min: 1, max: 10000, required: true }
-      level: { type: int, min: 0, max: 100, required: true }
-      cue:   { type: int, min: 1, max: 65536, required: true }
+      stack: { type: int, min: 1, max: 10000, required: true, label: Cue stack, description: "Cue stack id, from 1." }
+      level: { type: int, min: 0, max: 100, required: true, label: Level, description: "Level in percent to test the stack at, 0 to 100." }
+      cue:   { type: int, min: 1, max: 65536, required: true, label: Cue, description: "Cue id in the stack to start from." }
     send: { address: "/rpc", args: [ { value: "82,{stack},{level},{cue}H", type: string } ] }
     returns: none
 
   rpc_untest_cue_stack:
     summary: "Remote programming 83: untest a cue stack (/rpc \"83,<stack>H\")"
     params:
-      stack: { type: int, min: 1, max: 10000, required: true }
+      stack: { type: int, min: 1, max: 10000, required: true, label: Cue stack, description: "Cue stack id, from 1." }
     send: { address: "/rpc", args: [ { value: "83,{stack}H", type: string } ] }
     returns: none
 
   rpc_save_show:
     summary: "Remote programming 90: save the show as showXXXX.shw (four-digit id 0000-9999) (/rpc \"90,<show>H\")"
     params:
-      show: { type: int, min: 0, max: 9999, required: true }
+      show: { type: int, min: 0, max: 9999, required: true, label: Show, description: "Show file number 0-9999, the four digits of showXXXX.shw." }
     send: { address: "/rpc", args: [ { value: "90,{show:04d}H", type: string } ] }
     returns: none
 
   rpc_load_show:
     summary: "Remote programming 91: load show showXXXX.shw (four-digit id 0000-9999) (/rpc \"91,<show>H\")"
     params:
-      show: { type: int, min: 0, max: 9999, required: true }
+      show: { type: int, min: 0, max: 9999, required: true, label: Show, description: "Show file number 0-9999, the four digits of showXXXX.shw." }
     send: { address: "/rpc", args: [ { value: "91,{show:04d}H", type: string } ] }
     returns: none
 
   rpc_load_import:
     summary: "Remote programming 92: load show importXXXX.csv (four-digit id 0000-9999) (/rpc \"92,<file>H\")"
     params:
-      file: { type: int, min: 0, max: 9999, required: true }
+      file: { type: int, min: 0, max: 9999, required: true, label: Import file, description: "Import file number 0-9999, the four digits of importXXXX.csv." }
     send: { address: "/rpc", args: [ { value: "92,{file:04d}H", type: string } ] }
     returns: none
 
   rpc_load_grid:
     summary: "Remote programming 93: load grid gridXXXX.csv (four-digit id 0000-9999) (/rpc \"93,<grid>H\")"
     params:
-      grid: { type: int, min: 0, max: 9999, required: true }
+      grid: { type: int, min: 0, max: 9999, required: true, label: Grid file, description: "Grid file number 0-9999, the four digits of gridXXXX.csv." }
     send: { address: "/rpc", args: [ { value: "93,{grid:04d}H", type: string } ] }
     returns: none
 
   rpc_shutdown:
     summary: "Remote programming 94: shutdown; mode 1 normal (close the MagicQ application on PC, power off on a console), 2 power off, 3 reboot. The confirmation bytes 81,117,105,116 (\"Quit\") are part of the command (/rpc \"94,<mode>,81,117,105,116H\")"
     params:
-      mode: { type: enum, values: ["1", "2", "3"], required: true }
+      mode: { type: enum, values: ["1", "2", "3"], required: true, label: Shutdown mode, description: "1 normal (closes MagicQ on a PC, powers off a console), 2 power off, 3 reboot." }
     send: { address: "/rpc", args: [ { value: "94,{mode},81,117,105,116H", type: string } ] }
     returns: none
 
   rpc_emergency_hot_takeover:
     summary: "Remote programming 112: emergency hot takeover on (1) or off (0); 911 and 999 are documented aliases (/rpc \"112,<enabled>H\")"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Hot takeover, description: "On starts emergency hot takeover, off ends it." }
     send: { address: "/rpc", args: [ { value: "112,{enabled:bool01}H", type: string } ] }
     returns: none
 
