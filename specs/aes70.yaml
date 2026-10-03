@@ -1,0 +1,361 @@
+spec: 1
+id: aes70
+name: AES70 / OCA devices (OCP.1)
+vendor: AES70 (Open Control Architecture)
+category: other
+implementation: native
+reason: >
+  AES70 is an object protocol: the controller discovers the device's objects by walking its blocks, addresses
+  each by a session-independent object number and a class it must know to marshal parameters, and keeps state
+  current through subscriptions whose notifications arrive asynchronously. OCP.1 is binary, with a sync byte,
+  PDU headers, several messages per PDU matched to requests by handle, and a negotiated keep-alive. None of
+  this is expressible as data.
+
+source:
+  - title: "tschiemer/ocac: AES70/OCA device framework in C99 (master, LICENSE: MIT)"
+    author: Philip Tschiemer
+    url: "https://github.com/tschiemer/ocac"
+    note: >
+      Top-level LICENSE is MIT (checked 2026-10-02). Read: src/include/ocac/ocp/ocp1.h (sync value 0x3B, the
+      9-byte header of protocol version, PDU size, PDU type and message count, message types 0-4, command,
+      response and notification layouts, keep-alive heartbeat in u16 seconds or u32 milliseconds told apart by
+      size, and the keep-alive timeout of three heartbeat times, "as defined in standard (AES70-3-2018 5.3)"),
+      src/include/ocac/occ/datatypes (base, framework, eventsubscription, time: OcaClassID is a field count and
+      u16 fields, OcaTimeInterval is OcaFloat32 in seconds), docs/occ_classes.md (a human-readable extract of
+      AES70-2-2018 Annex A: class ids and versions, OcaRoot 1.1 GetClassIdentification and 1.5 GetRole,
+      OcaWorker, OcaBlock 3.5 GetMembers and 3.6 GetMembersRecursive, OcaDeviceManager methods 3.1-3.20 and
+      properties, OcaSubscriptionManager 3.1 AddSubscription and 3.5 AddPropertyChangeSubscription, well-known
+      object numbers 1-13 and root block 100) and docs/subscriptions.md (reliable delivery on the control
+      connection, lightweight subscriptions with zero subscriber method and empty context). No code was copied.
+  - title: "PADL/SwiftOCA: AES70 controller and device library in Swift (main, LICENSE.md: Apache-2.0)"
+    author: PADL Software Pty Ltd
+    url: "https://github.com/PADL/SwiftOCA"
+    note: >
+      Top-level LICENSE.md is Apache-2.0 (checked 2026-10-02). Read: OCF/Messages (Header, MessageType with
+      type 5 notification 2 of AES70-2023, Command, Response, KeepAlive1/2, Notification1/2),
+      OCA/OcaConnection+Codable.swift (PDU size counts every byte after the sync byte; each message starts with
+      its own size; a keep-alive PDU's body is its heartbeat), OCP.1/Ocp1Encoder.swift (an OcaString's length
+      counts Unicode scalar values, lists and maps are u16-counted, blobs u16-length), OCA/OcaConnectionMonitor
+      (no message for three heartbeat times means the connection is lost; a keep-alive is sent when nothing
+      else has been for a heartbeat time), OCA/OcaConnection+Subscribe.swift (OCP.1 uses AddSubscription for the
+      PropertyChanged event 1.1, normal delivery mode 1, empty context and destination),
+      OCC/ControlDataTypes (OcaStatus 0-17 with their meanings, OcaPropertyChangedEventData as property id,
+      value and change type 1-6, OcaModelGUID, OcaModelDescription, OcaDeviceState bits, well-known object
+      numbers) and OCC/ControlClasses (class ids of the workers, sensors, agents and managers; property and
+      method ids of OcaRoot, OcaWorker, OcaBlock, OcaGain, OcaMute, OcaPolarity, OcaSwitch, OcaDelay,
+      OcaIdentificationActuator, the basic actuators, OcaSensor, OcaLevelSensor, OcaDeviceManager and
+      OcaSubscriptionManager). No code was copied.
+  - title: "OCAAlliance/OcaToolsAndDemos: OCAMicro reference device (main, OCA Alliance EULA)"
+    author: OCA Alliance
+    url: "https://github.com/OCAAlliance/OcaToolsAndDemos"
+    note: >
+      Licensed under the OCA Alliance EULA, a permissive Apache-style licence (checked 2026-10-02). Read:
+      OCAMicro/Src/common/OCALite/OCP.1/Ocp1LiteSocketConnection.cpp (the device takes its heartbeat time from
+      the controller's first keep-alive, in seconds or milliseconds, sends a keep-alive when it has sent nothing
+      for that long, and drops a connection silent for three heartbeat times),
+      OCC/ControlDataTypes/OcaLiteFrameworkDataTypes.h (OcaStatus 0-15), OcaLiteBaseDataTypes.h, and the class
+      headers OcaLiteDelay.h, OcaLiteLevelSensor.h, OcaLiteSwitch.h, OcaLiteStringActuator.h, OcaLiteWorker.h,
+      OcaLiteRoot.h and OcaLiteDeviceManager.h. No code was copied.
+  - title: "OCA Alliance: AES70 Control Model"
+    author: OCA Alliance
+    url: "https://ocaalliance.com/aes70-control-model/"
+    note: >
+      Manufacturer-neutral overview: control classes as templates, objects as instances with object numbers,
+      blocks containing objects, roles. Used for the concepts only.
+  - title: "OCA Alliance technical site: Downloads"
+    author: OCA Alliance
+    url: "https://ocaalliance.github.io/downloads.html"
+    note: >
+      Lists the AES70 Implementation Chart (a spreadsheet template documenting a device's OCA objects; vendors
+      such as d&b publish theirs) and the Focusrite RedNet Virtual OCA Device, a freeware simulator useful for
+      checking this integration. The full AES70-1/2/3 standards are sold by the AES and were not used.
+
+settings:
+  # The heartbeat time sent to the device in the keep-alive on connecting: the
+  # device sends a keep-alive when it has sent nothing for this long, and
+  # nothing heard for three of them drops the connection. Whole seconds are
+  # sent in seconds; anything else in milliseconds (AES70-2018's second form).
+  keepalive_interval_ms: { type: int, min: 100, max: 600000, default: 1000 }
+  # How long a request waits for its response.
+  request_timeout_ms: { type: int, min: 100, max: 600000, default: 5000 }
+  # Walk the root block on connecting (when the device is monitored).
+  walk: { type: bool, default: true }
+  # Block levels walked: 1 is the root block's members only, 2 also their
+  # members, and so on. Every level when not given.
+  walk_depth: { type: int, min: 1, max: 255 }
+  # Subscribe to the property changes of every known object found.
+  subscribe: { type: bool, default: true }
+  # Level sensors (meters): off (not read), read (once, on connecting), poll
+  # (read every level_poll_ms), or subscribe (follow their changes, which may
+  # be many per second).
+  level_sensors: { type: enum, values: ["off", read, poll, subscribe], default: poll }
+  level_poll_ms: { type: int, min: 50, max: 600000, default: 1000 }
+  # Requests waiting for a response at once; more are queued.
+  max_in_flight: { type: int, min: 1, max: 1024, default: 32 }
+
+models:
+  - id: aes70-device
+    name: "Any AES70 device over OCP.1/TCP (give the device's OCP.1 port)"
+    supports: &all
+      [set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, identify,
+      get_property, set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      One model for every device: what a device offers is discovered from its object tree, not declared here.
+      AES70 assigns no TCP port; the device's documentation, or its _oca._tcp DNS-SD record, gives it. Remote
+      preamps on AES67 and ST 2110 stageboxes, d&b audiotechnik amplifiers and DS processors, and other
+      devices that speak OCP.1 over TCP.
+
+commands:
+  set_gain:
+    summary: "OcaGain SetGain (4.2): the gain in dB, on an object addressed by role path (object) or object number (ono)"
+    params:
+      object: &object { type: string, max_length: 4096 }
+      ono: &ono { type: int, min: 1, max: 4294967295 }
+      gain_db: { type: float, required: true }
+    returns: ack
+  set_mute:
+    summary: "OcaMute SetState (4.2): muted (state 1) or unmuted (2)"
+    params:
+      object: *object
+      ono: *ono
+      muted: { type: bool, default: true }
+    returns: ack
+  set_switch:
+    summary: >
+      OcaSwitch SetPosition (4.2): a position number from 0, or a position by its name (position_name, from the
+      switch's position names read on connecting)
+    params:
+      object: *object
+      ono: *ono
+      position: { type: int, min: 0, max: 65535 }
+      position_name: { type: string, max_length: 1024 }
+    returns: ack
+  set_polarity:
+    summary: "OcaPolarity SetState (4.2): inverted (state 2) or non-inverted (1)"
+    params:
+      object: *object
+      ono: *ono
+      inverted: { type: bool, default: true }
+    returns: ack
+  set_delay:
+    summary: "OcaDelay SetDelayTime (4.2): the delay in seconds"
+    params:
+      object: *object
+      ono: *ono
+      delay_s: { type: float, min: 0, required: true }
+    returns: ack
+  set_bool:
+    summary: "OcaBooleanActuator SetSetting (5.2)"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: bool, required: true }
+    returns: ack
+  set_int:
+    summary: "OcaInt8/16/32/64Actuator or OcaUint8/16/32/64Actuator SetSetting (5.2); the value must fit the actuator's type"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: int, required: true }
+    returns: ack
+  set_float:
+    summary: "OcaFloat32Actuator or OcaFloat64Actuator SetSetting (5.2)"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: float, required: true }
+    returns: ack
+  set_string:
+    summary: "OcaStringActuator SetSetting (5.2)"
+    params:
+      object: *object
+      ono: *ono
+      value: { type: string, required: true, max_length: 65535 }
+    returns: ack
+  identify:
+    summary: >
+      OcaIdentificationActuator SetActive (4.2): start or stop the device's identification (a flashing LED or
+      display). Without object or ono, the first identification actuator found in the tree
+    params:
+      object: *object
+      ono: *ono
+      enabled: { type: bool, default: true }
+    returns: ack
+  get_property:
+    summary: >
+      Read one property ("level.index", e.g. "4.1") of an object, with the getter of its class. Returns the
+      decoded value, or {value, min, max} for a bounded property, or {hex} when the reply cannot be decoded. Only
+      the properties listed under state are known; call_method reaches any other
+    params:
+      object: *object
+      ono: *ono
+      property: &property { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$" }
+    returns: value
+  set_property:
+    summary: >
+      Write one property ("level.index") of an object with the setter of its class; value is JSON of the
+      property's type (a number, boolean, string, or list of strings or booleans; muted and inverted states as
+      booleans, delays in seconds)
+    params:
+      object: *object
+      ono: *ono
+      property: *property
+      value: { type: json, required: true }
+    returns: ack
+  call_method:
+    summary: >
+      Escape hatch: call any method ("level.index") on an object with parameters already marshalled as OCP.1
+      bytes (params_hex) and their count (param_count; 1 when params_hex is not empty, else 0). Returns the
+      response as {status, status_name, param_count, params_hex}, whatever the status
+    params:
+      object: *object
+      ono: *ono
+      method: { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$" }
+      params_hex: { type: string, default: "", max_length: 131070, pattern: "^[0-9A-Fa-f ]*$" }
+      param_count: { type: int, min: 0, max: 255 }
+    returns: value
+  refresh_objects:
+    summary: >
+      Forget the object tree and walk the root block again; acknowledged when the walk is done. When monitored,
+      known objects are then read again and any new ones subscribed to
+    returns: ack
+  get_device_info:
+    summary: >
+      Read the device manager (object 1): model GUID, serial number, model description, name, AES70 version,
+      role, user inventory code, enabled, state, message and revision id. A property the device does not
+      implement is null
+    returns: value
+
+state:
+  discovery.complete:              { type: bool, description: "The walk of the root block has been answered or has timed out throughout" }
+  discovery.objects:               { type: int, description: "Objects found under the root block, at every level walked" }
+  objects.*.ono:                   { type: int, description: "Object number. Objects are keyed by role path: the roles from the root block down, joined by '/' (e.g. \"Input 1/Gain\"); a second object with the same path gets \"#<ono>\" appended" }
+  objects.*.class:                 { type: string, description: "Class name (OcaGain, OcaBlock, ...) when the class is one the module knows by name, else the class id" }
+  objects.*.class_id:              { type: string, description: "Class id, its fields joined by '.' (\"1.1.1.5\"); proprietary classes include 65535 and the vendor's fields" }
+  objects.*.class_version:         { type: int, description: "Class version the device reports" }
+  objects.*.kind:                  { type: string, description: "The nearest standard class the object is or derives from, e.g. OcaGain for a vendor's subclass of it" }
+  objects.*.gain_db:               { type: float, unit: dB, description: "OcaGain 4.1 Gain; with gain_db_min and gain_db_max" }
+  objects.*.gain_db_min:           { type: float, unit: dB, description: "OcaGain minimum gain" }
+  objects.*.gain_db_max:           { type: float, unit: dB, description: "OcaGain maximum gain" }
+  objects.*.muted:                 { type: bool, description: "OcaMute 4.1 State: true for Muted (1), false for Unmuted (2)" }
+  objects.*.inverted:              { type: bool, description: "OcaPolarity 4.1 State: true for Inverted (2)" }
+  objects.*.position:              { type: int, description: "OcaSwitch 4.1 Position, from 0; with position_min and position_max" }
+  objects.*.position_min:          { type: int, description: "OcaSwitch lowest position" }
+  objects.*.position_max:          { type: int, description: "OcaSwitch highest position" }
+  objects.*.position_names:        { type: array, description: "OcaSwitch 4.2 PositionNames, indexed by position" }
+  objects.*.position_enabled:      { type: array, description: "OcaSwitch 4.3 PositionEnableds, when a change is reported" }
+  objects.*.delay_s:               { type: float, unit: s, description: "OcaDelay 4.1 DelayTime in seconds; with delay_s_min and delay_s_max" }
+  objects.*.delay_s_min:           { type: float, unit: s, description: "OcaDelay minimum delay" }
+  objects.*.delay_s_max:           { type: float, unit: s, description: "OcaDelay maximum delay" }
+  objects.*.active:                { type: bool, description: "OcaIdentificationActuator 4.1 Active: the device is identifying itself" }
+  objects.*.setting:               { type: float, description: "Basic actuator 5.1 Setting: a boolean, integer, float or string by the actuator's class; numeric ones with setting_min and setting_max" }
+  objects.*.setting_min:           { type: float, description: "Numeric basic actuator minimum" }
+  objects.*.setting_max:           { type: float, description: "Numeric basic actuator maximum" }
+  objects.*.reading_db:            { type: float, unit: dB, description: "OcaLevelSensor 4.1 Reading, as the level_sensors setting asks; with reading_db_min and reading_db_max. Infinite or NaN readings are \"inf\", \"-inf\" or \"nan\"" }
+  objects.*.reading_db_min:        { type: float, unit: dB, description: "OcaLevelSensor lowest reading" }
+  objects.*.reading_db_max:        { type: float, unit: dB, description: "OcaLevelSensor highest reading" }
+  objects.*.reading_state:         { type: string, description: "OcaSensor 3.1 ReadingState when a change is reported: unknown, valid, underrange, overrange or error" }
+  objects.*.enabled:               { type: bool, description: "OcaWorker 2.1 Enabled, when a change is reported or set" }
+  objects.*.label:                 { type: string, description: "OcaWorker 2.3 Label, when a change is reported or set" }
+  objects.*.raw.*:                 { type: string, description: "A reported change of a property the module does not know, keyed by property id (\"4.9\"): its new value as OCP.1 bytes in hex" }
+  device.model_guid:               { type: string, description: "OcaDeviceManager ModelGUID as 16 hex digits: a reserved byte, the manufacturer's IEEE OUI (3 bytes) and the model code (4)" }
+  device.serial_number:            { type: string, description: "OcaDeviceManager SerialNumber" }
+  device.model.manufacturer:       { type: string, description: "OcaDeviceManager ModelDescription manufacturer" }
+  device.model.name:               { type: string, description: "OcaDeviceManager ModelDescription name" }
+  device.model.version:            { type: string, description: "OcaDeviceManager ModelDescription version" }
+  device.name:                     { type: string, description: "OcaDeviceManager DeviceName" }
+  device.oca_version:              { type: int, description: "OcaDeviceManager OcaVersion: the AES70 version the device implements" }
+  device.role:                     { type: string, description: "OcaDeviceManager Role, from get_device_info" }
+  device.user_inventory_code:      { type: string, description: "OcaDeviceManager UserInventoryCode, from get_device_info" }
+  device.enabled:                  { type: bool, description: "OcaDeviceManager Enabled" }
+  device.state:                    { type: array, description: "OcaDeviceManager State: the names of the bits set, of operational, disabled, error, initializing and updating" }
+  device.message:                  { type: string, description: "OcaDeviceManager Message, from get_device_info" }
+  device.revision_id:              { type: string, description: "OcaDeviceManager DeviceRevisionID, where implemented" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      AES70 assigns no TCP port to OCP.1, so the device's port must be given when it is opened (the open fails
+      without it). Devices advertise it as _oca._tcp over DNS-SD. Only OCP.1 over plain TCP is implemented; the
+      secure (_ocasec._tcp), UDP and WebSocket variants are not.
+  - models: [all]
+    severity: info
+    text: >
+      The AES70 standards were not available; the wire format, ids and status codes come from open
+      implementations (ocac, SwiftOCA, OCAMicro), which agree with one another where they overlap. Any detail
+      only one of them states is listed here.
+  - models: [all]
+    severity: warning
+    text: >
+      OcaTimeInterval (OcaDelay's delay time) is a 32-bit float in ocac (AES70-2018) and OCAMicro, and a 64-bit
+      float in SwiftOCA (later revisions). The module reads it at whichever width the device sends (by the
+      reply's length) and writes it at the width last read from that object, 32-bit until one has been read.
+  - models: [all]
+    severity: info
+    text: >
+      The device is reported connected when the first PDU arrives from it, not when TCP connects: OCP.1 has no
+      handshake. Opened for commands only, that is the device's first keep-alive, up to one heartbeat time
+      after connecting. The module sends its keep-alive first, in seconds when the interval is whole seconds and
+      in milliseconds otherwise; a device that knows only the seconds form (before AES70-2018) needs a whole
+      number of seconds.
+  - models: [all]
+    severity: info
+    text: >
+      Loss is judged as three heartbeat times without any PDU from the device (keep-alive, response or
+      notification), as ocac cites AES70-3-2018 5.3 and as SwiftOCA and OCAMicro do. A device that does not send
+      keep-alives when idle is dropped and reconnected after three intervals; raise keepalive_interval_ms for
+      it.
+  - models: [all]
+    severity: info
+    text: >
+      Changes are followed with AddSubscription (subscription manager 3.1) to each known object's
+      PropertyChanged event (1.1), delivery mode 1 on this connection, naming subscriber method 1.1 of object
+      4096 and an empty context, as SwiftOCA does on OCP.1. A lightweight device returns the subscriber and
+      context zeroed, which the module ignores. AddPropertyChangeSubscription (3.5) and the AES70-2023
+      subscription methods are not used. Subscriptions end with the connection and are made again after a
+      reconnection. A refused subscription is logged once; the values read on connecting then go stale.
+  - models: [all]
+    severity: info
+    text: >
+      The walk asks each block for its members with GetMembers (3.5), not GetMembersRecursive (3.6), and each
+      object for its role with GetRole (1.5): one request per object, sent several to a PDU and at most
+      max_in_flight at a time. A device with thousands of objects takes a moment to walk; walk_depth and walk
+      limit it. Objects outside the root block (the managers) are not walked; the device manager is read
+      directly.
+  - models: [all]
+    severity: info
+    text: >
+      Roles are meant to be unique within their block; a role containing '/' makes its role path ambiguous, and
+      a second object with the same path is keyed with "#<ono>" appended. Object numbers are stable for a
+      device's configuration, so ono addressing is the robust choice for automation; role paths are readable.
+  - models: [all]
+    severity: info
+    text: >
+      Opened for commands only, a command naming an object by role path asks the blocks on the way for their
+      members and the members' roles, one level per round trip, and remembers them for the session. A
+      command naming an object by number asks for its class (GetClassIdentification, 1.1) first when the
+      command must check the class or marshal by it; call_method needs nothing. When monitored and walked, a
+      number not found in the tree is refused at once.
+  - models: [all]
+    severity: info
+    text: >
+      Setters are acknowledged by the device's OK response and the new value is put in state then; a device
+      that clamps rather than refusing reports the clamped value by notification when subscribed. Non-OK
+      statuses fail the command as device_error with the status number and its name (1 ProtocolVersionError, 2
+      DeviceError, 3 Locked, 4 BadFormat, 5 BadONo, 6 ParameterError, 7 ParameterOutOfRange, 8 NotImplemented,
+      9 InvalidRequest, 10 ProcessingFailed, 11 BadMethod, 12 PartiallySucceeded, 13 Timeout, 14
+      BufferOverflow, 15 PermissionDenied, 16 OutOfMemory, 17 Busy; 16 and 17 from SwiftOCA only).
+  - models: [all]
+    severity: info
+    text: >
+      Level sensors are polled once a second by default (one GetReading per sensor, no new one while the last
+      is unanswered), not subscribed, since a meter's changes can arrive many times a second. Set level_sensors
+      to subscribe to follow them by notification instead, or off.
+  - models: [all]
+    severity: info
+    text: >
+      An OCP.1 notification of type 2 (AES70-2023) is read like a type 1 notification; an exception
+      notification is logged. Commands the device sends are ignored. A property change of a list item (change
+      types 4-6) makes the module read the whole property again.

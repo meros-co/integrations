@@ -26,6 +26,7 @@ TRANSPORT = {
 
 # Native modules choose their own transport, so it is described here.
 NATIVE = {
+    "aes70": "OCP.1 over TCP (the device's port)",
     "allenheath-ahm": "MIDI over TCP 51325",
     "allenheath-cq": "MIDI over TCP 51325",
     "allenheath-dlive": "MIDI over TCP 51325 (MixRack) or 51328 (Surface)",
