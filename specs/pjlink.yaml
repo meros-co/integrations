@@ -50,12 +50,12 @@ source:
 settings:
   # Empty for a projector with PJLink security off. Class 1 §5.1 gives "32 or fewer ASCII alphanumeric
   # characters"; see the quirks.
-  password: { type: string, secret: true, max_length: 32, pattern: "^[!-~]*$", default: "" }
+  password: { type: string, secret: true, max_length: 32, pattern: "^[!-~]*$", default: "", label: Password, description: "The PJLink password set on the projector, up to 32 ASCII characters; empty when PJLink security is off." }
   # auto: SHA-256 (version 2.10) when the projector takes it up, else MD5. md5 never sends "PJLINK 2";
   # sha256 refuses a projector that does not offer it.
-  authentication: { type: enum, values: [auto, md5, sha256], default: auto }
+  authentication: { type: enum, values: [auto, md5, sha256], default: auto, label: Authentication, description: "auto uses SHA-256 when the projector supports it (PJLink 2.10) and MD5 otherwise; md5 never tries SHA-256; sha256 refuses a projector without it." }
   # Class 2 status notifications to UDP 4352 on this computer, which must be registered on the projector.
-  notifications: { type: bool, default: false }
+  notifications: { type: bool, default: false, label: Status notifications, description: "When on, listens for Class 2 status notifications on UDP 4352 of this computer, which must be registered on the projector." }
 
 ports:
   - { port: 4352, protocol: tcp, role: control }
@@ -86,7 +86,7 @@ commands:
   set_power:
     summary: "Power on (lamp on) or off (standby) (%1POWR 1 / 0, §4.1). Then reads the power status"
     params:
-      "on": { type: bool, required: true }
+      "on": { type: bool, required: true, label: Power, description: "On powers the projector up (lamp on); off puts it in standby." }
     returns: ack
   get_power:
     summary: "Read the power status (%1POWR ?, §4.2): 'off' (standby), 'on' (lamp on), 'cooling' or 'warming'"
@@ -94,7 +94,7 @@ commands:
   set_input:
     summary: "Switch input (INPT, §4.3) by its two-character number: source 1 RGB, 2 VIDEO, 3 DIGITAL, 4 STORAGE, 5 NETWORK, 6 INTERNAL (Class 2), then terminal 1-9, or A-Z on Class 2; such as '31'. Sent %2 on Class 2. Then reads the input"
     params:
-      input: { type: string, pattern: "^[1-6][1-9A-Z]$", required: true }
+      input: { type: string, pattern: "^[1-6][1-9A-Z]$", required: true, label: Input, description: "Two-character input code: the source type (1 RGB, 2 video, 3 digital, 4 storage, 5 network, 6 internal) then the terminal number 1-9 (A-Z on Class 2), such as 31 for the first digital input." }
     returns: ack
   get_input:
     summary: "Read the current input (INPT ?, §4.4); returns {code, source, terminal}"
@@ -105,8 +105,8 @@ commands:
   set_mute:
     summary: "Mute or unmute video, audio or both (%1AVMT 11/10, 21/20, 31/30, §4.5). Then reads the mute state"
     params:
-      target: { type: enum, values: [video, audio, video_and_audio], default: video_and_audio }
-      muted: { type: bool, default: true }
+      target: { type: enum, values: [video, audio, video_and_audio], default: video_and_audio, label: Target, description: "What to mute: the picture (video), the sound (audio), or both." }
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the chosen target, off unmutes it." }
     returns: ack
   get_mute:
     summary: "Read the mute state (%1AVMT ?, §4.6); returns {video, audio}"
@@ -141,7 +141,7 @@ commands:
   get_input_name:
     summary: "Read an input's name (%2INNM ?<input>, §4.17), such as 'PC' for 31"
     params:
-      input: { type: string, pattern: "^[1-6][1-9A-Z]$", required: true }
+      input: { type: string, pattern: "^[1-6][1-9A-Z]$", required: true, label: Input, description: "Two-character input code: the source type (1 RGB, 2 video, 3 digital, 4 storage, 5 network, 6 internal) then the terminal number 1-9 (A-Z on Class 2), such as 31 for the first digital input." }
     returns: value
   get_input_resolution:
     summary: "Read the input signal's resolution (%2IRES ?, §4.18); returns {status: 'present', 'none' or 'unknown', horizontal, vertical}"
@@ -161,17 +161,17 @@ commands:
   adjust_speaker_volume:
     summary: "Step the speaker (audio output) volume one level up or down (%2SVOL 1 / 0, §4.23); ERR1 means no speaker"
     params:
-      direction: { type: enum, values: [up, down], required: true }
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "Up raises the speaker volume by one level, down lowers it by one level." }
     returns: ack
   adjust_microphone_volume:
     summary: "Step the microphone (audio input) volume one level up or down (%2MVOL 1 / 0, §4.24); ERR1 means no microphone"
     params:
-      direction: { type: enum, values: [up, down], required: true }
+      direction: { type: enum, values: [up, down], required: true, label: Direction, description: "Up raises the microphone volume by one level, down lowers it by one level." }
     returns: ack
   set_freeze:
     summary: "Freeze or unfreeze the picture (%2FREZ 1 / 0, §4.25). Then reads the freeze state"
     params:
-      frozen: { type: bool, default: true }
+      frozen: { type: bool, default: true, label: Freeze, description: "On freezes the picture, off lets it run again." }
     returns: ack
   get_freeze:
     summary: "Read whether the picture is frozen (%2FREZ ?, §4.26)"

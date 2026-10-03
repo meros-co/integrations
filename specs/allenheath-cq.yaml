@@ -28,7 +28,7 @@ source:
 
 settings:
   # Also read every send level and pan on connecting (paced).
-  sync_sends: { type: bool, default: false }
+  sync_sends: { type: bool, default: false, label: Read sends on connect, description: "When on, every send level and pan is also read on connecting, paced, which takes longer." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control }
@@ -58,8 +58,10 @@ commands:
         type: enum
         values: [input, stereo_input, usb, bluetooth, main, output, fx_send, dca, mute_group]
         required: true
-      channel: &channel { type: int, min: 1, max: 16, required: true }
-      muted: { type: bool, default: true }
+        label: Channel type
+        description: "Kind of channel or master to mute: input, stereo input, USB, Bluetooth, Main LR, output, FX unit input (fx_send), DCA or mute group."
+      channel: &channel { type: int, min: 1, max: 16, required: true, label: Channel, description: "Number within the chosen type, numbered from 1 as on the console: inputs 1-16, outputs 1-6 and FX units, DCAs and mute groups 1-4; stereo inputs are ST1 and ST2." }
+      muted: { type: bool, default: true, label: Mute, description: "On mutes the channel, off unmutes it." }
     returns: none
   toggle_mute:
     summary: "Toggle a mute (B0 60 00, p.8); not for DCA or mute group mutes"
@@ -76,16 +78,18 @@ commands:
         type: enum
         values: [input, stereo_input, usb, bluetooth, fx_return, main, output, fx_send, dca]
         required: true
+        label: Channel type
+        description: "Kind of channel: a source (input, stereo input, USB, Bluetooth, FX return) or a master (Main LR, output, FX unit input as fx_send, DCA)."
       channel: *channel
-      level_db: &level_db { type: float, min: -89, max: 10 }
-      level_raw: &level_raw { type: int, min: 0, max: 16383 }
+      level_db: &level_db { type: float, min: -89, max: 10, label: Level, description: "Level in dB from -89 to +10, following the console's level table; give this or the raw value." }
+      level_raw: &level_raw { type: int, min: 0, max: 16383, label: Raw level, description: "Level as the console's 14-bit value from 0 (-inf) to 16383; give this or the level in dB." }
     returns: none
   adjust_level:
     summary: "Step a channel's own level 1 dB up or down (B0 60 00 / B0 61 00, p.10)"
     params:
       channel_type: *level_type
       channel: *channel
-      direction: &updown { type: enum, values: [up, down], required: true }
+      direction: &updown { type: enum, values: [up, down], required: true, label: Direction, description: "Up raises the level by 1 dB, down lowers it by 1 dB." }
     returns: none
   get_level:
     summary: "Read a channel's own level (p.13); returns {level_db, level_raw}"
@@ -96,8 +100,8 @@ commands:
     params:
       channel_type: *level_type
       channel: *channel
-      destination_type: &destination_type { type: enum, values: [output, fx_send], required: true }
-      destination: &destination { type: int, min: 1, max: 6, required: true }
+      destination_type: &destination_type { type: enum, values: [output, fx_send], required: true, label: Destination type, description: "Where the send goes: an output, or an FX unit's input (fx_send); an FX return has no send to its own FX unit." }
+      destination: &destination { type: int, min: 1, max: 6, required: true, label: Destination, description: "Output or FX unit number, from 1; for a stereo output pan, give the odd output of the linked pair (1, 3 or 5)." }
       level_db: *level_db
       level_raw: *level_raw
     returns: none
@@ -123,15 +127,15 @@ commands:
     params:
       channel_type: *level_type
       channel: *channel
-      pan: &pan { type: float, min: -100, max: 100 }
-      pan_raw: &pan_raw { type: int, min: 0, max: 16383 }
+      pan: &pan { type: float, min: -100, max: 100, label: Pan, description: "Pan from -100 (fully left) through 0 (centre) to 100 (fully right), following the console's pan table; give this or the raw value." }
+      pan_raw: &pan_raw { type: int, min: 0, max: 16383, label: Raw pan, description: "Pan as the console's 14-bit value from 0 (left) to 16383 (right); give this or the pan from -100 to 100." }
     returns: none
   adjust_pan:
     summary: "Step a pan one step left or right (B0 61 00 / B0 60 00, p.12)"
     params:
       channel_type: *level_type
       channel: *channel
-      direction: &leftright { type: enum, values: [left, right], required: true }
+      direction: &leftright { type: enum, values: [left, right], required: true, label: Direction, description: "Left or right moves the pan one step that way." }
     returns: none
   get_pan:
     summary: "Read a pan (p.13); returns {pan, pan_raw}"
@@ -142,7 +146,7 @@ commands:
     params:
       channel_type: *level_type
       channel: *channel
-      destination_type: &pan_destination { type: enum, values: [output], required: true }
+      destination_type: &pan_destination { type: enum, values: [output], required: true, label: Destination type, description: "Where the send goes; only a linked stereo output has a send pan." }
       destination: *destination
       pan: *pan
       pan_raw: *pan_raw
@@ -167,18 +171,18 @@ commands:
   recall_scene:
     summary: "Recall scene 1-128 (B0 00 00, C0 program, p.6). The scene must exist"
     params:
-      scene: { type: int, min: 1, max: 128, required: true }
+      scene: { type: int, min: 1, max: 128, required: true, label: Scene, description: "Scene number from 1 to 128, as on the console; the scene must exist." }
     returns: none
   soft_key:
     summary: "Press (90 SK 7F) or release (80 SK 00) SoftKey 1-3 on notes 30-32 (p.7, p.15)"
     params:
-      key: { type: int, min: 1, max: 3, required: true }
-      pressed: { type: bool, required: true }
+      key: { type: int, min: 1, max: 3, required: true, label: SoftKey, description: "SoftKey number from 1 to 3." }
+      pressed: { type: bool, required: true, label: Pressed, description: "On presses the SoftKey, off releases it." }
     returns: none
   raw_midi:
     summary: "Send MIDI bytes given as hex, for messages not modelled here"
     params:
-      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true, label: MIDI bytes, description: "MIDI bytes as hexadecimal pairs, spaces allowed, for messages this integration does not model." }
     returns: none
   refresh:
     summary: "Read the mixer's state again: every mute, own level and pan (and with sync_sends, every send)"

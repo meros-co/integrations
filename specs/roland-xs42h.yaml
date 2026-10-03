@@ -40,6 +40,8 @@ settings:
     default: ""
     max_length: 8
     pattern: '^([0-9A-Za-z]{8})?$'
+    label: Password
+    description: "The eight-character password set on the unit for WebRCS and Telnet; empty when none is set."
 
 on_connect:
   - when_set: password
@@ -98,7 +100,7 @@ commands:
   set_transition_time:
     summary: "Set the video/scene transition time, 0-4000 ms (set,10,19,0)"
     params:
-      time: { type: int, min: 0, max: 4000, required: true }
+      time: { type: int, min: 0, max: 4000, required: true, label: Transition time, description: "Video and scene transition time in milliseconds, from 0 (cut) to 4000." }
     send: "set,10,19,0,{time}"
     expect: { contains: "ack," }
     returns: ack
@@ -106,7 +108,7 @@ commands:
   recall_scene:
     summary: "Switch to a scene, 1-10 (set,11,11,0)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
     send: "set,11,11,0,{scene:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -114,8 +116,8 @@ commands:
   select_output_input:
     summary: "Select the input for OUTPUT 1 or 2: inputs 1-4, or 5 for Input Black (set,11,10)"
     params:
-      output: { type: int, min: 1, max: 2, required: true }
-      input: { type: int, min: 1, max: 5, required: true }
+      output: { type: int, min: 1, max: 2, required: true, label: Output, description: "Output number, 1 for OUTPUT 1 or 2 for OUTPUT 2." }
+      input: { type: int, min: 1, max: 5, required: true, label: Input, description: "Input number from 1 to 4, or 5 for Input Black." }
     send: "set,11,10,{output:-1},{input:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -129,8 +131,8 @@ commands:
   get_output_input:
     summary: "Input selected for OUTPUT 1 or 2 in a scene (get,scene,0,output); the value arrives as a set line"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      output: { type: int, min: 1, max: 2, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      output: { type: int, min: 1, max: 2, required: true, label: Output, description: "Output number, 1 for OUTPUT 1 or 2 for OUTPUT 2." }
     send: "get,{scene:-1},0,{output:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -138,9 +140,9 @@ commands:
   set_mixer1_input_level:
     summary: "Adjust an input channel volume of Audio Mixer 1, 0-127, in a scene 1-10 (set,scene,1,input)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      input: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 1 input channel, from 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,{scene:-1},1,{input:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -148,8 +150,8 @@ commands:
   set_mixer1_input_level_current:
     summary: "Adjust an input channel volume of Audio Mixer 1, 0-127, in the current scene (set,15,1,input)"
     params:
-      input: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 1 input channel, from 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,15,1,{input:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -157,8 +159,8 @@ commands:
   set_mixer1_level:
     summary: "Adjust the overall volume of Audio Mixer 1, 0-127, in a scene 1-10 (set,scene,2,0)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,{scene:-1},2,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -166,7 +168,7 @@ commands:
   set_mixer1_level_current:
     summary: "Adjust the overall volume of Audio Mixer 1, 0-127, in the current scene (set,15,2,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,15,2,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -174,9 +176,9 @@ commands:
   set_mixer2_input_level:
     summary: "Adjust an input channel volume of Audio Mixer 2, 0-127, in a scene 1-10 (set,scene,6,input)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      input: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 2 input channel, from 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,{scene:-1},6,{input:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -184,8 +186,8 @@ commands:
   set_mixer2_input_level_current:
     summary: "Adjust an input channel volume of Audio Mixer 2, 0-127, in the current scene (set,15,6,input)"
     params:
-      input: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      input: { type: int, min: 1, max: 4, required: true, label: Mixer input, description: "Audio Mixer 2 input channel, from 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,15,6,{input:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -193,8 +195,8 @@ commands:
   set_mixer2_level:
     summary: "Adjust the overall volume of Audio Mixer 2, 0-127, in a scene 1-10 (set,scene,7,0)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,{scene:-1},7,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -202,7 +204,7 @@ commands:
   set_mixer2_level_current:
     summary: "Adjust the overall volume of Audio Mixer 2, 0-127, in the current scene (set,15,7,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,15,7,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -210,9 +212,9 @@ commands:
   set_layer_visible:
     summary: "Show or hide a layer 1-4 in a scene 1-10 (set,scene,41,layer)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      layer: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      layer: { type: int, min: 1, max: 4, required: true, label: Layer, description: "Layer number from 1 to 4." }
+      enabled: { type: bool, required: true, label: Visible, description: "On shows the layer, off hides it." }
     send: "set,{scene:-1},41,{layer:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -220,8 +222,8 @@ commands:
   set_layer_visible_current:
     summary: "Show or hide a layer 1-4 in the current scene (set,15,41,layer)"
     params:
-      layer: { type: int, min: 1, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      layer: { type: int, min: 1, max: 4, required: true, label: Layer, description: "Layer number from 1 to 4." }
+      enabled: { type: bool, required: true, label: Visible, description: "On shows the layer, off hides it." }
     send: "set,15,41,{layer:-1},{enabled:bool01}"
     expect: { contains: "ack," }
     returns: ack
@@ -229,9 +231,9 @@ commands:
   set_layer_input:
     summary: "Assign an input to a layer 1-4 in a scene 1-10: inputs 1-4, or 5 for Input Black (set,scene,42,layer)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      layer: { type: int, min: 1, max: 4, required: true }
-      input: { type: int, min: 1, max: 5, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      layer: { type: int, min: 1, max: 4, required: true, label: Layer, description: "Layer number from 1 to 4." }
+      input: { type: int, min: 1, max: 5, required: true, label: Input, description: "Input number from 1 to 4, or 5 for Input Black." }
     send: "set,{scene:-1},42,{layer:-1},{input:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -239,8 +241,8 @@ commands:
   set_layer_input_current:
     summary: "Assign an input to a layer 1-4 in the current scene: inputs 1-4, or 5 for Input Black (set,15,42,layer)"
     params:
-      layer: { type: int, min: 1, max: 4, required: true }
-      input: { type: int, min: 1, max: 5, required: true }
+      layer: { type: int, min: 1, max: 4, required: true, label: Layer, description: "Layer number from 1 to 4." }
+      input: { type: int, min: 1, max: 5, required: true, label: Input, description: "Input number from 1 to 4, or 5 for Input Black." }
     send: "set,15,42,{layer:-1},{input:-1}"
     expect: { contains: "ack," }
     returns: ack
@@ -248,9 +250,9 @@ commands:
   set_input_level:
     summary: "Adjust an input channel volume, 0-127, in a scene 1-10 (set,scene,1,input)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      input: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Audio input channel, from 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,{scene:-1},1,{input:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -258,8 +260,8 @@ commands:
   set_input_level_current:
     summary: "Adjust an input channel volume, 0-127, in the current scene (set,15,1,input)"
     params:
-      input: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      input: { type: int, min: 1, max: 4, required: true, label: Input, description: "Audio input channel, from 1 to 4." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,15,1,{input:-1},{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -267,8 +269,8 @@ commands:
   set_master_level:
     summary: "Adjust the overall volume, 0-127, in a scene 1-10 (set,scene,2,0)"
     params:
-      scene: { type: int, min: 1, max: 10, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      scene: { type: int, min: 1, max: 10, required: true, label: Scene, description: "Scene number from 1 to 10, as on the unit." }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,{scene:-1},2,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -276,7 +278,7 @@ commands:
   set_master_level_current:
     summary: "Adjust the overall volume, 0-127, in the current scene (set,15,2,0)"
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true, label: Volume, description: "Volume as the unit's value from 0 (minimum) to 127 (maximum); the manual gives no dB mapping." }
     send: "set,15,2,0,{level}"
     expect: { contains: "ack," }
     returns: ack
@@ -284,10 +286,10 @@ commands:
   set_parameter:
     summary: "Set any parameter by category, ID and sub-ID (set)"
     params:
-      category: { type: int, min: 0, max: 999, required: true }
-      id: { type: int, min: 0, max: 999, required: true }
-      sub_id: { type: int, min: 0, max: 999, required: true }
-      value: { type: int, min: -9999, max: 9999, required: true }
+      category: { type: int, min: 0, max: 999, required: true, label: Category, description: "Parameter category number from the manual's command list." }
+      id: { type: int, min: 0, max: 999, required: true, label: ID, description: "Parameter ID within the category, from the manual's command list." }
+      sub_id: { type: int, min: 0, max: 999, required: true, label: Sub-ID, description: "Parameter sub-ID from the manual's command list, such as an input or layer number; 0 when it has none." }
+      value: { type: int, min: -9999, max: 9999, required: true, label: Value, description: "Value to set, as the manual's command list gives it for that parameter." }
     send: "set,{category},{id},{sub_id},{value}"
     expect: { contains: "ack," }
     returns: ack
@@ -295,9 +297,9 @@ commands:
   get_parameter:
     summary: "Read any parameter by category, ID and sub-ID; the value arrives as a set line (get)"
     params:
-      category: { type: int, min: 0, max: 999, required: true }
-      id: { type: int, min: 0, max: 999, required: true }
-      sub_id: { type: int, min: 0, max: 999, required: true }
+      category: { type: int, min: 0, max: 999, required: true, label: Category, description: "Parameter category number from the manual's command list." }
+      id: { type: int, min: 0, max: 999, required: true, label: ID, description: "Parameter ID within the category, from the manual's command list." }
+      sub_id: { type: int, min: 0, max: 999, required: true, label: Sub-ID, description: "Parameter sub-ID from the manual's command list, such as an input or layer number; 0 when it has none." }
     send: "get,{category},{id},{sub_id}"
     expect: { contains: "ack," }
     returns: ack

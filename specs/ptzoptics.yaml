@@ -47,8 +47,8 @@ transport:
 settings:
   # The camera's web login, answered only when the camera challenges (HTTP
   # authentication on). The document gives no default credentials.
-  username: { type: string }
-  password: { type: string, secret: true }
+  username: { type: string, label: Username, description: "The camera's web login name, used only when the camera asks for authentication." }
+  password: { type: string, secret: true, label: Password, description: "The camera's web login password, used only when the camera asks for authentication." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -180,9 +180,9 @@ commands:
   move:
     summary: "Begin a continuous pan/tilt move; runs until stop_move"
     params:
-      direction: { type: "enum", values: ["up", "down", "left", "right", "leftup", "rightup", "leftdown", "rightdown"], required: true }
-      pan_speed: { type: "int", min: 1, max: 24, default: 10 }
-      tilt_speed: { type: "int", min: 1, max: 20, default: 10 }
+      direction: { type: "enum", values: ["up", "down", "left", "right", "leftup", "rightup", "leftdown", "rightdown"], required: true, label: Direction, description: "Direction of the pan/tilt move, including the four diagonals; the camera keeps moving until stop_move." }
+      pan_speed: { type: "int", min: 1, max: 24, default: 10, label: Pan speed, description: "Pan speed from 1 (slowest) to 24 (fastest)." }
+      tilt_speed: { type: "int", min: 1, max: 20, default: 10, label: Tilt speed, description: "Tilt speed from 1 (slowest) to 20 (fastest)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&{direction}&{pan_speed}&{tilt_speed}" }
     expect: { status: 200 }
     returns: ack
@@ -194,14 +194,14 @@ commands:
   zoom_in:
     summary: "Zoom in (tele) continuously until stop_zoom; speed 0 slowest, 7 fastest"
     params:
-      speed: { type: "int", min: 0, max: 7, default: 5 }
+      speed: { type: "int", min: 0, max: 7, default: 5, label: Zoom speed, description: "Zoom speed from 0 (slowest) to 7 (fastest); 0 is not documented for G2 cameras." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomin&{speed}" }
     expect: { status: 200 }
     returns: ack
   zoom_out:
     summary: "Zoom out (wide) continuously until stop_zoom; speed 0 slowest, 7 fastest"
     params:
-      speed: { type: "int", min: 0, max: 7, default: 5 }
+      speed: { type: "int", min: 0, max: 7, default: 5, label: Zoom speed, description: "Zoom speed from 0 (slowest) to 7 (fastest); 0 is not documented for G2 cameras." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomout&{speed}" }
     expect: { status: 200 }
     returns: ack
@@ -213,22 +213,22 @@ commands:
   zoom_to:
     summary: "Drive the zoom to a direct position, 4-digit hex 0000 (full wide) to 4000 (full tele)"
     params:
-      speed: { type: "int", min: 1, max: 7, required: true }
-      position: { type: "string", pattern: "^(?:[0-3][0-9A-Fa-f]{3}|4000)$", required: true }
+      speed: { type: "int", min: 1, max: 7, required: true, label: Zoom speed, description: "Zoom speed from 1 (slowest) to 7 (fastest)." }
+      position: { type: "string", pattern: "^(?:[0-3][0-9A-Fa-f]{3}|4000)$", required: true, label: Zoom position, description: "Zoom position as 4 hexadecimal digits, from 0000 (full wide) to 4000 (full tele)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&zoomto&{speed}&{position}" }
     expect: { status: 200 }
     returns: ack
   focus_in:
     summary: "Focus nearer continuously until stop_focus; speed 0 slowest, 7 fastest"
     params:
-      speed: { type: "int", min: 0, max: 7, default: 5 }
+      speed: { type: "int", min: 0, max: 7, default: 5, label: Focus speed, description: "Focus speed from 0 (slowest) to 7 (fastest); 0 is not documented for G2 cameras." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&focusin&{speed}" }
     expect: { status: 200 }
     returns: ack
   focus_out:
     summary: "Focus farther continuously until stop_focus; speed 0 slowest, 7 fastest"
     params:
-      speed: { type: "int", min: 0, max: 7, default: 5 }
+      speed: { type: "int", min: 0, max: 7, default: 5, label: Focus speed, description: "Focus speed from 0 (slowest) to 7 (fastest); 0 is not documented for G2 cameras." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&focusout&{speed}" }
     expect: { status: 200 }
     returns: ack
@@ -250,68 +250,68 @@ commands:
   position_absolute:
     summary: "Move to an absolute pan/tilt position. pan: 4-digit hex, 0000/FFFF home, 0001-0990 right, FFFE-F670 left; tilt: 0000/FFFF home, 0001-0510 up, FFFE-FE51 down"
     params:
-      pan_speed: { type: "int", min: 1, max: 24, required: true }
-      tilt_speed: { type: "int", min: 1, max: 20, required: true }
-      pan: { type: "string", pattern: "^(?:0[0-8][0-9A-Fa-f]{2}|09[0-8][0-9A-Fa-f]|0990|F6[7-9A-Fa-f][0-9A-Fa-f]|F[7-9A-Fa-f][0-9A-Fa-f]{2})$", required: true }
-      tilt: { type: "string", pattern: "^(?:0[0-4][0-9A-Fa-f]{2}|050[0-9A-Fa-f]|0510|FE5[1-9A-Fa-f]|FE[6-9A-Fa-f][0-9A-Fa-f]|FF[0-9A-Fa-f]{2})$", required: true }
+      pan_speed: { type: "int", min: 1, max: 24, required: true, label: Pan speed, description: "Pan speed from 1 (slowest) to 24 (fastest)." }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true, label: Tilt speed, description: "Tilt speed from 1 (slowest) to 20 (fastest)." }
+      pan: { type: "string", pattern: "^(?:0[0-8][0-9A-Fa-f]{2}|09[0-8][0-9A-Fa-f]|0990|F6[7-9A-Fa-f][0-9A-Fa-f]|F[7-9A-Fa-f][0-9A-Fa-f]{2})$", required: true, label: Pan position, description: "Pan position as 4 hexadecimal digits: 0000 (or FFFF) is home, 0001 to 0990 are to the right and FFFE down to F670 to the left." }
+      tilt: { type: "string", pattern: "^(?:0[0-4][0-9A-Fa-f]{2}|050[0-9A-Fa-f]|0510|FE5[1-9A-Fa-f]|FE[6-9A-Fa-f][0-9A-Fa-f]|FF[0-9A-Fa-f]{2})$", required: true, label: Tilt position, description: "Tilt position as 4 hexadecimal digits: 0000 (or FFFF) is home, 0001 to 0510 are up and FFFE down to FE51 are down." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&abs&{pan_speed}&{tilt_speed}&{pan}&{tilt}" }
     expect: { status: 200 }
     returns: ack
   position_relative:
     summary: "Move by a pan/tilt offset from the current position, in the same 4-digit hex steps as position_absolute"
     params:
-      pan_speed: { type: "int", min: 1, max: 24, required: true }
-      tilt_speed: { type: "int", min: 1, max: 20, required: true }
-      pan: { type: "string", pattern: "^(?:0[0-8][0-9A-Fa-f]{2}|09[0-8][0-9A-Fa-f]|0990|F6[7-9A-Fa-f][0-9A-Fa-f]|F[7-9A-Fa-f][0-9A-Fa-f]{2})$", required: true }
-      tilt: { type: "string", pattern: "^(?:0[0-4][0-9A-Fa-f]{2}|050[0-9A-Fa-f]|0510|FE5[1-9A-Fa-f]|FE[6-9A-Fa-f][0-9A-Fa-f]|FF[0-9A-Fa-f]{2})$", required: true }
+      pan_speed: { type: "int", min: 1, max: 24, required: true, label: Pan speed, description: "Pan speed from 1 (slowest) to 24 (fastest)." }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true, label: Tilt speed, description: "Tilt speed from 1 (slowest) to 20 (fastest)." }
+      pan: { type: "string", pattern: "^(?:0[0-8][0-9A-Fa-f]{2}|09[0-8][0-9A-Fa-f]|0990|F6[7-9A-Fa-f][0-9A-Fa-f]|F[7-9A-Fa-f][0-9A-Fa-f]{2})$", required: true, label: Pan offset, description: "Pan offset from the current position, in the same 4-digit hexadecimal steps as the absolute pan position: 0001 to 0990 to the right, FFFE down to F670 to the left." }
+      tilt: { type: "string", pattern: "^(?:0[0-4][0-9A-Fa-f]{2}|050[0-9A-Fa-f]|0510|FE5[1-9A-Fa-f]|FE[6-9A-Fa-f][0-9A-Fa-f]|FF[0-9A-Fa-f]{2})$", required: true, label: Tilt offset, description: "Tilt offset from the current position, in the same 4-digit hexadecimal steps as the absolute tilt position: 0001 to 0510 up, FFFE down to FE51 down." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&rel&{pan_speed}&{tilt_speed}&{pan}&{tilt}" }
     expect: { status: 200 }
     returns: ack
   recall_preset:
     summary: "Recall preset 0-89 (100-254: recall_preset_extended)"
     params:
-      preset: { type: "int", min: 0, max: 89, required: true }
+      preset: { type: "int", min: 0, max: 89, required: true, label: Preset, description: "Preset number from 0 to 89; presets 100 to 254 use the extended command, and 90 to 99 are not presets." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&poscall&{preset}" }
     expect: { status: 200 }
     returns: ack
   save_preset:
     summary: "Overwrite preset 0-89 with the current position and settings"
     params:
-      preset: { type: "int", min: 0, max: 89, required: true }
+      preset: { type: "int", min: 0, max: 89, required: true, label: Preset, description: "Preset number from 0 to 89 to overwrite with the current position and settings; 90 to 99 are not presets." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&posset&{preset}" }
     expect: { status: 200 }
     returns: ack
   recall_preset_extended:
     summary: "Recall preset 100-254"
     params:
-      preset: { type: "int", min: 100, max: 254, required: true }
+      preset: { type: "int", min: 100, max: 254, required: true, label: Preset, description: "Preset number from 100 to 254; presets 0 to 89 use the standard command." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&poscall&{preset}" }
     expect: { status: 200 }
     returns: ack
   save_preset_extended:
     summary: "Overwrite preset 100-254 with the current position and settings"
     params:
-      preset: { type: "int", min: 100, max: 254, required: true }
+      preset: { type: "int", min: 100, max: 254, required: true, label: Preset, description: "Preset number from 100 to 254 to overwrite with the current position and settings." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&posset&{preset}" }
     expect: { status: 200 }
     returns: ack
   recall_preset_with_speed:
     summary: "Recall preset 0-89 at the given pan, tilt and zoom speeds"
     params:
-      preset: { type: "int", min: 0, max: 89, required: true }
-      pan_speed: { type: "int", min: 1, max: 24, required: true }
-      tilt_speed: { type: "int", min: 1, max: 20, required: true }
-      zoom_speed: { type: "int", min: 1, max: 7, required: true }
+      preset: { type: "int", min: 0, max: 89, required: true, label: Preset, description: "Preset number from 0 to 89; presets 100 to 254 use the extended command, and 90 to 99 are not presets." }
+      pan_speed: { type: "int", min: 1, max: 24, required: true, label: Pan speed, description: "Pan speed from 1 (slowest) to 24 (fastest)." }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true, label: Tilt speed, description: "Tilt speed from 1 (slowest) to 20 (fastest)." }
+      zoom_speed: { type: "int", min: 1, max: 7, required: true, label: Zoom speed, description: "Zoom speed from 1 (slowest) to 7 (fastest)." }
     send: { method: POST, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_preset&poscallwithspeed={preset}&panspeed={pan_speed}&tiltspeed={tilt_speed}&zoomspeed={zoom_speed}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   recall_preset_with_speed_extended:
     summary: "Recall preset 100-254 at the given pan, tilt and zoom speeds"
     params:
-      preset: { type: "int", min: 100, max: 254, required: true }
-      pan_speed: { type: "int", min: 1, max: 24, required: true }
-      tilt_speed: { type: "int", min: 1, max: 20, required: true }
-      zoom_speed: { type: "int", min: 1, max: 7, required: true }
+      preset: { type: "int", min: 100, max: 254, required: true, label: Preset, description: "Preset number from 100 to 254; presets 0 to 89 use the standard command." }
+      pan_speed: { type: "int", min: 1, max: 24, required: true, label: Pan speed, description: "Pan speed from 1 (slowest) to 24 (fastest)." }
+      tilt_speed: { type: "int", min: 1, max: 20, required: true, label: Tilt speed, description: "Tilt speed from 1 (slowest) to 20 (fastest)." }
+      zoom_speed: { type: "int", min: 1, max: 7, required: true, label: Zoom speed, description: "Zoom speed from 1 (slowest) to 7 (fastest)." }
     send: { method: POST, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_preset&poscallwithspeed={preset}&panspeed={pan_speed}&tiltspeed={tilt_speed}&zoomspeed={zoom_speed}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -325,44 +325,44 @@ commands:
   focus_lock:
     summary: "Lock or unlock focus"
     params:
-      action: { type: "enum", values: ["lock", "unlock"], required: true }
+      action: { type: "enum", values: ["lock", "unlock"], required: true, label: Focus lock, description: "Lock holds the current focus, unlock releases it." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "ptzcmd&{action}_mfocus" }
     expect: { status: 200 }
     returns: ack
   focus_mode:
     summary: "Focus mode: 1 auto, 2 one-shot AF, 3 manual (see quirks: the document also lists 2 as auto)"
     params:
-      mode: { type: "enum", values: ["1", "2", "3"], required: true }
+      mode: { type: "enum", values: ["1", "2", "3"], required: true, label: Focus mode, description: "1 is auto, 2 one-shot autofocus and 3 manual, per the document's function text; its parameter table instead lists 2 as auto, so check on the camera." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&focusmode&{mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   af_zone:
     summary: "Autofocus zone: 0 top, 1 center, 2 bottom, 3 front"
     params:
-      zone: { type: "int", min: 0, max: 3, required: true }
+      zone: { type: "int", min: 0, max: 3, required: true, label: Autofocus zone, description: "Part of the picture autofocus uses: 0 top, 1 centre, 2 bottom, 3 front." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&focusregion&{zone}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   af_sensitivity:
     summary: "Autofocus sensitivity: 1 high, 2 normal, 3 low"
     params:
-      sensitivity: { type: "int", min: 1, max: 3, required: true }
+      sensitivity: { type: "int", min: 1, max: 3, required: true, label: Autofocus sensitivity, description: "How readily autofocus reacts: 1 high, 2 normal, 3 low." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&focussense&{sensitivity}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   focus_limit:
     summary: "Limit the focus range; near and far in metres (0-11), near no greater than far"
     params:
-      enabled: { type: "bool", required: true }
-      near: { type: "int", min: 0, max: 11, required: true }
-      far: { type: "int", min: 0, max: 11, required: true }
+      enabled: { type: "bool", required: true, label: Focus limit, description: "On limits focus to the near and far distances given, off allows the full range." }
+      near: { type: "int", min: 0, max: 11, required: true, label: Near limit, description: "Nearest focus distance in metres, from 0 to 11; must be no greater than the far limit." }
+      far: { type: "int", min: 0, max: 11, required: true, label: Far limit, description: "Farthest focus distance in metres, from 0 to 11; must be no less than the near limit." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_zoomfocus&type=focusrange&enable={enabled:bool01}&near={near}&far={far}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   time_of_flight:
     summary: "Time-of-flight focus assist: 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Time of flight, description: "Time-of-flight focus assist: 2 turns it on, 3 turns it off." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&tof&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -371,84 +371,84 @@ commands:
   exposure_mode:
     summary: "Exposure mode: 0 auto, 3 manual, 10 shutter priority (SAE), 11 iris priority (AAE), 13 bright (not on Move 4K or Link 4K)"
     params:
-      mode: { type: "enum", values: ["0", "3", "10", "11", "13"], required: true }
+      mode: { type: "enum", values: ["0", "3", "10", "11", "13"], required: true, label: Exposure mode, description: "0 auto, 3 manual, 10 shutter priority (SAE), 11 iris priority (AAE), 13 bright (not on Move 4K or Link 4K)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&aemode&{mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   exposure_compensation:
     summary: "Exposure compensation (auto exposure): 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Exposure compensation, description: "2 turns exposure compensation on, 3 turns it off; it applies in auto exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&expcomp_mode&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   exposure_compensation_level:
     summary: "Exposure compensation level 0-14 for -7 to +7 (7 is 0)"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Compensation level, description: "Exposure compensation from 0 (-7) to 14 (+7), where 7 is no compensation; applies in auto exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&expcomp_level&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   backlight:
     summary: "Backlight compensation: 2 on, 3 off (see quirks)"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Backlight compensation, description: "2 turns backlight compensation on, 3 turns it off, per the parameter table (the document's text also lists 1 off and 3 enhanced); applies in auto, SAE or AAE." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&backlight&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   anti_flicker:
     summary: "Anti-flicker: 0 off, 1 50 Hz, 2 60 Hz (auto, AAE)"
     params:
-      mode: { type: "int", min: 0, max: 2, required: true }
+      mode: { type: "int", min: 0, max: 2, required: true, label: Anti-flicker, description: "0 off, 1 for 50 Hz lighting, 2 for 60 Hz lighting; applies in auto or AAE exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&antiflicker&{mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   gain_limit:
     summary: "Gain limit 0-15 (auto, SAE, AAE)"
     params:
-      level: { type: "int", min: 0, max: 15, required: true }
+      level: { type: "int", min: 0, max: 15, required: true, label: Gain limit, description: "Highest gain the camera may use, from 0 to 15; applies in auto, SAE or AAE exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&gainLimit&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   gain:
     summary: "Gain 0-7 (manual exposure)"
     params:
-      level: { type: "int", min: 0, max: 7, required: true }
+      level: { type: "int", min: 0, max: 7, required: true, label: Gain, description: "Gain from 0 to 7; applies in manual exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&gain&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   iris:
     summary: "Iris (manual, AAE): 0 close, 1 F11 ... 12 F1.8 (Move 4K, Link 4K table)"
     params:
-      value: { type: "int", min: 0, max: 12, required: true }
+      value: { type: "int", min: 0, max: 12, required: true, label: Iris, description: "Iris index on Move 4K and Link 4K: 0 closed, 1 F11 up to 12 F1.8 (the document's table says 0-8 but its list runs to 12); applies in manual or AAE exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&iris&{value}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   iris_se:
     summary: "Iris (manual, AAE): 0 close, 6 F11 ... 17 F1.8 (Move SE, Studio Pro, Studio 4K table)"
     params:
-      value: { type: "enum", values: ["0", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"], required: true }
+      value: { type: "enum", values: ["0", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"], required: true, label: Iris, description: "Iris index on Move SE, Studio Pro and Studio 4K: 0 closed, 6 F11 up to 17 F1.8; applies in manual or AAE exposure." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&iris&{value}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   shutter:
     summary: "Shutter speed index 1-17 (manual, AAE); the speed for each index differs by model (see quirks)"
     params:
-      value: { type: "int", min: 1, max: 17, required: true }
+      value: { type: "int", min: 1, max: 17, required: true, label: Shutter speed, description: "Shutter index from 1 (1/30 s) upward to faster speeds, with the speed per index depending on the model (Move 4K and Link 4K reach 1/10000 at 17, Studio Pro 1/190); applies in manual or AAE exposure, as the document states." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&shutter&{value}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   meter_region:
     summary: "Metering region: 0 average, 1 center, 2 smart, 3 top (auto, SAE, AAE)"
     params:
-      region: { type: "int", min: 0, max: 3, required: true }
+      region: { type: "int", min: 0, max: 3, required: true, label: Metering region, description: "Part of the picture exposure is metered on: 0 average, 1 centre, 2 smart, 3 top; applies in auto, SAE or AAE." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&meter&{region}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   dynamic_range:
     summary: "Dynamic range control 0-8"
     params:
-      level: { type: "int", min: 0, max: 8, required: true }
+      level: { type: "int", min: 0, max: 8, required: true, label: Dynamic range, description: "Dynamic range control level from 0 to 8." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&drc&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -457,7 +457,7 @@ commands:
   white_balance_mode:
     summary: "White balance: 0 auto, 1 indoor, 2 outdoor, 3 one-push, 5 manual, 32 VAR (colour temperature)"
     params:
-      mode: { type: "enum", values: ["0", "1", "2", "3", "5", "32"], required: true }
+      mode: { type: "enum", values: ["0", "1", "2", "3", "5", "32"], required: true, label: White balance, description: "0 auto, 1 indoor, 2 outdoor, 3 one-push, 5 manual (red and blue gain), 32 VAR (set colour temperature)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&wbmode&{mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -469,35 +469,35 @@ commands:
   color_temperature:
     summary: "VAR colour temperature index 0-55: 2500 K + 100 K per step (31 is 5600 K)"
     params:
-      index: { type: "int", min: 0, max: 55, required: true }
+      index: { type: "int", min: 0, max: 55, required: true, label: Colour temperature, description: "Colour temperature index from 0 (2500 K) in 100 K steps to 55 (8000 K), 31 being 5600 K; applies in VAR white balance." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&colortemp&{index}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   red_gain:
     summary: "Red gain 0-255 (manual white balance)"
     params:
-      level: { type: "int", min: 0, max: 255, required: true }
+      level: { type: "int", min: 0, max: 255, required: true, label: Red gain, description: "Red gain from 0 to 255; applies in manual white balance." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&rgain&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   blue_gain:
     summary: "Blue gain 0-255 (manual white balance)"
     params:
-      level: { type: "int", min: 0, max: 255, required: true }
+      level: { type: "int", min: 0, max: 255, required: true, label: Blue gain, description: "Blue gain from 0 to 255; applies in manual white balance." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&bgain&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   red_gain_tuning:
     summary: "Red gain tuning 0-20 for -10 to +10 (auto, one-push, VAR)"
     params:
-      level: { type: "int", min: 0, max: 20, required: true }
+      level: { type: "int", min: 0, max: 20, required: true, label: Red gain tuning, description: "Red adjustment from 0 (-10) to 20 (+10), 10 being none; applies in auto, one-push or VAR white balance." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&rgaintuning&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   blue_gain_tuning:
     summary: "Blue gain tuning 0-20 for -10 to +10 (auto, one-push, VAR)"
     params:
-      level: { type: "int", min: 0, max: 20, required: true }
+      level: { type: "int", min: 0, max: 20, required: true, label: Blue gain tuning, description: "Blue adjustment from 0 (-10) to 20 (+10), 10 being none; applies in auto, one-push or VAR white balance." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&bgaintuning&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -506,42 +506,42 @@ commands:
   contrast:
     summary: "Contrast 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Contrast, description: "Contrast from 0 (lowest) to 14 (highest)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&contrast&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   hue:
     summary: "Hue 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Hue, description: "Hue setting from 0 to 14." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&hue&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   luminance:
     summary: "Luminance 0 (darker) to 14 (brighter)"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Luminance, description: "Luminance from 0 (darker) to 14 (brighter)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&luminance&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   saturation:
     summary: "Saturation 0-14 for 60% to 200% in 10% steps"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Saturation, description: "Saturation from 0 (60%) to 14 (200%) in 10% steps." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&saturation&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   sharpness:
     summary: "Sharpness 0-11 (Move 4K, Link 4K)"
     params:
-      level: { type: "int", min: 0, max: 11, required: true }
+      level: { type: "int", min: 0, max: 11, required: true, label: Sharpness, description: "Sharpness from 0 (softest) to 11 (sharpest) on Move 4K and Link 4K." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&sharpness&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   sharpness_se:
     summary: "Sharpness 0-16 (Move SE, Studio Pro, Studio 4K)"
     params:
-      level: { type: "int", min: 0, max: 16, required: true }
+      level: { type: "int", min: 0, max: 16, required: true, label: Sharpness, description: "Sharpness from 0 (softest) to 16 (sharpest) on Move SE, Studio Pro and Studio 4K." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&sharpness&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -550,105 +550,105 @@ commands:
   noise_reduction_2d:
     summary: "2D noise reduction level 0-6 (6 auto in the document's example)"
     params:
-      level: { type: "int", min: 0, max: 6, required: true }
+      level: { type: "int", min: 0, max: 6, required: true, label: "2D noise reduction", description: "2D noise reduction level from 0 to 6; the document's example suggests 6 is auto." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&noise2d&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   noise_reduction_3d:
     summary: "3D noise reduction level 0-9 (9 auto in the document's example)"
     params:
-      level: { type: "int", min: 0, max: 9, required: true }
+      level: { type: "int", min: 0, max: 9, required: true, label: "3D noise reduction", description: "3D noise reduction level from 0 to 9; the document's example suggests 9 is auto." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&noise3d&{level}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   auto_inversion:
     summary: "Auto inversion (ceiling mount): 2 on, 0 off"
     params:
-      state: { type: "enum", values: ["0", "2"], required: true }
+      state: { type: "enum", values: ["0", "2"], required: true, label: Auto inversion, description: "Automatic picture inversion for ceiling mounting: 2 on, 0 off." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&inversionmode&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   auto_tracking:
     summary: "Turn auto tracking on or off"
     params:
-      state: { type: "enum", values: ["on", "off"], required: true }
+      state: { type: "enum", values: ["on", "off"], required: true, label: Auto tracking, description: "On starts the camera following its subject, off stops it." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "set_overlay&autotracking&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   bw_mode:
     summary: "Black and white picture (true) or colour (false)"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: Black and white, description: "On gives a black and white picture, off a colour one." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&bwmode&{enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   bounding_boxes:
     summary: "Tracking bounding boxes: 2 debug, 3 off, 4 select target"
     params:
-      mode: { type: "int", min: 2, max: 4, required: true }
+      mode: { type: "int", min: 2, max: 4, required: true, label: Bounding boxes, description: "Tracking bounding boxes on the picture: 2 debug, 3 off, 4 select target." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&trackbox&{mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   display_info:
     summary: "On-screen display info: 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Display info, description: "On-screen display of camera information: 2 on, 3 off." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&displayinfo&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   image_orientation:
     summary: "Image orientation: 0 normal, 1 flip, 2 mirror, 3 flip and mirror"
     params:
-      orientation: { type: "int", min: 0, max: 3, required: true }
+      orientation: { type: "int", min: 0, max: 3, required: true, label: Orientation, description: "0 normal, 1 flipped vertically, 2 mirrored, 3 flipped and mirrored." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&imageorientation&{orientation}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   motion_sync:
     summary: "Motion sync: 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Motion sync, description: "Motion sync: 2 on, 3 off." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&motionsync&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   patrol_mode:
     summary: "Patrol (preset inspection) mode: 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Patrol mode, description: "Patrol (preset inspection) mode: 2 on, 3 off." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&presetinspection&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   preset_freeze:
     summary: "Freeze the picture during preset recall: 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Preset freeze, description: "Freezing the picture while a preset is recalled: 2 on, 3 off." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&presetfreeze&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   tally_mode:
     summary: "Tally mode: 2 on, 3 off"
     params:
-      state: { type: "int", min: 2, max: 3, required: true }
+      state: { type: "int", min: 2, max: 3, required: true, label: Tally mode, description: "Tally mode: 2 on, 3 off (the camera may report it back as 1)." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&tallymode&{state}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   tracking_overlay:
     summary: "Tracking overlay on (true) or off (false)"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: Tracking overlay, description: "On shows the tracking overlay on the picture, off hides it." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&trackingoverlay&{enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   tracking_start_location:
     summary: "Where auto tracking starts: live, home, or a preset number 0-254"
     params:
-      location: { type: "string", pattern: "^(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4]|live|home)$", required: true }
+      location: { type: "string", pattern: "^(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4]|live|home)$", required: true, label: Start location, description: "Where auto tracking starts: live (the current view), home, or a preset number from 0 to 254." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&trackpreset&{location}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   zoom_mode:
     summary: "Zoom mode: 0 optical, 1 digital 2x, 2 digital 4x, 3 digital 8x, 4 digital 16x"
     params:
-      mode: { type: "int", min: 0, max: 4, required: true }
+      mode: { type: "int", min: 0, max: 4, required: true, label: Zoom mode, description: "0 optical only, then digital zoom on top of optical: 1 2x, 2 4x, 3 8x, 4 16x." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "post_image_value&digitalzoom&{mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -677,7 +677,7 @@ commands:
   osd_navigate:
     summary: "Move the OSD selection up or down, or adjust the option left or right"
     params:
-      direction: { type: "enum", values: ["up", "down", "left", "right"], required: true }
+      direction: { type: "enum", values: ["up", "down", "left", "right"], required: true, label: Direction, description: "Up or down moves the menu selection, left or right changes the selected option." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&osd={direction}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -686,49 +686,49 @@ commands:
   audio_encoding:
     summary: "Audio encoding: 0 off, 1 on, 2 Dante AV-H (Link 4K only)"
     params:
-      mode: { type: "int", min: 0, max: 2, required: true }
+      mode: { type: "int", min: 0, max: 2, required: true, label: Audio encoding, description: "0 off, 1 on, 2 Dante AV-H (Link 4K only)." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&audio_switch={mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   audio_adts:
     summary: "ADTS headers on the AAC stream on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: ADTS headers, description: "On adds ADTS headers to the AAC audio stream, off leaves them out." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&adts_flag={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   audio_bitrate:
     summary: "Audio bitrate in kbps"
     params:
-      kbps: { type: "enum", values: ["96", "128"], required: true }
+      kbps: { type: "enum", values: ["96", "128"], required: true, label: Audio bitrate, description: "Audio bitrate in kbit/s, 96 or 128." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&streamrate={kbps}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   audio_sample_rate:
     summary: "Audio sample rate in kHz (32 on Move SE and Studio Pro only; 44.1 and 48 on Move 4K, Link 4K)"
     params:
-      khz: { type: "enum", values: ["32", "44.1", "48"], required: true }
+      khz: { type: "enum", values: ["32", "44.1", "48"], required: true, label: Sample rate, description: "Audio sample rate in kHz: 32 on Move SE and Studio Pro only, 44.1 and 48 on Move 4K and Link 4K." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&samplerate={khz}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   audio_input_volume:
     summary: "Audio input volume 0-59 (Move SE and Studio Pro accept 0-30)"
     params:
-      volume: { type: "int", min: 0, max: 59, required: true }
+      volume: { type: "int", min: 0, max: 59, required: true, label: Input volume, description: "Audio input volume from 0 to 59 on Move 4K and Link 4K, 0 to 30 on Move SE and Studio Pro." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&volume_value={volume}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   audio_line_out_volume:
     summary: "Line out volume 0-59 (Move SE and Studio Pro accept 0-30)"
     params:
-      volume: { type: "int", min: 0, max: 59, required: true }
+      volume: { type: "int", min: 0, max: 59, required: true, label: Line out volume, description: "Line out volume from 0 to 59 on Move 4K and Link 4K, 0 to 30 on Move SE and Studio Pro." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&lineout_volume={volume}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   usb_audio:
     summary: "USB audio on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: USB audio, description: "On sends audio over USB, off does not." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_audio&usbaudio_switch={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -737,105 +737,105 @@ commands:
   video_template:
     summary: "Apply a video template: off (IP video off), ultra, high, medium, low, 264P50, 264P60, 265P50, 265P60 (not Link 4K or Move SE), dante, dante4K (Link 4K only)"
     params:
-      template: { type: "enum", values: ["off", "ultra", "high", "medium", "low", "264P50", "264P60", "265P50", "265P60", "dante", "dante4K"], required: true }
+      template: { type: "enum", values: ["off", "ultra", "high", "medium", "low", "264P50", "264P60", "265P50", "265P60", "dante", "dante4K"], required: true, label: Video template, description: "Preset bundle of video settings: off turns IP video off; ultra, high, medium, low; 264P50, 264P60, 265P50, 265P60 (not Link 4K or Move SE); dante and dante4K (Link 4K only)." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&ndi_mode={template}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   video_outputs:
     summary: "Choose the active outputs: all-30fps, USB_IP, USB_HDMI-SDI or HDMI-SDI_IP"
     params:
-      outputs: { type: "enum", values: ["all-30fps", "USB_IP", "USB_HDMI-SDI", "HDMI-SDI_IP"], required: true }
+      outputs: { type: "enum", values: ["all-30fps", "USB_IP", "USB_HDMI-SDI", "HDMI-SDI_IP"], required: true, label: Active outputs, description: "Which outputs are active: all-30fps (all at 30 fps), USB_IP, USB_HDMI-SDI or HDMI-SDI_IP." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&video_ability={outputs}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   video_advanced:
     summary: "Advanced (hybrid) video mode off or hybrid"
     params:
-      mode: { type: "enum", values: ["off", "hybrid"], required: true }
+      mode: { type: "enum", values: ["off", "hybrid"], required: true, label: Advanced video mode, description: "Off for normal operation, hybrid for the advanced hybrid video mode." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&advanced={mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   encoding_profile:
     summary: "Encoding profile"
     params:
-      profile: { type: "enum", values: ["mainprofile", "highprofile", "baseline"], required: true }
+      profile: { type: "enum", values: ["mainprofile", "highprofile", "baseline"], required: true, label: Encoding profile, description: "Video encoding profile: main, high or baseline." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&profile={profile}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   hdmi_sdi_output:
     summary: "Baseband output: 0 SDI, 1 HDMI"
     params:
-      output: { type: "enum", values: ["0", "1"], required: true }
+      output: { type: "enum", values: ["0", "1"], required: true, label: Baseband output, description: "Which baseband output carries video: 0 SDI, 1 HDMI." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&hdmi_sdi={output}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   refresh_rate:
     summary: "Video refresh rate: 50 Hz, 60 Hz, or dial (the camera's rotary switch)"
     params:
-      rate: { type: "enum", values: ["50", "60", "dial"], required: true }
+      rate: { type: "enum", values: ["50", "60", "dial"], required: true, label: Refresh rate, description: "Video refresh rate: 50 Hz, 60 Hz, or dial to follow the camera's rotary switch." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&vinorm={rate}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   studio_pro_hdmi_format:
     summary: "Studio Pro HDMI output format"
     params:
-      format: { type: "enum", values: ["1080P30", "1080P50", "1080P60", "720P50", "720P60"], required: true }
+      format: { type: "enum", values: ["1080P30", "1080P50", "1080P60", "720P50", "720P60"], required: true, label: HDMI format, description: "Studio Pro HDMI output resolution and frame rate." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&hdmivideoformat={format}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_protocol:
     summary: "Encoding of IP stream 1 or 2 (MJPEG not on Move SE)"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      protocol: { type: "enum", values: ["H264", "H265", "MJPEG"], required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      protocol: { type: "enum", values: ["H264", "H265", "MJPEG"], required: true, label: Encoding, description: "Video encoding of the stream: H264, H265 or MJPEG (MJPEG not on Move SE)." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&protocol_{stream}={protocol}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_resolution:
     summary: "Resolution of IP stream 1 or 2 (stream 2: PIC_HD720 and smaller; PIC_UHD4K Move/Link 4K only; PIC_960_540 Move SE and Studio Pro only)"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      resolution: { type: "enum", values: ["PIC_UHD4K", "PIC_HD1080", "PIC_HD720", "PIC_HD576", "PIC_960_540", "PIC_D1", "PIC_720_408", "PIC_VGA", "PIC_640_360", "PIC_480_320", "PIC_QVGA"], required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      resolution: { type: "enum", values: ["PIC_UHD4K", "PIC_HD1080", "PIC_HD720", "PIC_HD576", "PIC_960_540", "PIC_D1", "PIC_720_408", "PIC_VGA", "PIC_640_360", "PIC_480_320", "PIC_QVGA"], required: true, label: Resolution, description: "Stream resolution, from PIC_UHD4K (Move 4K and Link 4K only) down to PIC_QVGA; stream 2 takes PIC_HD720 and smaller, and PIC_960_540 is on Move SE and Studio Pro only." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&size_{stream}={resolution}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_bitrate:
     summary: "Bitrate of IP stream 1 or 2 in kbps (32-102400)"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      kbps: { type: "int", min: 32, max: 102400, required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      kbps: { type: "int", min: 32, max: 102400, required: true, label: Bitrate, description: "Stream bitrate in kbit/s, from 32 to 102400." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&bps_{stream}={kbps}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_frame_rate:
     summary: "Frame rate of IP stream 1 or 2 (1-60 fps)"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      fps: { type: "int", min: 1, max: 60, required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      fps: { type: "int", min: 1, max: 60, required: true, label: Frame rate, description: "Stream frame rate in frames per second, from 1 to 60." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&fps_{stream}={fps}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_keyframe_interval:
     summary: "I-frame interval of IP stream 1 or 2 in frames (1-1200)"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      frames: { type: "int", min: 1, max: 1200, required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      frames: { type: "int", min: 1, max: 1200, required: true, label: I-frame interval, description: "Number of frames between I-frames, from 1 to 1200." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&gop_{stream}={frames}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_rate_control:
     summary: "Bitrate control of IP stream 1 or 2: CBR or VBR"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      mode: { type: "enum", values: ["CBR", "VBR"], required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      mode: { type: "enum", values: ["CBR", "VBR"], required: true, label: Rate control, description: "CBR keeps a constant bitrate, VBR lets it vary with the picture." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&rcmode_{stream}={mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   stream_qfactor:
     summary: "MJPEG quality factor of IP stream 1 or 2 (1-99, lower is better quality)"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      qfactor: { type: "int", min: 1, max: 99, required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      qfactor: { type: "int", min: 1, max: 99, required: true, label: Quality factor, description: "MJPEG quality factor from 1 to 99, where lower is better quality." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_media_video&qfactor_{stream}={qfactor}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -844,143 +844,143 @@ commands:
   rtmp:
     summary: "RTMP publishing of stream 1 or 2 on or off"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      enabled: { type: "bool", required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      enabled: { type: "bool", required: true, label: RTMP, description: "On publishes the stream to its RTMP server, off stops publishing." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtmp_url:
     summary: "RTMP server URL (MRL) for stream 1 or 2"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      url: { type: "string", pattern: "^[A-Za-z0-9._~:/@!$'()*+,;=%-]+$", required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      url: { type: "string", pattern: "^[A-Za-z0-9._~:/@!$'()*+,;=%-]+$", required: true, label: RTMP URL, description: "RTMP server URL (MRL) for the stream, without any & character; percent-encode characters outside RFC 3986 yourself." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_mrl={url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtmp_key:
     summary: "RTMP stream key for stream 1 or 2"
     params:
-      stream: { type: "int", min: 1, max: 2, required: true }
-      key: { type: "string", required: true }
+      stream: { type: "int", min: 1, max: 2, required: true, label: Stream, description: "IP stream number: 1 is the main stream, 2 the secondary stream." }
+      key: { type: "string", required: true, label: Stream key, description: "Stream key given by the RTMP service." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtmp{stream}_key={key:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt:
     summary: "SRT on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: SRT, description: "On turns SRT streaming on, off turns it off." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_mode:
     summary: "SRT mode"
     params:
-      mode: { type: "enum", values: ["caller", "listener"], required: true }
+      mode: { type: "enum", values: ["caller", "listener"], required: true, label: SRT mode, description: "Caller connects out to an SRT server; listener waits for a receiver to connect." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_mode={mode}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_server:
     summary: "SRT server address (caller mode)"
     params:
-      server: { type: "string", required: true }
+      server: { type: "string", required: true, label: SRT server, description: "Address of the SRT server to connect to, used in caller mode." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_server={server:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_port:
     summary: "SRT port (default 6516)"
     params:
-      port: { type: "int", min: 1025, max: 65535, required: true }
+      port: { type: "int", min: 1025, max: 65535, required: true, label: SRT port, description: "SRT port from 1025 to 65535; the camera's default is 6516." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_port={port}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_latency:
     summary: "SRT latency in ms (20-8000)"
     params:
-      ms: { type: "int", min: 20, max: 8000, required: true }
+      ms: { type: "int", min: 20, max: 8000, required: true, label: SRT latency, description: "SRT latency in milliseconds, from 20 to 8000." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_latency={ms}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_bandwidth_overhead:
     summary: "SRT bandwidth overhead in percent (5-100)"
     params:
-      percent: { type: "int", min: 5, max: 100, required: true }
+      percent: { type: "int", min: 5, max: 100, required: true, label: Bandwidth overhead, description: "Extra bandwidth SRT may use for recovery, in percent from 5 to 100." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_bw_precent={percent}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_encryption:
     summary: "SRT encryption: 0 off, 1 AES-128, 2 AES-192, 3 AES-256"
     params:
-      encryption: { type: "int", min: 0, max: 3, required: true }
+      encryption: { type: "int", min: 0, max: 3, required: true, label: SRT encryption, description: "0 off, 1 AES-128, 2 AES-192, 3 AES-256." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_passsid={encryption}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_password:
     summary: "SRT passphrase for encrypted streams"
     params:
-      password: { type: "string", required: true }
+      password: { type: "string", required: true, label: SRT passphrase, description: "Passphrase for an encrypted SRT stream, the same on both ends." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_passtr={password:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   srt_stream_id:
     summary: "SRT stream ID"
     params:
-      stream_id: { type: "string", required: true }
+      stream_id: { type: "string", required: true, label: SRT stream ID, description: "Stream ID sent to the SRT peer to identify the stream." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&srt_streamid_str={stream_id:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtsp_port:
     summary: "RTSP port (default 554)"
     params:
-      port: { type: "int", min: 1025, max: 65535, required: true }
+      port: { type: "int", min: 1025, max: 65535, required: true, label: RTSP port, description: "RTSP port from 1025 to 65535; the camera's default is 554." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtsp_port={port}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtsp_auth:
     summary: "RTSP authentication on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: RTSP authentication, description: "On requires a login to view the RTSP stream, off does not." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&rtsp_auth_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtp_multicast:
     summary: "RTP multicast streaming on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: RTP multicast, description: "On turns RTP multicast streaming on, off turns it off." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multicast_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtp_multicast_address:
     summary: "RTP multicast IPv4 address"
     params:
-      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Multicast address, description: "IPv4 multicast group address for the RTP stream, for example 239.1.1.1." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multi_rtp_addr={address}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtp_multicast_port:
     summary: "RTP multicast port"
     params:
-      port: { type: "int", min: 1025, max: 65535, required: true }
+      port: { type: "int", min: 1025, max: 65535, required: true, label: Multicast port, description: "UDP port for the RTP multicast stream, from 1025 to 65535." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multi_rtp_port={port}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   rtp_multicast_ttl:
     summary: "RTP multicast TTL (1-255)"
     params:
-      ttl: { type: "int", min: 1, max: 255, required: true }
+      ttl: { type: "int", min: 1, max: 255, required: true, label: Multicast TTL, description: "Time to live of multicast packets, from 1 to 255: how many router hops they may cross." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&multi_ttl={ttl}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   onvif:
     summary: "ONVIF on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: ONVIF, description: "On turns ONVIF control on, off turns it off." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&onvif_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   onvif_auth:
     summary: "ONVIF authentication on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: ONVIF authentication, description: "On requires a login for ONVIF, off does not." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&onvif_auth_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -989,91 +989,91 @@ commands:
   ndi_name:
     summary: "NDI channel name"
     params:
-      name: { type: "string", required: true }
+      name: { type: "string", required: true, label: NDI name, description: "Channel name the camera's NDI source shows on the network." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&channelName={name:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   ndi_group:
     summary: "NDI receive group"
     params:
-      group: { type: "string", required: true }
+      group: { type: "string", required: true, label: NDI group, description: "NDI group the source belongs to; receivers must be in the same group to see it." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&group={group:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   ndi_discovery:
     summary: "NDI discovery server on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: NDI discovery server, description: "On uses an NDI discovery server, off does not." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&discovery_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   ndi_multicast:
     summary: "NDI multicast on or off"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: NDI multicast, description: "On turns NDI multicast on, off turns it off." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ndi_info&multicast_en={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   device_name:
     summary: "Set the camera's device name"
     params:
-      name: { type: "string", required: true }
+      name: { type: "string", required: true, label: Device name, description: "Name the camera shows on the network and in its web interface." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_devinfo_conf&devname={name:url}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   dhcp:
     summary: "IP configuration: DHCP (true) or static (false)"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: DHCP, description: "On takes the address from a DHCP server, off uses the static address settings; the camera may move to a new address." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&dhcp={enabled:bool01}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   ip_address:
     summary: "Static IPv4 address"
     params:
-      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: IP address, description: "Static IPv4 address; the connection drops and the camera must be re-added at the new address." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&ipaddr={address}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   netmask:
     summary: "Subnet mask"
     params:
-      mask: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+      mask: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Subnet mask, description: "Static IPv4 subnet mask, for example 255.255.255.0." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&netmask={mask}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   gateway:
     summary: "Default gateway"
     params:
-      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: Gateway, description: "Static IPv4 default gateway address." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&gateway={address}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   dns:
     summary: "DNS server"
     params:
-      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true }
+      address: { type: "string", pattern: "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$", required: true, label: DNS server, description: "IPv4 address of the DNS server." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_info_conf&fdns={address}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   http_port:
     summary: "HTTP port (default 80)"
     params:
-      port: { type: "int", min: 1025, max: 65535, required: true }
+      port: { type: "int", min: 1025, max: 65535, required: true, label: HTTP port, description: "HTTP port from 1025 to 65535 (default 80); the camera must be re-added at the new port." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&httpport={port}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   visca_tcp_port:
     summary: "VISCA-over-IP TCP port (default 5678)"
     params:
-      port: { type: "int", min: 1025, max: 65535, required: true }
+      port: { type: "int", min: 1025, max: 65535, required: true, label: VISCA TCP port, description: "VISCA-over-IP TCP port from 1025 to 65535; the camera's default is 5678." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&ptzport={port}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
   visca_udp_port:
     summary: "VISCA-over-IP UDP port (default 1259)"
     params:
-      port: { type: "int", min: 1025, max: 65535, required: true }
+      port: { type: "int", min: 1025, max: 65535, required: true, label: VISCA UDP port, description: "VISCA-over-IP UDP port from 1025 to 65535; the camera's default is 1259." }
     send: { method: POST, path: /cgi-bin/param.cgi, raw_query: "post_network_other_conf&udpport={port}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -1102,7 +1102,7 @@ commands:
   ir_channel:
     summary: "IR remote channel 1-4"
     params:
-      channel: { type: "int", min: 1, max: 4, required: true }
+      channel: { type: "int", min: 1, max: 4, required: true, label: IR channel, description: "IR remote channel from 1 to 4 that the camera answers to, matching the remote's setting." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_ir_info=&ir_id={channel}" }
     expect: { status: 200, contains: "Success" }
     returns: ack
@@ -1173,49 +1173,49 @@ commands:
   brightness_g2:
     summary: "Brightness 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Brightness, description: "Brightness from 0 (darkest) to 14 (brightest)." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&bright&{level}" }
     expect: { status: 200 }
     returns: ack
   saturation_g2:
     summary: "Saturation 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Saturation, description: "Saturation from 0 (lowest) to 14 (highest)." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&saturation&{level}" }
     expect: { status: 200 }
     returns: ack
   contrast_g2:
     summary: "Contrast 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Contrast, description: "Contrast from 0 (lowest) to 14 (highest)." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&contrast&{level}" }
     expect: { status: 200 }
     returns: ack
   sharpness_g2:
     summary: "Sharpness 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Sharpness, description: "Sharpness from 0 (softest) to 14 (sharpest)." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&sharpness&{level}" }
     expect: { status: 200 }
     returns: ack
   hue_g2:
     summary: "Hue 0-14"
     params:
-      level: { type: "int", min: 0, max: 14, required: true }
+      level: { type: "int", min: 0, max: 14, required: true, label: Hue, description: "Hue setting from 0 to 14." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&hue&{level}" }
     expect: { status: 200 }
     returns: ack
   flip_g2:
     summary: "Flip the picture vertically (true) or not (false)"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: Flip, description: "On flips the picture vertically, off shows it upright." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&flip&{enabled:bool01}" }
     expect: { status: 200 }
     returns: ack
   mirror_g2:
     summary: "Mirror the picture (true) or not (false)"
     params:
-      enabled: { type: "bool", required: true }
+      enabled: { type: "bool", required: true, label: Mirror, description: "On mirrors the picture left to right, off shows it normally." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&mirror&{enabled:bool01}" }
     expect: { status: 200 }
     returns: ack
@@ -1227,14 +1227,14 @@ commands:
   exposure_mode_g2:
     summary: "Exposure mode: auto, manual, shutter (SAE), iris (AAE) or bright"
     params:
-      mode: { type: "enum", values: ["auto", "manual", "shutter", "iris", "bright"], required: true }
+      mode: { type: "enum", values: ["auto", "manual", "shutter", "iris", "bright"], required: true, label: Exposure mode, description: "auto, manual, shutter (shutter priority, SAE), iris (iris priority, AAE) or bright." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&aemode&{mode}" }
     expect: { status: 200 }
     returns: ack
   white_balance_mode_g2:
     summary: "White balance mode"
     params:
-      mode: { type: "enum", values: ["auto", "indoor", "outdoor", "onepush", "manual", "var"], required: true }
+      mode: { type: "enum", values: ["auto", "indoor", "outdoor", "onepush", "manual", "var"], required: true, label: White balance, description: "auto, indoor, outdoor, onepush (calibrate with the one-push trigger), manual or var (set colour temperature)." }
     send: { method: GET, path: /cgi-bin/param.cgi, raw_query: "post_image_value&wbmode&{mode}" }
     expect: { status: 200 }
     returns: ack
@@ -1246,29 +1246,29 @@ commands:
   osd_navigate_g2:
     summary: "With the OSD open, move the selection up or down, or adjust the option left or right"
     params:
-      direction: { type: "enum", values: ["up", "down", "left", "right"], required: true }
+      direction: { type: "enum", values: ["up", "down", "left", "right"], required: true, label: Direction, description: "With the menu open, up or down moves the selection, left or right changes the selected option." }
     send: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&{direction}" }
     expect: { status: 200 }
     returns: ack
   snapshot_resolution_g2:
     summary: "JPEG snapshot resolution"
     params:
-      size: { type: "enum", values: ["1920x1080", "960x600", "480x300"], required: true }
+      size: { type: "enum", values: ["1920x1080", "960x600", "480x300"], required: true, label: Snapshot resolution, description: "Resolution of the JPEG snapshot in pixels." }
     send: { method: GET, path: /cgi-bin/snapshot.cgi, raw_query: "post_snapshot_conf&resolution={size}" }
     expect: { status: 200 }
     returns: ack
   photobooth_photos_g2:
     summary: "Take four photobooth pictures after a delay of 1-99 s (photo1.jpg to photo4.jpg)"
     params:
-      delay: { type: "int", min: 1, max: 99, required: true }
+      delay: { type: "int", min: 1, max: 99, required: true, label: Delay, description: "Seconds from 1 to 99 before the four photos are taken." }
     send: { method: GET, path: /cgi-bin/booth.cgi, raw_query: "0&4&{delay}&photo&0" }
     expect: { status: 200 }
     returns: ack
   photobooth_videos_g2:
     summary: "Record four photobooth videos of 1-10 s after a delay of 1-99 s (video1.mp4 to video4.mp4)"
     params:
-      delay: { type: "int", min: 1, max: 99, required: true }
-      length: { type: "int", min: 1, max: 10, required: true }
+      delay: { type: "int", min: 1, max: 99, required: true, label: Delay, description: "Seconds from 1 to 99 before the four videos are recorded." }
+      length: { type: "int", min: 1, max: 10, required: true, label: Video length, description: "Length of each of the four videos in seconds, from 1 to 10." }
     send: { method: GET, path: /cgi-bin/booth.cgi, raw_query: "0&4&{delay}&video&{length}" }
     expect: { status: 200 }
     returns: ack
