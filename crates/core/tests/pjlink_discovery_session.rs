@@ -92,6 +92,7 @@ async fn class_2_projectors_are_found_by_search_and_link_up() {
             host: OPEN.to_string(),
             port: Some(9),
             settings: json!({"notifications": true}).as_object().unwrap().clone(),
+            monitor: true,
         })
         .unwrap();
     // The session registers its UDP 4352 route as it starts.

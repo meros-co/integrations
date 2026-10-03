@@ -91,6 +91,7 @@ async fn g4_receiver_end_to_end() {
             host: DEVICE_IP.to_string(),
             port: None,
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 

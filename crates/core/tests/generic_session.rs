@@ -33,6 +33,7 @@ fn open(core: &Core, device: &str, port: u16, settings: Value) -> DeviceId {
         host: "127.0.0.1".into(),
         port: Some(port),
         settings: params(settings),
+        monitor: true,
     })
     .unwrap()
 }

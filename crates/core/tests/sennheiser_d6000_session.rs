@@ -110,6 +110,7 @@ async fn em6000_end_to_end() {
             host: DEVICE_IP.to_string(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 

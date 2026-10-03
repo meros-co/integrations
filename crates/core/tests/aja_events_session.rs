@@ -151,6 +151,7 @@ async fn kumo_events_connect_wait_and_expire() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 

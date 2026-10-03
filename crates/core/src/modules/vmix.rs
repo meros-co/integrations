@@ -6,6 +6,11 @@
 //! outstanding; and subscribed events (TALLY, ACTS) can arrive at any time,
 //! including between a request and its reply. vMix also sends an unrequested
 //! `VERSION OK <version>` line on connection.
+//!
+//! Opened for commands only (`monitor` false), the module subscribes to
+//! nothing and never reads the XML state; `XMLTEXT vmix/version` every 10 s
+//! is its liveness check, since vMix sends nothing unasked without a
+//! subscription.
 
 use std::collections::{BTreeSet, VecDeque};
 use std::net::SocketAddr;
@@ -36,9 +41,14 @@ const RETRY: Key = "retry";
 
 #[derive(Debug, Clone, PartialEq)]
 enum Request {
-    Function { id: CommandId, line: String },
+    Function {
+        id: CommandId,
+        line: String,
+    },
     Subscribe(&'static str),
     Xml,
+    /// Commands only: the version, by XPath, as the liveness check.
+    Version,
 }
 
 impl Request {
@@ -47,6 +57,7 @@ impl Request {
             Request::Function { line, .. } => line.clone(),
             Request::Subscribe(what) => format!("SUBSCRIBE {what}"),
             Request::Xml => "XML".into(),
+            Request::Version => "XMLTEXT vmix/version".into(),
         }
     }
 
@@ -56,6 +67,7 @@ impl Request {
             Request::Function { .. } => "FUNCTION",
             Request::Subscribe(_) => "SUBSCRIBE",
             Request::Xml => "XML",
+            Request::Version => "XMLTEXT",
         }
     }
 }
@@ -130,6 +142,10 @@ pub(crate) struct Vmix {
     connected: bool,
     queue: VecDeque<Request>,
     current: Option<Request>,
+    /// When `current` was sent.
+    sent_at: Millis,
+    /// False: commands only, no subscriptions and no state reads.
+    monitor: bool,
     retry_after: Millis,
     /// Input numbers in the last XML state, to report removed inputs.
     inputs: BTreeSet<String>,
@@ -194,7 +210,9 @@ fn is_true(s: &str) -> bool {
 
 impl Vmix {
     pub(crate) fn new(ctx: OpenContext) -> Vmix {
-        Vmix::for_device(SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)))
+        let mut m = Vmix::for_device(SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)));
+        m.monitor = ctx.monitor;
+        m
     }
 
     fn for_device(device: SocketAddr) -> Vmix {
@@ -204,6 +222,8 @@ impl Vmix {
             connected: false,
             queue: VecDeque::new(),
             current: None,
+            sent_at: 0,
+            monitor: true,
             retry_after: RETRY_MIN,
             inputs: BTreeSet::new(),
             tally_inputs: 0,
@@ -224,6 +244,7 @@ impl Vmix {
         };
         cx.tcp_send(SOCKET, format!("{}\r\n", request.line()));
         cx.set_timer(REPLY, REPLY_TIMEOUT);
+        self.sent_at = cx.now();
         self.current = Some(request);
     }
 
@@ -286,6 +307,7 @@ impl Vmix {
             return;
         }
         cx.cancel_timer(REPLY);
+        cx.round_trip(cx.now().saturating_sub(self.sent_at));
         match self.current.take().unwrap() {
             Request::Function { id, .. } => {
                 let result = match message.status {
@@ -312,6 +334,11 @@ impl Vmix {
                     format!("vMix refused XML: {}", message.rest),
                 ),
             },
+            Request::Version => {
+                if message.status == Status::Ok {
+                    cx.state(json!({"device": {"version": message.rest}}));
+                }
+            }
         }
         self.pump(cx);
     }
@@ -467,9 +494,13 @@ impl Module for Vmix {
     fn tcp(&mut self, cx: &mut Cx, _socket: Key, input: TcpInput) {
         match input {
             TcpInput::Connected => {
-                self.enqueue(cx, Request::Subscribe("TALLY"));
-                self.enqueue(cx, Request::Subscribe("ACTS"));
-                self.enqueue(cx, Request::Xml);
+                if self.monitor {
+                    self.enqueue(cx, Request::Subscribe("TALLY"));
+                    self.enqueue(cx, Request::Subscribe("ACTS"));
+                    self.enqueue(cx, Request::Xml);
+                }
+                // Commands only: the first liveness request goes at the
+                // first poll; the unrequested VERSION line shows vMix is there.
                 cx.set_timer(POLL, POLL_EVERY);
             }
             TcpInput::Data(data) => {
@@ -491,8 +522,13 @@ impl Module for Vmix {
             // A missing reply leaves every later reply unpaired: start again.
             REPLY => self.lost(cx, "no reply from vMix within 5 s".into()),
             POLL => {
-                if !self.queue.contains(&Request::Xml) && self.current != Some(Request::Xml) {
-                    self.enqueue(cx, Request::Xml);
+                let request = if self.monitor {
+                    Request::Xml
+                } else {
+                    Request::Version
+                };
+                if !self.queue.contains(&request) && self.current.as_ref() != Some(&request) {
+                    self.enqueue(cx, request);
                 }
                 cx.set_timer(POLL, POLL_EVERY);
             }
@@ -780,5 +816,48 @@ mod tests {
             key: RETRY,
             after: RETRY_MIN
         }));
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_subscribes_to_nothing_and_reads_nothing() {
+        let mut m = vmix();
+        m.monitor = false;
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        assert!(sent(&cx.take()).is_empty());
+        let a = feed(&mut m, 10, "VERSION OK 27.0.0.49\r\n");
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(sent(&a).is_empty());
+
+        // The poll asks only for the version.
+        let mut cx = Cx::new(POLL_EVERY);
+        m.timer(&mut cx, POLL);
+        assert_eq!(sent(&cx.take()), ["XMLTEXT vmix/version\r\n"]);
+        let a = feed(&mut m, POLL_EVERY + 5, "XMLTEXT OK 27.0.0.49\r\n");
+        assert_eq!(state(&a)["device"]["version"], "27.0.0.49");
+
+        // Commands work as before.
+        let mut cx = Cx::new(POLL_EVERY + 10);
+        m.command(&mut cx, 3, "cut", &params(json!({})));
+        assert_eq!(sent(&cx.take()), ["FUNCTION Cut\r\n"]);
+        let a = feed(&mut m, POLL_EVERY + 20, "FUNCTION OK Completed\r\n");
+        assert!(a.contains(&Action::Complete {
+            id: 3,
+            result: Ok(Outcome::Ack)
+        }));
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let (mut m, _) = connected();
+        let mut cx = Cx::new(100);
+        m.command(&mut cx, 4, "cut", &params(json!({})));
+        cx.take();
+        // An event before the reply is not the reply.
+        let a = feed(&mut m, 120, "TALLY OK 12\r\n");
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+        let a = feed(&mut m, 137, "FUNCTION OK Completed\r\n");
+        assert!(a.contains(&Action::RoundTrip(37)));
     }
 }

@@ -499,6 +499,7 @@ mod tests {
             model: model.into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         };
         let engine = SpecEngine::new(Arc::new(spec.clone()), ctx.clone()).unwrap();
         AjaConfigEvents::new(engine, &spec, &ctx).unwrap()

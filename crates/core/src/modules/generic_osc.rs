@@ -25,6 +25,10 @@
 //! `r` (RGBA), `m` (MIDI) and `[`/`]` arrays from 1.0's nonstandard list.
 //! A type the module does not know ends that message's arguments, since its
 //! size cannot be known.
+//!
+//! Opening for commands only changes nothing: the module asks a device for
+//! nothing commands did not, and what it sends unasked is still kept. The
+//! time from a query to its reply is reported as the device's latency.
 
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
@@ -455,6 +459,7 @@ enum Transport {
 struct Query {
     id: CommandId,
     address: String,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -573,6 +578,7 @@ impl GenericOsc {
         self.remember(cx, &m, &record);
         if let Some(at) = answered {
             let query = self.queries.remove(at);
+            cx.round_trip(cx.now().saturating_sub(query.sent_at));
             cx.complete(query.id, Ok(Outcome::Value { value: record }));
             self.arm(cx);
         }
@@ -669,6 +675,7 @@ impl Module for GenericOsc {
         self.queries.push(Query {
             id,
             address: reply.to_string(),
+            sent_at: cx.now(),
             deadline: cx.now() + timeout,
         });
         self.arm(cx);
@@ -759,6 +766,7 @@ mod tests {
             model: "osc".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
         .unwrap()
     }
@@ -1011,6 +1019,42 @@ mod tests {
     }
 
     #[test]
+    fn opened_for_commands_only_it_still_asks_nothing_and_times_queries() {
+        let mut m = GenericOsc::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 20)),
+            port: Some(8000),
+            model: "osc".into(),
+            channels: None,
+            settings: Params::new(),
+            monitor: false,
+        })
+        .unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let a = cx.take();
+        assert!(!a.iter().any(|x| matches!(x, Action::UdpSend { .. })));
+
+        let mut cx = Cx::new(100);
+        m.command(&mut cx, 1, "query", &params(json!({"address": "/status"})));
+        assert!(cx
+            .take()
+            .iter()
+            .any(|x| matches!(x, Action::UdpSend { .. })));
+        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 20)), 8000);
+        // An unasked message is kept, but answers nothing and times nothing.
+        let mut cx = Cx::new(110);
+        m.datagram(&mut cx, SOCKET, from, &encode("/meter", &[Arg::Int(3)]));
+        let a = cx.take();
+        assert!(a.iter().any(|x| matches!(x, Action::State(_))));
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+        let mut cx = Cx::new(124);
+        m.datagram(&mut cx, SOCKET, from, &encode("/status", &[Arg::Int(1)]));
+        let a = cx.take();
+        assert!(a.contains(&Action::RoundTrip(24)));
+        assert!(matches!(completion(&a, 1), Some(Ok(Outcome::Value { .. }))));
+    }
+
+    #[test]
     fn tcp_sends_framed_and_reconnects() {
         let mut m = module(json!({"transport": "tcp", "tcp_framing": "length-prefixed"}));
         let mut cx = Cx::new(0);
@@ -1074,6 +1118,7 @@ mod tests {
             model: "osc".into(),
             channels: None,
             settings: params(json!({"transport": "tcp", "listen_port": 9000})),
+            monitor: true,
         });
         assert!(tcp.is_err());
     }

@@ -86,6 +86,7 @@ async fn frames_flow_only_while_watched() {
                 .as_object()
                 .unwrap()
                 .clone(),
+            monitor: true,
         })
         .unwrap();
     connected(&core, id).await;
@@ -174,6 +175,7 @@ async fn devices_without_streams_refuse_them() {
             host: "127.0.0.1".into(),
             port: Some(9),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
     assert!(matches!(

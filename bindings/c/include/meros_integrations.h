@@ -41,7 +41,9 @@ void mi_string_free(char *s);
 char *mi_catalog(const MiCore *core);
 
 /* request: {"device":"<spec id>","model":"<model id>","host":"<ip or name>",
- *           "port":<optional>,"settings":{...}}
+ *           "port":<optional>,"settings":{...},"monitor":<optional bool>}
+ * "monitor":false opens the device for commands only: no subscription,
+ * connect-time read or poll.
  * returns: {"device":<id>} or {"error":{...}} */
 char *mi_open(const MiCore *core, const char *request);
 

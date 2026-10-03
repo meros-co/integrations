@@ -511,7 +511,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "With path: names for values taken from a JSON reply, by JSON path. With address: from the JSON in the string argument at json_arg. With json_match: from the websocket message."
+                "description": "With path: names for values taken from a JSON reply, by JSON path. With address: from the JSON in the string argument at json_arg. With json_match alone: from the JSON message."
               },
               "xml_each": {
                 "type": "string",
@@ -532,7 +532,15 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "A JSON message on a websocket: JSON path to an RE2-safe regex its value must match (a string as is, anything else as compact JSON). Captures are {1}, {2}, ... across the regexes in order."
+                "description": "JSON path to an RE2-safe regex its value must match (a string as is, anything else as compact JSON). Alone: a JSON message on a websocket, an event stream, or a line of a line transport. With path: the JSON reply must match too. Captures are {1}, {2}, ... across the regexes in order, after the path's."
+              },
+              "request_match": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "With path: JSON path to an RE2-safe regex the JSON body of the request the reply answers must match, so replies sharing one path (JSON-RPC) can be told apart. Its captures come after the path's and before json_match's."
               }
             },
             "oneOf": [
@@ -579,7 +587,12 @@
                 "required": [
                   "json_match",
                   "state"
-                ]
+                ],
+                "not": {
+                  "required": [
+                    "path"
+                  ]
+                }
               }
             ]
           }
@@ -647,6 +660,20 @@
                   }
                 }
               ]
+            }
+          }
+        },
+        "sse": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "description": "A server-sent event stream opened beside an http transport, with the transport's credential, for a device that pushes changes as text/event-stream. Each event goes to the json_match rules as {\"event\": name, \"data\": data} (data parsed where it is JSON) and its data to the text rules; it is reopened with backoff when it closes.",
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^/"
             }
           }
         }
@@ -1298,6 +1325,7 @@
             "GET",
             "POST",
             "PUT",
+            "PATCH",
             "DELETE"
           ]
         },

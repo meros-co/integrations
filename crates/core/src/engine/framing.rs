@@ -87,6 +87,16 @@ impl Framer {
             let (open, close) = (open.trim(), close.trim());
             while let Some(end) = self.text.find(close) {
                 let segment: String = self.text.drain(..end + close.len()).collect();
+                if open.is_empty() {
+                    // Only a closing marker: a separator between messages
+                    // (PIXERA's `0xPX` after each JSON message), not part of
+                    // the message.
+                    let message = segment[..end].trim();
+                    if !message.is_empty() {
+                        out.push(message.to_string());
+                    }
+                    continue;
+                }
                 let start = segment.find(open).unwrap_or(0);
                 out.push(segment[start..].trim().to_string());
             }
@@ -327,5 +337,18 @@ mod tests {
             got.extend(r.feed(b));
             assert_eq!(got, [packet]);
         }
+    }
+
+    #[test]
+    fn a_closing_marker_alone_separates_messages() {
+        let mut f = Framer::new(ReplyFraming::Delimited {
+            open: String::new(),
+            close: "0xPX".into(),
+        });
+        assert_eq!(
+            f.feed(b"{\"id\":1}0xPX{\"id\""),
+            vec!["{\"id\":1}".to_string()]
+        );
+        assert_eq!(f.feed(b":2}0xPX"), vec!["{\"id\":2}".to_string()]);
     }
 }

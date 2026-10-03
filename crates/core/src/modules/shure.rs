@@ -11,6 +11,11 @@
 //! - Metering is a per-channel subscription, `SET n METER_RATE 01000`, that
 //!   produces one SAMPLE per channel per interval, until set to 00000.
 //! - Names, offsets and SAMPLE layouts differ by family.
+//!
+//! Opened for commands only, it starts no metering and reads nothing on
+//! connecting or later. Changes are still pushed as REP and applied. A
+//! receiver that is not metering is otherwise silent, so its device id is asked
+//! every 5 s as the liveness check.
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
@@ -38,6 +43,9 @@ const FIRST_WORD_WARNING: Millis = 5_000;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 const DEFAULT_METER_MS: i64 = 1_000;
+/// Opened for commands only, how often the device id is asked to prove the
+/// receiver is there: well inside the silence timeout.
+const LIVENESS_EVERY: Millis = 5_000;
 
 const REPLY: Key = "reply";
 const REFRESH: Key = "refresh";
@@ -69,6 +77,15 @@ impl Family {
         match self {
             Family::Ulxd => 128,
             _ => 120,
+        }
+    }
+
+    /// The device-level parameter asked as the liveness check: short, and
+    /// answered by every family.
+    fn identity_param(self) -> &'static str {
+        match self {
+            Family::Psm1000 => "DEVICE_NAME",
+            _ => "DEVICE_ID",
         }
     }
 
@@ -171,6 +188,7 @@ struct Pending {
     id: CommandId,
     channel: Option<u32>,
     param: String,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -179,6 +197,10 @@ pub(crate) struct Shure {
     family: Family,
     channels: u32,
     meter_ms: i64,
+    /// Read state and meter; false for commands only.
+    monitor: bool,
+    /// When the unanswered identity GET went.
+    probe: Option<Millis>,
     framer: Framer,
     socket_open: bool,
     connected: bool,
@@ -193,12 +215,16 @@ impl Shure {
             .get("meter_interval_ms")
             .and_then(Value::as_i64)
             .unwrap_or(DEFAULT_METER_MS);
-        Shure::for_device(
+        let mut shure = Shure::for_device(
             SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)),
             Family::of(&ctx.model),
             ctx.channels.unwrap_or(2),
-            meter_ms,
-        )
+            // Commands only: metering is never started, so there is none to
+            // leave running either.
+            if ctx.monitor { meter_ms } else { 0 },
+        );
+        shure.monitor = ctx.monitor;
+        shure
     }
 
     fn for_device(device: SocketAddr, family: Family, channels: u32, meter_ms: i64) -> Shure {
@@ -208,6 +234,8 @@ impl Shure {
             channels,
             // Shure documents 100 ms as the minimum interval.
             meter_ms: if meter_ms == 0 { 0 } else { meter_ms.max(100) },
+            monitor: true,
+            probe: None,
             framer: Framer::default(),
             socket_open: false,
             connected: false,
@@ -233,8 +261,16 @@ impl Shure {
         }
     }
 
+    /// The identity GET alone: the liveness check of a device opened for
+    /// commands only, whose answer is timed.
+    fn ask_identity(&mut self, cx: &mut Cx) {
+        self.send(cx, &format!("GET {}", self.family.identity_param()));
+        self.probe = Some(cx.now());
+    }
+
     /// Everything, once: device identity, then each channel.
-    fn query_all(&self, cx: &mut Cx) {
+    fn query_all(&mut self, cx: &mut Cx) {
+        self.probe = Some(cx.now());
         match self.family {
             Family::Axient => {
                 for p in [
@@ -294,6 +330,15 @@ impl Shure {
         self.retry_after = (self.retry_after * 2).min(RETRY_MAX);
     }
 
+    /// The full refresh when monitoring; for commands only, the liveness check.
+    fn refresh_every(&self) -> Millis {
+        if self.monitor {
+            REFRESH_EVERY
+        } else {
+            LIVENESS_EVERY
+        }
+    }
+
     fn arm_reply_timer(&self, cx: &mut Cx) {
         match self.pending.iter().map(|p| p.deadline).min() {
             Some(at) => cx.set_timer(REPLY, at.saturating_sub(cx.now())),
@@ -311,6 +356,7 @@ impl Shure {
             id,
             channel,
             param: param.to_string(),
+            sent_at: cx.now(),
             deadline: cx.now() + REPLY_TIMEOUT,
         });
         self.arm_reply_timer(cx);
@@ -333,12 +379,18 @@ impl Shure {
                 if let Some(patch) = self.report(&msg) {
                     cx.state(patch);
                 }
+                if msg.channel.is_none() && msg.param == self.family.identity_param() {
+                    if let Some(sent) = self.probe.take() {
+                        cx.round_trip(cx.now().saturating_sub(sent));
+                    }
+                }
                 if let Some(i) = self
                     .pending
                     .iter()
                     .position(|p| p.channel == msg.channel && p.param == msg.param)
                 {
                     let p = self.pending.remove(i).unwrap();
+                    cx.round_trip(cx.now().saturating_sub(p.sent_at));
                     cx.complete(p.id, Ok(Outcome::Ack));
                     self.arm_reply_timer(cx);
                 }
@@ -566,14 +618,18 @@ impl Module for Shure {
         match input {
             TcpInput::Connected => {
                 self.socket_open = true;
-                self.query_all(cx);
+                if self.monitor {
+                    self.query_all(cx);
+                } else {
+                    self.ask_identity(cx);
+                }
                 if self.meter_ms > 0 {
                     for ch in 1..=self.channels {
                         self.send(cx, &self.meter_rate(ch, self.meter_ms));
                     }
                 }
                 cx.set_timer(SILENCE, SILENCE_TIMEOUT);
-                cx.set_timer(REFRESH, REFRESH_EVERY);
+                cx.set_timer(REFRESH, self.refresh_every());
                 cx.set_timer(FIRST_WORD, FIRST_WORD_WARNING);
             }
             TcpInput::Data(data) => {
@@ -610,8 +666,12 @@ impl Module for Shure {
                 },
             ),
             REFRESH => {
-                self.query_all(cx);
-                cx.set_timer(REFRESH, REFRESH_EVERY);
+                if self.monitor {
+                    self.query_all(cx);
+                } else {
+                    self.ask_identity(cx);
+                }
+                cx.set_timer(REFRESH, self.refresh_every());
             }
             REPLY => {
                 let now = cx.now();
@@ -931,6 +991,84 @@ mod tests {
                 ..
             }]
         ));
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_neither_meters_nor_reads() {
+        let mut m = Shure::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 30)),
+            port: None,
+            model: "ad4d".into(),
+            channels: Some(2),
+            settings: params(json!({"meter_interval_ms": 500})),
+            monitor: false,
+        });
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        // No METER_RATE, no GET ALL: the device id alone, as the liveness check.
+        assert_eq!(sent(&a), ["< GET DEVICE_ID >"]);
+        assert!(a.contains(&Action::SetTimer {
+            key: REFRESH,
+            after: LIVENESS_EVERY
+        }));
+
+        let a = feed(&mut m, 12, "< REP DEVICE_ID {Rack1   } >");
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(a.contains(&Action::RoundTrip(12)));
+
+        // The refresh only asks the device id again.
+        let mut cx = Cx::new(LIVENESS_EVERY);
+        m.timer(&mut cx, REFRESH);
+        assert_eq!(sent(&cx.take()), ["< GET DEVICE_ID >"]);
+
+        // Pushed changes are applied, and commands work.
+        let a = feed(&mut m, 5_100, "< REP 1 CHAN_NAME {Lead Vox} >");
+        assert_eq!(state(&a)["channels"]["1"]["name"], "Lead Vox");
+        let mut cx = Cx::new(5_200);
+        m.command(
+            &mut cx,
+            1,
+            "mute",
+            &params(json!({"channel": 2, "muted": true})),
+        );
+        assert_eq!(sent(&cx.take()), ["< SET 2 AUDIO_MUTE ON >"]);
+        let a = feed(&mut m, 5_230, "< REP 2 AUDIO_MUTE ON >");
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Ok(Outcome::Ack)
+        }));
+
+        // Metering was never started, so closing has none to stop.
+        let mut cx = Cx::new(6_000);
+        m.stop(&mut cx);
+        assert!(sent(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let (mut m, _) = connected(Family::Ulxd, 2);
+        // The identity GET sent on connecting is timed.
+        let a = feed(&mut m, 20, "< REP DEVICE_ID {Rack1   } >");
+        assert!(a.contains(&Action::RoundTrip(20)));
+        // Samples and unprompted REPs are pushed, not answers.
+        let a = feed(
+            &mut m,
+            30,
+            "< SAMPLE 2 ALL AX 078 032 >< REP 1 CHAN_NAME {A} >",
+        );
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+
+        let mut cx = Cx::new(100);
+        m.command(
+            &mut cx,
+            1,
+            "set_gain",
+            &params(json!({"channel": 1, "gain_db": 0})),
+        );
+        let a = feed(&mut m, 117, "< REP 1 AUDIO_GAIN 018 >");
+        assert!(a.contains(&Action::RoundTrip(17)));
     }
 
     #[test]

@@ -174,6 +174,7 @@ async fn atem_end_to_end() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 

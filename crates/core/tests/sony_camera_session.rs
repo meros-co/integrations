@@ -635,6 +635,7 @@ async fn connected(core: &Core, model: &str, port: u16, settings: Value) -> u64 
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(settings),
+            monitor: true,
         })
         .unwrap();
     // Connected once the handshake is done and every property has been read.

@@ -39,6 +39,7 @@ fn open(core: &Core, device: &str, model: &str, port: u16) -> u64 {
         host: "127.0.0.1".into(),
         port: Some(port),
         settings: Default::default(),
+        monitor: true,
     })
     .unwrap()
 }

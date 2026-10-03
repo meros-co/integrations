@@ -226,6 +226,7 @@ async fn livepremier_end_to_end() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"extra_subscriptions": "DeviceObject/audio"})),
+            monitor: true,
         })
         .unwrap();
     wait_for(&core, |e| {
@@ -351,6 +352,7 @@ async fn midra_reads_the_tbar_before_a_banked_write() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"read_on_connect": false})),
+            monitor: true,
         })
         .unwrap();
     wait_for(&core, |e| {
@@ -448,6 +450,7 @@ async fn livecore_recall_sends_every_register_in_order() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({})),
+            monitor: true,
         })
         .unwrap();
     wait_for(&core, |e| {
@@ -512,6 +515,7 @@ async fn midra_layer_change_is_followed_by_the_screen_update() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({})),
+            monitor: true,
         })
         .unwrap();
     wait_for(&core, |e| {

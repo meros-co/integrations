@@ -510,6 +510,7 @@ mod tests {
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: crate::module::Connection::Connecting,
             state: serde_json::Value::Null,
+            latency_ms: None,
         }));
         let session = Session::new(
             7,

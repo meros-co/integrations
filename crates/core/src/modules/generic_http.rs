@@ -31,6 +31,11 @@
 //! or 403 stops polling and reports the device unauthorized: credentials are
 //! never retried on a schedule (SPEC.md §2, http), since repeated failed
 //! logins can lock a device out.
+//!
+//! Opened for commands only, `poll_path` is never polled on a schedule, so
+//! the device is reported unmonitored; `poll_now` still makes one poll and
+//! keeps its result. The time from each request to its response is reported
+//! as the device's latency.
 
 use std::collections::HashMap;
 
@@ -178,11 +183,14 @@ pub(crate) struct GenericHttp {
     timeout: Millis,
     poll_path: Option<String>,
     poll_every: Millis,
+    /// Poll on a schedule; false for commands only.
+    monitor: bool,
     polling: bool,
     /// A poll refused the credentials. Terminal for polling.
     refused: bool,
     next_id: RequestId,
-    requests: HashMap<RequestId, Purpose>,
+    /// Requests in flight: why each was made and when it went.
+    requests: HashMap<RequestId, (Purpose, Millis)>,
 }
 
 impl GenericHttp {
@@ -239,6 +247,7 @@ impl GenericHttp {
                 .get("poll_interval_ms")
                 .and_then(Value::as_u64)
                 .unwrap_or(DEFAULT_POLL_EVERY),
+            monitor: ctx.monitor,
             polling: false,
             refused: false,
             next_id: 1,
@@ -289,7 +298,7 @@ impl GenericHttp {
     fn send(&mut self, cx: &mut Cx, purpose: Purpose, request: HttpRequest) {
         let id = self.next_id;
         self.next_id += 1;
-        self.requests.insert(id, purpose);
+        self.requests.insert(id, (purpose, cx.now()));
         cx.http(id, request);
     }
 
@@ -381,11 +390,12 @@ fn transport_error(message: String) -> CommandError {
 
 impl Module for GenericHttp {
     fn start(&mut self, cx: &mut Cx) {
-        if self.poll_path.is_some() {
+        if self.poll_path.is_some() && self.monitor {
             cx.connection(Connection::Connecting);
             self.poll(cx, None);
         } else {
-            // Nothing is asked of the device until a command is.
+            // Nothing is asked of the device until a command is, including
+            // when opened for commands only with a poll_path.
             cx.connection(Connection::Unmonitored);
         }
     }
@@ -419,11 +429,12 @@ impl Module for GenericHttp {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
-        let Some(purpose) = self.requests.remove(&id) else {
+        let Some((purpose, sent)) = self.requests.remove(&id) else {
             return;
         };
         match &result {
             Ok(_) => {
+                cx.round_trip(cx.now().saturating_sub(sent));
                 cx.alive();
                 self.reachable(cx);
             }
@@ -486,7 +497,7 @@ impl Module for GenericHttp {
     }
 
     fn timer(&mut self, cx: &mut Cx, key: Key) {
-        if key == POLL && !self.refused && !self.polling {
+        if key == POLL && self.monitor && !self.refused && !self.polling {
             self.poll(cx, None);
         }
     }
@@ -513,6 +524,7 @@ mod tests {
             model: "http".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
         .unwrap()
     }
@@ -595,6 +607,7 @@ mod tests {
             model: "http".into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         })
         .unwrap();
         assert_eq!(m.base, "http://[::1]:8080");
@@ -625,6 +638,7 @@ mod tests {
             model: "http".into(),
             channels: None,
             settings: params(json!({"poll_path": "status"})),
+            monitor: true,
         })
         .is_err());
     }
@@ -753,5 +767,74 @@ mod tests {
         let mut cx = Cx::new(9000);
         m.timer(&mut cx, POLL);
         assert!(requests(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_polls_only_when_asked() {
+        let mut m = GenericHttp::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 30)),
+            port: None,
+            model: "http".into(),
+            channels: None,
+            settings: params(json!({"poll_path": "/status", "poll_interval_ms": 2000})),
+            monitor: false,
+        })
+        .unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let a = cx.take();
+        assert!(requests(&a).is_empty());
+        assert!(a.contains(&Action::Connection(Connection::Unmonitored)));
+
+        // poll_now still polls once, keeps the result and schedules nothing.
+        let mut cx = Cx::new(100);
+        m.command(&mut cx, 1, "poll_now", &Params::new());
+        let (rid, r) = requests(&cx.take())[0].clone();
+        assert_eq!(r.url, "http://192.0.2.30:80/status");
+        let mut cx = Cx::new(140);
+        m.http_response(
+            &mut cx,
+            rid,
+            Ok(HttpResponse {
+                status: 200,
+                body: br#"{"power":"on"}"#.to_vec(),
+            }),
+        );
+        let a = cx.take();
+        assert!(matches!(completion(&a, 1), Some(Ok(Outcome::Value { .. }))));
+        assert!(a.iter().any(|x| matches!(x, Action::State(_))));
+        assert!(!a.iter().any(|x| matches!(x, Action::SetTimer { .. })));
+        assert!(a.contains(&Action::RoundTrip(40)));
+
+        // A stray poll timer asks nothing either.
+        let mut cx = Cx::new(5_000);
+        m.timer(&mut cx, POLL);
+        assert!(requests(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut m = module(json!({}));
+        let mut cx = Cx::new(1_000);
+        m.command(&mut cx, 1, "request", &params(json!({"path": "/"})));
+        let (rid, _) = requests(&cx.take())[0].clone();
+        let mut cx = Cx::new(1_075);
+        m.http_response(
+            &mut cx,
+            rid,
+            Ok(HttpResponse {
+                status: 404,
+                body: Vec::new(),
+            }),
+        );
+        // Any status is an answer.
+        assert!(cx.take().contains(&Action::RoundTrip(75)));
+
+        let mut cx = Cx::new(2_000);
+        m.command(&mut cx, 2, "request", &params(json!({"path": "/"})));
+        let (rid, _) = requests(&cx.take())[0].clone();
+        let mut cx = Cx::new(7_000);
+        m.http_response(&mut cx, rid, Err("operation timed out".into()));
+        assert!(!cx.take().iter().any(|x| matches!(x, Action::RoundTrip(_))));
     }
 }

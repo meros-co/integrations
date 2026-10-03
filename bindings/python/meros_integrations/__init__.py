@@ -117,7 +117,11 @@ class Core:
         return json.loads(self._native.catalog())
 
     def open(self, request: dict[str, Any]) -> int:
-        """Start a session; returns the device id. Connects in the background."""
+        """Start a session; returns the device id. Connects in the background.
+
+        request: {"device", "model", "host", "port"?, "settings"?, "monitor"?}.
+        "monitor": False opens the device for commands only: no subscription,
+        connect-time read or poll, so none of its subscription slots is taken."""
         result = json.loads(self._native.open(json.dumps(request)))
         if "error" in result:
             raise IntegrationsError(result["error"])

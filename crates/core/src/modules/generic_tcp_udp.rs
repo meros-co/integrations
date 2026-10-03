@@ -25,6 +25,9 @@
 //!   doubling to 30 s) whenever the connection fails or the device closes it.
 //!   UDP has no connection: the device is reported `unmonitored`, and alive
 //!   whenever it sends something.
+//! - Opening for commands only changes nothing: the module never asks a
+//!   device for anything commands did not. The time from a `request` to the
+//!   message answering it is reported as the device's latency.
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
@@ -222,6 +225,7 @@ enum Protocol {
 #[derive(Debug)]
 struct Request {
     id: CommandId,
+    sent_at: Millis,
     deadline: Millis,
     pattern: Option<Regex>,
 }
@@ -360,6 +364,7 @@ impl GenericTcpUdp {
             .position(|r| r.pattern.as_ref().is_none_or(|p| p.is_match(&text)));
         if let Some(at) = answers {
             let request = self.requests.remove(at).expect("found");
+            cx.round_trip(cx.now().saturating_sub(request.sent_at));
             cx.complete(request.id, Ok(Outcome::Value { value: entry }));
             self.arm(cx);
         }
@@ -438,6 +443,7 @@ impl Module for GenericTcpUdp {
                 .unwrap_or(2_000);
             self.requests.push_back(Request {
                 id,
+                sent_at: cx.now(),
                 deadline: cx.now() + timeout,
                 pattern,
             });
@@ -527,6 +533,7 @@ mod tests {
             model: "generic".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
         .unwrap()
     }
@@ -613,6 +620,7 @@ mod tests {
                 model: "generic".into(),
                 channels: None,
                 settings: params(settings),
+                monitor: true,
             })
         };
         assert!(open(json!({"terminator": "custom"})).is_err());
@@ -626,8 +634,44 @@ mod tests {
             model: "generic".into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         });
         assert!(no_port.is_err());
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_still_asks_nothing_and_times_requests() {
+        let mut m = GenericTcpUdp::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)),
+            port: Some(5000),
+            model: "generic".into(),
+            channels: None,
+            settings: params(json!({"send_terminator": "cr"})),
+            monitor: false,
+        })
+        .unwrap();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        assert!(sent(&cx.take()).is_empty());
+
+        let mut cx = Cx::new(100);
+        m.command(
+            &mut cx,
+            1,
+            "request",
+            &params(json!({"text": "PWR?", "match": "^PWR="})),
+        );
+        assert_eq!(sent(&cx.take()), vec![b"PWR?\r".to_vec()]);
+        // Data that does not answer is kept but not timed.
+        let mut cx = Cx::new(110);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"NOISE\r".to_vec()));
+        assert!(!cx.take().iter().any(|x| matches!(x, Action::RoundTrip(_))));
+        let mut cx = Cx::new(133);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"PWR=1\r".to_vec()));
+        let a = cx.take();
+        assert!(a.contains(&Action::RoundTrip(33)));
+        assert!(matches!(completion(&a, 1), Some(Ok(Outcome::Value { .. }))));
     }
 
     #[test]

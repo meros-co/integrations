@@ -146,6 +146,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         model: model.id.clone(),
         channels: model.channels,
         settings,
+        monitor: true,
     };
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
     let mut cx = Cx::new(0);
@@ -233,10 +234,13 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         // The reply to a request for this path, as the engine offers it.
         let path = r["path"].as_str().ok_or("inbound_http needs a path")?;
         let body = r["body"].as_str().unwrap_or("").as_bytes();
-        if let Some(patch) = engine
-            .telemetry
-            .apply(&super::telemetry::Inbound::Http { path, body })
-        {
+        // The JSON body of the request it answers, for `request_match`.
+        let request = r.get("request");
+        if let Some(patch) = engine.telemetry.apply(&super::telemetry::Inbound::Http {
+            path,
+            body,
+            request,
+        }) {
             cx.state(patch);
         }
         // As the engine does: a text reply also goes to the text rules.
@@ -333,6 +337,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         model: model.id.clone(),
         channels: model.channels,
         settings,
+        monitor: true,
     };
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
 
@@ -592,6 +597,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             model: model.id.clone(),
             channels: model.channels,
             settings: validate(&spec.settings, &Default::default()).unwrap_or_default(),
+            monitor: true,
         };
         if let Err(e) = SpecEngine::new(Arc::new(spec.clone()), ctx) {
             panic!("{}: {e}", spec.id);

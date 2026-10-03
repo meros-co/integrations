@@ -25,7 +25,7 @@ use serde_json::{Map, Value};
 use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest, HttpResponse, Key,
-    Level, Millis, Module, OpenContext, Outcome, RequestId, TcpInput, WsInput, WsRequest,
+    Level, Millis, Module, OpenContext, Outcome, RequestId, SseInput, TcpInput, WsInput, WsRequest,
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
@@ -38,6 +38,9 @@ const SOCKET: Key = "device";
 /// (`telemetry.websocket`).
 const PUSH: Key = "push";
 const PUSH_RECONNECT: Key = "push-reconnect";
+/// The server-sent event stream (`telemetry.sse`).
+const EVENTS: Key = "events";
+const EVENTS_RECONNECT: Key = "events-reconnect";
 const REPLY: Key = "reply";
 const PROBE: Key = "probe";
 const RECONNECT: Key = "reconnect";
@@ -198,6 +201,8 @@ struct InFlight {
     expect: Map<String, Value>,
     returns: String,
     awaiting: Option<Await>,
+    /// When the message now awaiting its reply was sent.
+    sent_at: Millis,
 }
 
 struct Job {
@@ -230,7 +235,7 @@ pub(crate) struct SpecEngine {
     telemetry: Arc<telemetry::Telemetry>,
     /// The path and query of each HTTP request in flight, so its reply can be
     /// offered to the telemetry rules for that path.
-    request_paths: std::collections::HashMap<RequestId, String>,
+    request_paths: std::collections::HashMap<RequestId, (String, Option<Value>)>,
     /// Set when the device refuses the configured credential. Terminal: the
     /// credential is never presented again, since repeated failures can lock
     /// a device out. The host re-opens the device with corrected settings.
@@ -248,6 +253,13 @@ pub(crate) struct SpecEngine {
     /// `telemetry.websocket`: a push channel beside the transport.
     push: Option<Push>,
     push_backoff: Millis,
+    /// `telemetry.sse`: an event stream beside an HTTP transport.
+    events: Option<HttpRequest>,
+    events_backoff: Millis,
+    /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
+    /// opened: no subscription, poll or push websocket. Replies and anything
+    /// the device sends unasked still go to the rules.
+    monitor: bool,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -544,9 +556,49 @@ impl SpecEngine {
                 })
             }
         };
+        let events = match spec.telemetry.as_ref().and_then(|t| t.get("sse")) {
+            None => None,
+            Some(e) => {
+                let Transport::Http {
+                    base,
+                    auth,
+                    accept_invalid_certs,
+                    ..
+                } = &transport
+                else {
+                    return Err("telemetry.sse needs an http transport".into());
+                };
+                let path = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
+                let mut headers = auth_headers(*auth, &ctx.settings);
+                headers.push(("Accept".into(), "text/event-stream".into()));
+                let setting = |name: &str| {
+                    ctx.settings
+                        .get(name)
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string()
+                };
+                Some(HttpRequest {
+                    method: "GET",
+                    url: format!("{base}{path}"),
+                    headers,
+                    body: None,
+                    // A stream stays open; the session watches it for activity.
+                    timeout: None,
+                    accept_invalid_certs: *accept_invalid_certs,
+                    digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(
+                        Credentials {
+                            username: setting("username"),
+                            password: setting("password"),
+                        },
+                    ),
+                })
+            }
+        };
         Ok(SpecEngine {
             spec,
             host: ctx.host,
+            monitor: ctx.monitor,
             settings: ctx.settings,
             transport,
             timeout,
@@ -567,6 +619,8 @@ impl SpecEngine {
             conversions,
             push,
             push_backoff: RECONNECT_MIN,
+            events,
+            events_backoff: RECONNECT_MIN,
         })
     }
 
@@ -642,6 +696,7 @@ impl SpecEngine {
                     "GET" => "GET",
                     "POST" => "POST",
                     "PUT" => "PUT",
+                    "PATCH" => "PATCH",
                     "DELETE" => "DELETE",
                     other => return Err(format!("method {other} is not supported")),
                 };
@@ -778,6 +833,7 @@ impl SpecEngine {
             expect,
             returns,
             awaiting: None,
+            sent_at: 0,
         })
     }
 
@@ -854,13 +910,19 @@ impl SpecEngine {
                     let id = self.next_request;
                     self.next_request += 1;
                     let target = request.url.splitn(4, '/').nth(3).unwrap_or("");
-                    self.request_paths.insert(id, format!("/{target}"));
+                    let body = request
+                        .body
+                        .as_deref()
+                        .and_then(|b| serde_json::from_slice::<Value>(b).ok());
+                    self.request_paths.insert(id, (format!("/{target}"), body));
                     cx.http(id, request);
                     Await::Http(id)
                 }
             };
             if waits || matches!(awaiting, Await::Http(_)) {
-                self.current.as_mut().unwrap().awaiting = Some(awaiting);
+                let flight = self.current.as_mut().unwrap();
+                flight.awaiting = Some(awaiting);
+                flight.sent_at = cx.now();
                 cx.set_timer(REPLY, self.timeout);
                 return;
             }
@@ -881,7 +943,9 @@ impl SpecEngine {
         let Some(flight) = self.current.as_mut() else {
             return;
         };
-        flight.awaiting = None;
+        if flight.awaiting.take().is_some() {
+            cx.round_trip(cx.now().saturating_sub(flight.sent_at));
+        }
 
         if flight.id.is_none() {
             // Probe answered.
@@ -1220,7 +1284,7 @@ impl SpecEngine {
 
     /// After connecting: subscribe, poll once, and schedule both.
     fn start_telemetry(&mut self, cx: &mut Cx) {
-        if self.telemetry.is_empty() {
+        if self.telemetry.is_empty() || !self.monitor {
             return;
         }
         let subscribe = self.telemetry.subscribe.clone();
@@ -1257,7 +1321,7 @@ impl SpecEngine {
         // text that happens to match is not about the login.
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
-        self.apply_text(cx, &message);
+        self.apply_message(cx, &message);
         let waiting = matches!(
             self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
             Some(Await::Text)
@@ -1282,9 +1346,9 @@ impl SpecEngine {
         }
     }
 
-    /// Offer a websocket message to the telemetry rules: as JSON where it
-    /// parses, and as text.
-    fn apply_ws(&self, cx: &mut Cx, text: &str) {
+    /// Offer a message to the telemetry rules: as JSON where it parses (a
+    /// websocket message, a line or block of a JSON protocol), and as text.
+    fn apply_message(&self, cx: &mut Cx, text: &str) {
         if let Ok(doc) = serde_json::from_str::<Value>(text) {
             if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
                 cx.state(patch);
@@ -1294,7 +1358,7 @@ impl SpecEngine {
     }
 
     fn inbound_ws(&mut self, cx: &mut Cx, text: String) {
-        self.apply_ws(cx, &text);
+        self.apply_message(cx, &text);
         let ours =
             match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Ws(Some(fields))) => serde_json::from_str::<Value>(&text)
@@ -1330,8 +1394,72 @@ impl SpecEngine {
 
     /// The push channel (`telemetry.websocket`).
     fn open_push(&mut self, cx: &mut Cx) {
+        if !self.monitor {
+            return;
+        }
         if let Some(push) = &self.push {
             cx.ws_open(PUSH, push.request.clone());
+        }
+    }
+
+    fn open_events(&mut self, cx: &mut Cx) {
+        if !self.monitor || self.refused.is_some() {
+            return;
+        }
+        if let Some(request) = &self.events {
+            cx.sse_open(EVENTS, request.clone());
+        }
+    }
+
+    /// The event stream: each event goes to the JSON rules as
+    /// `{"event": name, "data": data}`, with `data` parsed where it is JSON,
+    /// and its data to the text rules.
+    fn events_input(&mut self, cx: &mut Cx, input: SseInput) {
+        if self.refused.is_some() {
+            return;
+        }
+        match input {
+            SseInput::Opened => {
+                self.events_backoff = RECONNECT_MIN;
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            SseInput::Event(event) => {
+                let data = serde_json::from_str::<Value>(&event.data)
+                    .unwrap_or_else(|_| Value::String(event.data.clone()));
+                let doc = serde_json::json!({"event": event.event, "data": data});
+                if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
+                    cx.state(patch);
+                }
+                self.apply_text(cx, &event.data);
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            SseInput::Activity => {
+                self.last_heard = cx.now();
+                cx.alive();
+            }
+            SseInput::Closed { status, reason } => {
+                let refusal = match &self.transport {
+                    Transport::Http { auth, refusal, .. } => {
+                        *auth != HttpAuth::None && status.is_some_and(|s| refusal.contains(&s))
+                    }
+                    _ => false,
+                };
+                if refusal {
+                    self.refuse(
+                        cx,
+                        format!("the device refused the credential on its event stream ({reason})"),
+                    );
+                    return;
+                }
+                cx.log(
+                    Level::Info,
+                    format!("event stream closed: {reason}; reopening"),
+                );
+                cx.set_timer(EVENTS_RECONNECT, self.events_backoff);
+                self.events_backoff = (self.events_backoff * 2).min(RECONNECT_MAX);
+            }
         }
     }
 
@@ -1363,7 +1491,7 @@ impl SpecEngine {
                 cx.alive();
             }
             WsInput::Text(text) => {
-                self.apply_ws(cx, &text);
+                self.apply_message(cx, &text);
                 self.last_heard = cx.now();
                 cx.alive();
             }
@@ -1472,6 +1600,7 @@ impl Module for SpecEngine {
         cx.connection(Connection::Connecting);
         self.connect(cx);
         self.open_push(cx);
+        self.open_events(cx);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
@@ -1582,11 +1711,12 @@ impl Module for SpecEngine {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
-        if let (Some(path), Ok(response)) = (self.request_paths.remove(&id), &result) {
+        if let (Some((path, request)), Ok(response)) = (self.request_paths.remove(&id), &result) {
             if (200..300).contains(&response.status) {
                 let inbound = telemetry::Inbound::Http {
                     path: &path,
                     body: &response.body,
+                    request: request.as_ref(),
                 };
                 if let Some(patch) = self.telemetry.apply(&inbound) {
                     cx.state(patch);
@@ -1685,11 +1815,13 @@ impl Module for SpecEngine {
             }
             RECONNECT => self.connect(cx),
             PUSH_RECONNECT => self.open_push(cx),
+            EVENTS_RECONNECT => self.open_events(cx),
             PROMPT => {
                 if self.prompt_wait.take().is_some() {
                     self.lost(cx, "no login prompt within the timeout".into());
                 }
             }
+            RENEW | POLL if !self.monitor => {}
             RENEW => {
                 let items = self.telemetry.subscribe.clone();
                 self.send_telemetry(cx, items, false);
@@ -1715,6 +1847,15 @@ impl Module for SpecEngine {
         }
         if self.push.is_some() {
             cx.ws_close(PUSH);
+        }
+        if self.events.is_some() {
+            cx.sse_close(EVENTS);
+        }
+    }
+
+    fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
+        if stream == EVENTS {
+            self.events_input(cx, input);
         }
     }
 }
@@ -1781,6 +1922,7 @@ mod tests {
                 model: "propresenter-7".into(),
                 channels: None,
                 settings,
+                monitor: true,
             },
         )
         .unwrap()
@@ -1805,6 +1947,7 @@ mod tests {
                 model: "p3000-generic".into(),
                 channels: None,
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap()
@@ -1845,6 +1988,7 @@ mod tests {
                 model: "propresenter-7".into(),
                 channels: None,
                 settings: settings.as_object().unwrap().clone(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -1883,6 +2027,7 @@ mod tests {
                 model: "carbonite".into(),
                 channels: None,
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -1932,6 +2077,7 @@ mod tests {
                     model: "x32".into(),
                     channels: Some(32),
                     settings: settings.as_object().unwrap().clone(),
+                    monitor: true,
                 },
             )
             .unwrap();
@@ -2007,6 +2153,7 @@ mod tests {
                 model: "p3000-generic".into(),
                 channels: None,
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -2083,6 +2230,7 @@ mod tests {
                 model: "x32".into(),
                 channels: Some(32),
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -2167,6 +2315,7 @@ mod tests {
                 model: model.into(),
                 channels: None,
                 settings: settings.as_object().unwrap().clone(),
+                monitor: true,
             },
         )
         .unwrap()
@@ -2575,5 +2724,243 @@ mod tests {
             sent,
             [osc::encode("/ch/01/mix/fader", &[osc::Arg::Float(0.75)])]
         );
+    }
+
+    fn x32(monitor: bool) -> SpecEngine {
+        let spec = Catalog::source_tree()
+            .device("behringer-x32")
+            .unwrap()
+            .clone();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "x32".into(),
+                channels: Some(32),
+                settings: Params::new(),
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    fn osc_addresses(actions: &[Action]) -> Vec<String> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { data, .. } => {
+                    let end = data.iter().position(|b| *b == 0).unwrap_or(data.len());
+                    Some(String::from_utf8_lossy(&data[..end]).into_owned())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_device_opened_for_commands_only_is_not_subscribed_or_read() {
+        // Monitored: the subscription and the connect-time read go out.
+        let mut e = x32(true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let sent = osc_addresses(&cx.take());
+        assert!(sent.iter().any(|a| a == "/xremote"), "{sent:?}");
+
+        // Commands only: nothing but the liveness probe, and commands still go.
+        let mut e = x32(false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let sent = osc_addresses(&cx.take());
+        assert_eq!(sent, ["/info"]);
+        let mut cx = Cx::new(10);
+        e.timer(&mut cx, RENEW);
+        e.timer(&mut cx, POLL);
+        assert!(osc_addresses(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.telemetry = None;
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let params = json!({"input": 3, "output": 2})
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut cx = Cx::new(100);
+        e.command(&mut cx, 7, "route_video", &params);
+        cx.take();
+        let mut cx = Cx::new(142);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(
+                b"~01@ROUTE 1,2,3 OK
+"
+                .to_vec(),
+            ),
+        );
+        assert!(cx.take().contains(&Action::RoundTrip(42)));
+    }
+
+    /// ProPresenter's HTTP spec with the given telemetry.
+    fn http_with(telemetry: Value, state: Value, monitor: bool) -> SpecEngine {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        spec.telemetry = Some(telemetry);
+        spec.state = serde_json::from_value(state).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn an_event_stream_beside_http_keeps_state_current() {
+        let telemetry = json!({
+            "sse": {"path": "/events"},
+            "updates": [{
+                "json_match": {"$.event": "^brightness$"},
+                "json": {"value": "$.data.value"},
+                "state": {"output.brightness": "{value}"},
+            }],
+        });
+        let state = json!({"output.brightness": {"type": "float", "description": "x"}});
+        let mut e = http_with(telemetry.clone(), state.clone(), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let opened = cx.take().into_iter().find_map(|a| match a {
+            Action::SseOpen { stream, request } => Some((stream, request)),
+            _ => None,
+        });
+        let (stream, request) = opened.expect("the event stream");
+        assert!(request.url.ends_with("/events"), "{}", request.url);
+        assert!(request
+            .headers
+            .contains(&("Accept".to_string(), "text/event-stream".to_string())));
+
+        let mut cx = Cx::new(10);
+        e.sse(
+            &mut cx,
+            stream,
+            SseInput::Event(crate::sse::SseEvent {
+                event: "brightness".into(),
+                data: r#"{"value": 0.5}"#.into(),
+            }),
+        );
+        assert!(cx
+            .take()
+            .contains(&Action::State(json!({"output": {"brightness": 0.5}}))));
+
+        // A closed stream is reopened after a backoff.
+        let mut cx = Cx::new(20);
+        e.sse(
+            &mut cx,
+            stream,
+            SseInput::Closed {
+                status: None,
+                reason: "eof".into(),
+            },
+        );
+        assert!(cx.take().iter().any(|a| matches!(
+            a,
+            Action::SetTimer {
+                key: EVENTS_RECONNECT,
+                ..
+            }
+        )));
+
+        // Commands only: no stream.
+        let mut e = http_with(telemetry, state, false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        assert!(!cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::SseOpen { .. })));
+    }
+
+    #[test]
+    fn json_lines_go_to_the_json_rules() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.telemetry = Some(json!({"updates": [{
+            "json_match": {"$.type": "^level$"},
+            "json": {"db": "$.db"},
+            "state": {"level": "{db}"},
+        }]}));
+        spec.state =
+            serde_json::from_value(json!({"level": {"type": "float", "description": "x"}}))
+                .unwrap();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let mut cx = Cx::new(1);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"{\"type\":\"level\",\"db\":-6.5}\r\n".to_vec()),
+        );
+        assert!(cx.take().contains(&Action::State(json!({"level": -6.5}))));
+    }
+
+    #[test]
+    fn requests_may_be_patched() {
+        let e = credentialed();
+        let empty = Params::new();
+        let specs = BTreeMap::new();
+        let values = e.values(&empty, &specs);
+        let Outgoing::Http(request) = e
+            .build(
+                &json!({"method": "PATCH", "path": "/v1/x", "body": "{}"}),
+                &values,
+            )
+            .unwrap()
+        else {
+            panic!("an HTTP request");
+        };
+        assert_eq!(request.method, "PATCH");
     }
 }

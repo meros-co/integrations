@@ -190,6 +190,7 @@ fn open(core: &Core, port: u16, model: &str, password: &str) -> meros_integratio
         host: "127.0.0.1".into(),
         port: Some(port),
         settings: params(json!({"password": password})),
+        monitor: true,
     })
     .unwrap()
 }

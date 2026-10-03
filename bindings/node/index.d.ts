@@ -13,6 +13,13 @@ export interface OpenRequest {
   port?: number;
   /** Settings declared by the spec, such as a password. */
   settings?: Record<string, unknown>;
+  /**
+   * Keep the device's state current (the default). `false` opens it for
+   * commands only: no subscription, connect-time read or poll, so none of the
+   * device's limited subscription slots is taken. What the device sends
+   * unasked is still applied to the state.
+   */
+  monitor?: boolean;
 }
 
 export interface DiscoverRequest {
@@ -47,14 +54,19 @@ export interface Snapshot {
   connection: Connection;
   /** Last known state; `connection` says whether it is current. */
   state: Record<string, unknown>;
+  /** The most recent request-to-reply time, where the protocol answers requests. */
+  latency_ms?: number;
 }
 
 export type Event =
   | { event: 'connection'; device: DeviceId; connection: Connection }
   /** An RFC 7386 merge patch against the device's state. */
   | { event: 'state'; device: DeviceId; patch: Record<string, unknown> }
-  /** Heard from the device. At most once per device per second. */
-  | { event: 'alive'; device: DeviceId }
+  /**
+   * Heard from the device. At most once per device per second. `latency_ms`
+   * is the most recent request-to-reply time, where the protocol answers.
+   */
+  | { event: 'alive'; device: DeviceId; latency_ms?: number }
   | { event: 'log'; device: DeviceId; level: 'debug' | 'info' | 'warning'; message: string }
   | { event: 'closed'; device: DeviceId }
   /** State patches were discarded; resynchronise from snapshots. */

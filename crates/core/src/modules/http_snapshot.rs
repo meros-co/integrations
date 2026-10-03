@@ -11,6 +11,11 @@
 //! A body is a JPEG when it begins with the SOI marker FF D8 (ITU-T T.81
 //! Annex B.1.1.3); anything else (a login page, an error page) is not
 //! published.
+//!
+//! Opening for commands only changes nothing: there are no commands, the
+//! 30 s check is the liveness check, and pictures are fetched only while
+//! someone watches. The time from each fetch to its response is reported as
+//! the camera's latency.
 
 use serde_json::{json, Value};
 
@@ -188,6 +193,7 @@ impl Module for HttpSnapshot {
         self.in_flight = None;
         let failed = match result {
             Ok(response) => {
+                cx.round_trip(cx.now().saturating_sub(sent));
                 cx.alive();
                 let status = response.status;
                 if matches!(status, 401 | 403) && self.credentials.is_some() {
@@ -262,6 +268,7 @@ mod tests {
             model: "generic".into(),
             channels: None,
             settings: s,
+            monitor: true,
         })
         .unwrap()
     }
@@ -336,6 +343,44 @@ mod tests {
             key: FETCH,
             after: CHECK_EVERY
         }));
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_checks_as_ever_and_times_fetches() {
+        let mut m = HttpSnapshot::new(OpenContext {
+            host: "10.0.0.5".parse().unwrap(),
+            port: None,
+            model: "generic".into(),
+            channels: None,
+            settings: json!({"path": "/snapshot.jpg"})
+                .as_object()
+                .unwrap()
+                .clone(),
+            monitor: false,
+        })
+        .unwrap();
+        // The liveness check: one fetch, then one every 30 s.
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        let reqs = requests(&cx.take());
+        assert_eq!(reqs.len(), 1);
+        let mut cx = Cx::new(45);
+        m.http_response(&mut cx, reqs[0].0, Ok(jpeg(1)));
+        let a = cx.take();
+        assert!(a.contains(&Action::RoundTrip(45)));
+        assert!(a.contains(&Action::SetTimer {
+            key: FETCH,
+            after: CHECK_EVERY
+        }));
+        assert!(!a.iter().any(|a| matches!(a, Action::Frame { .. })));
+
+        // A failed fetch was not answered: nothing is timed.
+        let mut cx = Cx::new(CHECK_EVERY);
+        m.timer(&mut cx, FETCH);
+        let reqs = requests(&cx.take());
+        let mut cx = Cx::new(CHECK_EVERY + 5_000);
+        m.http_response(&mut cx, reqs[0].0, Err("timed out".into()));
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::RoundTrip(_))));
     }
 
     #[test]

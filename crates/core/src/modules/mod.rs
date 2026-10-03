@@ -105,6 +105,9 @@ pub(crate) fn construct(
     if spec.implementation == Implementation::Spec {
         let extension = spec.extension.as_deref();
         let engine = SpecEngine::new(Arc::new(spec.clone()), context.clone())?;
+        // The native extensions only keep state current, so a device opened
+        // for commands only runs on the engine alone.
+        let extension = if context.monitor { extension } else { None };
         return match extension {
             None => Ok(Box::new(engine)),
             #[cfg(feature = "panasonic-ptz")]

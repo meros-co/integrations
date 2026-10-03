@@ -6,6 +6,11 @@
 //! the server confirms with Identified (op 2). After that the client sends
 //! Request (op 6) messages, matched to RequestResponse (op 7) by the client's
 //! requestId, and receives Event (op 5) messages for the subscribed categories.
+//!
+//! Opened for commands only (`monitor` false), the module identifies with no
+//! event categories and reads no state; a `GetVersion` request every 5 s is
+//! its liveness check, since an open WebSocket alone does not show OBS is
+//! answering.
 
 use std::collections::HashMap;
 
@@ -58,7 +63,9 @@ const REQUEST: Key = "request";
 /// Why a request was sent.
 #[derive(Debug, Clone, PartialEq)]
 enum Purpose {
-    Command { id: CommandId },
+    Command {
+        id: CommandId,
+    },
     Version,
     SceneList,
     StudioMode,
@@ -67,18 +74,28 @@ enum Purpose {
     RecordStatus,
     VirtualCam,
     InputList,
-    InputMute { input: String },
-    InputVolume { input: String },
+    InputMute {
+        input: String,
+    },
+    InputVolume {
+        input: String,
+    },
+    /// Commands only: GetVersion in place of the output-status poll.
+    Liveness,
 }
 
 impl Purpose {
     fn is_poll(&self) -> bool {
-        matches!(self, Purpose::StreamStatus | Purpose::RecordStatus)
+        matches!(
+            self,
+            Purpose::StreamStatus | Purpose::RecordStatus | Purpose::Liveness
+        )
     }
 }
 
 struct Pending {
     purpose: Purpose,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -97,6 +114,8 @@ pub(crate) struct Obs {
     connected: bool,
     next_request: u64,
     pending: HashMap<String, Pending>,
+    /// False: commands only, no events and no state reads.
+    monitor: bool,
     retry_after: Millis,
     strikes: u32,
     /// Set when OBS refuses the password. Terminal, as for every credential in
@@ -130,6 +149,7 @@ impl Obs {
             connected: false,
             next_request: 1,
             pending: HashMap::new(),
+            monitor: ctx.monitor,
             retry_after: RETRY_MIN,
             strikes: 0,
             refused: None,
@@ -165,6 +185,7 @@ impl Obs {
             id,
             Pending {
                 purpose,
+                sent_at: cx.now(),
                 deadline: cx.now() + REQUEST_TIMEOUT,
             },
         );
@@ -233,7 +254,9 @@ impl Obs {
 
     fn hello(&mut self, cx: &mut Cx, d: &Value) {
         cx.cancel_timer(HELLO);
-        let mut identify = json!({"rpcVersion": RPC_VERSION, "eventSubscriptions": EVENTS});
+        // Commands only: no event categories at all.
+        let events = if self.monitor { EVENTS } else { 0 };
+        let mut identify = json!({"rpcVersion": RPC_VERSION, "eventSubscriptions": events});
         if let Some(auth) = d.get("authentication") {
             if self.password.is_empty() {
                 self.refuse(cx, "OBS requires a password and none is configured");
@@ -256,6 +279,10 @@ impl Obs {
         self.retry_after = RETRY_MIN;
         cx.connection(Connection::Connected);
         cx.alive();
+        if !self.monitor {
+            self.poll(cx);
+            return;
+        }
         self.request(cx, Purpose::Version, "GetVersion", None);
         self.request(cx, Purpose::SceneList, "GetSceneList", None);
         self.request(cx, Purpose::StudioMode, "GetStudioModeEnabled", None);
@@ -266,8 +293,13 @@ impl Obs {
     }
 
     fn poll(&mut self, cx: &mut Cx) {
-        self.request(cx, Purpose::StreamStatus, "GetStreamStatus", None);
-        self.request(cx, Purpose::RecordStatus, "GetRecordStatus", None);
+        if self.monitor {
+            self.request(cx, Purpose::StreamStatus, "GetStreamStatus", None);
+            self.request(cx, Purpose::RecordStatus, "GetRecordStatus", None);
+        } else {
+            // Commands only: the cheapest request OBS answers, for liveness.
+            self.request(cx, Purpose::Liveness, "GetVersion", None);
+        }
         cx.set_timer(POLL, POLL_EVERY);
     }
 
@@ -299,6 +331,7 @@ impl Obs {
             return;
         };
         self.arm_request_timer(cx);
+        cx.round_trip(cx.now().saturating_sub(pending.sent_at));
         let status = &d["requestStatus"];
         let ok = status.get("result").and_then(Value::as_bool) == Some(true);
         let data = d.get("responseData").cloned().unwrap_or(Value::Null);
@@ -340,7 +373,7 @@ impl Obs {
                     );
                 }
             }
-            Purpose::Version => cx.state(json!({"device": {
+            Purpose::Version | Purpose::Liveness => cx.state(json!({"device": {
                 "obs_version": data["obsVersion"],
                 "websocket_version": data["obsWebSocketVersion"],
                 "platform": data["platformDescription"],
@@ -627,12 +660,17 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     fn obs(password: &str) -> Obs {
+        obs_with(password, true)
+    }
+
+    fn obs_with(password: &str, monitor: bool) -> Obs {
         Obs::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
             port: None,
             model: "obs-studio-28".into(),
             channels: None,
             settings: json!({"password": password}).as_object().unwrap().clone(),
+            monitor,
         })
     }
 
@@ -1059,5 +1097,83 @@ mod tests {
                 result: Err(CommandError::Transport { .. })
             }
         )));
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_subscribes_to_nothing_and_reads_nothing() {
+        let mut m = obs_with("", false);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        cx.take();
+        let a = feed(&mut m, 10, hello(None));
+        assert_eq!(sent(&a)[0]["d"]["eventSubscriptions"], 0);
+
+        // Identified: only the liveness request, GetVersion.
+        let a = feed(
+            &mut m,
+            20,
+            json!({"op": 2, "d": {"negotiatedRpcVersion": 1}}),
+        );
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        let requests: Vec<Value> = sent(&a)
+            .iter()
+            .map(|r| r["d"]["requestType"].clone())
+            .collect();
+        assert_eq!(requests, [json!("GetVersion")]);
+        answer(
+            &mut m,
+            30,
+            &a,
+            &json!({"GetVersion": {"obsVersion": "31.0.1"}}),
+        );
+
+        // The poll is the same liveness request, never the output status.
+        let mut cx = Cx::new(POLL_EVERY + 20);
+        m.timer(&mut cx, POLL);
+        let requests: Vec<Value> = sent(&cx.take())
+            .iter()
+            .map(|r| r["d"]["requestType"].clone())
+            .collect();
+        assert_eq!(requests, [json!("GetVersion")]);
+
+        // Commands work as before.
+        let mut cx = Cx::new(POLL_EVERY + 30);
+        m.command(&mut cx, 8, "start_stream", &Params::new());
+        let request = sent(&cx.take())[0]["d"].clone();
+        assert_eq!(request["requestType"], "StartStream");
+        let a = feed(
+            &mut m,
+            POLL_EVERY + 40,
+            json!({"op": 7, "d": {"requestType": "StartStream", "requestId": request["requestId"],
+                "requestStatus": {"result": true, "code": 100}}}),
+        );
+        assert!(a.contains(&Action::Complete {
+            id: 8,
+            result: Ok(Outcome::Ack)
+        }));
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut m = obs("");
+        identified(&mut m);
+        let mut cx = Cx::new(100);
+        m.command(&mut cx, 9, "start_stream", &Params::new());
+        let request = sent(&cx.take())[0]["d"].clone();
+        let a = feed(
+            &mut m,
+            142,
+            json!({"op": 7, "d": {"requestType": "StartStream", "requestId": request["requestId"],
+                "requestStatus": {"result": true, "code": 100}}}),
+        );
+        assert!(a.contains(&Action::RoundTrip(42)));
+        // An event is not a reply.
+        let a = feed(
+            &mut m,
+            150,
+            json!({"op": 5, "d": {"eventType": "CurrentProgramSceneChanged",
+                "eventData": {"sceneName": "Close"}}}),
+        );
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
     }
 }

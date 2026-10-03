@@ -26,6 +26,11 @@
 //! 0.4.0 (MIT). Writable commands carry a bit mask of the fields they set, and
 //! the switcher ignores fields whose bit is clear (Sofie `CommandBase.ts:58-91`),
 //! so a setting command here sets exactly the parameters given.
+//!
+//! Opened for commands only (`monitor` false), the module neither polls the
+//! streaming and recording durations nor renews a Fairlight level
+//! subscription after reconnecting. The switcher still sends its whole state
+//! on every connection, as the handshake makes it, and that is applied.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::net::SocketAddr;
@@ -176,6 +181,8 @@ struct Sent {
     packet: Vec<u8>,
     sent_at: Millis,
     attempts: u32,
+    /// Sent more than once: its acknowledgement does not time one send.
+    resent: bool,
     /// The caller's command, or none for the module's own requests.
     command: Option<CommandId>,
 }
@@ -233,6 +240,8 @@ pub(crate) struct Atem {
     duration_armed: bool,
     /// The caller asked for Fairlight levels; asked again after reconnecting.
     levels_wanted: bool,
+    /// False: commands only, no duration polling and no level renewal.
+    monitor: bool,
 }
 
 /// A command to send: its name and body.
@@ -514,7 +523,9 @@ fn camera_body(
 
 impl Atem {
     pub(crate) fn new(ctx: OpenContext) -> Atem {
-        Atem::for_device(SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)))
+        let mut m = Atem::for_device(SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)));
+        m.monitor = ctx.monitor;
+        m
     }
 
     fn for_device(device: SocketAddr) -> Atem {
@@ -533,6 +544,7 @@ impl Atem {
             recording_active: false,
             duration_armed: false,
             levels_wanted: false,
+            monitor: true,
         }
     }
 
@@ -623,6 +635,7 @@ impl Atem {
             packet,
             sent_at: cx.now(),
             attempts: 1,
+            resent: false,
             command: id,
         });
         cx.set_timer(RESEND, RESEND_AFTER);
@@ -634,6 +647,9 @@ impl Atem {
                 break;
             }
             let sent = self.in_flight.pop_front().unwrap();
+            if !sent.resent {
+                cx.round_trip(cx.now().saturating_sub(sent.sent_at));
+            }
             if let Some(command) = sent.command {
                 cx.complete(command, Ok(Outcome::Ack));
             }
@@ -653,6 +669,7 @@ impl Atem {
         for sent in self.in_flight.iter_mut().skip(start) {
             cx.udp_send(SOCKET, self.device, sent.packet.clone());
             sent.sent_at = now;
+            sent.resent = true;
         }
     }
 
@@ -742,7 +759,8 @@ impl Atem {
 
     /// Poll the durations while streaming or recording, once ready.
     fn arm_duration(&mut self, cx: &mut Cx) {
-        if self.phase == Phase::Ready
+        if self.monitor
+            && self.phase == Phase::Ready
             && !self.duration_armed
             && (self.streaming_active || self.recording_active)
         {
@@ -1394,7 +1412,7 @@ impl Atem {
                     self.hello_attempts = 0;
                     cx.connection(Connection::Connected);
                     // A new session does not remember the level subscription.
-                    if self.levels_wanted && self.topology.fairlight {
+                    if self.monitor && self.levels_wanted && self.topology.fairlight {
                         self.send_commands(cx, None, &[(*b"SFLN", vec![1, 0, 0, 0])]);
                     }
                 }
@@ -2454,6 +2472,7 @@ impl Module for Atem {
                         cx.udp_send(SOCKET, self.device, packet);
                         sent.sent_at = now;
                         sent.attempts += 1;
+                        sent.resent = true;
                     }
                 }
                 if give_up {
@@ -3870,5 +3889,77 @@ mod tests {
                 .any(|p| p.len() > 12 && p[12..] == command(b"SFLN", &[1, 0, 0, 0])[..]),
             "{packets:?}"
         );
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_polls_nothing_and_renews_nothing() {
+        let mut m = atem();
+        m.monitor = false;
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        cx.take();
+        feed(&mut m, 10, syn_reply());
+        // The switcher sends its state regardless; only acknowledgements go back.
+        let a = feed(&mut m, 20, reliable(0x8001, 1, &dump()));
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(sent(&a).iter().all(|p| p.len() == HEADER));
+        assert_eq!(state(&a)["device"]["product"], "ATEM Mini Pro");
+
+        // Recording: no duration polling.
+        let a = feed(
+            &mut m,
+            30,
+            reliable(0x8001, 2, &[cmd(b"RTMS", &[0, 3, 0, 0, 0, 0, 0x0E, 0x10])]),
+        );
+        assert!(!a
+            .iter()
+            .any(|x| matches!(x, Action::SetTimer { key: DURATION, .. })));
+
+        // Commands work, the level subscription among them, but it is not
+        // renewed after reconnecting.
+        payload(&mut m, "set_audio_levels", json!({"enabled": true}));
+        let a = feed(&mut m, 110, header(FLAG_ACK, HEADER, 0x8001, 1, 0));
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Ok(Outcome::Ack)
+        }));
+        let mut cx = Cx::new(10_000);
+        m.timer(&mut cx, SILENCE);
+        feed(&mut m, 10_010, syn_reply());
+        let a = feed(&mut m, 10_020, reliable(0x8002, 1, &dump()));
+        assert!(sent(&a).iter().all(|p| p.len() == HEADER));
+    }
+
+    #[test]
+    fn the_time_to_each_acknowledgement_is_reported() {
+        let (mut m, _) = ready();
+        let mut cx = Cx::new(100);
+        let params = json!({"me": 1, "source": 2}).as_object().unwrap().clone();
+        m.command(&mut cx, 7, "set_program", &params);
+        cx.take();
+        let a = feed(&mut m, 125, header(FLAG_ACK, HEADER, 0x8001, 1, 0));
+        assert!(a.contains(&Action::RoundTrip(25)));
+
+        // A resent packet's acknowledgement times no send.
+        let mut cx = Cx::new(200);
+        m.command(&mut cx, 8, "set_program", &params);
+        cx.take();
+        let mut cx = Cx::new(200 + RESEND_AFTER);
+        m.timer(&mut cx, RESEND);
+        cx.take();
+        let a = feed(&mut m, 290, header(FLAG_ACK, HEADER, 0x8001, 2, 0));
+        assert!(a.contains(&Action::Complete {
+            id: 8,
+            result: Ok(Outcome::Ack)
+        }));
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+
+        // Pushed state is not a reply.
+        let a = feed(
+            &mut m,
+            300,
+            reliable(0x8001, 2, &[cmd(b"PrgI", &[0, 0, 0, 1])]),
+        );
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
     }
 }

@@ -369,6 +369,7 @@ async fn resolume_state_is_pushed() {
             host: "127.0.0.1".into(),
             port: Some(sim.port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 

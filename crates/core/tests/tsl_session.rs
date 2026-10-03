@@ -29,6 +29,7 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 
@@ -40,6 +41,7 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 
@@ -82,6 +84,7 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
             host: "127.0.0.1".into(),
             port: None,
             settings: Default::default(),
+            monitor: true,
         })
         .is_err());
 }
@@ -102,6 +105,7 @@ async fn tsl_over_tcp_the_switcher_connects_to_the_listener() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 
@@ -113,6 +117,7 @@ async fn tsl_over_tcp_the_switcher_connects_to_the_listener() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: Default::default(),
+            monitor: true,
         })
         .unwrap();
 

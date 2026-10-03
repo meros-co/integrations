@@ -232,6 +232,7 @@ fn open(core: &Core, port: u16, password: &str) -> u64 {
         host: DEVICE_IP.to_string(),
         port: Some(port),
         settings: params(json!({ "password": password })),
+        monitor: true,
     })
     .unwrap()
 }

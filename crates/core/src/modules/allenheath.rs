@@ -35,6 +35,12 @@
 //! password's bytes, with nothing between or after them. A connection dropped
 //! after the login is a refusal, terminal like the core's other credential
 //! refusals: repeated wrong logins are not sent on a schedule.
+//!
+//! Opened for commands only (`monitor` false), the console's state is not
+//! read after connecting (no paced sync, no Qu "Get System State"): one
+//! liveness probe goes out instead, so the console's answer shows it is
+//! there, and what it sends unasked and what commands read still update the
+//! state. A read's request-to-reply time is reported as the latency.
 
 use std::collections::VecDeque;
 use std::net::SocketAddr;
@@ -261,6 +267,7 @@ impl Args<'_> {
 struct Pending {
     id: CommandId,
     wait: Wait,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -324,6 +331,9 @@ pub(crate) struct AllenHeath {
     auth_reply: Vec<u8>,
     /// The console refused the login: nothing more is attempted.
     refused: Option<String>,
+    /// False: opened for commands only, so the state is not read on
+    /// connecting.
+    monitor: bool,
 }
 
 /// The dialect for a spec and model, or why there is none.
@@ -357,6 +367,7 @@ impl AllenHeath {
         };
         let mut m = AllenHeath::with_dialect(SocketAddr::new(ctx.host, port), dialect);
         m.login = login;
+        m.monitor = ctx.monitor;
         Ok(m)
     }
 
@@ -375,6 +386,7 @@ impl AllenHeath {
             auth: Auth::Done,
             auth_reply: Vec::new(),
             refused: None,
+            monitor: true,
         }
     }
 
@@ -423,7 +435,14 @@ impl AllenHeath {
             cx.tcp_send(SOCKET, bytes);
             cx.set_timer(KEEPALIVE, KEEPALIVE_EVERY);
         }
-        self.queue_sync(cx);
+        if self.monitor {
+            self.queue_sync(cx);
+        } else {
+            // Commands only: MIDI pushes nothing until something changes, so
+            // the console's one liveness read stands in for the state read
+            // as its first word.
+            cx.tcp_send(SOCKET, self.dialect.probe());
+        }
         cx.set_timer(QUIET_TIMER, QUIET);
         cx.set_timer(FIRST_WORD, FIRST_WORD_WARNING);
     }
@@ -549,6 +568,7 @@ impl AllenHeath {
             let path = &self.pending[i].wait.path;
             if let Some((_, value)) = group.iter().find(|(p, _)| p == path) {
                 let p = self.pending.remove(i).unwrap();
+                cx.round_trip(cx.now().saturating_sub(p.sent_at));
                 let result = if p.wait.fields.is_empty() {
                     value.clone()
                 } else {
@@ -650,6 +670,7 @@ impl Module for AllenHeath {
                 self.pending.push_back(Pending {
                     id,
                     wait,
+                    sent_at: cx.now(),
                     deadline: cx.now() + REPLY_TIMEOUT,
                 });
                 self.arm_reply_timer(cx);
@@ -996,6 +1017,38 @@ mod tests {
     }
 
     #[test]
+    fn opened_for_commands_only_the_console_is_probed_not_read() {
+        let mut m = module(Box::new(Fake));
+        m.monitor = false;
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        assert_eq!(sent(&a), [vec![0xF0, 0x7E, 0xF7]], "the probe alone");
+        assert!(m.outbox.is_empty(), "no paced sync");
+        assert!(!a
+            .iter()
+            .any(|x| matches!(x, Action::SetTimer { key: PACE, .. })));
+        // The probe's answer connects it, and commands work.
+        let a = feed(&mut m, 30, &[0x90, 0x01, 0x7F]);
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert_eq!(state(&a)["x"]["level_raw"], 1, "what arrives is applied");
+        let a = run(&mut m, 40, "set", json!({"n": 9}));
+        assert_eq!(sent(&a), [vec![0x90, 9, 0x7F], vec![0xF0, 0x01, 0xF7]]);
+    }
+
+    #[test]
+    fn a_read_reports_its_round_trip() {
+        let (mut m, _) = connected(Box::new(Fake), &[0xFE]);
+        run(&mut m, 100, "get", json!({}));
+        let a = feed(&mut m, 137, &[0x90, 0x05, 0x7F]);
+        assert!(a.contains(&Action::RoundTrip(37)));
+        // Unasked messages carry no round trip.
+        let a = feed(&mut m, 200, &[0x90, 0x06, 0x7F]);
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+    }
+
+    #[test]
     fn a_quiet_console_is_probed_then_dropped() {
         let (mut m, _) = connected(Box::new(Fake), &[0xFE]);
         let mut cx = Cx::new(QUIET);
@@ -1030,6 +1083,7 @@ mod tests {
                 model: model.into(),
                 channels: None,
                 settings: params(settings),
+                monitor: true,
             },
         )
     }
