@@ -143,7 +143,9 @@ commands:
   get_power_supply_status:
     summary: 'Get the status of power supply unit A (power1) or B (power2): fine or down (devstatus power1/power2, 2-3, p.14)'
     params:
-      unit: { type: enum, values: [power1, power2], required: true }
+      unit: { type: enum, values: [power1, power2], required: true,
+              label: Power supply,
+              description: "Power supply unit A (power1) or B (power2)." }
     send: "devstatus {unit}"
     expect: { matches: '^OK devstatus (?i:power)[12] "(\w+)"' }
     returns: value
@@ -151,7 +153,9 @@ commands:
   set_run_mode:
     summary: 'Change the run mode to normal or emergency (devmode, 2-4, p.14)'
     params:
-      mode: { type: enum, values: [normal, emergency], required: true }
+      mode: { type: enum, values: [normal, emergency], required: true,
+              label: Run mode,
+              description: "Normal, or emergency mode." }
     send: "devmode {mode}"
     expect: { matches: '^OK devmode ' }
     returns: ack
@@ -160,7 +164,9 @@ commands:
   set_encoding:
     summary: 'Set the character encoding of replies and notifications, ascii (default) or utf8; in ascii, characters out of range are sent as "?" (scpmode encoding, 2-5, p.14)'
     params:
-      encoding: { type: enum, values: [ascii, utf8], required: true }
+      encoding: { type: enum, values: [ascii, utf8], required: true,
+                  label: Encoding,
+                  description: "Character encoding of replies and notifications: ascii (the default, other characters sent as ?) or utf8." }
     send: "scpmode encoding {encoding}"
     expect: { matches: '^OK scpmode encoding ' }
     returns: ack
@@ -168,7 +174,9 @@ commands:
   set_value_type:
     summary: 'Set whether parameter change notifications carry raw values (NOTIFY set, default) or normalized values (NOTIFY setn) (scpmode valuetype, 2-6, p.15)'
     params:
-      value_type: { type: enum, values: [raw, normalized], required: true }
+      value_type: { type: enum, values: [raw, normalized], required: true,
+                    label: Value type,
+                    description: "Whether change notifications carry raw values (the default) or normalized values." }
     send: "scpmode valuetype {value_type}"
     expect: { matches: '^OK scpmode valuetype ' }
     returns: ack
@@ -176,7 +184,9 @@ commands:
   set_normalized_resolution:
     summary: 'Set the resolution of normalized values, default 1000; "should be more than 100", no maximum given; 1023 gives fader raw-value resolution (scpmode resolution, 2-7, p.15)'
     params:
-      resolution: { type: int, min: 101, required: true }
+      resolution: { type: int, min: 101, required: true,
+                    label: Resolution,
+                    description: "Full-scale normalized value, default 1000; 1023 matches a fader's raw-value resolution." }
     send: "scpmode resolution {resolution}"
     expect: { matches: '^OK scpmode resolution ' }
     returns: ack
@@ -184,7 +194,9 @@ commands:
   set_keepalive:
     summary: 'Enable the keepalive: the device closes the connection when nothing (a command or a bare LF) arrives within interval_ms plus 1 s; "should be more than 1000" ms; disabled by default (scpmode keepalive, 2-8, p.15)'
     params:
-      interval_ms: { type: int, min: 1001, required: true }
+      interval_ms: { type: int, min: 1001, required: true,
+                     label: Interval,
+                     description: "Milliseconds of silence after which, plus 1 s, the device closes the connection; more than 1000." }
     send: "scpmode keepalive {interval_ms}"
     expect: { matches: '^OK scpmode keepalive ' }
     returns: ack
@@ -278,7 +290,9 @@ commands:
   get_parameter_info:
     summary: 'Get the parameter at a Remote Control Setup List index as the device''s text: "address" xnum ynum min max default "unit" type ui rw scaling; an error when a meter is at the index (prminfo, 3-15, p.28-29)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List, from 0; a meter at the index gives an error." }
     send: "prminfo {index}"
     expect: { matches: '^OK prminfo ' }
     returns: text
@@ -292,7 +306,9 @@ commands:
   get_meter_info:
     summary: 'Get the meter at a Remote Control Setup List index as the device''s text: "address" count type (level, hold, gr, vu, raw or gr+100); an error when a parameter is at the index (mtrinfo, 3-17, p.30)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List, from 0; a parameter at the index gives an error." }
     send: "mtrinfo {index}"
     expect: { matches: '^OK (?:mtrinfo|prminfo) ?\d' }
     returns: text
@@ -300,7 +316,9 @@ commands:
   identify:
     summary: 'Enter identify display mode for 1-60 seconds, or 0 to stop (identify, 3-20, p.32)'
     params:
-      seconds: { type: int, min: 0, max: 60, required: true }
+      seconds: { type: int, min: 0, max: 60, required: true,
+                 label: Duration,
+                 description: "Seconds to show the identify display, 1 to 60; 0 stops it." }
     send: "identify {seconds}"
     expect: { matches: '^OKm? identify ' }
     returns: ack
@@ -309,10 +327,18 @@ commands:
   set_parameter:
     summary: 'Set the parameter at a Remote Control Setup List index to a raw value (scaling per section 7, p.62-69); x and y are the sub-addresses as sent on the wire, numbered from 0, "0" for a parameter registered with fixed X/Y (set, 2-12, p.18). An out-of-range value is adjusted and answered OKm'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
-      value: { type: int, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
+      value: { type: int, required: true,
+               label: Value,
+               description: "Raw value, scaled as the parameter's type (manual section 7); an out-of-range value is adjusted by the device." }
     send: "set PROC:Remote/{index} {x} {y} {value}"
     expect: { matches: '^OKm? set PROC:Remote/\d+ ' }
     returns: ack
@@ -320,10 +346,18 @@ commands:
   set_parameter_normalized:
     summary: 'Set a parameter to a normalized value, 0 to the resolution (default 1000); x and y numbered from 0 (setn, 2-13, p.19)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
-      value: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
+      value: { type: int, min: 0, required: true,
+               label: Value,
+               description: "Normalized value, 0 to the normalized resolution (1000 by default)." }
     send: "setn PROC:Remote/{index} {x} {y} {value}"
     expect: { matches: '^OKm? setn PROC:Remote/\d+ ' }
     returns: ack
@@ -331,10 +365,18 @@ commands:
   set_parameter_text:
     summary: 'Set a parameter from its display string, printable ASCII, sent quoted with \" and \\ escapes ("Inf" is read as -inf); x and y numbered from 0 (sett, 2-14, p.20)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
-      text: { type: string, pattern: '^[ -~]*$', required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
+      text: { type: string, pattern: '^[ -~]*$', required: true,
+              label: Text,
+              description: "Value as its display string, e.g. -10.0 or Inf for -inf; printable ASCII." }
     send: "sett PROC:Remote/{index} {x} {y} {text:json}"
     expect: { matches: '^OKm? sett PROC:Remote/\d+ ' }
     returns: ack
@@ -342,10 +384,18 @@ commands:
   set_parameter_relative:
     summary: 'Move a fader-type parameter by a number of steps, negative to decrease (section 7 "setr" column); x and y numbered from 0 (setr, 2-15, p.21)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
-      steps: { type: int, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
+      steps: { type: int, required: true,
+               label: Steps,
+               description: "Number of steps to move the fader-type parameter; negative decreases." }
     send: "setr PROC:Remote/{index} {x} {y} {steps}"
     expect: { matches: '^OKm? (?:setr ?)?PROC:Remote/\d+ ' }
     returns: ack
@@ -353,9 +403,15 @@ commands:
   get_parameter:
     summary: 'Get a parameter''s raw value; x and y numbered from 0 (get, 2-9, p.16)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
     send: "get PROC:Remote/{index} {x} {y}"
     expect: { matches: '^OK get PROC:Remote/\d+ \d+ \d+ (-?\d+)' }
     returns: value
@@ -363,9 +419,15 @@ commands:
   get_parameter_normalized:
     summary: 'Get a parameter''s normalized value; x and y numbered from 0 (getn, 2-10, p.17)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
     send: "getn PROC:Remote/{index} {x} {y}"
     expect: { matches: '^OK getn PROC:Remote/\d+ \d+ \d+ (-?\d+)' }
     returns: value
@@ -373,9 +435,15 @@ commands:
   get_parameter_text:
     summary: 'Get a parameter''s display string; x and y numbered from 0 (gett, 2-11, p.17)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
-      y: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
     send: "gett PROC:Remote/{index} {x} {y}"
     expect: { matches: '^OK gett PROC:Remote/\d+ \d+ \d+ "((?:[^"\\]|\\.)*)"' }
     returns: value
@@ -383,8 +451,12 @@ commands:
   get_parameter_all_x:
     summary: 'Get the raw values of every X for one Y (X sent as "all"), as the space-separated list the device returns; y numbered from 0 (get, 2-9, p.16)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      y: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
     send: "get PROC:Remote/{index} all {y}"
     expect: { matches: '^OK get PROC:Remote/\d+ all \d+ (.+)$' }
     returns: value
@@ -392,8 +464,12 @@ commands:
   get_parameter_all_y:
     summary: 'Get the raw values of every Y for one X (Y sent as "all"), as the space-separated list the device returns; x numbered from 0 (get, 2-9, p.16)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
     send: "get PROC:Remote/{index} {x} all"
     expect: { matches: '^OK get PROC:Remote/\d+ \d+ all (.+)$' }
     returns: value
@@ -401,8 +477,12 @@ commands:
   get_parameter_normalized_all_x:
     summary: 'Get the normalized values of every X for one Y, as the list the device returns (getn with X "all", 2-10, p.17)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      y: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
     send: "getn PROC:Remote/{index} all {y}"
     expect: { matches: '^OK getn PROC:Remote/\d+ all \d+ (.+)$' }
     returns: value
@@ -410,8 +490,12 @@ commands:
   get_parameter_normalized_all_y:
     summary: 'Get the normalized values of every Y for one X, as the list the device returns (getn with Y "all", 2-10, p.17)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
     send: "getn PROC:Remote/{index} {x} all"
     expect: { matches: '^OK getn PROC:Remote/\d+ \d+ all (.+)$' }
     returns: value
@@ -419,8 +503,12 @@ commands:
   get_parameter_text_all_x:
     summary: 'Get the display strings of every X for one Y, as the quoted list the device returns (gett with X "all", 2-11, p.17)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      y: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      y: { type: int, min: 0, default: 0,
+           label: "Y",
+           description: "Second sub-address of the parameter, numbered from 0; 0 for a parameter registered with fixed Y." }
     send: "gett PROC:Remote/{index} all {y}"
     expect: { matches: '^OK gett PROC:Remote/\d+ all \d+ (.+)$' }
     returns: value
@@ -428,8 +516,12 @@ commands:
   get_parameter_text_all_y:
     summary: 'Get the display strings of every Y for one X, as the quoted list the device returns (gett with Y "all", 2-11, p.17)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      x: { type: int, min: 0, default: 0 }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      x: { type: int, min: 0, default: 0,
+           label: X,
+           description: "First sub-address of the parameter (e.g. a channel), numbered from 0; 0 for a parameter registered with fixed X." }
     send: "gett PROC:Remote/{index} {x} all"
     expect: { matches: '^OK gett PROC:Remote/\d+ \d+ all (.+)$' }
     returns: value
@@ -438,8 +530,12 @@ commands:
   start_meter:
     summary: 'Start level notifications (NOTIFY mtr) for the meter at a Remote Control Setup List index at a minimum interval in ms; they stop after 10 s unless requested again (mtrstart, 2-16, p.22, 4.6 p.48)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      interval_ms: { type: int, min: 1, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      interval_ms: { type: int, min: 1, required: true,
+                     label: Interval,
+                     description: "Shortest time between meter notifications in milliseconds; they stop after 10 s unless requested again." }
     send: "mtrstart PROC:Remote/{index} {interval_ms}"
     expect: { matches: '^OK mtrstart PROC:Remote/\d+' }
     returns: ack
@@ -447,8 +543,12 @@ commands:
   start_meter_peak_hold:
     summary: 'Start peak-hold notifications (NOTIFY mtr ...>PeakHold) for a meter at a minimum interval in ms; they stop after 10 s unless requested again (mtrstart >PeakHold, 2-16, p.22)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
-      interval_ms: { type: int, min: 1, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
+      interval_ms: { type: int, min: 1, required: true,
+                     label: Interval,
+                     description: "Shortest time between meter notifications in milliseconds; they stop after 10 s unless requested again." }
     send: "mtrstart PROC:Remote/{index}>PeakHold {interval_ms}"
     expect: { matches: '^OK mtrstart PROC:Remote/\d+>PeakHold' }
     returns: ack
@@ -456,7 +556,9 @@ commands:
   stop_meter:
     summary: 'Stop level notifications for a meter (mtrstop, 2-17, p.22)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
     send: "mtrstop PROC:Remote/{index}"
     expect: { matches: '^OK mtrstop PROC:Remote/\d+' }
     returns: ack
@@ -464,7 +566,9 @@ commands:
   stop_meter_peak_hold:
     summary: 'Stop peak-hold notifications for a meter (mtrstop >PeakHold, 2-17, p.22)'
     params:
-      index: { type: int, min: 0, max: 1000, required: true }
+      index: { type: int, min: 0, max: 1000, required: true,
+               label: Index,
+               description: "Entry in the Remote Control Setup List uploaded from ProVisionaire, from 0." }
     send: "mtrstop PROC:Remote/{index}>PeakHold"
     expect: { matches: '^OK mtrstop PROC:Remote/\d+>PeakHold' }
     returns: ack
@@ -479,7 +583,9 @@ commands:
   get_current_snapshot:
     summary: 'Get the current snapshot number (1-100) of a parameter set; the reply also says modified or unmodified (sscurrent_ex <id>, 2-18, p.23)'
     params:
-      parameter_set: { type: int, min: 0, required: true }
+      parameter_set: { type: int, min: 0, required: true,
+                       label: Parameter set,
+                       description: "ID of the parameter set holding the snapshots, as set up in ProVisionaire." }
     send: "sscurrent_ex {parameter_set}"
     expect: { matches: '^OK sscurrent(?:_ex)? \d+ (\d+)' }
     returns: value
@@ -487,8 +593,12 @@ commands:
   recall_snapshot:
     summary: 'Recall snapshot 1-100 of a parameter set (ssrecall_ex, 2-19, p.23); parameters changed by the recall are not notified, so query them again'
     params:
-      parameter_set: { type: int, min: 0, required: true }
-      snapshot: { type: int, min: 1, max: 100, required: true }
+      parameter_set: { type: int, min: 0, required: true,
+                       label: Parameter set,
+                       description: "ID of the parameter set holding the snapshots, as set up in ProVisionaire." }
+      snapshot: { type: int, min: 1, max: 100, required: true,
+                  label: Snapshot,
+                  description: "Snapshot number in the parameter set, 1 to 100." }
     send: "ssrecall_ex {parameter_set} {snapshot}"
     expect: { matches: '^OK ssrecall(?:_ex)? ' }
     returns: ack
@@ -496,7 +606,9 @@ commands:
   get_snapshot_count:
     summary: 'Get the number of snapshots in a parameter set (ssnum_ex, 3-18, p.31; replies are shown both with and without the ID)'
     params:
-      parameter_set: { type: int, min: 0, required: true }
+      parameter_set: { type: int, min: 0, required: true,
+                       label: Parameter set,
+                       description: "ID of the parameter set holding the snapshots, as set up in ProVisionaire." }
     send: "ssnum_ex {parameter_set}"
     expect: { matches: '^OK ssnum_ex (?:\d+ )?(\d+)\s*$' }
     returns: value
@@ -504,8 +616,12 @@ commands:
   get_snapshot_info:
     summary: 'Get snapshot 1-100 of a parameter set as the device''s text: id index "numtext" "title" "comment" attribute (preinst, reserve, user or empty) (ssinfo_ex, 3-19, p.31)'
     params:
-      parameter_set: { type: int, min: 0, required: true }
-      snapshot: { type: int, min: 1, max: 100, required: true }
+      parameter_set: { type: int, min: 0, required: true,
+                       label: Parameter set,
+                       description: "ID of the parameter set holding the snapshots, as set up in ProVisionaire." }
+      snapshot: { type: int, min: 1, max: 100, required: true,
+                  label: Snapshot,
+                  description: "Snapshot number in the parameter set, 1 to 100." }
     send: "ssinfo_ex {parameter_set} {snapshot}"
     expect: { matches: '^OK ssinfo(?:_ex)? ' }
     returns: text
@@ -514,8 +630,12 @@ commands:
   set_audio_player_type:
     summary: 'Set the playback type of an Audio Player item: noAssign, 1song or folder (event PROC:AudioPlayerSetType, 3-21, p.32); item indexes from listitemnum'
     params:
-      index: { type: int, min: 0, required: true }
-      type: { type: enum, values: [noAssign, 1song, folder], required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
+      type: { type: enum, values: [noAssign, 1song, folder], required: true,
+              label: Playback type,
+              description: "What the item plays: noAssign (nothing), 1song (one file) or folder (every file in a folder)." }
     send: 'event PROC:AudioPlayerSetType "index={index}" "type={type}"'
     expect: { matches: '^OK event PROC:AudioPlayerSetType ' }
     returns: ack
@@ -523,8 +643,12 @@ commands:
   set_audio_player_path:
     summary: 'Set the song or folder path of an Audio Player item; printable ASCII without quotes or backslashes (event PROC:AudioPlayerSetPath, 3-22, p.32)'
     params:
-      index: { type: int, min: 0, required: true }
-      path: { type: string, pattern: '^[ !#-\[\]-~]*$', required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
+      path: { type: string, pattern: '^[ !#-\[\]-~]*$', required: true,
+              label: Path,
+              description: "Path of the song or folder on the device's storage, printable ASCII without quotes or backslashes." }
     send: 'event PROC:AudioPlayerSetPath "index={index}" "path={path}"'
     expect: { matches: '^OK event PROC:AudioPlayerSetPath ' }
     returns: ack
@@ -532,8 +656,12 @@ commands:
   set_audio_player_play_mode:
     summary: 'Set the playback mode of an Audio Player item: normal, repeat or shuffleRepeat (event PROC:AudioPlayerSetPlayMode, 3-23, p.33)'
     params:
-      index: { type: int, min: 0, required: true }
-      mode: { type: enum, values: [normal, repeat, shuffleRepeat], required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
+      mode: { type: enum, values: [normal, repeat, shuffleRepeat], required: true,
+              label: Play mode,
+              description: "Normal (once through), repeat, or shuffleRepeat (shuffle and repeat)." }
     send: 'event PROC:AudioPlayerSetPlayMode "index={index}" "mode={mode}"'
     expect: { matches: '^OK event PROC:AudioPlayerSetPlayMode ' }
     returns: ack
@@ -541,8 +669,12 @@ commands:
   set_audio_player_go_to_top:
     summary: 'Set Go To The Top of an Audio Player item, on or off (event PROC:AudioPlayerSetGoToTheTop, 3-24, p.33)'
     params:
-      index: { type: int, min: 0, required: true }
-      go_to_top: { type: enum, values: ['on', 'off'], required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
+      go_to_top: { type: enum, values: ['on', 'off'], required: true,
+                   label: Go to the top,
+                   description: "On or off: the Audio Player's Go To The Top option." }
     send: 'event PROC:AudioPlayerSetGoToTheTop "index={index}" "goToTheTop={go_to_top}"'
     expect: { matches: '^OK event PROC:AudioPlayerSetGoToTheTop ' }
     returns: ack
@@ -550,8 +682,12 @@ commands:
   set_audio_player_interval:
     summary: 'Set the song interval of an Audio Player item in seconds, 0.0-10.0 (event PROC:AudioPlayerSetInterval, 3-25, p.33; range from listitem, p.37)'
     params:
-      index: { type: int, min: 0, required: true }
-      interval: { type: float, min: 0.0, max: 10.0, required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
+      interval: { type: float, min: 0.0, max: 10.0, required: true,
+                  label: Song interval,
+                  description: "Gap between songs in seconds, 0.0 to 10.0." }
     send: 'event PROC:AudioPlayerSetInterval "index={index}" "interval={interval:.1f}"'
     expect: { matches: '^OK event PROC:AudioPlayerSetInterval ' }
     returns: ack
@@ -595,7 +731,9 @@ commands:
   set_audio_player_current_song:
     summary: 'Select the Audio Player item to play (event PROC:AudioPlayerSetCurrentSong, 3-29, p.35)'
     params:
-      index: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
     send: 'event PROC:AudioPlayerSetCurrentSong "index={index}"'
     expect: { matches: '^OK event PROC:AudioPlayerSetCurrentSong "index=' }
     returns: ack
@@ -609,7 +747,9 @@ commands:
   get_audio_player_item:
     summary: 'Get an Audio Player item as "Type PlayMode GoToTheTop Interval Name", such as "1Song Normal On 1.0 xxx.wav" (listitem PROC:AudioPlayer, 3-34, p.37)'
     params:
-      index: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, required: true,
+               label: Item,
+               description: "Audio Player item index, from 0, as listitemnum counts them." }
     send: "listitem PROC:AudioPlayer {index}"
     expect: { matches: '^OK listitem PROC:AudioPlayer \d+ "((?:[^"\\]|\\.)*)"' }
     returns: value
@@ -618,7 +758,9 @@ commands:
   set_display_font:
     summary: 'Set the display font: type1 (M Plus: Japanese kana and kanji, English, European languages) or type2 (Dyna Chinese characters and kana, M Plus English and European) (event PROC:Language, 3-30, p.35)'
     params:
-      font: { type: enum, values: [type1, type2], required: true }
+      font: { type: enum, values: [type1, type2], required: true,
+              label: Font,
+              description: "Display font set: type1 (M Plus: Japanese kana and kanji, English, European languages) or type2 (Dyna Chinese characters and kana, M Plus English and European)." }
     send: 'event PROC:Language "{font}"'
     expect: { matches: '^OK event PROC:Language ' }
     returns: ack
@@ -626,8 +768,12 @@ commands:
   set_scheduler_event_enabled:
     summary: 'Enable or disable a public Scheduler event by index; fails (OKm) when no Scheduler component is placed or the index is invalid (event PROC:SchedulerSetEnable, 3-31, p.36)'
     params:
-      index: { type: int, min: 0, required: true }
-      enabled: { type: bool, required: true }
+      index: { type: int, min: 0, required: true,
+               label: Event,
+               description: "Public Scheduler event index, from 0." }
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "True enables the Scheduler event, false disables it." }
     send: 'event PROC:SchedulerSetEnable "index={index}" "enable={enabled}"'
     expect: { matches: '^OK event PROC:SchedulerSetEnable "index=' }
     returns: ack
@@ -635,8 +781,12 @@ commands:
   set_scheduler_event_time:
     summary: 'Set the time of a public Scheduler event, such as 9:00; fails (OKm) when the time is invalid (event PROC:SchedulerSetTime, 3-32, p.36)'
     params:
-      index: { type: int, min: 0, required: true }
-      time: { type: string, pattern: '^[0-9]{1,2}:[0-9]{2}$', required: true }
+      index: { type: int, min: 0, required: true,
+               label: Event,
+               description: "Public Scheduler event index, from 0." }
+      time: { type: string, pattern: '^[0-9]{1,2}:[0-9]{2}$', required: true,
+              label: Time,
+              description: "Event time as H:MM or HH:MM, e.g. 9:00." }
     send: 'event PROC:SchedulerSetTime "index={index}" "time={time}"'
     expect: { matches: '^OK event PROC:SchedulerSetTime "index=' }
     returns: ack
@@ -650,7 +800,9 @@ commands:
   get_scheduler_event:
     summary: 'Get a public Scheduler event as "enable|disable time name", such as "enable 9:00 MorningChime" (listitem PROC:Scheduler, 3-36, p.38)'
     params:
-      index: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, required: true,
+               label: Event,
+               description: "Public Scheduler event index, from 0." }
     send: "listitem PROC:Scheduler {index}"
     expect: { matches: '^OK listitem PROC:Scheduler \d+ "((?:[^"\\]|\\.)*)"' }
     returns: value

@@ -100,80 +100,128 @@ commands:
   run_cue:
     summary: "Run a cue by number (quick start guide p.3, cue x)"
     params:
-      cue: { type: int, min: 0, required: true }
+      cue: { type: int, min: 0, required: true,
+             label: Cue,
+             description: "Cue number to run, as numbered in the show." }
     send: "cue {cue}"
     returns: none
   playback_select:
     summary: "Put a cue stack in a playback, at a cue position major.minor; a position other than 0.0 also runs that cue (quick start guide p.4). The playback is named stack<n> on the command line"
     params:
-      playback: { type: int, min: 1, required: true }
-      cue_stack: { type: int, min: 0, required: true }
-      major: { type: int, min: 0, default: 0 }
-      minor: { type: int, min: 0, default: 0 }
+      playback: { type: int, min: 1, required: true,
+                  label: Playback,
+                  description: "Playback number, from 1." }
+      cue_stack: { type: int, min: 0, required: true,
+                   label: Cue stack,
+                   description: "Cue stack to put in the playback; it is named stack<n> on the server." }
+      major: { type: int, min: 0, default: 0,
+               label: Cue major,
+               description: "Major part of the cue position (the 3 in 3.1); 0.0 only loads the stack, any other position also runs that cue." }
+      minor: { type: int, min: 0, default: 0,
+               label: Cue minor,
+               description: "Minor part of the cue position (the 1 in 3.1); 0.0 only loads the stack, any other position also runs that cue." }
     send: "set stack{playback} select cue_stack={cue_stack},major={major},minor={minor}"
     returns: none
   playback_go:
     summary: "Press a playback's go button (quick start guide p.4, command=1)"
     params:
-      playback: { type: int, min: 1, required: true }
+      playback: { type: int, min: 1, required: true,
+                  label: Playback,
+                  description: "Playback whose go button to press, from 1." }
     send: "set stack{playback} control command=1"
     returns: none
   layer_media:
     summary: "Select the media a layer plays: slot in a media library (collection) (manual D.f.f example)"
     params:
-      layer: { type: int, min: 1, required: true }
-      slot: { type: int, min: 0, max: 255, required: true }
-      collection: { type: int, min: 0, max: 255, default: 0 }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      slot: { type: int, min: 0, max: 255, required: true,
+              label: Slot,
+              description: "Media slot in the collection, 0 to 255." }
+      collection: { type: int, min: 0, max: 255, default: 0,
+                    label: Collection,
+                    description: "Media library (collection) holding the slot, 0 to 255." }
     send: "set source{layer} selection slot={slot},collection={collection}"
     returns: none
   layer_play_mode:
     summary: "Requested play mode of a layer: 0 play loop (default), 1 play next, 2 play stop, 3 play pause, 4 play loop, 5 pause, 6 stop (manual D.d.a, play_state_req)"
     params:
-      layer: { type: int, min: 1, required: true }
-      mode: { type: int, min: 0, max: 6, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      mode: { type: int, min: 0, max: 6, required: true,
+              label: Play mode,
+              description: "Requested play mode: 0 play loop (default), 1 play next, 2 play stop, 3 play pause, 4 play loop, 5 pause, 6 stop." }
     send: "set source{layer} control play_state_req={mode}"
     returns: none
   layer_seek:
     summary: "Seek a layer's media, 0 to 1 of its length (manual D.c, seek)"
     params:
-      layer: { type: int, min: 1, required: true }
-      position: { type: float, min: 0, max: 1, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      position: { type: float, min: 0, max: 1, required: true,
+                  label: Position,
+                  description: "Position in the layer's media as a fraction of its length: 0 is the start, 1 the end." }
     send: "set source{layer} control seek={position:.4f}"
     returns: none
   layer_intensity:
     summary: "Intensity of a layer, 0 to 1 (manual D.f.f, composition intensity)"
     params:
-      layer: { type: int, min: 1, required: true }
-      intensity: { type: float, min: 0, max: 1, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      intensity: { type: float, min: 0, max: 1, required: true,
+                   label: Intensity,
+                   description: "Layer intensity, 0 (invisible) to 1 (full)." }
     send: "set layer{layer} composition intensity={intensity:.3f}"
     returns: none
   layer_intensity_fade:
     summary: "Fade a layer's intensity over a time in seconds (manual D.f.f, time=)"
     params:
-      layer: { type: int, min: 1, required: true }
-      intensity: { type: float, min: 0, max: 1, required: true }
-      time: { type: float, min: 0, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      intensity: { type: float, min: 0, max: 1, required: true,
+                   label: Intensity,
+                   description: "Target layer intensity, 0 (invisible) to 1 (full)." }
+      time: { type: float, min: 0, required: true,
+              label: Fade time,
+              description: "Fade duration in seconds; 0 changes at once." }
     send: "set layer{layer} composition time={time:.2f} intensity={intensity:.3f}"
     returns: none
   layer_position:
     summary: "Position of a layer, x and y in the composition's units (manual D.f.f, composition x and y)"
     params:
-      layer: { type: int, min: 1, required: true }
-      x: { type: float, required: true }
-      y: { type: float, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      x: { type: float, required: true,
+           label: X,
+           description: "Horizontal position of the layer in the composition's units." }
+      y: { type: float, required: true,
+           label: "Y",
+           description: "Vertical position of the layer in the composition's units." }
     send: "set layer{layer} composition x={x:.4f},y={y:.4f}"
     returns: none
   layer_fullscreen:
     summary: "Fit a layer to a display (manual D.f.h, fullscreen layer display)"
     params:
-      layer: { type: int, min: 1, required: true }
-      display: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
+      display: { type: int, min: 1, required: true,
+                 label: Display,
+                 description: "Display to fit the layer to, from 1." }
     send: "fullscreen layer{layer} {display}"
     returns: none
   layer_status:
     summary: "Ask for a layer's source status; the answer arrives as a control status message (manual D.f.a)"
     params:
-      layer: { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true,
+               label: Layer,
+               description: "Layer number as in the show's objects (layer1, layer2, ...), from 1." }
     send: "ctrl_status source{layer}"
     returns: none
   status_all:
@@ -191,7 +239,9 @@ commands:
   send_raw:
     summary: "Any server command line, e.g. a set command copied from Picturall Commander's command log (quick start guide p.2)"
     params:
-      command: { type: string, max_length: 1024, required: true }
+      command: { type: string, max_length: 1024, required: true,
+                 label: Command,
+                 description: "A full server command line, e.g. a set command copied from Picturall Commander's command log." }
     send: "{command}"
     returns: none
 
