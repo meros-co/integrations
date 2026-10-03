@@ -54,9 +54,9 @@ transport:
   probe: { method: GET, path: /control/api/v1/system/product }
 
 settings:
-  scheme: { type: enum, values: [http, https], default: http }
-  username: { type: string, default: "" }
-  password: { type: string, secret: true, default: "" }
+  scheme: { type: enum, values: [http, https], default: http, label: Scheme, description: "http for the web media manager enabled without security, https when it is enabled with security." }
+  username: { type: string, default: "", label: Username, description: "The username set in Blackmagic Camera Setup when the web media manager is enabled with security; empty otherwise." }
+  password: { type: string, secret: true, default: "", label: Password, description: "The password set in Blackmagic Camera Setup when the web media manager is enabled with security; empty otherwise." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -914,7 +914,7 @@ commands:
   set_transport_mode:
     summary: "Set the transport mode: InputPreview (live) or Output (playback) (PUT /transports/0, p.27)"
     params:
-      mode: { type: enum, values: [InputPreview, Output], required: true }
+      mode: { type: enum, values: [InputPreview, Output], required: true, label: Transport mode, description: "InputPreview shows the live input, Output plays back." }
     send: { method: PUT, path: "/control/api/v1/transports/0", body: '{"mode":"{mode}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -946,42 +946,42 @@ commands:
   set_playback:
     summary: "Set the playback state. The body is JSON in the document's playback shape: any of type (Play, Jog, Shuttle, Var), loop, singleClip, speed, position (PUT /transports/0/playback, p.29)"
     params:
-      body: { type: json, required: true }
+      body: { type: json, required: true, label: Playback, description: "JSON with any of type (Play, Jog, Shuttle, Var), loop, singleClip, speed and position; fields left out are unchanged." }
     send: { method: PUT, path: "/control/api/v1/transports/0/playback", body: '{body}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_playback_type:
     summary: "Set the playback type (PUT /transports/0/playback, p.29)"
     params:
-      type: { type: enum, values: [Play, Jog, Shuttle, Var], required: true }
+      type: { type: enum, values: [Play, Jog, Shuttle, Var], required: true, label: Playback type, description: "Play, Jog, Shuttle or Var." }
     send: { method: PUT, path: "/control/api/v1/transports/0/playback", body: '{"type":"{type}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_playback_loop:
     summary: "Loop playback from the end of the timeline to its beginning (PUT /transports/0/playback, p.29)"
     params:
-      loop: { type: bool, default: true }
+      loop: { type: bool, default: true, label: Loop, description: "On loops from the end of the timeline back to its beginning, off stops at the end." }
     send: { method: PUT, path: "/control/api/v1/transports/0/playback", body: '{"loop":{loop}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_playback_single_clip:
     summary: "Loop playback within the current clip (PUT /transports/0/playback, p.29)"
     params:
-      single_clip: { type: bool, default: true }
+      single_clip: { type: bool, default: true, label: Single clip, description: "On loops within the current clip, off plays through the timeline." }
     send: { method: PUT, path: "/control/api/v1/transports/0/playback", body: '{"singleClip":{single_clip}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_playback_speed:
     summary: "Set the playback speed, 1.0 for normal forward playback (PUT /transports/0/playback, p.29)"
     params:
-      speed: { type: float, required: true }
+      speed: { type: float, required: true, label: Speed, description: "Playback speed, 1.0 for normal forward playback; negative plays in reverse. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/transports/0/playback", body: '{"speed":{speed:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_playback_position:
     summary: "Move the playhead to a timeline frame, 0 being the first frame of the timeline (PUT /transports/0/playback, p.29)"
     params:
-      position: { type: int, min: 0, required: true }
+      position: { type: int, min: 0, required: true, label: Position, description: "Timeline frame to move the playhead to, 0 being the first frame." }
     send: { method: PUT, path: "/control/api/v1/transports/0/playback", body: '{"position":{position}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -998,14 +998,14 @@ commands:
   record_named:
     summary: "Start recording to a named clip (POST /transports/0/record, p.30)"
     params:
-      clip_name: { type: string, max_length: 255, required: true }
+      clip_name: { type: string, max_length: 255, required: true, label: Clip name, description: "Name for the clip being recorded." }
     send: { method: POST, path: "/control/api/v1/transports/0/record", body: '{"clipName":{clip_name:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_recording:
     summary: "Start (true) or stop (false) recording. The document marks this PUT deprecated in favour of record and stop (POST) (PUT /transports/0/record, p.29)"
     params:
-      recording: { type: bool, required: true }
+      recording: { type: bool, required: true, label: Recording, description: "On starts recording, off stops it." }
     send: { method: PUT, path: "/control/api/v1/transports/0/record", body: '{"recording":{recording}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1034,22 +1034,22 @@ commands:
   add_timeline_clips:
     summary: "Add clips to the timeline. The body is JSON in one of the document's four shapes: {clips: id}, {clips: [ids]}, {clips: {clipUniqueId, clipIn, frameCount}} or {clips: [those]}, each with an optional insertBefore (POST /timelines/0, p.32)"
     params:
-      body: { type: json, required: true }
+      body: { type: json, required: true, label: Clips, description: "JSON with clips as an id, a list of ids, or clip objects {clipUniqueId, clipIn, frameCount}, with an optional insertBefore." }
     send: { method: POST, path: "/control/api/v1/timelines/0", body: '{body}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   append_timeline_clip:
     summary: "Add one media clip, by clipUniqueId, to the end of the timeline (POST /timelines/0, p.33)"
     params:
-      clip_id: { type: int, min: 0, required: true }
+      clip_id: { type: int, min: 0, required: true, label: Clip ID, description: "clipUniqueId of the media clip to add." }
     send: { method: POST, path: "/control/api/v1/timelines/0", body: '{"clips":{clip_id}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   insert_timeline_clip:
     summary: "Insert one media clip, by clipUniqueId, before the timeline clip at a 0-based index (0 inserts at the beginning) (POST /timelines/0, p.33)"
     params:
-      insert_before: { type: int, min: 0, required: true }
-      clip_id: { type: int, min: 0, required: true }
+      insert_before: { type: int, min: 0, required: true, label: Insert before, description: "Timeline clip index to insert before, numbered from 0; 0 inserts at the beginning." }
+      clip_id: { type: int, min: 0, required: true, label: Clip ID, description: "clipUniqueId of the media clip to insert." }
     send: { method: POST, path: "/control/api/v1/timelines/0", body: '{"insertBefore":{insert_before},"clips":{clip_id}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1061,7 +1061,7 @@ commands:
   remove_timeline_clip:
     summary: "Remove the clip at a 0-based timeline clip index from the timeline (DELETE /timelines/0/clips/{timelineClipIndex}, p.34)"
     params:
-      index: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, required: true, label: Timeline clip, description: "Timeline clip index to remove, numbered from 0." }
     send: { method: DELETE, path: "/control/api/v1/timelines/0/clips/{index}" }
     expect: { status: 204 }
     returns: ack
@@ -1085,7 +1085,7 @@ commands:
   set_active_media:
     summary: "Make a working set slot the active media device (PUT /media/active, p.35)"
     params:
-      index: { type: int, min: 0, required: true }
+      index: { type: int, min: 0, required: true, label: Working set slot, description: "Working set slot to make active, numbered from 0 as get_working_set lists them." }
     send: { method: PUT, path: "/control/api/v1/media/active", body: '{"workingsetIndex":{index}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1097,24 +1097,24 @@ commands:
   get_media_device_state:
     summary: "A media device's state: None, Scanning, Mounted, Uninitialised, Formatting or RaidComponent (GET /media/devices/{deviceName}, p.36)"
     params:
-      device: { type: string, max_length: 64, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
     send: { method: GET, path: "/control/api/v1/media/devices/{device}" }
     expect: { status: 200, json_path: "$.state" }
     returns: value
   prepare_format:
     summary: "Prepare to format a media device; returns the one-time format key that format_media needs (GET /media/devices/{deviceName}/doformat, p.36)"
     params:
-      device: { type: string, max_length: 64, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
     send: { method: GET, path: "/control/api/v1/media/devices/{device}/doformat" }
     expect: { status: 200, json_path: "$.key" }
     returns: value
   format_media:
     summary: "Format a media device, erasing it, with the key from prepare_format (PUT /media/devices/{deviceName}/doformat, p.37)"
     params:
-      device: { type: string, max_length: 64, required: true }
-      key: { type: string, max_length: 255, required: true }
-      filesystem: { type: string, max_length: 64, required: true }
-      volume: { type: string, max_length: 255, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
+      key: { type: string, max_length: 255, required: true, label: Format key, description: "One-time key returned by prepare_format for this device." }
+      filesystem: { type: string, max_length: 64, required: true, label: Filesystem, description: "Filesystem to format with, one get_format_filesystems lists." }
+      volume: { type: string, max_length: 255, required: true, label: Volume name, description: "Name to give the formatted volume." }
     send: { method: PUT, path: "/control/api/v1/media/devices/{device}/doformat", body: '{"key":{key:json},"filesystem":{filesystem:json},"volume":{volume:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1128,28 +1128,28 @@ commands:
   set_iris_stop:
     summary: "Set the iris by aperture stop (f-number), within get_iris_description's range (PUT /lens/iris, p.51)"
     params:
-      stop: { type: float, required: true }
+      stop: { type: float, required: true, label: Aperture stop, description: "Aperture as an f-number, within the range get_iris_description gives." }
     send: { method: PUT, path: "/control/api/v1/lens/iris", body: '{"apertureStop":{stop:.1f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_iris_normalised:
     summary: "Set the iris by normalised value, 0.0 to 1.0 (PUT /lens/iris, p.51)"
     params:
-      value: { type: float, min: 0.0, max: 1.0, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Iris, description: "Iris position from 0.0 to 1.0 of the lens's range." }
     send: { method: PUT, path: "/control/api/v1/lens/iris", body: '{"normalised":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_iris_number:
     summary: "Set the iris by aperture number (PUT /lens/iris, p.51)"
     params:
-      number: { type: int, required: true }
+      number: { type: int, required: true, label: Aperture number, description: "Aperture number as the camera counts it. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/lens/iris", body: '{"apertureNumber":{number}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   adjust_iris:
     summary: "Open or close the iris by a signed number of steps (PUT /lens/iris, p.51)"
     params:
-      steps: { type: int, required: true }
+      steps: { type: int, required: true, label: Steps, description: "Steps to open or close the iris; the sign gives the direction." }
     send: { method: PUT, path: "/control/api/v1/lens/iris", body: '{"adjustmentStep":{steps}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1166,28 +1166,28 @@ commands:
   set_zoom_focal_length:
     summary: "Zoom to a focal length in mm, within get_zoom_description's range (PUT /lens/zoom, p.51)"
     params:
-      mm: { type: int, min: 0, required: true }
+      mm: { type: int, min: 0, required: true, label: Focal length, description: "Focal length in mm, within the range get_zoom_description gives." }
     send: { method: PUT, path: "/control/api/v1/lens/zoom", body: '{"focalLength":{mm}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_zoom_normalised:
     summary: "Zoom to a normalised position, 0.0 to 1.0 (PUT /lens/zoom, p.51)"
     params:
-      value: { type: float, min: 0.0, max: 1.0, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Zoom, description: "Zoom position from 0.0 (widest) to 1.0 (longest) of the lens's range." }
     send: { method: PUT, path: "/control/api/v1/lens/zoom", body: '{"normalised":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   adjust_zoom_focal_length:
     summary: "Zoom by a signed number of mm (PUT /lens/zoom, p.51)"
     params:
-      mm: { type: int, required: true }
+      mm: { type: int, required: true, label: Focal length change, description: "mm to zoom by; positive zooms in, negative zooms out." }
     send: { method: PUT, path: "/control/api/v1/lens/zoom", body: '{"adjustmentFocalLength":{mm}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   adjust_zoom_normalised:
     summary: "Zoom by a signed normalised amount (PUT /lens/zoom, p.51)"
     params:
-      amount: { type: float, min: -1.0, max: 1.0, required: true }
+      amount: { type: float, min: -1.0, max: 1.0, required: true, label: Zoom change, description: "Normalised amount to zoom by, -1.0 to 1.0; positive zooms in." }
     send: { method: PUT, path: "/control/api/v1/lens/zoom", body: '{"adjustmentNormalised":{amount:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1204,14 +1204,14 @@ commands:
   set_focus_normalised:
     summary: "Set focus to a normalised position, 0.0 to 1.0 (PUT /lens/focus, p.52)"
     params:
-      value: { type: float, min: 0.0, max: 1.0, required: true }
+      value: { type: float, min: 0.0, max: 1.0, required: true, label: Focus, description: "Focus position from 0.0 to 1.0 of the lens's range." }
     send: { method: PUT, path: "/control/api/v1/lens/focus", body: '{"normalised":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_focus_distance:
     summary: "Set focus by focus distance value, within get_focus_description's range (PUT /lens/focus, p.52)"
     params:
-      distance: { type: int, required: true }
+      distance: { type: int, required: true, label: Focus distance, description: "Focus distance value as the lens reports it, within the range get_focus_description gives." }
     send: { method: PUT, path: "/control/api/v1/lens/focus", body: '{"focusDistance":{distance}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1223,8 +1223,8 @@ commands:
   auto_focus_at:
     summary: "Run auto focus on a region of interest at a normalised x, y position (PUT /lens/focus/doAutoFocus, p.52)"
     params:
-      x: { type: float, min: 0.0, max: 1.0, required: true }
-      y: { type: float, min: 0.0, max: 1.0, required: true }
+      x: { type: float, min: 0.0, max: 1.0, required: true, label: X, description: "Horizontal position of the focus region, 0.0 (left) to 1.0 (right) of the picture." }
+      y: { type: float, min: 0.0, max: 1.0, required: true, label: "Y", description: "Vertical position of the focus region, 0.0 to 1.0 of the picture; the document does not say which edge is 0.0." }
     send: { method: PUT, path: "/control/api/v1/lens/focus/doAutoFocus", body: '{"position":{"x":{x:.3f},"y":{y:.3f}}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1241,7 +1241,7 @@ commands:
   set_optical_image_stabilization:
     summary: "Turn optical image stabilisation on or off (PUT /lens/opticalImageStabilization, p.53)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Image stabilisation, description: "On turns optical image stabilisation on, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/lens/opticalImageStabilization", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1255,7 +1255,7 @@ commands:
   set_iso:
     summary: "Set the ISO; one of get_supported_isos (PUT /video/iso, p.54)"
     params:
-      iso: { type: int, min: 0, required: true }
+      iso: { type: int, min: 0, required: true, label: ISO, description: "ISO value, one of those get_supported_isos lists." }
     send: { method: PUT, path: "/control/api/v1/video/iso", body: '{"iso":{iso}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1272,7 +1272,7 @@ commands:
   set_gain:
     summary: "Set the gain in dB; one of get_supported_gains (PUT /video/gain, p.55)"
     params:
-      db: { type: int, required: true }
+      db: { type: int, required: true, label: Gain, description: "Gain in dB, one of those get_supported_gains lists." }
     send: { method: PUT, path: "/control/api/v1/video/gain", body: '{"gain":{db}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1289,7 +1289,7 @@ commands:
   set_white_balance:
     summary: "Set the white balance in kelvin, within get_white_balance_range (PUT /video/whiteBalance, p.56)"
     params:
-      kelvin: { type: int, min: 0, required: true }
+      kelvin: { type: int, min: 0, required: true, label: White balance, description: "Colour temperature in kelvin, within the range get_white_balance_range gives." }
     send: { method: PUT, path: "/control/api/v1/video/whiteBalance", body: '{"whiteBalance":{kelvin}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1311,7 +1311,7 @@ commands:
   set_white_balance_tint:
     summary: "Set the white balance tint, within get_white_balance_tint_range (PUT /video/whiteBalanceTint, p.57)"
     params:
-      tint: { type: int, required: true }
+      tint: { type: int, required: true, label: Tint, description: "White balance tint, within the range get_white_balance_tint_range gives." }
     send: { method: PUT, path: "/control/api/v1/video/whiteBalanceTint", body: '{"whiteBalanceTint":{tint}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1328,7 +1328,7 @@ commands:
   set_nd_filter:
     summary: "Set the ND filter strength in stops; one of get_supported_nd_filters (PUT /video/ndFilter, p.58)"
     params:
-      stop: { type: float, min: 0.0, required: true }
+      stop: { type: float, min: 0.0, required: true, label: ND filter, description: "ND filter strength in stops, one of those get_supported_nd_filters lists; 0 for clear." }
     send: { method: PUT, path: "/control/api/v1/video/ndFilter", body: '{"stop":{stop:.1f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1350,7 +1350,7 @@ commands:
   set_nd_display_mode:
     summary: "Set how the camera shows the ND filter (PUT /video/ndFilter/displayMode, p.59)"
     params:
-      mode: { type: enum, values: [Stop, Number, Fraction], required: true }
+      mode: { type: enum, values: [Stop, Number, Fraction], required: true, label: ND display, description: "How the camera shows the ND filter: Stop, Number or Fraction." }
     send: { method: PUT, path: "/control/api/v1/video/ndFilter/displayMode", body: '{"displayMode":"{mode}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1367,14 +1367,14 @@ commands:
   set_shutter_speed:
     summary: "Set the shutter speed as the denominator of a fraction of a second (50 is 1/50); minimum is the sensor frame rate (PUT /video/shutter, p.59)"
     params:
-      speed: { type: int, min: 1, required: true }
+      speed: { type: int, min: 1, required: true, label: Shutter speed, description: "Shutter speed as N in 1/N s, such as 50 for 1/50; no lower than the sensor frame rate." }
     send: { method: PUT, path: "/control/api/v1/video/shutter", body: '{"shutterSpeed":{speed}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_shutter_angle:
     summary: "Set the shutter angle in degrees (PUT /video/shutter, p.59)"
     params:
-      angle: { type: float, min: 0.0, required: true }
+      angle: { type: float, min: 0.0, required: true, label: Shutter angle, description: "Shutter angle in degrees, such as 180." }
     send: { method: PUT, path: "/control/api/v1/video/shutter", body: '{"shutterAngle":{angle:.1f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1386,7 +1386,7 @@ commands:
   set_shutter_measurement:
     summary: "Set whether the shutter is measured as an angle or a speed (PUT /video/shutter/measurement, p.60)"
     params:
-      measurement: { type: enum, values: [ShutterAngle, ShutterSpeed], required: true }
+      measurement: { type: enum, values: [ShutterAngle, ShutterSpeed], required: true, label: Shutter measurement, description: "ShutterAngle to show and set the shutter as an angle, ShutterSpeed as a speed." }
     send: { method: PUT, path: "/control/api/v1/video/shutter/measurement", body: '{"measurement":"{measurement}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1408,15 +1408,15 @@ commands:
   set_auto_exposure_mode:
     summary: "Set the auto exposure mode (PUT /video/autoExposure, p.61)"
     params:
-      mode: { type: enum, values: ["Off", Continuous, OneShot], required: true }
+      mode: { type: enum, values: ["Off", Continuous, OneShot], required: true, label: Auto exposure, description: "Off, Continuous, or OneShot to expose once and hold." }
     send: { method: PUT, path: "/control/api/v1/video/autoExposure", body: '{"mode":"{mode}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_auto_exposure:
     summary: "Set the auto exposure mode and its stack, a comma-separated list of device types in the camera's own words as get_auto_exposure reports them (PUT /video/autoExposure, p.61)"
     params:
-      mode: { type: enum, values: ["Off", Continuous, OneShot], required: true }
-      type: { type: string, max_length: 255, required: true }
+      mode: { type: enum, values: ["Off", Continuous, OneShot], required: true, label: Auto exposure, description: "Off, Continuous, or OneShot to expose once and hold." }
+      type: { type: string, max_length: 255, required: true, label: Exposure stack, description: "Comma-separated devices auto exposure may change, in the camera's own words as get_auto_exposure reports them." }
     send: { method: PUT, path: "/control/api/v1/video/autoExposure", body: '{"mode":"{mode}","type":{type:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1428,7 +1428,7 @@ commands:
   set_detail_sharpening:
     summary: "Turn detail sharpening on or off (PUT /video/detailSharpening, p.61)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Detail sharpening, description: "On turns detail sharpening on, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/video/detailSharpening", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1440,7 +1440,7 @@ commands:
   set_detail_sharpening_level:
     summary: "Set the detail sharpening level (PUT /video/detailSharpeningLevel, p.62)"
     params:
-      level: { type: enum, values: [Low, Medium, High], required: true }
+      level: { type: enum, values: [Low, Medium, High], required: true, label: Sharpening level, description: "Low, Medium or High." }
     send: { method: PUT, path: "/control/api/v1/video/detailSharpeningLevel", body: '{"level":"{level}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1454,18 +1454,18 @@ commands:
   set_color_lift:
     summary: "Set all four colour correction lift components (PUT /colorCorrection/lift, p.66)"
     params:
-      red: { type: float, required: true }
-      green: { type: float, required: true }
-      blue: { type: float, required: true }
-      luma: { type: float, required: true }
+      red: { type: float, required: true, label: Red, description: "Red lift value. The document gives no fixed range; the camera refuses a value outside its own." }
+      green: { type: float, required: true, label: Green, description: "Green lift value. The document gives no fixed range; the camera refuses a value outside its own." }
+      blue: { type: float, required: true, label: Blue, description: "Blue lift value. The document gives no fixed range; the camera refuses a value outside its own." }
+      luma: { type: float, required: true, label: Luma, description: "Luma lift value. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/lift", body: '{"red":{red:.3f},"green":{green:.3f},"blue":{blue:.3f},"luma":{luma:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_lift_component:
     summary: "Set one colour correction lift component; the others stay unchanged (PUT /colorCorrection/lift, p.66)"
     params:
-      component: { type: enum, values: [red, green, blue, luma], required: true }
-      value: { type: float, required: true }
+      component: { type: enum, values: [red, green, blue, luma], required: true, label: Component, description: "Lift component to set: red, green, blue or luma." }
+      value: { type: float, required: true, label: Value, description: "New lift value for the component. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/lift", body: '{"{component}":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1477,18 +1477,18 @@ commands:
   set_color_gamma:
     summary: "Set all four colour correction gamma components (PUT /colorCorrection/gamma, p.67)"
     params:
-      red: { type: float, required: true }
-      green: { type: float, required: true }
-      blue: { type: float, required: true }
-      luma: { type: float, required: true }
+      red: { type: float, required: true, label: Red, description: "Red gamma value. The document gives no fixed range; the camera refuses a value outside its own." }
+      green: { type: float, required: true, label: Green, description: "Green gamma value. The document gives no fixed range; the camera refuses a value outside its own." }
+      blue: { type: float, required: true, label: Blue, description: "Blue gamma value. The document gives no fixed range; the camera refuses a value outside its own." }
+      luma: { type: float, required: true, label: Luma, description: "Luma gamma value. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/gamma", body: '{"red":{red:.3f},"green":{green:.3f},"blue":{blue:.3f},"luma":{luma:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_gamma_component:
     summary: "Set one colour correction gamma component; the others stay unchanged (PUT /colorCorrection/gamma, p.67)"
     params:
-      component: { type: enum, values: [red, green, blue, luma], required: true }
-      value: { type: float, required: true }
+      component: { type: enum, values: [red, green, blue, luma], required: true, label: Component, description: "Gamma component to set: red, green, blue or luma." }
+      value: { type: float, required: true, label: Value, description: "New gamma value for the component. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/gamma", body: '{"{component}":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1500,18 +1500,18 @@ commands:
   set_color_gain:
     summary: "Set all four colour correction gain components (PUT /colorCorrection/gain, p.67)"
     params:
-      red: { type: float, required: true }
-      green: { type: float, required: true }
-      blue: { type: float, required: true }
-      luma: { type: float, required: true }
+      red: { type: float, required: true, label: Red, description: "Red gain value. The document gives no fixed range; the camera refuses a value outside its own." }
+      green: { type: float, required: true, label: Green, description: "Green gain value. The document gives no fixed range; the camera refuses a value outside its own." }
+      blue: { type: float, required: true, label: Blue, description: "Blue gain value. The document gives no fixed range; the camera refuses a value outside its own." }
+      luma: { type: float, required: true, label: Luma, description: "Luma gain value. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/gain", body: '{"red":{red:.3f},"green":{green:.3f},"blue":{blue:.3f},"luma":{luma:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_gain_component:
     summary: "Set one colour correction gain component; the others stay unchanged (PUT /colorCorrection/gain, p.67)"
     params:
-      component: { type: enum, values: [red, green, blue, luma], required: true }
-      value: { type: float, required: true }
+      component: { type: enum, values: [red, green, blue, luma], required: true, label: Component, description: "Gain component to set: red, green, blue or luma." }
+      value: { type: float, required: true, label: Value, description: "New gain value for the component. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/gain", body: '{"{component}":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1523,18 +1523,18 @@ commands:
   set_color_offset:
     summary: "Set all four colour correction offset components (PUT /colorCorrection/offset, p.68)"
     params:
-      red: { type: float, required: true }
-      green: { type: float, required: true }
-      blue: { type: float, required: true }
-      luma: { type: float, required: true }
+      red: { type: float, required: true, label: Red, description: "Red offset value. The document gives no fixed range; the camera refuses a value outside its own." }
+      green: { type: float, required: true, label: Green, description: "Green offset value. The document gives no fixed range; the camera refuses a value outside its own." }
+      blue: { type: float, required: true, label: Blue, description: "Blue offset value. The document gives no fixed range; the camera refuses a value outside its own." }
+      luma: { type: float, required: true, label: Luma, description: "Luma offset value. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/offset", body: '{"red":{red:.3f},"green":{green:.3f},"blue":{blue:.3f},"luma":{luma:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_offset_component:
     summary: "Set one colour correction offset component; the others stay unchanged (PUT /colorCorrection/offset, p.68)"
     params:
-      component: { type: enum, values: [red, green, blue, luma], required: true }
-      value: { type: float, required: true }
+      component: { type: enum, values: [red, green, blue, luma], required: true, label: Component, description: "Offset component to set: red, green, blue or luma." }
+      value: { type: float, required: true, label: Value, description: "New offset value for the component. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/offset", body: '{"{component}":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1546,22 +1546,22 @@ commands:
   set_color_contrast:
     summary: "Set the contrast pivot and adjustment (PUT /colorCorrection/contrast, p.69)"
     params:
-      pivot: { type: float, required: true }
-      adjust: { type: float, required: true }
+      pivot: { type: float, required: true, label: Pivot, description: "Contrast pivot. The document gives no fixed range; the camera refuses a value outside its own." }
+      adjust: { type: float, required: true, label: Contrast, description: "Contrast adjustment. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/contrast", body: '{"pivot":{pivot:.3f},"adjust":{adjust:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_contrast_pivot:
     summary: "Set the contrast pivot; the adjustment stays unchanged (PUT /colorCorrection/contrast, p.69)"
     params:
-      pivot: { type: float, required: true }
+      pivot: { type: float, required: true, label: Pivot, description: "Contrast pivot. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/contrast", body: '{"pivot":{pivot:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_contrast_adjust:
     summary: "Set the contrast adjustment; the pivot stays unchanged (PUT /colorCorrection/contrast, p.69)"
     params:
-      adjust: { type: float, required: true }
+      adjust: { type: float, required: true, label: Contrast, description: "Contrast adjustment. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/contrast", body: '{"adjust":{adjust:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1573,22 +1573,22 @@ commands:
   set_color_hue_saturation:
     summary: "Set the hue and saturation (PUT /colorCorrection/color, p.69)"
     params:
-      hue: { type: float, required: true }
-      saturation: { type: float, required: true }
+      hue: { type: float, required: true, label: Hue, description: "Hue adjustment. The document gives no fixed range; the camera refuses a value outside its own." }
+      saturation: { type: float, required: true, label: Saturation, description: "Saturation. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/color", body: '{"hue":{hue:.3f},"saturation":{saturation:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_hue:
     summary: "Set the hue; saturation stays unchanged (PUT /colorCorrection/color, p.69)"
     params:
-      hue: { type: float, required: true }
+      hue: { type: float, required: true, label: Hue, description: "Hue adjustment. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/color", body: '{"hue":{hue:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_color_saturation:
     summary: "Set the saturation; hue stays unchanged (PUT /colorCorrection/color, p.69)"
     params:
-      saturation: { type: float, required: true }
+      saturation: { type: float, required: true, label: Saturation, description: "Saturation. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/color", body: '{"saturation":{saturation:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1600,7 +1600,7 @@ commands:
   set_color_luma_contribution:
     summary: "Set the luma contribution (PUT /colorCorrection/lumaContribution, p.70)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true, label: Luma contribution, description: "Luma contribution. The document gives no fixed range; the camera refuses a value outside its own." }
     send: { method: PUT, path: "/control/api/v1/colorCorrection/lumaContribution", body: '{"lumaContribution":{value:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1614,7 +1614,7 @@ commands:
   set_color_bars:
     summary: "Turn colour bars on or off (PUT /camera/colorBars, p.62)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Colour bars, description: "On shows colour bars, off hides them." }
     send: { method: PUT, path: "/control/api/v1/camera/colorBars", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1626,7 +1626,7 @@ commands:
   set_program_feed_display:
     summary: "Turn the program feed display on or off (PUT /camera/programFeedDisplay, p.63)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Program feed, description: "On shows the program feed, off hides it." }
     send: { method: PUT, path: "/control/api/v1/camera/programFeedDisplay", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1648,7 +1648,7 @@ commands:
   set_power_display_mode:
     summary: "Set how the camera shows power (PUT /camera/power/displayMode, p.64)"
     params:
-      mode: { type: enum, values: [Percentage, Voltage], required: true }
+      mode: { type: enum, values: [Percentage, Voltage], required: true, label: Power display, description: "Percentage or Voltage." }
     send: { method: PUT, path: "/control/api/v1/camera/power/displayMode", body: '{"mode":"{mode}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1672,21 +1672,21 @@ commands:
   set_active_preset:
     summary: "Load a preset; give its name with the .cset extension, or 'default' (PUT /presets/active, p.44)"
     params:
-      preset: { type: string, max_length: 255, required: true }
+      preset: { type: string, max_length: 255, required: true, label: Preset, description: "Preset name with its .cset extension, or default." }
     send: { method: PUT, path: "/control/api/v1/presets/active", body: '{"preset":{preset:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   save_preset:
     summary: "Save the camera's current state as a preset (PUT /presets/{presetName}, p.44)"
     params:
-      preset: { type: string, max_length: 255, required: true }
+      preset: { type: string, max_length: 255, required: true, label: Preset, description: "Name to save the preset under; whether to include .cset is not documented." }
     send: { method: PUT, path: "/control/api/v1/presets/{preset}" }
     expect: { status: 204 }
     returns: ack
   delete_preset:
     summary: "Delete a preset from the camera (DELETE /presets/{presetName}, p.45)"
     params:
-      preset: { type: string, max_length: 255, required: true }
+      preset: { type: string, max_length: 255, required: true, label: Preset, description: "Name of the preset to delete; whether to include .cset is not documented." }
     send: { method: DELETE, path: "/control/api/v1/presets/{preset}" }
     expect: { status: 204 }
     returns: ack
@@ -1705,104 +1705,104 @@ commands:
   get_audio_input:
     summary: "A channel's audio input (source and type) (GET /audio/channel/{channelIndex}/input, p.45)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/input" }
     expect: { status: 200, json_path: "$.input" }
     returns: value
   set_audio_input:
     summary: "Set a channel's audio input, by a name from get_audio_channel_inputs (PUT /audio/channel/{channelIndex}/input, p.46)"
     params:
-      channel: { type: int, min: 1, required: true }
-      input: { type: string, max_length: 64, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
+      input: { type: string, max_length: 64, required: true, label: Input, description: "Input name, one get_audio_channel_inputs lists for the channel." }
     send: { method: PUT, path: "/control/api/v1/audio/channel/{channel:-1}/input", body: '{"input":{input:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_audio_input_description:
     summary: "The gain range, and phantom power, low cut and padding capabilities, of a channel's current input (GET /audio/channel/{channelIndex}/input/description, p.46)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/input/description" }
     expect: { status: 200, json_path: "$.description" }
     returns: value
   get_audio_channel_inputs:
     summary: "A channel's supported inputs, and whether each can be switched to from the current one (GET /audio/channel/{channelIndex}/supportedInputs, p.47)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/supportedInputs" }
     expect: { status: 200, json_path: "$" }
     returns: value
   get_audio_level:
     summary: "A channel's level: gain in dB and normalised 0.0 to 1.0 (GET /audio/channel/{channelIndex}/level, p.47)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/level" }
     expect: { status: 200, json_path: "$" }
     returns: value
   set_audio_gain:
     summary: "Set a channel's gain in dB, within the input's gain range (PUT /audio/channel/{channelIndex}/level, p.48)"
     params:
-      channel: { type: int, min: 1, required: true }
-      db: { type: float, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
+      db: { type: float, required: true, label: Gain, description: "Gain in dB, within the range get_audio_input_description gives for the input." }
     send: { method: PUT, path: "/control/api/v1/audio/channel/{channel:-1}/level", body: '{"gain":{db:.2f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_audio_level:
     summary: "Set a channel's level as a normalised value, 0.0 to 1.0 (PUT /audio/channel/{channelIndex}/level, p.48)"
     params:
-      channel: { type: int, min: 1, required: true }
-      level: { type: float, min: 0.0, max: 1.0, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
+      level: { type: float, min: 0.0, max: 1.0, required: true, label: Level, description: "Level from 0.0 (minimum) to 1.0 (maximum) of the input's gain range." }
     send: { method: PUT, path: "/control/api/v1/audio/channel/{channel:-1}/level", body: '{"normalised":{level:.3f}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_audio_phantom_power:
     summary: "Whether a channel's phantom power is on (GET /audio/channel/{channelIndex}/phantomPower, p.48)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/phantomPower" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_audio_phantom_power:
     summary: "Turn a channel's phantom power on or off (PUT /audio/channel/{channelIndex}/phantomPower, p.48)"
     params:
-      channel: { type: int, min: 1, required: true }
-      enabled: { type: bool, default: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
+      enabled: { type: bool, default: true, label: Phantom power, description: "On turns phantom power on, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/audio/channel/{channel:-1}/phantomPower", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_audio_padding:
     summary: "Whether a channel's input pad is on (GET /audio/channel/{channelIndex}/padding, p.49)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/padding" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_audio_padding:
     summary: "Turn a channel's input pad on or off (PUT /audio/channel/{channelIndex}/padding, p.49)"
     params:
-      channel: { type: int, min: 1, required: true }
-      enabled: { type: bool, default: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
+      enabled: { type: bool, default: true, label: Pad, description: "On turns the input pad on, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/audio/channel/{channel:-1}/padding", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_audio_low_cut:
     summary: "Whether a channel's low cut filter is on (GET /audio/channel/{channelIndex}/lowCutFilter, p.49)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/lowCutFilter" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_audio_low_cut:
     summary: "Turn a channel's low cut filter on or off (PUT /audio/channel/{channelIndex}/lowCutFilter, p.50)"
     params:
-      channel: { type: int, min: 1, required: true }
-      enabled: { type: bool, default: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
+      enabled: { type: bool, default: true, label: Low cut, description: "On turns the low cut filter on, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/audio/channel/{channel:-1}/lowCutFilter", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_audio_available:
     summary: "Whether a channel's input is available; an unavailable source is muted (GET /audio/channel/{channelIndex}/available, p.50)"
     params:
-      channel: { type: int, min: 1, required: true }
+      channel: { type: int, min: 1, required: true, label: Audio channel, description: "Audio channel, numbered from 1." }
     send: { method: GET, path: "/control/api/v1/audio/channel/{channel:-1}/available" }
     expect: { status: 200, json_path: "$.available" }
     returns: value
@@ -1816,120 +1816,120 @@ commands:
   get_display_clean_feed:
     summary: "Whether clean feed on a display is on (GET /monitoring/{displayName}/cleanFeed, p.13)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/cleanFeed" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_clean_feed:
     summary: "Turn clean feed on a display on or off (PUT /monitoring/{displayName}/cleanFeed, p.13)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: Clean feed, description: "On turns clean feed on for the display, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/cleanFeed", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_display_lut:
     summary: "Whether the display LUT on a display is on (GET /monitoring/{displayName}/displayLUT, p.13)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/displayLUT" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_display_lut:
     summary: "Turn the display LUT on a display on or off (PUT /monitoring/{displayName}/displayLUT, p.14)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: Display LUT, description: "On applies the display LUT, off removes it." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/displayLUT", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_zebra:
     summary: "Whether zebra on a display is on (GET /monitoring/{displayName}/zebra, p.14)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/zebra" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_zebra:
     summary: "Turn zebra on a display on or off (PUT /monitoring/{displayName}/zebra, p.14)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: Zebra, description: "On shows zebra, off hides it." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/zebra", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_focus_assist:
     summary: "Whether focus assist is on for a display (GET /monitoring/{displayName}/focusAssist, p.15)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/focusAssist" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_focus_assist:
     summary: "Set focus assist on a display. The body is JSON; the document gives this PUT the global settings' shape (mode, color, intensity) while the GET and the websocket event carry {enabled} -- see quirks (PUT /monitoring/{displayName}/focusAssist, p.15)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      body: { type: json, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      body: { type: json, required: true, label: Focus assist, description: "JSON such as {\"enabled\": true}; the document is inconsistent about this body's shape." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/focusAssist", body: '{body}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_frame_guide:
     summary: "Whether frame guides on a display is on (GET /monitoring/{displayName}/frameGuide, p.16)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/frameGuide" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_frame_guide:
     summary: "Turn frame guides on a display on or off (PUT /monitoring/{displayName}/frameGuide, p.16)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: Frame guide, description: "On shows frame guides, off hides them." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/frameGuide", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_frame_grids:
     summary: "Whether frame grids on a display is on (GET /monitoring/{displayName}/frameGrids, p.17)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/frameGrids" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_frame_grids:
     summary: "Turn frame grids on a display on or off (PUT /monitoring/{displayName}/frameGrids, p.18)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: Frame grids, description: "On shows frame grids, off hides them." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/frameGrids", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_safe_area:
     summary: "Whether the safe area guide on a display is on (GET /monitoring/{displayName}/safeArea, p.19)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/safeArea" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_safe_area:
     summary: "Turn the safe area guide on a display on or off (PUT /monitoring/{displayName}/safeArea, p.19)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: Safe area, description: "On shows the safe area guide, off hides it." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/safeArea", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   get_display_false_color:
     summary: "Whether false colour on a display is on (GET /monitoring/{displayName}/falseColor, p.20)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/monitoring/{display}/falseColor" }
     expect: { status: 200, json_path: "$.enabled" }
     returns: value
   set_display_false_color:
     summary: "Turn false colour on a display on or off (PUT /monitoring/{displayName}/falseColor, p.20)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      enabled: { type: bool, default: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      enabled: { type: bool, default: true, label: False colour, description: "On shows false colour, off hides it." }
     send: { method: PUT, path: "/control/api/v1/monitoring/{display}/falseColor", body: '{"enabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1941,9 +1941,9 @@ commands:
   set_focus_assist:
     summary: "Set the focus assist mode, colour and intensity (0-100) (PUT /monitoring/focusAssist, p.16)"
     params:
-      mode: { type: enum, values: [Peak, ColoredLines], required: true }
-      color: { type: enum, values: [Red, Green, Blue, White, Black], required: true }
-      intensity: { type: int, min: 0, max: 100, required: true }
+      mode: { type: enum, values: [Peak, ColoredLines], required: true, label: Focus assist mode, description: "Peak or ColoredLines." }
+      color: { type: enum, values: [Red, Green, Blue, White, Black], required: true, label: Colour, description: "Colour of the coloured lines: Red, Green, Blue, White or Black." }
+      intensity: { type: int, min: 0, max: 100, required: true, label: Intensity, description: "Focus assist intensity, 0 to 100." }
     send: { method: PUT, path: "/control/api/v1/monitoring/focusAssist", body: '{"mode":"{mode}","color":"{color}","intensity":{intensity}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1955,7 +1955,7 @@ commands:
   set_frame_guide_ratio:
     summary: "Set the frame guide ratio, such as one of get_frame_guide_ratio_presets (PUT /monitoring/frameGuideRatio, p.17)"
     params:
-      ratio: { type: string, max_length: 32, required: true }
+      ratio: { type: string, max_length: 32, required: true, label: Frame guide ratio, description: "Frame guide ratio, such as one of those get_frame_guide_ratio_presets lists." }
     send: { method: PUT, path: "/control/api/v1/monitoring/frameGuideRatio", body: '{"ratio":{ratio:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1972,7 +1972,7 @@ commands:
   set_frame_grids:
     summary: "Set the frame grids shown. The value is a JSON array of any of \"Thirds\", \"Crosshair\", \"Dot\", \"Horizon\" (the document's frameGrids array) (PUT /monitoring/frameGrids, p.18)"
     params:
-      grids: { type: json, required: true }
+      grids: { type: json, required: true, label: Frame grids, description: "JSON array of any of Thirds, Crosshair, Dot and Horizon; an empty array shows none." }
     send: { method: PUT, path: "/control/api/v1/monitoring/frameGrids", body: '{"frameGrids":{grids}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1984,7 +1984,7 @@ commands:
   set_safe_area_percent:
     summary: "Set the safe area coverage percentage (PUT /monitoring/safeAreaPercent, p.20)"
     params:
-      percent: { type: int, min: 0, max: 100, required: true }
+      percent: { type: int, min: 0, max: 100, required: true, label: Safe area, description: "Safe area coverage in percent of the picture." }
     send: { method: PUT, path: "/control/api/v1/monitoring/safeAreaPercent", body: '{"percent":{percent}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -1993,15 +1993,15 @@ commands:
   get_display_eye:
     summary: "Which eye a display shows: Left or Right (GET /immersive/display/{displayName}/eye, p.65)"
     params:
-      display: { type: string, max_length: 64, required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
     send: { method: GET, path: "/control/api/v1/immersive/display/{display}/eye" }
     expect: { status: 200, json_path: "$.eye" }
     returns: value
   set_display_eye:
     summary: "Set which eye a display shows (PUT /immersive/display/{displayName}/eye, p.65)"
     params:
-      display: { type: string, max_length: 64, required: true }
-      eye: { type: enum, values: [Left, Right], required: true }
+      display: { type: string, max_length: 64, required: true, label: Display, description: "Display name as get_displays lists it." }
+      eye: { type: enum, values: [Left, Right], required: true, label: Eye, description: "Left or Right eye." }
     send: { method: PUT, path: "/control/api/v1/immersive/display/{display}/eye", body: '{"eye":"{eye}"}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -2015,91 +2015,91 @@ commands:
   set_next_clip_slate:
     summary: "Update the next clip's slate. The body is JSON in the document's slate shape: clip (reel, scene, take, shotType, takeType, sceneLocation, sceneTime, goodTake), lens (lensType, iris, focalLength, distance, filter) and project (projectName, director, camera, cameraOperator); any subset (PUT /slates/nextClip, p.38)"
     params:
-      body: { type: json, required: true }
+      body: { type: json, required: true, label: Slate, description: "JSON with any of clip, lens and project slate fields; fields left out are unchanged." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{body}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_reel:
     summary: "Set the reel number on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      reel: { type: int, min: 0, required: true }
+      reel: { type: int, min: 0, required: true, label: Reel, description: "Reel number." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"reel":{reel}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_scene:
     summary: "Set the scene on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      scene: { type: string, max_length: 64, required: true }
+      scene: { type: string, max_length: 64, required: true, label: Scene, description: "Scene as written on the slate, such as 12A." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"scene":{scene:json}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_take:
     summary: "Set the take number on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      take: { type: int, min: 0, required: true }
+      take: { type: int, min: 0, required: true, label: Take, description: "Take number." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"take":{take}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_good_take:
     summary: "Set the good take flag on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      good: { type: bool, default: true }
+      good: { type: bool, default: true, label: Good take, description: "On marks the take good, off clears the mark." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"goodTake":{good}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_shot_type:
     summary: "Set the shot type on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      shot_type: { type: enum, values: ["None", WS, MS, MCU, CU, BCU, ECU], required: true }
+      shot_type: { type: enum, values: ["None", WS, MS, MCU, CU, BCU, ECU], required: true, label: Shot type, description: "None, WS wide, MS medium, MCU medium close-up, CU close-up, BCU big close-up or ECU extreme close-up." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"shotType":"{shot_type}"}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_take_type:
     summary: "Set the take type on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      take_type: { type: enum, values: ["None", PU, VFX, SER], required: true }
+      take_type: { type: enum, values: ["None", PU, VFX, SER], required: true, label: Take type, description: "None, PU pick-up, VFX visual effects or SER series." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"takeType":"{take_type}"}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_scene_location:
     summary: "Set interior or exterior on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      location: { type: enum, values: [Interior, Exterior], required: true }
+      location: { type: enum, values: [Interior, Exterior], required: true, label: Location, description: "Interior or Exterior." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"sceneLocation":"{location}"}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_scene_time:
     summary: "Set day or night on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      time: { type: enum, values: [Day, Night], required: true }
+      time: { type: enum, values: [Day, Night], required: true, label: Time of day, description: "Day or Night." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"clip":{"sceneTime":"{time}"}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_project_name:
     summary: "Set the project name on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      name: { type: string, max_length: 255, required: true }
+      name: { type: string, max_length: 255, required: true, label: Project name, description: "Project name for the slate." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"project":{"projectName":{name:json}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_director:
     summary: "Set the director on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      name: { type: string, max_length: 255, required: true }
+      name: { type: string, max_length: 255, required: true, label: Director, description: "Director's name for the slate." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"project":{"director":{name:json}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_camera:
     summary: "Set the camera identifier on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      camera: { type: string, max_length: 64, required: true }
+      camera: { type: string, max_length: 64, required: true, label: Camera, description: "Camera identifier for the slate, such as A." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"project":{"camera":{camera:json}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   set_slate_camera_operator:
     summary: "Set the camera operator on the next clip's slate; other slate fields stay unchanged (PUT /slates/nextClip, p.38)"
     params:
-      name: { type: string, max_length: 255, required: true }
+      name: { type: string, max_length: 255, required: true, label: Camera operator, description: "Camera operator's name for the slate." }
     send: { method: PUT, path: "/control/api/v1/slates/nextClip", body: '{"project":{"cameraOperator":{name:json}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -2116,33 +2116,33 @@ commands:
   get_clip_slate:
     summary: "Slate data of a recorded clip (GET /slates/clips/{deviceName}/{path}, p.41)"
     params:
-      device: { type: string, max_length: 64, required: true }
-      path: { type: string, max_length: 255, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
+      path: { type: string, max_length: 255, required: true, label: Clip path, description: "Clip path on the media device." }
     send: { method: GET, path: "/control/api/v1/slates/clips/{device}/{path}" }
     expect: { status: 200, json_path: "$" }
     returns: value
   set_clip_slate:
     summary: "Update a recorded clip's slate. The body is JSON in the document's slate shape, as set_next_clip_slate (PUT /slates/clips/{deviceName}/{path}, p.42)"
     params:
-      device: { type: string, max_length: 64, required: true }
-      path: { type: string, max_length: 255, required: true }
-      body: { type: json, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
+      path: { type: string, max_length: 255, required: true, label: Clip path, description: "Clip path on the media device." }
+      body: { type: json, required: true, label: Slate, description: "JSON with any of clip, lens and project slate fields, as for the next clip's slate." }
     send: { method: PUT, path: "/control/api/v1/slates/clips/{device}/{path}", body: '{body}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
   reset_clip_project_data:
     summary: "Reset the project data of a recorded clip's slate (POST /slates/clips/{deviceName}/{path}/resetProjectData, p.40)"
     params:
-      device: { type: string, max_length: 64, required: true }
-      path: { type: string, max_length: 255, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
+      path: { type: string, max_length: 255, required: true, label: Clip path, description: "Clip path on the media device." }
     send: { method: POST, path: "/control/api/v1/slates/clips/{device}/{path}/resetProjectData" }
     expect: { status: 200 }
     returns: ack
   reset_clip_lens_data:
     summary: "Reset the lens data of a recorded clip's slate (POST /slates/clips/{deviceName}/{path}/resetLensData, p.40)"
     params:
-      device: { type: string, max_length: 64, required: true }
-      path: { type: string, max_length: 255, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
+      path: { type: string, max_length: 255, required: true, label: Clip path, description: "Clip path on the media device." }
     send: { method: POST, path: "/control/api/v1/slates/clips/{device}/{path}/resetLensData" }
     expect: { status: 200 }
     returns: ack
@@ -2171,8 +2171,8 @@ commands:
   set_codec_format:
     summary: "Set the codec and container, as get_supported_codec_formats lists them (PUT /system/codecFormat, p.23)"
     params:
-      codec: { type: string, max_length: 64, required: true }
-      container: { type: string, max_length: 64, required: true }
+      codec: { type: string, max_length: 64, required: true, label: Codec, description: "Codec as get_supported_codec_formats lists it." }
+      container: { type: string, max_length: 64, required: true, label: Container, description: "Container as get_supported_codec_formats lists it with the codec." }
     send: { method: PUT, path: "/control/api/v1/system/codecFormat", body: '{"codec":{codec:json},"container":{container:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -2184,17 +2184,17 @@ commands:
   set_video_format_by_name:
     summary: "Set the video format by its name, as get_supported_video_formats lists it (PUT /system/videoFormat, p.24)"
     params:
-      name: { type: string, max_length: 64, required: true }
+      name: { type: string, max_length: 64, required: true, label: Video format, description: "Video format name as get_supported_video_formats lists it." }
     send: { method: PUT, path: "/control/api/v1/system/videoFormat", body: '{"name":{name:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_video_format:
     summary: "Set the video format by frame rate, size and scan (PUT /system/videoFormat, p.24)"
     params:
-      frame_rate: { type: enum, values: ["23.98", "24.00", "24", "25.00", "25", "29.97", "30.00", "30", "47.95", "48.00", "48", "50.00", "50", "59.94", "60.00", "60", "119.88", "120.00", "120"], required: true }
-      height: { type: int, min: 1, required: true }
-      width: { type: int, min: 1, required: true }
-      interlaced: { type: bool, default: false }
+      frame_rate: { type: enum, values: ["23.98", "24.00", "24", "25.00", "25", "29.97", "30.00", "30", "47.95", "48.00", "48", "50.00", "50", "59.94", "60.00", "60", "119.88", "120.00", "120"], required: true, label: Frame rate, description: "Frame rate in frames per second, as the camera writes it." }
+      height: { type: int, min: 1, required: true, label: Height, description: "Frame height in pixels." }
+      width: { type: int, min: 1, required: true, label: Width, description: "Frame width in pixels." }
+      interlaced: { type: bool, default: false, label: Interlaced, description: "On for an interlaced format, off for progressive." }
     send: { method: PUT, path: "/control/api/v1/system/videoFormat", body: '{"frameRate":"{frame_rate}","height":{height},"width":{width},"interlaced":{interlaced}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -2216,21 +2216,21 @@ commands:
   set_format:
     summary: "Set the recording format. The body is JSON in the document's format shape: any of codec, frameRate, offSpeedEnabled, offSpeedFrameRate, recordResolution {width, height}, sensorResolution {width, height} (PUT /system/format, p.26)"
     params:
-      body: { type: json, required: true }
+      body: { type: json, required: true, label: Format, description: "JSON with any of codec, frameRate, offSpeedEnabled, offSpeedFrameRate, recordResolution and sensorResolution." }
     send: { method: PUT, path: "/control/api/v1/system/format", body: '{body}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_off_speed:
     summary: "Turn off-speed recording on or off (PUT /system/format, p.26)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true, label: Off-speed, description: "On turns off-speed recording on, off turns it off." }
     send: { method: PUT, path: "/control/api/v1/system/format", body: '{"offSpeedEnabled":{enabled}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
   set_off_speed_frame_rate:
     summary: "Set the off-speed frame rate, within the format's minimum and maximum (PUT /system/format, p.26)"
     params:
-      fps: { type: int, min: 1, required: true }
+      fps: { type: int, min: 1, required: true, label: Off-speed frame rate, description: "Off-speed frame rate in frames per second, within the format's minimum and maximum." }
     send: { method: PUT, path: "/control/api/v1/system/format", body: '{"offSpeedFrameRate":{fps}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -2274,7 +2274,7 @@ commands:
   set_livestream_platform:
     summary: "Select the livestream platform. The body is JSON in the document's shape: platform, server and quality required; key, passphrase (SRT) and url (customisable servers) optional (PUT /livestreams/0/activePlatform, p.5)"
     params:
-      body: { type: json, required: true }
+      body: { type: json, required: true, label: Platform, description: "JSON with platform, server and quality, and optionally key, passphrase (SRT) and url." }
     send: { method: PUT, path: "/control/api/v1/livestreams/0/activePlatform", body: '{body}', content_type: application/json }
     expect: { status: 204 }
     returns: ack
@@ -2286,7 +2286,7 @@ commands:
   get_livestream_platform_config:
     summary: "A platform's servers, quality profiles and defaults (GET /livestreams/platforms/{platformName}, p.6)"
     params:
-      platform: { type: string, max_length: 255, required: true }
+      platform: { type: string, max_length: 255, required: true, label: Platform, description: "Livestream platform name as the camera lists it." }
     send: { method: GET, path: "/control/api/v1/livestreams/platforms/{platform}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -2303,22 +2303,22 @@ commands:
   get_custom_platform:
     summary: "A custom platform file, as Blackmagic streaming XML (GET /livestreams/customPlatforms/{filename}, p.7)"
     params:
-      filename: { type: string, max_length: 255, required: true }
+      filename: { type: string, max_length: 255, required: true, label: File name, description: "Custom platform file name." }
     send: { method: GET, path: "/control/api/v1/livestreams/customPlatforms/{filename}" }
     expect: { status: 200 }
     returns: text
   set_custom_platform:
     summary: "Create or replace a custom platform file. The XML is Blackmagic streaming XML on one line (PUT /livestreams/customPlatforms/{filename}, p.8)"
     params:
-      filename: { type: string, max_length: 255, required: true }
-      xml: { type: string, max_length: 65536, required: true }
+      filename: { type: string, max_length: 255, required: true, label: File name, description: "Custom platform file name to create or replace." }
+      xml: { type: string, max_length: 65536, required: true, label: XML, description: "Blackmagic streaming XML on one line, without line breaks." }
     send: { method: PUT, path: "/control/api/v1/livestreams/customPlatforms/{filename}", body: '{xml}', content_type: application/xml }
     expect: { status: 204 }
     returns: ack
   delete_custom_platform:
     summary: "Remove a custom platform file (DELETE /livestreams/customPlatforms/{filename}, p.8)"
     params:
-      filename: { type: string, max_length: 255, required: true }
+      filename: { type: string, max_length: 255, required: true, label: File name, description: "Custom platform file name to remove." }
     send: { method: DELETE, path: "/control/api/v1/livestreams/customPlatforms/{filename}" }
     expect: { status: 204 }
     returns: ack
@@ -2337,7 +2337,7 @@ commands:
   get_cloud_project:
     summary: "A project, by project ID (GET /cloud/projects/{projectID}, p.10)"
     params:
-      project: { type: int, min: 0, required: true }
+      project: { type: int, min: 0, required: true, label: Project ID, description: "Blackmagic Cloud project ID." }
     send: { method: GET, path: "/control/api/v1/cloud/projects/{project}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -2354,8 +2354,8 @@ commands:
   get_cloud_clip:
     summary: "A clip's upload state, by device and path (GET /cloud/clips/{deviceName}/{path}, p.12)"
     params:
-      device: { type: string, max_length: 64, required: true }
-      path: { type: string, max_length: 255, required: true }
+      device: { type: string, max_length: 64, required: true, label: Media device, description: "Media device name as get_working_set lists it." }
+      path: { type: string, max_length: 255, required: true, label: Clip path, description: "Clip path on the media device." }
     send: { method: GET, path: "/control/api/v1/cloud/clips/{device}/{path}" }
     expect: { status: 200, json_path: "$" }
     returns: value
