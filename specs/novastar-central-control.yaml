@@ -1,0 +1,172 @@
+spec: 1
+id: novastar-central-control
+name: NovaStar COEX central control protocol (binary, TCP 5200)
+vendor: NovaStar
+category: display
+implementation: native
+reason: >
+  Each request is a binary frame whose last two bytes are a checksum over every byte before them (the
+  sum plus 0x5555), so a command's value changes the checksum; the format has no arithmetic over the
+  bytes it sends. Answers are binary frames matched to the request by its register address.
+
+# The same controllers' HTTP OpenAPI is novastar-coex; this protocol is the
+# one control systems (and the card-based MX6000 Pro and MX2000 Pro) use on
+# TCP 5200, with a smaller command set.
+
+source:
+  - title: COEX Central Control Protocol Instructions, V1.5.0
+    author: NovaStar (Xi'an NovaStar Tech Co.)
+    url: https://oss.novastar.tech/uploads/2025/09/Central-Control-Protocol-Instructions-V1.5.0.pdf
+    note: >
+      Manufacturer document, published on NovaStar's own file server. Used for:
+      the applicable controllers and version (section 1), RS-232 at 115200
+      8N1, TCP 5200 and UDP 5201 (section 2), the frame layout, the checksum
+      and the answer frame (3.1), and every request: brightness, receiving
+      card black screen, freeze and normal display (3.2), preset switching
+      (3.3), low latency, 3D, 3D eye and working mode (3.4), sending card
+      display per output card or all (3.5) and layer source switching (3.6),
+      each with its example frame. Cited as CCP 1.5.0.
+
+models:
+  - id: mx40-pro
+    name: NovaStar MX40 Pro
+    supports: &all [set_brightness, set_brightness_percent, set_blackout, set_freeze, recall_preset,
+                    set_low_latency, set_3d, set_3d_eye, set_working_mode, set_output_display, switch_layer_source]
+    verification: none
+  - id: mx30
+    name: NovaStar MX30
+    supports: *all
+    verification: none
+  - id: mx20
+    name: NovaStar MX20
+    supports: *all
+    verification: none
+  - id: ku20
+    name: NovaStar KU20
+    supports: *all
+    verification: none
+  - id: cx40-pro
+    name: NovaStar CX40 Pro
+    supports: *all
+    verification: none
+  - id: mx6000-pro
+    name: NovaStar MX6000 Pro (card-based)
+    supports: *all
+    verification: none
+  - id: mx2000-pro
+    name: NovaStar MX2000 Pro (card-based)
+    supports: *all
+    verification: none
+
+commands:
+  set_brightness:
+    summary: "Set the screen brightness, 0 to 255 (the ratio is the value / 255) (CCP 3.2.2)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  set_brightness_percent:
+    summary: "Set the screen brightness in percent, 0 to 100, sent as the nearest of 0 to 255"
+    params:
+      percent: { type: float, min: 0, max: 100, required: true }
+    returns: ack
+  set_blackout:
+    summary: "Black out the receiving cards, or return them to normal display (CCP 3.2.3, 3.2.6)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  set_freeze:
+    summary: "Freeze or unfreeze the receiving cards (CCP 3.2.4, 3.2.5)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  recall_preset:
+    summary: "Switch to a preset, 1 to 255 (CCP 3.3)"
+    params:
+      preset: { type: int, min: 1, max: 255, required: true }
+    returns: ack
+  set_low_latency:
+    summary: "Turn low latency on or off (CCP 3.4.2, 3.4.3)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  set_3d:
+    summary: "Turn 3D on or off (CCP 3.4.4, 3.4.5)"
+    params:
+      enabled: { type: bool, default: true }
+    returns: ack
+  set_3d_eye:
+    summary: "Choose the 3D eye: left or right (CCP 3.4.6, 3.4.7)"
+    params:
+      eye: { type: enum, values: [left, right], required: true }
+    returns: ack
+  set_working_mode:
+    summary: "Working mode: send_only or all_in_one controller (CCP 3.4.8, 3.4.9)"
+    params:
+      mode: { type: enum, values: [send_only, all_in_one], required: true }
+    returns: ack
+  set_output_display:
+    summary: "Sending card display of one output card (from 1) or all (255): normal, blackout or freeze (CCP 3.5)"
+    params:
+      card: { type: int, min: 1, max: 255, default: 255 }
+      mode: { type: enum, values: [normal, blackout, freeze], required: true }
+    returns: ack
+  switch_layer_source:
+    summary: "Put an input on a layer: the layer number, the input card (from 0) and its interface (from 0) (CCP 3.6)"
+    params:
+      layer: { type: int, min: 0, max: 255, required: true }
+      input_card: { type: int, min: 0, max: 255, required: true }
+      input_port: { type: int, min: 0, max: 255, required: true }
+    returns: ack
+
+state:
+  brightness: { type: int, description: "Screen brightness, 0 to 255, as last set and acknowledged" }
+  receiving_cards.blackout: { type: bool, description: "Receiving cards blacked out, as last set" }
+  receiving_cards.frozen: { type: bool, description: "Receiving cards frozen, as last set" }
+  preset: { type: int, description: "Preset last switched to" }
+  low_latency: { type: bool, description: "Low latency, as last set" }
+  three_d.enabled: { type: bool, description: "3D, as last set" }
+  three_d.eye: { type: string, description: "3D eye, left or right, as last set" }
+  working_mode: { type: string, description: "Working mode, send_only or all_in_one, as last set" }
+  output_cards.*.display: { type: string, description: "Sending card display (normal, blackout, freeze) as last set, keyed by output card number or all" }
+  layers.*.input_card: { type: int, description: "Input card last put on the layer" }
+  layers.*.input_port: { type: int, description: "Input card interface last put on the layer" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The public document has no read request, so the state holds what this
+      session last set and the controller acknowledged; a change made from the
+      front panel, VMP or the HTTP API is not seen. Use novastar-coex for the
+      controllers' read API.
+
+  - models: [all]
+    severity: info
+    text: >
+      Liveness is the TCP connection: the protocol has no documented query to
+      use as a check. Each request waits for its answer (3 s), matched by its
+      register address; a controller that stops answering is reconnected.
+
+  - models: [all]
+    severity: info
+    text: >
+      An answer's ACK byte is taken as 0 for success; the document shows only
+      a successful answer, so a non-zero ACK is reported as a device error
+      with that byte as the code. That example's checksum also covers the
+      aa 55 header, which a request's does not; answers are accepted with
+      either.
+
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset, set_blackout, set_freeze, set_output_display and
+      switch_layer_source act on the live screen at once. set_working_mode
+      changes the controller's whole layer structure.
+
+  - models: [all]
+    severity: info
+    text: >
+      Output card numbers start from 1; 255 addresses every output card, and
+      a single-card controller uses 255 (CCP 3.5.1). Input card and interface
+      numbers start from 0 (CCP 3.6.1). UDP on port 5201 and RS-232 carry the
+      same frames; the module uses TCP.

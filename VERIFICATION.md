@@ -322,6 +322,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## brompton-tessera — Brompton Tessera
+
+- [ ] Confirm that GET /api/ answers the whole tree under an "api" key, with groups, input ports, cable loops and frame remapping frames keyed "1", "2", ... (ports and frames numbered from 1), as the poll reads it. ([specs/brompton-tessera.yaml:3315](specs/brompton-tessera.yaml#L3315))
+- [ ] Confirm that a section read (GET /api/override) answers {"override": {...}}, and that every single-endpoint read and write answers {"<last path segment>": value}. ([specs/brompton-tessera.yaml:4707](specs/brompton-tessera.yaml#L4707))
+- [ ] Record the HTTP status of a failed request ({"response-code": "..."}), such as a write out of range, a path that does not exist and a read with no project loaded. ([specs/brompton-tessera.yaml:5465](specs/brompton-tessera.yaml#L5465))
+- [ ] Measure how long GET /api/ takes on a large wall (thousands of panels) and whether reading it every 5 seconds affects the processor. ([specs/brompton-tessera.yaml:3327](specs/brompton-tessera.yaml#L3327))
+- [ ] On each model, list which genlock, ShutterSync, frame remapping, hidden marker, failover and cable redundancy endpoints answer "Not supported". ([specs/brompton-tessera.yaml:5484](specs/brompton-tessera.yaml#L5484))
+- [ ] Confirm each model's input ports (SX40 and S8: HDMI and SDI; S4 and T1: DVI; M2: DVI and two SDI) and that the port number starts at 1. ([specs/brompton-tessera.yaml:85](specs/brompton-tessera.yaml#L85))
+- [ ] Check what a brightness above an active brightness limit does: refused, or held at the limit. ([specs/brompton-tessera.yaml:5551](specs/brompton-tessera.yaml#L5551))
+- [ ] Check reboot and shutdown with and without a processor password, and what a wrong password answers. ([specs/brompton-tessera.yaml:5529](specs/brompton-tessera.yaml#L5529))
+- [ ] Confirm that set_input_source (GET ?set=1&port-type=...&port-number=...) switches the input in one request on 3.5. ([specs/brompton-tessera.yaml:3306](specs/brompton-tessera.yaml#L3306))
+- [ ] Check how the tree reports the test pattern type after a frame store user number was set (a number or a string). ([specs/brompton-tessera.yaml:5560](specs/brompton-tessera.yaml#L5560))
+- [ ] Check that request_failover with an empty string hands over to the partner, and what it answers with no partner present. ([specs/brompton-tessera.yaml:1556](specs/brompton-tessera.yaml#L1556))
+- [ ] On 3.6 or later, confirm the TrueLight endpoints and their ranges. ([specs/brompton-tessera.yaml:5584](specs/brompton-tessera.yaml#L5584))
+
 ## bss-london — BSS Soundweb London
 
 - [ ] Confirm that nothing (no ACK or NAK byte) is sent back over TCP, and whether the device expects an ACK from the controller over Ethernet before it stops resending a subscription's message (the FAQ describes 1-second resends on serial). ([specs/bss-london.yaml:168](specs/bss-london.yaml#L168))
@@ -367,6 +382,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On QuickQ, check the jump cue form (whole numbers only) and the X zone range 0-10. ([specs/chamsys-magicq-udp.yaml:836](specs/chamsys-magicq-udp.yaml#L836))
 - [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
 - [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
+
+## christie-spyder — Christie Spyder X20 / X80
+
+- [ ] Confirm that answers come back to the sending port with no "spyder" header, the result code first. ([specs/christie-spyder.yaml:46](specs/christie-spyder.yaml#L46))
+- [ ] Record the exact answers to RLC, RSN, RBL, RRL, RLK and RCS (spacing, trailing characters), which the get_ commands return as text. ([specs/christie-spyder.yaml:731](specs/christie-spyder.yaml#L731))
+- [ ] Check that Spyder decodes percent-encoding other than %20 in names (such as %28 for a parenthesis). ([specs/christie-spyder.yaml:846](specs/christie-spyder.yaml#L846))
+- [ ] Check what learn_command_key answers (command key ID and script ID) on X20 and X80. ([specs/christie-spyder.yaml:146](specs/christie-spyder.yaml#L146))
+- [ ] Check whether an X20 accepts ILA with the fifth (gamma) argument, which only the X80 reference lists. ([specs/christie-spyder.yaml:384](specs/christie-spyder.yaml#L384))
+- [ ] Check how often UDP commands or answers are lost on a busy network, and whether a repeated command is harmless. ([specs/christie-spyder.yaml:890](specs/christie-spyder.yaml#L890))
 
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
@@ -568,6 +592,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2615](specs/lightware-lw3.yaml#L2615))
 - [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2564](specs/lightware-lw3.yaml#L2564))
 
+## megapixel-helios — Megapixel HELIOS
+
+- [ ] Confirm that the JSON-RPC websocket answers {"jsonrpc":"2.0","id":1,"method":"state"} with the whole tree under result, then pushes updates without a subscription, and that it takes the web application's credentials when authentication is on. ([specs/megapixel-helios.yaml:520](specs/megapixel-helios.yaml#L520))
+- [ ] Check that basic access is accepted when authentication is on, or that the processor's digest challenge is answered. ([specs/megapixel-helios.yaml:83](specs/megapixel-helios.yaml#L83))
+- [ ] Confirm that a PATCH out of range answers 200 with the unchanged value, as the document says, on current firmware. ([specs/megapixel-helios.yaml:2827](specs/megapixel-helios.yaml#L2827))
+- [ ] Record the ranges of display gains, output adjustment gain, gamma, lift, offset and saturation, which the document does not give. ([specs/megapixel-helios.yaml:199](specs/megapixel-helios.yaml#L199))
+- [ ] Confirm that a group's gains are keyed r, g, b and i, its mask l, t, b and r, and its test pattern colour r, g, b and a, and record their ranges (0-1 or 0-255). ([specs/megapixel-helios.yaml:362](specs/megapixel-helios.yaml#L362))
+- [ ] Confirm that blackClipping can be written (it is in the processor's data and fixtures, not the API tables). ([specs/megapixel-helios.yaml:191](specs/megapixel-helios.yaml#L191))
+- [ ] Check whether redundancy mode accepts manual and single, which sys.fixtures lists beside none, failover and seamless. ([specs/megapixel-helios.yaml:286](specs/megapixel-helios.yaml#L286))
+- [ ] List the test pattern type names the processor accepts. ([specs/megapixel-helios.yaml:2900](specs/megapixel-helios.yaml#L2900))
+- [ ] Check that a receiver's x, y and groupId can be written by MAC address. ([specs/megapixel-helios.yaml:426](specs/megapixel-helios.yaml#L426))
+- [ ] Record the status of a successful preset apply (200 is assumed) and of hide_still (204 is assumed, as for show). ([specs/megapixel-helios.yaml:458](specs/megapixel-helios.yaml#L458))
+
 ## millumin — Millumin
 
 - [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:722](specs/millumin.yaml#L722))
@@ -584,6 +621,35 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:269](specs/newtek-tricaster.yaml#L269))
 - [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:262](specs/newtek-tricaster.yaml#L262))
+
+## novastar-central-control — NovaStar COEX central control protocol
+
+- [ ] Record a refused request's answer (a non-zero ACK byte is assumed) and whether its checksum covers the aa 55 header as the documented answer's does. ([specs/novastar-central-control.yaml:153](specs/novastar-central-control.yaml#L153))
+- [ ] Check whether the controller keeps an idle TCP connection open, and whether it answers anything that could serve as a liveness check. ([specs/novastar-central-control.yaml:146](specs/novastar-central-control.yaml#L146))
+- [ ] Confirm that output card 255 addresses every card on single-card controllers and that card numbers start from 1 on MX6000 Pro and MX2000 Pro. ([specs/novastar-central-control.yaml:169](specs/novastar-central-control.yaml#L169))
+- [ ] Confirm the card-based MX6000 Pro and MX2000 Pro answer the same frames as the single-card controllers. ([specs/novastar-central-control.yaml:52](specs/novastar-central-control.yaml#L52))
+
+## novastar-coex — NovaStar COEX
+
+- [ ] Check which API generation each model and firmware answers: the current OpenAPI paths (/api/v1/screen/..., /api/v1/preset/...) or the 2023 manual's (/api/v1/device/screen/..., /api/v1/device/currentpreset). ([specs/novastar-coex.yaml:854](specs/novastar-coex.yaml#L854))
+- [ ] Confirm that the endpoints the OpenAPI pages list without /api/v1 (internal source, colour correction, 3D emitter, sync source, identify, controller name, no-signal image, thermal amount) answer with the prefix. ([specs/novastar-coex.yaml:1024](specs/novastar-coex.yaml#L1024))
+- [ ] Record the displayMode numbers the display state read reports for blackout and freeze. ([specs/novastar-coex.yaml:1032](specs/novastar-coex.yaml#L1032))
+- [ ] Check whether requests need the Device-Key header shown in the OpenAPI examples. ([specs/novastar-coex.yaml:1064](specs/novastar-coex.yaml#L1064))
+- [ ] Record the screenID format (the examples here assume a braced GUID-like string) and that a one-element screenIdList acts on that screen only. ([specs/novastar-coex.yaml:234](specs/novastar-coex.yaml#L234))
+- [ ] Check switch_layer_source in send-only and all-in-one modes, and what layer IDs each mode uses. ([specs/novastar-coex.yaml:381](specs/novastar-coex.yaml#L381))
+- [ ] Record the colour component range of set_test_pattern (0-4095 in the 2023 example, gray 0-255 in OpenAPI) and how to return from a test pattern to the input. ([specs/novastar-coex.yaml:489](specs/novastar-coex.yaml#L489))
+- [ ] Confirm identify_controller takes a JSON body (the OpenAPI page names application/xml). ([specs/novastar-coex.yaml:625](specs/novastar-coex.yaml#L625))
+- [ ] Check whether set_working_mode to all-in-one (3) works through the API. ([specs/novastar-coex.yaml:700](specs/novastar-coex.yaml#L700))
+- [ ] Confirm MX30 and MX20 answer the same API as the MX40 Pro. ([specs/novastar-coex.yaml:65](specs/novastar-coex.yaml#L65))
+
+## novastar-h — NovaStar H series
+
+- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
+- [ ] Confirm the OpenAPI listens on port 8000 (the documentation's example address) on every model. ([specs/novastar-h.yaml:47](specs/novastar-h.yaml#L47))
+- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:793](specs/novastar-h.yaml#L793))
+- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:801](specs/novastar-h.yaml#L801))
+- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off). ([specs/novastar-h.yaml:152](specs/novastar-h.yaml#L152))
+- [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:280](specs/novastar-h.yaml#L280))
 
 ## obsidian-onyx — Obsidian ONYX (Telnet)
 
@@ -866,6 +932,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))
 - [ ] On a Carbonite, confirm tally 1 is preview and tally 2 program on the TSL feed, and what ShowUMDId and ShowBusName add to the text. ([specs/tsl-umd-listener.yaml:94](specs/tsl-umd-listener.yaml#L94))
+
+## tvone-coriomaster — tvONE CORIOmaster
+
+- [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:689](specs/tvone-coriomaster.yaml#L689))
+- [ ] Confirm that the unit greets a connection with a caret prompt that needs no reply, and that login() before any other command is enough. ([specs/tvone-coriomaster.yaml:55](specs/tvone-coriomaster.yaml#L55))
+- [ ] Confirm that every command, including methods and StartBatch/EndBatch, ends with exactly one "!Done" line after its value lines. ([specs/tvone-coriomaster.yaml:46](specs/tvone-coriomaster.yaml#L46))
+- [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:567](specs/tvone-coriomaster.yaml#L567))
+- [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:681](specs/tvone-coriomaster.yaml#L681))
+- [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:199](specs/tvone-coriomaster.yaml#L199))
 
 ## visca — VISCA over IP
 

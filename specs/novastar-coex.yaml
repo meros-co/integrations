@@ -1,0 +1,1066 @@
+spec: 1
+id: novastar-coex
+name: NovaStar COEX controllers (OpenAPI)
+vendor: NovaStar
+category: display
+
+# COEX controllers (MX, KU and CX series) answer an HTTP JSON API on port
+# 8001. Reads are GET, writes PUT or POST with a JSON body, and every answer is
+# {"code": <error code>, "data": ..., "message": ...}, code 0 meaning success.
+# Most writes name what they act on: screens by screenID (a string from
+# get_screens), canvases by canvasID, cabinets by cabinet ID (from
+# get_cabinets), inputs by source ID and source group ID (from
+# get_input_sources). Commands taking one screen send it as a one-element
+# screenIdList; lists of cabinet or canvas IDs are JSON arrays. The commands
+# marked "2023 manual" use the earlier API generation, whose paths later
+# firmware replaced.
+
+source:
+  - title: COEX OpenAPI documentation (English), "COEX" project on Apifox
+    author: NovaStar (Xi'an NovaStar Tech Co.)
+    url: https://api.coex.novastar.tech/en/doc-7530630
+    note: >
+      Manufacturer documentation, read 2026-10-03 through its Markdown export
+      (llms.txt and each page's .md, which embed an OpenAPI 3.0 description of
+      the endpoint). Used for every endpoint's method, path, request body
+      fields, types, ranges and enumerations, and the response data of the
+      reads: General API, Input (internal sources, colour adjustment, EDID,
+      HDR mode), Screen (image, colour gamut, schedule, colour correction,
+      layer, 3D LUT, canvas, preset, output, 3D, multi-mode), Device (audio,
+      identify, backup, time, name, SNMP, multifunction card, monitoring) and
+      Cabinet pages, the API instructions (release the device from VMP
+      first) and the error code table. Cited as OpenAPI.
+  - title: COEX Series Interface API User Manual (COEX-Series-Interface-API-User-Manual.pdf, 2023)
+    author: NovaStar
+    url: https://oss.novastar.tech/uploads/2023/02/COEX-Series-Interface-API-User-Manual.pdf
+    note: >
+      Manufacturer document for the CX80 Pro, CX40 Pro, MX40 Pro and KU20. Used
+      for HTTP on port 8001 (1.4), the {code, data, message} answer (1.5.2),
+      the error codes (1.5.1), and the earlier endpoints kept here as legacy_
+      commands and as the InfoFrame override, cabinet gamma and gamut, project
+      file and working mode commands. Cited as 2023 manual.
+  - title: companion-module-novastar-coex and novastar-coex (MIT)
+    author: Bitfocus contributors; Atomic
+    url: https://github.com/bitfocus/companion-module-novastar-coex
+    note: >
+      MIT licences (top-level LICENSE of each; the module uses
+      https://github.com/atomicinfotech/novastar-coex). Read, not copied, as
+      corroboration: port 8001 and the 2023-manual paths, and the known issues
+      in its HELP.md (input selection only in send-only mode; a controller held
+      by COEX VMP answers other clients with "device locked").
+
+transport:
+  type: http
+  port: 8001
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/v1/device/hw }
+
+models:
+  - id: mx40-pro
+    name: NovaStar MX40 Pro
+    supports: [get_screens, get_screens_brief, get_screen_properties, get_cabinet_count, get_display_params, get_display_state, get_output, get_schedules, get_presets, get_input_sources, get_inputs, get_device_info, get_monitoring, get_monitoring_full, get_cabinets, get_audio, get_backup_status, get_snmp, get_multifunction_cards, export_project, set_brightness, set_gamma, set_color_temperature, set_display_mode, set_display_mode_all, set_canvas_display_mode, set_brightness_limit_enabled, set_brightness_limit_nits, set_brightness_limit_ratio, set_custom_gamma, set_gamut, set_custom_gamut, set_color_correction_enabled, set_color_correction_white_black, set_color_correction_colors, delete_3d_lut, set_3d_lut_strength, set_3d_lut_enabled, set_schedule_enabled, delete_brightness_strategies, switch_layer_source, set_canvas_mapping, recall_preset, modify_preset, set_3d_enabled, set_3d_emitter_enabled, set_multimode, set_output_bit_depth, set_sync_source, move_cabinets, set_internal_source, set_test_pattern, set_input_shadow, set_input_black_level, set_input_highlight, set_input_contrast, set_input_saturation, set_input_hue, reset_input_color, set_edid, set_hdr_mode, set_input_color_space, set_input_gamut, set_input_range, set_audio, identify_controller, identify_device, set_backup_verify, set_system_time, set_auto_time, set_timezone, set_controller_name, set_snmp, set_working_mode, import_project, set_cabinet_brightness, set_cabinet_brightness_nits, set_cabinet_rgb_brightness, set_cabinet_rgbw_component, set_cabinet_color_temperature, set_cabinet_gamma, set_cabinet_test_pattern, set_cabinet_mapping, set_cabinet_multimode, set_cabinet_no_signal_image, set_thermal_compensation_enabled, set_thermal_compensation_amount, set_thermal_compensation_mode, set_cabinet_gamut, legacy_set_display_mode, legacy_select_input, legacy_recall_preset, legacy_set_test_pattern, legacy_set_output_bit_depth]
+    verification: none
+  - id: mx30
+    name: NovaStar MX30
+    supports: [get_screens, get_screens_brief, get_screen_properties, get_cabinet_count, get_display_params, get_display_state, get_output, get_schedules, get_presets, get_input_sources, get_inputs, get_device_info, get_monitoring, get_monitoring_full, get_cabinets, get_audio, get_backup_status, get_snmp, get_multifunction_cards, export_project, set_brightness, set_gamma, set_color_temperature, set_display_mode, set_display_mode_all, set_canvas_display_mode, set_brightness_limit_enabled, set_brightness_limit_nits, set_brightness_limit_ratio, set_custom_gamma, set_gamut, set_custom_gamut, set_color_correction_enabled, set_color_correction_white_black, set_color_correction_colors, delete_3d_lut, set_3d_lut_strength, set_3d_lut_enabled, set_schedule_enabled, delete_brightness_strategies, switch_layer_source, set_canvas_mapping, recall_preset, modify_preset, set_3d_enabled, set_3d_emitter_enabled, set_multimode, set_output_bit_depth, set_sync_source, move_cabinets, set_internal_source, set_test_pattern, set_input_shadow, set_input_black_level, set_input_highlight, set_input_contrast, set_input_saturation, set_input_hue, reset_input_color, set_edid, set_hdr_mode, set_input_color_space, set_input_gamut, set_input_range, set_audio, identify_controller, identify_device, set_backup_verify, set_system_time, set_auto_time, set_timezone, set_controller_name, set_snmp, set_working_mode, import_project, set_cabinet_brightness, set_cabinet_brightness_nits, set_cabinet_rgb_brightness, set_cabinet_rgbw_component, set_cabinet_color_temperature, set_cabinet_gamma, set_cabinet_test_pattern, set_cabinet_mapping, set_cabinet_multimode, set_cabinet_no_signal_image, set_thermal_compensation_enabled, set_thermal_compensation_amount, set_thermal_compensation_mode, set_cabinet_gamut, legacy_set_display_mode, legacy_select_input, legacy_recall_preset, legacy_set_test_pattern, legacy_set_output_bit_depth]
+    verification: none
+  - id: mx20
+    name: NovaStar MX20
+    supports: [get_screens, get_screens_brief, get_screen_properties, get_cabinet_count, get_display_params, get_display_state, get_output, get_schedules, get_presets, get_input_sources, get_inputs, get_device_info, get_monitoring, get_monitoring_full, get_cabinets, get_audio, get_backup_status, get_snmp, get_multifunction_cards, export_project, set_brightness, set_gamma, set_color_temperature, set_display_mode, set_display_mode_all, set_canvas_display_mode, set_brightness_limit_enabled, set_brightness_limit_nits, set_brightness_limit_ratio, set_custom_gamma, set_gamut, set_custom_gamut, set_color_correction_enabled, set_color_correction_white_black, set_color_correction_colors, delete_3d_lut, set_3d_lut_strength, set_3d_lut_enabled, set_schedule_enabled, delete_brightness_strategies, switch_layer_source, set_canvas_mapping, recall_preset, modify_preset, set_3d_enabled, set_3d_emitter_enabled, set_multimode, set_output_bit_depth, set_sync_source, move_cabinets, set_internal_source, set_test_pattern, set_input_shadow, set_input_black_level, set_input_highlight, set_input_contrast, set_input_saturation, set_input_hue, reset_input_color, set_edid, set_hdr_mode, set_input_color_space, set_input_gamut, set_input_range, set_audio, identify_controller, identify_device, set_backup_verify, set_system_time, set_auto_time, set_timezone, set_controller_name, set_snmp, set_working_mode, import_project, set_cabinet_brightness, set_cabinet_brightness_nits, set_cabinet_rgb_brightness, set_cabinet_rgbw_component, set_cabinet_color_temperature, set_cabinet_gamma, set_cabinet_test_pattern, set_cabinet_mapping, set_cabinet_multimode, set_cabinet_no_signal_image, set_thermal_compensation_enabled, set_thermal_compensation_amount, set_thermal_compensation_mode, set_cabinet_gamut, legacy_set_display_mode, legacy_select_input, legacy_recall_preset, legacy_set_test_pattern, legacy_set_output_bit_depth]
+    verification: none
+  - id: ku20
+    name: NovaStar KU20
+    supports: [get_screens, get_screens_brief, get_screen_properties, get_cabinet_count, get_display_params, get_display_state, get_output, get_schedules, get_presets, get_input_sources, get_inputs, get_device_info, get_monitoring, get_monitoring_full, get_cabinets, get_audio, get_backup_status, get_snmp, get_multifunction_cards, export_project, set_brightness, set_gamma, set_color_temperature, set_display_mode, set_display_mode_all, set_canvas_display_mode, set_brightness_limit_enabled, set_brightness_limit_nits, set_brightness_limit_ratio, set_custom_gamma, set_gamut, set_custom_gamut, set_color_correction_enabled, set_color_correction_white_black, set_color_correction_colors, delete_3d_lut, set_3d_lut_strength, set_3d_lut_enabled, set_schedule_enabled, delete_brightness_strategies, switch_layer_source, set_canvas_mapping, recall_preset, modify_preset, set_3d_enabled, set_3d_emitter_enabled, set_multimode, set_output_bit_depth, set_sync_source, move_cabinets, set_internal_source, set_test_pattern, set_input_shadow, set_input_black_level, set_input_highlight, set_input_contrast, set_input_saturation, set_input_hue, reset_input_color, set_edid, set_hdr_mode, set_input_color_space, set_input_gamut, set_input_range, set_audio, identify_controller, identify_device, set_backup_verify, set_system_time, set_auto_time, set_timezone, set_controller_name, set_snmp, set_working_mode, import_project, set_cabinet_brightness, set_cabinet_brightness_nits, set_cabinet_rgb_brightness, set_cabinet_rgbw_component, set_cabinet_color_temperature, set_cabinet_gamma, set_cabinet_test_pattern, set_cabinet_mapping, set_cabinet_multimode, set_cabinet_no_signal_image, set_thermal_compensation_enabled, set_thermal_compensation_amount, set_thermal_compensation_mode, set_cabinet_gamut, legacy_set_display_mode, legacy_select_input, legacy_recall_preset, legacy_set_test_pattern, legacy_set_output_bit_depth]
+    verification: none
+  - id: cx40-pro
+    name: NovaStar CX40 Pro
+    supports: [get_screens, get_screens_brief, get_screen_properties, get_cabinet_count, get_display_params, get_display_state, get_output, get_schedules, get_presets, get_input_sources, get_inputs, get_device_info, get_monitoring, get_monitoring_full, get_cabinets, get_audio, get_backup_status, get_snmp, get_multifunction_cards, export_project, set_brightness, set_gamma, set_color_temperature, set_display_mode, set_display_mode_all, set_canvas_display_mode, set_brightness_limit_enabled, set_brightness_limit_nits, set_brightness_limit_ratio, set_custom_gamma, set_gamut, set_custom_gamut, set_color_correction_enabled, set_color_correction_white_black, set_color_correction_colors, delete_3d_lut, set_3d_lut_strength, set_3d_lut_enabled, set_schedule_enabled, delete_brightness_strategies, switch_layer_source, set_canvas_mapping, recall_preset, modify_preset, set_3d_enabled, set_3d_emitter_enabled, set_multimode, set_output_bit_depth, set_sync_source, move_cabinets, set_internal_source, set_test_pattern, set_input_shadow, set_input_black_level, set_input_highlight, set_input_contrast, set_input_saturation, set_input_hue, reset_input_color, set_edid, set_hdr_mode, set_input_color_space, set_input_gamut, set_input_range, set_audio, identify_controller, identify_device, set_backup_verify, set_system_time, set_auto_time, set_timezone, set_controller_name, set_snmp, set_working_mode, import_project, set_cabinet_brightness, set_cabinet_brightness_nits, set_cabinet_rgb_brightness, set_cabinet_rgbw_component, set_cabinet_color_temperature, set_cabinet_gamma, set_cabinet_test_pattern, set_cabinet_mapping, set_cabinet_multimode, set_cabinet_no_signal_image, set_thermal_compensation_enabled, set_thermal_compensation_amount, set_thermal_compensation_mode, set_cabinet_gamut, legacy_set_display_mode, legacy_select_input, legacy_recall_preset, legacy_set_test_pattern, legacy_set_output_bit_depth]
+    verification: none
+  - id: cx80-pro
+    name: NovaStar CX80 Pro
+    supports: [get_screens, get_screens_brief, get_screen_properties, get_cabinet_count, get_display_params, get_display_state, get_output, get_schedules, get_presets, get_input_sources, get_inputs, get_device_info, get_monitoring, get_monitoring_full, get_cabinets, get_audio, get_backup_status, get_snmp, get_multifunction_cards, export_project, set_brightness, set_gamma, set_color_temperature, set_display_mode, set_display_mode_all, set_canvas_display_mode, set_brightness_limit_enabled, set_brightness_limit_nits, set_brightness_limit_ratio, set_custom_gamma, set_gamut, set_custom_gamut, set_color_correction_enabled, set_color_correction_white_black, set_color_correction_colors, delete_3d_lut, set_3d_lut_strength, set_3d_lut_enabled, set_schedule_enabled, delete_brightness_strategies, switch_layer_source, set_canvas_mapping, recall_preset, modify_preset, set_3d_enabled, set_3d_emitter_enabled, set_multimode, set_output_bit_depth, set_sync_source, move_cabinets, set_internal_source, set_test_pattern, set_input_shadow, set_input_black_level, set_input_highlight, set_input_contrast, set_input_saturation, set_input_hue, reset_input_color, set_edid, set_hdr_mode, set_input_color_space, set_input_gamut, set_input_range, set_audio, identify_controller, identify_device, set_backup_verify, set_system_time, set_auto_time, set_timezone, set_controller_name, set_snmp, set_working_mode, import_project, set_cabinet_brightness, set_cabinet_brightness_nits, set_cabinet_rgb_brightness, set_cabinet_rgbw_component, set_cabinet_color_temperature, set_cabinet_gamma, set_cabinet_test_pattern, set_cabinet_mapping, set_cabinet_multimode, set_cabinet_no_signal_image, set_thermal_compensation_enabled, set_thermal_compensation_amount, set_thermal_compensation_mode, set_cabinet_gamut, legacy_set_display_mode, legacy_select_input, legacy_recall_preset, legacy_set_test_pattern, legacy_set_output_bit_depth]
+    verification: none
+
+commands:
+  get_screens:
+    summary: "Every screen with its ID, working mode, canvases, cabinets, cabinet groups and layers (GET /api/v1/screen)"
+    send: { method: GET, path: "/api/v1/screen" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_screens_brief:
+    summary: "As get_screens, without cabinet and cabinet group data (isNeedCabinetInfo=1)"
+    send: { method: GET, path: "/api/v1/screen", raw_query: "isNeedCabinetInfo=1" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_screen_properties:
+    summary: "Screen properties: whether calibrated, image booster and multi-mode information (modeId)"
+    send: { method: GET, path: "/api/v1/screen/base/info" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_cabinet_count:
+    summary: "Online cabinets per screen"
+    send: { method: GET, path: "/api/v1/screen/cabinet/count" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_display_params:
+    summary: "Each screen's brightness, colour temperature and gamma"
+    send: { method: GET, path: "/api/v1/screen/displayparams" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_display_state:
+    summary: "Each canvas's blackout/freeze state and mapping state"
+    send: { method: GET, path: "/api/v1/screen/output/display/state" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_output:
+    summary: "Screen output data: 3D, frame multiplication, sync, gamut list and more"
+    send: { method: GET, path: "/api/v1/screen/output" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_schedules:
+    summary: "Every screen's schedules: brightness, preset and power strategies"
+    send: { method: GET, path: "/api/v1/screen/schedule/all" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_presets:
+    summary: "Presets per screen: sequenceNumber, name, whether applied, and what they hold"
+    send: { method: GET, path: "/api/v1/preset" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_input_sources:
+    summary: "Input sources: id, groupId, connector type, resolution, frame rate, EDID, HDR"
+    send: { method: GET, path: "/api/v1/device/input/sources" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_inputs:
+    summary: "Input configuration, including internal sources and EDID"
+    send: { method: GET, path: "/api/v1/device/input" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_device_info:
+    summary: "Controller information: name, model, serial, MAC, IP, versions, working mode, capabilities"
+    send: { method: GET, path: "/api/v1/device/hw" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_monitoring:
+    summary: "Controller monitoring: uptime, backup status, temperatures, voltages, fans, ports, cards (without cabinets)"
+    send: { method: GET, path: "/api/v1/device/monitor/info", raw_query: "isNeedCabinetInfo=1" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_monitoring_full:
+    summary: "As get_monitoring, with every cabinet and receiving card"
+    send: { method: GET, path: "/api/v1/device/monitor/info", raw_query: "isNeedCabinetInfo=0" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_cabinets:
+    summary: "Every cabinet with its ID (the idList value of the cabinet commands)"
+    send: { method: GET, path: "/api/v1/device/cabinet" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_audio:
+    summary: "Audio output setting: on and the source group (firmware 1.5.0 and later)"
+    send: { method: GET, path: "/api/v1/device/audio" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_backup_status:
+    summary: "Primary and backup controller MAC addresses and names"
+    send: { method: GET, path: "/api/v1/device/backup" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  get_snmp:
+    summary: "Whether SNMP is on"
+    send: { method: GET, path: "/api/v1/device/snmpstate" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data.state" }
+    returns: value
+
+  get_multifunction_cards:
+    summary: "Multifunction cards: power channels, light and environment sensors"
+    send: { method: GET, path: "/api/v1/device/multifunc-card/detailinfo" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  export_project:
+    summary: "Export the controller's project file, base64 (2023 manual 5.1.1)"
+    send: { method: GET, path: "/api/v1/device/hw/deviceengineeringdocdata" }
+    expect: { status: 200, json_equals: { "$.code": 0 }, json_path: "$.data" }
+    returns: value
+
+  set_brightness:
+    summary: "Set a screen's brightness, 0 to 1 (all its cabinets)"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      brightness: { type: float, min: 0, max: 1, required: true }
+    send: { method: PUT, path: "/api/v1/screen/brightness", body: '{"screenIdList":[{screen:json}],"brightness":{brightness:.4f}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_gamma:
+    summary: "Set a screen's gamma, 1 to 4"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      gamma: { type: float, min: 1, max: 4, required: true }
+    send: { method: PUT, path: "/api/v1/screen/gamma", body: '{"screenIdList":[{screen:json}],"gamma":{gamma:.2f}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_color_temperature:
+    summary: "Set a screen's colour temperature, 1700 to 15000 K"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      kelvin: { type: int, min: 1700, max: 15000, required: true }
+    send: { method: PUT, path: "/api/v1/screen/colortemperature", body: '{"screenIdList":[{screen:json}],"colorTemperature":{kelvin}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_display_mode:
+    summary: "Set a screen's display: 0 normal, 1 blackout, 2 freeze"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/displaymode", body: '{"value":{mode},"screenIdList":[{screen:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_display_mode_all:
+    summary: "Set every screen's display: 0 normal, 1 blackout, 2 freeze (an empty screen list)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/displaymode", body: '{"value":{mode},"screenIdList":[]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_canvas_display_mode:
+    summary: "Set canvases' display by canvas ID: 0 normal, 1 blackout, 2 freeze; canvases is a JSON array of canvas IDs"
+    params:
+      canvases: { type: json, required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: { method: PUT, path: "/api/v1/device/displaymode", body: '{"value":{mode},"canvasIDs":{canvases}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_brightness_limit_enabled:
+    summary: "Turn a screen's brightness limit on or off"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      enabled: { type: bool, default: true }
+    send: { method: POST, path: "/api/v1/screen/output/max-brightness", body: '{"state":{enabled},"screenIdList":[{screen:json}],"type":1}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_brightness_limit_nits:
+    summary: "Set a screen's brightness limit in nits, 0 to 65535 (calibrated screens)"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      nits: { type: int, min: 0, max: 65535, required: true }
+    send: { method: POST, path: "/api/v1/screen/output/max-brightness", body: '{"nit":{nits},"screenIdList":[{screen:json}],"type":2,"ratio":0}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_brightness_limit_ratio:
+    summary: "Set a screen's brightness limit as a ratio, 0 to 1"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      ratio: { type: float, min: 0, max: 1, required: true }
+    send: { method: POST, path: "/api/v1/screen/output/max-brightness", body: '{"nit":0,"screenIdList":[{screen:json}],"type":3,"ratio":{ratio:.4f}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_custom_gamma:
+    summary: "Set screens' custom gamma tables: a JSON array of {screenId, gammaTable} (the documented body)"
+    params:
+      tables: { type: json, required: true }
+    send: { method: POST, path: "/api/v1/screen/gamma/update", body: '{tables}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_gamut:
+    summary: "Switch a screen's colour gamut by name, from the gamutList of get_output"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      name: { type: string, max_length: 64, required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/gamut", body: '{"name":{name:json},"screenIdList":[{screen:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_custom_gamut:
+    summary: "Set screens' custom gamut: a JSON array of {screenId, colorGamutInfo} (the documented body)"
+    params:
+      gamuts: { type: json, required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/customgamut", body: '{gamuts}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_color_correction_enabled:
+    summary: "Turn a screen's 14-way colour correction on or off"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/screen/processing/colorcorrect/enable", body: '{"enable":{enabled},"screenIdList":[{screen:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_color_correction_white_black:
+    summary: "Set colour correction white and black data: a JSON array of {screenId, whiteBlackColorParam} (the documented body)"
+    params:
+      data: { type: json, required: true }
+    send: { method: PUT, path: "/api/v1/screen/processing/colorcorrect/whiteblack", body: '{data}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_color_correction_colors:
+    summary: "Set colour correction data for the other colours: the documented nested array of {screenId, oneColorParam}"
+    params:
+      data: { type: json, required: true }
+    send: { method: PUT, path: "/api/v1/screen/processing/colorcorrect/data", body: '{data}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  delete_3d_lut:
+    summary: "Delete a screen's imported 3D LUT file"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+    send: { method: DELETE, path: "/api/v1/screen/processing/threedlut/file", body: '{"screenIdList":[{screen:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_3d_lut_strength:
+    summary: "Set a screen's 3D LUT strength, 0 to 100"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      strength: { type: int, min: 0, max: 100, required: true }
+    send: { method: PUT, path: "/api/v1/screen/processing/threedlut/strength", body: '{"screenIdList":[{screen:json}],"strength":{strength}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_3d_lut_enabled:
+    summary: "Turn a screen's 3D LUT on or off"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/screen/processing/threedlut/enable", body: '{"screenIdList":[{screen:json}],"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_schedule_enabled:
+    summary: "Turn a screen's schedule on or off"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      enabled: { type: bool, default: true }
+    send: { method: POST, path: "/api/v1/screen/schedule/enable/update", body: '{"screenId":{screen:json},"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  delete_brightness_strategies:
+    summary: "Delete brightness strategies from a screen's schedule; strategies is a JSON array of strategyId strings"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      strategies: { type: json, required: true }
+    send: { method: POST, path: "/api/v1/screen/schedule/brightness-strategy/delete", body: '{"screenId":{screen:json},"strategyIdList":{strategies}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  switch_layer_source:
+    summary: "Put a source group on a layer of a screen (layer IDs per working mode, from get_screens)"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      layer: { type: int, min: 0, max: 255, required: true }
+      source: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/screen/layer/input", body: '{"layers":[{"id":{layer},"source":{source}}],"screenID":{screen:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_canvas_mapping:
+    summary: "Show or hide the mapping overlay on canvases; canvases is a JSON array of canvas IDs"
+    params:
+      canvases: { type: json, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/screen/output/canvas/mapping", body: '{"canvasIDs":{canvases},"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  recall_preset:
+    summary: "Apply a screen's preset by sequence number"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      preset: { type: int, min: 0, max: 32767, required: true }
+    send: { method: POST, path: "/api/v1/preset/current/update", body: '{"sequenceNumber":{preset},"screenID":{screen:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  modify_preset:
+    summary: "Rename a preset and choose what it holds: source, processing, output and screen data, and transition through black"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      preset: { type: int, min: 0, max: 32767, required: true }
+      name: { type: string, max_length: 64, required: true }
+      source_data: { type: bool, default: true }
+      processing_data: { type: bool, default: true }
+      output_data: { type: bool, default: true }
+      screen_data: { type: bool, default: true }
+      through_black: { type: bool, default: false }
+    send: { method: POST, path: "/api/v1/preset/update", body: '{"screenID":{screen:json},"preset":{"sequenceNumber":{preset},"name":{name:json},"sourceData":{source_data},"processingData":{processing_data},"outputData":{output_data},"screenData":{screen_data},"effectSwitch":{through_black:bool01}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_3d_enabled:
+    summary: "Turn a screen's 3D output on or off"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/screen/output/threed/enable", body: '{"screenIdList":[{screen:json}],"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_3d_emitter_enabled:
+    summary: "Turn a screen's 3D emitter on or off"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/screen/output/threed/emitter", body: '{"Enable":{enabled},"screenIdList":[{screen:json}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_multimode:
+    summary: "Switch a screen to a multi-mode by modeId (from get_screen_properties)"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      mode: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/multimode", body: '{"screenIdList":[{screen:json}],"modeId":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_output_bit_depth:
+    summary: "Set a screen's output bit depth: 0 8-bit, 1 10-bit, 2 12-bit, 255 follow the input"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      bit_depth: { type: enum, values: ["0", "1", "2", "255"], required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/bitdepth", body: '{"screenIdList":[{screen:json}],"bitDepth":{bit_depth}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_sync_source:
+    summary: "Set a screen's output sync source by source group ID"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      source: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/screen/output/sync/source", body: '{"screenIdList":[{screen:json}],"selectSource":{source}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  move_cabinets:
+    summary: "Move cabinets in a screen's topology: the documented body {screenID, canvases: [{canvasID, cabinets}]}"
+    params:
+      layout: { type: json, required: true }
+    send: { method: PUT, path: "/api/v1/screen/cabinets", body: '{layout}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_internal_source:
+    summary: "Set the internal source's resolution, frame rate and bit depth (0 8-bit, 1 10-bit, 2 12-bit)"
+    params:
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+      rate: { type: float, min: 1, required: true }
+      bit_depth: { type: int, min: 0, max: 2, default: 0 }
+      custom: { type: bool, default: false }
+    send: { method: PUT, path: "/api/v1/device/input/internalsource", body: '{"width":{width},"height":{height},"refreshrate":{rate:.2f},"bitdepth":{bit_depth},"isEdidCustom":{custom}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_test_pattern:
+    summary: "Show a sending card test pattern: mode 0 solid colour, 16-21 stripes and grids, 32-39 gradients, 48 lightning"
+    params:
+      mode: { type: int, min: 0, max: 48, required: true }
+      red: { type: int, min: 0, max: 4095, default: 4095 }
+      green: { type: int, min: 0, max: 4095, default: 4095 }
+      blue: { type: int, min: 0, max: 4095, default: 4095 }
+      gray: { type: int, min: 0, max: 4095, default: 255 }
+      grid_width: { type: int, min: 1, max: 255, default: 8 }
+      move_speed: { type: int, min: 0, max: 100, default: 50 }
+      gradient_stretch: { type: int, min: 1, max: 20, default: 8 }
+    send: { method: PUT, path: "/api/v1/device/input/pattern/test", body: '{"mode":{mode},"parameters":{"red":{red},"green":{green},"blue":{blue},"gray":{gray},"gridWidth":{grid_width},"moveSpeed":{move_speed},"gradientStretch":{gradient_stretch},"state":0}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_shadow:
+    summary: "Set an input's shadow for one colour: channel 0 red, 1 green, 2 blue; 0 to 200"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      channel: { type: int, min: 0, max: 2, required: true }
+      value: { type: int, min: 0, max: 200, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/shadow", body: '{"inputIdList":[{input}],"type":{channel},"shadow":{value}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_black_level:
+    summary: "Set an input's black level, 0 to 200 (shadow type 3)"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      value: { type: int, min: 0, max: 200, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/shadow", body: '{"inputIdList":[{input}],"type":3,"shadow":{value}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_highlight:
+    summary: "Set an input's highlight for one colour: channel 0 red, 1 green, 2 blue; 0 to 200"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      channel: { type: int, min: 0, max: 2, required: true }
+      value: { type: int, min: 0, max: 200, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/highlight", body: '{"inputIdList":[{input}],"type":{channel},"highLight":{value}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_contrast:
+    summary: "Set an input's contrast, 0 to 200 (highlight type 3)"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      value: { type: int, min: 0, max: 200, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/highlight", body: '{"inputIdList":[{input}],"type":3,"highLight":{value}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_saturation:
+    summary: "Set an input's saturation, 0 to 200"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      value: { type: int, min: 0, max: 200, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/saturation", body: '{"inputIdList":[{input}],"saturation":{value}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_hue:
+    summary: "Set an input's hue, -180 to 180"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      value: { type: int, min: -180, max: 180, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/hue", body: '{"inputIdList":[{input}],"hue":{value}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  reset_input_color:
+    summary: "Reset an input's colour adjustments"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+    send: { method: PUT, path: "/api/v1/device/input/reset", body: '{"inputIdList":[{input}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_edid:
+    summary: "Set an input's EDID resolution and frame rate, from its supported list or custom"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+      rate: { type: float, min: 1, required: true }
+      custom: { type: bool, default: false }
+    send: { method: PUT, path: "/api/v1/device/input/{input}/edid", body: '{"para":{"resolution":{"width":{width},"height":{height}},"refreshRate":{rate:.2f},"isCustom":{custom}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_hdr_mode:
+    summary: "Override an input's HDR mode: 0 HDR10, 1 HLG, 2 SDR, 255 auto"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      mode: { type: enum, values: ["0", "1", "2", "255"], required: true }
+    send: { method: PUT, path: "/api/v1/device/input/{input}/hdrmode", body: '{"hdrMode":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_color_space:
+    summary: "Override an input's colour space: 0 RGB, 1 YUV444, 2 YUV422, 3 YUV420, 4 XYZ, 255 auto (2023 manual 3.4.1)"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      space: { type: enum, values: ["0", "1", "2", "3", "4", "255"], required: true }
+    send: { method: PUT, path: "/api/v1/device/input/{input}/colorspace", body: '{"colorSpace":{space}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_gamut:
+    summary: "Override an input's colour gamut: 2 Rec.709, 3 Rec.2020, 4 DCI-P3, 255 auto (2023 manual 3.4.2)"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      gamut: { type: enum, values: ["2", "3", "4", "255"], required: true }
+    send: { method: PUT, path: "/api/v1/device/input/{input}/colourgamut", body: '{"colourGamut":{gamut}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_input_range:
+    summary: "Override an input's quantisation range: 0 limited, 1 full, 255 auto (2023 manual 3.4.3)"
+    params:
+      input: { type: int, min: 0, max: 65535, required: true }
+      range: { type: enum, values: ["0", "1", "255"], required: true }
+    send: { method: PUT, path: "/api/v1/device/input/{input}/range", body: '{"range":{range}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_audio:
+    summary: "Turn SPDIF audio output on or off and choose its source group (firmware 1.5.0 and later)"
+    params:
+      enabled: { type: bool, default: true }
+      source: { type: int, min: 0, max: 255, default: 0 }
+    send: { method: POST, path: "/api/v1/device/audio", body: '{"enable":{enabled},"source":{source}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  identify_controller:
+    summary: "Light the controller's LCD in a colour to find it, or stop"
+    params:
+      enabled: { type: bool, default: true }
+      r: { type: int, min: 0, max: 255, default: 60 }
+      g: { type: int, min: 0, max: 255, default: 154 }
+      b: { type: int, min: 0, max: 255, default: 50 }
+    send: { method: POST, path: "/api/v1/device/hw/colorBeacon", body: '{"enable":{enabled},"color":{"r":{r},"g":{g},"b":{b}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  identify_device:
+    summary: "Turn the controller's mapping identification on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/device/hw/mapping", body: '{"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_backup_verify:
+    summary: "Primary/backup verification for a screen: 0 off, 1 only the primary active, 2 only the backup active"
+    params:
+      screen: { type: string, pattern: "^[A-Za-z0-9{}_.:-]{1,64}$", required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: { method: POST, path: "/api/v1/device/backup/verify", body: '{"screenID":{screen:json},"verifyType":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_system_time:
+    summary: "Set the controller's clock (turn automatic time off first)"
+    params:
+      year: { type: int, min: 1970, max: 2069, required: true }
+      month: { type: int, min: 1, max: 12, required: true }
+      day: { type: int, min: 1, max: 31, required: true }
+      hour: { type: int, min: 0, max: 23, required: true }
+      minute: { type: int, min: 0, max: 59, required: true }
+      second: { type: int, min: 0, max: 59, required: true }
+      utc: { type: bool, default: false }
+    send: { method: PUT, path: "/api/v1/device/hw/systemtime", body: '{"year":{year},"month":{month},"day":{day},"hour":{hour},"minute":{minute},"second":{second},"isUTC":{utc}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_auto_time:
+    summary: "Turn automatic time on or off, from the PC (0) or an NTP server (1)"
+    params:
+      enabled: { type: bool, default: true }
+      source: { type: int, min: 0, max: 1, default: 1 }
+    send: { method: PUT, path: "/api/v1/device/time/enable", body: '{"enable":{enabled},"timeSource":{source}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_timezone:
+    summary: "Set the controller's time zone by name"
+    params:
+      timezone: { type: string, max_length: 64, required: true }
+    send: { method: POST, path: "/api/v1/device/timezone", body: '{"timezone":{timezone:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_controller_name:
+    summary: "Rename the controller, up to 255 characters"
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: { method: PUT, path: "/api/v1/device/hw/customname", body: '{"customName":{name:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_snmp:
+    summary: "Turn SNMP on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/device/snmpstate", body: '{"state":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_working_mode:
+    summary: "Working mode: 2 send-only controller, 3 all-in-one controller (2023 manual 5.3)"
+    params:
+      mode: { type: int, min: 2, max: 3, required: true }
+    send: { method: PUT, path: "/api/v1/device/hw/mode", body: '{"mode":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  import_project:
+    summary: "Import a project file (base64 from export_project) into the controller (2023 manual 5.1.2)"
+    params:
+      backup_file: { type: string, pattern: "^[A-Za-z0-9+/=]+$", required: true }
+    send: { method: PUT, path: "/api/v1/device/hw/deviceengineeringdocdata", body: '{"backupFile":{backup_file:json}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_brightness:
+    summary: "Set cabinets' brightness, 0 to 1; cabinets is a JSON array of cabinet IDs"
+    params:
+      cabinets: { type: json, required: true }
+      ratio: { type: float, min: 0, max: 1, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/brightness", body: '{"idList":{cabinets},"ratio":{ratio:.4f}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_brightness_nits:
+    summary: "Set cabinets' brightness with its nit value"
+    params:
+      cabinets: { type: json, required: true }
+      ratio: { type: float, min: 0, max: 1, required: true }
+      nits: { type: int, min: 0, max: 65535, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/brightness", body: '{"idList":{cabinets},"ratio":{ratio:.4f},"nit":{nits}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_rgb_brightness:
+    summary: "Set cabinets' red, green and blue brightness, 0 to 255"
+    params:
+      cabinets: { type: json, required: true }
+      r: { type: int, min: 0, max: 255, required: true }
+      g: { type: int, min: 0, max: 255, required: true }
+      b: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/rgb/brightness", body: '{"r":{r},"g":{g},"b":{b},"idList":{cabinets}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_rgbw_component:
+    summary: "Set one RGBW brightness component of cabinets: 1 W, 2 R, 3 G, 4 B; 0 to 1 (firmware 1.5.0 and later)"
+    params:
+      cabinets: { type: json, required: true }
+      component: { type: int, min: 1, max: 4, required: true }
+      value: { type: float, min: 0, max: 1, required: true }
+    send: { method: POST, path: "/api/v1/device/cabinet/rgbwbrightness", body: '{"idList":{cabinets},"changeType":{component},"value":{value:.4f}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_color_temperature:
+    summary: "Set cabinets' colour temperature, 1700 to 15000 K"
+    params:
+      cabinets: { type: json, required: true }
+      kelvin: { type: int, min: 1700, max: 15000, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/colortemperature", body: '{"idList":{cabinets},"value":{kelvin}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_gamma:
+    summary: "Set cabinets' gamma, 1 to 4, for red (0), green (1), blue (2) or all (3) (2023 manual)"
+    params:
+      cabinets: { type: json, required: true }
+      channel: { type: int, min: 0, max: 3, default: 3 }
+      gamma: { type: float, min: 1, max: 4, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/gamma", body: '{"idList":{cabinets},"type":{channel},"value":{gamma:.2f}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_test_pattern:
+    summary: "Receiving card test pattern: 1 normal, 4 red, 5 green, 6 blue, 7 white, 8 H lines, 9 V lines, 10 slashes, 11 checkerboard, 12 grayscale, 13 aging"
+    params:
+      cabinets: { type: json, required: true }
+      pattern: { type: enum, values: ["1", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"], required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/testpattern", body: '{"idList":{cabinets},"testmode":{pattern}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_mapping:
+    summary: "Show or hide the mapping overlay on cabinets"
+    params:
+      cabinets: { type: json, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/mapping", body: '{"idList":{cabinets},"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_multimode:
+    summary: "Switch cabinets to a multi-mode by modeId"
+    params:
+      cabinets: { type: json, required: true }
+      mode: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/multimode", body: '{"idList":{cabinets},"modeId":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_no_signal_image:
+    summary: "What cabinets show with no data signal: 0 black, 1 the last frame"
+    params:
+      cabinets: { type: json, required: true }
+      image: { type: int, min: 0, max: 1, required: true }
+    send: { method: PUT, path: "/api/v1/device/cabinet/prestoreimage", body: '{"idList":{cabinets},"abnormalMode":1,"prestoreImageType":{image}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_thermal_compensation_enabled:
+    summary: "Turn cabinets' thermal compensation on or off"
+    params:
+      cabinets: { type: json, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PUT, path: "/api/v1/device/correctionop/cabinets/thermacal/enable", body: '{"idList":{cabinets},"enable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_thermal_compensation_amount:
+    summary: "Set cabinets' thermal compensation intensity, 0 to 255"
+    params:
+      cabinets: { type: json, required: true }
+      amount: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/device/correctionop/cabinets/thermacal/amount", body: '{"idList":{cabinets},"amount":{amount}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_thermal_compensation_mode:
+    summary: "Set cabinets' thermal compensation mode: 0 manual, 1 auto"
+    params:
+      cabinets: { type: json, required: true }
+      mode: { type: int, min: 0, max: 1, required: true }
+    send: { method: PUT, path: "/api/v1/device/correctionop/cabinets/thermacal/mode", body: '{"idList":{cabinets},"mode":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  set_cabinet_gamut:
+    summary: "Switch cabinets' colour gamut: From input, DCI-P3, Rec.709, Rec.2020, Custom, or empty for the original (2023 manual)"
+    params:
+      name: { type: enum, values: ["From input", "DCI-P3", "Rec.709", "Rec.2020", "Custom", ""], required: true }
+    send: { method: PUT, path: "/api/v1/device/correctionop/cabinets/gamut", body: '{"name":"{name}"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  legacy_set_display_mode:
+    summary: "Display mode of the whole controller: 0 normal, 1 blackout, 2 freeze (2023 manual, earlier firmware)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: { method: PUT, path: "/api/v1/device/screen/displaymode", body: '{"value":{mode}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  legacy_select_input:
+    summary: "Select the input source group in send-only mode (2023 manual, earlier firmware)"
+    params:
+      group: { type: int, min: 0, max: 255, required: true }
+    send: { method: PUT, path: "/api/v1/device/screen/input", body: '{"groupId":{group}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  legacy_recall_preset:
+    summary: "Apply preset 1 to 50 (2023 manual, earlier firmware)"
+    params:
+      preset: { type: int, min: 1, max: 50, required: true }
+    send: { method: PUT, path: "/api/v1/device/currentpreset", body: '{"sequenceNumber":{preset}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  legacy_set_test_pattern:
+    summary: "Show a test pattern as the screen's source (2023 manual, earlier firmware); fields as set_test_pattern"
+    params:
+      mode: { type: int, min: 0, max: 48, required: true }
+      red: { type: int, min: 0, max: 4095, default: 4095 }
+      green: { type: int, min: 0, max: 4095, default: 4095 }
+      blue: { type: int, min: 0, max: 4095, default: 4095 }
+      gray: { type: int, min: 0, max: 4095, default: 4095 }
+      grid_width: { type: int, min: 1, max: 255, default: 1 }
+      move_speed: { type: int, min: 0, max: 100, default: 50 }
+      gradient_stretch: { type: int, min: 1, max: 20, default: 8 }
+    send: { method: PUT, path: "/api/v1/device/screen/controller/pattern/test", body: '{"mode":{mode},"parameters":{"red":{red},"green":{green},"blue":{blue},"gray":{gray},"gridWidth":{grid_width},"moveSpeed":{move_speed},"gradientStretch":{gradient_stretch},"state":0}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+  legacy_set_output_bit_depth:
+    summary: "Output bit depth: 0 8-bit, 1 10-bit, 2 12-bit, 255 automatic (2023 manual, earlier firmware)"
+    params:
+      bit_depth: { type: enum, values: ["0", "1", "2", "255"], required: true }
+    send: { method: PUT, path: "/api/v1/device/screen/video/bitdepth", body: '{"bitDepth":{bit_depth}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.code": 0 } }
+    returns: ack
+
+telemetry:
+  # The controller does not push. Display parameters, display state, cabinet
+  # counts, controller information, monitoring (without cabinets) and audio
+  # are read every 10 seconds.
+  poll:
+    send:
+      - { method: GET, path: /api/v1/screen/displayparams }
+      - { method: GET, path: /api/v1/screen/output/display/state }
+      - { method: GET, path: /api/v1/screen/cabinet/count }
+      - { method: GET, path: /api/v1/device/hw }
+      - { method: GET, path: /api/v1/device/monitor/info, raw_query: "isNeedCabinetInfo=1" }
+    every_ms: 10000
+  updates:
+    - path: "^/api/v1/screen/displayparams$"
+      json_each: "$.data.list"
+      json: { id: "$.screenId", brightness: "$.brightness", kelvin: "$.colorTemperature", gamma: "$.gamma" }
+      state:
+        "screens.{id}.brightness": "{brightness}"
+        "screens.{id}.color_temperature": "{kelvin}"
+        "screens.{id}.gamma": "{gamma}"
+    - path: "^/api/v1/screen/cabinet/count$"
+      json_each: "$.data.list"
+      json: { id: "$.screenId", count: "$.cabinetCount" }
+      state:
+        "screens.{id}.cabinet_count": "{count}"
+    - path: "^/api/v1/screen/output/display/state$"
+      json_each: "$.data.displayState"
+      json: { id: "$.canvasID", mode: "$.displayMode" }
+      state:
+        "canvases.{id}.display_mode": "{mode}"
+    - path: "^/api/v1/screen/output/display/state$"
+      json_each: "$.data.mappingState"
+      json: { id: "$.canvasID", enable: "$.enable" }
+      state:
+        "canvases.{id}.mapping": "{enable}"
+    - path: "^/api/v1/device/hw$"
+      json:
+        name: "$.data.name"
+        custom_name: "$.data.customName"
+        model: "$.data.modelID"
+        sn: "$.data.sn"
+        mac: "$.data.mac"
+        ip: "$.data.ip"
+        hw: "$.data.hwVersion"
+        sw: "$.data.swVersion"
+        mode: "$.data.mode"
+      state:
+        device.name: "{name}"
+        device.custom_name: "{custom_name}"
+        device.model_id: "{model}"
+        device.serial: "{sn}"
+        device.mac: "{mac}"
+        device.ip: "{ip}"
+        device.firmware_version: "{hw}"
+        device.software_version: "{sw}"
+        device.working_mode: "{mode}"
+    - path: "^/api/v1/device/monitor/info"
+      json:
+        runtime: "$.data.runtime"
+        backup: "$.data.backupStatus"
+        temp: "$.data.mainBoardTemperature.value"
+        temp_status: "$.data.mainBoardTemperature.status"
+        volt: "$.data.mainBoardVoltage.value"
+        volt_status: "$.data.mainBoardVoltage.status"
+      state:
+        device.runtime: "{runtime}"
+        device.backup_status: "{backup}"
+        device.mainboard_temperature: "{temp}"
+        device.mainboard_temperature_status: "{temp_status}"
+        device.mainboard_voltage: "{volt}"
+        device.mainboard_voltage_status: "{volt_status}"
+    - path: "^/api/v1/device/audio$"
+      json: { enable: "$.data.enable", source: "$.data.source" }
+      state:
+        audio.enabled: "{enable}"
+        audio.source: "{source}"
+
+state:
+  screens.*.brightness: { type: float, description: "Screen brightness, 0 to 1, keyed by screen ID" }
+  screens.*.color_temperature: { type: int, unit: K, description: "Screen colour temperature" }
+  screens.*.gamma: { type: float, description: "Screen gamma" }
+  screens.*.cabinet_count: { type: int, description: "Online cabinets on the screen" }
+  canvases.*.display_mode: { type: int, description: "Canvas display mode as the controller reports it, keyed by canvas ID (the read documents 0 normal, 1 frozen, 2 blackout; the writes use 1 blackout, 2 freeze)" }
+  canvases.*.mapping: { type: bool, description: "Mapping overlay shown on the canvas" }
+  device.name: { type: string, description: "Controller name" }
+  device.custom_name: { type: string, description: "Controller custom name" }
+  device.model_id: { type: int, description: "Controller model ID" }
+  device.serial: { type: string, description: "Controller serial number" }
+  device.mac: { type: string, description: "Controller MAC address" }
+  device.ip: { type: string, description: "Controller IP address" }
+  device.firmware_version: { type: string, description: "Firmware version" }
+  device.software_version: { type: string, description: "Software version" }
+  device.working_mode: { type: int, description: "Working mode: 1 fibre converter, 2 sending card (send-only), 3 all-in-one" }
+  device.runtime: { type: int, unit: s, description: "Controller uptime" }
+  device.backup_status: { type: int, description: "Backup status: 109 primary in use and backup standby, 110 both in use, 111 primary in use and backup failed, 112 primary failed and backup standby, 113 primary failed and backup in use, 114 and up further failure states" }
+  device.mainboard_temperature: { type: float, unit: degC, description: "Main board temperature" }
+  device.mainboard_temperature_status: { type: int, description: "Main board temperature status: 0 normal, 1 alarm, 2 fault" }
+  device.mainboard_voltage: { type: float, unit: V, description: "Main board voltage" }
+  device.mainboard_voltage_status: { type: int, description: "Main board voltage status: 0 normal, 1 alarm, 2 fault" }
+  audio.enabled: { type: bool, description: "SPDIF audio output on" }
+  audio.source: { type: int, description: "Audio source group ID" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A controller held by NovaStar's COEX VMP software accepts API requests
+      only from that computer; release it in VMP (click a blank space in the
+      device tree) before using the API. Others are answered "device locked"
+      (OpenAPI instructions; Companion module HELP.md).
+
+  - models: [all]
+    severity: info
+    text: >
+      Failures arrive as HTTP 200 with a non-zero code (1 invalid parameters, 5
+      device busy, 6 not supported, 27-35 function restrictions, ...), so every
+      command requires $.code 0. The documents give no answer body for a 4xx.
+
+  - models: [all]
+    severity: info
+    text: >
+      Screen IDs are strings the controller makes; read them with get_screens
+      (screenID). Canvas, cabinet and input IDs come from get_screens,
+      get_cabinets and get_input_sources. The layer IDs for switch_layer_source
+      depend on the working mode (get_screens workingMode). Input selection on
+      layers is documented for all-in-one mode; legacy_select_input for
+      send-only mode.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The OpenAPI pages give some paths without the /api/v1 prefix (internal
+      source, colour correction, 3D emitter, sync source, controller identify,
+      controller name, no-signal image, thermal compensation amount); the
+      prefix is used here, as on every other endpoint.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The display state read documents displayMode 1 as frozen and 2 as
+      blackout, the reverse of the writes (1 blackout, 2 freeze); the state
+      keeps the number as the controller reports it.
+
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset and legacy_recall_preset apply a preset to the live screen
+      at once; there is no undo. set_display_mode, set_display_mode_all,
+      set_canvas_display_mode and legacy_set_display_mode black out or freeze
+      the live output. switch_layer_source and the test pattern commands change
+      what is on screen.
+
+  - models: [all]
+    severity: critical
+    text: >
+      import_project replaces the controller's whole configuration;
+      set_working_mode switches between send-only and all-in-one, which
+      changes the layer structure. Setting all-in-one (3) through the API is
+      reported not to work (Companion module HELP.md).
+
+  - models: [all]
+    severity: info
+    text: >
+      Not included: 3D LUT import (multipart/form-data upload) and log export
+      (a file download). set_custom_gamma, set_custom_gamut, the colour
+      correction data commands and move_cabinets take the documented request
+      body as JSON.
+
+  - models: [all]
+    severity: info
+    text: >
+      The OpenAPI pages show a Device-Key header holding the controller's
+      ip:port in every example, with no description; it is not sent. Audio and
+      RGBW brightness components need firmware 1.5.0 or later.

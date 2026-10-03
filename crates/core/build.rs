@@ -61,9 +61,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "blackmagic-videohub",
         ],
     ),
+    ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
+    ("vendor-christie", &["christie-spyder"]),
     ("vendor-churchapps", &["freeshow"]),
     ("vendor-digico", &["digico-sd"]),
     (
@@ -91,7 +93,12 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lawo", &["emberplus"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
+    ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-newtek", &["newtek-tricaster"]),
+    (
+        "vendor-novastar",
+        &["novastar-central-control", "novastar-coex", "novastar-h"],
+    ),
     ("vendor-obs", &["obs-studio"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
     ("vendor-panasonic", &["panasonic-ptz"]),
@@ -147,6 +154,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
+    ("vendor-tvone", &["tvone-coriomaster"]),
     (
         "vendor-yamaha",
         &[
