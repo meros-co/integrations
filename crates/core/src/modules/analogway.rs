@@ -26,6 +26,11 @@
 //!   transition status, which the module reads first when it does not know
 //!   it, and the state reports each screen's program and preview content
 //!   under those names as well as under the raw bank names.
+//! - Opened for commands only (`monitor` false), "Subscriptions" is not
+//!   replaced and nothing is read on connecting (not even with
+//!   `read_on_connect`): the device-type read that opens the session and the
+//!   keepalive read remain, and a `subscribe` command subscribes to its own
+//!   paths only. Each answered get reports its request-to-reply time.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::net::SocketAddr;
@@ -1275,6 +1280,7 @@ enum Purpose {
 struct PendingGet {
     path: String,
     purpose: Purpose,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -1289,6 +1295,9 @@ pub(crate) struct AnalogWay {
     dialect: Dialect,
     device: SocketAddr,
     read_on_connect: bool,
+    /// False: opened for commands only, so no subscription and no reads on
+    /// connecting.
+    monitor: bool,
     subscriptions: Vec<String>,
     deframer: Deframer,
     socket_open: bool,
@@ -1306,15 +1315,17 @@ pub(crate) struct AnalogWay {
 
 impl AnalogWay {
     pub(crate) fn new(dialect: Dialect, ctx: OpenContext) -> AnalogWay {
-        let mut subscriptions: Vec<String> = dialect
-            .subscriptions()
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        // Commands only: the list starts empty, so only what a `subscribe`
+        // command names is ever subscribed to.
+        let mut subscriptions: Vec<String> = Vec::new();
+        if ctx.monitor {
+            subscriptions.extend(dialect.subscriptions().iter().map(|s| s.to_string()));
+        }
         if let Some(extra) = ctx
             .settings
             .get("extra_subscriptions")
             .and_then(Value::as_str)
+            .filter(|_| ctx.monitor)
         {
             for s in extra.split(',').map(str::trim).filter(|s| !s.is_empty()) {
                 if !subscriptions.iter().any(|x| x == s) {
@@ -1330,6 +1341,7 @@ impl AnalogWay {
                 .get("read_on_connect")
                 .and_then(Value::as_bool)
                 .unwrap_or(true),
+            monitor: ctx.monitor,
             subscriptions,
             deframer: Deframer::default(),
             socket_open: false,
@@ -1354,6 +1366,7 @@ impl AnalogWay {
         self.pending.push(PendingGet {
             path: path.to_string(),
             purpose,
+            sent_at: cx.now(),
             deadline: cx.now() + REPLY_TIMEOUT,
         });
         self.arm_reply_timer(cx);
@@ -1424,6 +1437,11 @@ impl AnalogWay {
         self.ready = true;
         self.retry_after = RETRY_MIN;
         cx.connection(Connection::Connected);
+        if !self.monitor {
+            // Commands only: the Hello read was the handshake; nothing is
+            // subscribed to or read.
+            return;
+        }
         self.subscribe_all(cx);
         let d = self.dialect;
         for path in [d.serial_path(), d.firmware_path()] {
@@ -1523,6 +1541,7 @@ impl AnalogWay {
             match owner {
                 Some(i) => {
                     let p = self.pending.remove(i);
+                    cx.round_trip(cx.now().saturating_sub(p.sent_at));
                     self.arm_reply_timer(cx);
                     let err = CommandError::DeviceError {
                         code: code.clone(),
@@ -1569,6 +1588,7 @@ impl AnalogWay {
         }
         if let Some(i) = answered {
             let p = self.pending.remove(i);
+            cx.round_trip(cx.now().saturating_sub(p.sent_at));
             // Everything sent before this get has been handled.
             if let Some(at) = self
                 .unanswered
@@ -2639,5 +2659,63 @@ mod tests {
                 value: json!("Sc1")
             })
         }));
+    }
+
+    #[test]
+    fn opened_for_commands_only_nothing_is_subscribed_or_read() {
+        let d = Dialect::LivePremier;
+        let mut c = ctx("aquilon-rs4");
+        c.monitor = false;
+        c.settings = params(json!({"read_on_connect": true, "extra_subscriptions": "X/y"}));
+        let mut m = AnalogWay::new(d, c);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        assert_eq!(
+            sends(&cx.take()),
+            vec![json!({"op": "get", "path": d.device_type_path()})]
+        );
+        let actions = feed(
+            &mut m,
+            1,
+            json!({"path": d.device_type_path(), "value": "NLC_RS4"}),
+        );
+        assert!(actions.contains(&Action::Connection(Connection::Connected)));
+        assert!(sends(&actions).is_empty(), "no Subscriptions, no reads");
+
+        // Commands work; an explicit subscribe names only its own paths.
+        let mut cx = Cx::new(10);
+        m.command(
+            &mut cx,
+            5,
+            "subscribe",
+            &params(json!({"paths": ["DeviceObject/$input"]})),
+        );
+        assert_eq!(
+            sends(&cx.take()),
+            vec![
+                json!({"op": "replace", "path": "Subscriptions", "value": ["DeviceObject/$input"]})
+            ]
+        );
+        // What the device sends is still applied.
+        let actions = feed(
+            &mut m,
+            20,
+            json!({"path": "DeviceObject/$input/@items/1/x", "value": 3}),
+        );
+        assert!(actions.iter().any(|a| matches!(a, Action::State(_))));
+    }
+
+    #[test]
+    fn an_answered_get_reports_its_round_trip() {
+        let mut m = connected(Dialect::LivePremier, "aquilon-rs4");
+        let path = "DeviceObject/$screen/@items/S1/control/@props/label";
+        let mut cx = Cx::new(100);
+        m.command(&mut cx, 4, "awj_get", &params(json!({"path": path})));
+        let actions = feed(&mut m, 142, json!({"path": path, "value": "Sc1"}));
+        assert!(actions.contains(&Action::RoundTrip(42)));
+        // A pushed change answers nothing.
+        let actions = feed(&mut m, 150, json!({"path": path, "value": "Sc2"}));
+        assert!(!actions.iter().any(|a| matches!(a, Action::RoundTrip(_))));
     }
 }

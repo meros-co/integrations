@@ -27,6 +27,17 @@
 //! State is the tree: every element under `elements`, keyed by its numeric
 //! path ("1.2.3"), and `identifiers` mapping identifier paths
 //! ("Device/Audio/Gain") to numeric paths. Commands take either form.
+//!
+//! Opened for commands only (`monitor` false), nothing is walked on
+//! connecting: an S101 keep-alive request shows the provider is there, and a
+//! command asks for just the directories on the way to its element, as the
+//! lazy walk does. Because a GetDirectory also subscribes, each directory
+//! asked for that way is followed by an Unsubscribe on it, unless a
+//! subscription the commands made lies at or below it; `get_directory`,
+//! `refresh` and `subscribe` keep their subscriptions, being asked for. What
+//! the provider sends is still applied. Directories, value changes, matrix
+//! operations, invocations and keep-alives report their request-to-reply
+//! time.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
@@ -414,6 +425,7 @@ impl Settings {
 struct Waiting {
     id: CommandId,
     path: Vec<u32>,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -437,6 +449,7 @@ struct ConnectWait {
     id: CommandId,
     path: Vec<u32>,
     target: u32,
+    sent_at: Millis,
     deadline: Millis,
 }
 
@@ -453,6 +466,8 @@ pub(crate) struct EmberPlus {
     dir_queue: VecDeque<Vec<u32>>,
     dir_requested: HashSet<Vec<u32>>,
     dir_outstanding: BTreeMap<Vec<u32>, Millis>,
+    /// When each outstanding directory was asked for.
+    dir_sent: HashMap<Vec<u32>, Millis>,
     dir_waiters: Vec<(Vec<u32>, CommandId)>,
     /// Directories the provider has answered this session: an element not
     /// among their children does not exist.
@@ -472,7 +487,8 @@ pub(crate) struct EmberPlus {
     walk_complete: bool,
     sets: Vec<Waiting>,
     connects: Vec<ConnectWait>,
-    invocations: BTreeMap<i64, (CommandId, Millis)>,
+    /// Invocation id to (command, sent at, deadline).
+    invocations: BTreeMap<i64, (CommandId, Millis, Millis)>,
     next_invocation: i64,
     /// Elements subscribed to, by identifier path where known (numbers may
     /// change between sessions), else by numeric path.
@@ -482,13 +498,22 @@ pub(crate) struct EmberPlus {
     last_heard: Millis,
     keepalive_sent: Option<Millis>,
     retry_after: Millis,
+    /// False: opened for commands only, so nothing is walked on connecting
+    /// and a directory asked for to find an element is unsubscribed.
+    monitor: bool,
 }
 
 impl EmberPlus {
     pub(crate) fn new(ctx: OpenContext) -> EmberPlus {
+        let mut settings = Settings::from(&ctx.settings);
+        if !ctx.monitor {
+            // Commands only: no directory is asked for beyond what a command
+            // needs, whatever the walk setting.
+            settings.walk = Walk::Lazy;
+        }
         EmberPlus {
             device: SocketAddr::new(ctx.host, ctx.port.unwrap_or(DEFAULT_PORT)),
-            settings: Settings::from(&ctx.settings),
+            settings,
             decoder: s101::Decoder::default(),
             assembler: s101::Assembler::default(),
             socket_open: false,
@@ -499,6 +524,7 @@ impl EmberPlus {
             dir_queue: VecDeque::new(),
             dir_requested: HashSet::new(),
             dir_outstanding: BTreeMap::new(),
+            dir_sent: HashMap::new(),
             dir_waiters: Vec::new(),
             dir_answered: HashSet::new(),
             dir_timed_out: HashSet::new(),
@@ -517,6 +543,7 @@ impl EmberPlus {
             last_heard: 0,
             keepalive_sent: None,
             retry_after: RETRY_MIN,
+            monitor: ctx.monitor,
         }
     }
 
@@ -555,7 +582,7 @@ impl EmberPlus {
         for w in self.connects.drain(..) {
             cx.complete(w.id, Err(error.clone()));
         }
-        for (_, (id, _)) in std::mem::take(&mut self.invocations) {
+        for (_, (id, _, _)) in std::mem::take(&mut self.invocations) {
             cx.complete(id, Err(error.clone()));
         }
         for d in self.deferred.drain(..) {
@@ -563,6 +590,7 @@ impl EmberPlus {
         }
         self.restore.clear();
         self.dir_outstanding.clear();
+        self.dir_sent.clear();
         self.on_demand.clear();
         self.dir_queue.clear();
     }
@@ -578,7 +606,7 @@ impl EmberPlus {
             .copied()
             .chain(self.sets.iter().map(|w| w.deadline))
             .chain(self.connects.iter().map(|w| w.deadline))
-            .chain(self.invocations.values().map(|(_, d)| *d))
+            .chain(self.invocations.values().map(|(_, _, d)| *d))
             .min();
         match next {
             Some(at) => cx.set_timer(REPLY, at.saturating_sub(cx.now())),
@@ -800,6 +828,7 @@ impl EmberPlus {
         self.dir_requested.insert(path.to_vec());
         self.dir_outstanding
             .insert(path.to_vec(), cx.now() + self.settings.request_timeout);
+        self.dir_sent.insert(path.to_vec(), cx.now());
         self.arm_reply_timer(cx);
     }
 
@@ -832,22 +861,57 @@ impl EmberPlus {
         if self.dir_outstanding.remove(path).is_none() {
             return;
         }
-        self.on_demand.remove(path);
+        if let Some(sent) = self.dir_sent.remove(path) {
+            cx.round_trip(cx.now().saturating_sub(sent));
+        }
+        let on_demand = self.on_demand.remove(path);
         self.dir_answered.insert(path.to_vec());
+        let mut asked = false;
         let mut i = 0;
         while i < self.dir_waiters.len() {
             if self.dir_waiters[i].0 == path {
                 let (_, id) = self.dir_waiters.remove(i);
                 cx.complete(id, Ok(Outcome::Ack));
+                asked = true;
             } else {
                 i += 1;
             }
         }
+        if !self.monitor && on_demand && !asked {
+            self.unsubscribe_lookup(cx, path);
+        }
         self.arm_reply_timer(cx);
+    }
+
+    /// Commands only: end the subscription that a GetDirectory asked for
+    /// only to find a command's element makes, unless a subscription the
+    /// commands made lies at or below it, which an Unsubscribe on a node
+    /// would end too.
+    fn unsubscribe_lookup(&mut self, cx: &mut Cx, path: &[u32]) {
+        let kept = self.subscribed_now.iter().any(|s| s.starts_with(path))
+            || self.restore.iter().any(|name_key| {
+                self.ids
+                    .get(name_key)
+                    .is_none_or(|numeric| numeric.starts_with(path))
+            });
+        if kept {
+            return;
+        }
+        let root = self.command_on(path, glow::Command::new(glow::UNSUBSCRIBE));
+        self.send(cx, &root);
     }
 
     /// Forget the tree and walk it again from the root.
     fn start_walk(&mut self, cx: &mut Cx) {
+        self.reset_tree(cx);
+        self.enqueue(Vec::new());
+        let mut p = Patch::default();
+        self.pump(cx, &mut p);
+        p.flush(cx);
+    }
+
+    /// Forget the tree: its numbers are only valid for a session.
+    fn reset_tree(&mut self, cx: &mut Cx) {
         self.tree.clear();
         self.ids.clear();
         self.streams.clear();
@@ -870,10 +934,6 @@ impl EmberPlus {
             "identifiers": null,
             "walk": {"complete": false, "mode": self.settings.walk.name()},
         }));
-        self.enqueue(Vec::new());
-        let mut p = Patch::default();
-        self.pump(cx, &mut p);
-        p.flush(cx);
     }
 
     // --- Applying what the provider reports -------------------------------------
@@ -1034,7 +1094,10 @@ impl EmberPlus {
                 // for a directory asked for before, whatever the walk mode.
                 if back && self.dir_requested.remove(path) {
                     self.dir_answered.remove(path);
-                    self.enqueue(path.to_vec());
+                    // Commands only: a command that needs it asks again.
+                    if self.monitor {
+                        self.enqueue(path.to_vec());
+                    }
                 }
             }
         }
@@ -1168,6 +1231,7 @@ impl EmberPlus {
             p.put(path, "value", value.clone());
             if let Some(i) = self.sets.iter().position(|w| w.path == path) {
                 let w = self.sets.remove(i);
+                cx.round_trip(cx.now().saturating_sub(w.sent_at));
                 cx.complete(w.id, Ok(Outcome::Value { value }));
                 self.arm_reply_timer(cx);
             }
@@ -1278,6 +1342,7 @@ impl EmberPlus {
                 .position(|w| w.path == path && w.target == c.target)
             {
                 let w = self.connects.remove(i);
+                cx.round_trip(cx.now().saturating_sub(w.sent_at));
                 let result = if disposition == glow::DISPOSITION_LOCKED {
                     Err(CommandError::DeviceError {
                         code: Some("locked".into()),
@@ -1363,9 +1428,10 @@ impl EmberPlus {
     }
 
     fn invocation_result(&mut self, cx: &mut Cx, r: &glow::InvocationResult) {
-        let Some((id, _)) = self.invocations.remove(&r.invocation_id) else {
+        let Some((id, sent_at, _)) = self.invocations.remove(&r.invocation_id) else {
             return;
         };
+        cx.round_trip(cx.now().saturating_sub(sent_at));
         let values: Vec<Value> = r.result.iter().flatten().map(json_of).collect();
         let result = if r.success == Some(false) {
             Err(CommandError::DeviceError {
@@ -1469,7 +1535,7 @@ impl EmberPlus {
                 }
             };
             self.last_heard = cx.now();
-            self.keepalive_sent = None;
+            let keepalive_sent = self.keepalive_sent.take();
             cx.alive();
             if !self.connected {
                 self.connected = true;
@@ -1478,7 +1544,11 @@ impl EmberPlus {
             }
             match message {
                 s101::Message::KeepAliveRequest => cx.tcp_send(SOCKET, s101::keepalive_response()),
-                s101::Message::KeepAliveResponse => {}
+                s101::Message::KeepAliveResponse => {
+                    if let Some(sent) = keepalive_sent {
+                        cx.round_trip(cx.now().saturating_sub(sent));
+                    }
+                }
                 s101::Message::Ember { flags, payload } => {
                     match self.assembler.push(flags, payload) {
                         Ok(Some(message)) => self.ember(cx, &message),
@@ -1566,7 +1636,12 @@ impl EmberPlus {
                     })
                 });
                 self.send(cx, &root);
-                self.sets.push(Waiting { id, path, deadline });
+                self.sets.push(Waiting {
+                    id,
+                    path,
+                    sent_at: cx.now(),
+                    deadline,
+                });
                 self.arm_reply_timer(cx);
             }
             "subscribe" | "unsubscribe" => {
@@ -1629,6 +1704,7 @@ impl EmberPlus {
                     id,
                     path,
                     target,
+                    sent_at: cx.now(),
                     deadline,
                 });
                 self.arm_reply_timer(cx);
@@ -1664,7 +1740,8 @@ impl EmberPlus {
                     )
                 });
                 self.send(cx, &root);
-                self.invocations.insert(invocation, (id, deadline));
+                self.invocations
+                    .insert(invocation, (id, cx.now(), deadline));
                 self.arm_reply_timer(cx);
             }
             other => {
@@ -1816,9 +1893,26 @@ impl Module for EmberPlus {
                 self.assembler = s101::Assembler::default();
                 self.last_heard = cx.now();
                 self.keepalive_sent = None;
-                // Numbers are only valid for a session: walk afresh.
-                self.start_walk(cx);
-                cx.set_timer(KEEPALIVE, self.settings.keepalive_interval);
+                if self.monitor {
+                    // Numbers are only valid for a session: walk afresh.
+                    self.start_walk(cx);
+                    cx.set_timer(KEEPALIVE, self.settings.keepalive_interval);
+                } else {
+                    // Commands only: forget the last session's numbers but
+                    // ask for no directory. Nothing is pushed unasked, so a
+                    // keep-alive request, which the provider must answer,
+                    // shows it is there.
+                    self.reset_tree(cx);
+                    cx.tcp_send(SOCKET, s101::keepalive_request());
+                    self.keepalive_sent = Some(cx.now());
+                    cx.set_timer(KEEPALIVE, self.settings.keepalive_timeout);
+                    // Look for the subscriptions `subscribe` made in an
+                    // earlier session; with none, the (empty) walk is done.
+                    self.retry_deferred(cx);
+                    let mut p = Patch::default();
+                    self.pump(cx, &mut p);
+                    p.flush(cx);
+                }
             }
             TcpInput::Data(data) => self.data(cx, &data),
             TcpInput::Closed { reason } => {
@@ -1869,6 +1963,7 @@ impl Module for EmberPlus {
                     .collect();
                 for path in expired {
                     self.dir_outstanding.remove(&path);
+                    self.dir_sent.remove(&path);
                     self.on_demand.remove(&path);
                     self.dir_timed_out.insert(path.clone());
                     if path.is_empty() && !self.connected {
@@ -1909,11 +2004,11 @@ impl Module for EmberPlus {
                 let late: Vec<i64> = self
                     .invocations
                     .iter()
-                    .filter(|(_, (_, d))| *d <= now)
+                    .filter(|(_, (_, _, d))| *d <= now)
                     .map(|(k, _)| *k)
                     .collect();
                 for k in late {
-                    if let Some((id, _)) = self.invocations.remove(&k) {
+                    if let Some((id, _, _)) = self.invocations.remove(&k) {
                         cx.complete(id, Err(CommandError::Timeout));
                     }
                 }
@@ -2954,5 +3049,174 @@ mod tests {
             .take()
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Disconnected { .. }))));
+    }
+
+    fn commands_only(settings: Value) -> EmberPlus {
+        EmberPlus::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 40)),
+            port: None,
+            model: "provider".into(),
+            channels: None,
+            settings: params(settings),
+            monitor: false,
+        })
+    }
+
+    fn keepalive_answer(m: &mut EmberPlus, now: Millis) -> Vec<Action> {
+        let mut cx = Cx::new(now);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(s101::keepalive_response()));
+        cx.take()
+    }
+
+    #[test]
+    fn opened_for_commands_only_nothing_is_walked_and_lookups_are_unsubscribed() {
+        // Even with a full walk set.
+        let mut m = commands_only(json!({"walk": "full"}));
+        let mut st = json!({});
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let a = cx.take();
+        state(&mut st, &a);
+        // A keep-alive request alone: no GetDirectory.
+        assert!(sent(&a).is_empty());
+        assert!(a.contains(&Action::TcpSend {
+            socket: SOCKET,
+            data: s101::keepalive_request()
+        }));
+        assert_eq!(st["walk"], json!({"complete": true, "mode": "lazy"}));
+        let a = keepalive_answer(&mut m, 12);
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(a.contains(&Action::RoundTrip(12)));
+
+        // A command asks for the directories on the way to its element, and
+        // unsubscribes each once answered.
+        let a = run(
+            &mut m,
+            100,
+            1,
+            "set_parameter",
+            json!({"path": "Device/gain", "value": -6.5}),
+        );
+        assert_eq!(sent(&a), vec![Root::Elements(vec![get_dir(-1)])]);
+        let a = feed(
+            &mut m,
+            110,
+            Root::Elements(vec![node(Id::Number(1), Some("Device"), None)]),
+        );
+        assert_eq!(
+            sent(&a),
+            vec![
+                Root::Elements(vec![Element::Command(Command::new(glow::UNSUBSCRIBE))]),
+                directory_of(vec![1]),
+            ]
+        );
+        let a = feed(&mut m, 120, device_children());
+        state(&mut st, &a);
+        let out = sent(&a);
+        assert!(out.contains(&Root::Elements(vec![Element::Node(Node {
+            id: Id::Path(vec![1]),
+            contents: None,
+            children: Some(vec![Element::Command(Command::new(glow::UNSUBSCRIBE))])
+        })])));
+        assert_eq!(out.len(), 2, "{out:?}");
+        // The walk does not follow the nodes the answers name.
+        assert_eq!(st["elements"]["1.6"]["identifier"], "Sub");
+        assert!(!out.contains(&directory_of(vec![1, 6])));
+
+        // The provider's answer completes the command with its round trip.
+        let a = feed(
+            &mut m,
+            150,
+            Root::Elements(vec![Element::Parameter(Parameter {
+                id: Id::Path(vec![1, 1]),
+                contents: Some(ParameterContents {
+                    value: Some(Glow::Real(-6.5)),
+                    ..Default::default()
+                }),
+                children: None,
+            })]),
+        );
+        assert_eq!(
+            completed(&a, 1),
+            Some(Ok(Outcome::Value { value: json!(-6.5) }))
+        );
+        assert!(a.contains(&Action::RoundTrip(30)));
+
+        // An explicit get_directory keeps its subscription.
+        let a = run(
+            &mut m,
+            200,
+            2,
+            "get_directory",
+            json!({"path": "Device/Sub"}),
+        );
+        assert_eq!(sent(&a), vec![directory_of(vec![1, 6])]);
+        let a = feed(
+            &mut m,
+            210,
+            Root::Elements(vec![Element::Node(Node {
+                id: Id::Path(vec![1, 6]),
+                contents: None,
+                children: Some(vec![param(
+                    1,
+                    ParameterContents {
+                        identifier: Some("trim".into()),
+                        value: Some(Glow::Real(0.0)),
+                        ..Default::default()
+                    },
+                )]),
+            })]),
+        );
+        assert_eq!(completed(&a, 2), Some(Ok(Outcome::Ack)));
+        assert!(sent(&a).is_empty(), "no Unsubscribe");
+        assert!(a.contains(&Action::RoundTrip(10)));
+    }
+
+    #[test]
+    fn a_silent_provider_opened_for_commands_only_is_dropped() {
+        let mut m = commands_only(json!({}));
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let mut cx = Cx::new(5_000);
+        m.timer(&mut cx, KEEPALIVE);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Disconnected { .. }))));
+    }
+
+    #[test]
+    fn value_changes_and_keepalives_report_their_round_trip() {
+        let (mut m, _) = walked(json!({}));
+        run(
+            &mut m,
+            100,
+            1,
+            "set_parameter",
+            json!({"path": "1.1", "value": -3.0}),
+        );
+        let a = feed(
+            &mut m,
+            125,
+            Root::Elements(vec![Element::Parameter(Parameter {
+                id: Id::Path(vec![1, 1]),
+                contents: Some(ParameterContents {
+                    value: Some(Glow::Real(-3.0)),
+                    ..Default::default()
+                }),
+                children: None,
+            })]),
+        );
+        assert!(a.contains(&Action::RoundTrip(25)));
+        let mut cx = Cx::new(5_200);
+        m.timer(&mut cx, KEEPALIVE);
+        let a = keepalive_answer(&mut m, 5_207);
+        assert!(a.contains(&Action::RoundTrip(7)));
+        // A provider's own keep-alive request is no round trip of ours.
+        let mut cx = Cx::new(5_300);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(s101::keepalive_request()));
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::RoundTrip(_))));
     }
 }

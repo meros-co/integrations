@@ -38,6 +38,17 @@
 //! the device again. A camera with SSH enabled accepts PTP-IP only through an
 //! SSH tunnel to its own localhost:15740, which the session opens when the
 //! `connection` setting is `ssh`.
+//!
+//! Opened for commands only (`monitor` false), the session and handshake are
+//! the same, but the property set is not read on connecting or polled, and
+//! nothing is read in answer to the camera's events or the module's own
+//! writes. Events are still applied as they come. Commands need the
+//! properties' types and current values, so a command finding them unread,
+//! or changed since by an event or a write, reads them first (changes only
+//! on PTP 3 once read in full). Instead of the poll, GetDeviceInfo is asked
+//! for at the poll interval while nothing else is in flight, to notice a
+//! camera that has gone. Every operation the camera answers, apart from bulk
+//! transfers, reports its request-to-reply time.
 
 use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, SocketAddr};
@@ -314,6 +325,9 @@ enum Step {
     GetAll {
         diff: bool,
     },
+    /// Commands only: the property read the commands waiting in
+    /// `awaiting_props` need before they are planned.
+    PropsRead,
     TransferMode,
     /// Part of an operator command.
     Command,
@@ -392,11 +406,40 @@ impl Op {
         self.command = Some(id);
         self
     }
+
+    /// A read the module makes of its own accord to keep the state current,
+    /// not one a command asked for.
+    fn is_state_read(&self) -> bool {
+        self.command.is_none()
+            && matches!(
+                self.step,
+                Step::GetAll { .. } | Step::Info(_) | Step::FtpRefresh | Step::JobsRefresh
+            )
+    }
+
+    /// The reply's timing is the camera's latency, not a bulk transfer's.
+    fn times_latency(&self) -> bool {
+        !matches!(
+            self.step,
+            Step::LiveView { .. }
+                | Step::LiveFrame
+                | Step::DownloadChunk
+                | Step::DownloadWhole
+                | Step::DownloadDataset
+                | Step::Upload { .. }
+                | Step::UploadResultFile
+                | Step::Value(Parse::Thumbnail)
+                | Step::ListHandles
+                | Step::ListInfo(_)
+                | Step::Value(Parse::ContentList)
+        )
+    }
 }
 
 struct InFlight {
     op: Op,
     transaction: u32,
+    sent_at: Millis,
     data: Vec<u8>,
     /// Bytes written straight to the download file.
     streamed: u64,
@@ -548,6 +591,18 @@ pub(crate) struct SonyCamera {
     cautions: u64,
     /// The `live` stream.
     live: live::Live,
+
+    /// False: opened for commands only, so the properties are read only
+    /// when a command needs them.
+    monitor: bool,
+    /// Commands only: the handshake's last operations are queued, so the
+    /// session is ready once they have gone.
+    handshake_queued: bool,
+    /// Commands only: the properties have been read and nothing has changed
+    /// them since, as far as the module knows.
+    props_fresh: bool,
+    /// Commands only: commands waiting for the property read.
+    awaiting_props: Vec<(CommandId, String, Params)>,
 }
 
 fn text_setting(settings: &Params, name: &str) -> String {
@@ -866,6 +921,10 @@ impl SonyCamera {
             captures: 0,
             cautions: 0,
             live: live::Live::new(live_interval, keep_live, transfer_interval),
+            monitor: ctx.monitor,
+            handshake_queued: false,
+            props_fresh: false,
+            awaiting_props: Vec::new(),
         })
     }
 
@@ -915,6 +974,7 @@ impl SonyCamera {
         if let Some(listing) = self.listing.take() {
             failed.push(listing.id);
         }
+        failed.extend(self.awaiting_props.drain(..).map(|(id, _, _)| id));
         failed.extend(self.upload.take().map(|u| u.id));
         failed.extend(self.deletion.take().map(|d| d.id));
         if self
@@ -948,6 +1008,8 @@ impl SonyCamera {
         self.cmd_framer = Framer::default();
         self.evt_framer = Framer::default();
         self.ready = false;
+        self.handshake_queued = false;
+        self.props_fresh = false;
         self.live_view_enabled = false;
         self.ext_info_attempts = 0;
         self.props.clear();
@@ -1044,7 +1106,7 @@ impl SonyCamera {
         let Some(op) = self
             .live_cut_in(cx.now())
             .or_else(|| self.commands.pop_front())
-            .or_else(|| self.background.pop_front())
+            .or_else(|| self.next_background())
         else {
             return;
         };
@@ -1069,9 +1131,22 @@ impl SonyCamera {
         self.current = Some(InFlight {
             op,
             transaction,
+            sent_at: cx.now(),
             data: Vec::new(),
             streamed: 0,
         });
+    }
+
+    /// The next background operation. Opened for commands only, the
+    /// module's own state reads are dropped here rather than at each of the
+    /// places that queue them.
+    fn next_background(&mut self) -> Option<Op> {
+        while let Some(op) = self.background.pop_front() {
+            if self.monitor || !op.is_state_read() {
+                return Some(op);
+            }
+        }
+        None
     }
 
     fn flag(&self) -> u32 {
@@ -1102,6 +1177,12 @@ impl SonyCamera {
     /// always reads everything).
     fn want_refresh(&mut self, cx: &mut Cx, full: bool) {
         if !self.ready {
+            return;
+        }
+        if !self.monitor {
+            // Commands only: the next command that needs the properties
+            // reads them.
+            self.props_fresh = false;
             return;
         }
         let queued = self
@@ -1178,6 +1259,9 @@ impl SonyCamera {
         }
         cx.cancel_timer(REPLY);
         let inflight = self.current.take().unwrap();
+        if inflight.op.times_latency() {
+            cx.round_trip(cx.now().saturating_sub(inflight.sent_at));
+        }
         self.finish(
             cx,
             inflight.op,
@@ -1186,7 +1270,89 @@ impl SonyCamera {
             inflight.data,
             inflight.streamed,
         );
+        if !self.monitor
+            && !self.ready
+            && self.handshake_queued
+            && self.phase == Phase::Session
+            && self.background.iter().all(Op::is_state_read)
+        {
+            self.become_ready(cx);
+        }
         self.pump(cx);
+    }
+
+    /// The session is ready for commands: with monitoring, once the property
+    /// set has been read; for commands only, once the handshake is done.
+    fn become_ready(&mut self, cx: &mut Cx) {
+        self.ready = true;
+        self.retry_after = RETRY_MIN;
+        cx.connection(Connection::Connected);
+        // Commands only, the timer paces the liveness check instead.
+        cx.set_timer(POLL, self.poll_every);
+        if self.monitor {
+            self.queue_info_reads();
+        }
+        self.live_start(cx);
+    }
+
+    /// Commands only: the property read for the waiting commands, changes
+    /// only on PTP 3 once the whole set has been read.
+    fn props_read_op(&self) -> Op {
+        let diff = !self.props.is_empty();
+        let mut op = self.get_all(diff);
+        op.step = Step::PropsRead;
+        op
+    }
+
+    /// Commands only: a command that needs the properties waits for them to
+    /// be read. False when they are fresh, and for `refresh`, which reads
+    /// them itself.
+    fn wait_for_props(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) -> bool {
+        if self.monitor || self.props_fresh || name == "refresh" {
+            return false;
+        }
+        let reading = self
+            .commands
+            .iter()
+            .chain(self.current.as_ref().map(|c| &c.op))
+            .any(|op| op.step == Step::PropsRead);
+        self.awaiting_props
+            .push((id, name.to_string(), params.clone()));
+        if !reading {
+            let op = self.props_read_op();
+            self.commands.push_back(op);
+            self.pump(cx);
+        }
+        true
+    }
+
+    /// Commands only: the property read is done; run the commands waiting
+    /// for it, or fail them.
+    fn props_read(&mut self, cx: &mut Cx, code: u16, data: &[u8]) {
+        let waiting = std::mem::take(&mut self.awaiting_props);
+        if code == RC_OK {
+            match parse_prop_info_array(data) {
+                Ok(list) => {
+                    self.apply(cx, list);
+                    self.props_fresh = true;
+                }
+                Err(e) => {
+                    cx.log(Level::Warning, format!("unreadable property set: {e}"));
+                    for (id, _, _) in waiting {
+                        cx.complete(id, Err(refused("unreadable", e.clone())));
+                    }
+                    return;
+                }
+            }
+        } else {
+            for (id, _, _) in waiting {
+                cx.complete(id, Err(rejected(code)));
+            }
+            return;
+        }
+        for (id, name, params) in waiting {
+            self.command(cx, id, &name, &params);
+        }
     }
 
     fn complete_op(&mut self, cx: &mut Cx, op: &Op, code: u16) {
@@ -1283,16 +1449,15 @@ impl SonyCamera {
             Step::GetAll { diff } => {
                 if ok {
                     match parse_prop_info_array(&data) {
-                        Ok(list) => self.apply(cx, list),
+                        Ok(list) => {
+                            self.apply(cx, list);
+                            // A full read by `refresh`.
+                            self.props_fresh |= !diff;
+                        }
                         Err(e) => cx.log(Level::Warning, format!("unreadable property set: {e}")),
                     }
                     if !self.ready {
-                        self.ready = true;
-                        self.retry_after = RETRY_MIN;
-                        cx.connection(Connection::Connected);
-                        cx.set_timer(POLL, self.poll_every);
-                        self.queue_info_reads();
-                        self.live_start(cx);
+                        self.become_ready(cx);
                     }
                 } else if !self.ready {
                     self.lost(
@@ -1319,6 +1484,7 @@ impl SonyCamera {
                     );
                 }
             }
+            Step::PropsRead => self.props_read(cx, code, &data),
             Step::Pause(_) => {}
             Step::Command => {
                 if ok && op.code == OP_CONTROL && op.params.first() == Some(&0xD313) {
@@ -1494,8 +1660,14 @@ impl SonyCamera {
                     Step::TransferMode,
                 ));
             }
-            let op = self.get_all(false);
-            self.background.push_back(op);
+            if self.monitor {
+                let op = self.get_all(false);
+                self.background.push_back(op);
+            } else {
+                // Commands only: no property read; the session is ready
+                // once what is queued has gone.
+                self.handshake_queued = true;
+            }
         }
     }
 
@@ -3229,6 +3401,9 @@ impl Module for SonyCamera {
             );
             return;
         }
+        if self.wait_for_props(cx, id, name, params) {
+            return;
+        }
         match self.plan(name, params, id) {
             Ok(Plan::Ops(ops)) => {
                 if ops.is_empty() {
@@ -3519,7 +3694,24 @@ impl Module for SonyCamera {
                 }
             }
             POLL => {
-                self.want_refresh(cx, false);
+                if self.monitor {
+                    self.want_refresh(cx, false);
+                } else if self.ready
+                    && self.current.is_none()
+                    && self.pausing.is_none()
+                    && self.commands.is_empty()
+                    && self.background.is_empty()
+                {
+                    // Commands only: the camera pushes events but no sign of
+                    // life, so one small read, while nothing else is in
+                    // flight, shows it is still there.
+                    self.background.push_back(Op::new(
+                        OP_GET_DEVICE_INFO,
+                        vec![],
+                        Step::DeviceInfo,
+                    ));
+                    self.pump(cx);
+                }
                 if self.ready {
                     cx.set_timer(POLL, self.poll_every);
                 }
@@ -6004,5 +6196,169 @@ mod tests {
             camera(json!({})).live.keep_during_transfers,
             "keep by default"
         );
+    }
+
+    /// Connected for commands only: the handshake, and no property read.
+    fn commands_only() -> (SonyCamera, Vec<Action>) {
+        let mut s = settings(json!({}));
+        s.insert("session_mode".into(), json!("remote"));
+        let mut m = SonyCamera::new(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
+            port: None,
+            model: "ilce-7sm3".into(),
+            channels: None,
+            settings: s,
+            monitor: false,
+        })
+        .unwrap();
+        let sim = Sim::default();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, CMD, TcpInput::Connected);
+        let mut all = cx.take();
+        all.extend(feed(
+            &mut m,
+            CMD,
+            &[Packet::InitCommandAck {
+                connection: 5,
+                guid: [9; 16],
+                name: "ILCE-7SM3".into(),
+                version: PROTOCOL_VERSION,
+            }],
+        ));
+        let mut cx = Cx::new(0);
+        m.tcp(&mut cx, EVT, TcpInput::Connected);
+        all.extend(cx.take());
+        all.extend(feed(&mut m, EVT, &[Packet::InitEventAck]));
+        for _ in 0..20 {
+            if all.contains(&Action::Connection(Connection::Connected)) {
+                return (m, all);
+            }
+            let (code, t, _) = last_request(&all);
+            let packets = match code {
+                OP_GET_DEVICE_INFO => {
+                    let mut v = data_in(
+                        t,
+                        build::device_info_with(
+                            &sim.operations,
+                            "Sony Corporation",
+                            "ILCE-7SM3",
+                            "3.00",
+                            "5001",
+                        ),
+                    );
+                    v.push(ok(t, vec![]));
+                    v
+                }
+                OP_EXT_DEVICE_INFO => {
+                    let mut v = data_in(
+                        t,
+                        build::ext_device_info(
+                            sim.version,
+                            &[0x5005, 0x5007, 0xD21D],
+                            &sim.controls,
+                        ),
+                    );
+                    v.push(ok(t, vec![sim.vendor]));
+                    v
+                }
+                OP_GET_ALL_PROPERTIES => panic!("the property set is read on connecting"),
+                _ => vec![ok(t, vec![])],
+            };
+            all.extend(feed(&mut m, CMD, &packets));
+        }
+        panic!("the handshake does not end");
+    }
+
+    fn requested(actions: &[Action]) -> Vec<u16> {
+        sent(actions, CMD)
+            .into_iter()
+            .filter_map(|p| match p {
+                Packet::OperationRequest { code, .. } => Some(code),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn opened_for_commands_only_properties_are_read_only_for_commands() {
+        let (mut m, all) = commands_only();
+        let codes = requested(&all);
+        assert!(codes.contains(&OP_CONNECT), "the handshake runs");
+        assert!(!codes.contains(&OP_GET_ALL_PROPERTIES));
+        assert!(all.contains(&Action::SetTimer {
+            key: POLL,
+            after: 1_000
+        }));
+
+        // The poll is a liveness read, not a property read.
+        let mut cx = Cx::new(1_000);
+        m.timer(&mut cx, POLL);
+        let a = cx.take();
+        assert_eq!(requested(&a), [OP_GET_DEVICE_INFO]);
+        let (_, t, _) = last_request(&a);
+        let mut packets = data_in(
+            t,
+            build::device_info_with(&[0x1001], "Sony Corporation", "ILCE-7SM3", "3.00", "5001"),
+        );
+        packets.push(ok(t, vec![]));
+        let mut cx = Cx::new(1_018);
+        let mut bytes = Vec::new();
+        for p in &packets {
+            bytes.extend(p.encode());
+        }
+        m.tcp(&mut cx, CMD, TcpInput::Data(bytes));
+        assert!(cx.take().contains(&Action::RoundTrip(18)));
+
+        // Events are applied without a read.
+        let a = feed(
+            &mut m,
+            EVT,
+            &[Packet::Event {
+                code: 0xC222,
+                transaction: 0,
+                params: vec![0x9207_D2C8, 4],
+            }],
+        );
+        assert!(requested(&a).is_empty());
+        assert_eq!(
+            state(&a)["operation"]["last"]["result"],
+            "camera_status_error"
+        );
+
+        // A command reads the properties in full first, then writes.
+        let a = run(&mut m, 1, "set_white_balance", json!({"value": "daylight"}));
+        assert_eq!(completion(&a, 1), None);
+        let (code, _, params) = last_request(&a);
+        assert_eq!((code, params), (OP_GET_ALL_PROPERTIES, vec![0, 0]));
+        let a = answer(&mut m, &a, props_dataset(), vec![]);
+        let (code, t, params) = last_request(&a);
+        assert_eq!((code, params), (OP_SET_PROPERTY, vec![0x5005, 0]));
+        let a = feed(&mut m, CMD, &[ok(t, vec![])]);
+        assert_eq!(completion(&a, 1), Some(Ok(Outcome::Ack)));
+        assert!(requested(&a).is_empty(), "no read after the write");
+
+        // The write may have changed them: the next command reads the
+        // changes first.
+        let a = run(&mut m, 2, "set_white_balance", json!({"value": "daylight"}));
+        let (code, _, params) = last_request(&a);
+        assert_eq!((code, params), (OP_GET_ALL_PROPERTIES, vec![1, 0]));
+    }
+
+    #[test]
+    fn each_answered_operation_reports_its_round_trip() {
+        let mut m = camera(json!({}));
+        connected(&mut m, 300);
+        let mut cx = Cx::new(100);
+        m.command(
+            &mut cx,
+            1,
+            "set_white_balance",
+            &settings(json!({"value": "daylight"})),
+        );
+        let (_, t, _) = last_request(&cx.take());
+        let mut cx = Cx::new(131);
+        m.tcp(&mut cx, CMD, TcpInput::Data(ok(t, vec![]).encode()));
+        assert!(cx.take().contains(&Action::RoundTrip(31)));
     }
 }
