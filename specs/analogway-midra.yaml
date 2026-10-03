@@ -113,7 +113,9 @@ commands:
   take:
     summary: "TAKE on one screen (guide 3.4, GCtak); answered 1 at once and 0 when the transition ends. The device needs TAKEAVA (get_take_available) to be 1"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
     send: "{screen:-1},1GCtak"
     expect: { matches: "^GCtak" }
     returns: ack
@@ -125,8 +127,12 @@ commands:
   set_tbar:
     summary: "T-bar position of a screen, 0-10000 in hundredths of a percent (variables, GCtba)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
-      position: { type: int, min: 0, max: 10000, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      position: { type: int, min: 0, max: 10000, required: true,
+        label: T-bar position,
+        description: "T-bar position in hundredths of a percent, 0 (start) to 10000 (end of the transition)." }
     send: "{screen:-1},{position}GCtba"
     expect: { matches: "^GCtba" }
     returns: ack
@@ -135,21 +141,39 @@ commands:
   recall_preset:
     summary: "Load master memory 1-8, as stored from screen from_screen, to a screen's preview (or program) (guide 3.6, GClrq). filter adds the elements NOT recalled: 1 auto-scale, 2 source, 4 position and size, 8 transparency, 16 cropping, 32 border, 64 transition, 128 timing, 256 effects, 512 audio layer; 0 recalls everything"
     params:
-      memory: { type: int, min: 1, max: 8, required: true }
-      screen: { type: int, min: 1, max: 2, required: true }
-      from_screen: { type: int, min: 1, max: 2, default: 1 }
-      preview: { type: bool, default: true }
-      filter: { type: int, min: 0, max: 1023, default: 0 }
+      memory: { type: int, min: 1, max: 8, required: true,
+        label: Master memory,
+        description: "Master memory number, 1 to 8." }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      from_screen: { type: int, min: 1, max: 2, default: 1,
+        label: Stored from screen,
+        description: "The screen, 1 or 2, the memory was stored from." }
+      preview: { type: bool, default: true,
+        label: To preview,
+        description: "On acts on the screen's preview, off on its program." }
+      filter: { type: int, min: 0, max: 1023, default: 0,
+        label: Exclusion filter,
+        description: "Sum of the elements NOT to recall: 1 auto-scale, 2 source, 4 position and size, 8 transparency, 16 cropping, 32 border, 64 transition, 128 timing, 256 effects, 512 audio layer; 0 recalls everything." }
     send: "{from_screen:-1},{memory:-1},{screen:-1},{preview:bool01},{filter},1GClrq"
     expect: { matches: "^GClrq" }
     returns: ack
   set_layer_source:
     summary: "Source of a layer on a screen's preview (or program), then the screen update that applies it (guide 3.3, PRinp and PUscu). layer: 0 frame, 1-4 PIP, 5-6 logos, 7 audio; source: 0 none, 1-10 input or frame, 11 color"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
-      layer: { type: int, min: 0, max: 7, required: true }
-      source: { type: int, min: 0, max: 11, required: true }
-      preview: { type: bool, default: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      layer: { type: int, min: 0, max: 7, required: true,
+        label: Layer,
+        description: "0 frame, 1-4 PIPs, 5-6 logos, 7 audio." }
+      source: { type: int, min: 0, max: 11, required: true,
+        label: Source,
+        description: "0 none, 1-10 input or frame, 11 colour." }
+      preview: { type: bool, default: true,
+        label: To preview,
+        description: "On acts on the screen's preview, off on its program." }
     send:
       - "{screen:-1},{preview:bool01},{layer},{source}PRinp"
       - "{screen:-1},1PUscu"
@@ -158,21 +182,27 @@ commands:
   update_screen:
     summary: "Apply pending preset changes to a screen (variables, PU_SCREEN_UPDATE PUscu)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
     send: "{screen:-1},1PUscu"
     expect: { matches: "^PUscu" }
     returns: ack
   step_back:
     summary: "Load the preset before the last TAKE to preview (variables, STEPBACK GCsba)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
     send: "{screen:-1},1GCsba"
     expect: { matches: "^GCsba" }
     returns: ack
   reload_program:
     summary: "Copy program to preview (variables, RELOAD_PROGRAM GCrpr)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
     send: "{screen:-1},1GCrpr"
     expect: { matches: "^GCrpr" }
     returns: ack
@@ -181,54 +211,78 @@ commands:
   freeze_screen:
     summary: "Freeze all layers of a screen (variables, FREEZE_SCREEN GCfsc)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
-      frozen: { type: bool, default: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      frozen: { type: bool, default: true,
+        label: Frozen,
+        description: "On freezes, off unfreezes." }
     send: "{screen:-1},{frozen:bool01}GCfsc"
     expect: { matches: "^GCfsc" }
     returns: ack
   freeze_all:
     summary: "Freeze all layers of all screens (variables, FREEZE_ALL GCfra)"
     params:
-      frozen: { type: bool, default: true }
+      frozen: { type: bool, default: true,
+        label: Frozen,
+        description: "On freezes, off unfreezes." }
     send: "{frozen:bool01}GCfra"
     expect: { matches: "^GCfra" }
     returns: ack
   freeze_layer:
     summary: "Freeze one layer of a screen (variables, FREEZE_LAYER GCfrl); layer as set_layer_source"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
-      layer: { type: int, min: 0, max: 7, required: true }
-      frozen: { type: bool, default: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      layer: { type: int, min: 0, max: 7, required: true,
+        label: Layer,
+        description: "0 frame, 1-4 PIPs, 5-6 logos, 7 audio." }
+      frozen: { type: bool, default: true,
+        label: Frozen,
+        description: "On freezes, off unfreezes." }
     send: "{screen:-1},{layer},{frozen:bool01}GCfrl"
     expect: { matches: "^GCfrl" }
     returns: ack
   freeze_input:
     summary: "Freeze an input (variables, IN_FREEZE INfrz)"
     params:
-      input: { type: int, min: 1, max: 10, required: true }
-      frozen: { type: bool, default: true }
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      frozen: { type: bool, default: true,
+        label: Frozen,
+        description: "On freezes, off unfreezes." }
     send: "{input:-1},{frozen:bool01}INfrz"
     expect: { matches: "^INfrz" }
     returns: ack
   quick_frame:
     summary: "Show or hide the Quick Frame on one screen (guide 3.8, CTqfa)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
-      enabled: { type: bool, default: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      enabled: { type: bool, default: true,
+        label: Enabled,
+        description: "On shows the Quick Frame, off hides it." }
     send: "{screen:-1},{enabled:bool01}CTqfa"
     expect: { matches: "^CTqfa" }
     returns: ack
   quick_frame_all:
     summary: "Show or hide the Quick Frames on both screens (guide 3.9, CTqfl)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Enabled,
+        description: "On shows the Quick Frame, off hides it." }
     send: "{enabled:bool01}CTqfl"
     expect: { matches: "^CTqfl" }
     returns: ack
   auto_quick_frame:
     summary: "Show the Quick Frame automatically when a displayed source is lost (variables, CTaqf)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Enabled,
+        description: "On shows the Quick Frame automatically when a displayed source is lost." }
     send: "{enabled:bool01}CTaqf"
     expect: { matches: "^CTaqf" }
     returns: ack
@@ -237,29 +291,39 @@ commands:
   standby:
     summary: "Put the device in standby, or wake it (variables, STDBY_REQUEST SBreq)"
     params:
-      standby: { type: bool, default: true }
+      standby: { type: bool, default: true,
+        label: Standby,
+        description: "On puts the device in standby, off wakes it." }
     send: "{standby:bool01}SBreq"
     expect: { matches: "^SBreq" }
     returns: ack
   set_switcher_mode:
     summary: "Switcher mode: 0 mixer, 1 matrix, 2 quadravision (variables, SGswm)"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+        label: Switcher mode,
+        description: "0 mixer, 1 matrix, 2 quadravision." }
     send: "{mode}SGswm"
     expect: { matches: "^SGswm" }
     returns: ack
   set_input_plug:
     summary: "Active plug of an input: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT (variables, IN_PLUG INplg)"
     params:
-      input: { type: int, min: 1, max: 10, required: true }
-      plug: { type: int, min: 0, max: 4, required: true }
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
+      plug: { type: int, min: 0, max: 4, required: true,
+        label: Plug,
+        description: "Active plug of the input: 0 HD15, 1 DVI, 2 SDI, 3 HDMI, 4 HDBaseT." }
     send: "{input:-1},{plug}INplg"
     expect: { matches: "^INplg" }
     returns: ack
   autoset_input:
     summary: "Request the auto settings of all plugs of an input (variables, INasi)"
     params:
-      input: { type: int, min: 1, max: 10, required: true }
+      input: { type: int, min: 1, max: 10, required: true,
+        label: Input,
+        description: "Input number, 1 to 10." }
     send: "{input:-1},1INasi"
     expect: { matches: "^INasi" }
     returns: ack
@@ -268,40 +332,60 @@ commands:
   set_audio_input_level:
     summary: "Level of an audio input, 0-255: 16 -50 dB, 64 -20 dB, 128 -6 dB, 192 0 dB, 255 +6 dB. audio_input is the documented number: 1-4 analog, 5-8 DVI 1-4, 9-12 HDMI 3-6, 13-16 SDI 7-10, 17-18 SPDIF, 19-20 HDMI 1-2, 21-24 HDBaseT (variables, AUile)"
     params:
-      audio_input: { type: int, min: 1, max: 24, required: true }
-      level: { type: int, min: 0, max: 255, required: true }
+      audio_input: { type: int, min: 1, max: 24, required: true,
+        label: Audio input,
+        description: "Documented audio input number: 1-4 analogue, 5-8 DVI 1-4, 9-12 HDMI 3-6, 13-16 SDI 7-10, 17-18 S/PDIF, 19-20 HDMI 1-2, 21-24 HDBaseT." }
+      level: { type: int, min: 0, max: 255, required: true,
+        label: Level,
+        description: "Input level from 0 to 255 on the device's scale: 16 is -50 dB, 64 -20 dB, 128 -6 dB, 192 0 dB, 255 +6 dB." }
     send: "{audio_input},{level}AUile"
     expect: { matches: "^AUile" }
     returns: ack
   set_audio_output_volume:
     summary: "Master volume of an audio output, 0-192 (192 is 0 dB) (variables, AUomv)"
     params:
-      output: { type: int, min: 1, max: 2, required: true }
-      volume: { type: int, min: 0, max: 192, required: true }
+      output: { type: int, min: 1, max: 2, required: true,
+        label: Audio output,
+        description: "Audio output number, 1 or 2." }
+      volume: { type: int, min: 0, max: 192, required: true,
+        label: Volume,
+        description: "Master volume from 0 to 192, where 192 is 0 dB." }
     send: "{output:-1},{volume}AUomv"
     expect: { matches: "^AUomv" }
     returns: ack
   mute_audio_input:
     summary: "Mute an audio input, numbered as set_audio_input_level (variables, AUimu)"
     params:
-      audio_input: { type: int, min: 1, max: 24, required: true }
-      muted: { type: bool, default: true }
+      audio_input: { type: int, min: 1, max: 24, required: true,
+        label: Audio input,
+        description: "Documented audio input number: 1-4 analogue, 5-8 DVI 1-4, 9-12 HDMI 3-6, 13-16 SDI 7-10, 17-18 S/PDIF, 19-20 HDMI 1-2, 21-24 HDBaseT." }
+      muted: { type: bool, default: true,
+        label: Mute,
+        description: "On mutes, off unmutes." }
     send: "{audio_input},{muted:bool01}AUimu"
     expect: { matches: "^AUimu" }
     returns: ack
   mute_audio_output:
     summary: "Mute an audio output (variables, AUomu)"
     params:
-      output: { type: int, min: 1, max: 2, required: true }
-      muted: { type: bool, default: true }
+      output: { type: int, min: 1, max: 2, required: true,
+        label: Audio output,
+        description: "Audio output number, 1 or 2." }
+      muted: { type: bool, default: true,
+        label: Mute,
+        description: "On mutes, off unmutes." }
     send: "{output:-1},{muted:bool01}AUomu"
     expect: { matches: "^AUomu" }
     returns: ack
   set_audio_output_input:
     summary: "Video input whose audio an output plays in de-embedded audio mode, 0 none (variables, AUodi)"
     params:
-      output: { type: int, min: 1, max: 2, required: true }
-      input: { type: int, min: 0, max: 10, required: true }
+      output: { type: int, min: 1, max: 2, required: true,
+        label: Audio output,
+        description: "Audio output number, 1 or 2." }
+      input: { type: int, min: 0, max: 10, required: true,
+        label: Video input,
+        description: "Video input, 1 to 10, whose audio the output plays in de-embedded mode, or 0 for none." }
     send: "{output:-1},{input}AUodi"
     expect: { matches: "^AUodi" }
     returns: ack
@@ -310,7 +394,9 @@ commands:
   ping:
     summary: "Keep-alive: the device answers the 32-bit inverse of the value (guide 3.2, SYpig)"
     params:
-      value: { type: int, min: 0, max: 4294967295, default: 0 }
+      value: { type: int, min: 0, max: 4294967295, default: 0,
+        label: Value,
+        description: "Any 32-bit number; the device answers its inverse to show it is alive." }
     send: "{value}SYpig"
     expect: { matches: "^SYpig(\\d+)$" }
     returns: value
@@ -337,37 +423,51 @@ commands:
   get_take_available:
     summary: "1 when TAKE can be used on a screen (guide 3.4, TAKEAVA GCtav)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
     send: "{screen:-1},GCtav"
     expect: { matches: "^GCtav\\d+,(\\d+)$" }
     returns: value
   get_layer_source:
     summary: "Source of a layer on a screen's preview (or program)"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
-      layer: { type: int, min: 0, max: 7, required: true }
-      preview: { type: bool, default: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
+      layer: { type: int, min: 0, max: 7, required: true,
+        label: Layer,
+        description: "0 frame, 1-4 PIPs, 5-6 logos, 7 audio." }
+      preview: { type: bool, default: true,
+        label: To preview,
+        description: "On acts on the screen's preview, off on its program." }
     send: "{screen:-1},{preview:bool01},{layer},PRinp"
     expect: { matches: "^PRinp\\d+,\\d+,\\d+,(\\d+)$" }
     returns: value
   get_tbar:
     summary: "T-bar position of a screen, 0-10000"
     params:
-      screen: { type: int, min: 1, max: 2, required: true }
+      screen: { type: int, min: 1, max: 2, required: true,
+        label: Screen,
+        description: "Screen number, 1 or 2." }
     send: "{screen:-1},GCtba"
     expect: { matches: "^GCtba\\d+,(\\d+)$" }
     returns: value
   read_back:
     summary: "Ask the device to send every register (1), those away from their defaults (2), or the compatible set (3) (guide 3.1, #)"
     params:
-      mode: { type: int, min: 1, max: 3, default: 3 }
+      mode: { type: int, min: 1, max: 3, default: 3,
+        label: Read-back mode,
+        description: "1 sends every register, 2 those away from their defaults, 3 the compatible set." }
     send: "{mode}#"
     expect: { matches: "^#" }
     returns: ack
   send_raw:
     summary: "Any TPP command from the commands document, as written; returns the device's answer line"
     params:
-      command: { type: string, max_length: 64, pattern: "^[!-~]+$", required: true }
+      command: { type: string, max_length: 64, pattern: "^[!-~]+$", required: true,
+        label: Command,
+        description: "A TPP command as written in the commands document, with its indexes, value and register name." }
     send: "{command}"
     expect: { matches: "^(([^E]|E[^1]).*)$" }
     returns: value
