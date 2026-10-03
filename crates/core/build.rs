@@ -115,6 +115,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-sony", &["sony-camera", "visca"]),
     ("vendor-studiocoast", &["vmix"]),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
+    ("vendor-tvone", &["tvone-coriomaster"]),
     (
         "vendor-yamaha",
         &[

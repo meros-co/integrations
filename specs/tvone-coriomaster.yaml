@@ -1,0 +1,732 @@
+spec: 1
+id: tvone-coriomaster
+name: tvONE CORIOmaster (command line API)
+vendor: tvONE
+category: switcher
+
+# CORIOmaster's command line API is a tree of properties and methods over TCP
+# port 10001, one command per line. "<path> = <value>" sets a property and
+# "<path>" reads it (or lists a branch); the unit echoes each value as
+# "<path> = <value>" and ends every command with "!Done <path>". Methods are
+# "<path>()". Events the connection has subscribed to with AddEvents arrive
+# unasked as "!Event <category>,<event>,<detail>". A command's reply is the
+# "!Done" line; the value lines before it go to the telemetry rules, so a read
+# fills the state rather than returning its value.
+
+source:
+  - title: tvONE CORIOmaster Commands, document version 411.0.1 (System API 4.11, firmware M411)
+    author: tvONE
+    url: https://api.tvone.com/products/c3-series/c3-5xx/tvONE%20CORIOmaster%20Commands_current.pdf
+    note: >
+      Manufacturer document, linked from tvONE's CORIOmaster API page
+      (https://api.tvone.com/products/c3-series/c3-5xx/). Used for the serial
+      and Ethernet settings (port 10001, one controlling connection at a time,
+      page 4), Login, StartBatch and EndBatch (page 6), the CORIOmax
+      properties (page 8), the event mechanism (AddEvents, RemoveEvents and
+      the event list, page 37), the Window, Canvas, Layout, Storyboard and
+      Preset properties, methods, ranges and events (Routing commands, pages
+      187-204) and the custom types (page 205). Cited as Commands 411.
+  - title: tvONE CORIOmaster / CORIOmaster mini Manual, version 1.0.7
+    author: tvONE
+    url: https://tvone.com/filestore/Manuals-CORIO-Products/CORIOmaster_Manual.pdf
+    note: >
+      Manufacturer document. The command line section ("Using Command Line
+      Interface for Resolution Editing") shows the unit greeting a connection
+      with a caret prompt, login(<username>,<password>), and "!Done <path>"
+      after each command.
+
+transport:
+  type: line-tcp
+  port: 10001
+  framing: terminated
+  terminator: crlf
+  reply_framing: line
+  # Only "!Done" (and an error line, see quirks) ends a command; value lines,
+  # "!Info" and "!Event" lines go to the telemetry rules.
+  reply_match: "^!(Done|Error)"
+  timeout_ms: 3000
+  probe: "CORIOmax.Model_Name"
+
+settings:
+  username: { type: string, default: admin }
+  password: { type: string, secret: true, default: adminpw }
+
+on_connect:
+  - when_set: password
+    send: "login({settings.username},{settings.password})"
+
+models:
+  - id: c3-540
+    name: tvONE CORIOmaster (C3-540)
+    supports: [window_input, window_canvas, window_alias, window_width, window_height, window_x, window_y, window_geometry, window_zorder, window_rotation, window_quality, window_border_width, window_border_color, window_hflip, window_vflip, window_fade, window_animate_fade, window_animate_hshrink, window_animate_vshrink, window_animate_spin, window_keying_layer, window_luma_key, get_window, canvas_alias, canvas_windows, canvas_layouts, canvas_audio_mode, canvas_audio_source, canvas_audio_follow_window, canvas_audio_mute, canvas_audio_volume, get_canvas, layout_canvas, layout_outputs, layout_size, layout_centre, storyboard_take, storyboard_save, storyboard_remove, storyboard_name, preset_take, preset_save, preset_name, preset_duration, preset_remove, preset_list, preset_save_all, preset_restore_all, preset_remove_all, get_property, set_property, add_events, remove_events, get_device_info]
+    verification: none
+  - id: c3-510
+    name: tvONE CORIOmaster mini (C3-510)
+    supports: [window_input, window_canvas, window_alias, window_width, window_height, window_x, window_y, window_geometry, window_zorder, window_rotation, window_quality, window_border_width, window_border_color, window_hflip, window_vflip, window_fade, window_animate_fade, window_animate_hshrink, window_animate_vshrink, window_animate_spin, window_keying_layer, window_luma_key, get_window, canvas_alias, canvas_windows, canvas_layouts, canvas_audio_mode, canvas_audio_source, canvas_audio_follow_window, canvas_audio_mute, canvas_audio_volume, get_canvas, layout_canvas, layout_outputs, layout_size, layout_centre, storyboard_take, storyboard_save, storyboard_remove, storyboard_name, preset_take, preset_save, preset_name, preset_duration, preset_remove, preset_list, preset_save_all, preset_restore_all, preset_remove_all, get_property, set_property, add_events, remove_events, get_device_info]
+    verification: none
+  - id: c3-503
+    name: tvONE CORIOmaster micro (C3-503)
+    supports: [window_input, window_canvas, window_alias, window_width, window_height, window_x, window_y, window_geometry, window_zorder, window_rotation, window_quality, window_border_width, window_border_color, window_hflip, window_vflip, window_fade, window_animate_fade, window_animate_hshrink, window_animate_vshrink, window_animate_spin, window_keying_layer, window_luma_key, get_window, canvas_alias, canvas_windows, canvas_layouts, canvas_audio_mode, canvas_audio_source, canvas_audio_follow_window, canvas_audio_mute, canvas_audio_volume, get_canvas, layout_canvas, layout_outputs, layout_size, layout_centre, storyboard_take, storyboard_save, storyboard_remove, storyboard_name, preset_take, preset_save, preset_name, preset_duration, preset_remove, preset_list, preset_save_all, preset_restore_all, preset_remove_all, get_property, set_property, add_events, remove_events, get_device_info]
+    verification: none
+
+commands:
+  window_input:
+    summary: "Route an input to a window, such as Slot4.In1 (Window<n>.Input)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      input: { type: string, pattern: "^Slot\\d+\\.In\\d+$", required: true }
+    send: "Window{window}.Input = {input}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_canvas:
+    summary: "Assign a window to canvases, comma separated (Canvas1,Canvas2), or NULL for none"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      canvases: { type: string, pattern: "^(Canvas\\d+(,Canvas\\d+)*|NULL)$", required: true }
+    send: "Window{window}.Canvas = {canvases}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_alias:
+    summary: "Set a window's alias name"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      alias: { type: string, pattern: "^[A-Za-z0-9_-]{1,32}$", required: true }
+    send: "Window{window}.Alias = {alias}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_width:
+    summary: "Set a window's width on the canvas, 0 to 16383"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      width: { type: int, min: 0, max: 16383, required: true }
+    send: "Window{window}.CanWidth = {width}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_height:
+    summary: "Set a window's height on the canvas, 0 to 16383"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      height: { type: int, min: 0, max: 16383, required: true }
+    send: "Window{window}.CanHeight = {height}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_x:
+    summary: "Set the x coordinate of a window's centre, -8192 to 8191"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      x: { type: int, min: -8192, max: 8191, required: true }
+    send: "Window{window}.CanXCentre = {x}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_y:
+    summary: "Set the y coordinate of a window's centre, -8192 to 8191"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      y: { type: int, min: -8192, max: 8191, required: true }
+    send: "Window{window}.CanYCentre = {y}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_geometry:
+    summary: "Set a window's size and centre together, applied at once (StartBatch ... EndBatch)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      width: { type: int, min: 0, max: 16383, required: true }
+      height: { type: int, min: 0, max: 16383, required: true }
+      x: { type: int, min: -8192, max: 8191, required: true }
+      y: { type: int, min: -8192, max: 8191, required: true }
+    send:
+      - "StartBatch"
+      - "Window{window}.CanWidth = {width}"
+      - "Window{window}.CanHeight = {height}"
+      - "Window{window}.CanXCentre = {x}"
+      - "Window{window}.CanYCentre = {y}"
+      - "EndBatch"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_zorder:
+    summary: "Set a window's depth within the canvas, 0 to 15"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      zorder: { type: int, min: 0, max: 15, required: true }
+    send: "Window{window}.Zorder = {zorder}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_rotation:
+    summary: "Rotate a window, 0 to 359 degrees"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      degrees: { type: int, min: 0, max: 359, required: true }
+    send: "Window{window}.RotateDeg = {degrees}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_quality:
+    summary: "Set a window's quality: 0 preview, 1024 HQ, 2048 EHQ, 4096 UHQ"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      quality: { type: enum, values: ["0", "1024", "2048", "4096"], required: true }
+    send: "Window{window}.WDPQ = {quality}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_border_width:
+    summary: "Set a window's border width, 0 to 64 pixels"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      width: { type: int, min: 0, max: 64, required: true }
+    send: "Window{window}.BdrPixWidth = {width}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_border_color:
+    summary: "Set a window's border colour as an RGB integer (0xRRGGBB)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      rgb: { type: int, min: 0, max: 16777215, required: true }
+    send: "Window{window}.BdrRGB = {rgb}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_hflip:
+    summary: "Flip a window horizontally, or not"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      enabled: { type: enum, values: ["On", "Off"], default: "On" }
+    send: "Window{window}.HFlip = {enabled}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_vflip:
+    summary: "Flip a window vertically, or not"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      enabled: { type: enum, values: ["On", "Off"], default: "On" }
+    send: "Window{window}.VFlip = {enabled}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_fade:
+    summary: "Set a window's fade: 0 full brightness to 256 black (FTB)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      level: { type: int, min: 0, max: 256, required: true }
+    send: "Window{window}.FTB = {level}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_animate_fade:
+    summary: "Turn a window's fade-through-black animation on or off"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      enabled: { type: enum, values: ["On", "Off"], default: "On" }
+    send: "Window{window}.SCFTB = {enabled}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_animate_hshrink:
+    summary: "Turn a window's horizontal shrink animation on or off"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      enabled: { type: enum, values: ["On", "Off"], default: "On" }
+    send: "Window{window}.SCHShrink = {enabled}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_animate_vshrink:
+    summary: "Turn a window's vertical shrink animation on or off"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      enabled: { type: enum, values: ["On", "Off"], default: "On" }
+    send: "Window{window}.SCVShrink = {enabled}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_animate_spin:
+    summary: "Set a window's spin animation, -7 (anticlockwise) to 7 (clockwise), 0 off"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      spin: { type: int, min: -7, max: 7, required: true }
+    send: "Window{window}.SCSpin = {spin}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_keying_layer:
+    summary: "Set a window's keying layer: 1 background, 2 foreground (keyed)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      layer: { type: int, min: 1, max: 2, required: true }
+    send: "Window{window}.KeyingLayer = {layer}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  window_luma_key:
+    summary: "Set a window's luma key: minimum and maximum 0-255, softness 0-15 (0 turns keying off)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+      min: { type: int, min: 0, max: 255, required: true }
+      max: { type: int, min: 0, max: 255, required: true }
+      softness: { type: int, min: 0, max: 15, required: true }
+    send:
+      - "StartBatch"
+      - "Window{window}.KeyingYMin = {min}"
+      - "Window{window}.KeyingYMax = {max}"
+      - "Window{window}.KeyingYSoft = {softness}"
+      - "EndBatch"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  get_window:
+    summary: "Read every property of a window into state (Window<n>)"
+    params:
+      window: { type: int, min: 1, max: 99, required: true }
+    send: "Window{window}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_alias:
+    summary: "Set a canvas's alias name"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      alias: { type: string, pattern: "^[A-Za-z0-9_-]{1,32}$", required: true }
+    send: "Canvas{canvas}.Alias = {alias}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_windows:
+    summary: "Set the windows on a canvas, comma separated (Window1,Window2)"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      windows: { type: string, pattern: "^(Window\\d+(,Window\\d+)*|NULL)$", required: true }
+    send: "Canvas{canvas}.WindowList = {windows}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_layouts:
+    summary: "Set the layouts a canvas is assigned to, comma separated"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      layouts: { type: string, pattern: "^(Layout\\d+(,Layout\\d+)*|NULL)$", required: true }
+    send: "Canvas{canvas}.LayoutList = {layouts}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_audio_mode:
+    summary: "Set where a canvas's audio comes from: FromSource or FollowWindow"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      mode: { type: enum, values: [FromSource, FollowWindow], required: true }
+    send: "Canvas{canvas}.AudioMode = {mode}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_audio_source:
+    summary: "Set a canvas's audio source, such as Slot1.In1, or NULL"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      source: { type: string, pattern: "^(Slot\\d+\\.In\\d+(\\.AudIn[A-Z])?|NULL)$", required: true }
+    send: "Canvas{canvas}.AudioSource = {source}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_audio_follow_window:
+    summary: "Set the window whose audio a canvas outputs"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      window: { type: int, min: 0, max: 99, required: true }
+    send: "Canvas{canvas}.AudioFollowWindow = {window}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_audio_mute:
+    summary: "Mute or unmute a canvas's audio"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      muted: { type: enum, values: ["On", "Off"], default: "On" }
+    send: "Canvas{canvas}.AudioMute = {muted}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  canvas_audio_volume:
+    summary: "Set a canvas's audio volume, 0 to 100 percent"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+      volume: { type: int, min: 0, max: 100, required: true }
+    send: "Canvas{canvas}.AudioVolume = {volume}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  get_canvas:
+    summary: "Read every property of a canvas into state (Canvas<n>)"
+    params:
+      canvas: { type: int, min: 1, max: 99, required: true }
+    send: "Canvas{canvas}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  layout_canvas:
+    summary: "Assign a layout to a canvas"
+    params:
+      layout: { type: int, min: 1, max: 99, required: true }
+      canvas: { type: int, min: 1, max: 99, required: true }
+    send: "Layout{layout}.Canvas = Canvas{canvas}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  layout_outputs:
+    summary: "Set a layout's outputs, comma separated (Slot13.Out1,Slot16.Out2)"
+    params:
+      layout: { type: int, min: 1, max: 99, required: true }
+      outputs: { type: string, pattern: "^(Slot\\d+\\.Out\\d+(,Slot\\d+\\.Out\\d+)*|NULL)$", required: true }
+    send: "Layout{layout}.OutputList = {outputs}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  layout_size:
+    summary: "Set a layout's image sizing, -32 to 16383 each (smaller is a larger image)"
+    params:
+      layout: { type: int, min: 1, max: 99, required: true }
+      width: { type: int, min: -32, max: 16383, required: true }
+      height: { type: int, min: -32, max: 16383, required: true }
+    send:
+      - "StartBatch"
+      - "Layout{layout}.CanWidth4kUnit = {width}"
+      - "Layout{layout}.CanHeight4kUnit = {height}"
+      - "EndBatch"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  layout_centre:
+    summary: "Set a layout's centring, -8191 to 8191 each"
+    params:
+      layout: { type: int, min: 1, max: 99, required: true }
+      x: { type: int, min: -8191, max: 8191, required: true }
+      y: { type: int, min: -8191, max: 8191, required: true }
+    send:
+      - "StartBatch"
+      - "Layout{layout}.CanXCentre = {x}"
+      - "Layout{layout}.CanYCentre = {y}"
+      - "EndBatch"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  storyboard_take:
+    summary: "Run a storyboard (Stbds.Stbd<n>.Take())"
+    params:
+      storyboard: { type: int, min: 1, max: 50, required: true }
+    send: "Stbds.Stbd{storyboard}.Take()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  storyboard_save:
+    summary: "Make a storyboard persistent"
+    params:
+      storyboard: { type: int, min: 1, max: 50, required: true }
+    send: "Stbds.Stbd{storyboard}.Save()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  storyboard_remove:
+    summary: "Clear a storyboard"
+    params:
+      storyboard: { type: int, min: 1, max: 50, required: true }
+    send: "Stbds.Stbd{storyboard}.Remove()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  storyboard_name:
+    summary: "Rename a storyboard"
+    params:
+      storyboard: { type: int, min: 1, max: 50, required: true }
+      name: { type: string, pattern: "^[A-Za-z0-9_]{1,20}$", required: true }
+    send: "Stbds.Stbd{storyboard}.Name = {name}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_take:
+    summary: "Take a preset, 1 to 49 (Preset.Take)"
+    params:
+      preset: { type: int, min: 1, max: 49, required: true }
+    send: "Preset.Take = {preset}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_save:
+    summary: "Save the live layout as a preset (Preset.Read, then Preset.SaveRead())"
+    params:
+      preset: { type: int, min: 1, max: 49, required: true }
+    send:
+      - "Preset.Read = {preset}"
+      - "Preset.SaveRead()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_name:
+    summary: "Name a preset, up to 20 letters, digits or underscores"
+    params:
+      preset: { type: int, min: 1, max: 49, required: true }
+      name: { type: string, pattern: "^[A-Za-z0-9_]{1,20}$", required: true }
+    send:
+      - "Preset.Read = {preset}"
+      - "Preset.NameRead = {name}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_duration:
+    summary: "Set a preset's transition time, 0 to 60000 ms"
+    params:
+      preset: { type: int, min: 1, max: 49, required: true }
+      ms: { type: int, min: 0, max: 60000, required: true }
+    send:
+      - "Preset.Read = {preset}"
+      - "Preset.DurationRead = {ms}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_remove:
+    summary: "Clear a preset from memory"
+    params:
+      preset: { type: int, min: 1, max: 49, required: true }
+    send:
+      - "Preset.Read = {preset}"
+      - "Preset.RmvPresetFileRead()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_list:
+    summary: "List the valid presets: each answers Routing.Preset.PresetList[n]=name,canvas,duration (into state)"
+    send: "Preset.PresetList()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_save_all:
+    summary: "Save every preset to on-chip memory"
+    send: "Preset.SaveAllPresets()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_restore_all:
+    summary: "Restore every preset from on-chip memory"
+    send: "Preset.RestoreAllPresets()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  preset_remove_all:
+    summary: "Clear every preset from on-chip memory"
+    send: "Preset.RemovePresetFiles()"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  get_property:
+    summary: "Read any property or list by its path, such as Slot4.In1 or System; matching lines update state"
+    params:
+      path: { type: string, pattern: "^[A-Za-z0-9_.()\\[\\]]{1,128}$", required: true }
+    send: "{path}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  set_property:
+    summary: "Set any property: <path> = <value>, as the command reference lists them"
+    params:
+      path: { type: string, pattern: "^[A-Za-z0-9_.\\[\\]]{1,128}$", required: true }
+      value: { type: string, pattern: "^[A-Za-z0-9_.:,@/ -]{0,128}$", required: true }
+    send: "{path} = {value}"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  add_events:
+    summary: "Subscribe this connection to an event category, such as HDMI or MODULE"
+    params:
+      category: { type: string, pattern: "^[A-Z_]{1,32}$", required: true }
+    send: "AddEvents({category})"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  remove_events:
+    summary: "Unsubscribe this connection from an event category"
+    params:
+      category: { type: string, pattern: "^[A-Z_]{1,32}$", required: true }
+    send: "RemoveEvents({category})"
+    expect: { contains: "!Done" }
+    returns: ack
+
+  get_device_info:
+    summary: "Read the model, serial number and software version (CORIOmax) into state"
+    send: "CORIOmax"
+    expect: { contains: "!Done" }
+    returns: ack
+
+telemetry:
+  # The unit pushes the events a connection subscribes to; the window input,
+  # preset, storyboard and canvas categories are added on connecting. The
+  # model information, the active preset and windows 1 to 16 are read once;
+  # after that the events and the echo of every command keep them current.
+  subscribe:
+    send:
+      - "AddEvents(WINDOW)"
+      - "AddEvents(PRESET)"
+      - "AddEvents(STBD)"
+      - "AddEvents(CANVAS)"
+  poll:
+    send:
+      - "CORIOmax"
+      - "Preset.Take"
+      - "Window1.Input"
+      - "Window2.Input"
+      - "Window3.Input"
+      - "Window4.Input"
+      - "Window5.Input"
+      - "Window6.Input"
+      - "Window7.Input"
+      - "Window8.Input"
+      - "Window9.Input"
+      - "Window10.Input"
+      - "Window11.Input"
+      - "Window12.Input"
+      - "Window13.Input"
+      - "Window14.Input"
+      - "Window15.Input"
+      - "Window16.Input"
+  updates:
+    - match: "^!Event WINDOW, ?INPUT, ?Window(\\d+), ?(\\S+)$"
+      state: { "windows.{1}.input": "{2}" }
+    - match: "^!Event PRESET, ?TAKE, ?(\\d+)$"
+      state: { preset.current: "{1}" }
+    - match: "^!Event PRESET, ?COMPLETE, ?(\\d+)$"
+      state: { preset.completed: "{1}" }
+    - match: "^!Event STBD, ?ISCURRENT_CHANGED, ?Stbd(\\d+), ?([01])$"
+      state: { "storyboards.{1}.current": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: "^(?:Routing\\.)?Preset\\.Take ?= ?(\\d+)$"
+      state: { preset.current: "{1}" }
+    - match: "^Routing\\.Preset\\.PresetList\\[(\\d+)\\] ?= ?([^,]*),([^,]*),(\\d+)$"
+      state:
+        "presets.{1}.name": "{2}"
+        "presets.{1}.canvas": "{3}"
+        "presets.{1}.duration": "{4}"
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.Input ?= ?(\\S+)$"
+      state: { "windows.{1}.input": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.Canvas ?= ?(\\S*)$"
+      state: { "windows.{1}.canvas": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.Alias ?= ?(\\S*)$"
+      state: { "windows.{1}.alias": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.CanWidth ?= ?(-?\\d+)$"
+      state: { "windows.{1}.width": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.CanHeight ?= ?(-?\\d+)$"
+      state: { "windows.{1}.height": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.CanXCentre ?= ?(-?\\d+)$"
+      state: { "windows.{1}.x": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.CanYCentre ?= ?(-?\\d+)$"
+      state: { "windows.{1}.y": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.Zorder ?= ?(\\d+)$"
+      state: { "windows.{1}.zorder": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.FTB ?= ?(\\d+)$"
+      state: { "windows.{1}.fade": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Windows\\.)?Window(\\d+)\\.Status ?= ?(\\S+)$"
+      state: { "windows.{1}.status": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Canvases\\.)?Canvas(\\d+)\\.WindowList ?= ?(\\S*)$"
+      state: { "canvases.{1}.windows": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Canvases\\.)?Canvas(\\d+)\\.StbdCurrent ?= ?(\\S+)$"
+      state: { "canvases.{1}.current_storyboard": "{2}" }
+    - match: "^(?:Routing\\.)?(?:Canvases\\.)?Canvas(\\d+)\\.AudioMute ?= ?(On|Off)$"
+      state: { "canvases.{1}.audio_mute": { value: "{2}", map: { "On": true, "Off": false } } }
+    - match: "^(?:Routing\\.)?(?:Canvases\\.)?Canvas(\\d+)\\.AudioVolume ?= ?(\\d+)$"
+      state: { "canvases.{1}.audio_volume": "{2}" }
+    - match: "^CORIOmax\\.Model_Name ?= ?(.+)$"
+      state: { device.model_name: "{1}" }
+    - match: "^CORIOmax\\.Model_Number ?= ?(.+)$"
+      state: { device.model_number: "{1}" }
+    - match: "^CORIOmax\\.Serial_Number ?= ?(.+)$"
+      state: { device.serial_number: "{1}" }
+    - match: "^CORIOmax\\.Software_Version ?= ?(.+)$"
+      state: { device.software_version: "{1}" }
+
+state:
+  windows.*.input: { type: string, description: "Input routed to the window, such as Slot4.In1, keyed by window number" }
+  windows.*.canvas: { type: string, description: "Canvases the window is on, comma separated, or NULL" }
+  windows.*.alias: { type: string, description: "Window alias, NULL when none" }
+  windows.*.width: { type: int, description: "Window width on the canvas" }
+  windows.*.height: { type: int, description: "Window height on the canvas" }
+  windows.*.x: { type: int, description: "X coordinate of the window's centre" }
+  windows.*.y: { type: int, description: "Y coordinate of the window's centre" }
+  windows.*.zorder: { type: int, description: "Window depth within the canvas, 0 to 15" }
+  windows.*.fade: { type: int, description: "Window fade, 0 full brightness to 256 black" }
+  windows.*.status: { type: string, description: "Window status, such as FREE" }
+  canvases.*.windows: { type: string, description: "Windows on the canvas, comma separated" }
+  canvases.*.current_storyboard: { type: string, description: "Storyboard (preset) current on the canvas, NULL when none" }
+  canvases.*.audio_mute: { type: bool, description: "Canvas audio muted" }
+  canvases.*.audio_volume: { type: int, unit: percent, description: "Canvas audio volume" }
+  preset.current: { type: int, description: "Last preset taken" }
+  preset.completed: { type: int, description: "Last preset whose transition completed" }
+  presets.*.name: { type: string, description: "Preset name, keyed by preset ID (from preset_list)" }
+  presets.*.canvas: { type: string, description: "Canvas the preset applies to" }
+  presets.*.duration: { type: int, unit: ms, description: "Preset transition time" }
+  storyboards.*.current: { type: bool, description: "The storyboard is current" }
+  device.model_name: { type: string, description: "Model name, such as CORIOmaster" }
+  device.model_number: { type: string, description: "Model number, such as C3-540" }
+  device.serial_number: { type: string, description: "Serial number" }
+  device.software_version: { type: string, description: "Software version" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The unit accepts one controlling connection at a time, serial or
+      Ethernet, never both (Commands 411, Constraints). CORIOgrapher or another
+      controller connected at the same time can lose its connection or take
+      this one's.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The command reference does not document error replies. A failed command
+      is assumed to answer a line starting "!Error", which fails it; a reply in
+      another form would leave the command waiting until the timeout.
+
+  - models: [all]
+    severity: info
+    text: >
+      Login uses the web interface's accounts, admin/adminpw by default. The
+      reference gives the success text ("!Info : User admin Logged In") but no
+      failure text, so a wrong password is not detected as a refusal.
+
+  - models: [all]
+    severity: info
+    text: >
+      A read answers with "<path> = <value>" lines before "!Done", so read
+      commands (get_window, get_canvas, get_property, preset_list,
+      get_device_info) return only an acknowledgement; the values reach the
+      state through the rules. get_property returns nothing for a path the
+      rules do not name.
+
+  - models: [all]
+    severity: critical
+    text: >
+      preset_take and storyboard_take change the live outputs, with the
+      preset's transition time. window_input, window_canvas and the window
+      geometry commands change what is on screen immediately. Do not use
+      presets to add or remove windows (Commands 411, Preset Commands).
+
+  - models: [all]
+    severity: warning
+    text: >
+      preset_save, preset_remove, preset_remove_all, preset_save_all and
+      storyboard_remove overwrite or clear stored presets without asking.
+      Window<n>.Input must never be set to NULL (undefined behaviour), so
+      window_input takes a SlotN.InN only.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not included: System.Reset() (reboot), which answers "!Info: Rebooting..."
+      rather than "!Done"; the per-slot input and output module properties
+      (resolution, EDID, HDBaseT, audio, media player), which set_property and
+      get_property reach by path; and CORIOmaster2 (CM2 series), which has its
+      own command reference.

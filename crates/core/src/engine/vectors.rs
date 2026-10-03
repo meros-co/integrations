@@ -384,8 +384,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 7] = [
-        "200 ok", "~01@ok", "ACK;", "ACK", "ack,ok", "OK ok", "\u{6}",
+    const SUCCESS: [&str; 8] = [
+        "200 ok", "~01@ok", "ACK;", "ACK", "ack,ok", "OK ok", "\u{6}", "!Done ok",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
