@@ -78,7 +78,9 @@ transport:
 settings:
   # Administrator or user password; empty for a unit without passwords. The factory password is the unit's
   # serial number (IN1808 guide p.53, IN1608 guide p.43).
-  password: { type: string, secret: true, default: "", max_length: 128, pattern: '^[^|/\\* ]*$' }
+  password: { type: string, secret: true, default: "", max_length: 128, pattern: '^[^|/\\* ]*$',
+              label: Password,
+              description: "Administrator or user password; empty for a unit without passwords (the factory password is the unit's serial number)." }
 
 on_connect:
   - when_set: password
@@ -158,21 +160,27 @@ commands:
   select_input:
     summary: Select an input's video and audio for the output (X!*1!); 9 is the aux audio input
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "{input}*1!"
     expect: { matches: '^In\s*\d+(?:\*1)?\s*All$' }
     returns: ack
   select_video_input:
     summary: Select an input's video only (breakaway) (X!*1%)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "{input}*1%"
     expect: { matches: '^In\s*\d+(?:\*1)?\s*Vid$' }
     returns: ack
   select_audio_input:
     summary: Select an input's audio only (breakaway) (X!*1$); 9 is the aux audio input
     params:
-      input: { type: int, min: 1, max: 9, required: true }
+      input: { type: int, min: 1, max: 9, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel; 9 is the IN1808's aux audio input." }
     send: "{input}*1$"
     expect: { matches: '^In\s*\d+(?:\*1)?\s*Aud$' }
     returns: ack
@@ -194,21 +202,27 @@ commands:
   select_input_in1600:
     summary: Select an input's video and audio (X!!)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "{input}!"
     expect: { matches: '^In\s*\d+\s*All$' }
     returns: ack
   select_video_input_in1600:
     summary: Select an input's video only (X!&); not allowed from an input set to a digital audio format (E17)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "{input}&"
     expect: { matches: '^In\s*\d+\s*RGB$' }
     returns: ack
   select_audio_input_in1600:
     summary: Select an input's audio only (X!$); not allowed to an input set to a digital audio format (E17)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "{input}$"
     expect: { matches: '^In\s*\d+\s*Aud$' }
     returns: ack
@@ -232,7 +246,9 @@ commands:
   set_loop_out_input:
     summary: Tie the HDMI loop output to an input (Esc X!LOUT)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}LOUT"
     expect: { matches: '^Lout\s*\d+$' }
     returns: ack
@@ -244,45 +260,63 @@ commands:
   set_input_name:
     summary: Name a video input, up to 32 characters; a single space restores the default (Esc IX!*name VNAM)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true,
+              label: Name,
+              description: "Name to give, without commas, asterisks or |; a single space restores the default." }
     send: "\x1bI{input}*{name}VNAM"
     expect: { matches: '^VnamI' }
     returns: ack
   get_input_name:
     summary: Get a video input's name (Esc IX!VNAM)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1bI{input}VNAM"
     expect: { matches: '^(?:VnamI\s*\d+\*)?(.*)$' }
     returns: value
   set_output_name:
     summary: Name a video output (1A, 1B, loop), up to 32 characters (Esc OX@*name VNAM)
     params:
-      output: { type: int, min: 1, max: 3, required: true }
-      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
+      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true,
+              label: Name,
+              description: "Name to give, up to 32 characters, without commas, asterisks or |." }
     send: "\x1bO{output}*{name}VNAM"
     expect: { matches: '^VnamO' }
     returns: ack
   get_output_name:
     summary: Get a video output's name (Esc OX@VNAM)
     params:
-      output: { type: int, min: 1, max: 3, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
     send: "\x1bO{output}VNAM"
     expect: { matches: '^(?:VnamO\s*\d+\*)?(.*)$' }
     returns: value
   set_input_name_in1600:
     summary: Name an input, up to 16 characters; a single space restores the default (Esc X!,name NI)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      name: { type: string, max_length: 16, pattern: '^[^,*|]+$', required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      name: { type: string, max_length: 16, pattern: '^[^,*|]+$', required: true,
+              label: Name,
+              description: "Name to give, without commas, asterisks or |; a single space restores the default." }
     send: "\x1b{input},{name}NI"
     expect: { matches: '^Nmi' }
     returns: ack
   get_input_name_in1600:
     summary: Get an input's name (Esc X!NI)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}NI"
     expect: { matches: '^(?:Nmi\s*\d+,)?(.*)$' }
     returns: value
@@ -291,7 +325,9 @@ commands:
   auto_image:
     summary: Run Auto-Image on the current input, following its aspect ratio, filling the output, or keeping the input's aspect (1*0A / 1*1A / 1*2A)
     params:
-      mode: { type: enum, values: ["0", "1", "2"], default: "0" }
+      mode: { type: enum, values: ["0", "1", "2"], default: "0",
+              label: Auto-Image mode,
+              description: "0 follows the input's aspect ratio, 1 fills the output, 2 keeps the input's aspect." }
     send: "1*{mode}A"
     expect: { matches: '^Img1\*[0-2]$' }
     returns: ack
@@ -313,67 +349,93 @@ commands:
   set_auto_image:
     summary: Turn automatic Auto-Image on or off for an input (X!*1A / X!*0A)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      enabled: { type: bool, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      enabled: { type: bool, required: true,
+                 label: Auto-Image,
+                 description: "True runs Auto-Image automatically when the input's signal changes, false turns it off." }
     send: "{input}*{enabled:bool01}A"
     expect: { matches: '^Img\s*\d+\*[01]$' }
     returns: ack
   get_auto_image:
     summary: Get whether automatic Auto-Image is on for an input (X!A)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "{input}A"
     expect: { matches: '^(?:Img\s*\d+\*)?([01])$' }
     returns: value
   set_input_hdcp_authorized:
     summary: Allow or block HDCP-encrypted content on an input (Esc EX!*1HDCP / *0)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      allowed: { type: bool, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      allowed: { type: bool, required: true,
+                 label: HDCP allowed,
+                 description: "True lets the input accept HDCP-encrypted content, false blocks it." }
     send: "\x1bE{input}*{allowed:bool01}HDCP"
     expect: { matches: '^HdcpE\s*\d+\*[01]$' }
     returns: ack
   get_input_hdcp_authorized:
     summary: Get whether HDCP is allowed on an input (Esc EX!HDCP)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1bE{input}HDCP"
     expect: { matches: '^(?:HdcpE\s*\d+\*)?([01])$' }
     returns: value
   set_aspect_ratio:
     summary: Fill the output with an input (1) or keep its native aspect ratio (2) (Esc X!*nASPR)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      mode: { type: int, min: 1, max: 2, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      mode: { type: int, min: 1, max: 2, required: true,
+              label: Aspect ratio,
+              description: "1 fills the output with the input, 2 keeps the input's native aspect ratio." }
     send: "\x1b{input}*{mode}ASPR"
     expect: { matches: '^Aspr\s*\d+\s*\*\s*[12]$' }
     returns: ack
   get_aspect_ratio:
     summary: Get an input's aspect ratio setting, 1 fill or 2 follow (Esc X!ASPR)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}ASPR"
     expect: { matches: '^(?:Aspr\s*\d+\s*\*\s*)?([12])$' }
     returns: value
   set_film_mode:
     summary: Turn 3:2, 2:2 and 24:1 film mode detection on (auto) or off for an input (Esc X!*1FILM / *0)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      enabled: { type: bool, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      enabled: { type: bool, required: true,
+                 label: Film mode,
+                 description: "True turns 3:2, 2:2 and 24:1 film mode detection on (auto), false off." }
     send: "\x1b{input}*{enabled:bool01}FILM"
     expect: { matches: '^Film\s*\d+\s*\*\s*[01]$' }
     returns: ack
   get_film_mode:
     summary: Get an input's film mode detection (Esc X!FILM)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}FILM"
     expect: { matches: '^(?:Film\s*\d+\s*\*\s*)?([01])$' }
     returns: value
   set_auto_switch_mode:
     summary: "Set auto-input switching (Esc nAUSW): 0 manual; IN1808 1 user priority, 2 last connected; IN1608 1 highest active input, 2 lowest active input"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Auto-switch mode,
+              description: "0 manual; IN1808 1 user priority, 2 last connected; IN1608 1 highest active input, 2 lowest active input." }
     send: "\x1b{mode}AUSW"
     expect: { matches: '^Ausw[0-2]$' }
     returns: ack
@@ -385,7 +447,9 @@ commands:
   set_auto_switch_timeout:
     summary: Set the seconds without video before auto-input switching moves on, 0-500 (Esc TnAUSW)
     params:
-      seconds: { type: int, min: 0, max: 500, required: true }
+      seconds: { type: int, min: 0, max: 500, required: true,
+                 label: Timeout,
+                 description: "Seconds without video before auto-input switching moves on, 0 to 500." }
     send: "\x1bT{seconds}AUSW"
     expect: { matches: '^AuswT\s*\d+$' }
     returns: ack
@@ -399,7 +463,9 @@ commands:
   set_freeze:
     summary: Freeze or unfreeze the output (1*1F / 1*0F)
     params:
-      frozen: { type: bool, required: true }
+      frozen: { type: bool, required: true,
+                label: Freeze,
+                description: "True freezes the output's picture, false releases it." }
     send: "1*{frozen:bool01}F"
     expect: { matches: '^Frz1\*[01]$' }
     returns: ack
@@ -411,7 +477,9 @@ commands:
   set_freeze_in1600:
     summary: Freeze or unfreeze the current input (1F / 0F)
     params:
-      frozen: { type: bool, required: true }
+      frozen: { type: bool, required: true,
+                label: Freeze,
+                description: "True freezes the current input's picture, false releases it." }
     send: "{frozen:bool01}F"
     expect: { matches: '^Frz[01]$' }
     returns: ack
@@ -423,37 +491,51 @@ commands:
   set_contrast:
     summary: Set an input's contrast, 0-127 (64 default) (Esc X!*nCONT)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Contrast,
+               description: "Contrast of the input, 0 to 127; 64 is the default." }
     send: "\x1b{input}*{level}CONT"
     expect: { matches: '^Cont\s*\d+\*\d+$' }
     returns: ack
   get_contrast:
     summary: Get an input's contrast (Esc X!CONT)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}CONT"
     expect: { matches: '^(?:Cont\s*\d+\*)?0*(\d+)$' }
     returns: value
   set_brightness:
     summary: Set an input's brightness, 0-127 (64 default) (Esc X!*nBRIT)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      level: { type: int, min: 0, max: 127, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Brightness,
+               description: "Brightness of the input, 0 to 127; 64 is the default." }
     send: "\x1b{input}*{level}BRIT"
     expect: { matches: '^Brit\s*\d+\*\d+$' }
     returns: ack
   get_brightness:
     summary: Get an input's brightness (Esc X!BRIT)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}BRIT"
     expect: { matches: '^(?:Brit\s*\d+\*)?0*(\d+)$' }
     returns: value
   set_detail:
     summary: Set the detail (sharpness) of the current input, 0-127 (Esc 1*nHDET)
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Detail,
+               description: "Detail (sharpness) of the current input, 0 to 127." }
     send: "\x1b1*{level}HDET"
     expect: { matches: '^Hdet1\*\d+$' }
     returns: ack
@@ -465,10 +547,18 @@ commands:
   set_image_position:
     summary: "Set the image's position and size at once: horizontal -4096..4096, vertical -2400..2400, width 10-8192, height 10-4800 (Esc 1,h*v*w*hXIMG)"
     params:
-      horizontal: { type: int, min: -4096, max: 4096, required: true }
-      vertical: { type: int, min: -2400, max: 2400, required: true }
-      width: { type: int, min: 10, max: 8192, required: true }
-      height: { type: int, min: 10, max: 4800, required: true }
+      horizontal: { type: int, min: -4096, max: 4096, required: true,
+                    label: Horizontal position,
+                    description: "Horizontal position of the image in pixels; negative moves it left." }
+      vertical: { type: int, min: -2400, max: 2400, required: true,
+                  label: Vertical position,
+                  description: "Vertical position of the image in pixels; negative moves it up." }
+      width: { type: int, min: 10, max: 8192, required: true,
+               label: Width,
+               description: "Image width in pixels." }
+      height: { type: int, min: 10, max: 4800, required: true,
+                label: Height,
+                description: "Image height in pixels." }
     send: "\x1b1,{horizontal}*{vertical}*{width}*{height}XIMG"
     expect: { matches: '^Ximg1,' }
     returns: ack
@@ -480,7 +570,9 @@ commands:
   set_contrast_current_input:
     summary: Set the current input's contrast, 0-127 (Esc nCONT)
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Contrast,
+               description: "Contrast of the current input, 0 to 127; 64 is the default." }
     send: "\x1b{level}CONT"
     expect: { matches: '^Cont\s*\d+\*\d+$' }
     returns: ack
@@ -492,7 +584,9 @@ commands:
   set_brightness_current_input:
     summary: Set the current input's brightness, 0-127 (Esc nBRIT)
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Brightness,
+               description: "Brightness of the current input, 0 to 127; 64 is the default." }
     send: "\x1b{level}BRIT"
     expect: { matches: '^Brit\s*\d+\*\d+$' }
     returns: ack
@@ -504,7 +598,9 @@ commands:
   set_detail_current_input:
     summary: Set the current input's detail filter, 0-127 (Esc nHDET)
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Detail,
+               description: "Detail filter of the current input, 0 to 127." }
     send: "\x1b{level}HDET"
     expect: { matches: '^Hdet\s*\d+\s*\*\s*\d+$' }
     returns: ack
@@ -516,7 +612,9 @@ commands:
   set_color_current_input:
     summary: Set the current input's color level, 0-127 (NTSC, PAL and SECAM inputs only) (Esc nCOLR)
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Color,
+               description: "Color level of the current input, 0 to 127; NTSC, PAL and SECAM inputs only." }
     send: "\x1b{level}COLR"
     expect: { matches: '^Colr\s*\d+\*\d+$' }
     returns: ack
@@ -528,7 +626,9 @@ commands:
   set_tint_current_input:
     summary: Set the current input's tint, 0-127 (NTSC inputs only) (Esc nTINT)
     params:
-      level: { type: int, min: 0, max: 127, required: true }
+      level: { type: int, min: 0, max: 127, required: true,
+               label: Tint,
+               description: "Tint of the current input, 0 to 127; NTSC inputs only." }
     send: "\x1b{level}TINT"
     expect: { matches: '^Tint\s*\d+\*\d+$' }
     returns: ack
@@ -540,10 +640,18 @@ commands:
   set_image_position_in1600:
     summary: "Set the image's position and size at once: horizontal -2048..2048, vertical -1200..1200, width 10-4096, height 10-2400 (Esc h*v*w*hXIMG)"
     params:
-      horizontal: { type: int, min: -2048, max: 2048, required: true }
-      vertical: { type: int, min: -1200, max: 1200, required: true }
-      width: { type: int, min: 10, max: 4096, required: true }
-      height: { type: int, min: 10, max: 2400, required: true }
+      horizontal: { type: int, min: -2048, max: 2048, required: true,
+                    label: Horizontal position,
+                    description: "Horizontal position of the image in pixels; negative moves it left." }
+      vertical: { type: int, min: -1200, max: 1200, required: true,
+                  label: Vertical position,
+                  description: "Vertical position of the image in pixels; negative moves it up." }
+      width: { type: int, min: 10, max: 4096, required: true,
+               label: Width,
+               description: "Image width in pixels." }
+      height: { type: int, min: 10, max: 2400, required: true,
+                label: Height,
+                description: "Image height in pixels." }
     send: "\x1b{horizontal}*{vertical}*{width}*{height}XIMG"
     expect: { matches: '^Ximg' }
     returns: ack
@@ -557,22 +665,30 @@ commands:
   set_video_mute:
     summary: "Mute an output: 0 unmute, 1 video to black, 2 video and sync (X@*nB)"
     params:
-      output: { type: int, min: 1, max: 3, required: true }
-      mode: { type: int, min: 0, max: 2, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Video mute,
+              description: "0 unmutes, 1 mutes video to black, 2 mutes video and sync." }
     send: "{output}*{mode}B"
     expect: { matches: '^Vmt\s*\d+\*[0-2]$' }
     returns: ack
   get_video_mute:
     summary: Get an output's video mute, 0-2 (X@*B)
     params:
-      output: { type: int, min: 1, max: 3, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
     send: "{output}*B"
     expect: { matches: '^(?:Vmt\s*\d+\*)?([0-2])$' }
     returns: value
   set_video_mute_all:
     summary: "Mute every output: 0 unmute, 1 video to black, 2 video and sync (nB)"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Video mute,
+              description: "0 unmutes, 1 mutes video to black, 2 mutes video and sync." }
     send: "{mode}B"
     expect: { matches: '^Vmt[0-2]$' }
     returns: ack
@@ -584,7 +700,9 @@ commands:
   set_output_rate:
     summary: Set the output resolution and rate by the guide's code (Esc 1*nRATE); see the IN1808 guide's table (p.57)
     params:
-      rate: { type: int, min: 10, max: 210, required: true }
+      rate: { type: int, min: 10, max: 210, required: true,
+              label: Output rate,
+              description: "Output resolution and refresh rate code from the IN1808 guide's table (p.57)." }
     send: "\x1b1*{rate}RATE"
     expect: { matches: '^Rate1\*\d+$' }
     returns: ack
@@ -596,7 +714,9 @@ commands:
   set_output_rate_in1600:
     summary: Set the output resolution and rate by the guide's code, 3-8, 10-92, 201, 202 (Esc nRATE); see the IN1608 guide's table (p.49)
     params:
-      rate: { type: int, min: 3, max: 202, required: true }
+      rate: { type: int, min: 3, max: 202, required: true,
+              label: Output rate,
+              description: "Output resolution and refresh rate code from the IN1608 guide's table (p.49): 3-8, 10-92, 201 or 202." }
     send: "\x1b{rate}RATE"
     expect: { matches: '^Rate\s*\d+$' }
     returns: ack
@@ -608,22 +728,30 @@ commands:
   set_hdmi_output_format:
     summary: Set an HDMI output's format and colour space by the guide's code, 0 auto (Esc X@*nVTPO)
     params:
-      output: { type: int, min: 1, max: 3, required: true }
-      format: { type: int, min: 0, max: 7, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
+      format: { type: int, min: 0, max: 7, required: true,
+                label: Output format,
+                description: "HDMI format and colour space code from the guide; 0 is auto." }
     send: "\x1b{output}*{format}VTPO"
     expect: { matches: '^Vtpo\s*\d+\s*\*\s*\d$' }
     returns: ack
   get_hdmi_output_format:
     summary: Get an HDMI output's format code (Esc X@VTPO)
     params:
-      output: { type: int, min: 1, max: 3, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
     send: "\x1b{output}VTPO"
     expect: { matches: '^(?:Vtpo\s*\d+\s*\*\s*)?(\d)$' }
     returns: value
   set_power_save:
     summary: "Set the power save mode: 0 full power; 1 lowest (IN1608: low) power; 2 low power with TP functions (IN1808) (Esc nPSAV)"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Power save mode,
+              description: "0 full power; 1 lowest power (IN1608 low power); 2 low power with TouchLink functions (IN1808)." }
     send: "\x1b{mode}PSAV"
     expect: { matches: '^Psav[0-2]$' }
     returns: ack
@@ -635,7 +763,9 @@ commands:
   set_osd_duration:
     summary: Set how long the on-screen input bug or menu shows, in seconds (IN1608 0 never shows, 501 always) (Esc nMDUR)
     params:
-      seconds: { type: int, min: 0, max: 501, required: true }
+      seconds: { type: int, min: 0, max: 501, required: true,
+                 label: OSD duration,
+                 description: "Seconds the on-screen input bug or menu shows; on IN1608 units 0 never shows it and 501 always." }
     send: "\x1b{seconds}MDUR"
     expect: { matches: '^Mdur\s*\d+$' }
     returns: ack
@@ -649,43 +779,57 @@ commands:
   recall_input_preset:
     summary: Recall an input preset (picture settings) for the current input, 1-16 on IN1808, 1-128 on IN1608 (2*n.)
     params:
-      preset: { type: int, min: 1, max: 128, required: true }
+      preset: { type: int, min: 1, max: 128, required: true,
+                label: Input preset,
+                description: "Input preset (picture settings) number: 1 to 16 on IN1808 units, 1 to 128 on IN1608 units." }
     send: "2*{preset}."
     expect: { matches: '^2Rpr\s*\d+$' }
     returns: ack
   save_input_preset:
     summary: Save the current input's picture settings as an input preset (2*n,)
     params:
-      preset: { type: int, min: 1, max: 128, required: true }
+      preset: { type: int, min: 1, max: 128, required: true,
+                label: Input preset,
+                description: "Input preset (picture settings) number: 1 to 16 on IN1808 units, 1 to 128 on IN1608 units." }
     send: "2*{preset},"
     expect: { matches: '^2Spr\s*\d+$' }
     returns: ack
   recall_user_preset:
     summary: Recall a user preset (picture and audio settings), 1-16 (1*n.)
     params:
-      preset: { type: int, min: 1, max: 16, required: true }
+      preset: { type: int, min: 1, max: 16, required: true,
+                label: User preset,
+                description: "User preset (picture and audio settings) number, 1 to 16." }
     send: "1*{preset}."
     expect: { matches: '^1Rpr\s*\d+$' }
     returns: ack
   save_user_preset:
     summary: Save the current picture controls as a user preset, 1-16 (1*n,)
     params:
-      preset: { type: int, min: 1, max: 16, required: true }
+      preset: { type: int, min: 1, max: 16, required: true,
+                label: User preset,
+                description: "User preset number, 1 to 16." }
     send: "1*{preset},"
     expect: { matches: '^1Spr\s*\d+$' }
     returns: ack
   set_auto_memory:
     summary: Turn Auto Memory (automatic per-signal input presets) on or off for an input (Esc X!*1AMEM / *0)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
-      enabled: { type: bool, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
+      enabled: { type: bool, required: true,
+                 label: Auto Memory,
+                 description: "True turns Auto Memory (automatic per-signal input presets) on for the input, false off." }
     send: "\x1b{input}*{enabled:bool01}AMEM"
     expect: { matches: '^Amem\s*\d+\s*\*\s*[01]$' }
     returns: ack
   get_auto_memory:
     summary: Get an input's Auto Memory setting (Esc X!AMEM)
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1b{input}AMEM"
     expect: { matches: '^(?:Amem\s*\d+\s*\*\s*)?([01])$' }
     returns: value
@@ -694,106 +838,150 @@ commands:
   set_audio_input_format:
     summary: "Set an input's audio format: 0 none (muted), 1 analog, 2 LPCM-2Ch, 3 multichannel, 4 LPCM-2Ch auto, 5 multichannel auto (Esc IX!*nAFMT)"
     params:
-      input: { type: int, min: 1, max: 9, required: true }
-      format: { type: int, min: 0, max: 5, required: true }
+      input: { type: int, min: 1, max: 9, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel; 9 is the IN1808's aux audio input." }
+      format: { type: int, min: 0, max: 5, required: true,
+                label: Audio format,
+                description: "0 none (muted), 1 analog, 2 LPCM-2Ch, 3 multichannel, 4 LPCM-2Ch auto, 5 multichannel auto." }
     send: "\x1bI{input}*{format}AFMT"
     expect: { matches: '^AfmtI\s*\d+\*[0-5]$' }
     returns: ack
   get_audio_input_format:
     summary: Get an input's audio format (Esc IX!AFMT)
     params:
-      input: { type: int, min: 1, max: 9, required: true }
+      input: { type: int, min: 1, max: 9, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel; 9 is the IN1808's aux audio input." }
     send: "\x1bI{input}AFMT"
     expect: { matches: '^(?:AfmtI\s*\d+\*)?([0-5])$' }
     returns: value
   set_group_level:
     summary: Set a group master (volume, bass or treble) in tenths of a dB, such as -293 for -29.3 dB (Esc Dg*nGRPM); groups per model in the notes
     params:
-      group: { type: int, min: 1, max: 10, required: true }
-      level: { type: int, min: -1000, max: 800, required: true }
+      group: { type: int, min: 1, max: 10, required: true,
+               label: Group,
+               description: "Group master number; what each group controls depends on the model (see the model notes, e.g. 3 is program volume on the IN1808)." }
+      level: { type: int, min: -1000, max: 800, required: true,
+               label: Level,
+               description: "Group master value in tenths of a dB, e.g. -293 for -29.3 dB; the group's own range applies." }
     send: "\x1bD{group}*{level}GRPM"
     expect: { matches: '^GrpmD\s*\d+\*[-+]?\d+$' }
     returns: ack
   increase_group_level:
     summary: Raise a group master by a step in tenths of a dB (Esc Dg*n+GRPM)
     params:
-      group: { type: int, min: 1, max: 10, required: true }
-      step: { type: int, min: 1, max: 1800, required: true }
+      group: { type: int, min: 1, max: 10, required: true,
+               label: Group,
+               description: "Group master number; what each group controls depends on the model (see the model notes, e.g. 3 is program volume on the IN1808)." }
+      step: { type: int, min: 1, max: 1800, required: true,
+              label: Step,
+              description: "Amount to raise the group master by, in tenths of a dB." }
     send: "\x1bD{group}*{step}+GRPM"
     expect: { matches: '^GrpmD\s*\d+\*[-+]?\d+$' }
     returns: ack
   decrease_group_level:
     summary: Lower a group master by a step in tenths of a dB (Esc Dg*n-GRPM)
     params:
-      group: { type: int, min: 1, max: 10, required: true }
-      step: { type: int, min: 1, max: 1800, required: true }
+      group: { type: int, min: 1, max: 10, required: true,
+               label: Group,
+               description: "Group master number; what each group controls depends on the model (see the model notes, e.g. 3 is program volume on the IN1808)." }
+      step: { type: int, min: 1, max: 1800, required: true,
+              label: Step,
+              description: "Amount to lower the group master by, in tenths of a dB." }
     send: "\x1bD{group}*{step}-GRPM"
     expect: { matches: '^GrpmD\s*\d+\*[-+]?\d+$' }
     returns: ack
   get_group_level:
     summary: Get a group master's value in tenths of a dB (Esc DgGRPM)
     params:
-      group: { type: int, min: 1, max: 10, required: true }
+      group: { type: int, min: 1, max: 10, required: true,
+               label: Group,
+               description: "Group master number; what each group controls depends on the model (see the model notes, e.g. 3 is program volume on the IN1808)." }
     send: "\x1bD{group}GRPM"
     expect: { matches: '^(?:GrpmD\s*\d+\*)?([-+]?\d+)$' }
     returns: value
   set_group_mute:
     summary: Mute or unmute every block in a mute group (Esc Dg*1GRPM / *0)
     params:
-      group: { type: int, min: 1, max: 10, required: true }
-      muted: { type: bool, required: true }
+      group: { type: int, min: 1, max: 10, required: true,
+               label: Group,
+               description: "Group master number; what each group controls depends on the model (see the model notes, e.g. 3 is program volume on the IN1808)." }
+      muted: { type: bool, required: true,
+               label: Mute,
+               description: "True mutes every block in the mute group, false unmutes them." }
     send: "\x1bD{group}*{muted:bool01}GRPM"
     expect: { matches: '^GrpmD\s*\d+\*[01]$' }
     returns: ack
   get_group_mute:
     summary: Get a mute group's state (Esc DgGRPM)
     params:
-      group: { type: int, min: 1, max: 10, required: true }
+      group: { type: int, min: 1, max: 10, required: true,
+               label: Group,
+               description: "Group master number; what each group controls depends on the model (see the model notes, e.g. 3 is program volume on the IN1808)." }
     send: "\x1bD{group}GRPM"
     expect: { matches: '^(?:GrpmD\s*\d+\*)?([01])$' }
     returns: value
   set_dsp_gain:
     summary: Set the gain or attenuation of a DSP block by its object ID (OID), in tenths of a dB (Esc Goid*nAU); OIDs per model in the quirks
     params:
-      oid: { type: int, min: 30000, max: 60011, required: true }
-      level: { type: int, min: -1000, max: 800, required: true }
+      oid: { type: int, min: 30000, max: 60011, required: true,
+             label: Object ID,
+             description: "DSP block object ID (OID), as listed per model in the spec's quirks." }
+      level: { type: int, min: -1000, max: 800, required: true,
+               label: Level,
+               description: "Level in tenths of a dB, e.g. -293 for -29.3 dB; the block's own range applies." }
     send: "\x1bG{oid}*{level}AU"
     expect: { matches: '^DsG\s*\d+\*[-+]?\d+$' }
     returns: ack
   get_dsp_gain:
     summary: Get a DSP block's gain in tenths of a dB (Esc GoidAU)
     params:
-      oid: { type: int, min: 30000, max: 60011, required: true }
+      oid: { type: int, min: 30000, max: 60011, required: true,
+             label: Object ID,
+             description: "DSP block object ID (OID), as listed per model in the spec's quirks." }
     send: "\x1bG{oid}AU"
     expect: { matches: '^(?:DsG\s*\d+\*)?([-+]?\d+)$' }
     returns: value
   set_dsp_mute:
     summary: Mute or unmute a DSP block by its object ID (Esc Moid*1AU / *0)
     params:
-      oid: { type: int, min: 30000, max: 60011, required: true }
-      muted: { type: bool, required: true }
+      oid: { type: int, min: 30000, max: 60011, required: true,
+             label: Object ID,
+             description: "DSP block object ID (OID), as listed per model in the spec's quirks." }
+      muted: { type: bool, required: true,
+               label: Mute,
+               description: "True mutes the DSP block, false unmutes it." }
     send: "\x1bM{oid}*{muted:bool01}AU"
     expect: { matches: '^DsM\s*\d+\*[01]$' }
     returns: ack
   get_dsp_mute:
     summary: Get a DSP block's mute (Esc MoidAU)
     params:
-      oid: { type: int, min: 30000, max: 60011, required: true }
+      oid: { type: int, min: 30000, max: 60011, required: true,
+             label: Object ID,
+             description: "DSP block object ID (OID), as listed per model in the spec's quirks." }
     send: "\x1bM{oid}AU"
     expect: { matches: '^(?:DsM\s*\d+\*)?([01])$' }
     returns: value
   set_phantom_power:
     summary: Turn 48 V phantom power on or off on mic/line input 1 (OID 40000) or 2 (40001) (Esc Zoid*1AU / *0)
     params:
-      oid: { type: enum, values: ["40000", "40001"], required: true }
-      enabled: { type: bool, required: true }
+      oid: { type: enum, values: ["40000", "40001"], required: true,
+             label: Mic input,
+             description: "Mic/line input by object ID: 40000 is input 1, 40001 input 2." }
+      enabled: { type: bool, required: true,
+                 label: Phantom power,
+                 description: "True turns 48 V phantom power on, false off." }
     send: "\x1bZ{oid}*{enabled:bool01}AU"
     expect: { matches: '^DsZ\s*\d+\*[01]$' }
     returns: ack
   set_volume_knob_group:
     summary: Choose what the front panel volume knob controls, 1 program, 3 mic or 8 output volume (Esc 1*nKNOB)
     params:
-      group: { type: enum, values: ["1", "3", "8"], required: true }
+      group: { type: enum, values: ["1", "3", "8"], required: true,
+               label: Knob controls,
+               description: "What the front panel volume knob controls: 1 program, 3 mic, 8 output volume." }
     send: "\x1b1*{group}KNOB"
     expect: { matches: '^Knob1\*\d+$' }
     returns: ack
@@ -805,14 +993,18 @@ commands:
   play_audio_file:
     summary: Play the audio file in slot 1-16; a lower priority slot than the one playing is refused (E22) (Esc slot*1PLAY)
     params:
-      slot: { type: int, min: 1, max: 16, required: true }
+      slot: { type: int, min: 1, max: 16, required: true,
+              label: Slot,
+              description: "Audio file slot, 1 to 16; a slot of lower priority than the one playing is refused." }
     send: "\x1b{slot}*1PLAY"
     expect: { matches: '^Play\s*\d+\*1$' }
     returns: ack
   stop_audio_file:
     summary: Stop the audio file in a slot (Esc slot*0PLAY)
     params:
-      slot: { type: int, min: 1, max: 16, required: true }
+      slot: { type: int, min: 1, max: 16, required: true,
+              label: Slot,
+              description: "Audio file slot, 1 to 16." }
     send: "\x1b{slot}*0PLAY"
     expect: { matches: '^Play\s*\d+\*0$' }
     returns: ack
@@ -826,7 +1018,9 @@ commands:
   set_test_pattern:
     summary: "Show a test pattern on the output: 0 off, 1 crop, 2 alternating pixels, 3 crosshatch, 4 color bars, 5 grayscale, 6 audio test (pink noise) (Esc 1*nTEST)"
     params:
-      pattern: { type: int, min: 0, max: 6, required: true }
+      pattern: { type: int, min: 0, max: 6, required: true,
+                 label: Test pattern,
+                 description: "0 off, 1 crop, 2 alternating pixels, 3 crosshatch, 4 color bars, 5 grayscale, 6 audio test (pink noise)." }
     send: "\x1b1*{pattern}TEST"
     expect: { matches: '^Test1\*\d+$' }
     returns: ack
@@ -838,7 +1032,9 @@ commands:
   set_test_pattern_in1600:
     summary: "Show a test pattern: 0 none, 1 crop, 2 alternating pixels, 3 color bars, 4 grayscale, 5 blue mode, 6 audio test (Esc nTEST)"
     params:
-      pattern: { type: int, min: 0, max: 6, required: true }
+      pattern: { type: int, min: 0, max: 6, required: true,
+                 label: Test pattern,
+                 description: "0 none, 1 crop, 2 alternating pixels, 3 color bars, 4 grayscale, 5 blue mode, 6 audio test." }
     send: "\x1b{pattern}TEST"
     expect: { matches: '^Test\s*\d+$' }
     returns: ack
@@ -850,7 +1046,9 @@ commands:
   set_switch_effect:
     summary: "Set the input switch effect: 0 cut through black, 1 fade through black, 2 seamless fade, 3 seamless cut (Esc O1*nSWEF)"
     params:
-      effect: { type: int, min: 0, max: 3, required: true }
+      effect: { type: int, min: 0, max: 3, required: true,
+                label: Switch effect,
+                description: "0 cut through black, 1 fade through black, 2 seamless fade, 3 seamless cut." }
     send: "\x1bO1*{effect}SWEF"
     expect: { matches: '^SwefO1\*[0-3]$' }
     returns: ack
@@ -862,7 +1060,9 @@ commands:
   set_switch_effect_in1600:
     summary: Set the switch effect, 0 cut or 1 fade through black (Esc nSWEF)
     params:
-      effect: { type: int, min: 0, max: 1, required: true }
+      effect: { type: int, min: 0, max: 1, required: true,
+                label: Switch effect,
+                description: "0 cut, 1 fade through black." }
     send: "\x1b{effect}SWEF"
     expect: { matches: '^Swef[01]$' }
     returns: ack
@@ -879,7 +1079,9 @@ commands:
   set_front_panel_lock:
     summary: "Lock the front panel: 0 off, 1 complete, 2 switching and volume (IN1808 also logos), 3 switching and logos (IN1808), 4 volume only (IN1808) (nX)"
     params:
-      mode: { type: int, min: 0, max: 4, required: true }
+      mode: { type: int, min: 0, max: 4, required: true,
+              label: Lock mode,
+              description: "0 off, 1 complete, 2 switching and volume (IN1808 also logos), 3 switching and logos (IN1808), 4 volume only (IN1808)." }
     send: "{mode}X"
     expect: { matches: '^Exe[0-4]$' }
     returns: ack
@@ -891,22 +1093,30 @@ commands:
   set_output_hdcp_mode:
     summary: "Set an output's HDCP mode: 0 off, 1 follow input, 2 always encrypt (10 s of retries), 3 follow, 4 encrypt (continuous retries) (Esc SX@*nHDCP)"
     params:
-      output: { type: int, min: 1, max: 3, required: true }
-      mode: { type: int, min: 0, max: 4, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
+      mode: { type: int, min: 0, max: 4, required: true,
+              label: HDCP mode,
+              description: "0 off, 1 follow input, 2 always encrypt (10 s of retries), 3 follow, 4 encrypt (continuous retries)." }
     send: "\x1bS{output}*{mode}HDCP"
     expect: { matches: '^HdcpS\s*\d+\*[0-4]$' }
     returns: ack
   get_output_hdcp_mode:
     summary: Get an output's HDCP mode (Esc SX@HDCP)
     params:
-      output: { type: int, min: 1, max: 3, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
     send: "\x1bS{output}HDCP"
     expect: { matches: '^(?:HdcpS\s*\d+\*)?([0-4])$' }
     returns: value
   set_output_hdcp_mode_in1600:
     summary: "Set the HDMI outputs' HDCP mode: 0 encrypt when required, 1 always, 2 and 3 the same for DVI sinks that drop to green screen, 4 never (Esc SnHDCP)"
     params:
-      mode: { type: int, min: 0, max: 4, required: true }
+      mode: { type: int, min: 0, max: 4, required: true,
+              label: HDCP mode,
+              description: "0 encrypt when required, 1 always, 2 and 3 the same for DVI sinks that drop to green screen, 4 never." }
     send: "\x1bS{mode}HDCP"
     expect: { matches: '^HdcpS\s*[0-4]$' }
     returns: ack
@@ -918,7 +1128,9 @@ commands:
   set_hdcp_notification:
     summary: "Set what a non-HDCP display shows for HDCP content: 0 black, 1 green screen with message, 2 user image (Esc N1*nHDCP)"
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: HDCP notification,
+              description: "What a non-HDCP display shows for HDCP content: 0 black, 1 green screen with message, 2 user image." }
     send: "\x1bN1*{mode}HDCP"
     expect: { matches: '^HdcpN1\*[0-2]$' }
     returns: ack
@@ -930,7 +1142,9 @@ commands:
   set_hdcp_notification_in1600:
     summary: Show a green screen (true) or mute to black (false) on a non-HDCP display for HDCP content (Esc N1HDCP / N0HDCP)
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true,
+                 label: Green screen,
+                 description: "True shows a green screen on a non-HDCP display for HDCP content, false mutes it to black." }
     send: "\x1bN{enabled:bool01}HDCP"
     expect: { matches: '^HdcpN[01]$' }
     returns: ack
@@ -942,14 +1156,18 @@ commands:
   get_input_hdcp_status:
     summary: "Get an input's HDCP status (Esc IX!HDCP): IN1808 0 no source, 1 no HDCP, 2 HDCP; IN1608 0 no source, 1 HDCP, 2 no HDCP"
     params:
-      input: { type: int, min: 1, max: 8, required: true }
+      input: { type: int, min: 1, max: 8, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel." }
     send: "\x1bI{input}HDCP"
     expect: { matches: '^(?:HdcpI\s*\d+\*)?([0-2])$' }
     returns: value
   get_output_hdcp_status:
     summary: Get an output's HDCP status (Esc OX@HDCP), coded as for inputs
     params:
-      output: { type: int, min: 1, max: 3, required: true }
+      output: { type: int, min: 1, max: 3, required: true,
+                label: Output,
+                description: "Output number: on IN1808 units 1 is 1A, 2 is 1B (DTP2/XTP/HDBT), 3 the loop; on IN1600 units HDMI A, HDMI B, Out C." }
     send: "\x1bO{output}HDCP"
     expect: { matches: '^(?:HdcpO\s*\d+\*)?([0-2])$' }
     returns: value
@@ -958,7 +1176,9 @@ commands:
   get_input_info:
     summary: Get an input's signal type, audio and video mute and frequencies, as the unit reports them (X!*I)
     params:
-      input: { type: int, min: 1, max: 9, required: true }
+      input: { type: int, min: 1, max: 9, required: true,
+               label: Input,
+               description: "Input number, from 1 as on the unit's rear panel; 9 is the IN1808's aux audio input." }
     send: "{input}*I"
     expect: { matches: '^(?:Inf00\*)?(Vid.*)$' }
     returns: value
@@ -995,7 +1215,9 @@ commands:
   set_verbose_mode:
     summary: "Set the verbose mode: 0 none, 1 verbose, 2 tagged replies, 3 both (Esc nCV); state needs 3, which is set on connecting"
     params:
-      mode: { type: int, min: 0, max: 3, required: true }
+      mode: { type: int, min: 0, max: 3, required: true,
+              label: Verbose mode,
+              description: "0 none, 1 verbose, 2 tagged replies, 3 both; state needs 3, which is set on connecting." }
     send: "\x1b{mode}CV"
     expect: { matches: '^Vrb[0-3]$' }
     returns: ack

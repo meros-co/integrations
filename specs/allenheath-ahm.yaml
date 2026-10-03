@@ -38,10 +38,16 @@ source:
 settings:
   # Connect with TLS/SSL encryption (51327, p.1) and log in as user_profile
   # with password.
-  tls: { type: bool, default: false }
+  tls: { type: bool, default: false,
+         label: TLS,
+         description: "Connect with TLS on port 51327 and log in with the user profile and password; off uses plain TCP on 51325." }
   # UserProfile, 00 to 1F (p.1), sent as that byte.
-  user_profile: { type: int, min: 0, max: 31, default: 0 }
-  password: { type: string, secret: true, default: "" }
+  user_profile: { type: int, min: 0, max: 31, default: 0,
+                  label: User profile,
+                  description: "User profile to log in as with TLS, 0 to 31 (00 to 1F)." }
+  password: { type: string, secret: true, default: "",
+              label: Password,
+              description: "Password of the user profile, used with TLS." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control }
@@ -70,9 +76,15 @@ commands:
   set_mute:
     summary: "Mute or unmute an input, zone or control group (Note On 7F or 3F, then 00, p.2)"
     params:
-      channel_type: &level_type { type: enum, values: [input, zone, control_group], required: true }
-      channel: &channel { type: int, min: 1, max: 64, required: true }
-      muted: { type: bool, default: true }
+      channel_type: &level_type { type: enum, values: [input, zone, control_group], required: true,
+                                  label: Channel type,
+                                  description: "Kind of channel addressed by the number." }
+      channel: &channel { type: int, min: 1, max: 64, required: true,
+                          label: Channel,
+                          description: "Channel number from 1, as in System Manager: an input, or the zone, control group or room chosen by channel type." }
+      muted: { type: bool, default: true,
+               label: Mute,
+               description: "True mutes the input, zone or control group, false unmutes it." }
     returns: none
   get_mute:
     summary: "Read a mute (SysEx 0N 01 09 CH, answered by the mute Note On, p.2)"
@@ -83,15 +95,21 @@ commands:
     params:
       channel_type: *level_type
       channel: *channel
-      level_db: &level_db { type: float, min: -48, max: 10 }
-      level_raw: &level_raw { type: int, min: 0, max: 127 }
+      level_db: &level_db { type: float, min: -48, max: 10,
+                            label: Level,
+                            description: "Level in dB, -48 to +10; give this or a raw level." }
+      level_raw: &level_raw { type: int, min: 0, max: 127,
+                              label: Raw level,
+                              description: "Level as the raw MIDI value: 0 is -inf, 127 is +10 dB; give this or a level in dB." }
     returns: none
   adjust_level:
     summary: "Step a level up or down (NRPN 20: 7F increment, 3F decrement, p.2)"
     params:
       channel_type: *level_type
       channel: *channel
-      direction: &direction { type: enum, values: [up, down], required: true }
+      direction: &direction { type: enum, values: [up, down], required: true,
+                              label: Direction,
+                              description: "Up raises the level by one step, down lowers it by one step." }
     returns: none
   get_level:
     summary: "Read a level (SysEx 0N 01 0B 17 CH, p.2); returns {level_db, level_raw}, level_db null at -inf"
@@ -101,8 +119,12 @@ commands:
     summary: "Set an input's trim (NRPN 18, p.3): trim_db -24 to +24 over 00-7F, or trim_raw"
     params:
       channel: *channel
-      trim_db: { type: float, min: -24, max: 24 }
-      trim_raw: { type: int, min: 0, max: 127 }
+      trim_db: { type: float, min: -24, max: 24,
+                 label: Trim,
+                 description: "Input trim in dB, -24 to +24; give this or a raw trim." }
+      trim_raw: { type: int, min: 0, max: 127,
+                  label: Raw trim,
+                  description: "Trim as the raw MIDI value: 0 is -24 dB, 127 is +24 dB; give this or a trim in dB." }
     returns: none
   get_input_trim:
     summary: "Read an input's trim (SysEx 00 01 0B 18 CH, p.3); returns {trim_db, trim_raw}"
@@ -112,8 +134,12 @@ commands:
     summary: "Set an input's preamp gain (NRPN 19, p.3): gain_db +5 to +60 over 00-7F, or gain_raw"
     params:
       channel: *channel
-      gain_db: { type: float, min: 5, max: 60 }
-      gain_raw: { type: int, min: 0, max: 127 }
+      gain_db: { type: float, min: 5, max: 60,
+                 label: Gain,
+                 description: "Preamp gain in dB, +5 to +60; give this or a raw gain." }
+      gain_raw: { type: int, min: 0, max: 127,
+                  label: Raw gain,
+                  description: "Gain as the raw MIDI value: 0 is +5 dB, 127 is +60 dB; give this or a gain in dB." }
     returns: none
   get_preamp_gain:
     summary: "Read an input's preamp gain (SysEx 00 01 0B 19 CH, p.3); returns {gain_db, gain_raw}"
@@ -121,7 +147,9 @@ commands:
     returns: value
   set_preamp_pad:
     summary: "Switch an input's pad (NRPN 1A: 7F on, 00 off, p.3)"
-    params: { channel: *channel, enabled: { type: bool, default: true } }
+    params: { channel: *channel, enabled: { type: bool, default: true,
+                                            label: Pad,
+                                            description: "True switches the input's pad on, false off." } }
     returns: none
   get_preamp_pad:
     summary: "Read an input's pad (SysEx 00 01 0B 1A CH, p.3)"
@@ -129,7 +157,9 @@ commands:
     returns: value
   set_phantom_power:
     summary: "Switch an input's phantom power (NRPN 1B: 7F on, 00 off, p.3)"
-    params: { channel: *channel, enabled: { type: bool, default: true } }
+    params: { channel: *channel, enabled: { type: bool, default: true,
+                                            label: Phantom power,
+                                            description: "True switches the input's 48 V phantom power on, false off." } }
     returns: none
   get_phantom_power:
     summary: "Read an input's phantom power (SysEx 00 01 0B 1B CH, p.3)"
@@ -138,9 +168,13 @@ commands:
   set_send_level:
     summary: "Set an input-to-zone or zone-to-zone send level (SysEx 0N 02 CH 01 zone LV, p.4), as set_level"
     params:
-      channel_type: &send_type { type: enum, values: [input, zone], required: true }
+      channel_type: &send_type { type: enum, values: [input, zone], required: true,
+                                 label: Channel type,
+                                 description: "Kind of channel addressed by the number." }
       channel: *channel
-      zone: &zone { type: int, min: 1, max: 64, required: true }
+      zone: &zone { type: int, min: 1, max: 64, required: true,
+                    label: Zone,
+                    description: "Zone number, from 1 as in System Manager." }
       level_db: *level_db
       level_raw: *level_raw
     returns: none
@@ -154,7 +188,9 @@ commands:
       channel_type: *send_type
       channel: *channel
       zone: *zone
-      muted: { type: bool, default: true }
+      muted: { type: bool, default: true,
+               label: Mute,
+               description: "True mutes the send, false unmutes it." }
     returns: none
   get_send_mute:
     summary: "Read a send's mute (SysEx 0N 01 0F 03 CH 01 zone, p.4)"
@@ -167,19 +203,27 @@ commands:
   recall_preset:
     summary: "Recall preset 1-500 (B0 00 bank, C0 program, p.4)"
     params:
-      preset: { type: int, min: 1, max: 500, required: true }
+      preset: { type: int, min: 1, max: 500, required: true,
+                label: Preset,
+                description: "Preset number, 1 to 500 as in System Manager." }
     returns: none
   play_track:
     summary: "Play an audio file (SysEx 00 06 PlaybackChannel TrackID, p.5); the channel is ignored for stereo playback"
     params:
-      track_id: { type: int, min: 0, max: 127, required: true }
-      playback_channel: { type: enum, values: [mono_1, mono_2], default: mono_1 }
+      track_id: { type: int, min: 0, max: 127, required: true,
+                  label: Track,
+                  description: "Track ID of the audio file to play, 0 to 127." }
+      playback_channel: { type: enum, values: [mono_1, mono_2], default: mono_1,
+                          label: Playback channel,
+                          description: "Mono playback channel 1 or 2; ignored for stereo playback." }
     returns: none
   select_source:
     summary: "Select a zone's source selector source 1-20 (SysEx 00 08 CH SourceNumber, p.5)"
     params:
       zone: *zone
-      source: &source { type: int, min: 1, max: 20, required: true }
+      source: &source { type: int, min: 1, max: 20, required: true,
+                        label: Source,
+                        description: "Source number in the selector, 1 to 20." }
     returns: none
   get_source:
     summary: "Read a zone's selected source and its source list (SysEx 01 01 0F 08 CH, p.5); returns the source number"
@@ -188,20 +232,28 @@ commands:
   select_room_source:
     summary: "Select a room's source 1-20 (SysEx 00 0D CH SourceNumber, p.5)"
     params:
-      room: &room { type: int, min: 1, max: 16, required: true }
+      room: &room { type: int, min: 1, max: 16, required: true,
+                    label: Room,
+                    description: "Room number, from 1 as in System Manager." }
       source: *source
     returns: none
   set_room_divider:
     summary: "Combine or divide two rooms (SysEx 00 0E Room1 Room2 VL: 00-3F combined, 40-7F divided, p.5)"
     params:
       room: *room
-      other_room: { type: int, min: 1, max: 16, required: true }
-      divided: { type: bool, required: true }
+      other_room: { type: int, min: 1, max: 16, required: true,
+                    label: Other room,
+                    description: "Second room of the pair, numbered from 1." }
+      divided: { type: bool, required: true,
+                 label: Divided,
+                 description: "True divides the two rooms, false combines them." }
     returns: none
   get_channel_name:
     summary: "Read a name (SysEx 0N 09 CH, reply 0N 0A CH Name, up to 8 characters, p.6)"
     params:
-      channel_type: &named_type { type: enum, values: [input, zone, control_group, room], required: true }
+      channel_type: &named_type { type: enum, values: [input, zone, control_group, room], required: true,
+                                  label: Channel type,
+                                  description: "Kind of channel addressed by the number." }
       channel: *channel
     returns: value
   get_channel_colour:
@@ -211,7 +263,9 @@ commands:
   raw_midi:
     summary: "Send MIDI bytes given as hex, for messages not modelled here"
     params:
-      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true,
+             label: MIDI bytes,
+             description: "MIDI bytes as hex, spaces allowed, e.g. B0 63 00." }
     returns: none
   refresh:
     summary: "Read the state again: names, colours, mutes and levels of inputs, zones and control groups, input preamps and trims, zone sources, room names and colours"

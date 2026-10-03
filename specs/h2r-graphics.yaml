@@ -93,7 +93,9 @@ transport:
 settings:
   # The project id shown in the Launcher; ABCD in a new installation
   # (Companion module page). Pro installations can hold several projects.
-  project: { type: string, default: ABCD, max_length: 32 }
+  project: { type: string, default: ABCD, max_length: 32,
+             label: Project,
+             description: "Project id shown in the Launcher; ABCD in a new installation." }
 
 ports:
   - { port: 4001, protocol: http, role: control }
@@ -138,7 +140,9 @@ commands:
   show_graphic:
     summary: Show a graphic, by its id from the Rundown's Copy "Show" URI (POST graphic/<id>/show)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/show" }
     expect: { status: 200 }
     returns: ack
@@ -146,7 +150,9 @@ commands:
   hide_graphic:
     summary: Hide a graphic (POST graphic/<id>/hide)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/hide" }
     expect: { status: 200 }
     returns: ack
@@ -156,10 +162,14 @@ commands:
       Toggle a graphic on or off air (v2.11 release notes; sent as the update
       body {"status":"toggle"}, the wire form from H2R's Companion module)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
       # A single-valued parameter: the template engine would read a flat
       # literal {"status":"toggle"} as a placeholder.
-      status:  { type: enum, values: [toggle], default: toggle }
+      status:  { type: enum, values: [toggle], default: toggle,
+                 label: Status,
+                 description: "Always toggle: shows the graphic if hidden, hides it if shown." }
     send:
       method: POST
       path: "/api/{settings.project}/graphic/{graphic}/update"
@@ -175,8 +185,12 @@ commands:
       gives it; its fields depend on the graphic type, and v3.4 and later
       refuse an update verb the graphic does not understand.
     params:
-      graphic: { type: string, max_length: 64, required: true }
-      body: { type: json, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
+      body: { type: json, required: true,
+              label: Contents,
+              description: "The graphic's JSON object as the Rundown's right-click Copy body JSON gives it; its fields depend on the graphic type." }
     send:
       method: POST
       path: "/api/{settings.project}/graphic/{graphic}/update"
@@ -190,11 +204,21 @@ commands:
       Set, raise or lower one score of a Score graphic
       (POST graphic/<id>/updateScore/<team>/<level>/<type>/<amount>)
     params:
-      graphic: { type: string, max_length: 64, required: true }
-      team:    { type: int, min: 1, required: true }
-      level:   { type: int, min: 1, required: true }
-      type:    { type: enum, values: [set, up, down], required: true }
-      amount:  { type: int, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
+      team:    { type: int, min: 1, required: true,
+                 label: Team,
+                 description: "Team number, from 1; usually 1 or 2." }
+      level:   { type: int, min: 1, required: true,
+                 label: Score level,
+                 description: "Which score of the team, from 1; usually 1 to 4." }
+      type:    { type: enum, values: [set, up, down], required: true,
+                 label: Change,
+                 description: "Set replaces the score with the amount; up adds the amount; down subtracts it." }
+      amount:  { type: int, required: true,
+                 label: Amount,
+                 description: "Value to set, or to add or subtract for up and down." }
     send:
       method: POST
       path: "/api/{settings.project}/graphic/{graphic}/updateScore/{team}/{level}/{type}/{amount}"
@@ -205,8 +229,12 @@ commands:
   set_text_variable:
     summary: "Set text variable [text.N] (POST updateVariableText/text.N with body {\"text\": ...})"
     params:
-      variable: { type: int, min: 1, required: true }
-      text:     { type: string, max_length: 4096, required: true }
+      variable: { type: int, min: 1, required: true,
+                  label: Text variable,
+                  description: "Text variable number N, used in graphics as [text.N]." }
+      text:     { type: string, max_length: 4096, required: true,
+                  label: Text,
+                  description: "New text of the variable." }
     send:
       method: POST
       path: "/api/{settings.project}/updateVariableText/text.{variable}"
@@ -218,7 +246,9 @@ commands:
   select_list_row_next:
     summary: Select the next row of a variable list (POST updateVariableList/<list>/selectRow/next)
     params:
-      list: { type: int, min: 1, required: true }
+      list: { type: int, min: 1, required: true,
+              label: List,
+              description: "Variable list number, from 1." }
     send: { method: POST, path: "/api/{settings.project}/updateVariableList/{list}/selectRow/next" }
     expect: { status: 200 }
     returns: ack
@@ -226,7 +256,9 @@ commands:
   select_list_row_previous:
     summary: Select the previous row of a variable list (POST updateVariableList/<list>/selectRow/previous)
     params:
-      list: { type: int, min: 1, required: true }
+      list: { type: int, min: 1, required: true,
+              label: List,
+              description: "Variable list number, from 1." }
     send: { method: POST, path: "/api/{settings.project}/updateVariableList/{list}/selectRow/previous" }
     expect: { status: 200 }
     returns: ack
@@ -234,8 +266,12 @@ commands:
   select_list_row:
     summary: Select a specific row of a variable list by number (POST updateVariableList/<list>/selectRow/<number>)
     params:
-      list: { type: int, min: 1, required: true }
-      row:  { type: int, min: 1, required: true }
+      list: { type: int, min: 1, required: true,
+              label: List,
+              description: "Variable list number, from 1." }
+      row:  { type: int, min: 1, required: true,
+              label: Row,
+              description: "Row number in the list; whether it counts from 1 or 0 is not documented." }
     send: { method: POST, path: "/api/{settings.project}/updateVariableList/{list}/selectRow/{row}" }
     expect: { status: 200 }
     returns: ack
@@ -244,7 +280,9 @@ commands:
   open_output:
     summary: Open an output window, 1 to 4 (POST output/<output_number>/open); outputs 2-4 need Pro
     params:
-      output: { type: int, min: 1, max: 4, required: true }
+      output: { type: int, min: 1, max: 4, required: true,
+                label: Output,
+                description: "Output window 1 to 4; outputs 2 to 4 need a Pro licence." }
     send: { method: POST, path: "/api/{settings.project}/output/{output}/open" }
     expect: { status: 200 }
     returns: ack
@@ -253,7 +291,9 @@ commands:
   timer_run:
     summary: Run or resume a Speaker Timer (POST graphic/<id>/timer/run)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/run" }
     expect: { status: 200 }
     returns: ack
@@ -261,7 +301,9 @@ commands:
   timer_pause:
     summary: Pause a Speaker Timer (POST graphic/<id>/timer/pause)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/pause" }
     expect: { status: 200 }
     returns: ack
@@ -269,7 +311,9 @@ commands:
   timer_reset:
     summary: Reset a Speaker Timer to its original duration (POST graphic/<id>/timer/reset)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/reset" }
     expect: { status: 200 }
     returns: ack
@@ -279,8 +323,12 @@ commands:
       Add (positive) or remove (negative) seconds: from the time left while
       running, from the duration while paused (POST graphic/<id>/timer/jump/<seconds>)
     params:
-      graphic: { type: string, max_length: 64, required: true }
-      seconds: { type: int, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
+      seconds: { type: int, required: true,
+                 label: Seconds,
+                 description: "Seconds to add (positive) or remove (negative): from the time left while running, from the duration while paused." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/jump/{seconds}" }
     expect: { status: 200 }
     returns: ack
@@ -288,8 +336,12 @@ commands:
   timer_set_duration:
     summary: Set a Speaker Timer's duration in seconds and reset it (POST graphic/<id>/timer/duration/<seconds>)
     params:
-      graphic: { type: string, max_length: 64, required: true }
-      seconds: { type: int, min: 0, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
+      seconds: { type: int, min: 0, required: true,
+                 label: Duration,
+                 description: "New timer duration in seconds; the timer is reset to it." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/timer/duration/{seconds}" }
     expect: { status: 200 }
     returns: ack
@@ -298,7 +350,9 @@ commands:
   lyric_next:
     summary: Go to the next line of a Lyrics graphic (POST graphic/<id>/lyric/next)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/lyric/next" }
     expect: { status: 200 }
     returns: ack
@@ -306,7 +360,9 @@ commands:
   lyric_previous:
     summary: Go to the previous line of a Lyrics graphic (POST graphic/<id>/lyric/previous)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/lyric/previous" }
     expect: { status: 200 }
     returns: ack
@@ -314,7 +370,9 @@ commands:
   lyric_start:
     summary: Go back to the start of a Lyrics graphic (POST graphic/<id>/lyric/start)
     params:
-      graphic: { type: string, max_length: 64, required: true }
+      graphic: { type: string, max_length: 64, required: true,
+                 label: Graphic,
+                 description: "Graphic id, as in the URI the Rundown's Copy \"Show\" gives." }
     send: { method: POST, path: "/api/{settings.project}/graphic/{graphic}/lyric/start" }
     expect: { status: 200 }
     returns: ack
@@ -329,8 +387,12 @@ commands:
       {"name", "logoUrl"}}]} object; id must be unique and displayMessage
       carries no HTML.
     params:
-      source: { type: string, max_length: 64, required: true }
-      body:   { type: json, required: true }
+      source: { type: string, max_length: 64, required: true,
+                label: Data source,
+                description: "Id of the HTTP Listener data source." }
+      body:   { type: json, required: true,
+                label: Messages,
+                description: "JSON body {\"messages\": [...]}, each message with id, timestamp, snippet.displayMessage, authorDetails and platform as H2R documents." }
     send:
       method: POST
       path: "/data/{source}"

@@ -75,23 +75,39 @@ settings:
   # device sends a keep-alive when it has sent nothing for this long, and
   # nothing heard for three of them drops the connection. Whole seconds are
   # sent in seconds; anything else in milliseconds (AES70-2018's second form).
-  keepalive_interval_ms: { type: int, min: 100, max: 600000, default: 1000 }
+  keepalive_interval_ms: { type: int, min: 100, max: 600000, default: 1000,
+                           label: Keep-alive interval,
+                           description: "Heartbeat time in milliseconds asked of the device; three intervals with nothing heard drop the connection." }
   # How long a request waits for its response.
-  request_timeout_ms: { type: int, min: 100, max: 600000, default: 5000 }
+  request_timeout_ms: { type: int, min: 100, max: 600000, default: 5000,
+                        label: Request timeout,
+                        description: "Milliseconds a request waits for its response before it fails." }
   # Walk the root block on connecting (when the device is monitored).
-  walk: { type: bool, default: true }
+  walk: { type: bool, default: true,
+          label: Walk object tree,
+          description: "Whether to walk the root block on connecting to learn the device's objects, when the device is monitored." }
   # Block levels walked: 1 is the root block's members only, 2 also their
   # members, and so on. Every level when not given.
-  walk_depth: { type: int, min: 1, max: 255 }
+  walk_depth: { type: int, min: 1, max: 255,
+                label: Walk depth,
+                description: "Block levels walked: 1 is the root block's members only, 2 also their members, and so on; every level when not given." }
   # Subscribe to the property changes of every known object found.
-  subscribe: { type: bool, default: true }
+  subscribe: { type: bool, default: true,
+               label: Subscribe,
+               description: "Whether to subscribe to property changes of every known object found." }
   # Level sensors (meters): off (not read), read (once, on connecting), poll
   # (read every level_poll_ms), or subscribe (follow their changes, which may
   # be many per second).
-  level_sensors: { type: enum, values: ["off", read, poll, subscribe], default: poll }
-  level_poll_ms: { type: int, min: 50, max: 600000, default: 1000 }
+  level_sensors: { type: enum, values: ["off", read, poll, subscribe], default: poll,
+                   label: Level sensors,
+                   description: "How meters are read: off, read once on connecting, poll every level poll interval, or subscribe to their changes (may be many per second)." }
+  level_poll_ms: { type: int, min: 50, max: 600000, default: 1000,
+                   label: Level poll interval,
+                   description: "Milliseconds between level sensor reads when level sensors are polled." }
   # Requests waiting for a response at once; more are queued.
-  max_in_flight: { type: int, min: 1, max: 1024, default: 32 }
+  max_in_flight: { type: int, min: 1, max: 1024, default: 32,
+                   label: Requests in flight,
+                   description: "Requests waiting for a response at once; more are queued." }
 
 ports:
   - { port: null, protocol: tcp, role: control, note: "AES70 (OCP.1) has no standard port: the port is given when the device is opened" }
@@ -113,16 +129,24 @@ commands:
   set_gain:
     summary: "OcaGain SetGain (4.2): the gain in dB, on an object addressed by role path (object) or object number (ono)"
     params:
-      object: &object { type: string, max_length: 4096 }
-      ono: &ono { type: int, min: 1, max: 4294967295 }
-      gain_db: { type: float, required: true }
+      object: &object { type: string, max_length: 4096,
+                        label: Object,
+                        description: "Object by role path, the roles from the root block down joined by '/', e.g. Input 1/Gain; give this or an object number." }
+      ono: &ono { type: int, min: 1, max: 4294967295,
+                  label: Object number,
+                  description: "Object number (ono), stable for a device's configuration; give this or a role path." }
+      gain_db: { type: float, required: true,
+                 label: Gain,
+                 description: "Gain in dB; the object's own minimum and maximum apply." }
     returns: ack
   set_mute:
     summary: "OcaMute SetState (4.2): muted (state 1) or unmuted (2)"
     params:
       object: *object
       ono: *ono
-      muted: { type: bool, default: true }
+      muted: { type: bool, default: true,
+               label: Mute,
+               description: "True mutes the object, false unmutes it." }
     returns: ack
   set_switch:
     summary: >
@@ -131,50 +155,66 @@ commands:
     params:
       object: *object
       ono: *ono
-      position: { type: int, min: 0, max: 65535 }
-      position_name: { type: string, max_length: 1024 }
+      position: { type: int, min: 0, max: 65535,
+                  label: Position,
+                  description: "Switch position, numbered from 0; give this or a position name." }
+      position_name: { type: string, max_length: 1024,
+                       label: Position name,
+                       description: "Switch position by its name, as the switch reported on connecting; give this or a position number." }
     returns: ack
   set_polarity:
     summary: "OcaPolarity SetState (4.2): inverted (state 2) or non-inverted (1)"
     params:
       object: *object
       ono: *ono
-      inverted: { type: bool, default: true }
+      inverted: { type: bool, default: true,
+                  label: Invert,
+                  description: "True inverts the polarity, false sets it back to normal." }
     returns: ack
   set_delay:
     summary: "OcaDelay SetDelayTime (4.2): the delay in seconds"
     params:
       object: *object
       ono: *ono
-      delay_s: { type: float, min: 0, required: true }
+      delay_s: { type: float, min: 0, required: true,
+                 label: Delay,
+                 description: "Delay time in seconds, e.g. 0.005 for 5 ms." }
     returns: ack
   set_bool:
     summary: "OcaBooleanActuator SetSetting (5.2)"
     params:
       object: *object
       ono: *ono
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+               label: Value,
+               description: "New setting of the boolean actuator." }
     returns: ack
   set_int:
     summary: "OcaInt8/16/32/64Actuator or OcaUint8/16/32/64Actuator SetSetting (5.2); the value must fit the actuator's type"
     params:
       object: *object
       ono: *ono
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+               label: Value,
+               description: "New setting of the integer actuator; it must fit the actuator's type, e.g. 0 to 255 for an 8-bit unsigned one." }
     returns: ack
   set_float:
     summary: "OcaFloat32Actuator or OcaFloat64Actuator SetSetting (5.2)"
     params:
       object: *object
       ono: *ono
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+               label: Value,
+               description: "New setting of the floating-point actuator, in the actuator's own unit." }
     returns: ack
   set_string:
     summary: "OcaStringActuator SetSetting (5.2)"
     params:
       object: *object
       ono: *ono
-      value: { type: string, required: true, max_length: 65535 }
+      value: { type: string, required: true, max_length: 65535,
+               label: Value,
+               description: "New text for the string actuator." }
     returns: ack
   identify:
     summary: >
@@ -183,7 +223,9 @@ commands:
     params:
       object: *object
       ono: *ono
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+                 label: Identify,
+                 description: "True starts the device's identification (a flashing LED or display), false stops it." }
     returns: ack
   get_property:
     summary: >
@@ -193,7 +235,9 @@ commands:
     params:
       object: *object
       ono: *ono
-      property: &property { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$" }
+      property: &property { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$",
+                            label: Property,
+                            description: "Property ID as level.index, e.g. 4.1 for the fourth class level's first property." }
     returns: value
   set_property:
     summary: >
@@ -204,7 +248,9 @@ commands:
       object: *object
       ono: *ono
       property: *property
-      value: { type: json, required: true }
+      value: { type: json, required: true,
+               label: Value,
+               description: "New value as JSON of the property's type: a number, boolean, string or list; mute and polarity states as booleans, delays in seconds." }
     returns: ack
   call_method:
     summary: >
@@ -214,9 +260,15 @@ commands:
     params:
       object: *object
       ono: *ono
-      method: { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$" }
-      params_hex: { type: string, default: "", max_length: 131070, pattern: "^[0-9A-Fa-f ]*$" }
-      param_count: { type: int, min: 0, max: 255 }
+      method: { type: string, required: true, pattern: "^[0-9]{1,5}\\.[0-9]{1,5}$",
+                label: Method,
+                description: "Method ID as level.index, e.g. 4.2." }
+      params_hex: { type: string, default: "", max_length: 131070, pattern: "^[0-9A-Fa-f ]*$",
+                    label: Parameters,
+                    description: "Method parameters already marshalled as OCP.1 bytes, in hex; empty for none." }
+      param_count: { type: int, min: 0, max: 255,
+                     label: Parameter count,
+                     description: "Number of parameters in the hex; when not given, 1 if parameters are given and 0 if not." }
     returns: value
   refresh_objects:
     summary: >

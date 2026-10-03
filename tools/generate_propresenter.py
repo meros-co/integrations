@@ -64,6 +64,92 @@ def yq(s: str) -> str:
     return json.dumps(s, ensure_ascii=False)
 
 
+FORMS = re.compile(r"either (.+?)(?:,? in order of|\.|$)")
+LAYERS = {
+    "presentation": "presentation",
+    "announcement": "announcement",
+    "audio": "audio",
+}
+
+
+def forms(doc: str) -> str:
+    """'UUID, name, or index' from the document's description, as 'UUID, name or index'."""
+    m = FORMS.search(doc)
+    return m.group(1).replace(", or ", " or ") if m else "UUID, name or index"
+
+
+def noun_from_doc(doc: str, path: str) -> str:
+    m = re.match(r"The ID of the (?:required )?(.+?), either", doc)
+    noun = m.group(1) if m else "item"
+    if noun == "item":
+        if "/video_inputs/" in path:
+            noun = "video input"
+        elif "/audio/" in path:
+            noun = "audio item"
+    if noun == "screen" and "/stage/" in path:
+        noun = "stage screen"
+    return noun
+
+
+def describe(name: str, pname: str, p: dict, path: str, doc: str) -> tuple:
+    """A label and a one-sentence description for a parameter, written from
+    the document's own description of it and the operation's path."""
+    if pname == "id":
+        noun = noun_from_doc(doc, path)
+        return noun[0].upper() + noun[1:], f"The {noun}, by {forms(doc)}."
+    if pname == "playlist_id":
+        kind = "audio playlist" if "/audio/" in path else "media playlist" if "/media/" in path else "playlist"
+        return (kind[0].upper() + kind[1:],
+                f"The {kind}, by UUID, name or index, or a path of them for a playlist within folders.")
+    if pname == "library_id":
+        return "Library", "The library, by name or index (matching by UUID is deprecated)."
+    if pname == "presentation_id":
+        return "Presentation", "The presentation in the library, by UUID, name or index."
+    if pname == "uuid":
+        return "Presentation", "The presentation's UUID."
+    if pname == "media_id":
+        return "Media item", "The media item in the playlist, by UUID, name or index."
+    if pname == "group_id":
+        return "Group", "The presentation's group (such as Verse 1), by UUID, name or index."
+    if pname == "layout_id":
+        return "Stage layout", "The stage layout, by name, index or UUID."
+    if pname == "theme_slide":
+        return "Theme slide", "The theme slide, by name, index or UUID."
+    if pname == "index":
+        if "/playlist/" in path:
+            return "Item index", "Position of the item in the playlist, counted from 0."
+        return "Cue index", "Position of the cue (slide) in the presentation, counted from 0, following its selected arrangement."
+    if pname == "operation":
+        if "/capture/" in path:
+            return "Operation", "Start or stop capturing."
+        if "/timers/" in path:
+            return "Operation", "Start, stop or reset every configured timer."
+        if "/timer/" in path:
+            return "Operation", "Start, stop or reset the timer."
+        return "Operation", "Play, pause or rewind the timeline."
+    if pname == "type":
+        return "Capture type", "Capture destination: disk, rtmp (streaming) or resi (Resi streaming)."
+    if pname == "layer":
+        if "/clear/" in path:
+            return "Layer", "The layer to clear: audio, props, messages, announcements, slide, media or video input."
+        return "Layer", "The transport layer: presentation, announcement or audio."
+    if pname == "time":
+        if "/timer/" in path:
+            return "Seconds", "Seconds to add to the running timer."
+        return "Seconds", "Number of seconds to skip."
+    if pname == "body":
+        return "Body", "JSON in the shape the API document gives for this operation; ProPresenter validates it."
+    if pname == "value":
+        if "/stage/message" in path:
+            return "Message", "The message to show on the stage screens."
+        if p["type"] == "float":
+            return "Time", "Time in seconds to move to."
+    if pname == "enabled":
+        what = "stage" if "stage_screens" in path else "audience"
+        return "Enabled", f"True enables the {what} screens, false disables them."
+    raise KeyError(f"{name}.{pname}: no label written for this parameter")
+
+
 commands = {}
 skipped = []
 renamed = []
@@ -91,14 +177,16 @@ for path, ops in sorted(spec["paths"].items()):
                 continue
             schema = prm.get("schema", {})
             kind = schema.get("type", "string")
+            doc = (prm.get("description") or "").strip()
             if "enum" in schema:
                 params[prm["name"]] = {"type": "enum", "values": schema["enum"], "required": True,
-                                       "in": prm["in"]}
+                                       "in": prm["in"], "doc": doc}
             elif kind == "integer":
-                params[prm["name"]] = {"type": "int", "min": 0, "required": True, "in": prm["in"]}
+                params[prm["name"]] = {"type": "int", "min": 0, "required": True, "in": prm["in"],
+                                       "doc": doc}
             else:
                 params[prm["name"]] = {"type": "string", "max_length": 256, "required": True,
-                                       "in": prm["in"]}
+                                       "in": prm["in"], "doc": doc}
         # The document names some path placeholders differently from their
         # parameter (/v1/stage/layout/{id} with layout_id): match by position.
         holders = re.findall(r"\{([^}]+)\}", path)
@@ -174,7 +262,11 @@ for name, c in commands.items():
             if "max_length" in p:
                 fields.append(f"max_length: {p['max_length']}")
             fields.append("required: true")
-            lines.append(f"      {pname}: {{ {', '.join(fields)} }}")
+            label, description = describe(name, pname, p, c["path"], p.get("doc", ""))
+            pad = " " * (len(f"      {pname}: {{ "))
+            lines.append(f"      {pname}: {{ {', '.join(fields)},")
+            lines.append(f"{pad}label: {label},")
+            lines.append(f"{pad}description: {yq(description)} }}")
     send = [f"method: {c['method']}", f"path: {yq(c['path'])}"]
     if c["query"]:
         send.append("query: { " + ", ".join(f"{k}: {yq(v)}" for k, v in c["query"].items()) + " }")
@@ -224,6 +316,9 @@ transport:
   auth: none
   timeout_ms: 4000
   probe: {{ method: GET, path: /version }}
+
+ports:
+  - {{ port: 50001, protocol: http, role: control }}
 
 models:
   - id: propresenter-7
