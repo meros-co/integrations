@@ -54,6 +54,10 @@ mod generic_tcp_udp;
 mod http_snapshot;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
+#[cfg(feature = "novastar-h")]
+mod novastar_h;
+#[cfg(feature = "novastar-h")]
+mod novastar_h_commands;
 #[cfg(feature = "obs-studio")]
 mod obs;
 #[cfg(feature = "panasonic-ptz")]
@@ -138,6 +142,8 @@ pub(crate) fn construct(
         "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
         #[cfg(feature = "novastar-central-control")]
         "novastar-central-control" => Ok(Box::new(novastar_ccp::NovastarCcp::new(context))),
+        #[cfg(feature = "novastar-h")]
+        "novastar-h" => Ok(Box::new(novastar_h::NovastarH::new(context))),
         #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
         #[cfg(feature = "shure-wireless")]

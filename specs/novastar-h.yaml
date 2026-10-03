@@ -1,0 +1,823 @@
+spec: 1
+id: novastar-h
+name: NovaStar H series video wall splicers (OpenAPI)
+vendor: NovaStar
+category: switcher
+implementation: native
+reason: >
+  Every request carries a signature over the current time in milliseconds and the requestor ID
+  (Base64 of the hexadecimal MD5 of timestamp + pId), and the splicer refuses a request whose time
+  is wrong; the format has no clock and no hashing. Replies wrap the data in {status, msg, body}, and
+  the poll walks the screens it reads to ask each one's current preset.
+
+# Every request is an HTTP POST of JSON to http://<splicer>:8000/open/api/<endpoint>
+# with the body {"body": {...}, "sign": ..., "pId": ..., "timeStamp": ...}.
+# The commands below take the business fields of each endpoint; the module adds
+# deviceId (device_id, default 0) where the endpoint has one and signs the
+# request. Endpoints with nested structures (layers, screen layouts, OSD,
+# timing, playlists) take those structures in `body`, merged in as the
+# documentation gives them; `call` reaches any endpoint by path.
+
+source:
+  - title: H Series OpenAPI Instructions (English), NovaStar's "H" project on Apifox
+    author: NovaStar (Xi'an NovaStar Tech Co.)
+    url: https://openapi.novastar.tech/en/h/doc-7540897
+    note: >
+      Manufacturer documentation, read 2026-10-03 through its Markdown export
+      (llms.txt and each page's .md). Used for: HTTP POST of JSON, the pId
+      and secret key made under Settings > OpenAPI Management, the request
+      envelope (body, sign, pId, timeStamp), the signature rules (unencrypted:
+      Base64 of md5(timeStamp + pId) in hexadecimal; encrypted: DES of the
+      body and md5 over ciphertext, time, pId and key), the reply envelope
+      {status, msg, sign, body}, the root http://<ip>:8000/open/api (sections
+      1-5), the error codes page (including 11, incorrect device time, and 18,
+      incorrect signature), the change history (to V2000), and every endpoint
+      page used here: device, homepage, screen, inputs, outputs, layers,
+      presets, BKG and IPC. The signature rule was checked against both
+      worked examples on the pages (pId ZTlj and YmRj at 1689586062335).
+      Cited as H OpenAPI.
+
+settings:
+  # Settings > OpenAPI Management on the splicer.
+  p_id: { type: string, max_length: 64, default: "" }
+  # Read the state (screens and the preset each plays) every this many ms; 0 reads it once.
+  poll_ms: { type: int, min: 0, max: 600000, default: 5000 }
+
+models:
+  - id: h2
+    name: NovaStar H2
+    supports: &all [read_device_detail, read_card_versions, read_device_ip, read_init_status, list_screens, get_screen, get_screen_offline, set_screen_brightness, save_screen_brightness, set_screen_gamma, screen_ftb, set_screen_freeze, set_screen_bkg, show_screen_ids, rename_screen, delete_screens, clear_screens, create_screen, set_screen_layout, set_screen_3d, set_text_osd, set_image_osd, list_inputs, get_input, rename_input, set_input_resolution, set_input_timing, create_input_crop, update_input_crop, delete_input_crop, create_input_group, update_input_group, sort_input_groups, delete_input_group, remove_input_from_group, import_edid, list_source_playlists, create_source_playlist, update_source_playlist, enable_source_playlists, delete_source_playlists, list_outputs, get_output, rename_output, set_output_gamma, set_output_image_quality, set_output_locating, set_output_resolution, set_output_timing, set_4k_output_timing, set_all_in_one_payload, list_layers, get_layer, get_layer_zorder, create_layer, delete_layer, clear_layers, set_layer_window, set_layer_general, set_layer_zorder, lock_layer, set_layer_source, freeze_layer, open_layer_layout, set_layer_stream_rule, list_presets, get_preset, get_current_preset, load_preset, create_preset, overwrite_preset, rename_preset, delete_preset, clear_presets, list_preset_groups, get_preset_group, create_preset_group, update_preset_group, delete_preset_group, play_preset_group, get_preset_group_playing, list_bkgs, get_bkg, create_bkg, delete_bkgs, call]
+    verification: none
+  - id: h5
+    name: NovaStar H5
+    supports: *all
+    verification: none
+  - id: h9
+    name: NovaStar H9
+    supports: *all
+    verification: none
+  - id: h15
+    name: NovaStar H15
+    supports: *all
+    verification: none
+  - id: h20
+    name: NovaStar H20
+    supports: *all
+    verification: none
+
+commands:
+  read_device_detail:
+    summary: "Device information: name, model, work mode, slots and cards, power supplies, fans, network, genlock"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  read_card_versions:
+    summary: "Every card's model, MCU and FPGA versions and serial number"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  read_device_ip:
+    summary: "The device's IP settings"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  read_init_status:
+    summary: "Whether initialisation completed, the main control model, serial number and software version"
+    returns: value
+
+  list_screens:
+    summary: "Screens: screenId, name and creation time"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  get_screen:
+    summary: "A screen's details: layout, outputs, OSD, BKG, 3D and audio"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  get_screen_offline:
+    summary: "Screen details not in live mode (body as documented)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      body: { type: json }
+    returns: value
+
+  set_screen_brightness:
+    summary: "Set a screen's brightness, 0 to 100 (certain sending cards only)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      brightness: { type: int, min: 0, max: 100, required: true }
+    returns: value
+
+  save_screen_brightness:
+    summary: "Set and save a screen's brightness, 0 to 100 (certain sending cards only)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      brightness: { type: int, min: 0, max: 100, required: true }
+    returns: value
+
+  set_screen_gamma:
+    summary: "Set a screen's gamma"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      gamma: { type: float, required: true }
+    returns: value
+
+  screen_ftb:
+    summary: "Fade a screen to black (type 0) or back on (type 1) over a time in seconds"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      type: { type: int, min: 0, max: 1, required: true }
+      seconds: { type: int, min: 0, required: true }
+    returns: value
+
+  set_screen_freeze:
+    summary: "Freeze (1) or unfreeze (0) a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      enable: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  set_screen_bkg:
+    summary: "Set a screen's background image (enable 0 shows it, 1 hides it, as documented)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      enable: { type: int, min: 0, max: 1, required: true }
+      bkg_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  show_screen_ids:
+    summary: "Show (1) or hide (0) screen IDs on the programming page"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      enable: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  rename_screen:
+    summary: "Rename a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      name: { type: string, max_length: 64, required: true }
+    returns: value
+
+  delete_screens:
+    summary: "Delete screens: screen_ids is a JSON array of screen IDs"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_ids: { type: json, required: true }
+    returns: value
+
+  clear_screens:
+    summary: "Delete every screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  create_screen:
+    summary: "Create a screen: name, plus the documented screenInterfaces and mosaic in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      name: { type: string, max_length: 64, required: true }
+      body: { type: json }
+    returns: value
+
+  set_screen_layout:
+    summary: "Set a screen's layout: the documented mosaic, size and screenInterfaces in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  set_screen_3d:
+    summary: "Set a screen's 3D: the documented enable, type, eye order, start points, emitter and delays in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  set_text_osd:
+    summary: "Set a screen's text OSD: the documented fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  set_image_osd:
+    summary: "Set a screen's image OSD: the documented fields (image as Base64) in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  list_inputs:
+    summary: "Inputs: IDs, names, signal, resolution, colour settings"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  get_input:
+    summary: "An input's details and cropped sources"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  rename_input:
+    summary: "Rename an input"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      name: { type: string, max_length: 64, required: true }
+    returns: value
+
+  set_input_resolution:
+    summary: "Set an input's EDID resolution and refresh rate"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+      refresh_rate: { type: int, min: 1, required: true }
+    returns: value
+
+  set_input_timing:
+    summary: "Set an input's timing: the documented horizontal and vertical timing in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      body: { type: json }
+    returns: value
+
+  create_input_crop:
+    summary: "Create a cropped source from an input"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      name: { type: string, max_length: 64, required: true }
+      x: { type: int, min: 0, required: true }
+      y: { type: int, min: 0, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+    returns: value
+
+  update_input_crop:
+    summary: "Change a cropped source (the documented field heigth is sent as spelt)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      crop_id: { type: int, min: 0, required: true }
+      name: { type: string, max_length: 64, required: true }
+      x: { type: int, min: 0, required: true }
+      y: { type: int, min: 0, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+    returns: value
+
+  delete_input_crop:
+    summary: "Delete a cropped source"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      crop_id: { type: int, min: 0, required: true }
+    returns: value
+
+  create_input_group:
+    summary: "Create an input group: name, and the documented inputs array in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      name: { type: string, max_length: 64, required: true }
+      body: { type: json }
+    returns: value
+
+  update_input_group:
+    summary: "Change an input group: the documented inputs array in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      group_id: { type: int, min: 0, required: true }
+      name: { type: string, max_length: 64, required: true }
+      body: { type: json }
+    returns: value
+
+  sort_input_groups:
+    summary: "Order input groups: the documented groups array in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      body: { type: json }
+    returns: value
+
+  delete_input_group:
+    summary: "Delete an input group"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      group_id: { type: int, min: 0, required: true }
+    returns: value
+
+  remove_input_from_group:
+    summary: "Remove an input from a group"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      group_id: { type: int, min: 0, required: true }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  import_edid:
+    summary: "Import an EDID file to an input (file path and name as documented)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      input_id: { type: int, min: 0, max: 65535, required: true }
+      file: { type: string, max_length: 1024, required: true }
+      file_name: { type: string, max_length: 255, required: true }
+    returns: value
+
+  list_source_playlists:
+    summary: "Signal source playlists"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  create_source_playlist:
+    summary: "Create a signal source playlist: the documented fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      body: { type: json }
+    returns: value
+
+  update_source_playlist:
+    summary: "Change a signal source playlist: the documented fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      body: { type: json }
+    returns: value
+
+  enable_source_playlists:
+    summary: "Enable signal source playlists: the documented ctrl array in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      body: { type: json }
+    returns: value
+
+  delete_source_playlists:
+    summary: "Delete signal source playlists: source_ids is a JSON array of IDs"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      source_ids: { type: json, required: true }
+    returns: value
+
+  list_outputs:
+    summary: "Outputs: IDs, names, resolution, timing"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  get_output:
+    summary: "An output's details"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  rename_output:
+    summary: "Rename an output"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_id: { type: int, min: 0, max: 65535, required: true }
+      name: { type: string, max_length: 64, required: true }
+    returns: value
+
+  set_output_gamma:
+    summary: "Set an output's gamma (integer, as documented)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_id: { type: int, min: 0, max: 65535, required: true }
+      gamma: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  set_output_image_quality:
+    summary: "Set an output's contrast, brightness (all, R, G, B), hue, saturation and colour temperature: the documented fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_id: { type: int, min: 0, max: 65535, required: true }
+      body: { type: json }
+    returns: value
+
+  set_output_locating:
+    summary: "Turn output locating on (1) or off (0)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      enable: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  set_output_resolution:
+    summary: "Set outputs' resolution: output_ids is a JSON array"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_ids: { type: json, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+      refresh_rate: { type: int, min: 1, required: true }
+    returns: value
+
+  set_output_timing:
+    summary: "Set outputs' timing: output_ids is a JSON array; the documented horizontal and vertical timing in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_ids: { type: json, required: true }
+      refresh_rate: { type: int, min: 1, required: true }
+      body: { type: json }
+    returns: value
+
+  set_4k_output_timing:
+    summary: "Set a 4K output card's timing: the documented timing in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_id: { type: int, min: 0, max: 65535, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+      refresh_rate: { type: int, min: 1, required: true }
+      body: { type: json }
+    returns: value
+
+  set_all_in_one_payload:
+    summary: "Set the areas all-in-one cards load: output_ids is a JSON array"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      output_ids: { type: json, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+      refresh_rate: { type: int, min: 1, required: true }
+    returns: value
+
+  list_layers:
+    summary: "A screen's layers with their details"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  get_layer:
+    summary: "A layer's details"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  get_layer_zorder:
+    summary: "A screen's layer order"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  create_layer:
+    summary: "Open a layer on a screen: the documented window, source and other fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  delete_layer:
+    summary: "Close a layer"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  clear_layers:
+    summary: "Close every layer on a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  set_layer_window:
+    summary: "Move and size a layer"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      x: { type: int, required: true }
+      y: { type: int, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+    returns: value
+
+  set_layer_general:
+    summary: "Set a layer's name, size type, type, z-order, background, freeze and flip: the documented fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  set_layer_zorder:
+    summary: "Move a layer in the z-order (layersZOrderAct as documented)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      action: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  lock_layer:
+    summary: "Lock (1) or unlock (0) a layer"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      lock: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  set_layer_source:
+    summary: "Change a layer's source: the documented source fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      body: { type: json }
+    returns: value
+
+  freeze_layer:
+    summary: "Freeze (1) or unfreeze (0) a layer"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      enable: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  open_layer_layout:
+    summary: "Open layers from a layout template: the documented fields in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      body: { type: json }
+    returns: value
+
+  set_layer_stream_rule:
+    summary: "Choose the stream an IPC source layer pulls"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      layer_id: { type: int, min: 0, max: 255, required: true }
+      channel_id: { type: int, min: 0, required: true }
+      stream_index: { type: int, min: 0, required: true }
+    returns: value
+
+  list_presets:
+    summary: "A screen's presets: presetId and name"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  get_preset:
+    summary: "A preset's details"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      preset_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  get_current_preset:
+    summary: "The preset playing on a screen (-1 for none)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  load_preset:
+    summary: "Load (play) a preset on a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      preset_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  create_preset:
+    summary: "Save the screen as a new preset (overwrite 1 replaces one of the same name; layout template as documented)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      name: { type: string, max_length: 64, required: true }
+      overwrite: { type: int, min: 0, max: 1, required: true }
+      layout_template_id: { type: string, max_length: 64, default: "" }
+    returns: value
+
+  overwrite_preset:
+    summary: "Overwrite a preset with the screen as it is now"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      preset_id: { type: int, min: 0, max: 65535, required: true }
+      name: { type: string, max_length: 64, required: true }
+      overwrite: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  rename_preset:
+    summary: "Rename a preset"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      preset_id: { type: int, min: 0, max: 65535, required: true }
+      name: { type: string, max_length: 64, required: true }
+    returns: value
+
+  delete_preset:
+    summary: "Delete a preset"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      preset_id: { type: int, min: 0, max: 65535, required: true }
+    returns: value
+
+  clear_presets:
+    summary: "Delete every preset of a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  list_preset_groups:
+    summary: "A screen's preset groups (playlists)"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  get_preset_group:
+    summary: "The presets in a preset group"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      group_id: { type: int, min: 0, required: true }
+    returns: value
+
+  create_preset_group:
+    summary: "Create a preset group: name, time, and the documented presets array in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      name: { type: string, max_length: 64, required: true }
+      seconds: { type: int, min: 0, required: true }
+      body: { type: json }
+    returns: value
+
+  update_preset_group:
+    summary: "Change a preset group: the documented presets array in body"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      group_id: { type: int, min: 0, required: true }
+      name: { type: string, max_length: 64, required: true }
+      seconds: { type: int, min: 0, required: true }
+      body: { type: json }
+    returns: value
+
+  delete_preset_group:
+    summary: "Delete a preset group"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      group_id: { type: int, min: 0, required: true }
+    returns: value
+
+  play_preset_group:
+    summary: "Start (1) or stop (0) playing a preset group on a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+      group_id: { type: int, min: 0, required: true }
+      enable: { type: int, min: 0, max: 1, required: true }
+    returns: value
+
+  get_preset_group_playing:
+    summary: "The preset group playing on a screen"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      screen_id: { type: int, min: 0, max: 255, required: true }
+    returns: value
+
+  list_bkgs:
+    summary: "Every background image"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+    returns: value
+
+  get_bkg:
+    summary: "A background image's details"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      bkg_id: { type: int, min: 0, required: true }
+    returns: value
+
+  create_bkg:
+    summary: "Add a background image: name, file name, and the file as Base64"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      name: { type: string, max_length: 64, required: true }
+      file_name: { type: string, max_length: 255, required: true }
+      file: { type: string, max_length: 16777216, required: true }
+    returns: value
+
+  delete_bkgs:
+    summary: "Delete background images: bkg_ids is a JSON array"
+    params:
+      device_id: { type: int, min: 0, max: 255, default: 0 }
+      bkg_ids: { type: json, required: true }
+    returns: value
+
+  call:
+    summary: "Call any OpenAPI endpoint by its path after /open/api/ (such as ipc/readList) with the documented body as JSON; deviceId is not added"
+    params:
+      path: { type: string, pattern: "^[A-Za-z0-9/_]{1,128}$", required: true }
+      body: { type: json, required: true }
+    returns: value
+
+state:
+  device.initialized: { type: bool, description: "The splicer finished initialising (initStatus 1)" }
+  device.serial: { type: string, description: "Device serial number" }
+  device.software_version: { type: string, description: "Software version, such as 1.9.7.0.S1.T1" }
+  device.main_model_id: { type: int, description: "Main control card model ID" }
+  screens.*.name: { type: string, description: "Screen name, keyed by screenId" }
+  screens.*.preset: { type: int, description: "Preset playing on the screen, -1 for none" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Requests are sent unencrypted, signed with Base64(md5(timeStamp + pId)).
+      Turn encryption off for the requestor under Settings > OpenAPI
+      Management; with encryption on, the splicer expects a DES-encrypted body,
+      which the core does not send. The p_id setting is the requestor ID made
+      there.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The splicer checks the request time (error 11, incorrect device time):
+      the computer running the core and the splicer must agree on the time.
+      The time sent is the core's clock when the device was opened plus the
+      time since.
+
+  - models: [all]
+    severity: info
+    text: >
+      A reply with status other than 0 fails the command with that code and
+      the reply's msg (the error code page lists them: 18 incorrect signature,
+      404 screen does not exist, 410 brightness cannot be set, 412 OSD limit,
+      912 initialising ...). A successful command returns the reply's body.
+
+  - models: [all]
+    severity: info
+    text: >
+      deviceId is 0 in every example except the screen brightness pages, which
+      say to pass 1; device_id defaults to 0. set_screen_brightness and
+      save_screen_brightness work only with the H_16xRJ45+2xfiber, H_20xRJ45
+      and H_4xfiber (and enhanced) sending cards.
+
+  - models: [all]
+    severity: info
+    text: >
+      State is polled (poll_ms, 5 s by default): the initialisation status,
+      the screen list, and the preset each screen plays. Opened for commands
+      only, the module asks only the initialisation status, as its liveness
+      check. The change history mentions websocket push notifications (layer
+      z-order) whose form the pages do not give, so they are not used.
+
+  - models: [all]
+    severity: critical
+    text: >
+      load_preset, screen_ftb, set_screen_freeze, freeze_layer,
+      set_layer_source, create_layer, delete_layer, clear_layers and
+      play_preset_group change the live wall. delete_screens, clear_screens,
+      clear_presets, delete_preset, overwrite_preset and the delete commands
+      remove configuration without asking.
+
+  - models: [all]
+    severity: info
+    text: >
+      Commands whose request is a nested structure take it in `body` as the
+      documentation gives it (merged over the named parameters); `call`
+      reaches the IPC endpoints and any other by path. The set_screen_bkg
+      page documents enable 0 as on and 1 as off, the reverse of the other
+      switches.

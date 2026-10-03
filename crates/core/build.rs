@@ -77,7 +77,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-newtek", &["newtek-tricaster"]),
     (
         "vendor-novastar",
-        &["novastar-central-control", "novastar-coex"],
+        &["novastar-central-control", "novastar-coex", "novastar-h"],
     ),
     ("vendor-obs", &["obs-studio"]),
     ("vendor-panasonic", &["panasonic-ptz"]),

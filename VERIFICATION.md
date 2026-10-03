@@ -417,6 +417,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether set_working_mode to all-in-one (3) works through the API. ([specs/novastar-coex.yaml:700](specs/novastar-coex.yaml#L700))
 - [ ] Confirm MX30 and MX20 answer the same API as the MX40 Pro. ([specs/novastar-coex.yaml:65](specs/novastar-coex.yaml#L65))
 
+## novastar-h — NovaStar H series
+
+- [ ] Confirm that unencrypted requests signed with Base64(md5(timeStamp + pId)) are accepted with encryption off for the requestor, and how far the time may drift before error 11. ([specs/novastar-h.yaml:768](specs/novastar-h.yaml#L768))
+- [ ] Confirm the OpenAPI listens on port 8000 (the documentation's example address) on every model. ([specs/novastar-h.yaml:47](specs/novastar-h.yaml#L47))
+- [ ] Check which deviceId to send (0 in most examples, 1 on the brightness pages). ([specs/novastar-h.yaml:793](specs/novastar-h.yaml#L793))
+- [ ] Record whether the splicer pushes notifications (the change history mentions a websocket for layer z-order) and on which address. ([specs/novastar-h.yaml:801](specs/novastar-h.yaml#L801))
+- [ ] Check set_screen_bkg's enable sense (documented 0 on, 1 off). ([specs/novastar-h.yaml:152](specs/novastar-h.yaml#L152))
+- [ ] Check update_input_crop with the documented field spelling heigth. ([specs/novastar-h.yaml:280](specs/novastar-h.yaml#L280))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))
