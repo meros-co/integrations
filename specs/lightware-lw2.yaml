@@ -1,0 +1,711 @@
+spec: 1
+id: lightware-lw2
+name: Lightware LW2 (Lightware protocol 1/2) matrices and switchers
+vendor: Lightware
+category: router
+
+# The bracketed Lightware protocol of the MX-series matrices of the 2010s
+# (MX8x8DVI-Pro, MX8x8HDMI-Pro, MX16x16, MX32x32 and frames), which their
+# manuals call the Lightware protocol, and the reduced "LW2" set that later
+# products (UMX-HDMI-140) keep on TCP 10001 for compatibility. Commands are
+# sent in curly brackets, answers come in round brackets and only on success.
+#
+# Not here: network settings (IP_CONFIG, IP_ADDRESS..., which drop the
+# connection), RS-232 and GPIO settings, EDID upload/download and the EDID
+# validity table, HDCP key counting, firmware and the LCMD list (several
+# lines per answer).
+source:
+  - title: "MX8x8HDMI-Pro / MX8x8DVI-HDCP-Pro User's Manual v3.0, chapter 7 Programmers' Reference"
+    author: Lightware Visual Engineering
+    url: https://digis.ru/upload/iblock/b4b/34203_MX8x8HDMI_Pro_series_Users_Manual_v3.0.pdf
+    note: >
+      Manufacturer document (a reseller's copy of Lightware's manual; the product pages are at
+      archive.lightware.com). Bracket framing, success-only answers (7.1); product type, firmware, serial,
+      compile time, installed boards, restart, health status, protocol (7.2.1-7.2.10); HDCP key cache
+      (7.2.11-7.2.12); switch one or all, mute, unmute, lock, unlock, view connections (state letters L, M,
+      U), view mutes, save, load and view presets, preset, input and output names (16 characters,
+      uppercased) and their defaults (7.3.1-7.3.20); IP configuration query (7.4.1); EDID switch per input
+      and all inputs, learn, view emulated, header, delete (7.5); input and output port status hex digits
+      (7.6.1-7.6.2); TCP port 10001 (4.2.8, 7.4.1).
+  - title: "UMX-HDMI-140 series User Manual, chapter 6 LW2 Programmer's Reference"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/User-Manual/HTML/UMX-HDMI-140_Series/UM.html
+    note: >
+      Manufacturer document. LW2 on TCP 10001 in RAW mode, commands uppercased (6.1-6.2); product type
+      "(I:...)", protocol, firmware, ping "(PONG!)", serial, compile time, label, boards, restart, health,
+      factory defaults (6.3); port numbering and layers A, V, AV (6.4); switch with a layer, mute, unmute,
+      lock, unlock with a layer, connection view per layer, crosspoint size, autoselect mode and priority
+      (6.4.1-6.4.11). The Cleartext login does not cover port 10001 (7.12.2).
+  - title: companion-module-lightware-lw2 (Bitfocus Companion module, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-lightware-lw2
+    note: >
+      Corroboration only (MIT; no code used): connects to TCP 10001, sends each command in brackets
+      followed by CR LF, reads answers line by line, reads "(ALL ...)" for the crosspoint, names from
+      "(INAME#n=...)", "(ONAME#n=...)", "(PNAME#n=...)", and treats "(ERR04)" as an error answer.
+
+transport:
+  type: line-tcp
+  port: 10001
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Every answer is in round brackets. "(E_S_C)", which an EDID change sends after its answer, is not a
+  # reply (the pattern accepts any "(" not followed by E_S_C; the format's regexes have no look-ahead).
+  reply_match: '^\((?:[^E]|E[^_]|E_[^S]|E_S[^_]|E_S_[^C])'
+  # A template cannot hold a bare identifier in braces ("{i}" is a placeholder), so the probe is the
+  # protocol query, which has a ? in it.
+  probe: "{P_?}"
+
+models:
+  - id: mx-pro
+    name: Lightware MX-series matrices (MX8x8DVI-Pro, MX8x8HDMI-Pro, MX16x16, MX32x32 and modular frames)
+    supports:
+      [get_product_type, get_firmware, get_serial, get_compile_time, get_health, get_protocol, restart,
+       switch, switch_all, disconnect, mute_output, unmute_output, lock_output, unlock_output,
+       get_connections, get_mutes, save_preset, load_preset, view_preset, set_preset_name, get_preset_name,
+       reset_preset_names, set_input_name, get_input_name, reset_input_names, set_output_name,
+       get_output_name, reset_output_names, edid_switch, edid_switch_all, edid_learn, get_emulated_edids,
+       get_edid_header, get_input_status, get_output_status, clear_hdcp_key_cache, get_ip_config]
+    verification: none
+    notes: >
+      Up to 80 inputs and outputs depending on the frame; presets 1-32 (7.3.18). The connection view lists
+      every output in one line (7.3.7). A matrix set to protocol #2 (P#2, another maker's) does not answer
+      these commands (7.2.9).
+  - id: umx-hdmi-140
+    name: Lightware UMX-HDMI-140 / UMX-HDMI-140-Plus on LW2 (TCP 10001)
+    supports:
+      [get_product_type, get_firmware, get_serial, get_compile_time, get_health, get_protocol, ping, restart,
+       get_label, switch_layer, mute_output_layer, unmute_output_layer, lock_output_layer,
+       unlock_output_layer, get_connection_layer, get_crosspoint_size, get_autoselect, set_autoselect,
+       get_autoselect_priority, set_autoselect_priority, factory_defaults]
+    verification: none
+    notes: >
+      One output (1) with video inputs 1-5 and audio inputs 1-5 (VGA 1, HDMI 2, DP 3, DVI-D 4, DVI-A 5;
+      analog audio 1 and 5) (6.4). The same switcher on LW3 is lightware-lw3's umx model.
+
+commands:
+  # ── General (MX 7.2, UMX 6.3) ───────────────────────────────────────────
+  get_product_type:
+    summary: Get the product type, such as "MX8x8DVI FRAME" or "UMX-HDMI-140" ({i})
+    params:
+      command: { type: enum, values: ["{i}"], default: "{i}" }
+    send: "{command}"
+    expect: { matches: '^\((?:I:)?(.+)\)$' }
+    returns: value
+  get_firmware:
+    summary: Get the CPU firmware version ({f})
+    params:
+      command: { type: enum, values: ["{f}"], default: "{f}" }
+    send: "{command}"
+    expect: { matches: '^\(FW:(.+)\)$' }
+    returns: value
+  get_serial:
+    summary: Get the 8-digit serial number ({s})
+    params:
+      command: { type: enum, values: ["{s}"], default: "{s}" }
+    send: "{command}"
+    expect: { matches: '^\(SN:(.+)\)$' }
+    returns: value
+  get_compile_time:
+    summary: Get when the firmware was compiled ({ct})
+    params:
+      command: { type: enum, values: ["{ct}"], default: "{ct}" }
+    send: "{command}"
+    expect: { matches: '^\(Comp[il]+ed:\s*(.+)\)$' }
+    returns: value
+  get_health:
+    summary: Get the internal voltages and temperatures as reported ({st})
+    params:
+      command: { type: enum, values: ["{st}"], default: "{st}" }
+    send: "{command}"
+    expect: { matches: '^\(STA?T?\s+(.+)\)$' }
+    returns: value
+  get_protocol:
+    summary: "Get the control protocol in use: #1 Lightware, #2 the alternative protocol ({P_?})"
+    send: "{P_?}"
+    expect: { matches: '^\((?:CURRENT|CONTROL) PROTOCOL = #(\d)\)$' }
+    returns: value
+  ping:
+    summary: Check the connection ({ping}, answered "(PONG!)")
+    params:
+      command: { type: enum, values: ["{ping}"], default: "{ping}" }
+    send: "{command}"
+    expect: { matches: '^\(PONG!\)$' }
+    returns: ack
+  get_label:
+    summary: Get the device label ({label})
+    params:
+      command: { type: enum, values: ["{label}"], default: "{label}" }
+    send: "{command}"
+    expect: { matches: '^\(LABEL=(.*)\)$' }
+    returns: value
+  restart:
+    summary: Restart the device ({rst}); connections drop
+    params:
+      command: { type: enum, values: ["{rst}"], default: "{rst}" }
+    send: "{command}"
+    returns: none
+  factory_defaults:
+    summary: Reset every setting to factory default ({factory=all})
+    send: "{factory=all}"
+    expect: { matches: '^\(FACTORY ALL' }
+    returns: ack
+
+  # ── Crosspoint (MX 7.3) ─────────────────────────────────────────────────
+  switch:
+    summary: Route an input to an output ({in@out}); answered "(O<out> I<in>)"
+    params:
+      input: { type: int, min: 1, max: 80, required: true }
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{{input}@{output}}"
+    expect: { matches: '^\(O\d+ I\d+\)$' }
+    returns: ack
+  switch_all:
+    summary: Route an input to every output ({in@O}); answered "(I<in> ALL)"
+    params:
+      input: { type: int, min: 1, max: 80, required: true }
+    send: "{{input}@O}"
+    expect: { matches: '^\(I\d+ ALL\)$' }
+    returns: ack
+  disconnect:
+    summary: Disconnect an output (input 0) ({0@out})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{0@{output}}"
+    expect: { matches: '^\(O\d+ I0+\)$' }
+    returns: ack
+  mute_output:
+    summary: Mute an output; its route is kept ({#out})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{#{output:02d}}"
+    expect: { matches: '^\(1MT\d+\)$' }
+    returns: ack
+  unmute_output:
+    summary: Unmute an output ({+out})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{+{output:02d}}"
+    expect: { matches: '^\(0MT\d+\)$' }
+    returns: ack
+  lock_output:
+    summary: Lock an output so its route cannot change ({#>out})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{#>{output:02d}}"
+    expect: { matches: '^\(1LO\d+\)$' }
+    returns: ack
+  unlock_output:
+    summary: Unlock an output ({+<out})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{+<{output:02d}}"
+    expect: { matches: '^\(0LO\d+\)$' }
+    returns: ack
+  get_connections:
+    summary: "Get every output's input, in output order, each prefixed L (locked), M (muted) or U (both) ({VC}); such as \"M01 L02 03\""
+    params:
+      command: { type: enum, values: ["{VC}"], default: "{VC}" }
+    send: "{command}"
+    expect: { matches: '^\(ALL\s+(.*?)\s*\)$' }
+    returns: value
+  get_mutes:
+    summary: Get every output's mute, 1 or 0 in output order ({VM})
+    params:
+      command: { type: enum, values: ["{VM}"], default: "{VM}" }
+    send: "{command}"
+    expect: { matches: '^\(MUT\s+(.*?)\s*\)$' }
+    returns: value
+
+  # ── Layers (UMX 6.4) ────────────────────────────────────────────────────
+  switch_layer:
+    summary: Route an input to the output on the audio (A), video (V) or both (AV) layers ({in@out layer})
+    params:
+      input: { type: int, min: 0, max: 5, required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [A, V, AV], default: AV }
+    send: "{{input}@{output} {layer}}"
+    expect: { matches: '^\(O\d+ I\d+ (?:A|V|AV)\)$' }
+    returns: ack
+  mute_output_layer:
+    summary: Mute the output's audio, video or both ({#out layer})
+    params:
+      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [A, V, AV], default: AV }
+    send: "{#{output} {layer}}"
+    expect: { matches: '^\(1MT\d+(?: (?:A|V|AV))?\)$' }
+    returns: ack
+  unmute_output_layer:
+    summary: Unmute the output's audio, video or both ({+out layer})
+    params:
+      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [A, V, AV], default: AV }
+    send: "{+{output} {layer}}"
+    expect: { matches: '^\(0MT\d+(?: (?:A|V|AV))?\)$' }
+    returns: ack
+  lock_output_layer:
+    summary: Lock the output's audio, video or both ({#>out layer})
+    params:
+      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [A, V, AV], default: AV }
+    send: "{#>{output} {layer}}"
+    expect: { matches: '^\(1LO\d+(?: (?:A|V|AV))?\)$' }
+    returns: ack
+  unlock_output_layer:
+    summary: Unlock the output's audio, video or both ({+<out layer})
+    params:
+      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [A, V, AV], default: AV }
+    send: "{+<{output} {layer}}"
+    expect: { matches: '^\(0LO\d+(?: (?:A|V|AV))?\)$' }
+    returns: ack
+  get_connection_layer:
+    summary: Get the input on the output's audio (A) or video (V) layer, prefixed L, M or U when locked or muted ({VC layer})
+    params:
+      layer: { type: enum, values: [A, V], required: true }
+    send: "{VC {layer}}"
+    expect: { matches: '^\(ALL[AV]\s+([LMU]?\d+)\)$' }
+    returns: value
+  get_crosspoint_size:
+    summary: Get the audio (A) or video (V) crosspoint size as "<inputs>x<outputs>" ({GETSIZE layer})
+    params:
+      layer: { type: enum, values: [A, V], required: true }
+    send: "{GETSIZE {layer}}"
+    expect: { matches: '^\(SIZE=(\d+x\d+) [AV]\)$' }
+    returns: value
+  get_autoselect:
+    summary: "Get the output's autoselect on a layer as \"<E|D>;<F|L|P>\": enabled or disabled; first, last or priority detect ({AS_<layer>1=?})"
+    params:
+      layer: { type: enum, values: [A, V], required: true }
+    send: "{AS_{layer}1=?}"
+    expect: { matches: '^\(AS_[AV]1=([ED];[FLP])\)$' }
+    returns: value
+  set_autoselect:
+    summary: Enable (E) or disable (D) autoselect on a layer with first (F), last (L) or priority (P) detect ({AS_<layer>1=<state>;<mode>})
+    params:
+      layer: { type: enum, values: [A, V], required: true }
+      state: { type: enum, values: [E, D], required: true }
+      mode: { type: enum, values: [F, L, P], required: true }
+    send: "{AS_{layer}1={state};{mode}}"
+    expect: { matches: '^\(AS_[AV]1=[ED];[FLP]\)$' }
+    returns: ack
+  get_autoselect_priority:
+    summary: Get the autoselect priority of every input on a layer, 0 highest, semicolon-separated ({PRIO_<layer>1=?})
+    params:
+      layer: { type: enum, values: [A, V], required: true }
+    send: "{PRIO_{layer}1=?}"
+    expect: { matches: '^\(PRIO_[AV]1=([0-9;]+)\)$' }
+    returns: value
+  set_autoselect_priority:
+    summary: Set the autoselect priority of every input on a layer, 0-5 each, semicolon-separated in input order ({PRIO_<layer>1=...}); a partial list is not applied
+    params:
+      layer: { type: enum, values: [A, V], required: true }
+      priorities: { type: string, pattern: '^[0-5](;[0-5]){1,5}$', required: true }
+    send: "{PRIO_{layer}1={priorities}}"
+    expect: { matches: '^\(PRIO_[AV]1=[0-9;]+\)$' }
+    returns: ack
+
+  # ── Presets and names (MX 7.3.9-7.3.20) ─────────────────────────────────
+  save_preset:
+    summary: Save the current ties and mutes to a preset, 1-32 ({$id}); locks are not saved
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "{${preset}}"
+    expect: { matches: '^\(SPR\d+\)$' }
+    returns: ack
+  load_preset:
+    summary: Load a preset's ties and mutes ({%id}); locked outputs are not affected
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "{%{preset}}"
+    expect: { matches: '^\(LPR\d+\)$' }
+    returns: ack
+  view_preset:
+    summary: Get a preset's ties without loading it, as for get_connections ({VP#id=?})
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "{VP#{preset}=?}"
+    expect: { matches: '^\(VP#\d+=\s*(.*?)\s*\)$' }
+    returns: value
+  set_preset_name:
+    summary: Name a preset, up to 16 characters, stored in upper case ({PNAME#id=name})
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+      name: { type: string, max_length: 16, pattern: '^[^(){}=?!]+$', required: true }
+    send: "{PNAME#{preset}={name}}"
+    expect: { matches: '^\(PNAME#\d+=' }
+    returns: ack
+  get_preset_name:
+    summary: Get a preset's name ({PNAME#id=?})
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "{PNAME#{preset}=?}"
+    expect: { matches: '^\(PNAME#\d+=(.*)\)$' }
+    returns: value
+  reset_preset_names:
+    summary: Restore every preset's default name, Preset 1-32 ({PNAME#1=!})
+    send: "{PNAME#1=!}"
+    expect: { matches: '^\(PNAME#\d+=' }
+    returns: ack
+  set_input_name:
+    summary: Name an input, up to 16 characters, stored in upper case ({INAME#id=name})
+    params:
+      input: { type: int, min: 1, max: 80, required: true }
+      name: { type: string, max_length: 16, pattern: '^[^(){}=?!]+$', required: true }
+    send: "{INAME#{input}={name}}"
+    expect: { matches: '^\(INAME#\d+=' }
+    returns: ack
+  get_input_name:
+    summary: Get an input's name ({INAME#id=?})
+    params:
+      input: { type: int, min: 1, max: 80, required: true }
+    send: "{INAME#{input}=?}"
+    expect: { matches: '^\(INAME#\d+=(.*)\)$' }
+    returns: value
+  reset_input_names:
+    summary: Restore every input's default name ({INAME#1=!})
+    send: "{INAME#1=!}"
+    expect: { matches: '^\(INAME#\d+=' }
+    returns: ack
+  set_output_name:
+    summary: Name an output, up to 16 characters, stored in upper case ({ONAME#id=name})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+      name: { type: string, max_length: 16, pattern: '^[^(){}=?!]+$', required: true }
+    send: "{ONAME#{output}={name}}"
+    expect: { matches: '^\(ONAME#\d+=' }
+    returns: ack
+  get_output_name:
+    summary: Get an output's name ({ONAME#id=?})
+    params:
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{ONAME#{output}=?}"
+    expect: { matches: '^\(ONAME#\d+=(.*)\)$' }
+    returns: value
+  reset_output_names:
+    summary: Restore every output's default name ({ONAME#1=!})
+    send: "{ONAME#1=!}"
+    expect: { matches: '^\(ONAME#\d+=' }
+    returns: ack
+
+  # ── EDID and port status (MX 7.5-7.6) ───────────────────────────────────
+  edid_switch:
+    summary: Emulate the EDID at a memory location on an input ({in:loc}); "(E_S_C)" may follow when it changed
+    params:
+      input: { type: int, min: 1, max: 80, required: true }
+      location: { type: int, min: 1, max: 200, required: true }
+    send: "{{input}:{location}}"
+    expect: { matches: '^\(E_SW_OK\)$' }
+    returns: ack
+  edid_switch_all:
+    summary: Emulate the EDID at a memory location on every input ({A:loc})
+    params:
+      location: { type: int, min: 1, max: 200, required: true }
+    send: "{A:{location}}"
+    expect: { matches: '^\(E_SW_OK\)$' }
+    returns: ack
+  edid_learn:
+    summary: Save the EDID of a monitor on an output to a user memory location ({loc>out}) (the manual's example puts the location first)
+    params:
+      location: { type: int, min: 1, max: 200, required: true }
+      output: { type: int, min: 1, max: 80, required: true }
+    send: "{{location}>{output}}"
+    expect: { matches: '^\(E_SW_OK\)$' }
+    returns: ack
+  get_emulated_edids:
+    summary: Get the EDID memory location emulated on every input, space-separated ({VEDID})
+    params:
+      command: { type: enum, values: ["{VEDID}"], default: "{VEDID}" }
+    send: "{command}"
+    expect: { matches: '^\(VEDID\s+(.*?)\s*\)$' }
+    returns: value
+  get_edid_header:
+    summary: Get the manufacturer, preferred resolution and name of the EDID at a memory location ({WHloc})
+    params:
+      location: { type: int, min: 1, max: 200, required: true }
+    send: "{WH{location}}"
+    expect: { matches: '^\(EH#\d+\s+(.*)\)$' }
+    returns: value
+  get_input_status:
+    summary: "Get every input's status, one hex digit per input: bit 0 source 5 V, bit 1 signal, bit 2 HDMI ({:ISD})"
+    send: "{:ISD}"
+    expect: { matches: '^\(ISD\s+([0-9A-Fa-f]+)\s*\)$' }
+    returns: value
+  get_output_status:
+    summary: "Get every output's status, one hex digit per output: bit 0 receiver sense ({:OSD})"
+    send: "{:OSD}"
+    expect: { matches: '^\(OSD\s+([0-9A-Fa-f]+)\s*\)$' }
+    returns: value
+  clear_hdcp_key_cache:
+    summary: Clear the HDCP keys the matrix has cached from connected devices ({:HDCPRESET})
+    send: "{:HDCPRESET}"
+    expect: { matches: '^\(DONE\)$' }
+    returns: ack
+  get_ip_config:
+    summary: Get the IP configuration as "<type> <address> <port> <netmask> <gateway>", type 0 static or 7 DHCP ({IP_CONFIG=?})
+    send: "{IP_CONFIG=?}"
+    expect: { matches: '^\(IP_CONFIG=(.*)\)$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      load_preset and switch_all change many outputs at once and cannot be undone except by loading or
+      re-making the previous ties. A preset holds ties and mutes, not locks (MX 7.3.9-7.3.10). restart and
+      factory_defaults drop the connection; factory_defaults resets every setting.
+  - models: [all]
+    severity: warning
+    text: >
+      Answers come only on success (MX 7.1, UMX 6.1). A command the device cannot carry out is answered with
+      an error in brackets, such as "(ERR04)" (Companion's module), or not at all; either fails the command,
+      the second by a timeout after which the connection is reopened. Commands are sent in brackets followed
+      by CR LF, as Companion's module does; the manuals give no terminator.
+  - models: [all]
+    severity: warning
+    text: >
+      The protocol documents no change notifications: front panel and other clients' changes reach state
+      only through the poll of the connections ({VC}) every 5 seconds and through replies. On the UMX the
+      {VC} form without a layer is not documented and its error answer is ignored; its state comes from the
+      layer commands' replies.
+  - models: [all]
+    severity: info
+    text: >
+      Names are up to 16 characters and stored in upper case (MX 7.3.12-7.3.14). Commands are upper-cased by
+      the device (UMX 6.1). The reset_*_names commands rename every preset, input or output; the number sent
+      (1) only has to be valid.
+  - models: [all]
+    severity: info
+    text: >
+      Format gap: a template cannot hold a bare identifier in braces, because "{i}" is a placeholder. The
+      commands whose wire text is such a word ({i}, {f}, {s}, {ct}, {st}, {rst}, {ping}, {label}, {VC},
+      {VM}, {VEDID}) take it through a one-value enum parameter (command), which renders the exact text.
+  - models: [mx-pro]
+    severity: info
+    text: >
+      Port numbers are sent as given (1-2 digits; mute and lock with two, as the manual's examples); answers
+      pad them to two digits. The manual's MX8x8HDMI-Pro chapter calls the set "LW1"; it is the same bracket
+      protocol that later manuals call LW2. Input and output status digit layouts depend on the installed
+      boards (7.6.1-7.6.2).
+  - models: [mx-pro]
+    severity: warning
+    text: >
+      The manual prints the EDID learn command as {<out>><loc>} but its example {4>3} saves output 3 to
+      location 4, i.e. location first; edid_learn sends the location first, as the example does. EDID
+      changes are followed by "(E_S_C)" when the emulated EDID changed, which is not taken as a reply.
+  - models: [umx-hdmi-140]
+    severity: info
+    text: >
+      Port 10001 is not covered by the UMX's Cleartext login; the manual advises blocking it where the login
+      matters (7.12.2). Analog video inputs carry no embedded audio: AV on VGA (1) takes analog audio 1, on
+      DVI-A (5) analog audio 2 (6.4.1). An autoselect priority list must name every input or it is not
+      applied (6.4.11).
+
+state:
+  outputs.*.input:     { type: int, description: "Input routed to the output, numbered from 1; 0 disconnected" }
+  outputs.*.muted:     { type: bool, description: "The output is muted (route kept)" }
+  outputs.*.locked:    { type: bool, description: "The output is locked" }
+  outputs.*.name:      { type: string, description: "Output name (upper case)" }
+  inputs.*.name:       { type: string, description: "Input name (upper case)" }
+  presets.*.name:      { type: string, description: "Preset name (upper case)" }
+  last_preset_loaded:  { type: int, description: "Preset last loaded (LPR)" }
+  last_preset_saved:   { type: int, description: "Preset last saved (SPR)" }
+  layers.*.input:      { type: int, description: "UMX: input on the output's audio (A) or video (V) layer" }
+  layers.*.muted:      { type: bool, description: "UMX: the layer is muted" }
+  layers.*.locked:     { type: bool, description: "UMX: the layer is locked" }
+  device.product_type: { type: string, description: "Product type ({i})" }
+
+telemetry:
+  # No change notifications are documented, so the crosspoint is polled.
+  poll:
+    send: ["{VC}"]
+    every_ms: 5000
+  updates:
+    - match: '^\((?:I:)?((?:MX|UMX|DXP|MMX|HDMI|DVI)[^)]*)\)$'
+      state: { device.product_type: "{1}" }
+    - match: '^\(O0*(\d+) I0*(\d+)(?: AV| V| A)?\)$'
+      state: { "outputs.{1}.input": "{2}" }
+    - match: '^\(([01])MT0*(\d+)\)$'
+      state: { "outputs.{2}.muted": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(([01])LO0*(\d+)\)$'
+      state: { "outputs.{2}.locked": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^\(INAME#(\d+)=(.*)\)$'
+      state: { "inputs.{1}.name": "{2}" }
+    - match: '^\(ONAME#(\d+)=(.*)\)$'
+      state: { "outputs.{1}.name": "{2}" }
+    - match: '^\(PNAME#(\d+)=(.*)\)$'
+      state: { "presets.{1}.name": "{2}" }
+    - match: '^\(LPR0*(\d+)\)$'
+      state: { last_preset_loaded: "{1}" }
+    - match: '^\(SPR0*(\d+)\)$'
+      state: { last_preset_saved: "{1}" }
+    - match: '^\(ALL([AV])\s+[LMU]?0*(\d+)\)$'
+      state: { "layers.{1}.input": "{2}" }
+    - match: '^\(ALL([AV])\s+([LMU]?)\d+\)$'
+      state:
+        "layers.{1}.muted": { value: "x{2}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "layers.{1}.locked": { value: "x{2}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    # The connection view: one field per output, in order, a state letter then the input.
+    - match: '^\(ALL\s+([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.1.input": "{2}"
+        "outputs.1.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.1.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){1}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.2.input": "{2}"
+        "outputs.2.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.2.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){2}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.3.input": "{2}"
+        "outputs.3.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.3.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){3}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.4.input": "{2}"
+        "outputs.4.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.4.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){4}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.5.input": "{2}"
+        "outputs.5.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.5.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){5}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.6.input": "{2}"
+        "outputs.6.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.6.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){6}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.7.input": "{2}"
+        "outputs.7.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.7.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){7}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.8.input": "{2}"
+        "outputs.8.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.8.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){8}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.9.input": "{2}"
+        "outputs.9.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.9.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){9}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.10.input": "{2}"
+        "outputs.10.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.10.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){10}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.11.input": "{2}"
+        "outputs.11.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.11.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){11}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.12.input": "{2}"
+        "outputs.12.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.12.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){12}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.13.input": "{2}"
+        "outputs.13.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.13.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){13}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.14.input": "{2}"
+        "outputs.14.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.14.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){14}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.15.input": "{2}"
+        "outputs.15.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.15.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){15}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.16.input": "{2}"
+        "outputs.16.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.16.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){16}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.17.input": "{2}"
+        "outputs.17.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.17.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){17}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.18.input": "{2}"
+        "outputs.18.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.18.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){18}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.19.input": "{2}"
+        "outputs.19.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.19.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){19}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.20.input": "{2}"
+        "outputs.20.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.20.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){20}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.21.input": "{2}"
+        "outputs.21.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.21.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){21}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.22.input": "{2}"
+        "outputs.22.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.22.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){22}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.23.input": "{2}"
+        "outputs.23.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.23.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){23}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.24.input": "{2}"
+        "outputs.24.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.24.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){24}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.25.input": "{2}"
+        "outputs.25.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.25.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){25}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.26.input": "{2}"
+        "outputs.26.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.26.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){26}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.27.input": "{2}"
+        "outputs.27.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.27.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){27}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.28.input": "{2}"
+        "outputs.28.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.28.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){28}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.29.input": "{2}"
+        "outputs.29.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.29.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){29}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.30.input": "{2}"
+        "outputs.30.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.30.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){30}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.31.input": "{2}"
+        "outputs.31.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.31.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }
+    - match: '^\(ALL\s+(?:\S+\s+){31}([LMU]?)0*(\d+)(?:\s|\))'
+      state:
+        "outputs.32.input": "{2}"
+        "outputs.32.muted": { value: "x{1}", map: { "x": false, "xL": false, "xM": true, "xU": true } }
+        "outputs.32.locked": { value: "x{1}", map: { "x": false, "xL": true, "xM": false, "xU": true } }

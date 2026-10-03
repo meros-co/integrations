@@ -1,0 +1,456 @@
+spec: 1
+id: blackmagic-smartview
+name: Blackmagic SmartView / SmartScope
+vendor: Blackmagic Design
+category: display
+
+source:
+  - title: Blackmagic SmartView and SmartScope Installation and Operation Manual (July 2024), Developer Information, Blackmagic SmartView Ethernet Protocol v1.4
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/SmartViewManual.pdf
+    note: >
+      Manufacturer-documented, and the source of every block and command here unless
+      the command says otherwise. Covers SmartView 4K G3, SmartView Duo and SmartScope
+      Duo 4K. TCP 9992, the state dump on connecting and asynchronous changes, block
+      framing and unrecognised blocks (p.38); preamble and SMARTVIEW DEVICE block
+      (p.38); NETWORK block, DHCP and static settings, and the dropped connection on a
+      name or network change (p.39); MONITOR blocks with brightness, contrast and
+      saturation (p.39); WidescreenSD, Identify and Border (p.40); SmartScope ScopeMode
+      values (p.40); AudioChannel pairs and LUT selection (p.41). Front-panel LUT and
+      tally (p.11-12, p.33), SmartView Setup identify (p.14).
+  - title: Blackmagic SmartView 4K Installation and Operation Manual (earlier edition), Developer Information, Blackmagic SmartView Ethernet Protocol v1.3
+    author: Blackmagic Design
+    url: https://www.manualslib.com/manual/1334574/Blackmagicdesign-Smartview-4k.html?page=31
+    note: >
+      Manufacturer document as reproduced by ManualsLib. Protocol v1.3 has the same
+      preamble, device, network and monitor blocks as v1.4 (p.31-33), and covers the
+      earlier SmartView 4K, SmartView HD and SmartView Duo.
+  - title: companion-module-bmd-smartview (Bitfocus Companion module)
+    author: Bitfocus
+    url: https://github.com/bitfocus/companion-module-bmd-smartview
+    note: >
+      Community source (MIT licence), read as corroboration only. It takes ACK as the
+      reply to a command, sends a keep-alive some units do not answer, sends Border
+      values in lowercase, and reads and sets MonitorInput (SDI A, SDI B, OPTICAL) on
+      SmartView 4K, which Blackmagic's documents do not describe. Its model list is
+      SmartView HD, SmartView 4K, SmartView Duo and SmartScope Duo 4K.
+
+transport:
+  type: line-tcp
+  port: 9992
+  framing: block
+  encoding: utf-8
+  timeout_ms: 2000
+  reply: expected
+  reply_match: "^(ACK|NAK)"
+
+models:
+  - id: smartview-4k-g3
+    name: Blackmagic SmartView 4K G3
+    supports:
+      [set_device_name, set_network_dhcp, set_network_static, set_brightness,
+       set_contrast, set_saturation, identify, set_border, set_widescreen_sd, set_lut,
+       disable_lut, get_device_info, get_network, get_monitor, ping]
+    verification: none
+    notes: >
+      One 15.6 inch Ultra HD LCD (Monitor A), two 12G-SDI inputs, 10G 2110 IP and an
+      SFP (July 2024 manual, p.5, p.10). Two 3D LUT slots on the front panel (p.11).
+      Input selection is not in the documented protocol.
+  - id: smartview-4k
+    name: Blackmagic SmartView 4K (and SmartView 4K 2)
+    supports:
+      [set_device_name, set_network_dhcp, set_network_static, set_brightness,
+       set_contrast, set_saturation, identify, set_border, set_widescreen_sd, set_lut,
+       disable_lut, set_monitor_input, get_device_info, get_network, get_monitor, ping]
+    verification: none
+    notes: >
+      Earlier Ultra HD SmartView, one monitor (Monitor A). LUT selection is
+      documented for SmartView 4K (p.41). set_monitor_input is community-observed only
+      (see sources and quirks).
+  - id: smartview-duo
+    name: Blackmagic SmartView Duo
+    supports:
+      [set_device_name, set_network_dhcp, set_network_static, set_brightness,
+       set_contrast, set_saturation, identify, set_border, set_widescreen_sd,
+       get_device_info, get_network, get_monitor, ping]
+    verification: none
+    notes: >
+      Two 8 inch LCDs, Monitor A and Monitor B, each with its own 3G-SDI input (p.5,
+      p.38).
+  - id: smartscope-duo-4k
+    name: Blackmagic SmartScope Duo 4K
+    supports:
+      [set_device_name, set_network_dhcp, set_network_static, set_brightness,
+       set_contrast, set_saturation, identify, set_border, set_widescreen_sd,
+       set_scope_mode, set_audio_channel, get_device_info, get_network, get_monitor,
+       ping]
+    verification: none
+    notes: >
+      Two 8 inch LCDs with 6G-SDI inputs; each can show the picture or a scope (p.5,
+      p.40-41).
+  - id: smartview-hd
+    name: Blackmagic SmartView HD
+    supports:
+      [set_device_name, set_network_dhcp, set_network_static, set_brightness,
+       set_contrast, set_saturation, identify, set_border, set_widescreen_sd,
+       get_device_info, get_network, get_monitor, ping]
+    verification: none
+    notes: >
+      Earlier single-monitor SmartView (Monitor A), documented with protocol
+      v1.1 in its own manual edition; not in the current manual.
+
+commands:
+  set_device_name:
+    summary: Rename the monitor on the network; the connection drops and the monitor advertises the new name
+    params:
+      name: { type: string, required: true }
+    send: |
+      SMARTVIEW DEVICE:
+      Name: {name}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.38-39; block form inferred, see quirks
+
+  set_network_dhcp:
+    summary: Use DHCP for the monitor's address (Dynamic IP true); the connection drops
+    send: |
+      NETWORK:
+      Dynamic IP: true
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.39
+
+  set_network_static:
+    summary: Give the monitor a static address, netmask and gateway (Dynamic IP false); the connection drops
+    params:
+      address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+      netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+      gateway: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+    send: |
+      NETWORK:
+      Dynamic IP: false
+      Static address: {address}
+      Static netmask: {netmask}
+      Static gateway: {gateway}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.39: "supply all static parameters"
+
+  set_brightness:
+    summary: Set a monitor's backlight brightness, 0-255
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      level:   { type: int, min: 0, max: 255, required: true }
+    send: |
+      MONITOR {monitor}:
+      Brightness: {level}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.39
+
+  set_contrast:
+    summary: Set a monitor's contrast, 0-255 with 127 unchanged
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      level:   { type: int, min: 0, max: 255, required: true }
+    send: |
+      MONITOR {monitor}:
+      Contrast: {level}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.39
+
+  set_saturation:
+    summary: Set a monitor's saturation, 0-255 with 127 unchanged and 0 black and white
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      level:   { type: int, min: 0, max: 255, required: true }
+    send: |
+      MONITOR {monitor}:
+      Saturation: {level}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.39
+
+  identify:
+    summary: Show a white border around a monitor's picture for 15 seconds, to find it in a rack
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+    send: |
+      MONITOR {monitor}:
+      Identify: true
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.40
+
+  set_border:
+    summary: Set a monitor's soft tally border colour, or none; a wired tally input overrides it
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      color:   { type: enum, values: [none, red, green, blue, white], required: true }
+    send: |
+      MONITOR {monitor}:
+      Border: {color}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.40: "Border: green"
+
+  set_widescreen_sd:
+    summary: Show SD video on a monitor as 16:9 (true) or 4:3 (false)
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      enabled: { type: bool, required: true }
+    send: |
+      MONITOR {monitor}:
+      WidescreenSD: {enabled:on_off}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.40: "WidescreenSD: ON" / "OFF"
+
+  set_scope_mode:
+    summary: Show the picture or a scope on a SmartScope Duo 4K monitor
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      mode:
+        type: enum
+        values: [Picture, WaveformLuma, ParadeRGB, ParadeYUV, Vector100, Vector75, Histogram, AudioDbfs, AudioDbvu]
+        required: true
+    send: |
+      MONITOR {monitor}:
+      ScopeMode: {mode}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.40
+
+  set_audio_channel:
+    summary: Choose the audio channel pair (1 = channels 1-2 … 8 = channels 15-16) a SmartScope audio meter shows
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      pair:    { type: int, min: 1, max: 8, required: true }
+    send: |
+      MONITOR {monitor}:
+      AudioChannel: {pair:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.41: 0 is channels 1 and 2 … 7 is 15 and 16
+
+  set_lut:
+    summary: Apply 3D LUT 1 or 2 to a SmartView 4K monitor
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      lut:     { type: int, min: 1, max: 2, required: true }
+    send: |
+      MONITOR {monitor}:
+      LUT: {lut:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.41: 0 is LUT 1, 1 is LUT 2
+
+  disable_lut:
+    summary: Turn off the 3D LUT on a SmartView 4K monitor
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+    send: |
+      MONITOR {monitor}:
+      LUT: NONE
+    expect: { contains: "ACK" }
+    returns: ack
+    # SmartView Ethernet Protocol v1.4 (July 2024 manual), p.41: NONE disables
+
+  set_monitor_input:
+    summary: Choose the SDI or optical input a SmartView 4K shows (community-observed)
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+      input:   { type: enum, values: [SDI A, SDI B, OPTICAL], required: true }
+    send: |
+      MONITOR {monitor}:
+      MonitorInput: {input}
+    expect: { contains: "ACK" }
+    returns: ack
+    # Not in Blackmagic's documents; companion-module-bmd-smartview, see quirks
+
+  get_device_info:
+    summary: Ask the monitor to resend its device block; it follows the ACK and updates state
+    send: "SMARTVIEW DEVICE:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the SmartView document, see quirks
+
+  get_network:
+    summary: Ask the monitor to resend its network block; it follows the ACK and updates state
+    send: "NETWORK:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the SmartView document, see quirks
+
+  get_monitor:
+    summary: Ask the monitor to resend one monitor block; it follows the ACK and updates state
+    params:
+      monitor: { type: enum, values: [A, B], required: true }
+    send: "MONITOR {monitor}:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style status request; not in the SmartView document, see quirks
+
+  ping:
+    summary: Check that the monitor is still responding
+    send: "PING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub-style no-operation; not in the SmartView document, see quirks
+
+telemetry:
+  # The monitor sends its whole state as blocks when a client connects, then
+  # changes asynchronously (p.38). Nothing needs polling. Each monitor's block has
+  # its own header, so each has its own rule.
+  updates:
+    - header: "^PROTOCOL PREAMBLE:$"
+      fields:
+        Version: device.protocol_version
+    - header: "^SMARTVIEW DEVICE:$"
+      fields:
+        Model: device.model
+        Hostname: device.hostname
+        Name: device.name
+        Monitors: device.monitors
+        Inverted: { path: device.inverted, map: { "true": true, "false": false } }
+    - header: "^NETWORK:$"
+      fields:
+        Dynamic IP: { path: network.dynamic_ip, map: { "true": true, "false": false } }
+        Static address: network.static_address
+        Static netmask: network.static_netmask
+        Static gateway: network.static_gateway
+        Current address: network.current_address
+        Current netmask: network.current_netmask
+        Current gateway: network.current_gateway
+    - header: "^MONITOR A:$"
+      fields:
+        Brightness: monitors.A.brightness
+        Contrast: monitors.A.contrast
+        Saturation: monitors.A.saturation
+        Identify: { path: monitors.A.identify, map: { "true": true, "false": false } }
+        Border: { path: monitors.A.border, map: { none: none, NONE: none, red: red, RED: red, green: green, GREEN: green, blue: blue, BLUE: blue, white: white, WHITE: white } }
+        WidescreenSD: { path: monitors.A.widescreen_sd, map: { "ON": true, "OFF": false, "true": true, "false": false } }
+        ScopeMode: monitors.A.scope_mode
+        AudioChannel: { path: monitors.A.audio_channel, map: { "0": 1, "1": 2, "2": 3, "3": 4, "4": 5, "5": 6, "6": 7, "7": 8 } }
+        LUT: { path: monitors.A.lut, map: { "0": "1", "1": "2", "NONE": "none" } }
+        MonitorInput: monitors.A.input
+    - header: "^MONITOR B:$"
+      fields:
+        Brightness: monitors.B.brightness
+        Contrast: monitors.B.contrast
+        Saturation: monitors.B.saturation
+        Identify: { path: monitors.B.identify, map: { "true": true, "false": false } }
+        Border: { path: monitors.B.border, map: { none: none, NONE: none, red: red, RED: red, green: green, GREEN: green, blue: blue, BLUE: blue, white: white, WHITE: white } }
+        WidescreenSD: { path: monitors.B.widescreen_sd, map: { "ON": true, "OFF": false, "true": true, "false": false } }
+        ScopeMode: monitors.B.scope_mode
+        AudioChannel: { path: monitors.B.audio_channel, map: { "0": 1, "1": 2, "2": 3, "3": 4, "4": 5, "5": 6, "6": 7, "7": 8 } }
+        LUT: { path: monitors.B.lut, map: { "0": "1", "1": "2", "NONE": "none" } }
+        MonitorInput: monitors.B.input
+
+state:
+  device.protocol_version:  { type: string, description: "Protocol version from the preamble, e.g. 1.4" }
+  device.model:             { type: string, description: "Model, e.g. SmartView Duo" }
+  device.hostname:          { type: string, description: "Network host name" }
+  device.name:              { type: string, description: "Name the monitor advertises on the network" }
+  device.monitors:          { type: int, description: "Number of LCDs: 1 (Monitor A) or 2 (Monitors A and B)" }
+  device.inverted:          { type: bool, description: "The unit has detected it is mounted upside down to improve the LCD viewing angle" }
+  network.dynamic_ip:       { type: bool, description: "DHCP in use" }
+  network.static_address:   { type: string, description: "Configured static IP address" }
+  network.static_netmask:   { type: string, description: "Configured static netmask" }
+  network.static_gateway:   { type: string, description: "Configured static gateway" }
+  network.current_address:  { type: string, description: "Active IP address (DHCP or static)" }
+  network.current_netmask:  { type: string, description: "Active netmask" }
+  network.current_gateway:  { type: string, description: "Active gateway" }
+  monitors.*.brightness:    { type: int, description: "Brightness 0-255, keyed by monitor A or B" }
+  monitors.*.contrast:      { type: int, description: "Contrast 0-255, 127 unchanged" }
+  monitors.*.saturation:    { type: int, description: "Saturation 0-255, 127 unchanged, 0 black and white" }
+  monitors.*.identify:      { type: bool, description: "Identify border on (resets after 15 seconds)" }
+  monitors.*.border:        { type: string, description: "Current border: none, red, green, blue or white; the wired tally input overrides the soft tally and is what is reported" }
+  monitors.*.widescreen_sd: { type: bool, description: "SD shown as 16:9 (true) or 4:3 (false)" }
+  monitors.*.scope_mode:    { type: string, description: "SmartScope view: Picture, WaveformLuma, ParadeRGB, ParadeYUV, Vector100, Vector75, Histogram, AudioDbfs or AudioDbvu" }
+  monitors.*.audio_channel: { type: int, description: "Audio channel pair shown by the SmartScope audio meter: 1 = channels 1-2 … 8 = channels 15-16" }
+  monitors.*.lut:           { type: string, description: "3D LUT applied: 1, 2 or none (SmartView 4K)" }
+  monitors.*.input:         { type: string, description: "Input shown: SDI A, SDI B or OPTICAL (community-observed MonitorInput, SmartView 4K)" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Changing the name or any network setting drops the IP connection; the monitor
+      restarts its networking and advertises the new name (p.39). set_network_static
+      with a wrong address, netmask or gateway leaves the monitor unreachable over
+      Ethernet until it is reset over USB with SmartView Setup or from its front
+      panel. Neither asks for confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The SmartView document says the monitor dumps its state on connecting and sends
+      changes asynchronously (p.38), but it documents no command reply, no status
+      request and no PING. Commands here wait for ACK or NAK as on the Videohub
+      protocol it says it resembles; the community Companion module also waits for
+      ACK. get_device_info, get_network, get_monitor and ping send the Videohub
+      header-only and PING forms. The Companion module notes some units do not answer
+      its keep-alive, so no liveness probe is set. The document says the name can be
+      changed (p.39) but not how; set_device_name sends Name in the SMARTVIEW DEVICE
+      block, the form the monitor reports it in.
+
+  - models: [all]
+    severity: info
+    text: >
+      Contrast and saturation are centred: 127 shows the picture unchanged, higher
+      increases and lower decreases (p.39). Brightness is the plain 0-255 scale; the
+      document's 50 percent example is 127. One block can carry several settings
+      (p.39); these commands send one setting per block.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Identify is transient: a white border for 15 seconds, then it resets, and it
+      overrides any other border meanwhile (p.40). The soft tally border set here is
+      overridden by the wired tally input; the state report always shows the border in
+      effect (p.40), so monitors.*.border may differ from what was last sent.
+
+  - models: [all]
+    severity: info
+    text: >
+      Border colours are listed in upper case but the example sends lower case
+      ("green", p.40); commands send lower case and state accepts both. WidescreenSD is
+      sent as ON or OFF (p.40); how the monitor reports it is not shown, so state
+      accepts ON, OFF, true and false.
+
+  - models: [smartview-duo, smartscope-duo-4k]
+    severity: info
+    text: >
+      Monitor A and Monitor B are the two LCDs of a Duo (p.38). A single-monitor model
+      has only Monitor A; device.monitors reports the count. The document does not
+      say how a single-monitor model answers a MONITOR B block.
+
+  - models: [smartview-4k, smartview-4k-g3]
+    severity: info
+    text: >
+      LUT 0 selects LUT 1, 1 selects LUT 2 and NONE disables (p.41). The LUTs
+      themselves are loaded with SmartView Setup (p.19), not over this protocol.
+
+  - models: [smartview-4k]
+    severity: warning
+    text: >
+      MonitorInput is not in Blackmagic's documents. The community Companion module
+      reads it and sets it to SDI A, SDI B or OPTICAL on SmartView 4K. Whether a
+      SmartView 4K G3 (two SDI inputs, 2110 IP and SFP) uses the same field or values
+      is unknown, so set_monitor_input is not listed for it.
+
+  - models: [smartview-4k]
+    severity: info
+    text: >
+      The Companion module offers no contrast or saturation actions for SmartView 4K.
+      Blackmagic's documents list them for every monitor (p.39); they are kept, and
+      NAK or an unchanged monitor block shows whether a unit ignores them.
+
+  - models: [all]
+    severity: info
+    text: >
+      The document's legend marks line ends as carriage returns (p.38); commands end
+      lines with LF as on the Videohub protocol and the Companion module, and received
+      lines may end in CR, LF or CRLF.

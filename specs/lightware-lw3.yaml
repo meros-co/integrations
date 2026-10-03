@@ -1,0 +1,2621 @@
+spec: 1
+id: lightware-lw3
+name: Lightware LW3 matrices, switchers and extenders
+vendor: Lightware
+category: router
+
+# Transcribed from the LW3 Programmers' Reference chapters of Lightware's own
+# user manuals. Lightware publishes no stand-alone LW3 reference: each product's
+# manual carries the chapter for its own node tree. Three trees exist and their
+# paths and methods differ, so the commands are split by family:
+#
+#   - plain names: the /V1 tree of the current products (MMX2, Taurus UCX, DCX,
+#     UCX-TPX): /V1/MEDIA/VIDEO/XP:switch, crosspoint port properties
+#     XP/<port>.Lock and .Mute, XP/<out>.ConnectedSource, port status as
+#     separate properties (/V1/MEDIA/VIDEO/I1.SignalPresent).
+#   - mx2_*: the MX2 matrix tree: /MEDIA/XP/VIDEO with lock/mute methods
+#     (lockSource, muteDestination...), the crosspoint and port status as
+#     semicolon lists, port settings under /MEDIA/PORTS/VIDEO, presets under
+#     /MEDIA/PRESET.
+#   - umx_*: the UMX-HDMI-140 tree: /MEDIA/VIDEO/XP and /MEDIA/AUDIO/XP with the
+#     same lock/mute methods as MX2, status as semicolon lists, port settings
+#     on /MEDIA/VIDEO/<port>.
+#
+# Left out: EDID upload/download, the Event Manager, variables, Ethernet/HTTP
+# message sending, serial pass-through, GPIO/OCS, network and security
+# configuration (changing them drops the connection or locks it), remote
+# syslog, firmware update, and settings documented with conflicting syntax
+# (see quirks).
+source:
+  - title: "MX2 Standalone Series User Manual, rev. v7 (2026-09-07), FW package v1.11.3"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/User-Manual/HTML/MX2_Standalone_series/UM.html
+    note: >
+      Manufacturer document. Chapter 9, LW3 Programmers' Reference: protocol
+      rules, CrLf line ending, 800-byte line limit, TCP port 6107 (9.3.2);
+      GET/GETALL/SET/CALL/MAN (9.3.4); prefixes (9.3.5); errors %E004 (9.3.6);
+      escaping (9.3.7); signature (9.3.8); OPEN/CLOSE subscriptions per
+      connection and CHG messages (9.3.9-9.3.10); system commands (9.4:
+      ProductName, DeviceLabel, SerialNumber, softReset, factoryDefaults,
+      POWER.Operation, standby, wakeUp); crosspoint (9.5:
+      DestinationConnectionStatus, switch, switch(0:out), switchAll,
+      switchMulti); input settings (9.6: HdcpVersion, muteSource,
+      unmuteSource, lockSource, unlockSource, SourcePortStatus letter and hex
+      byte layout, EMBEDDEDAUDIO.AudioMode); CEC (9.7, 9.13); DisplayPort
+      (9.8, 9.14); analog audio (9.9-9.10, 9.15); output settings (9.11:
+      DestinationPortStatus, muteDestination, unmuteDestination,
+      lockDestination, unlockDestination, HdcpMode; 9.12 ForcedSignalType,
+      ForcedScrambling, Conversion); presets (9.16: create, save, load,
+      rename); EDID (9.18: EdidStatus, switch, copy).
+  - title: "MMX2 series User Manual, rev. v3 (2026-09-01), FW package v2.16.0b6"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/User-Manual/MMX2_series_UserManual.pdf
+    note: >
+      Manufacturer document. Chapter 7, LW3 Programmers' Reference (/V1
+      tree): general rules, names case-sensitive up to FW v2.9.0, 18 clients
+      over WS/WSS/LW3 together (7.4.2); prefixes, errors (%E002:Not exist),
+      signature, subscription and CHG (7.4.4-7.4.10); system (7.5: DeviceLabel
+      49 characters, restart, factoryDefaults, PACKAGE.Version, ControlLock,
+      identifyMe, DARKMODE); video (7.6: XP:switch, switch(0:out), switchAll,
+      XP/<port>.Lock and .Mute, AUTOSELECT Policy/Included/Priority 1-100,
+      XP/<out>.ConnectedSource, SWITCHABLE, ConnectedDestinations,
+      SignalPresent, AllowedHdcpVersion, OutputSignalType,
+      EmbeddedAudioPresent, EmbeddedAudioMute, Output5VMode); CEC (7.7: send,
+      sendUserControlClick, code list); audio (7.8: AUDIO/XP:switch,
+      ConnectedSource, AUTOSELECT Policy and VideoFollowPort, XP Lock/Mute,
+      port Mute, SignalPresent, VolumedB -95.62..0 in 0.375 dB steps,
+      VolumePercent, Balance -100..100, step methods); EDID (7.9); network
+      security (7.11: LW3 service on 6107 has no authentication and can be
+      disabled). Section 6.3.4 names the Connected and Name port properties.
+  - title: "Taurus UCX series User Manual, rev. v4 (2026-09-14), FW package v2.22.9b1 (HC40) / v2.16.1b2 (HC30)"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/User-Manual/HTML/UCX_Series/UM.html
+    note: >
+      Manufacturer document. Chapter 8, LW3 Programmers' Reference: the same
+      /V1 tree as MMX2 plus the I1/I5 crosspoint limitation answered
+      "%E006: Illegal operation" (8.6.1), welcome screen, USB crosspoint (8.11:
+      USB/XP:switch(<host>:H1), H1.ConnectedSource, Lock, autoselect),
+      USB-C, and the known issue that CHG EmbeddedAudioPresent on outputs can
+      be missed (release notes). Port numbering per model (12.2).
+  - title: "UMX-HDMI-140 / UMX-HDMI-140-Plus User Manual, FW package v1.3.1b2"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/User-Manual/HTML/UMX-HDMI-140_Series/UM.html
+    note: >
+      Manufacturer document. Chapter 7, LW3 Programmers' Reference (UMX
+      tree): system (7.4: ProductName, UID.DeviceLabel 39 characters,
+      SYS/MB.FirmwareVersion, UID.PackageVersion, SYS:reset, factoryDefaults,
+      UI.ControlLock 0/1/2, identifyMe, CTRL/MACROS:run); Cleartext login
+      (7.5: LOGIN:login, logout, LoginEnable; valid until the TCP socket
+      breaks); video (7.6: SourcePortStatus and DestinationPortStatus with a
+      letter and two hex bytes, DestinationConnectionList, XP:switch,
+      setDestinationPortAutoselect, mute/lock methods, HdcpEnable,
+      HdcpModeSetting, FreeRunMode, HdmiModeSetting, ColorSpaceSetting); audio
+      (7.7: the same for /MEDIA/AUDIO/XP, input Volume and Balance).
+  - title: "Security features in Lightware products, Application Notes, rev. v1"
+    author: Lightware Visual Engineering PLC.
+    url: https://assets.prod.pim.lightware.com/assets/File-Downloads/Guides-and-Manuals/Application-Note/Security_Guide.pdf
+    note: >
+      Which products have the Cleartext login (UMX-HDMI-140-Plus,
+      UMX-TPS-TX140-Plus and others) and that LW2 on port 10001 is not
+      covered by it.
+  - title: companion-module-lightware-lw3 (Bitfocus Companion module, MIT)
+    url: https://github.com/bitfocus/companion-module-lightware-lw3
+    note: >
+      Corroboration only, read for behaviour, no code copied: chooses the MX2
+      tree by ProductName, opens /MEDIA/XP/VIDEO and reads
+      DestinationConnectionStatus / DestinationConnectionList as
+      semicolon-separated I<n> or 0 per output, and reads MX2 port names from
+      /MEDIA/NAMES/VIDEO as <n>;<label>.
+
+transport:
+  type: line-tcp
+  port: 6107
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Every answer starts with a two-character prefix and a space (pr, pw, pE,
+  # mO, mF, mE, nE, n-, o-, c-...). A change notification starts "CHG " and is
+  # never the reply to a command.
+  reply_match: '^[pmnoc][-rwmEOFs] '
+  probe: 'GET /.SerialNumber'
+
+# Cleartext login password (UMX-HDMI-140-Plus and other products with the
+# Basic IT security pack). Left empty when the login is not enabled.
+settings:
+  password:
+    type: string
+    secret: true
+    default: ''
+    pattern: '^[^\\{}#%()\r\n\t]*$'
+
+on_connect:
+  - when_set: password
+    send: 'CALL /LOGIN:login({settings.password})'
+    await_reply: true
+
+models:
+  - id: mx2
+    name: 'Lightware MX2 matrix switchers (MX2-4x4 to MX2-48x48, HDMI 2.0 / DisplayPort)'
+    supports:
+      - get_serial
+      - get_product_name
+      - get_device_label_uid
+      - set_device_label_uid
+      - factory_defaults_legacy
+      - mx2_soft_reset
+      - mx2_get_power_mode
+      - mx2_standby
+      - mx2_wake_up
+      - mx2_switch
+      - mx2_disconnect
+      - mx2_switch_all
+      - mx2_disconnect_all
+      - mx2_switch_multi
+      - mx2_mute_input
+      - mx2_unmute_input
+      - mx2_lock_input
+      - mx2_unlock_input
+      - mx2_mute_output
+      - mx2_unmute_output
+      - mx2_lock_output
+      - mx2_unlock_output
+      - mx2_get_connections
+      - mx2_get_input_status
+      - mx2_get_output_status
+      - mx2_create_preset
+      - mx2_load_preset
+      - mx2_rename_preset
+      - mx2_set_input_hdcp
+      - mx2_set_output_hdcp_mode
+      - mx2_set_output_signal_type
+      - mx2_set_output_conversion
+      - mx2_set_embedded_audio_mode
+      - mx2_set_analog_output_mode
+      - mx2_set_analog_output_volume_db
+      - mx2_set_analog_mute
+      - mx2_set_analog_balance
+      - mx2_set_analog_input_gain
+      - mx2_cec_send
+      - mx2_get_edid_status
+      - mx2_edid_switch
+      - mx2_edid_copy
+    verification: none
+    notes: >
+      The MX2 tree: /MEDIA/XP/VIDEO methods, port settings under
+      /MEDIA/PORTS/VIDEO, named presets. Analog audio and DisplayPort
+      settings exist only on -A/-Audio and -D models. No device-wide audio
+      crosspoint and no port names are documented in LW3.
+  - id: umx
+    name: 'Lightware UMX-HDMI-140 / UMX-HDMI-140-Plus universal switchers'
+    supports:
+      - get_serial
+      - get_product_name
+      - get_device_label_uid
+      - set_device_label_uid
+      - factory_defaults_legacy
+      - umx_get_firmware_version
+      - umx_get_package_version
+      - umx_reset
+      - umx_identify
+      - umx_set_control_lock
+      - umx_run_macro
+      - umx_logout
+      - umx_switch
+      - umx_mute_input
+      - umx_unmute_input
+      - umx_lock_input
+      - umx_unlock_input
+      - umx_mute_output
+      - umx_unmute_output
+      - umx_lock_output
+      - umx_unlock_output
+      - umx_get_connection
+      - umx_get_input_status
+      - umx_get_output_status
+      - umx_set_autoselect
+      - umx_set_input_hdcp
+      - umx_set_output_hdcp_mode
+      - umx_set_test_pattern_mode
+      - umx_set_hdmi_mode
+      - umx_set_color_space
+      - umx_set_audio_input_volume
+      - umx_set_audio_input_balance
+    verification: none
+    notes: >
+      The UMX tree: /MEDIA/VIDEO/XP and /MEDIA/AUDIO/XP with lock/mute
+      methods, one output (O1). The Cleartext login and macros are on the
+      -Plus model from FW package 1.3.0b5.
+  - id: mmx2
+    name: 'Lightware MMX2 matrix switchers (MMX2-4x1-H20, MMX2-4x3-H20)'
+    supports:
+      - get_serial
+      - get_firmware_version
+      - get_device_label
+      - set_device_label
+      - restart
+      - factory_defaults
+      - identify
+      - set_control_lock
+      - set_dark_mode
+      - set_dark_mode_delay
+      - switch
+      - disconnect
+      - switch_video_all
+      - set_port_lock
+      - set_port_mute
+      - get_connected_source
+      - get_connected_destinations
+      - get_port_lock
+      - get_port_mute
+      - get_switchable
+      - get_signal_present
+      - get_port_connected
+      - get_embedded_audio_present
+      - get_port_name
+      - set_port_name
+      - set_embedded_audio_mute
+      - set_input_hdcp
+      - set_output_signal_type
+      - set_autoselect_policy
+      - set_autoselect_included
+      - set_autoselect_priority
+      - cec_send
+      - cec_send_user_control_click
+      - set_audio_output_mute
+      - set_audio_output_volume_db
+      - set_audio_output_volume_percent
+      - set_audio_output_balance
+      - step_audio_output_volume_db
+      - set_audio_autoselect_policy
+      - set_audio_follow_port
+      - get_edid_status
+      - edid_switch
+      - edid_switch_all
+      - edid_copy
+      - edid_delete
+      - edid_reset
+    verification: none
+    notes: >
+      The /V1 tree, without the USB crosspoint.
+  - id: taurus-ucx
+    name: 'Lightware Taurus UCX switchers (UCX-2x1, 2x2, 4x2, 4x3; HC30/HC40/HC60, -LCC)'
+    supports:
+      - get_serial
+      - get_firmware_version
+      - get_device_label
+      - set_device_label
+      - restart
+      - factory_defaults
+      - identify
+      - set_control_lock
+      - set_dark_mode
+      - set_dark_mode_delay
+      - switch
+      - disconnect
+      - switch_video_all
+      - set_port_lock
+      - set_port_mute
+      - get_connected_source
+      - get_connected_destinations
+      - get_port_lock
+      - get_port_mute
+      - get_switchable
+      - get_signal_present
+      - get_port_connected
+      - get_embedded_audio_present
+      - get_port_name
+      - set_port_name
+      - set_embedded_audio_mute
+      - set_input_hdcp
+      - set_output_signal_type
+      - set_autoselect_policy
+      - set_autoselect_included
+      - set_autoselect_priority
+      - cec_send
+      - cec_send_user_control_click
+      - set_audio_output_mute
+      - set_audio_output_volume_db
+      - set_audio_output_volume_percent
+      - set_audio_output_balance
+      - step_audio_output_volume_db
+      - set_audio_autoselect_policy
+      - set_audio_follow_port
+      - switch_usb
+      - disconnect_usb
+      - get_usb_source
+      - set_usb_port_lock
+      - get_edid_status
+      - edid_switch
+      - edid_switch_all
+      - edid_copy
+      - edid_delete
+      - edid_reset
+    verification: none
+    notes: >
+      The /V1 tree with the USB crosspoint (U1-U4 hosts to the H1 hub).
+  - id: v1-generic
+    name: 'Other Lightware products on the /V1 LW3 tree (DCX, UCX-TPX and similar)'
+    supports:
+      - get_serial
+      - get_firmware_version
+      - get_device_label
+      - set_device_label
+      - restart
+      - factory_defaults
+      - identify
+      - set_control_lock
+      - set_dark_mode
+      - set_dark_mode_delay
+      - switch
+      - disconnect
+      - switch_video_all
+      - set_port_lock
+      - set_port_mute
+      - get_connected_source
+      - get_connected_destinations
+      - get_port_lock
+      - get_port_mute
+      - get_switchable
+      - get_signal_present
+      - get_port_connected
+      - get_embedded_audio_present
+      - get_port_name
+      - set_port_name
+      - set_embedded_audio_mute
+      - set_input_hdcp
+      - set_output_signal_type
+      - set_autoselect_policy
+      - set_autoselect_included
+      - set_autoselect_priority
+      - cec_send
+      - cec_send_user_control_click
+      - set_audio_output_mute
+      - set_audio_output_volume_db
+      - set_audio_output_volume_percent
+      - set_audio_output_balance
+      - step_audio_output_volume_db
+      - set_audio_autoselect_policy
+      - set_audio_follow_port
+      - switch_usb
+      - disconnect_usb
+      - get_usb_source
+      - set_usb_port_lock
+      - get_edid_status
+      - edid_switch
+      - edid_switch_all
+      - edid_copy
+      - edid_delete
+      - edid_reset
+    verification: none
+    notes: >
+      Products whose manual documents the /V1 tree. Each product has a
+      subset: a path it lacks is answered with an nE/pE/mE error
+      (%E002 Not exist), which fails the command.
+
+commands:
+  # ── Shared by every tree ─────────────────────────────────────────────────
+  get_serial:
+    summary: 'Get the serial number'
+    send: 'GET /.SerialNumber'
+    expect: { matches: '^pr /\.SerialNumber=(.*)$' }
+    returns: value
+
+  get_product_name:
+    summary: 'Get the product name (read-only)'
+    send: 'GET /.ProductName'
+    expect: { matches: '^pr /\.ProductName=(.*)$' }
+    returns: value
+
+  # ── /V1 tree: MMX2, Taurus UCX, DCX, UCX-TPX ─────────────────────────────
+  # System (MMX2 7.5, UCX 8.5)
+  get_firmware_version:
+    summary: 'Get the firmware package version'
+    send: 'GET /V1/MANAGEMENT/UID/PACKAGE.Version'
+    expect: { matches: '^pr /V1/MANAGEMENT/UID/PACKAGE\.Version=(.*)$' }
+    returns: value
+
+  get_device_label:
+    summary: 'Get the device label'
+    send: 'GET /V1/MANAGEMENT/LABEL.DeviceLabel'
+    expect: { matches: '^p[rw] /V1/MANAGEMENT/LABEL\.DeviceLabel=(.*)$' }
+    returns: value
+
+  set_device_label:
+    summary: 'Set the device label (up to 49 ASCII characters; longer is truncated by the device)'
+    params:
+      label: { type: string, max_length: 49, pattern: '^[ -~]*$', required: true }
+    send: 'SET /V1/MANAGEMENT/LABEL.DeviceLabel={label}'
+    expect: { matches: '^pw /V1/MANAGEMENT/LABEL\.DeviceLabel=' }
+    returns: ack
+
+  restart:
+    summary: 'Restart the device; connections are dropped'
+    send: 'CALL /V1/SYS:restart()'
+    expect: { matches: '^mO /V1/SYS:restart(?:=|$)' }
+    returns: ack
+
+  factory_defaults:
+    summary: 'Restore the factory default settings and restart'
+    send: 'CALL /V1/SYS:factoryDefaults()'
+    expect: { matches: '^mO /V1/SYS:factoryDefaults(?:=|$)' }
+    returns: ack
+
+  identify:
+    summary: 'Blink the status LEDs for 10 seconds'
+    send: 'CALL /V1/MANAGEMENT/UI:identifyMe()'
+    expect: { matches: '^mO /V1/MANAGEMENT/UI:identifyMe(?:=|$)' }
+    returns: ack
+
+  set_control_lock:
+    summary: 'Lock or unlock the front panel buttons'
+    params:
+      mode: { type: enum, values: [None, Locked, Force locked], required: true }
+    send: 'SET /V1/MANAGEMENT/UI.ControlLock={mode}'
+    expect: { matches: '^pw /V1/MANAGEMENT/UI\.ControlLock=' }
+    returns: ack
+
+  set_dark_mode:
+    summary: 'Switch the LEDs off (dark mode) or back on'
+    params:
+      enabled: { type: bool, required: true }
+    send: 'SET /V1/MANAGEMENT/UI/DARKMODE.Enable={enabled}'
+    expect: { matches: '^pw /V1/MANAGEMENT/UI/DARKMODE\.Enable=' }
+    returns: ack
+
+  set_dark_mode_delay:
+    summary: 'Set the delay before dark mode starts, in seconds (0 for none)'
+    params:
+      seconds: { type: int, min: 0, required: true }
+    send: 'SET /V1/MANAGEMENT/UI/DARKMODE.Delay={seconds}'
+    expect: { matches: '^pw /V1/MANAGEMENT/UI/DARKMODE\.Delay=' }
+    returns: ack
+
+  # Crosspoint (MMX2 7.6/7.8, UCX 8.6/8.10)
+  switch:
+    summary: 'Route an input to an output on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, required: true }
+      output: { type: int, min: 1, required: true }
+    send: 'CALL /V1/MEDIA/{layer}/XP:switch(I{input}:O{output})'
+    expect: { matches: '^mO /V1/MEDIA/(?:VIDEO|AUDIO)/XP:switch(?:=|$)' }
+    returns: ack
+
+  disconnect:
+    summary: 'Disconnect an output (route input 0) on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, required: true }
+    send: 'CALL /V1/MEDIA/{layer}/XP:switch(0:O{output})'
+    expect: { matches: '^mO /V1/MEDIA/(?:VIDEO|AUDIO)/XP:switch(?:=|$)' }
+    returns: ack
+
+  switch_video_all:
+    summary: 'Route a video input to every video output'
+    params:
+      input: { type: int, min: 1, required: true }
+    send: 'CALL /V1/MEDIA/VIDEO/XP:switchAll(I{input})'
+    expect: { matches: '^mO /V1/MEDIA/VIDEO/XP:switchAll(?:=|$)' }
+    returns: ack
+
+  set_port_lock:
+    summary: 'Lock or unlock a crosspoint port (input I<n> or output O<n>)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      locked: { type: bool, required: true }
+    send: 'SET /V1/MEDIA/{layer}/XP/{port}.Lock={locked}'
+    expect: { matches: '^pw /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Lock=' }
+    returns: ack
+
+  set_port_mute:
+    summary: 'Mute or unmute a crosspoint port (input I<n> or output O<n>); the route is kept'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      muted: { type: bool, required: true }
+    send: 'SET /V1/MEDIA/{layer}/XP/{port}.Mute={muted}'
+    expect: { matches: '^pw /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Mute=' }
+    returns: ack
+
+  get_connected_source:
+    summary: 'Get the input routed to an output (I<n>, or 0 when disconnected)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, required: true }
+    send: 'GET /V1/MEDIA/{layer}/XP/O{output}.ConnectedSource'
+    expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/O\d+\.ConnectedSource=(.*)$' }
+    returns: value
+
+  get_connected_destinations:
+    summary: 'Get the outputs an input is routed to, semicolon-separated'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, required: true }
+    send: 'GET /V1/MEDIA/{layer}/XP/I{input}.ConnectedDestinations'
+    expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/I\d+\.ConnectedDestinations=(.*)$' }
+    returns: value
+
+  get_port_lock:
+    summary: 'Get whether a crosspoint port is locked (true/false)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+    send: 'GET /V1/MEDIA/{layer}/XP/{port}.Lock'
+    expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Lock=(.*)$' }
+    returns: value
+
+  get_port_mute:
+    summary: 'Get whether a crosspoint port is muted (true/false)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+    send: 'GET /V1/MEDIA/{layer}/XP/{port}.Mute'
+    expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Mute=(.*)$' }
+    returns: value
+
+  get_switchable:
+    summary: 'Get whether an input can be routed to an output now (OK or Busy)'
+    params:
+      output: { type: int, min: 1, required: true }
+      input: { type: int, min: 1, required: true }
+    send: 'GET /V1/MEDIA/VIDEO/XP/O{output}/SWITCHABLE.I{input}'
+    expect: { matches: '^pr /V1/MEDIA/VIDEO/XP/O\d+/SWITCHABLE\.I\d+=(.*)$' }
+    returns: value
+
+  # Port status and names (MMX2 6.3.4, 7.6.11, 7.6.15, 7.8.9)
+  get_signal_present:
+    summary: 'Get whether a video or audio port has a signal (true/false)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+    send: 'GET /V1/MEDIA/{layer}/{port}.SignalPresent'
+    expect: { matches: '^pr /V1/MEDIA/(?:VIDEO|AUDIO)/[IO]\d+\.SignalPresent=(.*)$' }
+    returns: value
+
+  get_port_connected:
+    summary: 'Get whether a device is connected to a video port (true/false)'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+    send: 'GET /V1/MEDIA/VIDEO/{port}.Connected'
+    expect: { matches: '^pr /V1/MEDIA/VIDEO/[IO]\d+\.Connected=(.*)$' }
+    returns: value
+
+  get_embedded_audio_present:
+    summary: 'Get whether a video port carries embedded audio (true/false)'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+    send: 'GET /V1/MEDIA/VIDEO/{port}.EmbeddedAudioPresent'
+    expect: { matches: '^pr /V1/MEDIA/VIDEO/[IO]\d+\.EmbeddedAudioPresent=(.*)$' }
+    returns: value
+
+  get_port_name:
+    summary: 'Get the name of a video port'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+    send: 'GET /V1/MEDIA/VIDEO/{port}.Name'
+    expect: { matches: '^p[rw] /V1/MEDIA/VIDEO/[IO]\d+\.Name=(.*)$' }
+    returns: value
+
+  set_port_name:
+    summary: 'Set the name of a video port'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      name: { type: string, pattern: '^[^\\{}#%()]*$', required: true }
+    send: 'SET /V1/MEDIA/VIDEO/{port}.Name={name}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/[IO]\d+\.Name=' }
+    returns: ack
+
+  # Video port settings (MMX2 7.6.5-7.6.17)
+  set_embedded_audio_mute:
+    summary: 'Mute or unmute the embedded audio of a video output'
+    params:
+      output: { type: int, min: 1, required: true }
+      muted: { type: bool, required: true }
+    send: 'SET /V1/MEDIA/VIDEO/O{output}.EmbeddedAudioMute={muted}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/O\d+\.EmbeddedAudioMute=' }
+    returns: ack
+
+  set_input_hdcp:
+    summary: 'Set the HDCP capability an input reports to the source'
+    params:
+      input: { type: int, min: 1, required: true }
+      version: { type: enum, values: [HDCP 1.4, HDCP 2.2, 'Off'], required: true }
+    send: 'SET /V1/MEDIA/VIDEO/I{input}/HDCP.AllowedHdcpVersion={version}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/I\d+/HDCP\.AllowedHdcpVersion=' }
+    returns: ack
+
+  set_output_signal_type:
+    summary: 'Set the signal type of a video output (Auto is HDMI)'
+    params:
+      output: { type: int, min: 1, required: true }
+      signal_type: { type: enum, values: [Auto, DVI], required: true }
+    send: 'SET /V1/MEDIA/VIDEO/O{output}.OutputSignalType={signal_type}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/O\d+\.OutputSignalType=' }
+    returns: ack
+
+  set_autoselect_policy:
+    summary: 'Set the video autoselect policy of an output'
+    params:
+      output: { type: int, min: 1, required: true }
+      policy: { type: enum, values: ['Off', Last detect, First detect], required: true }
+    send: 'SET /V1/MEDIA/VIDEO/AUTOSELECT/O{output}.Policy={policy}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/AUTOSELECT/O\d+\.Policy=' }
+    returns: ack
+
+  set_autoselect_included:
+    summary: 'Include or exclude an input from an output''s video autoselect'
+    params:
+      output: { type: int, min: 1, required: true }
+      input: { type: int, min: 1, required: true }
+      included: { type: bool, required: true }
+    send: 'SET /V1/MEDIA/VIDEO/AUTOSELECT/O{output}/I{input}.Included={included}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/AUTOSELECT/O\d+/I\d+\.Included=' }
+    returns: ack
+
+  set_autoselect_priority:
+    summary: 'Set an input''s video autoselect priority for an output (1-100, equal values allowed)'
+    params:
+      output: { type: int, min: 1, required: true }
+      input: { type: int, min: 1, required: true }
+      priority: { type: int, min: 1, max: 100, required: true }
+    send: 'SET /V1/MEDIA/VIDEO/AUTOSELECT/O{output}/I{input}.Priority={priority}'
+    expect: { matches: '^pw /V1/MEDIA/VIDEO/AUTOSELECT/O\d+/I\d+\.Priority=' }
+    returns: ack
+
+  # CEC (MMX2 7.7, UCX 8.9)
+  cec_send:
+    summary: 'Send a CEC code (hex, e.g. 446D power on) from a video output to the sink'
+    params:
+      output: { type: int, min: 1, required: true }
+      code: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', required: true }
+    send: 'CALL /V1/MEDIA/VIDEO/O{output}/CEC:send({code})'
+    expect: { matches: '^mO /V1/MEDIA/VIDEO/O\d+/CEC:send(?:=|$)' }
+    returns: ack
+
+  cec_send_user_control_click:
+    summary: 'Send a CEC remote-control key press and release (hex code) to the sink'
+    params:
+      output: { type: int, min: 1, required: true }
+      code: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', required: true }
+    send: 'CALL /V1/MEDIA/VIDEO/O{output}/CEC:sendUserControlClick({code})'
+    expect: { matches: '^mO /V1/MEDIA/VIDEO/O\d+/CEC:sendUserControlClick(?:=|$)' }
+    returns: ack
+
+  # Audio (MMX2 7.8, UCX 8.10)
+  set_audio_output_mute:
+    summary: 'Mute or unmute an analog audio output (sets its volume low)'
+    params:
+      output: { type: int, min: 1, required: true }
+      muted: { type: bool, required: true }
+    send: 'SET /V1/MEDIA/AUDIO/O{output}.Mute={muted}'
+    expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.Mute=' }
+    returns: ack
+
+  set_audio_output_volume_db:
+    summary: 'Set an analog audio output volume in dB (0.375 dB steps, rounded by the device)'
+    params:
+      output: { type: int, min: 1, required: true }
+      level: { type: float, min: -95.62, max: 0, required: true }
+    send: 'SET /V1/MEDIA/AUDIO/O{output}.VolumedB={level:.2f}'
+    expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.VolumedB=' }
+    returns: ack
+
+  set_audio_output_volume_percent:
+    summary: 'Set an analog audio output volume in percent'
+    params:
+      output: { type: int, min: 1, required: true }
+      percent: { type: float, min: 0, max: 100, required: true }
+    send: 'SET /V1/MEDIA/AUDIO/O{output}.VolumePercent={percent:.2f}'
+    expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.VolumePercent=' }
+    returns: ack
+
+  set_audio_output_balance:
+    summary: 'Set an analog audio output balance (-100 left, 0 centre, 100 right)'
+    params:
+      output: { type: int, min: 1, required: true }
+      balance: { type: int, min: -100, max: 100, required: true }
+    send: 'SET /V1/MEDIA/AUDIO/O{output}.Balance={balance}'
+    expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.Balance=' }
+    returns: ack
+
+  step_audio_output_volume_db:
+    summary: 'Raise or lower an analog audio output volume by a number of dB'
+    params:
+      output: { type: int, min: 1, required: true }
+      step: { type: int, min: -96, max: 96, required: true }
+    send: 'CALL /V1/MEDIA/AUDIO/O{output}:stepVolumedB({step})'
+    expect: { matches: '^mO /V1/MEDIA/AUDIO/O\d+:stepVolumedB(?:=|$)' }
+    returns: ack
+
+  set_audio_autoselect_policy:
+    summary: 'Set an analog audio output to follow a video output, or not'
+    params:
+      output: { type: int, min: 1, required: true }
+      policy: { type: enum, values: [Follow video, 'Off'], required: true }
+    send: 'SET /V1/MEDIA/AUDIO/AUTOSELECT/O{output}.Policy={policy}'
+    expect: { matches: '^pw /V1/MEDIA/AUDIO/AUTOSELECT/O\d+\.Policy=' }
+    returns: ack
+
+  set_audio_follow_port:
+    summary: 'Set the video output an analog audio output follows'
+    params:
+      output: { type: int, min: 1, required: true }
+      video_output: { type: int, min: 1, required: true }
+    send: 'SET /V1/MEDIA/AUDIO/AUTOSELECT/O{output}.VideoFollowPort=O{video_output}'
+    expect: { matches: '^pw /V1/MEDIA/AUDIO/AUTOSELECT/O\d+\.VideoFollowPort=' }
+    returns: ack
+
+  # USB crosspoint (UCX 8.11)
+  switch_usb:
+    summary: 'Connect a USB host (U<n>) to the USB hub H1'
+    params:
+      host: { type: int, min: 1, max: 4, required: true }
+    send: 'CALL /V1/MEDIA/USB/XP:switch(U{host}:H1)'
+    expect: { matches: '^mO /V1/MEDIA/USB/XP:switch(?:=|$)' }
+    returns: ack
+
+  disconnect_usb:
+    summary: 'Disconnect the USB hub H1 from every host'
+    send: 'CALL /V1/MEDIA/USB/XP:switch(0:H1)'
+    expect: { matches: '^mO /V1/MEDIA/USB/XP:switch(?:=|$)' }
+    returns: ack
+
+  get_usb_source:
+    summary: 'Get the USB host connected to the hub H1 (U<n>)'
+    send: 'GET /V1/MEDIA/USB/XP/H1.ConnectedSource'
+    expect: { matches: '^p[rw] /V1/MEDIA/USB/XP/H1\.ConnectedSource=(.*)$' }
+    returns: value
+
+  set_usb_port_lock:
+    summary: 'Lock or unlock a USB port (U<n> host or H1 hub)'
+    params:
+      port: { type: string, pattern: '^(U[1-4]|H1)$', required: true }
+      locked: { type: bool, required: true }
+    send: 'SET /V1/MEDIA/USB/XP/{port}.Lock={locked}'
+    expect: { matches: '^pw /V1/MEDIA/USB/XP/[UH]\d+\.Lock=' }
+    returns: ack
+
+  # EDID (MMX2 7.9, UCX 8.13)
+  get_edid_status:
+    summary: 'Get the EDID emulated on each input, as <source>:E<n> pairs'
+    send: 'GET /V1/EDID.EdidStatus'
+    expect: { matches: '^pr /V1/EDID\.EdidStatus=(.*)$' }
+    returns: value
+
+  edid_switch:
+    summary: 'Emulate an EDID (F<n> factory, U<n> user, D<n> dynamic) on an input'
+    params:
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
+      input: { type: int, min: 1, required: true }
+    send: 'CALL /V1/EDID:switch({source}:E{input})'
+    expect: { matches: '^mO /V1/EDID:switch(?:=|$)' }
+    returns: ack
+
+  edid_switch_all:
+    summary: 'Emulate an EDID on every input'
+    params:
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
+    send: 'CALL /V1/EDID:switchAll({source})'
+    expect: { matches: '^mO /V1/EDID:switchAll(?:=|$)' }
+    returns: ack
+
+  edid_copy:
+    summary: 'Copy an EDID into a user EDID slot (overwritten without warning)'
+    params:
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
+      slot: { type: int, min: 1, max: 100, required: true }
+    send: 'CALL /V1/EDID:copy({source}:U{slot})'
+    expect: { matches: '^mO /V1/EDID:copy(?:=|$)' }
+    returns: ack
+
+  edid_delete:
+    summary: 'Delete a user EDID'
+    params:
+      slot: { type: int, min: 1, max: 100, required: true }
+    send: 'CALL /V1/EDID:delete(U{slot})'
+    expect: { matches: '^mO /V1/EDID:delete(?:=|$)' }
+    returns: ack
+
+  edid_reset:
+    summary: 'Switch every emulated EDID back to the factory default'
+    send: 'CALL /V1/EDID:reset()'
+    expect: { matches: '^mO /V1/EDID:reset(?:=|$)' }
+    returns: ack
+
+  # ── MX2 tree (/MEDIA/XP/VIDEO) ───────────────────────────────────────────
+  # System (MX2 9.4); the label is shared with UMX
+  get_device_label_uid:
+    summary: 'Get the device label'
+    send: 'GET /MANAGEMENT/UID.DeviceLabel'
+    expect: { matches: '^p[rw] /MANAGEMENT/UID\.DeviceLabel=(.*)$' }
+    returns: value
+
+  set_device_label_uid:
+    summary: 'Set the device label (MX2 up to 32, UMX up to 39 ASCII characters; longer is truncated)'
+    params:
+      label: { type: string, max_length: 39, pattern: '^[ -~]*$', required: true }
+    send: 'SET /MANAGEMENT/UID.DeviceLabel={label}'
+    expect: { matches: '^pw /MANAGEMENT/UID\.DeviceLabel=' }
+    returns: ack
+
+  factory_defaults_legacy:
+    summary: 'Restore the factory default settings and restart'
+    send: 'CALL /SYS:factoryDefaults()'
+    expect: { matches: '^mO /SYS:factoryDefaults(?:=|$)' }
+    returns: ack
+
+  mx2_soft_reset:
+    summary: 'Restart the matrix; connections are dropped'
+    send: 'CALL /SYS:softReset()'
+    expect: { matches: '^mO /SYS:softReset(?:=|$)' }
+    returns: ack
+
+  mx2_get_power_mode:
+    summary: 'Get the operation mode (NORMAL or STANDBY)'
+    send: 'GET /MANAGEMENT/POWER.Operation'
+    expect: { matches: '^pr /MANAGEMENT/POWER\.Operation=(.*)$' }
+    returns: value
+
+  mx2_standby:
+    summary: 'Switch to standby: video transmission and LCD off, remote control stays'
+    send: 'CALL /MANAGEMENT/POWER:standby()'
+    expect: { matches: '^mO /MANAGEMENT/POWER:standby(?:=|$)' }
+    returns: ack
+
+  mx2_wake_up:
+    summary: 'Return from standby to normal operation'
+    send: 'CALL /MANAGEMENT/POWER:wakeUp()'
+    expect: { matches: '^mO /MANAGEMENT/POWER:wakeUp(?:=|$)' }
+    returns: ack
+
+  # Crosspoint (MX2 9.5, 9.6.2-9.6.6, 9.11.1-9.11.5)
+  mx2_switch:
+    summary: 'Route an input to an output'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+      output: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:switch(I{input}:O{output})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:switch(?:=|$)' }
+    returns: ack
+
+  mx2_disconnect:
+    summary: 'Disconnect an output (route input 0)'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:switch(0:O{output})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:switch(?:=|$)' }
+    returns: ack
+
+  mx2_switch_all:
+    summary: 'Route an input to every output'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:switchAll(I{input})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:switchAll(?:=|$)' }
+    returns: ack
+
+  mx2_disconnect_all:
+    summary: 'Disconnect every output'
+    send: 'CALL /MEDIA/XP/VIDEO:switchAll(0)'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:switchAll(?:=|$)' }
+    returns: ack
+
+  mx2_switch_multi:
+    summary: 'Set several outputs at once: the source of each output in order, semicolon-separated (I<n>, 0, or empty to leave it)'
+    params:
+      sources: { type: string, pattern: '^((I[1-9][0-9]?|0)?;){0,47}(I[1-9][0-9]?|0)?$', required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:switchMulti({sources})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:switchMulti(?:=|$)' }
+    returns: ack
+
+  mx2_mute_input:
+    summary: 'Mute an input'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:muteSource(I{input})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:muteSource(?:=|$)' }
+    returns: ack
+
+  mx2_unmute_input:
+    summary: 'Unmute an input'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:unmuteSource(I{input})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:unmuteSource(?:=|$)' }
+    returns: ack
+
+  mx2_lock_input:
+    summary: 'Lock an input'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:lockSource(I{input})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:lockSource(?:=|$)' }
+    returns: ack
+
+  mx2_unlock_input:
+    summary: 'Unlock an input'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:unlockSource(I{input})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:unlockSource(?:=|$)' }
+    returns: ack
+
+  mx2_mute_output:
+    summary: 'Mute an output; the route is kept and restored on unmute'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:muteDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:muteDestination(?:=|$)' }
+    returns: ack
+
+  mx2_unmute_output:
+    summary: 'Unmute an output'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:unmuteDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:unmuteDestination(?:=|$)' }
+    returns: ack
+
+  mx2_lock_output:
+    summary: 'Lock an output so its route cannot change'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:lockDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:lockDestination(?:=|$)' }
+    returns: ack
+
+  mx2_unlock_output:
+    summary: 'Unlock an output'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /MEDIA/XP/VIDEO:unlockDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/XP/VIDEO:unlockDestination(?:=|$)' }
+    returns: ack
+
+  mx2_get_connections:
+    summary: 'Get every output''s source, semicolon-separated in output order (I<n> or 0)'
+    send: 'GET /MEDIA/XP/VIDEO.DestinationConnectionStatus'
+    expect: { matches: '^pr /MEDIA/XP/VIDEO\.DestinationConnectionStatus=(.*)$' }
+    returns: value
+
+  mx2_get_input_status:
+    summary: 'Get every input''s status (lock/mute letter and status byte), semicolon-separated'
+    send: 'GET /MEDIA/XP/VIDEO.SourcePortStatus'
+    expect: { matches: '^pr /MEDIA/XP/VIDEO\.SourcePortStatus=(.*)$' }
+    returns: value
+
+  mx2_get_output_status:
+    summary: 'Get every output''s status (lock/mute letter and status byte), semicolon-separated'
+    send: 'GET /MEDIA/XP/VIDEO.DestinationPortStatus'
+    expect: { matches: '^pr /MEDIA/XP/VIDEO\.DestinationPortStatus=(.*)$' }
+    returns: value
+
+  # Presets (MX2 9.16)
+  mx2_create_preset:
+    summary: 'Store the current crosspoint and mute states as a new named preset'
+    params:
+      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+    send: 'CALL /MEDIA/PRESET:create({name},VIDEO)'
+    expect: { matches: '^mO /MEDIA/PRESET:create(?:=|$)' }
+    returns: ack
+
+  mx2_load_preset:
+    summary: 'Load a named preset (every port except locked ones)'
+    params:
+      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+    send: 'CALL /MEDIA/PRESET/{name}:load()'
+    expect: { matches: '^mO /MEDIA/PRESET/[A-Za-z0-9_-]+:load(?:=|$)' }
+    returns: ack
+
+  mx2_rename_preset:
+    summary: 'Rename a preset'
+    params:
+      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+      new_name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+    send: 'CALL /MEDIA/PRESET:rename({name},{new_name})'
+    expect: { matches: '^mO /MEDIA/PRESET:rename(?:=|$)' }
+    returns: ack
+
+  # Port settings (MX2 9.6-9.15)
+  mx2_set_input_hdcp:
+    summary: 'Set an input''s HDCP: 0 off, 1 HDCP 1.4, 2 HDCP 2.3, 3 any version converted up to 2.3'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+      version: { type: int, min: 0, max: 3, required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/I{input}/SETTINGS.HdcpVersion={version}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/I\d+/SETTINGS\.HdcpVersion=' }
+    returns: ack
+
+  mx2_set_output_hdcp_mode:
+    summary: 'Set an output''s HDCP mode: AUTO follows the input, ALWAYS encrypts'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+      mode: { type: enum, values: [AUTO, ALWAYS], required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/O{output}/SETTINGS.HdcpMode={mode}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/SETTINGS\.HdcpMode=' }
+    returns: ack
+
+  mx2_set_output_signal_type:
+    summary: 'Force an output''s signal type (AUTO: HDMI when audio is present)'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+      signal_type: { type: enum, values: [DVI, HDMI, AUTO], required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/O{output}/SETTINGS.ForcedSignalType={signal_type}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/SETTINGS\.ForcedSignalType=' }
+    returns: ack
+
+  mx2_set_output_conversion:
+    summary: 'Set an output''s colour conversion (LEFT/RIGHT split a 4K60 4:4:4 picture across two outputs)'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+      conversion: { type: enum, values: ['OFF', '420', '422', LEFT, RIGHT], required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/O{output}/SETTINGS.Conversion={conversion}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/SETTINGS\.Conversion=' }
+    returns: ack
+
+  mx2_set_embedded_audio_mode:
+    summary: 'Set the audio embedded in a video port: OFF, HDMI (original) or ANALOG (-A/-Audio models)'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      mode: { type: enum, values: ['OFF', HDMI, ANALOG], required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/{port}/EMBEDDEDAUDIO.AudioMode={mode}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/[IO]\d+/EMBEDDEDAUDIO\.AudioMode=' }
+    returns: ack
+
+  mx2_set_analog_output_mode:
+    summary: 'Set where an output''s audio goes (-A/-Audio models): OFF, HDMI, ANALOG or HDMI+ANALOG'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+      mode: { type: enum, values: ['OFF', HDMI, ANALOG, HDMI+ANALOG], required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/O{output}/ANALOGAUDIO.AudioMode={mode}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/ANALOGAUDIO\.AudioMode=' }
+    returns: ack
+
+  mx2_set_analog_output_volume_db:
+    summary: 'Set an analog audio output volume in dB (-A/-Audio models)'
+    params:
+      output: { type: int, min: 1, max: 48, required: true }
+      level: { type: float, min: -95.62, max: 0, required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/O{output}/ANALOGAUDIO.VolumedB={level:.2f}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/ANALOGAUDIO\.VolumedB=' }
+    returns: ack
+
+  mx2_set_analog_mute:
+    summary: 'Mute or unmute the analog audio of a port (-A/-Audio models)'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      muted: { type: bool, required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/{port}/ANALOGAUDIO.Mute={muted}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/[IO]\d+/ANALOGAUDIO\.Mute=' }
+    returns: ack
+
+  mx2_set_analog_balance:
+    summary: 'Set the analog audio balance of a port (-100 left, 0 centre, 100 right)'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      balance: { type: int, min: -100, max: 100, required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/{port}/ANALOGAUDIO.Balance={balance}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/[IO]\d+/ANALOGAUDIO\.Balance=' }
+    returns: ack
+
+  mx2_set_analog_input_gain:
+    summary: 'Set an analog audio input gain in dB (rounded by the device)'
+    params:
+      input: { type: int, min: 1, max: 48, required: true }
+      gain: { type: int, min: -12, max: 35, required: true }
+    send: 'SET /MEDIA/PORTS/VIDEO/I{input}/ANALOGAUDIO.Gain={gain}'
+    expect: { matches: '^pw /MEDIA/PORTS/VIDEO/I\d+/ANALOGAUDIO\.Gain=' }
+    returns: ack
+
+  mx2_cec_send:
+    summary: 'Send a named CEC command from an HDMI port to the connected device'
+    params:
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      command: { type: enum, values: [image_view_on, standby, ok, back, up, down, left, right, root_menu, setup_menu, contents_menu, favorite_menu, media_top_menu, media_context_menu, number_0, number_1, number_2, number_3, number_4, number_5, number_6, number_7, number_8, number_9, dot, enter, clear, channel_up, channel_down, sound_select, input_select, display_info, power_legacy, page_up, page_down, volume_up, volume_down, mute_toggle, mute, unmute, play, stop, pause, record, rewind, fast_forward, eject, skip_forward, skip_backward, 3d_mode, stop_record, pause_record, play_forward, play_reverse, select_next_media, select_media_1, select_media_2, select_media_3, select_media_4, select_media_5, power_toggle, power_on, power_off, stop_function, f1, f2, f3, f4, set_osd], required: true }
+    send: 'CALL /MEDIA/PORTS/VIDEO/{port}/CEC:send({command})'
+    expect: { matches: '^mO /MEDIA/PORTS/VIDEO/[IO]\d+/CEC:send(?:=|$)' }
+    returns: ack
+
+  # EDID (MX2 9.18)
+  mx2_get_edid_status:
+    summary: 'Get the EDID emulated on each input, semicolon-separated in input order'
+    send: 'GET /EDID.EdidStatus'
+    expect: { matches: '^pr /EDID\.EdidStatus=(.*)$' }
+    returns: value
+
+  mx2_edid_switch:
+    summary: 'Emulate an EDID (F<n> factory, U<n> user, D<n> dynamic) on an input'
+    params:
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
+      input: { type: int, min: 1, max: 48, required: true }
+    send: 'CALL /EDID:switch({source}:E{input})'
+    expect: { matches: '^mO /EDID:switch(?:=|$)' }
+    returns: ack
+
+  mx2_edid_copy:
+    summary: 'Copy an EDID into a user EDID slot (overwritten without warning)'
+    params:
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
+      slot: { type: int, min: 1, max: 100, required: true }
+    send: 'CALL /EDID:copy({source}:U{slot})'
+    expect: { matches: '^mO /EDID:copy(?:=|$)' }
+    returns: ack
+
+  # ── UMX tree (/MEDIA/VIDEO/XP, /MEDIA/AUDIO/XP) ──────────────────────────
+  umx_get_firmware_version:
+    summary: 'Get the CPU firmware version'
+    send: 'GET /SYS/MB.FirmwareVersion'
+    expect: { matches: '^pr /SYS/MB\.FirmwareVersion=(.*)$' }
+    returns: value
+
+  umx_get_package_version:
+    summary: 'Get the installed firmware package version (FW package 1.3.0b5 and later)'
+    send: 'GET /MANAGEMENT/UID.PackageVersion'
+    expect: { matches: '^pr /MANAGEMENT/UID\.PackageVersion=(.*)$' }
+    returns: value
+
+  umx_reset:
+    summary: 'Restart the device; connections are dropped'
+    send: 'CALL /SYS:reset()'
+    expect: { matches: '^mO /SYS:reset(?:=|$)' }
+    returns: ack
+
+  umx_identify:
+    summary: 'Blink the status LEDs for 10 seconds'
+    send: 'CALL /MANAGEMENT/UI:identifyMe()'
+    expect: { matches: '^mO /MANAGEMENT/UI:identifyMe(?:=|$)' }
+    returns: ack
+
+  umx_set_control_lock:
+    summary: 'Front panel lock: 0 none, 1 locked (unlockable by buttons), 2 force locked'
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: 'SET /MANAGEMENT/UI.ControlLock={mode}'
+    expect: { matches: '^pw /MANAGEMENT/UI\.ControlLock=' }
+    returns: ack
+
+  umx_run_macro:
+    summary: 'Run a macro stored in the device (UMX-HDMI-140-Plus)'
+    params:
+      name: { type: string, pattern: '^[^\\{}#%()]*$', required: true }
+    send: 'CALL /CTRL/MACROS:run({name})'
+    expect: { matches: '^mO /CTRL/MACROS:run(?:=|$)' }
+    returns: ack
+
+  umx_logout:
+    summary: 'Log out (Cleartext login); the tree is protected again'
+    send: 'CALL /LOGIN:logout({settings.password})'
+    expect: { matches: '^mO /LOGIN:logout(?:=|$)' }
+    returns: ack
+
+  umx_switch:
+    summary: 'Route an input to the output on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, max: 6, required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+    send: 'CALL /MEDIA/{layer}/XP:switch(I{input}:O{output})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:switch(?:=|$)' }
+    returns: ack
+
+  umx_mute_input:
+    summary: 'Mute an input on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, max: 6, required: true }
+    send: 'CALL /MEDIA/{layer}/XP:muteSource(I{input})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:muteSource(?:=|$)' }
+    returns: ack
+
+  umx_unmute_input:
+    summary: 'Unmute an input on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, max: 6, required: true }
+    send: 'CALL /MEDIA/{layer}/XP:unmuteSource(I{input})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unmuteSource(?:=|$)' }
+    returns: ack
+
+  umx_lock_input:
+    summary: 'Lock an input on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, max: 6, required: true }
+    send: 'CALL /MEDIA/{layer}/XP:lockSource(I{input})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:lockSource(?:=|$)' }
+    returns: ack
+
+  umx_unlock_input:
+    summary: 'Unlock an input on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      input: { type: int, min: 1, max: 6, required: true }
+    send: 'CALL /MEDIA/{layer}/XP:unlockSource(I{input})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unlockSource(?:=|$)' }
+    returns: ack
+
+  umx_mute_output:
+    summary: 'Mute the output; the route is kept on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+    send: 'CALL /MEDIA/{layer}/XP:muteDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:muteDestination(?:=|$)' }
+    returns: ack
+
+  umx_unmute_output:
+    summary: 'Unmute the output on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+    send: 'CALL /MEDIA/{layer}/XP:unmuteDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unmuteDestination(?:=|$)' }
+    returns: ack
+
+  umx_lock_output:
+    summary: 'Lock the output so its route cannot change on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+    send: 'CALL /MEDIA/{layer}/XP:lockDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:lockDestination(?:=|$)' }
+    returns: ack
+
+  umx_unlock_output:
+    summary: 'Unlock the output on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+    send: 'CALL /MEDIA/{layer}/XP:unlockDestination(O{output})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unlockDestination(?:=|$)' }
+    returns: ack
+
+  umx_get_connection:
+    summary: 'Get the input routed to the output on the video or audio crosspoint'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+    send: 'GET /MEDIA/{layer}/XP.DestinationConnectionList'
+    expect: { matches: '^pr /MEDIA/(?:VIDEO|AUDIO)/XP\.DestinationConnectionList=(.*)$' }
+    returns: value
+
+  umx_get_input_status:
+    summary: 'Get every input''s status (lock/mute letter and two status bytes), semicolon-separated'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+    send: 'GET /MEDIA/{layer}/XP.SourcePortStatus'
+    expect: { matches: '^pr /MEDIA/(?:VIDEO|AUDIO)/XP\.SourcePortStatus=(.*)$' }
+    returns: value
+
+  umx_get_output_status:
+    summary: 'Get the output''s status (lock/mute letter and two status bytes)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+    send: 'GET /MEDIA/{layer}/XP.DestinationPortStatus'
+    expect: { matches: '^pr /MEDIA/(?:VIDEO|AUDIO)/XP\.DestinationPortStatus=(.*)$' }
+    returns: value
+
+  umx_set_autoselect:
+    summary: 'Set the autoselect of the output: E or D (enabled/disabled), optionally followed by F, P or L (first, priority, last detect; S static for audio)'
+    params:
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      output: { type: int, min: 1, max: 1, default: 1 }
+      setting: { type: string, pattern: '^[ED][FPLS]?$', required: true }
+    send: 'CALL /MEDIA/{layer}/XP:setDestinationPortAutoselect(O{output}:{setting})'
+    expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP[:.]setDestinationPortAutoselect(?:=|$)' }
+    returns: ack
+
+  umx_set_input_hdcp:
+    summary: 'Enable or disable HDCP on a digital video input (I2-I4)'
+    params:
+      input: { type: int, min: 2, max: 4, required: true }
+      enabled: { type: bool, required: true }
+    send: 'SET /MEDIA/VIDEO/I{input}.HdcpEnable={enabled}'
+    expect: { matches: '^pw /MEDIA/VIDEO/I\d+\.HdcpEnable=' }
+    returns: ack
+
+  umx_set_output_hdcp_mode:
+    summary: 'Set the output HDCP mode: 0 auto, 1 always'
+    params:
+      mode: { type: int, min: 0, max: 1, required: true }
+    send: 'SET /MEDIA/VIDEO/O1.HdcpModeSetting={mode}'
+    expect: { matches: '^pw /MEDIA/VIDEO/O1\.HdcpModeSetting=' }
+    returns: ack
+
+  umx_set_test_pattern_mode:
+    summary: 'Set an input''s test pattern: 0 off, 1 on, 2 when the input has no signal'
+    params:
+      input: { type: int, min: 1, max: 6, required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: 'SET /MEDIA/VIDEO/I{input}.FreeRunMode={mode}'
+    expect: { matches: '^pw /MEDIA/VIDEO/I\d+\.FreeRunMode=' }
+    returns: ack
+
+  umx_set_hdmi_mode:
+    summary: 'Set the output HDMI mode: 0 auto, 1 DVI, 2 HDMI 24-bit, 3 HDMI 30-bit, 4 HDMI 36-bit'
+    params:
+      mode: { type: int, min: 0, max: 4, required: true }
+    send: 'SET /MEDIA/VIDEO/O1.HdmiModeSetting={mode}'
+    expect: { matches: '^pw /MEDIA/VIDEO/O1\.HdmiModeSetting=' }
+    returns: ack
+
+  umx_set_color_space:
+    summary: 'Set the output colour space: 0 auto, 1 RGB, 2 YCbCr 4:4:4, 3 YCbCr 4:2:2'
+    params:
+      mode: { type: int, min: 0, max: 3, required: true }
+    send: 'SET /MEDIA/VIDEO/O1.ColorSpaceSetting={mode}'
+    expect: { matches: '^pw /MEDIA/VIDEO/O1\.ColorSpaceSetting=' }
+    returns: ack
+
+  umx_set_audio_input_volume:
+    summary: 'Set an analog audio input volume in dB (0.375 dB steps, rounded by the device)'
+    params:
+      input: { type: int, min: 1, max: 5, required: true }
+      level: { type: float, min: -95.625, max: 0, required: true }
+    send: 'SET /MEDIA/AUDIO/I{input}.Volume={level:.3f}'
+    expect: { matches: '^pw /MEDIA/AUDIO/I\d+\.Volume=' }
+    returns: ack
+
+  umx_set_audio_input_balance:
+    summary: 'Set an analog audio input balance (0 left, 50 centre, 100 right)'
+    params:
+      input: { type: int, min: 1, max: 5, required: true }
+      balance: { type: int, min: 0, max: 100, required: true }
+    send: 'SET /MEDIA/AUDIO/I{input}.Balance={balance}'
+    expect: { matches: '^pw /MEDIA/AUDIO/I\d+\.Balance=' }
+    returns: ack
+
+state:
+  device.serial:            { type: string, description: "Serial number (/.SerialNumber)" }
+  device.product_name:      { type: string, description: "Product name (/.ProductName)" }
+  device.label:             { type: string, description: "Device label (DeviceLabel)" }
+  device.firmware:          { type: string, description: "Firmware package version (/V1 PACKAGE.Version, UMX UID.PackageVersion)" }
+  device.cpu_firmware:      { type: string, description: "UMX CPU firmware version (SYS/MB.FirmwareVersion)" }
+  device.power_mode:        { type: string, description: "MX2 operation mode: NORMAL or STANDBY (POWER.Operation)" }
+  device.logged_in:         { type: bool, description: "Cleartext login state (LOGIN.LoggedIn)" }
+  video.outputs.*.input:    { type: int, description: "Input routed to the video output; 0 is disconnected" }
+  video.outputs.*.locked:   { type: bool, description: "The video output is locked" }
+  video.outputs.*.muted:    { type: bool, description: "The video output is muted (route kept)" }
+  video.outputs.*.signal:   { type: bool, description: "A signal is present on the video output" }
+  video.outputs.*.connected: { type: bool, description: "A sink is connected to the video output" }
+  video.outputs.*.hdcp:     { type: bool, description: "The output signal is HDCP-encrypted (MX2/UMX status byte)" }
+  video.outputs.*.embedded_audio: { type: bool, description: "The output signal carries embedded audio" }
+  video.outputs.*.embedded_audio_muted: { type: bool, description: "Embedded audio muted on the output (/V1 EmbeddedAudioMute)" }
+  video.outputs.*.name:     { type: string, description: "Output name (/V1 Name)" }
+  video.outputs.*.switchable.*: { type: bool, description: "Whether the input (second number) can be routed to the output now (/V1 SWITCHABLE: OK true, Busy false)" }
+  video.inputs.*.locked:    { type: bool, description: "The video input is locked" }
+  video.inputs.*.muted:     { type: bool, description: "The video input is muted" }
+  video.inputs.*.signal:    { type: bool, description: "A signal is present on the video input" }
+  video.inputs.*.connected: { type: bool, description: "A source is connected to the video input" }
+  video.inputs.*.hdcp:      { type: bool, description: "The input signal is HDCP-encrypted (MX2/UMX status byte)" }
+  video.inputs.*.embedded_audio: { type: bool, description: "The input signal carries embedded audio" }
+  video.inputs.*.name:      { type: string, description: "Input name (/V1 Name, MX2 /MEDIA/NAMES/VIDEO)" }
+  video.outputs.*.name_mx2: { type: string, description: "MX2 output name (/MEDIA/NAMES/VIDEO)" }
+  audio.outputs.*.input:    { type: int, description: "Input routed to the audio output; 0 is disconnected" }
+  audio.outputs.*.locked:   { type: bool, description: "The audio output is locked" }
+  audio.outputs.*.muted:    { type: bool, description: "The audio output is muted on the crosspoint" }
+  audio.outputs.*.signal:   { type: bool, description: "An audio signal is present on the output" }
+  audio.outputs.*.connected: { type: bool, description: "Something is connected to the audio output (UMX status byte)" }
+  audio.outputs.*.volume_muted: { type: bool, description: "Analog output mute (/V1 AUDIO/O<n>.Mute)" }
+  audio.outputs.*.volume_db: { type: float, unit: dB, description: "Analog output volume" }
+  audio.outputs.*.volume_percent: { type: float, unit: "%", description: "Analog output volume in percent" }
+  audio.outputs.*.balance:  { type: int, description: "Analog output balance, -100 left to 100 right" }
+  audio.inputs.*.locked:    { type: bool, description: "The audio input is locked" }
+  audio.inputs.*.muted:     { type: bool, description: "The audio input is muted" }
+  audio.inputs.*.signal:    { type: bool, description: "An audio signal is present on the input" }
+  audio.inputs.*.connected: { type: bool, description: "Something is connected to the audio input (UMX status byte)" }
+  usb.hubs.*.host:          { type: int, description: "USB host (U<n>) connected to the hub; 0 is disconnected" }
+  usb.hubs.*.locked:        { type: bool, description: "The USB hub port is locked" }
+  usb.hosts.*.locked:       { type: bool, description: "The USB host port is locked" }
+  edid.status:              { type: string, description: "Emulated EDID per input as the device lists it (EdidStatus)" }
+
+telemetry:
+  # Subscriptions are per connection and lost when it closes (MX2 9.3.9,
+  # MMX2 7.4.9), so they are sent on every connect. A product answers an OPEN of
+  # a node it lacks with an error line, which is ignored: the list covers every
+  # tree because it cannot be chosen per model.
+  subscribe:
+    send:
+      - 'OPEN /V1/MEDIA/VIDEO/*'
+      - 'OPEN /V1/MEDIA/VIDEO/XP/*'
+      - 'OPEN /V1/MEDIA/AUDIO/*'
+      - 'OPEN /V1/MEDIA/AUDIO/XP/*'
+      - 'OPEN /V1/MEDIA/USB/XP/*'
+      - 'OPEN /V1/MANAGEMENT/LABEL'
+      - 'OPEN /MEDIA/XP/VIDEO'
+      - 'OPEN /MEDIA/NAMES/VIDEO'
+      - 'OPEN /MANAGEMENT/POWER'
+      - 'OPEN /MANAGEMENT/UID'
+      - 'OPEN /MEDIA/VIDEO/XP'
+      - 'OPEN /MEDIA/AUDIO/XP'
+      - 'OPEN /LOGIN'
+  # Current values are read once on connecting; afterwards CHG lines keep them
+  # current. Only single-property GETs are used: a multi-line answer (GETALL)
+  # would be taken line by line as the replies to later commands. /V1 ports are
+  # read for the largest documented port set (video I1-I5, O1-O3; audio O1-O4;
+  # USB H1); other ports are kept current from CHG lines only.
+  poll:
+    send:
+      - 'GET /.ProductName'
+      - 'GET /.SerialNumber'
+      - 'GET /V1/MANAGEMENT/UID/PACKAGE.Version'
+      - 'GET /V1/MANAGEMENT/LABEL.DeviceLabel'
+      - 'GET /V1/MEDIA/VIDEO/XP/I1.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/I1.Mute'
+      - 'GET /V1/MEDIA/VIDEO/I1.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/I2.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/I2.Mute'
+      - 'GET /V1/MEDIA/VIDEO/I2.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/I3.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/I3.Mute'
+      - 'GET /V1/MEDIA/VIDEO/I3.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/I4.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/I4.Mute'
+      - 'GET /V1/MEDIA/VIDEO/I4.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/I5.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/I5.Mute'
+      - 'GET /V1/MEDIA/VIDEO/I5.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/O1.ConnectedSource'
+      - 'GET /V1/MEDIA/VIDEO/XP/O1.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/O1.Mute'
+      - 'GET /V1/MEDIA/VIDEO/O1.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/O2.ConnectedSource'
+      - 'GET /V1/MEDIA/VIDEO/XP/O2.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/O2.Mute'
+      - 'GET /V1/MEDIA/VIDEO/O2.SignalPresent'
+      - 'GET /V1/MEDIA/VIDEO/XP/O3.ConnectedSource'
+      - 'GET /V1/MEDIA/VIDEO/XP/O3.Lock'
+      - 'GET /V1/MEDIA/VIDEO/XP/O3.Mute'
+      - 'GET /V1/MEDIA/VIDEO/O3.SignalPresent'
+      - 'GET /V1/MEDIA/AUDIO/XP/O1.ConnectedSource'
+      - 'GET /V1/MEDIA/AUDIO/XP/O2.ConnectedSource'
+      - 'GET /V1/MEDIA/AUDIO/XP/O3.ConnectedSource'
+      - 'GET /V1/MEDIA/AUDIO/XP/O4.ConnectedSource'
+      - 'GET /V1/MEDIA/USB/XP/H1.ConnectedSource'
+      - 'GET /V1/EDID.EdidStatus'
+      - 'GET /MANAGEMENT/UID.DeviceLabel'
+      - 'GET /MANAGEMENT/POWER.Operation'
+      - 'GET /MEDIA/XP/VIDEO.DestinationConnectionStatus'
+      - 'GET /MEDIA/XP/VIDEO.SourcePortStatus'
+      - 'GET /MEDIA/XP/VIDEO.DestinationPortStatus'
+      - 'GET /EDID.EdidStatus'
+      - 'GET /SYS/MB.FirmwareVersion'
+      - 'GET /MANAGEMENT/UID.PackageVersion'
+      - 'GET /MEDIA/VIDEO/XP.DestinationConnectionList'
+      - 'GET /MEDIA/VIDEO/XP.SourcePortStatus'
+      - 'GET /MEDIA/VIDEO/XP.DestinationPortStatus'
+      - 'GET /MEDIA/AUDIO/XP.DestinationConnectionList'
+      - 'GET /MEDIA/AUDIO/XP.SourcePortStatus'
+      - 'GET /MEDIA/AUDIO/XP.DestinationPortStatus'
+  # A rule matches a GET/SET reply (pr/pw) and a change notification (CHG)
+  # alike. Values end the line, so an error answer (pE ... %E...) is never
+  # taken as state.
+  updates:
+    - match: '^(?:CHG|pr) /\.SerialNumber=(\S+)$'
+      state: { "device.serial": "{1}" }
+    - match: '^(?:CHG|pr) /\.ProductName=(.+)$'
+      state: { "device.product_name": "{1}" }
+    - match: '^(?:CHG|p[rw]) /(?:V1/MANAGEMENT/LABEL|MANAGEMENT/UID)\.DeviceLabel=(.*)$'
+      state: { "device.label": "{1}" }
+    - match: '^(?:CHG|pr) /(?:V1/MANAGEMENT/UID/PACKAGE\.Version|MANAGEMENT/UID\.PackageVersion)=(\S+)$'
+      state: { "device.firmware": "{1}" }
+    - match: '^(?:CHG|pr) /SYS/MB\.FirmwareVersion=(.+)$'
+      state: { "device.cpu_firmware": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MANAGEMENT/POWER\.Operation=(NORMAL|STANDBY)$'
+      state: { "device.power_mode": "{1}" }
+    - match: '^(?:CHG|p[rw]) /LOGIN\.LoggedIn=(true|false)$'
+      state: { "device.logged_in": { value: "{1}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /(?:V1/)?EDID\.EdidStatus=(.*)$'
+      state: { "edid.status": "{1}" }
+    # /V1 tree: one property per port.
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/XP/O(\d+)\.ConnectedSource=I?(\d+)$'
+      state: { "video.outputs.{1}.input": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/XP/O(\d+)\.ConnectedSource=I?(\d+)$'
+      state: { "audio.outputs.{1}.input": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/USB/XP/H(\d+)\.ConnectedSource=U?(\d+)$'
+      state: { "usb.hubs.{1}.host": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/XP/I(\d+)\.Lock=(true|false)$'
+      state: { "video.inputs.{1}.locked": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/XP/I(\d+)\.Mute=(true|false)$'
+      state: { "video.inputs.{1}.muted": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/I(\d+)\.SignalPresent=(true|false)$'
+      state: { "video.inputs.{1}.signal": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/XP/O(\d+)\.Lock=(true|false)$'
+      state: { "video.outputs.{1}.locked": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/XP/O(\d+)\.Mute=(true|false)$'
+      state: { "video.outputs.{1}.muted": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/O(\d+)\.SignalPresent=(true|false)$'
+      state: { "video.outputs.{1}.signal": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/XP/I(\d+)\.Lock=(true|false)$'
+      state: { "audio.inputs.{1}.locked": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/XP/I(\d+)\.Mute=(true|false)$'
+      state: { "audio.inputs.{1}.muted": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/AUDIO/I(\d+)\.SignalPresent=(true|false)$'
+      state: { "audio.inputs.{1}.signal": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/XP/O(\d+)\.Lock=(true|false)$'
+      state: { "audio.outputs.{1}.locked": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/XP/O(\d+)\.Mute=(true|false)$'
+      state: { "audio.outputs.{1}.muted": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/AUDIO/O(\d+)\.SignalPresent=(true|false)$'
+      state: { "audio.outputs.{1}.signal": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/I(\d+)\.Connected=(true|false)$'
+      state: { "video.inputs.{1}.connected": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/I(\d+)\.EmbeddedAudioPresent=(true|false)$'
+      state: { "video.inputs.{1}.embedded_audio": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/I(\d+)\.Name=(.*)$'
+      state: { "video.inputs.{1}.name": "{2}" }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/O(\d+)\.Connected=(true|false)$'
+      state: { "video.outputs.{1}.connected": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/O(\d+)\.EmbeddedAudioPresent=(true|false)$'
+      state: { "video.outputs.{1}.embedded_audio": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/O(\d+)\.Name=(.*)$'
+      state: { "video.outputs.{1}.name": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/VIDEO/O(\d+)\.EmbeddedAudioMute=(true|false)$'
+      state: { "video.outputs.{1}.embedded_audio_muted": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|pr) /V1/MEDIA/VIDEO/XP/O(\d+)/SWITCHABLE\.I(\d+)=(OK|Busy)$'
+      state: { "video.outputs.{1}.switchable.{2}": { value: "{3}", map: { "OK": true, "Busy": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/O(\d+)\.Mute=(true|false)$'
+      state: { "audio.outputs.{1}.volume_muted": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/O(\d+)\.VolumedB=(-?[0-9.]+)$'
+      state: { "audio.outputs.{1}.volume_db": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/O(\d+)\.VolumePercent=([0-9.]+)$'
+      state: { "audio.outputs.{1}.volume_percent": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/AUDIO/O(\d+)\.Balance=(-?\d+)$'
+      state: { "audio.outputs.{1}.balance": "{2}" }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/USB/XP/H(\d+)\.Lock=(true|false)$'
+      state: { "usb.hubs.{1}.locked": { value: "{2}", map: { "true": true, "false": false } } }
+    - match: '^(?:CHG|p[rw]) /V1/MEDIA/USB/XP/U(\d+)\.Lock=(true|false)$'
+      state: { "usb.hosts.{1}.locked": { value: "{2}", map: { "true": true, "false": false } } }
+    # MX2 port names (corroborated by the Companion module only): <n>;<label>.
+    - match: '^(?:CHG|p[rw]) /MEDIA/NAMES/VIDEO\.I(\d+)=\d+;(.*)$'
+      state: { "video.inputs.{1}.name": "{2}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/NAMES/VIDEO\.O(\d+)=\d+;(.*)$'
+      state: { "video.outputs.{1}.name_mx2": "{2}" }
+    # MX2 and UMX trees: semicolon lists in port order, one rule per position.
+    # The crosspoint lists I<n> or 0 per output. A status field is the
+    # lock/mute letter (T neither, L locked, M muted, U both) and a status
+    # byte as two hex digits (MX2), or two bytes of which the first is
+    # reserved (UMX): bits 7-6 embedded audio, 5-4 HDCP, 3-2 signal, 1-0
+    # connection, each 10 no and 11 yes (00 unknown and 01 reserved are not
+    # assigned).
+    # MX2 /MEDIA/XP/VIDEO (48x48 at most) and UMX /MEDIA/VIDEO/XP.
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){0}I?(\d+)(?:;|$)'
+      state: { "video.outputs.1.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){1}I?(\d+)(?:;|$)'
+      state: { "video.outputs.2.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){2}I?(\d+)(?:;|$)'
+      state: { "video.outputs.3.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){3}I?(\d+)(?:;|$)'
+      state: { "video.outputs.4.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){4}I?(\d+)(?:;|$)'
+      state: { "video.outputs.5.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){5}I?(\d+)(?:;|$)'
+      state: { "video.outputs.6.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){6}I?(\d+)(?:;|$)'
+      state: { "video.outputs.7.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){7}I?(\d+)(?:;|$)'
+      state: { "video.outputs.8.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){8}I?(\d+)(?:;|$)'
+      state: { "video.outputs.9.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){9}I?(\d+)(?:;|$)'
+      state: { "video.outputs.10.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){10}I?(\d+)(?:;|$)'
+      state: { "video.outputs.11.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){11}I?(\d+)(?:;|$)'
+      state: { "video.outputs.12.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){12}I?(\d+)(?:;|$)'
+      state: { "video.outputs.13.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){13}I?(\d+)(?:;|$)'
+      state: { "video.outputs.14.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){14}I?(\d+)(?:;|$)'
+      state: { "video.outputs.15.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){15}I?(\d+)(?:;|$)'
+      state: { "video.outputs.16.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){16}I?(\d+)(?:;|$)'
+      state: { "video.outputs.17.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){17}I?(\d+)(?:;|$)'
+      state: { "video.outputs.18.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){18}I?(\d+)(?:;|$)'
+      state: { "video.outputs.19.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){19}I?(\d+)(?:;|$)'
+      state: { "video.outputs.20.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){20}I?(\d+)(?:;|$)'
+      state: { "video.outputs.21.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){21}I?(\d+)(?:;|$)'
+      state: { "video.outputs.22.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){22}I?(\d+)(?:;|$)'
+      state: { "video.outputs.23.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){23}I?(\d+)(?:;|$)'
+      state: { "video.outputs.24.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){24}I?(\d+)(?:;|$)'
+      state: { "video.outputs.25.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){25}I?(\d+)(?:;|$)'
+      state: { "video.outputs.26.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){26}I?(\d+)(?:;|$)'
+      state: { "video.outputs.27.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){27}I?(\d+)(?:;|$)'
+      state: { "video.outputs.28.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){28}I?(\d+)(?:;|$)'
+      state: { "video.outputs.29.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){29}I?(\d+)(?:;|$)'
+      state: { "video.outputs.30.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){30}I?(\d+)(?:;|$)'
+      state: { "video.outputs.31.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){31}I?(\d+)(?:;|$)'
+      state: { "video.outputs.32.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){32}I?(\d+)(?:;|$)'
+      state: { "video.outputs.33.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){33}I?(\d+)(?:;|$)'
+      state: { "video.outputs.34.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){34}I?(\d+)(?:;|$)'
+      state: { "video.outputs.35.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){35}I?(\d+)(?:;|$)'
+      state: { "video.outputs.36.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){36}I?(\d+)(?:;|$)'
+      state: { "video.outputs.37.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){37}I?(\d+)(?:;|$)'
+      state: { "video.outputs.38.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){38}I?(\d+)(?:;|$)'
+      state: { "video.outputs.39.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){39}I?(\d+)(?:;|$)'
+      state: { "video.outputs.40.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){40}I?(\d+)(?:;|$)'
+      state: { "video.outputs.41.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){41}I?(\d+)(?:;|$)'
+      state: { "video.outputs.42.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){42}I?(\d+)(?:;|$)'
+      state: { "video.outputs.43.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){43}I?(\d+)(?:;|$)'
+      state: { "video.outputs.44.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){44}I?(\d+)(?:;|$)'
+      state: { "video.outputs.45.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){45}I?(\d+)(?:;|$)'
+      state: { "video.outputs.46.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){46}I?(\d+)(?:;|$)'
+      state: { "video.outputs.47.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.Destination(?:ConnectionStatus|ConnectionList)=(?:[^;]*;){47}I?(\d+)(?:;|$)'
+      state: { "video.outputs.48.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){0}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.1.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.1.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.1.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.1.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.1.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.1.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){1}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.2.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.2.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.2.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.2.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.2.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.2.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){2}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.3.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.3.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.3.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.3.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.3.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.3.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){3}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.4.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.4.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.4.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.4.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.4.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.4.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){4}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.5.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.5.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.5.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.5.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.5.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.5.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){5}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.6.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.6.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.6.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.6.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.6.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.6.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){6}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.7.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.7.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.7.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.7.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.7.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.7.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){7}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.8.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.8.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.8.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.8.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.8.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.8.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){8}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.9.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.9.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.9.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.9.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.9.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.9.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){9}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.10.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.10.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.10.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.10.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.10.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.10.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){10}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.11.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.11.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.11.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.11.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.11.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.11.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){11}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.12.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.12.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.12.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.12.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.12.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.12.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){12}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.13.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.13.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.13.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.13.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.13.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.13.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){13}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.14.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.14.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.14.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.14.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.14.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.14.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){14}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.15.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.15.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.15.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.15.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.15.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.15.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){15}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.16.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.16.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.16.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.16.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.16.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.16.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){16}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.17.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.17.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.17.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.17.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.17.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.17.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){17}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.18.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.18.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.18.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.18.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.18.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.18.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){18}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.19.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.19.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.19.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.19.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.19.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.19.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){19}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.20.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.20.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.20.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.20.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.20.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.20.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){20}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.21.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.21.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.21.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.21.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.21.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.21.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){21}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.22.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.22.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.22.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.22.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.22.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.22.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){22}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.23.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.23.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.23.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.23.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.23.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.23.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){23}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.24.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.24.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.24.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.24.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.24.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.24.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){24}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.25.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.25.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.25.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.25.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.25.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.25.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){25}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.26.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.26.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.26.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.26.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.26.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.26.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){26}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.27.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.27.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.27.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.27.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.27.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.27.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){27}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.28.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.28.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.28.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.28.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.28.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.28.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){28}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.29.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.29.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.29.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.29.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.29.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.29.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){29}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.30.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.30.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.30.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.30.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.30.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.30.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){30}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.31.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.31.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.31.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.31.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.31.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.31.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){31}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.32.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.32.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.32.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.32.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.32.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.32.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){32}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.33.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.33.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.33.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.33.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.33.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.33.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){33}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.34.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.34.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.34.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.34.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.34.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.34.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){34}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.35.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.35.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.35.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.35.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.35.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.35.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){35}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.36.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.36.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.36.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.36.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.36.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.36.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){36}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.37.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.37.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.37.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.37.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.37.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.37.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){37}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.38.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.38.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.38.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.38.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.38.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.38.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){38}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.39.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.39.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.39.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.39.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.39.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.39.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){39}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.40.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.40.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.40.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.40.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.40.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.40.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){40}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.41.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.41.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.41.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.41.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.41.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.41.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){41}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.42.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.42.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.42.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.42.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.42.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.42.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){42}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.43.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.43.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.43.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.43.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.43.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.43.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){43}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.44.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.44.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.44.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.44.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.44.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.44.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){44}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.45.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.45.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.45.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.45.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.45.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.45.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){45}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.46.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.46.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.46.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.46.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.46.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.46.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){46}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.47.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.47.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.47.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.47.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.47.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.47.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.SourcePortStatus=(?:[^;]*;){47}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.inputs.48.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.inputs.48.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.inputs.48.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.48.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.inputs.48.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.inputs.48.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){0}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.1.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.1.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.1.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.1.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.1.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.1.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){1}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.2.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.2.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.2.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.2.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.2.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.2.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){2}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.3.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.3.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.3.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.3.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.3.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.3.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){3}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.4.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.4.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.4.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.4.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.4.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.4.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){4}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.5.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.5.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.5.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.5.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.5.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.5.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){5}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.6.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.6.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.6.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.6.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.6.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.6.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){6}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.7.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.7.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.7.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.7.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.7.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.7.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){7}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.8.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.8.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.8.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.8.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.8.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.8.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){8}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.9.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.9.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.9.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.9.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.9.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.9.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){9}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.10.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.10.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.10.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.10.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.10.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.10.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){10}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.11.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.11.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.11.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.11.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.11.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.11.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){11}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.12.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.12.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.12.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.12.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.12.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.12.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){12}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.13.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.13.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.13.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.13.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.13.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.13.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){13}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.14.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.14.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.14.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.14.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.14.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.14.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){14}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.15.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.15.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.15.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.15.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.15.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.15.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){15}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.16.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.16.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.16.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.16.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.16.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.16.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){16}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.17.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.17.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.17.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.17.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.17.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.17.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){17}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.18.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.18.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.18.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.18.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.18.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.18.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){18}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.19.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.19.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.19.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.19.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.19.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.19.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){19}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.20.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.20.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.20.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.20.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.20.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.20.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){20}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.21.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.21.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.21.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.21.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.21.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.21.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){21}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.22.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.22.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.22.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.22.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.22.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.22.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){22}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.23.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.23.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.23.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.23.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.23.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.23.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){23}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.24.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.24.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.24.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.24.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.24.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.24.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){24}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.25.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.25.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.25.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.25.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.25.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.25.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){25}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.26.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.26.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.26.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.26.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.26.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.26.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){26}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.27.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.27.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.27.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.27.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.27.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.27.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){27}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.28.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.28.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.28.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.28.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.28.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.28.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){28}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.29.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.29.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.29.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.29.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.29.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.29.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){29}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.30.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.30.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.30.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.30.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.30.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.30.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){30}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.31.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.31.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.31.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.31.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.31.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.31.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){31}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.32.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.32.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.32.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.32.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.32.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.32.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){32}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.33.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.33.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.33.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.33.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.33.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.33.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){33}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.34.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.34.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.34.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.34.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.34.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.34.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){34}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.35.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.35.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.35.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.35.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.35.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.35.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){35}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.36.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.36.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.36.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.36.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.36.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.36.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){36}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.37.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.37.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.37.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.37.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.37.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.37.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){37}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.38.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.38.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.38.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.38.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.38.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.38.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){38}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.39.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.39.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.39.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.39.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.39.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.39.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){39}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.40.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.40.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.40.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.40.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.40.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.40.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){40}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.41.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.41.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.41.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.41.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.41.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.41.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){41}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.42.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.42.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.42.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.42.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.42.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.42.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){42}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.43.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.43.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.43.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.43.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.43.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.43.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){43}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.44.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.44.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.44.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.44.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.44.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.44.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){44}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.45.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.45.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.45.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.45.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.45.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.45.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){45}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.46.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.46.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.46.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.46.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.46.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.46.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){46}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.47.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.47.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.47.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.47.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.47.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.47.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/(?:XP/VIDEO|VIDEO/XP)\.DestinationPortStatus=(?:[^;]*;){47}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "video.outputs.48.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "video.outputs.48.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "video.outputs.48.embedded_audio": { value: "{2}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.48.hdcp": { value: "{2}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+        "video.outputs.48.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "video.outputs.48.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    # UMX /MEDIA/AUDIO/XP: five inputs, one output.
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.DestinationConnectionList=(?:[^;]*;){0}I?(\d+)(?:;|$)'
+      state: { "audio.outputs.1.input": "{1}" }
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.SourcePortStatus=(?:[^;]*;){0}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "audio.inputs.1.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "audio.inputs.1.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "audio.inputs.1.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "audio.inputs.1.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.SourcePortStatus=(?:[^;]*;){1}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "audio.inputs.2.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "audio.inputs.2.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "audio.inputs.2.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "audio.inputs.2.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.SourcePortStatus=(?:[^;]*;){2}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "audio.inputs.3.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "audio.inputs.3.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "audio.inputs.3.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "audio.inputs.3.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.SourcePortStatus=(?:[^;]*;){3}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "audio.inputs.4.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "audio.inputs.4.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "audio.inputs.4.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "audio.inputs.4.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.SourcePortStatus=(?:[^;]*;){4}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "audio.inputs.5.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "audio.inputs.5.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "audio.inputs.5.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "audio.inputs.5.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+    - match: '^(?:CHG|p[rw]) /MEDIA/AUDIO/XP\.DestinationPortStatus=(?:[^;]*;){0}([TLMU])(?:[0-9A-F]{2})?([0-9A-F])([0-9A-F])(?:;|$)'
+      state:
+        "audio.outputs.1.locked": { value: "{1}", map: { "T": false, "L": true, "M": false, "U": true } }
+        "audio.outputs.1.muted": { value: "{1}", map: { "T": false, "L": false, "M": true, "U": true } }
+        "audio.outputs.1.signal": { value: "{3}", map: { "8": false, "9": false, "A": false, "B": false, "C": true, "D": true, "E": true, "F": true } }
+        "audio.outputs.1.connected": { value: "{3}", map: { "2": false, "6": false, "A": false, "E": false, "3": true, "7": true, "B": true, "F": true } }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Three LW3 node trees exist and their paths are not interchangeable: the
+      /V1 tree (MMX2, Taurus UCX, DCX: /V1/MEDIA/VIDEO/XP), the MX2 tree
+      (/MEDIA/XP/VIDEO) and the UMX tree (/MEDIA/VIDEO/XP). Commands are split
+      by tree (plain names, mx2_*, umx_*) and each model lists only its own.
+      A command sent to the wrong tree is answered with an error
+      (%E002 Not exist) and does nothing.
+
+  - models: [mx2]
+    severity: critical
+    text: >
+      mx2_load_preset changes every unlocked output at once, and
+      mx2_switch_all / mx2_disconnect_all / mx2_switch_multi change every
+      output they name in one step; there is no undo. A preset stores the
+      crosspoint and mute states (MX2 9.16); locked outputs are left as they
+      are.
+
+  - models: [all]
+    severity: critical
+    text: >
+      factory_defaults and factory_defaults_legacy restore every setting and
+      restart the device; the connection drops, and on the UMX the Cleartext
+      login password is erased. restart, mx2_soft_reset and umx_reset drop
+      every connection; subscriptions are lost and are sent again when the
+      core reconnects.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Lines end with CR LF and are limited to 800 bytes (MX2 9.3.2). Names and
+      values are case-sensitive (on MMX2 up to FW v2.9.0), so enumerated
+      values are sent with the documented capitalisation. The characters
+      \ { } # % ( ) and CR, LF, TAB are protocol characters that must be
+      escaped with a backslash (MX2 9.3.7); free-text parameters here (labels,
+      names, macro names) refuse them instead.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Answers carry no request id. Each command waits for the next line that
+      starts with an answer prefix (pr, pw, pE, mO, mF, mE, nE, o-...); CHG
+      lines are never taken as answers. A failed method answers mE or mF and a
+      failed property access pE or nE, with %E<code>:<text>, which fails the
+      command (e.g. %E004 Invalid value, %E002 Not exist, %E006 Illegal
+      operation). Signatures (XXXX#) and GETALL are not used, because their
+      multi-line answers would be read as the answers to later commands.
+
+  - models: [all]
+    severity: warning
+    text: >
+      State is kept current by subscription: OPEN on the crosspoint and port
+      nodes after every connect, then CHG lines (MX2 9.3.9-9.3.10). Values are
+      read once on connecting. The subscribe and read lists cover all three
+      trees, because telemetry cannot be chosen per model; a product answers
+      the other trees' paths with error lines, which are ignored. On /V1
+      products only the documented port range (video I1-I5, O1-O3, audio
+      O1-O4, USB H1) is read on connecting; other ports appear on their first
+      change. Whether "OPEN <node>/*" also covers grandchild nodes is not
+      documented.
+
+  - models: [taurus-ucx]
+    severity: warning
+    text: >
+      The video crosspoint cannot route I1 and I5 at the same time: routing
+      one while the other is on any output is refused with "%E006: Illegal
+      operation" (UCX 8.6.1). get_switchable reports Busy for such inputs. A
+      CHG for EmbeddedAudioPresent on an HDMI output can be missed when the
+      crosspoint switches between sources with and without embedded audio
+      (UCX release notes).
+
+  - models: [mx2, umx]
+    severity: info
+    text: >
+      Crosspoint and port status are semicolon lists in port order. The
+      crosspoint lists I<n> or 0 per output; a port status is a letter (T
+      unlocked and unmuted, L locked, M muted, U locked and muted) and a
+      status byte in hex on MX2, two bytes on UMX (the first reserved): bits
+      7-6 embedded audio, 5-4 HDCP, 3-2 signal, 1-0 connection, each 10 no
+      and 11 yes, 00 unknown (MX2 9.6.6, UMX 7.6.1). The list is decoded per
+      position for up to 48 ports.
+
+  - models: [mx2, umx]
+    severity: info
+    text: >
+      Muting a port does not change the crosspoint: the route is kept and
+      comes back on unmute; switching a muted output does not unmute it. A
+      locked output keeps its route; a preset load skips it.
+
+  - models: [mx2]
+    severity: info
+    text: >
+      Documentation inconsistencies: the device-label syntax is printed as
+      /MANAGEMENT/UID/DeviceLabel but the example as /MANAGEMENT/UID.DeviceLabel
+      (the property form, used here); muteSource's syntax line drops a slash
+      (/MEDIA/XPVIDEO) while its reply and example have /MEDIA/XP/VIDEO; the
+      preset save method is printed as save(1) with an example save(My_pres),
+      so saving into an existing preset is left out (create stores a new
+      one). Port names are not in the manual's LW3 chapter; the
+      /MEDIA/NAMES/VIDEO rule follows the Companion module.
+
+  - models: [mmx2, taurus-ucx, v1-generic]
+    severity: info
+    text: >
+      Documentation inconsistencies: the output HdcpMode property is printed
+      both on the port and under its HDCP node, and the sink HDCP capability
+      path with a slash before the property, so neither is included. The
+      autoselect policy values are printed "Last Detect"/"First Detect" in the
+      table and "First detect" in the example; the example's spelling is sent.
+      The Connected and Name port properties are named in the REST chapter
+      (6.3.4) as examples only. The MMX2 manual prints some method replies as
+      "m0" (zero); they are taken to be mO.
+
+  - models: [mmx2, taurus-ucx, v1-generic]
+    severity: info
+    text: >
+      The LW3 port 6107 has no authentication. From FW v2.15.0 MMX2 enables
+      HTTP(S) authentication by default (password Lightware10g) but that
+      covers the REST API and websockets, not 6107; the manual advises
+      disabling 6107 where security matters. Up to 18 clients may be
+      connected over WS, WSS and LW3 together.
+
+  - models: [umx]
+    severity: info
+    text: >
+      With the Cleartext login enabled (UMX-HDMI-140-Plus, FW 1.3.0b5 and
+      later), nothing but ProductName, PartNumber, SerialNumber,
+      FirmwareVersion, PackageVersion and MacAddress can be read until
+      CALL /LOGIN:login(<password>) succeeds; the login lasts until the TCP
+      connection breaks. Set the password setting and the core logs in on
+      every connect. The failure answer is not documented, so a wrong password
+      is not recognised as a refusal; later commands fail with errors.

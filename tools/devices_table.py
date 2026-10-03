@@ -46,6 +46,7 @@ NATIVE = {
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
     "obsidian-onyx": "Telnet over TCP 2323",
     "pjlink": "PJLink over TCP 4352",
+    "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default)",
     "qsys": "QRC JSON-RPC over TCP 1710",
     "sennheiser-digital-6000": "SSC over UDP 45",
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2)",

@@ -1,0 +1,483 @@
+spec: 1
+id: blackmagic-multiview
+name: Blackmagic MultiView 16 / MultiView 4
+vendor: Blackmagic Design
+category: display
+
+source:
+  - title: Blackmagic MultiView Installation and Operation Manual (January 2022), Developer Information, Blackmagic Videohub Ethernet Protocol v2.3
+    author: Blackmagic Design
+    url: https://documents.blackmagicdesign.com/UserManuals/MultiViewManual.pdf
+    note: >
+      Manufacturer-documented, and the source of every block and command here unless
+      the command says otherwise. Covers MultiView 16, MultiView 4 and MultiView 4 HD.
+      Ethernet control on MultiView 16 and MultiView 4, TCP 9990, line endings, the
+      status dump and push behaviour (p.35); preamble and MULTIVIEW DEVICE block
+      (p.35-36); labels, routing, locks and the configuration block (p.36); status
+      updates, change requests, ACK/NAK, solo and audio routing (p.37); the label
+      dialogue, status dump requests and PING (p.38). Layouts (p.6, p.12), overlays
+      (p.13, p.29), video output formats (p.14, p.20-21, p.27), Videohub Control's solo
+      and audio pushbuttons (p.33-34) and the views tab's solo and audio outputs (p.26).
+  - title: companion-module-bmd-multiview16 (Bitfocus Companion module)
+    author: Bitfocus
+    url: https://github.com/bitfocus/companion-module-bmd-multiview16
+    note: >
+      Community source (MIT licence), read as corroboration only. It sends the
+      CONFIGURATION fields with lowercase true and false, and addresses the solo and
+      audio outputs as the two outputs after the views, as the manual's examples do.
+
+transport:
+  type: line-tcp
+  port: 9990
+  framing: block
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  reply_match: "^(ACK|NAK)"
+  probe: "PING:"
+
+models:
+  - id: multiview-16
+    name: Blackmagic MultiView 16
+    supports:
+      [set_route, set_solo_source, set_audio_source, set_input_label, set_output_label,
+       lock_output, unlock_output, force_unlock_output, set_layout, set_output_format,
+       set_solo_enabled, set_widescreen_sd, set_display_border, set_display_labels,
+       set_display_audio_meters, set_display_sdi_tally, get_device_info,
+       get_input_labels, get_output_labels, get_video_output_routing,
+       get_video_output_locks, get_configuration, ping]
+    verification: none
+    notes: >
+      16 SDI inputs and 16 views, plus the solo output (output 17) and the audio output
+      (output 18) (p.26, p.36). Layouts solo, 2x2, 3x3 and 4x4 (p.12). Ultra HD output at
+      2160p29.97 or 2160p25 with the HD output progressive or interlaced (p.14).
+  - id: multiview-4
+    name: Blackmagic MultiView 4
+    supports:
+      [set_solo_source_4, set_audio_source_4, set_input_label, set_layout,
+       set_solo_enabled, set_display_border, set_display_labels, set_display_audio_meters,
+       set_display_sdi_tally, get_device_info, get_input_labels, get_output_labels,
+       get_video_output_routing, get_video_output_locks, get_configuration, ping]
+    verification: none
+    notes: >
+      4 SDI inputs in a fixed 2x2 or solo layout (p.6); over Ethernet only the solo
+      source and the audio source change (p.35, p.33). SDI output 2160p29.97, 2160p25,
+      1080i59.94 or 1080i50 (p.20-21). SDI tally from a program feed on input 4 (p.29).
+      MultiView 4 HD has no Ethernet control and is not covered (see quirks).
+
+commands:
+  set_route:
+    summary: Show an input in a view (MultiView 16)
+    params:
+      input:  { type: int, min: 1, max: 16, required: true }
+      output: { type: int, min: 1, max: 16, required: true }
+    send: |
+      VIDEO OUTPUT ROUTING:
+      {output:-1} {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.37: "VIDEO OUTPUT ROUTING:\n7 2" routes input 3 to output 8
+
+  set_solo_source:
+    summary: Choose the input shown full screen in solo mode (MultiView 16, output 17)
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+    send: |
+      VIDEO OUTPUT ROUTING:
+      16 {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.37: "16 10" makes input 11 the solo source
+
+  set_audio_source:
+    summary: Choose the input whose embedded audio goes to the multi view output (MultiView 16, output 18)
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+    send: |
+      VIDEO OUTPUT ROUTING:
+      17 {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.37: "17 0" embeds audio from input 1
+
+  set_solo_source_4:
+    summary: Choose the input shown full screen in solo mode (MultiView 4, output 5)
+    params:
+      input: { type: int, min: 1, max: 4, required: true }
+    send: |
+      VIDEO OUTPUT ROUTING:
+      4 {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.35 and p.33 (solo source over Ethernet); output number inferred, see quirks
+
+  set_audio_source_4:
+    summary: Choose the input whose embedded audio goes to the multi view output (MultiView 4, output 6)
+    params:
+      input: { type: int, min: 1, max: 4, required: true }
+    send: |
+      VIDEO OUTPUT ROUTING:
+      5 {input:-1}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.37: "5 0" embeds audio from input 1 on MultiView 4
+
+  set_input_label:
+    summary: Set the label of an input, shown on its view when labels are on
+    params:
+      input: { type: int, min: 1, max: 16, required: true }
+      label: { type: string, required: true }
+    send: |
+      INPUT LABELS:
+      {input:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36-37 (same form as the status block)
+
+  set_output_label:
+    summary: Set the label of a view, or of the solo (17) or audio (18) output, as Videohub Control shows it (MultiView 16)
+    params:
+      output: { type: int, min: 1, max: 18, required: true }
+      label:  { type: string, required: true }
+    send: |
+      OUTPUT LABELS:
+      {output:-1} {label}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.38: "OUTPUT LABELS:\n6 new output label seven"; p.26 (solo and audio labels)
+
+  lock_output:
+    summary: Lock a view, or the solo or audio output, as owned by this client (MultiView 16)
+    params:
+      output: { type: int, min: 1, max: 18, required: true }
+    send: |
+      VIDEO OUTPUT LOCKS:
+      {output:-1} O
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36-37 (lock states; locks are changed with the status block's form)
+
+  unlock_output:
+    summary: Release a lock this client holds on a view (MultiView 16)
+    params:
+      output: { type: int, min: 1, max: 18, required: true }
+    send: |
+      VIDEO OUTPUT LOCKS:
+      {output:-1} U
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36-37
+
+  force_unlock_output:
+    summary: Release a lock another client holds on a view (MultiView 16)
+    params:
+      output: { type: int, min: 1, max: 18, required: true }
+    send: |
+      VIDEO OUTPUT LOCKS:
+      {output:-1} F
+    expect: { contains: "ACK" }
+    returns: ack
+    # Videohub Ethernet Protocol v2.3 force unlock; not in the MultiView manual, see quirks
+
+  set_layout:
+    summary: Set the multi view layout; MultiView 4 has only SOLO and 2x2
+    params:
+      layout: { type: enum, values: [SOLO, 2x2, 3x3, 4x4], required: true }
+    send: |
+      CONFIGURATION:
+      Layout: {layout}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block); see quirks
+
+  set_output_format:
+    summary: Set the multi view output format (MultiView 16)
+    params:
+      format: { type: enum, values: [50i, 50p, 60i, 60p], required: true }
+    send: |
+      CONFIGURATION:
+      Output format: {format}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block); see quirks
+
+  set_solo_enabled:
+    summary: Turn solo (one input full screen) on or off
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Solo enabled: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.37: "CONFIGURATION:\nSolo enabled: true"
+
+  set_widescreen_sd:
+    summary: Show SD sources as 16:9 (true) or 4:3 (false) (MultiView 16)
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Widescreen SD enable: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block), p.29 (SD aspect ratio); see quirks
+
+  set_display_border:
+    summary: Show or hide the borders between views
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Display border: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block), p.13 (overlay); see quirks
+
+  set_display_labels:
+    summary: Show or hide the view labels
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Display labels: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block), p.13 (overlay); see quirks
+
+  set_display_audio_meters:
+    summary: Show or hide the audio meters (first two embedded channels) on every view
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Display audio meters: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block), p.13 (overlay); see quirks
+
+  set_display_sdi_tally:
+    summary: Show or hide tally borders taken from an ATEM program feed on the last input
+    params:
+      enabled: { type: bool, required: true }
+    send: |
+      CONFIGURATION:
+      Display SDI tally: {enabled}
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 (configuration block), p.13 and p.29 (SDI tally); see quirks
+
+  get_device_info:
+    summary: Ask the MultiView to resend its device information; the block follows the ACK and updates state
+    send: "MULTIVIEW DEVICE:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.35 and p.38
+
+  get_input_labels:
+    summary: Ask the MultiView to resend its input labels; the block follows the ACK and updates state
+    send: "INPUT LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 and p.38
+
+  get_output_labels:
+    summary: Ask the MultiView to resend its view labels; the block follows the ACK and updates state
+    send: "OUTPUT LABELS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.38 (the documented example)
+
+  get_video_output_routing:
+    summary: Ask the MultiView to resend which input each view, the solo and the audio output show; the block follows the ACK
+    send: "VIDEO OUTPUT ROUTING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 and p.38
+
+  get_video_output_locks:
+    summary: Ask the MultiView to resend its view locks; the block follows the ACK and updates state
+    send: "VIDEO OUTPUT LOCKS:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36 and p.38
+
+  get_configuration:
+    summary: Ask the MultiView to resend its configuration (layout, format, solo, overlays); the block follows the ACK
+    send: "CONFIGURATION:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.36-38
+
+  ping:
+    summary: Check that the MultiView is still responding
+    send: "PING:"
+    expect: { contains: "ACK" }
+    returns: ack
+    # MultiView manual (January 2022), p.38
+
+telemetry:
+  # The MultiView sends its whole state as status blocks when a client connects,
+  # then the changed lines of a block after every change from any client, panel,
+  # switch or setup utility (p.35, p.37). A status request (get_*) is answered with
+  # ACK and then the full block, which these same rules read. Nothing needs polling.
+  # Numbers are 0-based on the wire and 1-based in the state.
+  updates:
+    - header: "^PROTOCOL PREAMBLE:$"
+      fields:
+        Version: device.protocol_version
+    - header: "^MULTIVIEW DEVICE:$"
+      fields:
+        Device present: device.present
+        Model name: device.model
+        Friendly name: device.friendly_name
+        Unique ID: device.unique_id
+        Video inputs: device.inputs
+        Video processing units: device.processing_units
+        Video outputs: device.outputs
+        Video monitoring outputs: device.monitoring_outputs
+        Serial Ports: device.serial_ports
+        Serial ports: device.serial_ports
+    - header: "^INPUT LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "inputs.{1:+1}.label": "{2}" }
+    - header: "^OUTPUT LABELS:$"
+      each_line: "^(\\d+) (.*)$"
+      state: { "outputs.{1:+1}.label": "{2}" }
+    - header: "^VIDEO OUTPUT ROUTING:$"
+      each_line: "^(\\d+) (\\d+)$"
+      state: { "outputs.{1:+1}.input": "{2:+1}" }
+    - header: "^VIDEO OUTPUT LOCKS:$"
+      each_line: "^(\\d+) ([OLU])$"
+      state:
+        "outputs.{1:+1}.lock": { value: "{2}", map: { O: ours, L: other, U: unlocked } }
+    - header: "^CONFIGURATION:$"
+      fields:
+        Layout: config.layout
+        Output format: config.output_format
+        Solo enabled: { path: config.solo_enabled, map: { "true": true, "True": true, "false": false, "False": false } }
+        Widescreen SD enable: { path: config.widescreen_sd, map: { "true": true, "True": true, "false": false, "False": false } }
+        Display border: { path: config.display_border, map: { "true": true, "True": true, "false": false, "False": false } }
+        Display labels: { path: config.display_labels, map: { "true": true, "True": true, "false": false, "False": false } }
+        Display audio meters: { path: config.display_audio_meters, map: { "true": true, "True": true, "false": false, "False": false } }
+        Display SDI tally: { path: config.display_sdi_tally, map: { "true": true, "True": true, "false": false, "False": false } }
+
+state:
+  device.protocol_version:   { type: string, description: "Protocol version from the preamble, e.g. 2.3" }
+  device.present:            { type: string, description: "Device present as sent: true when the MultiView reports itself" }
+  device.model:              { type: string, description: "Model name, e.g. Blackmagic MultiView 16" }
+  device.friendly_name:      { type: string, description: "Friendly name, the name set in MultiView Setup (empty in the manual's example)" }
+  device.unique_id:          { type: string, description: "Unique device ID (empty in the manual's example)" }
+  device.inputs:             { type: int, description: "Number of video inputs" }
+  device.processing_units:   { type: int, description: "Number of video processing units (0)" }
+  device.outputs:            { type: int, description: "Number of video outputs as the device reports it (16 in the MultiView 16 example, which has 18 outputs counting solo and audio)" }
+  device.monitoring_outputs: { type: int, description: "Number of video monitoring outputs (0)" }
+  device.serial_ports:       { type: int, description: "Number of serial ports (empty in the manual's example)" }
+  inputs.*.label:            { type: string, description: "Input label, keyed by input number from 1" }
+  outputs.*.label:           { type: string, description: "View label, keyed by output number from 1. On MultiView 16, output 17 is solo and 18 is audio" }
+  outputs.*.input:           { type: int, description: "Input shown in the view, numbered from 1. MultiView 16: output 17 is the solo source and 18 the audio source. MultiView 4: output 5 is the solo source and 6 the audio source" }
+  outputs.*.lock:            { type: string, description: "ours (locked from this client's IP address), other (locked by another client) or unlocked" }
+  config.layout:             { type: string, description: "Layout: SOLO, 2x2, 3x3 or 4x4" }
+  config.output_format:      { type: string, description: "Output format: 50i, 50p, 60i or 60p" }
+  config.solo_enabled:       { type: bool, description: "Solo (one input full screen) is on" }
+  config.widescreen_sd:      { type: bool, description: "SD sources shown as 16:9 (true) or 4:3 (false)" }
+  config.display_border:     { type: bool, description: "Borders between views shown" }
+  config.display_labels:     { type: bool, description: "View labels shown" }
+  config.display_audio_meters: { type: bool, description: "Audio meters shown on every view" }
+  config.display_sdi_tally:  { type: bool, description: "Tally borders from the program feed on the last input shown" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Inputs and outputs are numbered from zero on the wire, zero being port one on
+      the chassis (p.36). Operator-facing numbering here is 1-based, as on the front
+      panel and in Videohub Control. The -1 offset in each command and +1 in telemetry
+      handle it; an implementation that omits it routes to the wrong view.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ACK means the request was understood, not that it was carried out (p.37). Only
+      the status block that follows confirms a change, and it can differ from the
+      request when other clients change the same setting at the same time or the
+      request could not be performed. Take state only from status blocks. NAK means
+      the block was not understood.
+
+  - models: [all]
+    severity: info
+    text: >
+      The MultiView pushes status blocks at any time: the full dump on connecting and
+      the changed lines after every change (p.35, p.37). Only ACK and NAK are taken as
+      command replies. A status request (get_*) is answered with ACK and then the full
+      block (p.38), which updates state through telemetry. Clients must ignore blocks
+      and lines they do not recognise (p.35). Lines sent to it may end in LF, CR or
+      both (p.35).
+
+  - models: [all]
+    severity: warning
+    text: >
+      The routing outputs go past the views. On MultiView 16, outputs 1-16 are the
+      views, output 17 (wire 16) is the solo source and output 18 (wire 17) the audio
+      source (p.26, p.37). On MultiView 4 the manual's audio example uses wire 5
+      (output 6), so the solo source is taken to be wire 4 (output 5); the manual does
+      not give that index. Solo routing takes effect once solo is enabled (p.37).
+
+  - models: [multiview-4]
+    severity: warning
+    text: >
+      The manual contradicts itself on MultiView 4 solo: the Ethernet note and the
+      Videohub Control section say its solo source can be changed (p.35, p.33), while
+      the solo routing example says this is not available on MultiView 4 (p.37).
+      set_solo_source_4 is kept for verification; NAK or an unchanged routing block
+      shows the unit does not accept it. Views on MultiView 4 are fixed to inputs 1-4
+      and cannot be routed (p.24).
+
+  - models: [all]
+    severity: warning
+    text: >
+      The manual lists the configuration block's lines but prints its header only in
+      the solo example (CONFIGURATION:, p.37), and shows a client sending only Solo
+      enabled. The other set_* configuration commands send the same block with the
+      line as listed (p.36), following the rule that a client changes state by sending
+      a block of the form the device reports (p.37); ACK/NAK and the following status
+      block show whether the unit accepted it. The manual lists booleans as "True or
+      False" but its example sends "true"; commands send lowercase and state accepts
+      both.
+
+  - models: [all]
+    severity: info
+    text: >
+      Output format takes 50i, 50p, 60i or 60p (p.36), which matches the HD output
+      choice on MultiView 16 (1080i50, 1080p25, 1080i59.94, 1080p29.97, p.14) rather
+      than the Ultra HD rate. How these map to MultiView 4's four SDI output formats
+      (2160p29.97, 2160p25, 1080i59.94, 1080i50, p.20-21) is not documented, so
+      set_output_format is listed for MultiView 16 only.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Locks follow the Videohub protocol: O owned by this client (locked from the same
+      IP address), L by another client, U unlocked (p.36). The MultiView manual does
+      not document F (force unlock); force_unlock_output sends it as the Videohub
+      protocol v2.3 does.
+
+  - models: [multiview-4]
+    severity: info
+    text: >
+      Settings changed over Ethernet, the Teranex Mini Smart Panel or MultiView Setup
+      are kept, but the built-in switches can apply their positions again when toggled
+      (p.21). A unit set by switches may therefore differ from what a client last sent.
+
+  - models: [all]
+    severity: info
+    text: >
+      Blackmagic MultiView 4 HD is configured by switches and by MultiView Setup over
+      USB; the manual lists Ethernet control only for MultiView 16 and MultiView 4
+      (p.35), so it has no model here.
+
+  - models: [all]
+    severity: info
+    text: >
+      Labels are free text with no documented length limit. A label holding CR or LF
+      would end the block early and is rejected before sending.

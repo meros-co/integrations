@@ -286,6 +286,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On protocol 1.8 and 1.11 decks, check which other documented commands work. ([specs/blackmagic-hyperdeck.yaml:2261](specs/blackmagic-hyperdeck.yaml#L2261))
 - [ ] Check how many clients may connect at once. ([specs/blackmagic-hyperdeck.yaml:2190](specs/blackmagic-hyperdeck.yaml#L2190))
 
+## blackmagic-multiview — Blackmagic MultiView 16 / MultiView 4
+
+- [ ] On MultiView 4, check which routing output is the solo source (wire 4 assumed) and whether its solo source can be set over Ethernet at all. ([specs/blackmagic-multiview.yaml:420](specs/blackmagic-multiview.yaml#L420))
+- [ ] Check that every CONFIGURATION line can be set by sending the block (the manual shows only Solo enabled being sent), and the boolean case the unit reports. ([specs/blackmagic-multiview.yaml:439](specs/blackmagic-multiview.yaml#L439))
+- [ ] Check how Output format values map on MultiView 4. ([specs/blackmagic-multiview.yaml:451](specs/blackmagic-multiview.yaml#L451))
+- [ ] Check whether the MultiView accepts F (force unlock) on VIDEO OUTPUT LOCKS. ([specs/blackmagic-multiview.yaml:460](specs/blackmagic-multiview.yaml#L460))
+- [ ] Confirm the MULTIVIEW DEVICE output count (16 in the manual's example, with 18 routing outputs). ([specs/blackmagic-multiview.yaml:393](specs/blackmagic-multiview.yaml#L393))
+
+## blackmagic-smartview — Blackmagic SmartView / SmartScope
+
+- [ ] Check that the monitor answers commands with ACK/NAK, answers header-only status requests and PING, as the Videohub protocol does. ([specs/blackmagic-smartview.yaml:389](specs/blackmagic-smartview.yaml#L389))
+- [ ] Check how the name is set (Name in the SMARTVIEW DEVICE block assumed). ([specs/blackmagic-smartview.yaml:389](specs/blackmagic-smartview.yaml#L389))
+- [ ] Record how WidescreenSD and Border are reported (case, ON/OFF or true/false). ([specs/blackmagic-smartview.yaml:418](specs/blackmagic-smartview.yaml#L418))
+- [ ] Check how a single-monitor model answers a MONITOR B block. ([specs/blackmagic-smartview.yaml:426](specs/blackmagic-smartview.yaml#L426))
+- [ ] On SmartView 4K, check MonitorInput (community-observed), and whether SmartView 4K G3 has it. ([specs/blackmagic-smartview.yaml:439](specs/blackmagic-smartview.yaml#L439))
+- [ ] Check whether SmartView 4K accepts contrast and saturation. ([specs/blackmagic-smartview.yaml:447](specs/blackmagic-smartview.yaml#L447))
+
 ## blackmagic-streaming — Blackmagic Web Presenter / Streaming
 
 - [ ] Check whether the device accepts a Streaming XML file sent on a single line. ([specs/blackmagic-streaming.yaml:681](specs/blackmagic-streaming.yaml#L681))
@@ -427,6 +444,36 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check where PSAP trigger output is sent (the destination set in LightDesigner) and that it reaches feedback_port. ([specs/etc-paradigm.yaml:1018](specs/etc-paradigm.yaml#L1018))
 - [ ] Confirm that fade times with one decimal (2.5) and the sequence rate with two (1.50) are accepted. ([specs/etc-paradigm.yaml:732](specs/etc-paradigm.yaml#L732))
 
+## evertz-quartz — Evertz Quartz protocol routers
+
+- [ ] Confirm the control port of each product (23 assumed per AN65; EQT, EMR and 7700R use 3737-3740, the 7700R also 2000). ([specs/evertz-quartz.yaml:97](specs/evertz-quartz.yaml#L97))
+- [ ] Check that a route (.S) is answered only by a .U update, and that .E comes only for commands the router cannot parse. ([specs/evertz-quartz.yaml:414](specs/evertz-quartz.yaml#L414))
+- [ ] Check what an interrogate of a missing destination returns on EQX and MAGNUM (AN65 says nothing). ([specs/evertz-quartz.yaml:436](specs/evertz-quartz.yaml#L436))
+- [ ] Check that numbers without leading zeros are accepted, and that replies use three digits. ([specs/evertz-quartz.yaml:457](specs/evertz-quartz.yaml#L457))
+- [ ] Check whether lock and name changes made elsewhere are pushed as .BA or .RA. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
+- [ ] Check which commands MAGNUM implements beyond routing, interrogate, locks, salvos and names. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
+- [ ] Check whether name replies carry the number on current firmware. ([specs/evertz-quartz.yaml:473](specs/evertz-quartz.yaml#L473))
+- [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:448](specs/evertz-quartz.yaml#L448))
+
+## extron-matrix — Extron SIS matrix switchers
+
+- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([specs/extron-matrix.yaml:931](specs/extron-matrix.yaml#L931))
+- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([specs/extron-matrix.yaml:941](specs/extron-matrix.yaml#L941))
+- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([specs/extron-matrix.yaml:916](specs/extron-matrix.yaml#L916))
+- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([specs/extron-matrix.yaml:955](specs/extron-matrix.yaml#L955))
+- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([specs/extron-matrix.yaml:971](specs/extron-matrix.yaml#L971))
+- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([specs/extron-matrix.yaml:985](specs/extron-matrix.yaml#L985))
+- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([specs/extron-matrix.yaml:978](specs/extron-matrix.yaml#L978))
+
+## extron-switcher — Extron IN-series scaling presentation switchers
+
+- [ ] Record the tagged reply forms in verbose mode 3 (In X!*1 All, VnamI, Inf00, GrpmD padding). ([specs/extron-switcher.yaml:1031](specs/extron-switcher.yaml#L1031))
+- [ ] Confirm that a CR after a simple command (1*3!, 2B, 1X) is ignored. ([specs/extron-switcher.yaml:1025](specs/extron-switcher.yaml#L1025))
+- [ ] Check how often a change report arrives while a command waits. ([specs/extron-switcher.yaml:1009](specs/extron-switcher.yaml#L1009))
+- [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([specs/extron-switcher.yaml:1063](specs/extron-switcher.yaml#L1063))
+- [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1070](specs/extron-switcher.yaml#L1070))
+- [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:1018](specs/extron-switcher.yaml#L1018))
+
 ## freeshow — FreeShow
 
 - [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1482](specs/freeshow.yaml#L1482))
@@ -504,6 +551,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:1187](specs/kramer-p3000.yaml#L1187))
 - [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:1162](specs/kramer-p3000.yaml#L1162))
 
+## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
+
+- [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:463](specs/lightware-lw2.yaml#L463))
+- [ ] Record the error answers ("(ERR04)" and others) and whether a failed command is answered at all. ([specs/lightware-lw2.yaml:463](specs/lightware-lw2.yaml#L463))
+- [ ] Check whether front panel changes are reported unasked on TCP 10001 (none documented; the crosspoint is polled). ([specs/lightware-lw2.yaml:470](specs/lightware-lw2.yaml#L470))
+- [ ] Confirm the EDID learn order ({location>output}, as the manual's example). ([specs/lightware-lw2.yaml:496](specs/lightware-lw2.yaml#L496))
+- [ ] Check how the UMX answers {VC} without a layer. ([specs/lightware-lw2.yaml:470](specs/lightware-lw2.yaml#L470))
+
+## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
+
+- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2541](specs/lightware-lw3.yaml#L2541))
+- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2530](specs/lightware-lw3.yaml#L2530))
+- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2582](specs/lightware-lw3.yaml#L2582))
+- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2594](specs/lightware-lw3.yaml#L2594))
+- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2615](specs/lightware-lw3.yaml#L2615))
+- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2564](specs/lightware-lw3.yaml#L2564))
+
 ## millumin — Millumin
 
 - [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:722](specs/millumin.yaml#L722))
@@ -550,6 +614,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether AVMT ? ever returns 10 or 20, and how they read. ([specs/pjlink.yaml:234](specs/pjlink.yaml#L234))
 - [ ] Confirm the power-on response is "%1POWR=OK". ([specs/pjlink.yaml:240](specs/pjlink.yaml#L240))
 - [ ] On a Class 2 projector, find how the controller address for status notifications is registered. ([specs/pjlink.yaml:254](specs/pjlink.yaml#L254))
+
+## probel-swp08 — Probel / Grass Valley SW-P-08 routers
+
+- [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:442](specs/probel-swp08.yaml#L442))
+- [ ] Confirm matrix and level 1 are wire 0 on each controller family, and 1 on System 2. ([specs/probel-swp08.yaml:391](specs/probel-swp08.yaml#L391))
+- [ ] Check what a controller sends after a connect to a protected destination (nothing is assumed, so it times out). ([specs/probel-swp08.yaml:398](specs/probel-swp08.yaml#L398))
+- [ ] Check that a controller acknowledges DUAL CONTROLLER STATUS REQUEST (08) with DLE ACK even when it does not implement it, since that ACK is the liveness check. ([specs/probel-swp08.yaml:414](specs/probel-swp08.yaml#L414))
+- [ ] Check whether a controller NAKs commands it does not implement, answers INVALID MESSAGE (99), or stays silent. ([specs/probel-swp08.yaml:425](specs/probel-swp08.yaml#L425))
+- [ ] Check which device numbers a remote client may protect with, and that PROTECT CONNECTED reports state 3 (OEM) with that device. ([specs/probel-swp08.yaml:455](specs/probel-swp08.yaml#L455))
+- [ ] Confirm the protect tally dump request (19) layout: matrix/level byte then a two-byte first destination. ([specs/probel-swp08.yaml:503](specs/probel-swp08.yaml#L503))
+- [ ] Confirm the tie-line connect (111) bytes 7 and 8 are the source association number. ([specs/probel-swp08.yaml:503](specs/probel-swp08.yaml#L503))
+- [ ] Check whether CONNECTED messages follow a salvo go on XD and Eclipse routers (Issue 30 says none; go-acp reports controllers that expect them). ([specs/probel-swp08.yaml:476](specs/probel-swp08.yaml#L476))
+- [ ] On dual controllers over IP, record the unsolicited DUAL CONTROLLER STATUS RESPONSE on a changeover. ([specs/probel-swp08.yaml:448](specs/probel-swp08.yaml#L448))
+- [ ] Record name responses with name counts below 16, where a community parser reports the names starting one byte later. ([specs/probel-swp08.yaml:494](specs/probel-swp08.yaml#L494))
 
 ## propresenter — ProPresenter
 

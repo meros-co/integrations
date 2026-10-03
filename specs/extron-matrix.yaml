@@ -1,0 +1,1580 @@
+spec: 1
+id: extron-matrix
+name: Extron SIS matrix switchers (DXP, XTP II CrossPoint, SMX)
+vendor: Extron
+category: router
+
+# Extron's Simple Instruction Set (SIS) as its matrix switchers speak it over
+# Telnet (TCP 23). Every matrix family shares the core grammar (input*output
+# followed by ! for audio and video, % or & for video, $ for audio; "n," saves
+# and "n." recalls a preset; Esc commands for configuration), but each family's
+# user guide documents its own subset and variants. Each model below supports
+# only what its own guide documents. Commands are written from the guides'
+# command and response tables; page numbers are the guides' printed numbers.
+#
+# Not here: EDID management, IP/serial/e-mail configuration, file system,
+# passwords, firmware and factory resets (Z commands, which differ dangerously
+# between families: Esc ZXXX is "unmute all" on XTP II but a full reset of
+# settings on DXP HD 4K PLUS), XTP endpoint (transmitter/receiver) control,
+# WindoWall and the SMX virtual-plane definition.
+source:
+  - title: "DXP HD 4K PLUS Series Matrix Switchers User Guide, 68-2939-01 Rev. A"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-2939-01_A_DXPHD4KPLUS_user_guide.pdf
+    note: >
+      Manufacturer document. SIS chapter p.35-56: connection methods and
+      host communication (no start or end characters, CR LF after every
+      response) and copyright message p.35; device-initiated messages
+      (Password prompt, Login Administrator/User, Qik, Rpr, Spr, Vmt, Amt, Exe,
+      HplgO) p.36; error codes, 5-minute connection timeout with periodic
+      queries recommended, 200 connections p.37; verbose mode 1 or 3 for
+      change notices p.38; symbol definitions p.39-42; ties, quick multiple tie
+      and tie views p.43; input names and HDCP p.44; output names and format
+      p.45; output HDCP status and video mutes p.46; input attenuation, output
+      volume and audio mutes p.47; global presets, VC views and preset names
+      p.48; rooms and room presets p.49-50; front panel lockout and signal
+      presence p.50; verbose mode, resets and power save p.51; information
+      requests p.52-53; port timeout p.54.
+  - title: "DXP DVI, DXP DVI Pro, and DXP HDMI Series User Guide, 68-2192-01 Rev. B"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-2192-01_B_DXP_DVI-DVI_Pro-HDMI_UG.pdf
+    note: >
+      Manufacturer document. 5-minute timeout and Q keep-alive, verbose mode 1
+      or 3 for change notices, switcher-initiated messages (Qik, Rpr, Spr, Vmt,
+      Amt, Exe) p.50-52; ties, quick multiple tie p.57; mutes and global
+      presets p.58; room presets p.59; VC views of current ties (16 positions,
+      dashes past the last output) p.60; signal presence (0LS) p.61; names
+      (NI, NO, NG, NR) p.62; verbose mode p.70.
+  - title: "XTP II CrossPoint Series User Guide, 68-1736-02 Rev. P"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-1736-02_P_xtp_ii_crosspoint.pdf
+    note: >
+      Manufacturer document covering XTP II CrossPoint 1600, 3200 and 6400.
+      Telnet TCP 23, 5-minute timeout with Q keep-alive, 200 connections,
+      password prompt and Login replies (6400: factory administrator password
+      is the serial number) p.46-47; unsolicited messages and verbose mode 1
+      or 3 for changes from other connections p.48; symbols (| may replace CR)
+      p.49; error codes p.50; ties p.51; global preset recall (Esc R..PRST) and
+      mutes p.52; audio gain, attenuation and volume p.53-54; input HDCP p.56;
+      signal status (0LS, Frq00) p.57; information requests p.60-61; test
+      patterns p.61; executive mode (Esc ..EXEC) p.62; verbose mode and port
+      timeout p.66.
+  - title: "SMX System MultiMatrix Switcher User Guide, 68-1451-01 Rev. E"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/SMX_Sys_68-1451-01_E.pdf
+    note: >
+      Manufacturer document. Ethernet connection, password prompt, 5-minute
+      timeout p.34-35; switcher-initiated messages (plane-prefixed Vmt, Amt,
+      Aud, Vol; Qik, Rpr, Spr, Exe, Reconfig) and error codes p.36-37;
+      plane-addressed ties and quick multiple tie p.42; tie views, plane mutes
+      and VM p.43; global and plane presets, VC views p.44; front panel lockout
+      and information requests p.45-47.
+  - title: Bitfocus Companion modules extron-dxp and extron-mmx-tcp (MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-extron-dxp
+    note: >
+      Community code, read for corroboration only (top-level LICENSE is MIT;
+      no code copied). It sends a line ending after each tie and query and
+      answers the "Password:" prompt with the password and CR (extron-dxp);
+      it parses tie replies as "Out01 In02 All" and input levels as "In01
+      Aud+07" (extron-mmx-tcp, https://github.com/bitfocus/companion-module-extron-mmx-tcp).
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  # Simple commands need no terminator; Esc and W commands end with CR or |
+  # (DXP HD 4K PLUS p.39, XTP II p.49). Every command here is sent with a CR:
+  # it ends Esc commands as documented, and follows simple ones as Telnet
+  # clients and Companion's modules do (see the quirks).
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Responses end with CR LF. The allow-list below names every response shape
+  # the commands here can get (tagged verbose-mode replies, untagged numbers,
+  # E-codes); the copyright banner, its date line, "Password:", "Login ...",
+  # "Reconfig" and "HplgO" never match, so they are never taken as a reply.
+  # Change reports from other controllers have the same text as replies and
+  # cannot be told apart (see the quirks).
+  reply_match: '^(E\d\d$|Out|In|Vmt|Amt|Mut|Rpr|Spr|Rmm?\s*\d|Prst|Nm[gimopr]|Exec?\s*\d|Vrb|Ver|Pno|Inf|Vgp|Frq|Hdcp|Sts|Qik|Psav|Tst|Mpr|V\d|\d|-|\*{4})'
+  # Q (firmware version) is Extron's documented keep-alive query.
+  probe: "Q"
+
+settings:
+  # Administrator or user password. Left empty for a unit without passwords;
+  # nothing is then sent and no prompt is awaited.
+  password: { type: string, secret: true, default: "", max_length: 128, pattern: '^[^|]*$' }
+
+on_connect:
+  # A password-protected unit sends "Password:" after the copyright banner;
+  # a good password is answered "Login Administrator" or "Login User", a
+  # wrong one by the prompt again (DXP HD 4K PLUS p.36, XTP II p.47, SMX
+  # p.35-36). The repeated prompt becomes a whole line once the next text
+  # arrives, which is the verbose-mode step below.
+  - when_set: password
+    after_prompt: "Password:"
+    send: "{settings.password}"
+    refused: '^Password:?$'
+    accepted: '^Login (Administrator|User)$'
+  # Verbose mode 3: tagged query replies and change reports from the front
+  # panel and other connections (DXP HD 4K PLUS p.38 and p.51, XTP II p.48 and
+  # p.66). Telnet connections start in mode 0. Answered "Vrb3".
+  - send: "\x1b3CV"
+    await_reply: true
+
+models:
+  - id: dxp-hd-4k-plus
+    name: Extron DXP HD 4K PLUS Series (DXP 44, 84, 88, 168, 1616 HD 4K PLUS)
+    supports:
+      [tie, tie_video, tie_audio, tie_input_to_all, tie_video_to_all, tie_audio_to_all,
+       quick_tie, get_tie, get_video_tie, get_audio_tie,
+       set_video_mute, set_video_sync_mute, get_video_mute, set_video_mute_all,
+       set_audio_mute, set_audio_mute_mode, get_audio_mute, set_audio_mute_all, get_mutes,
+       save_global_preset, recall_global_preset, get_global_preset_video_ties,
+       get_global_preset_audio_ties, set_global_preset_name, get_global_preset_name,
+       save_room_preset, recall_room_preset, set_room_name, get_room_name,
+       set_input_name, get_input_name, set_output_name, get_output_name,
+       set_input_attenuation_db, get_input_level,
+       set_output_volume, increase_output_volume, decrease_output_volume, get_output_volume,
+       set_front_panel_lock, get_front_panel_lock, get_signal_status,
+       get_input_hdcp_status, get_output_hdcp_status, set_power_save, get_power_save,
+       set_verbose_mode, get_verbose_mode, get_firmware, get_firmware_full,
+       get_part_number, get_info, get_status]
+    verification: none
+    notes: >
+      HDMI matrices from 4x4 to 16x16 with two analog/S/PDIF audio outputs.
+      Video mute mode 2 (video and sync) and audio mute modes 0-7 (by output
+      type) are specific to this series (p.40-47). Output volume is 0-100
+      percent (0-64 in MKP mode, p.56). Input attenuation is -20 to 0 dB.
+  - id: dxp-dvi-hdmi
+    name: Extron DXP DVI, DXP DVI Pro and DXP HDMI Series
+    supports:
+      [tie, tie_video, tie_audio, tie_input_to_all, tie_video_to_all, tie_audio_to_all,
+       quick_tie, get_tie, get_video_tie, get_audio_tie,
+       set_video_mute, get_video_mute, set_video_mute_all,
+       set_audio_mute, get_audio_mute, set_audio_mute_all, get_mutes,
+       save_global_preset, recall_global_preset, get_global_preset_video_ties,
+       get_global_preset_audio_ties, set_global_preset_name, get_global_preset_name,
+       save_room_preset, recall_room_preset, set_room_name, get_room_name,
+       set_input_name, get_input_name, set_output_name, get_output_name,
+       set_front_panel_lock, get_front_panel_lock, get_signal_status,
+       get_input_hdcp_status, get_output_hdcp_status,
+       set_verbose_mode, get_verbose_mode, get_firmware, get_firmware_full,
+       get_part_number, get_info, get_status]
+    verification: none
+    notes: >
+      DVI and HDMI matrices (4x4 to 16x16). Global presets 1-32, rooms 1-10
+      with up to 10 presets each (p.58-60). No analog audio level commands.
+  - id: xtp-ii-crosspoint
+    name: Extron XTP II CrossPoint 1600, 3200 and 6400
+    supports:
+      [tie, tie_video, tie_audio, tie_input_to_all, tie_video_to_all, tie_audio_to_all,
+       quick_tie, get_tie, get_video_tie, get_audio_tie,
+       set_video_mute, get_video_mute, set_video_mute_all,
+       set_audio_mute, set_audio_mute_mode, get_audio_mute, set_audio_mute_all, get_mutes,
+       recall_global_preset_prst,
+       set_input_gain, set_input_attenuation, increase_input_level, decrease_input_level,
+       get_input_level,
+       set_output_volume, increase_output_volume, decrease_output_volume, get_output_volume,
+       set_executive_mode, get_executive_mode, get_signal_status, get_input_hdcp_status,
+       set_test_pattern, get_test_pattern,
+       set_verbose_mode, get_verbose_mode, get_firmware, get_firmware_full,
+       get_part_number, get_info, get_status]
+    verification: none
+    notes: >
+      Modular matrices up to 16x16, 32x32 and 64x64. Global presets 1-32 are
+      recalled with Esc R..PRST (p.52); saving one is not documented over SIS.
+      Audio mute modes are 0-3 (off, HDMI/S/PDIF, analog, all); output volume
+      is 0-64 in 1 dB steps; analog input gain 0-24 dB and attenuation 1-18
+      dB (p.53). No input or output names over SIS. The 6400's factory
+      administrator password is its serial number (p.46).
+  - id: smx
+    name: Extron SMX System MultiMatrix
+    supports:
+      [smx_tie, smx_tie_video, smx_tie_audio, smx_tie_input_to_all, smx_quick_tie,
+       smx_get_video_tie, smx_get_audio_tie,
+       smx_set_video_mute, smx_get_video_mute, smx_set_plane_video_mute,
+       smx_set_audio_mute, smx_get_audio_mute, smx_set_plane_audio_mute, smx_get_mutes,
+       save_global_preset, recall_global_preset, smx_save_plane_preset, smx_recall_plane_preset,
+       set_front_panel_lock, get_front_panel_lock,
+       set_verbose_mode, get_verbose_mode, get_firmware, get_firmware_full,
+       get_part_number, get_info, get_status]
+    verification: none
+    notes: >
+      A frame of switching boards, each addressed as a plane (00-15, virtual
+      planes 90-99); every tie, mute and plane preset names its plane, and
+      replies carry the plane number first (p.42-44). Global presets 1-32
+      cover all planes; plane presets 1-10.
+
+commands:
+  # ── Ties (DXP HD 4K PLUS p.43, DXP DVI p.57, XTP II p.51) ───────────────
+  tie:
+    summary: Tie an input's video and audio to an output; input 0 unties the output
+    params:
+      input:  { type: int, min: 0, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{input}*{output}!"
+    expect: { matches: '^Out\s*\d+\s+In\s*\d+\s+All$' }
+    returns: ack
+
+  tie_video:
+    summary: Tie an input's video only to an output (breakaway); input 0 unties it
+    params:
+      input:  { type: int, min: 0, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{input}*{output}%"
+    expect: { matches: '^Out\s*\d+\s+In\s*\d+\s+(Vid|RGB)$' }
+    returns: ack
+
+  tie_audio:
+    summary: Tie an input's audio only to an output (breakaway); input 0 unties it
+    params:
+      input:  { type: int, min: 0, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{input}*{output}$"
+    expect: { matches: '^Out\s*\d+\s+In\s*\d+\s+Aud$' }
+    returns: ack
+
+  tie_input_to_all:
+    summary: Tie an input's video and audio to every output
+    params:
+      input: { type: int, min: 0, max: 128, required: true }
+    send: "{input}*!"
+    expect: { matches: '^In\s*\d+\s+All$' }
+    returns: ack
+
+  tie_video_to_all:
+    summary: Tie an input's video to every output
+    params:
+      input: { type: int, min: 0, max: 128, required: true }
+    send: "{input}*%"
+    expect: { matches: '^In\s*\d+\s+(Vid|RGB)$' }
+    returns: ack
+
+  tie_audio_to_all:
+    summary: Tie an input's audio to every output
+    params:
+      input: { type: int, min: 0, max: 128, required: true }
+    send: "{input}*$"
+    expect: { matches: '^In\s*\d+\s+Aud$' }
+    returns: ack
+
+  quick_tie:
+    summary: >
+      Make several ties at once, switched together (Esc +Q); ties is a run of
+      input*output followed by ! (video and audio), % (video) or $ (audio),
+      such as 3*4%6*1$3*2!
+    params:
+      ties: { type: string, max_length: 240, pattern: '^(\d{1,3}\*\d{1,3}[!%&$])+$', required: true }
+    send: "\x1b+Q{ties}"
+    expect: { matches: '^Qik$' }
+    returns: ack
+
+  get_tie:
+    summary: Input tied to an output for video and audio (E13/E14 when the output is broken away)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}!"
+    expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+All)?$' }
+    returns: value
+
+  get_video_tie:
+    summary: Input tied to an output's video
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}%"
+    expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+(?:Vid|RGB))?$' }
+    returns: value
+
+  get_audio_tie:
+    summary: Input tied to an output's audio
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}$"
+    expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+Aud)?$' }
+    returns: value
+
+  # ── Mutes (DXP HD 4K PLUS p.46-47, DXP DVI p.58, XTP II p.52) ───────────
+  set_video_mute:
+    summary: Mute or unmute an output's video
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+      muted:  { type: bool, default: true }
+    send: "{output}*{muted:bool01}B"
+    expect: { matches: '^Vmt\s*\d+\*[01]$' }
+    returns: ack
+
+  set_video_sync_mute:
+    summary: Mute an output's video and sync (mute mode 2); unmute with set_video_mute
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}*2B"
+    expect: { matches: '^Vmt\s*\d+\*2$' }
+    returns: ack
+
+  get_video_mute:
+    summary: An output's video mute (0 off, 1 video muted, 2 video and sync muted)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}B"
+    expect: { matches: '^(?:Vmt\s*\d+\*)?([0-2])$' }
+    returns: value
+
+  set_video_mute_all:
+    summary: Mute or unmute every output's video
+    params:
+      muted: { type: bool, default: true }
+    send: "{muted:bool01}*B"
+    expect: { matches: '^Vmt\s*[01]$' }
+    returns: ack
+
+  set_audio_mute:
+    summary: >
+      Mute or unmute an output's audio (on DXP HD 4K PLUS, mute 1 is the HDMI
+      audio only; on XTP II, the HDMI/S/PDIF audio only; see set_audio_mute_mode)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+      muted:  { type: bool, default: true }
+    send: "{output}*{muted:bool01}Z"
+    expect: { matches: '^Amt\s*\d+\*[0-7]$' }
+    returns: ack
+
+  set_audio_mute_mode:
+    summary: >
+      Set an output's audio mute by output type. DXP HD 4K PLUS: 0 unmute, 1
+      HDMI, 2 analog, 3 HDMI and analog, 4 S/PDIF, 5 HDMI and S/PDIF, 6 analog
+      and S/PDIF, 7 all (outputs 3-8 take 0-1). XTP II: 0 off, 1 HDMI/S/PDIF,
+      2 analog, 3 all
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+      mode:   { type: int, min: 0, max: 7, required: true }
+    send: "{output}*{mode}Z"
+    expect: { matches: '^Amt\s*\d+\*[0-7]$' }
+    returns: ack
+
+  get_audio_mute:
+    summary: An output's audio mute mode (0 unmuted; see set_audio_mute_mode)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}Z"
+    expect: { matches: '^(?:Amt\s*\d+\*)?([0-7])$' }
+    returns: value
+
+  set_audio_mute_all:
+    summary: Mute or unmute every output's audio
+    params:
+      muted: { type: bool, default: true }
+    send: "{muted:bool01}*Z"
+    expect: { matches: '^Amt\s*[01]$' }
+    returns: ack
+
+  get_mutes:
+    summary: >
+      Every output's mute status, one digit per output from output 1 (0 none, 1
+      video; 2 and above an audio mute)
+    send: "\x1bVM"
+    expect: { matches: '^(?:Mut(?:00[\s*]+|\s*))?([0-7][0-7\s]*)$' }
+    returns: value
+
+  # ── Presets (DXP HD 4K PLUS p.48-50, DXP DVI p.58-60, XTP II p.52, SMX p.44)
+  save_global_preset:
+    summary: Save the current ties as a global preset
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "{preset},"
+    expect: { matches: '^Spr\s*\d+$' }
+    returns: ack
+
+  recall_global_preset:
+    summary: Recall a global preset, replacing the current ties (E11 if never saved)
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "{preset}."
+    expect: { matches: '^Rpr\s*\d+$' }
+    returns: ack
+
+  recall_global_preset_prst:
+    summary: Recall a global preset, replacing the current ties (XTP II, Esc R..PRST)
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "\x1bR{preset}PRST"
+    expect: { matches: '^PrstR\s*\d+$' }
+    returns: ack
+
+  get_global_preset_video_ties:
+    summary: >
+      Inputs tied to outputs 1-16 for video in a global preset, preset 0 for the
+      current ties ("--" past the last output)
+    params:
+      preset: { type: int, min: 0, max: 32, required: true }
+    send: "\x1b{preset}*1*1VC"
+    expect: { matches: '^(?:Vgp\d+\*\s*Out\d+\s+)?(.*\S)\s+Vid$' }
+    returns: value
+
+  get_global_preset_audio_ties:
+    summary: Inputs tied to outputs 1-16 for audio in a global preset, preset 0 for the current ties
+    params:
+      preset: { type: int, min: 0, max: 32, required: true }
+    send: "\x1b{preset}*1*2VC"
+    expect: { matches: '^(?:Vgp\d+\*\s*Out\d+\s+)?(.*\S)\s+Aud$' }
+    returns: value
+
+  set_global_preset_name:
+    summary: Name a global preset (up to 16 characters, no |)
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+      name:   { type: string, max_length: 16, pattern: '^[^|]+$', required: true }
+    send: "\x1b{preset},{name}NG"
+    expect: { matches: '^Nmg\s*\d+,' }
+    returns: ack
+
+  get_global_preset_name:
+    summary: A global preset's name ([unassigned] when never saved)
+    params:
+      preset: { type: int, min: 1, max: 32, required: true }
+    send: "\x1b{preset}NG"
+    expect: { matches: '^Nmg\s*\d+,(.*)$' }
+    returns: value
+
+  save_room_preset:
+    summary: Save the current ties of a room's outputs as one of its presets
+    params:
+      room:   { type: int, min: 1, max: 10, required: true }
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "{room}*{preset},"
+    expect: { matches: '^Rmm?\s*\d+\s*Spr\s*\d+$' }
+    returns: ack
+
+  recall_room_preset:
+    summary: Recall a room preset, replacing the ties of that room's outputs
+    params:
+      room:   { type: int, min: 1, max: 10, required: true }
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "{room}*{preset}."
+    expect: { matches: '^Rmm?\s*\d+\s*Rpr\s*\d+$' }
+    returns: ack
+
+  set_room_name:
+    summary: Name a room (up to 12 characters, no |)
+    params:
+      room: { type: int, min: 1, max: 10, required: true }
+      name: { type: string, max_length: 12, pattern: '^[^|]+$', required: true }
+    send: "\x1b{room},{name}NR"
+    expect: { matches: '^Nmr\s*\d+,' }
+    returns: ack
+
+  get_room_name:
+    summary: A room's name
+    params:
+      room: { type: int, min: 1, max: 10, required: true }
+    send: "\x1b{room}NR"
+    expect: { matches: '^Nmr\s*\d+,(.*)$' }
+    returns: value
+
+  # ── Names (DXP HD 4K PLUS p.44-45, DXP DVI p.62) ────────────────────────
+  set_input_name:
+    summary: Name an input (up to 16 characters, no |)
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+      name:  { type: string, max_length: 16, pattern: '^[^|]+$', required: true }
+    send: "\x1b{input},{name}NI"
+    expect: { matches: '^Nmi\s*\d+,' }
+    returns: ack
+
+  get_input_name:
+    summary: An input's name
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+    send: "\x1b{input}NI"
+    expect: { matches: '^Nmi\s*\d+,(.*)$' }
+    returns: value
+
+  set_output_name:
+    summary: Name an output (up to 16 characters, no |)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+      name:   { type: string, max_length: 16, pattern: '^[^|]+$', required: true }
+    send: "\x1b{output},{name}NO"
+    expect: { matches: '^Nmo\s*\d+,' }
+    returns: ack
+
+  get_output_name:
+    summary: An output's name
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "\x1b{output}NO"
+    expect: { matches: '^Nmo\s*\d+,(.*)$' }
+    returns: value
+
+  # ── Audio levels (DXP HD 4K PLUS p.47, XTP II p.53-54) ──────────────────
+  set_input_attenuation_db:
+    summary: Set an input's attenuation, -20 to 0 dB (DXP HD 4K PLUS)
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+      level: { type: int, min: -20, max: 0, required: true }
+    send: "{input}*{level}G"
+    expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
+    returns: ack
+
+  set_input_gain:
+    summary: Set an analog input's gain, 0 to +24 dB (XTP II)
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+      gain:  { type: int, min: 0, max: 24, required: true }
+    send: "{input}*{gain}G"
+    expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
+    returns: ack
+
+  set_input_attenuation:
+    summary: Set an analog input's attenuation, 1 to 18 dB (XTP II; lowercase g is significant)
+    params:
+      input:       { type: int, min: 1, max: 128, required: true }
+      attenuation: { type: int, min: 1, max: 18, required: true }
+    send: "{input}*{attenuation}g"
+    expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
+    returns: ack
+
+  increase_input_level:
+    summary: Raise an input's level by 1 dB
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+    send: "{input}+G"
+    expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
+    returns: ack
+
+  decrease_input_level:
+    summary: Lower an input's level by 1 dB
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+    send: "{input}-G"
+    expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
+    returns: ack
+
+  get_input_level:
+    summary: An input's gain (positive) or attenuation (negative) in dB
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+    send: "{input}G"
+    expect: { matches: '^(?:In\s*\d+\s+Aud\s*)?([+-]?\d+)$' }
+    returns: value
+
+  set_output_volume:
+    summary: >
+      Set an output's volume: 0-100 percent on DXP HD 4K PLUS (0-64 in MKP
+      mode), 0-64 dB steps on XTP II
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+      level:  { type: int, min: 0, max: 100, required: true }
+    send: "{output}*{level}V"
+    expect: { matches: '^Out\s*\d+\s+Vol\s*\d+$' }
+    returns: ack
+
+  increase_output_volume:
+    summary: Raise an output's volume by one step (about 1 dB)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}+V"
+    expect: { matches: '^Out\s*\d+\s+Vol\s*\d+$' }
+    returns: ack
+
+  decrease_output_volume:
+    summary: Lower an output's volume by one step (about 1 dB)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}-V"
+    expect: { matches: '^Out\s*\d+\s+Vol\s*\d+$' }
+    returns: ack
+
+  get_output_volume:
+    summary: An output's volume
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{output}V"
+    expect: { matches: '^(?:Out\s*\d+\s+Vol\s*)?(\d+)$' }
+    returns: value
+
+  # ── Front panel (DXP HD 4K PLUS p.50, DXP DVI p.39, SMX p.45, XTP II p.62)
+  set_front_panel_lock:
+    summary: Front panel lockout (executive mode) 0 unlocked, 1 fully locked, 2 basic functions only
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "{mode}X"
+    expect: { matches: '^Exe\s*[0-2]$' }
+    returns: ack
+
+  get_front_panel_lock:
+    summary: Front panel lockout mode
+    send: "X"
+    expect: { matches: '^(?:Exe\s*)?([0-2])$' }
+    returns: value
+
+  set_executive_mode:
+    summary: >
+      XTP II front panel executive mode: 0 unlocked, 1 locked (view only), 2
+      locked except basic features (default)
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "\x1b{mode}EXEC"
+    expect: { matches: '^Exec\s*[0-2]$' }
+    returns: ack
+
+  get_executive_mode:
+    summary: XTP II front panel executive mode
+    send: "\x1bEXEC"
+    expect: { matches: '^(?:Exec\s*)?([0-2])$' }
+    returns: value
+
+  # ── Status and information ──────────────────────────────────────────────
+  get_signal_status:
+    summary: Signal presence on every input, one digit per input from input 1 (1 = signal)
+    send: "0LS"
+    expect: { matches: '^(?:Frq00[\s*]*)?([01][01\s]*)$' }
+    returns: value
+
+  get_input_hdcp_status:
+    summary: An input's HDCP status (0 no source, 1 HDCP source, 2 source without HDCP)
+    params:
+      input: { type: int, min: 1, max: 128, required: true }
+    send: "\x1bI{input}HDCP"
+    expect: { matches: '^(?:HdcpI\s*\d+\*)?([0-2])$' }
+    returns: value
+
+  get_output_hdcp_status:
+    summary: >
+      An output's HDCP status (0 no sink, 1 sink without HDCP, 2 HDCP sink not
+      encrypted, 3 HDCP sink encrypted)
+    params:
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "\x1bO{output}HDCP"
+    expect: { matches: '^(?:HdcpO\s*\d+\*)?([0-3])$' }
+    returns: value
+
+  set_power_save:
+    summary: Power save mode 0 normal, 1 limited (any front panel or SIS action wakes it), 2 limited until Esc 0PSAV
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "\x1b{mode}PSAV"
+    expect: { matches: '^Psav\s*[0-2]$' }
+    returns: ack
+
+  get_power_save:
+    summary: Power save mode
+    send: "\x1bPSAV"
+    expect: { matches: '^(?:Psav\s*)?([0-2])$' }
+    returns: value
+
+  set_test_pattern:
+    summary: >
+      XTP II test pattern on all outputs: 0 off, 1/2 colour bars/black at
+      720p50, 3/4 at 720p60, 5/6 at 1080p60
+    params:
+      pattern: { type: int, min: 0, max: 6, required: true }
+    send: "\x1b{pattern:02d}TEST"
+    expect: { matches: '^Tst\s*\d+$' }
+    returns: ack
+
+  get_test_pattern:
+    summary: XTP II test pattern in use
+    send: "\x1bTEST"
+    expect: { matches: '^(?:Tst\s*)?(\d+)$' }
+    returns: value
+
+  set_verbose_mode:
+    summary: >
+      Verbose mode of this connection: 0 none, 1 change reports, 2 tagged
+      replies, 3 both (set on connecting; lower modes stop the state updates)
+    params:
+      mode: { type: int, min: 0, max: 3, required: true }
+    send: "\x1b{mode}CV"
+    expect: { matches: '^Vrb\s*[0-3]$' }
+    returns: ack
+
+  get_verbose_mode:
+    summary: Verbose mode of this connection
+    send: "\x1bCV"
+    expect: { matches: '^(?:Vrb\s*)?([0-3])$' }
+    returns: value
+
+  get_firmware:
+    summary: Firmware version (n.nn)
+    send: "Q"
+    expect: { matches: '^(?:Ver\d*\*\s*)?(\d+\.\d+)' }
+    returns: value
+
+  get_firmware_full:
+    summary: Firmware version with build number
+    send: "*Q"
+    expect: { matches: '^(?:(?:Ver|Bld)\d*\*?\s*)?(\d[\d.]*)' }
+    returns: value
+
+  get_part_number:
+    summary: Extron part number (60-nnnn-nn), which identifies the model
+    send: "N"
+    expect: { matches: '^(?:Pno\s*)?(60-[0-9-]+)' }
+    returns: value
+
+  get_info:
+    summary: Video and audio matrix sizes (and, on SMX, each plane's)
+    send: "I"
+    expect: { matches: '^(?:Info?\d*\*\s*)?(V.*)$' }
+    returns: value
+
+  get_status:
+    summary: Power supply, temperature and fan status, as the model reports it
+    send: "S"
+    expect: { matches: '^(?:Sts\d*\*\s*)?(.+)$' }
+    returns: value
+
+  # ── SMX: plane-addressed commands (SMX p.42-44) ─────────────────────────
+  smx_tie:
+    summary: Tie an input's video and audio to an output on one plane; input 0 unties
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      input:  { type: int, min: 0, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{input}*{output}!"
+    expect: { matches: '^\d+\s+Out\s*\d+\s+In\s*\d+\s+All$' }
+    returns: ack
+
+  smx_tie_video:
+    summary: Tie an input's video to an output on one plane
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      input:  { type: int, min: 0, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{input}*{output}%"
+    expect: { matches: '^\d+\s+Out\s*\d+\s+In\s*\d+\s+(Vid|RGB)$' }
+    returns: ack
+
+  smx_tie_audio:
+    summary: Tie an input's audio to an output on one plane
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      input:  { type: int, min: 0, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{input}*{output}$"
+    expect: { matches: '^\d+\s+Out\s*\d+\s+In\s*\d+\s+Aud$' }
+    returns: ack
+
+  smx_tie_input_to_all:
+    summary: Tie an input's video and audio to every output of one plane
+    params:
+      plane: { type: int, min: 0, max: 99, required: true }
+      input: { type: int, min: 0, max: 128, required: true }
+    send: "{plane:02d}*{input}*!"
+    expect: { matches: '^\d+\s+In\s*\d+\s+All$' }
+    returns: ack
+
+  smx_quick_tie:
+    summary: >
+      Make several plane ties at once (Esc +Q); ties is a run of
+      plane*input*output followed by !, % or $, such as 01*3*4!01*3*5%
+    params:
+      ties: { type: string, max_length: 240, pattern: '^(\d{1,2}\*\d{1,3}\*\d{1,3}[!%&$])+$', required: true }
+    send: "\x1b+Q{ties}"
+    expect: { matches: '^Qik$' }
+    returns: ack
+
+  smx_get_video_tie:
+    summary: Input tied to an output's video on one plane
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{output}%"
+    expect: { matches: '^(?:\d+\s+Out\s*\d+\s+In\s*)?(\d+)(?:\s+(?:Vid|RGB))?$' }
+    returns: value
+
+  smx_get_audio_tie:
+    summary: Input tied to an output's audio on one plane
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{output}$"
+    expect: { matches: '^(?:\d+\s+Out\s*\d+\s+In\s*)?(\d+)(?:\s+Aud)?$' }
+    returns: value
+
+  smx_set_video_mute:
+    summary: Mute or unmute an output's video on one plane
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+      muted:  { type: bool, default: true }
+    send: "{plane:02d}*{output}*{muted:bool01}B"
+    expect: { matches: '^\d+\s+Vmt\s*\d+\*[01]$' }
+    returns: ack
+
+  smx_get_video_mute:
+    summary: An output's video mute on one plane (0 off, 1 on)
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{output}B"
+    expect: { matches: '^(?:\d+\s+Vmt\s*\d+\*)?([01])$' }
+    returns: value
+
+  smx_set_plane_video_mute:
+    summary: Mute or unmute the video of every output on one plane
+    params:
+      plane: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "{plane:02d}*{muted:bool01}*B"
+    expect: { matches: '^\d+\s+Vmt\s*00\*[01]$' }
+    returns: ack
+
+  smx_set_audio_mute:
+    summary: Mute or unmute an output's audio on one plane
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+      muted:  { type: bool, default: true }
+    send: "{plane:02d}*{output}*{muted:bool01}Z"
+    expect: { matches: '^\d+\s+Amt\s*\d+\*[01]$' }
+    returns: ack
+
+  smx_get_audio_mute:
+    summary: An output's audio mute on one plane (0 off, 1 on)
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 1, max: 128, required: true }
+    send: "{plane:02d}*{output}Z"
+    expect: { matches: '^(?:\d+\s+Amt\s*\d+\*)?([01])$' }
+    returns: value
+
+  smx_set_plane_audio_mute:
+    summary: Mute or unmute the audio of every output on one plane
+    params:
+      plane: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "{plane:02d}*{muted:bool01}*Z"
+    expect: { matches: '^\d+\s+Amt\s*00\*[01]$' }
+    returns: ack
+
+  smx_get_mutes:
+    summary: Every output's mute status on one plane, one digit per output (0 none, 1 video, 2 audio, 3 both)
+    params:
+      plane: { type: int, min: 0, max: 99, required: true }
+    send: "\x1b{plane:02d}VM"
+    expect: { matches: '^(?:Mut\s*\d+\*)?([0-3][0-3\s]*)$' }
+    returns: value
+
+  smx_save_plane_preset:
+    summary: Save one plane's current ties as a plane preset
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "{plane:02d}*{preset}*0,"
+    expect: { matches: '^\d+\s+Spr\s*\d+$' }
+    returns: ack
+
+  smx_recall_plane_preset:
+    summary: Recall a plane preset, replacing that plane's ties
+    params:
+      plane:  { type: int, min: 0, max: 99, required: true }
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "{plane:02d}*{preset}*0."
+    expect: { matches: '^\d+\s+Rpr\s*\d+$' }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_global_preset, recall_global_preset_prst, recall_room_preset,
+      smx_recall_plane_preset, tie_input_to_all, tie_video_to_all,
+      tie_audio_to_all and quick_tie change many outputs at once and cannot be
+      undone except by recalling or re-making the previous ties. Recalling a
+      preset that was never saved answers E11 and changes nothing.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Extron SIS errors are E-codes on their own line: E01 invalid input, E10
+      invalid command, E11 invalid preset, E12 invalid output, E13 invalid
+      value, E14 not valid for this configuration, E17 invalid for the signal
+      type (DXP) or timeout (XTP II, SMX), E18 timeout, E21 invalid room, E22
+      busy, E24 privilege violation (a user-level login), E25 device not
+      present, E26 too many connections, E27 invalid event, E28 bad file name
+      (DXP HD 4K PLUS p.37, XTP II p.50, SMX p.37). Every command's reply is
+      matched against its documented success text, so an E-code fails it as
+      a device error carrying the E-code line; the format's numeric `codes`
+      table reads three-digit codes only, so the meanings are listed here.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A Telnet connection is closed after 5 minutes without traffic (port
+      timeout 30 x 10 s, DXP HD 4K PLUS p.37 and p.54, XTP II p.46, SMX p.35),
+      and Extron recommends periodic queries to keep it open. The engine's
+      liveness probe sends Q (firmware version) after 10 seconds of silence,
+      whether or not telemetry runs, which keeps the session open; the state
+      poll repeats every 2 minutes.
+
+  - models: [all]
+    severity: warning
+    text: >
+      In verbose mode 3 (set on connecting) a change made from the front panel,
+      another Telnet session or the serial port is reported with the same text
+      as the reply to the command that would make it ("Out04 In03 All", "Vmt2*1",
+      "Rpr05"). Those reports keep state current, but they cannot be told apart
+      from replies: one arriving while a command waits is taken as that
+      command's reply, failing it if it does not match and leaving the real
+      reply for the next command or the probe. Each command's reply pattern is
+      as specific as the documented text allows, and the stream recovers at
+      the next timeout. Qik (front panel tie) is also a quick tie's reply.
+      The banner, Password:, Login ..., Reconfig and HplgO lines are never
+      taken as replies.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Simple SIS commands need no terminator and Esc commands end with CR or
+      | (DXP HD 4K PLUS p.35 and p.39). Every command is sent followed by CR,
+      which terminates Esc commands as documented; that a CR after a simple
+      command (1*2!) is ignored is assumed from Telnet use, which the guides
+      describe, and from Companion's modules, which send a line ending after
+      every command.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Password login: the password is sent after "Password:" arrives (none is
+      awaited while the setting is empty). A wrong password is answered by the
+      prompt again; the next step's text completes that line, which marks the
+      device unauthorized and stops sending. A unit with a password whose
+      setting is empty takes every command as a password attempt and answers
+      only "Password:"; a unit without a password but with the setting filled
+      in never prompts, and the connection is dropped and retried after the
+      timeout. A user-level login gets E24 for administrator commands. Port 23
+      is a Telnet server; the engine does not negotiate Telnet options, and
+      any option bytes the unit sends before the banner are ignored.
+
+  - models: [all]
+    severity: info
+    text: >
+      State: ties, mutes, volumes, levels, names, presets recalled or saved,
+      HDCP and front panel lockout come from the verbose-mode reports and from
+      the replies to every command and poll. The poll (on connecting and every
+      2 minutes) reads the part number, matrix size, the current ties of
+      outputs 1-16 (Esc 0*1*1VC and Esc 0*1*2VC, DXP), every output's mute
+      status (Esc VM), every input's signal (0LS) and the front panel lockout;
+      a model answers the queries it lacks with E10, which is ignored. Input
+      and output names are learnt from get_*_name replies and change reports,
+      not polled. tie_input_to_all and its variants report "In3 All", which
+      names no output, so their effect reaches state at the next poll (DXP) or
+      per-output query. XTP II documents no query of all ties, so its ties
+      reach state only from reports and get_*_tie replies.
+
+  - models: [dxp-hd-4k-plus]
+    severity: info
+    text: >
+      Input attenuation is written "X!*-X1%G" with X1% given as -20 to 00
+      (p.47); set_input_attenuation_db sends the level with its sign
+      (1*-10G), which reads the same either way except at 0 dB (1*0G).
+
+  - models: [xtp-ii-crosspoint]
+    severity: info
+    text: >
+      Global presets are saved from the front panel only (PrstS report); SIS
+      recalls them with Esc R..PRST. XTP II also reports executive mode as
+      Exec (Esc ..EXEC) where the DXP and SMX use n X / Exe.
+
+  - models: [smx]
+    severity: info
+    text: >
+      Planes are sent as two digits (01*3*4!), as in the guide's quick-tie
+      example; replies and reports start with the plane number ("01 Out04
+      In03 All", "01 Vmt4*1"). State for SMX is kept per plane under planes.
+      Virtual planes 90-99 are defined on the unit, not here.
+
+state:
+  device.model:            { type: string, description: "Model name from the copyright banner sent on connecting" }
+  device.firmware:         { type: string, description: "Firmware version from the banner or the Q reply" }
+  device.part_number:      { type: string, description: "Extron part number (60-nnnn-nn)" }
+  device.login:            { type: string, description: "Administrator or User, from the Login reply to the password" }
+  device.verbose_mode:     { type: int, description: "Verbose mode of this connection (3 after connecting)" }
+  device.video_inputs:     { type: int, description: "Video matrix inputs, from I" }
+  device.video_outputs:    { type: int, description: "Video matrix outputs, from I" }
+  device.audio_inputs:     { type: int, description: "Audio matrix inputs, from I" }
+  device.audio_outputs:    { type: int, description: "Audio matrix outputs, from I" }
+  outputs.*.video_input:   { type: int, description: "Input tied to the output's video, 0 when untied" }
+  outputs.*.audio_input:   { type: int, description: "Input tied to the output's audio, 0 when untied" }
+  outputs.*.video_mute:    { type: bool, description: "The output's video is muted" }
+  outputs.*.video_mute_mode: { type: int, description: "0 unmuted, 1 video muted, 2 video and sync muted (DXP HD 4K PLUS)" }
+  outputs.*.audio_mute:    { type: bool, description: "Some or all of the output's audio is muted" }
+  outputs.*.audio_mute_mode: { type: int, description: "Audio mute by output type; see set_audio_mute_mode" }
+  outputs.*.volume:        { type: int, description: "Output volume: percent on DXP HD 4K PLUS, 0-64 dB steps on XTP II" }
+  outputs.*.name:          { type: string, description: "Output name" }
+  outputs.*.hdcp_status:   { type: int, description: "0 no sink, 1 sink without HDCP, 2 HDCP sink not encrypted, 3 encrypted" }
+  inputs.*.name:           { type: string, description: "Input name" }
+  inputs.*.signal:         { type: bool, description: "A signal is present on the input" }
+  inputs.*.audio_level:    { type: int, unit: dB, description: "Input gain (positive) or attenuation (negative)" }
+  inputs.*.hdcp_status:    { type: int, description: "0 no source, 1 HDCP source, 2 source without HDCP" }
+  presets.last_recalled:   { type: int, description: "Global preset last recalled" }
+  presets.last_saved:      { type: int, description: "Global preset last saved" }
+  presets.*.name:          { type: string, description: "Global preset name" }
+  rooms.*.name:            { type: string, description: "Room name" }
+  rooms.*.last_recalled:   { type: int, description: "Room preset last recalled in the room" }
+  rooms.*.last_saved:      { type: int, description: "Room preset last saved in the room" }
+  front_panel_lock:        { type: int, description: "Front panel lockout (executive) mode: 0 unlocked; 1 and 2 as the model defines" }
+  power_save:              { type: int, description: "Power save mode, 0 normal" }
+  planes.*.outputs.*.video_input: { type: int, description: "SMX: input tied to the output's video on the plane" }
+  planes.*.outputs.*.audio_input: { type: int, description: "SMX: input tied to the output's audio on the plane" }
+  planes.*.outputs.*.video_mute:  { type: bool, description: "SMX: the output's video is muted" }
+  planes.*.outputs.*.audio_mute:  { type: bool, description: "SMX: the output's audio is muted" }
+  planes.*.last_recalled:  { type: int, description: "SMX: plane preset last recalled on the plane" }
+  planes.*.last_saved:     { type: int, description: "SMX: plane preset last saved on the plane" }
+
+telemetry:
+  # Verbose mode 3 is set on connecting (on_connect), so changes from any
+  # source are reported and query replies are tagged. The poll reads what no
+  # report gives on connecting; see the quirks.
+  poll:
+    send:
+      - "N"
+      - "I"
+      - "\x1b0*1*1VC"
+      - "\x1b0*1*2VC"
+      - "\x1bVM"
+      - "0LS"
+      - "X"
+      - "\x1bEXEC"
+    every_ms: 120000
+  updates:
+    # Copyright banner on connecting: model, firmware and part number (DXP HD
+    # 4K PLUS p.35, XTP II p.47). Not anchored: Telnet option bytes may come
+    # first.
+    - match: '\(c\) Copyright \d{4}, Extron Electronics,?\s*([^,]+?),\s*V(\d+\.\d+),\s*(60-[0-9-]+)'
+      state: { device.model: "{1}", device.firmware: "{2}", device.part_number: "{3}" }
+    - match: '^Login (Administrator|User)$'
+      state: { device.login: "{1}" }
+    - match: '^Vrb\s*([0-3])$'
+      state: { device.verbose_mode: "{1}" }
+    - match: '^Ver0?1\*\s*(\d+\.\d+)$'
+      state: { device.firmware: "{1}" }
+    - match: '^(?:Pno\s*)?(60-\d+-\d+)$'
+      state: { device.part_number: "{1}" }
+    - match: '^(?:Info?\d*\*\s*)?V(\d+)X(\d+)\s+A(\d+)X(\d+)\s*$'
+      state: { device.video_inputs: "{1}", device.video_outputs: "{2}", device.audio_inputs: "{3}", device.audio_outputs: "{4}" }
+    # Ties: replies and reports alike (DXP HD 4K PLUS p.43, XTP II p.51).
+    - match: '^Out\s*(\d+)\s+In\s*(\d+)\s+All$'
+      state: { "outputs.{1}.video_input": "{2}", "outputs.{1}.audio_input": "{2}" }
+    - match: '^Out\s*(\d+)\s+In\s*(\d+)\s+(?:Vid|RGB)$'
+      state: { "outputs.{1}.video_input": "{2}" }
+    - match: '^Out\s*(\d+)\s+In\s*(\d+)\s+Aud$'
+      state: { "outputs.{1}.audio_input": "{2}" }
+    # Mutes (DXP HD 4K PLUS p.46-47, XTP II p.52).
+    - match: '^Vmt\s*(\d+)\*([0-2])$'
+      state:
+        "outputs.{1}.video_mute_mode": "{2}"
+        "outputs.{1}.video_mute": { value: "{2}", map: { "0": false, "1": true, "2": true } }
+    - match: '^Amt\s*(\d+)\*([0-7])$'
+      state:
+        "outputs.{1}.audio_mute_mode": "{2}"
+        "outputs.{1}.audio_mute": { value: "{2}", map: { "0": false, "1": true, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } }
+    # Levels (DXP HD 4K PLUS p.47, XTP II p.53).
+    - match: '^In\s*(\d+)\s+Aud\s*([+-]?\d+)$'
+      state: { "inputs.{1}.audio_level": "{2}" }
+    - match: '^Out\s*(\d+)\s+Vol\s*(\d+)$'
+      state: { "outputs.{1}.volume": "{2}" }
+    # Presets and rooms (DXP HD 4K PLUS p.36 and p.48-50, XTP II p.48 and p.52).
+    - match: '^Rpr\s*(\d+)$'
+      state: { presets.last_recalled: "{1}" }
+    - match: '^Spr\s*(\d+)$'
+      state: { presets.last_saved: "{1}" }
+    - match: '^PrstR\s*(\d+)$'
+      state: { presets.last_recalled: "{1}" }
+    - match: '^PrstS\s*(\d+)$'
+      state: { presets.last_saved: "{1}" }
+    - match: '^Rmm?\s*(\d+)\s*Rpr\s*(\d+)$'
+      state: { "rooms.{1}.last_recalled": "{2}" }
+    - match: '^Rmm?\s*(\d+)\s*Spr\s*(\d+)$'
+      state: { "rooms.{1}.last_saved": "{2}" }
+    # Names (DXP HD 4K PLUS p.44-49, DXP DVI p.62).
+    - match: '^Nmi\s*(\d+),(.*)$'
+      state: { "inputs.{1}.name": "{2}" }
+    - match: '^Nmo\s*(\d+),(.*)$'
+      state: { "outputs.{1}.name": "{2}" }
+    - match: '^Nmg\s*(\d+),(.*)$'
+      state: { "presets.{1}.name": "{2}" }
+    - match: '^Nmr\s*(\d+),(.*)$'
+      state: { "rooms.{1}.name": "{2}" }
+    # Front panel, HDCP, power save.
+    - match: '^Exec?\s*([0-2])$'
+      state: { front_panel_lock: "{1}" }
+    - match: '^HdcpI\s*(\d+)\*([0-2])$'
+      state: { "inputs.{1}.hdcp_status": "{2}" }
+    - match: '^HdcpO\s*(\d+)\*([0-3])$'
+      state: { "outputs.{1}.hdcp_status": "{2}" }
+    - match: '^Psav\s*([0-2])$'
+      state: { power_save: "{1}" }
+    # SMX: plane number first (p.36 and p.42-44).
+    - match: '^(\d+)\s+Out\s*(\d+)\s+In\s*(\d+)\s+All$'
+      state: { "planes.{1}.outputs.{2}.video_input": "{3}", "planes.{1}.outputs.{2}.audio_input": "{3}" }
+    - match: '^(\d+)\s+Out\s*(\d+)\s+In\s*(\d+)\s+(?:Vid|RGB)$'
+      state: { "planes.{1}.outputs.{2}.video_input": "{3}" }
+    - match: '^(\d+)\s+Out\s*(\d+)\s+In\s*(\d+)\s+Aud$'
+      state: { "planes.{1}.outputs.{2}.audio_input": "{3}" }
+    - match: '^(\d+)\s+Vmt\s*(0*[1-9]\d*)\*([01])$'
+      state: { "planes.{1}.outputs.{2}.video_mute": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: '^(\d+)\s+Amt\s*(0*[1-9]\d*)\*([01])$'
+      state: { "planes.{1}.outputs.{2}.audio_mute": { value: "{3}", map: { "0": false, "1": true } } }
+    - match: '^(\d+)\s+Rpr\s*(\d+)$'
+      state: { "planes.{1}.last_recalled": "{2}" }
+    - match: '^(\d+)\s+Spr\s*(\d+)$'
+      state: { "planes.{1}.last_saved": "{2}" }
+    # Positional replies, one rule per position: the current ties of outputs
+    # 1-16 (Esc 0*1*1VC / Esc 0*1*2VC, "--" past the last output, DXP DVI
+    # p.60, DXP HD 4K PLUS p.48), every output's mute status (Esc VM, one
+    # digit per output: odd = video muted, 2 and above = an audio mute, DXP
+    # DVI p.58, XTP II p.52) and every input's signal (0LS, Frq00, XTP II
+    # p.57, DXP HD 4K PLUS p.50). A position past the unit's last one has no
+    # digit and no rule matches it.
+    - match: '^Vgp0+\*\s*Out0*1\s+(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.1.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){1}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.2.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){2}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.3.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){3}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.4.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){4}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.5.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){5}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.6.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){6}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.7.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){7}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.8.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){8}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.9.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){9}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.10.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){10}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.11.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){11}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.12.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){12}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.13.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){13}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.14.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){14}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.15.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){15}(\d+)\s+(?:\S+\s+)*Vid$'
+      state: { "outputs.16.video_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.1.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){1}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.2.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){2}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.3.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){3}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.4.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){4}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.5.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){5}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.6.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){6}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.7.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){7}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.8.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){8}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.9.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){9}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.10.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){10}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.11.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){11}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.12.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){12}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.13.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){13}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.14.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){14}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.15.audio_input": "{1}" }
+    - match: '^Vgp0+\*\s*Out0*1\s+(?:\S+\s+){15}(\d+)\s+(?:\S+\s+)*Aud$'
+      state: { "outputs.16.audio_input": "{1}" }
+    - match: '^Mut00[\s*]+([0-7])[0-7\s]*$'
+      state: { "outputs.1.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.1.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut([0-7])[0-7]*$'
+      state: { "outputs.1.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.1.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){1}([0-7])[0-7\s]*$'
+      state: { "outputs.2.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.2.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{1}([0-7])[0-7]*$'
+      state: { "outputs.2.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.2.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){2}([0-7])[0-7\s]*$'
+      state: { "outputs.3.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.3.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{2}([0-7])[0-7]*$'
+      state: { "outputs.3.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.3.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){3}([0-7])[0-7\s]*$'
+      state: { "outputs.4.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.4.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{3}([0-7])[0-7]*$'
+      state: { "outputs.4.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.4.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){4}([0-7])[0-7\s]*$'
+      state: { "outputs.5.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.5.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{4}([0-7])[0-7]*$'
+      state: { "outputs.5.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.5.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){5}([0-7])[0-7\s]*$'
+      state: { "outputs.6.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.6.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{5}([0-7])[0-7]*$'
+      state: { "outputs.6.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.6.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){6}([0-7])[0-7\s]*$'
+      state: { "outputs.7.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.7.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{6}([0-7])[0-7]*$'
+      state: { "outputs.7.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.7.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){7}([0-7])[0-7\s]*$'
+      state: { "outputs.8.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.8.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{7}([0-7])[0-7]*$'
+      state: { "outputs.8.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.8.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){8}([0-7])[0-7\s]*$'
+      state: { "outputs.9.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.9.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{8}([0-7])[0-7]*$'
+      state: { "outputs.9.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.9.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){9}([0-7])[0-7\s]*$'
+      state: { "outputs.10.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.10.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{9}([0-7])[0-7]*$'
+      state: { "outputs.10.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.10.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){10}([0-7])[0-7\s]*$'
+      state: { "outputs.11.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.11.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{10}([0-7])[0-7]*$'
+      state: { "outputs.11.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.11.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){11}([0-7])[0-7\s]*$'
+      state: { "outputs.12.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.12.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{11}([0-7])[0-7]*$'
+      state: { "outputs.12.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.12.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){12}([0-7])[0-7\s]*$'
+      state: { "outputs.13.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.13.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{12}([0-7])[0-7]*$'
+      state: { "outputs.13.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.13.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){13}([0-7])[0-7\s]*$'
+      state: { "outputs.14.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.14.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{13}([0-7])[0-7]*$'
+      state: { "outputs.14.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.14.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){14}([0-7])[0-7\s]*$'
+      state: { "outputs.15.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.15.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{14}([0-7])[0-7]*$'
+      state: { "outputs.15.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.15.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){15}([0-7])[0-7\s]*$'
+      state: { "outputs.16.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.16.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{15}([0-7])[0-7]*$'
+      state: { "outputs.16.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.16.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){16}([0-7])[0-7\s]*$'
+      state: { "outputs.17.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.17.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{16}([0-7])[0-7]*$'
+      state: { "outputs.17.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.17.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){17}([0-7])[0-7\s]*$'
+      state: { "outputs.18.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.18.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{17}([0-7])[0-7]*$'
+      state: { "outputs.18.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.18.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){18}([0-7])[0-7\s]*$'
+      state: { "outputs.19.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.19.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{18}([0-7])[0-7]*$'
+      state: { "outputs.19.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.19.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){19}([0-7])[0-7\s]*$'
+      state: { "outputs.20.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.20.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{19}([0-7])[0-7]*$'
+      state: { "outputs.20.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.20.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){20}([0-7])[0-7\s]*$'
+      state: { "outputs.21.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.21.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{20}([0-7])[0-7]*$'
+      state: { "outputs.21.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.21.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){21}([0-7])[0-7\s]*$'
+      state: { "outputs.22.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.22.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{21}([0-7])[0-7]*$'
+      state: { "outputs.22.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.22.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){22}([0-7])[0-7\s]*$'
+      state: { "outputs.23.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.23.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{22}([0-7])[0-7]*$'
+      state: { "outputs.23.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.23.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){23}([0-7])[0-7\s]*$'
+      state: { "outputs.24.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.24.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{23}([0-7])[0-7]*$'
+      state: { "outputs.24.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.24.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){24}([0-7])[0-7\s]*$'
+      state: { "outputs.25.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.25.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{24}([0-7])[0-7]*$'
+      state: { "outputs.25.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.25.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){25}([0-7])[0-7\s]*$'
+      state: { "outputs.26.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.26.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{25}([0-7])[0-7]*$'
+      state: { "outputs.26.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.26.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){26}([0-7])[0-7\s]*$'
+      state: { "outputs.27.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.27.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{26}([0-7])[0-7]*$'
+      state: { "outputs.27.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.27.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){27}([0-7])[0-7\s]*$'
+      state: { "outputs.28.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.28.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{27}([0-7])[0-7]*$'
+      state: { "outputs.28.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.28.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){28}([0-7])[0-7\s]*$'
+      state: { "outputs.29.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.29.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{28}([0-7])[0-7]*$'
+      state: { "outputs.29.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.29.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){29}([0-7])[0-7\s]*$'
+      state: { "outputs.30.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.30.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{29}([0-7])[0-7]*$'
+      state: { "outputs.30.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.30.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){30}([0-7])[0-7\s]*$'
+      state: { "outputs.31.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.31.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{30}([0-7])[0-7]*$'
+      state: { "outputs.31.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.31.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){31}([0-7])[0-7\s]*$'
+      state: { "outputs.32.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.32.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{31}([0-7])[0-7]*$'
+      state: { "outputs.32.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.32.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){32}([0-7])[0-7\s]*$'
+      state: { "outputs.33.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.33.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{32}([0-7])[0-7]*$'
+      state: { "outputs.33.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.33.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){33}([0-7])[0-7\s]*$'
+      state: { "outputs.34.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.34.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{33}([0-7])[0-7]*$'
+      state: { "outputs.34.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.34.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){34}([0-7])[0-7\s]*$'
+      state: { "outputs.35.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.35.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{34}([0-7])[0-7]*$'
+      state: { "outputs.35.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.35.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){35}([0-7])[0-7\s]*$'
+      state: { "outputs.36.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.36.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{35}([0-7])[0-7]*$'
+      state: { "outputs.36.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.36.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){36}([0-7])[0-7\s]*$'
+      state: { "outputs.37.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.37.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{36}([0-7])[0-7]*$'
+      state: { "outputs.37.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.37.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){37}([0-7])[0-7\s]*$'
+      state: { "outputs.38.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.38.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{37}([0-7])[0-7]*$'
+      state: { "outputs.38.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.38.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){38}([0-7])[0-7\s]*$'
+      state: { "outputs.39.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.39.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{38}([0-7])[0-7]*$'
+      state: { "outputs.39.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.39.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){39}([0-7])[0-7\s]*$'
+      state: { "outputs.40.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.40.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{39}([0-7])[0-7]*$'
+      state: { "outputs.40.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.40.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){40}([0-7])[0-7\s]*$'
+      state: { "outputs.41.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.41.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{40}([0-7])[0-7]*$'
+      state: { "outputs.41.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.41.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){41}([0-7])[0-7\s]*$'
+      state: { "outputs.42.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.42.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{41}([0-7])[0-7]*$'
+      state: { "outputs.42.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.42.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){42}([0-7])[0-7\s]*$'
+      state: { "outputs.43.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.43.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{42}([0-7])[0-7]*$'
+      state: { "outputs.43.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.43.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){43}([0-7])[0-7\s]*$'
+      state: { "outputs.44.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.44.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{43}([0-7])[0-7]*$'
+      state: { "outputs.44.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.44.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){44}([0-7])[0-7\s]*$'
+      state: { "outputs.45.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.45.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{44}([0-7])[0-7]*$'
+      state: { "outputs.45.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.45.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){45}([0-7])[0-7\s]*$'
+      state: { "outputs.46.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.46.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{45}([0-7])[0-7]*$'
+      state: { "outputs.46.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.46.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){46}([0-7])[0-7\s]*$'
+      state: { "outputs.47.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.47.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{46}([0-7])[0-7]*$'
+      state: { "outputs.47.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.47.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){47}([0-7])[0-7\s]*$'
+      state: { "outputs.48.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.48.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{47}([0-7])[0-7]*$'
+      state: { "outputs.48.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.48.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){48}([0-7])[0-7\s]*$'
+      state: { "outputs.49.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.49.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{48}([0-7])[0-7]*$'
+      state: { "outputs.49.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.49.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){49}([0-7])[0-7\s]*$'
+      state: { "outputs.50.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.50.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{49}([0-7])[0-7]*$'
+      state: { "outputs.50.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.50.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){50}([0-7])[0-7\s]*$'
+      state: { "outputs.51.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.51.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{50}([0-7])[0-7]*$'
+      state: { "outputs.51.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.51.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){51}([0-7])[0-7\s]*$'
+      state: { "outputs.52.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.52.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{51}([0-7])[0-7]*$'
+      state: { "outputs.52.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.52.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){52}([0-7])[0-7\s]*$'
+      state: { "outputs.53.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.53.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{52}([0-7])[0-7]*$'
+      state: { "outputs.53.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.53.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){53}([0-7])[0-7\s]*$'
+      state: { "outputs.54.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.54.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{53}([0-7])[0-7]*$'
+      state: { "outputs.54.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.54.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){54}([0-7])[0-7\s]*$'
+      state: { "outputs.55.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.55.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{54}([0-7])[0-7]*$'
+      state: { "outputs.55.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.55.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){55}([0-7])[0-7\s]*$'
+      state: { "outputs.56.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.56.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{55}([0-7])[0-7]*$'
+      state: { "outputs.56.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.56.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){56}([0-7])[0-7\s]*$'
+      state: { "outputs.57.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.57.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{56}([0-7])[0-7]*$'
+      state: { "outputs.57.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.57.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){57}([0-7])[0-7\s]*$'
+      state: { "outputs.58.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.58.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{57}([0-7])[0-7]*$'
+      state: { "outputs.58.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.58.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){58}([0-7])[0-7\s]*$'
+      state: { "outputs.59.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.59.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{58}([0-7])[0-7]*$'
+      state: { "outputs.59.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.59.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){59}([0-7])[0-7\s]*$'
+      state: { "outputs.60.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.60.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{59}([0-7])[0-7]*$'
+      state: { "outputs.60.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.60.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){60}([0-7])[0-7\s]*$'
+      state: { "outputs.61.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.61.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{60}([0-7])[0-7]*$'
+      state: { "outputs.61.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.61.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){61}([0-7])[0-7\s]*$'
+      state: { "outputs.62.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.62.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{61}([0-7])[0-7]*$'
+      state: { "outputs.62.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.62.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){62}([0-7])[0-7\s]*$'
+      state: { "outputs.63.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.63.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{62}([0-7])[0-7]*$'
+      state: { "outputs.63.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.63.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut00[\s*]+(?:[0-7]\s?){63}([0-7])[0-7\s]*$'
+      state: { "outputs.64.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.64.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Mut[0-7]{63}([0-7])[0-7]*$'
+      state: { "outputs.64.video_mute": { value: "{1}", map: { "0": false, "1": true, "2": false, "3": true, "4": false, "5": true, "6": false, "7": true } }, "outputs.64.audio_mute": { value: "{1}", map: { "0": false, "1": false, "2": true, "3": true, "4": true, "5": true, "6": true, "7": true } } }
+    - match: '^Frq00[\s*]*([01])[01\s]*$'
+      state: { "inputs.1.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){1}([01])[01\s]*$'
+      state: { "inputs.2.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){2}([01])[01\s]*$'
+      state: { "inputs.3.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){3}([01])[01\s]*$'
+      state: { "inputs.4.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){4}([01])[01\s]*$'
+      state: { "inputs.5.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){5}([01])[01\s]*$'
+      state: { "inputs.6.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){6}([01])[01\s]*$'
+      state: { "inputs.7.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){7}([01])[01\s]*$'
+      state: { "inputs.8.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){8}([01])[01\s]*$'
+      state: { "inputs.9.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){9}([01])[01\s]*$'
+      state: { "inputs.10.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){10}([01])[01\s]*$'
+      state: { "inputs.11.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){11}([01])[01\s]*$'
+      state: { "inputs.12.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){12}([01])[01\s]*$'
+      state: { "inputs.13.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){13}([01])[01\s]*$'
+      state: { "inputs.14.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){14}([01])[01\s]*$'
+      state: { "inputs.15.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){15}([01])[01\s]*$'
+      state: { "inputs.16.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){16}([01])[01\s]*$'
+      state: { "inputs.17.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){17}([01])[01\s]*$'
+      state: { "inputs.18.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){18}([01])[01\s]*$'
+      state: { "inputs.19.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){19}([01])[01\s]*$'
+      state: { "inputs.20.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){20}([01])[01\s]*$'
+      state: { "inputs.21.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){21}([01])[01\s]*$'
+      state: { "inputs.22.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){22}([01])[01\s]*$'
+      state: { "inputs.23.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){23}([01])[01\s]*$'
+      state: { "inputs.24.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){24}([01])[01\s]*$'
+      state: { "inputs.25.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){25}([01])[01\s]*$'
+      state: { "inputs.26.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){26}([01])[01\s]*$'
+      state: { "inputs.27.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){27}([01])[01\s]*$'
+      state: { "inputs.28.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){28}([01])[01\s]*$'
+      state: { "inputs.29.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){29}([01])[01\s]*$'
+      state: { "inputs.30.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){30}([01])[01\s]*$'
+      state: { "inputs.31.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){31}([01])[01\s]*$'
+      state: { "inputs.32.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){32}([01])[01\s]*$'
+      state: { "inputs.33.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){33}([01])[01\s]*$'
+      state: { "inputs.34.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){34}([01])[01\s]*$'
+      state: { "inputs.35.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){35}([01])[01\s]*$'
+      state: { "inputs.36.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){36}([01])[01\s]*$'
+      state: { "inputs.37.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){37}([01])[01\s]*$'
+      state: { "inputs.38.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){38}([01])[01\s]*$'
+      state: { "inputs.39.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){39}([01])[01\s]*$'
+      state: { "inputs.40.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){40}([01])[01\s]*$'
+      state: { "inputs.41.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){41}([01])[01\s]*$'
+      state: { "inputs.42.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){42}([01])[01\s]*$'
+      state: { "inputs.43.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){43}([01])[01\s]*$'
+      state: { "inputs.44.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){44}([01])[01\s]*$'
+      state: { "inputs.45.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){45}([01])[01\s]*$'
+      state: { "inputs.46.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){46}([01])[01\s]*$'
+      state: { "inputs.47.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){47}([01])[01\s]*$'
+      state: { "inputs.48.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){48}([01])[01\s]*$'
+      state: { "inputs.49.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){49}([01])[01\s]*$'
+      state: { "inputs.50.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){50}([01])[01\s]*$'
+      state: { "inputs.51.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){51}([01])[01\s]*$'
+      state: { "inputs.52.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){52}([01])[01\s]*$'
+      state: { "inputs.53.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){53}([01])[01\s]*$'
+      state: { "inputs.54.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){54}([01])[01\s]*$'
+      state: { "inputs.55.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){55}([01])[01\s]*$'
+      state: { "inputs.56.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){56}([01])[01\s]*$'
+      state: { "inputs.57.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){57}([01])[01\s]*$'
+      state: { "inputs.58.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){58}([01])[01\s]*$'
+      state: { "inputs.59.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){59}([01])[01\s]*$'
+      state: { "inputs.60.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){60}([01])[01\s]*$'
+      state: { "inputs.61.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){61}([01])[01\s]*$'
+      state: { "inputs.62.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){62}([01])[01\s]*$'
+      state: { "inputs.63.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Frq00[\s*]*(?:[01]\s?){63}([01])[01\s]*$'
+      state: { "inputs.64.signal": { value: "{1}", map: { "0": false, "1": true } } }

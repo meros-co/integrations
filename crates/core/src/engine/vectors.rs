@@ -410,7 +410,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 10] = [
+    const SUCCESS: [&str; 11] = [
         "200 ok",
         "~01@ok",
         "ACK;",
@@ -421,6 +421,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "[m]",
         r#"{"jsonrpc":"2.0","id":1}"#,
         "REP ok",
+        // LW3: the answer to OPEN is "o- <node>".
+        "o- ok",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
