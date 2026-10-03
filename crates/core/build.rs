@@ -77,7 +77,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
-    ("vendor-qsc", &["qsys"]),
+    ("vendor-qsc", &["qsys", "qsys-ecp"]),
     (
         "vendor-renewedvision",
         &["propresenter", "renewedvision-pvp"],

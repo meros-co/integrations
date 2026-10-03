@@ -1,0 +1,484 @@
+spec: 1
+id: qsys-ecp
+name: QSC Q-SYS Core (External Control Protocol, ECP)
+vendor: QSC
+category: other
+
+source:
+  - title: "Q-SYS Help 10.5.0: External Control Protocol (ECP)"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/ECP/ECP_Overview.htm"
+    note: >
+      Manufacturer help page (Q-SYS 10.5.0, footer copyright 2026). ECP is the original Named Control protocol,
+      superseded by QRC but supported in every version. "Connections": TCP port 1702; a client must communicate
+      at least once every 60 seconds or the Core closes the socket, a Status Get serving as the keep-alive; a
+      Core must have a design loaded and running; Emulate mode on localhost, the PC's name or address.
+      "Redundant Cores": poll Status Get, a new Core is re-synced by creating a change group whose first poll
+      returns every control. "Change Groups": cgc, cga, cgp, with cv / cvv and cgpa in reply, every control on
+      the first poll, cmv / cmvv when metadata changes. "Controlling Redundant Cores": commands to the inactive
+      Core are ignored.
+  - title: "Q-SYS Help 10.5.0: ECP Commands"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/ECP/ECP_Commands.htm"
+    note: >
+      Manufacturer help page; the command reference. "Basic Data Types and Encoding": ASCII, every message ends
+      in LF, a CR before it is ignored, responses end in CR LF, extra arguments give bad_command "expected EOM";
+      strings with spaces in double quotes, a quotation mark and a back slash escaped with a back slash, LF and
+      CR as \n and \r; command strings are case sensitive. "Arguments": CONTROL_ID (a Named Control), VALUE (32-bit
+      float), POSITION (0 to 1), CHANGE_GROUP_ID (unsigned, scoped to the connection, four per client),
+      SNAPSHOT_BANK, SNAPSHOT_NUMBER (1 to the bank's size), RAMP_TIME_SEC, POLL_PERIOD_MS. "Command Quick
+      Reference" and "Commands": cga, cgclr, cgc, cgd, cgi, cgp, cgpna, cgr, cgs, cgsna (minimum 30 ms, 0 stops),
+      cg, cgm, csp, cspr, cspv, cspvr, css, cssv, csv, csvr, csvv, csvvr, ct, login, ssl, sss, sg, with the
+      responses each one gives. "Response Quick Reference" and "Responses": cgpa, cmv (metadata aspects 0-7),
+      cmvv, control_read_only, cv, cvv, core_not_active, bad_change_group_handle, bad_command, bad_id,
+      login_failed, login_required, login_success, sr (DESIGN_NAME DESIGN_ID IS_PRIMARY IS_ACTIVE),
+      too_many_change_groups. The Login entry: login_required for a Core that needs a login, and the socket
+      closed after login_failed.
+  - title: "Q-SYS Help 10.5.0: Change Groups for ECP and QRC"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/External_Control_APIs/external_controls_change_groups.htm"
+    note: >
+      Manufacturer help page. A control added to an existing group is reported on the next poll; 512 change
+      groups at most across all clients, an external control system uses 0-4; a change on a standby Core is an
+      error; every change group is deleted with the connection.
+  - title: "Q-SYS Help 10.5.0: Users (Administrator)"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/Administrator/Users.htm"
+    note: >
+      Manufacturer help page. External Control users are created in Q-SYS Administrator with a name (A-Z a-z
+      0-9 - . _) and a PIN, and the External Control Protocol access permission.
+  - title: "Q-SYS Help 10.5.0: Processing hardware and vCore pages"
+    author: QSC
+    url: "https://q-syshelp.qsc.com/Content/Hardware/Processing/Core_510i.htm"
+    note: >
+      Manufacturer help pages under Hardware > Processing; used for the model list only, as in the qsys (QRC)
+      spec: the ECP pages make no distinction between Core models.
+
+transport:
+  type: line-tcp
+  port: 1702
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 2000
+  # Status Get: the documented keep-alive, answered with sr.
+  probe: "sg"
+
+settings:
+  # A Q-SYS Administrator user with External Control Protocol access, and its
+  # PIN. Leave the username empty when Access Control is off: no login is sent.
+  username: { type: string, default: "", max_length: 128, pattern: "^[A-Za-z0-9._-]*$" }
+  pin: { type: string, secret: true, default: "", max_length: 128, pattern: "^[^\\s\"\\\\]*$" }
+  # The schedule given to change group 1, the group the core keeps state
+  # from: the Core sends what changed in it this often (minimum 30, 0: none,
+  # poll with change_group_poll instead).
+  change_group_poll_ms: { type: int, min: 0, max: 3600000, default: 200 }
+
+on_connect:
+  - when_set: username
+    send: "login {settings.username} {settings.pin}"
+    await_reply: true
+    refused: "^login_failed$"
+    accepted: "^login_success$"
+
+models:
+  - id: core
+    name: "Q-SYS Core processor (Core Nano, Core 8 Flex, Core 24f, Core 110c, Core 110f, Core 510c, Core 510i, Core 610, Core 5200, Core 6000 CXR, Server Core X10/X20r/X50r, NV-32-H in Core mode, vCore), TCP 1702"
+    supports: &all
+      [status_get, control_get, control_get_metadata, control_set_value, control_set_value_ramp,
+      control_set_position, control_set_position_ramp, control_set_string, control_set_value_vector,
+      control_set_value_vector_ramp, control_set_position_vector, control_set_position_vector_ramp,
+      control_set_string_vector, control_trigger, change_group_create, change_group_add, change_group_remove,
+      change_group_clear, change_group_destroy, change_group_invalidate, change_group_poll,
+      change_group_poll_no_ack, change_group_schedule, change_group_schedule_no_ack, snapshot_load, snapshot_save,
+      command]
+    verification: none
+    notes: >
+      ECP is served by the Core running a design, whatever the model. Only controls named as Named Controls in
+      the design can be reached; the design decides which names exist.
+  - id: designer-emulation
+    name: "Q-SYS Designer in Emulate mode, TCP 1702 on the PC"
+    supports: *all
+    verification: none
+    notes: >
+      The design must be open in Q-SYS Designer and in Emulate mode; connect to localhost, the PC's name or its
+      address (ECP Overview).
+
+commands:
+  status_get:
+    summary: "Status Get (sg): the design name, design ID, and whether this Core is the primary and the active one; also updates core.*"
+    send: "sg"
+    expect:
+      reply_contains: 'sr "'
+      matches: '^(sr .*)$'
+    returns: value
+
+  control_get:
+    summary: "Control Get (cg): a Named Control's cv line (string, value, position), or a vector control's cvv line; also updates controls.*"
+    params:
+      name: &name { type: string, required: true, max_length: 256 }
+    send: "cg {name:json}"
+    expect:
+      reply_contains: " {name:json}"
+      matches: '^(cvv? .*)$'
+    returns: value
+
+  control_get_metadata:
+    summary: "Control Get Metadata (cgm): the control's metadata aspects as cmv / cmvv lines, zero or more, which update controls.* (disabled, invisible, indeterminate, legend, color)"
+    params:
+      name: *name
+    send: "cgm {name:json}"
+    returns: none
+
+  control_set_value:
+    summary: "Control Set Value (csv): set a Named Control from a number in its own units (e.g. dB); answered with the new cv"
+    params:
+      name: *name
+      value: { type: float, required: true }
+    send: "csv {name:json} {value:.6f}"
+    expect:
+      reply_contains: " {name:json}"
+      matches: '^cv '
+    returns: ack
+
+  control_set_value_ramp:
+    summary: "Control Set Value Ramp (csvr): ramp a Named Control to a value over ramp seconds; the Core sends no cv for the final value"
+    params:
+      name: *name
+      value: { type: float, required: true }
+      ramp: &ramp { type: float, min: 0, required: true }
+    send: "csvr {name:json} {value:.6f} {ramp:.3f}"
+    returns: none
+
+  control_set_position:
+    summary: "Control Set Position (csp): set a Named Control from a position 0 to 1 within its range, through its mapping; answered with the new cv"
+    params:
+      name: *name
+      position: &position { type: float, min: 0, max: 1, required: true }
+    send: "csp {name:json} {position:.6f}"
+    expect:
+      reply_contains: " {name:json}"
+      matches: '^cv '
+    returns: ack
+
+  control_set_position_ramp:
+    summary: "Control Set Position Ramp (cspr): ramp a Named Control to a position over ramp seconds; no cv for the final value"
+    params:
+      name: *name
+      position: *position
+      ramp: *ramp
+    send: "cspr {name:json} {position:.6f} {ramp:.3f}"
+    returns: none
+
+  control_set_string:
+    summary: "Control Set String (css): set a Named Control from its text form, such as \"5.0dB\" or a text box's text; answered with the new cv"
+    params:
+      name: *name
+      text: { type: string, required: true, max_length: 4096 }
+    send: "css {name:json} {text:json}"
+    expect:
+      reply_contains: " {name:json}"
+      matches: '^cv '
+    returns: ack
+
+  control_set_value_vector:
+    summary: >
+      Control Set Value Vector (csvv): set count values of a vector Named Control; values is the numbers separated
+      by single spaces, exactly count of them
+    params:
+      name: *name
+      count: &count { type: int, min: 1, max: 4096, required: true }
+      values: &numbers
+        type: string
+        required: true
+        max_length: 65536
+        pattern: '^-?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?( -?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)*$'
+    send: "csvv {name:json} {count} {values}"
+    returns: none
+
+  control_set_value_vector_ramp:
+    summary: "Control Set Value Vector Ramp (csvvr): as control_set_value_vector, ramped over ramp seconds"
+    params:
+      name: *name
+      count: *count
+      values: *numbers
+      ramp: *ramp
+    send: "csvvr {name:json} {count} {values} {ramp:.3f}"
+    returns: none
+
+  control_set_position_vector:
+    summary: "Control Set Position Vector (cspv): set count positions (0 to 1) of a vector Named Control, separated by single spaces"
+    params:
+      name: *name
+      count: *count
+      positions: *numbers
+    send: "cspv {name:json} {count} {positions}"
+    returns: none
+
+  control_set_position_vector_ramp:
+    summary: "Control Set Position Vector Ramp (cspvr): as control_set_position_vector, ramped over ramp seconds"
+    params:
+      name: *name
+      count: *count
+      positions: *numbers
+      ramp: *ramp
+    send: "cspvr {name:json} {count} {positions} {ramp:.3f}"
+    returns: none
+
+  control_set_string_vector:
+    summary: >
+      Control Set String Vector (cssv): set count strings of a vector Named Control; strings is each string in
+      double quotes, a quotation mark or back slash in it escaped with a back slash, separated by single spaces
+    params:
+      name: *name
+      count: *count
+      strings:
+        type: string
+        required: true
+        max_length: 65536
+        pattern: '^"([^"\\]|\\.)*"( "([^"\\]|\\.)*")*$'
+    send: "cssv {name:json} {count} {strings}"
+    returns: none
+
+  control_trigger:
+    summary: "Control Trigger (ct): fire a trigger-type Named Control, such as an Audio Player's Play button"
+    params:
+      name: *name
+    send: "ct {name:json}"
+    returns: none
+
+  change_group_create:
+    summary: >
+      Change Group Create (cgc): create a change group, at most four per connection. Group 1 is the one the core
+      creates and schedules itself to keep controls.* current; ignored when the group exists
+    params:
+      group: &group { type: int, min: 0, max: 4294967294, default: 1 }
+    send: "cgc {group}"
+    returns: none
+
+  change_group_add:
+    summary: >
+      Change Group Add (cga): add a Named Control to a change group; with group 1 (the default), its state is
+      then kept current in controls.*. Its state is reported on the group's next poll, changed or not
+    params:
+      group: *group
+      name: *name
+    send: "cga {group} {name:json}"
+    returns: none
+
+  change_group_remove:
+    summary: "Change Group Remove (cgr): remove a Named Control from a change group (it may still come in the next poll)"
+    params:
+      group: *group
+      name: *name
+    send: "cgr {group} {name:json}"
+    returns: none
+
+  change_group_clear:
+    summary: "Change Group Clear (cgclr): remove every control from a change group"
+    params:
+      group: *group
+    send: "cgclr {group}"
+    returns: none
+
+  change_group_destroy:
+    summary: "Change Group Destroy (cgd): destroy a change group"
+    params:
+      group: *group
+    send: "cgd {group}"
+    returns: none
+
+  change_group_invalidate:
+    summary: "Change Group Invalidate (cgi): mark every control in a change group changed, so the next poll reports them all"
+    params:
+      group: *group
+    send: "cgi {group}"
+    returns: none
+
+  change_group_poll:
+    summary: "Change Group Poll (cgp): the group's changed controls as cv / cvv / cmv / cmvv lines (into controls.*), then cgpa"
+    params:
+      group: *group
+    send: "cgp {group}"
+    expect:
+      reply_contains: "cgpa"
+    returns: ack
+
+  change_group_poll_no_ack:
+    summary: "Change Group Poll No ACK (cgpna): as change_group_poll, with no cgpa at the end"
+    params:
+      group: *group
+    send: "cgpna {group}"
+    returns: none
+
+  change_group_schedule:
+    summary: "Change Group Schedule (cgs): poll a change group automatically every period_ms (minimum 30; 0 stops), with a cgpa after each"
+    params:
+      group: *group
+      period_ms: &period { type: int, min: 0, max: 4294967294, required: true }
+    send: "cgs {group} {period_ms}"
+    returns: none
+
+  change_group_schedule_no_ack:
+    summary: "Change Group Schedule No ACK (cgsna): as change_group_schedule, with no cgpa"
+    params:
+      group: *group
+      period_ms: *period
+    send: "cgsna {group} {period_ms}"
+    returns: none
+
+  snapshot_load:
+    summary: "Snapshot Load (ssl): load snapshot number of a snapshot bank, ramped over ramp seconds"
+    params:
+      bank: &bank { type: string, required: true, max_length: 256 }
+      number: &snapshot { type: int, min: 1, max: 4294967294, required: true }
+      ramp: { type: float, min: 0, default: 0 }
+    send: "ssl {bank:json} {number} {ramp:.3f}"
+    returns: none
+
+  snapshot_save:
+    summary: "Snapshot Save (sss): save the bank's controls' current state as snapshot number of a snapshot bank, replacing it"
+    params:
+      bank: *bank
+      number: *snapshot
+    send: "sss {bank:json} {number}"
+    returns: none
+
+  command:
+    summary: "Send one raw ECP command line, such as \"cg gain1\"; replies and errors it causes go to the telemetry rules"
+    params:
+      line: { type: string, required: true, max_length: 65536 }
+    send: "{line}"
+    returns: none
+
+state:
+  controls.*.string:        { type: string, description: "A Named Control's CONTROL_STRING, its text form such as \"-12.0dB\", keyed by control name, with ECP's escapes (\\\" \\\\ \\r \\n) as sent. For a vector control (cvv), the first element: a Meter's RMS or current reading" }
+  controls.*.value:         { type: float, description: "The control's CONTROL_VALUE, a 32-bit float in the control's own units; for a vector control, the first element" }
+  controls.*.position:      { type: float, description: "The control's CONTROL_POSITION, 0 to 1 within its range (not reported for vector controls)" }
+  controls.*.disabled:      { type: bool, description: "Metadata aspect 6 (disabled): the control is greyed out" }
+  controls.*.invisible:     { type: bool, description: "Metadata aspect 5 (invisible): the control is irrelevant in the current context" }
+  controls.*.indeterminate: { type: bool, description: "Metadata aspect 4 (indeterminant): the control represents an unknown value, or several values at once" }
+  controls.*.legend:        { type: string, description: "Metadata aspect 7 (legend): the legend drawn on a button" }
+  controls.*.color:         { type: string, description: "Metadata aspect 3 (color): the control's colour when a custom control is not in its normal state" }
+  core.design_name:         { type: string, description: "DESIGN_NAME: the name the running design was saved with (sr)" }
+  core.design_id:           { type: string, description: "DESIGN_ID: generated each time a design is deployed or emulated; a change means a new design" }
+  core.primary:             { type: bool, description: "IS_PRIMARY: this is the primary Core of a redundant pair, or the design is not redundant" }
+  core.active:              { type: bool, description: "IS_ACTIVE: this Core is the active one of a redundant pair, or the design is not redundant. Commands to an inactive Core are ignored or refused (core_not_active)" }
+  session.logged_in:        { type: bool, description: "login_success (true), or login_failed / login_required (false)" }
+  errors.last.kind:         { type: string, description: "The last error the Core sent: bad_id, bad_command, bad_change_group_handle, control_read_only, core_not_active, login_required or too_many_change_groups. Commands the Core answers only on failure (returns none) report their failures here" }
+  errors.last.detail:       { type: string, description: "What the last error names: the control id, the command text or the change group id, as sent; empty when the error names nothing" }
+
+telemetry:
+  # Change group 1 holds the controls the consumer adds with change_group_add
+  # and is polled by the Core itself (cgsna) at change_group_poll_ms, so each
+  # change arrives as a cv line without being asked for. cgc and cgsna are
+  # answered only on failure, so the subscription ends with sg, whose sr is the
+  # reply the queue waits for: the three are one item, three ECP lines in one
+  # write. Not sent when the device is opened for commands only.
+  subscribe:
+    send:
+      - "cgc 1\ncgsna 1 {settings.change_group_poll_ms}\nsg"
+  # The keep-alive: the Core closes a connection it has heard nothing from for
+  # 60 s, and a scheduled change group's pushes would otherwise keep the
+  # core's idle probe from ever being sent. sr also keeps core.* current, the
+  # documented way to follow a redundant pair's failover.
+  poll:
+    send: ["sg"]
+    every_ms: 30000
+  updates:
+    # cv CONTROL_ID CONTROL_STRING CONTROL_VALUE CONTROL_POSITION. Names
+    # holding a dot, a quotation mark or a back slash are not tracked: a dot
+    # would split the state path.
+    - match: '^cv "([^".\\]+)" "((?:[^"\\]|\\.)*)" (\S+) (\S+)$'
+      state:
+        "controls.{1}.string": "{2}"
+        "controls.{1}.value": "{3}"
+        "controls.{1}.position": "{4}"
+    # cvv CONTROL_ID COUNT STRING... COUNT VALUE... COUNT POSITION...: the
+    # first string and the first value.
+    - match: '^cvv "([^".\\]+)" [1-9][0-9]* "((?:[^"\\]|\\.)*)"(?: "(?:[^"\\]|\\.)*")* [1-9][0-9]* (\S+)'
+      state:
+        "controls.{1}.string": "{2}"
+        "controls.{1}.value": "{3}"
+    # cmv CONTROL_ID ASPECT STRING VALUE POSITION.
+    - match: '^cmv "([^".\\]+)" 6 "(true|false)" \S+ \S+$'
+      state: { "controls.{1}.disabled": "{2}" }
+    - match: '^cmv "([^".\\]+)" 5 "(true|false)" \S+ \S+$'
+      state: { "controls.{1}.invisible": "{2}" }
+    - match: '^cmv "([^".\\]+)" 4 "(true|false)" \S+ \S+$'
+      state: { "controls.{1}.indeterminate": "{2}" }
+    - match: '^cmv "([^".\\]+)" 7 "((?:[^"\\]|\\.)*)" \S+ \S+$'
+      state: { "controls.{1}.legend": "{2}" }
+    - match: '^cmv "([^".\\]+)" 3 "((?:[^"\\]|\\.)*)" \S+ \S+$'
+      state: { "controls.{1}.color": "{2}" }
+    # sr DESIGN_NAME DESIGN_ID IS_PRIMARY IS_ACTIVE.
+    - match: '^sr "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)" ([01]) ([01])$'
+      state:
+        core.design_name: "{1}"
+        core.design_id: "{2}"
+        core.primary: { value: "{3}", map: { "0": false, "1": true } }
+        core.active: { value: "{4}", map: { "0": false, "1": true } }
+    - match: '^login_(success|failed|required)$'
+      state: { session.logged_in: { value: "{1}", map: { success: true, failed: false, required: false } } }
+    - match: '^(bad_id|bad_command|bad_change_group_handle|control_read_only) (.+)$'
+      state: { errors.last.kind: "{1}", errors.last.detail: "{2}" }
+    - match: '^(core_not_active|login_required|too_many_change_groups)$'
+      state: { errors.last.kind: "{1}", errors.last.detail: "" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      snapshot_load (ssl) recalls every control the snapshot bank holds at once, ramped over the given time, and
+      cannot be undone except by loading another snapshot. The Core does not answer it, so the result is
+      unverified; a failure comes back as an error line (errors.last).
+  - models: [all]
+    severity: warning
+    text: >
+      snapshot_save (sss) replaces the stored snapshot with the current state; the previous contents are lost.
+  - models: [all]
+    severity: warning
+    text: >
+      Many commands are answered only when they fail: cga, cgr, cgc, cgclr, cgd, cgi, cgs, cgsna, cgpna, cgm,
+      the ramp and vector sets, ct, ssl and sss. They are reported unverified; a bad_id, bad_command,
+      bad_change_group_handle, control_read_only, core_not_active, login_required or too_many_change_groups line
+      the Core sends afterwards is kept as errors.last.
+  - models: [all]
+    severity: warning
+    text: >
+      Control Get and the immediate sets (csv, csp, css) take as their reply the first line naming the control,
+      in double quotes: its cv, cvv, bad_id or control_read_only. A change group report of the same control
+      arriving first is taken instead; it carries the same state. Replies that name nothing (core_not_active on
+      a standby Core, login_required) leave the command to time out; they are kept as errors.last.
+  - models: [all]
+    severity: info
+    text: >
+      State is kept from change group 1, which the core creates and schedules (cgsna) on connecting. Only
+      controls added to it with change_group_add are followed, and the Core deletes change groups with the
+      connection, so after a reconnection the consumer adds its controls again (every control is then reported
+      on the next poll). Groups 2 to 4 are the consumer's own. A device opened for commands only gets no change
+      group from the core.
+  - models: [all]
+    severity: info
+    text: >
+      Controls are keyed in state by their Named Control name; a name containing a dot, a quotation mark or a
+      back slash is not tracked, since a dot would split the state path. Strings in state keep ECP's escapes.
+      Vector controls (cvv) report only their first string and first value; metadata choice lists (cmvv aspect 2)
+      are not kept.
+  - models: [all]
+    severity: info
+    text: >
+      The Core closes a connection it has not heard from in 60 seconds, sending rc first. The core sends Status
+      Get every 30 seconds while monitoring, and its liveness probe (also sg) after 10 seconds of silence
+      otherwise.
+  - models: [all]
+    severity: info
+    text: >
+      With Access Control on, set username and pin: login is sent first on each connection, and login_failed
+      (after which the Core closes the socket) is a terminal refusal of the credential. Without a login the
+      Core answers login_required.
+  - models: [all]
+    severity: info
+    text: >
+      With redundant Cores, open both: each answers Status Get with whether it is primary and active
+      (core.primary, core.active), and only the active Core acts on commands.
