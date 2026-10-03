@@ -49,6 +49,8 @@ settings:
     default: ""
     max_length: 4
     pattern: '^([\x21-\x7e]{4})?$'
+    label: Network password
+    description: "The four-character password set in the menu Remote Control, LAN Control, Password (firmware 3.00 and later); leave it empty when none is set."
 
 # Firmware 3.00 and later ask for the network password when one is set. See
 # the critical quirk: it is sent on connecting, not in answer to the prompt.
@@ -93,7 +95,9 @@ commands:
   select_pgm:
     summary: "Select the PGM channel, cross-point 1-8 (PGM)"
     params:
-      xpt: { type: int, min: 1, max: 8, required: true }
+      xpt: { type: int, min: 1, max: 8, required: true,
+             label: Cross-point,
+             description: "The cross-point to put on PGM, numbered from 1 as XPT 1 to XPT 8 on the switcher." }
     send: "PGM:{xpt:-1};"
     expect: { contains: "ACK" }
     returns: ack
@@ -101,7 +105,9 @@ commands:
   select_pst:
     summary: "Select the PST channel, cross-point 1-8 (PST)"
     params:
-      xpt: { type: int, min: 1, max: 8, required: true }
+      xpt: { type: int, min: 1, max: 8, required: true,
+             label: Cross-point,
+             description: "The cross-point to select on PST, numbered from 1 as XPT 1 to XPT 8 on the switcher." }
     send: "PST:{xpt:-1};"
     expect: { contains: "ACK" }
     returns: ack
@@ -109,7 +115,9 @@ commands:
   select_aux:
     summary: "Select the channel sent to the AUX bus, cross-point 1-8 (AUX)"
     params:
-      xpt: { type: int, min: 1, max: 8, required: true }
+      xpt: { type: int, min: 1, max: 8, required: true,
+             label: Cross-point,
+             description: "The cross-point sent to the AUX bus, numbered from 1 as XPT 1 to XPT 8 on the switcher." }
     send: "AUX:{xpt:-1};"
     expect: { contains: "ACK" }
     returns: ack
@@ -117,7 +125,9 @@ commands:
   set_transition_pattern:
     summary: "Select the transition pattern: 0 WIPE 1, 1 WIPE 2, 2 WIPE 3, 3 MIX (TRS)"
     params:
-      pattern: { type: int, min: 0, max: 3, required: true }
+      pattern: { type: int, min: 0, max: 3, required: true,
+                 label: Transition pattern,
+                 description: "Numbered from 0, unlike the button names: 0 is WIPE 1, 1 WIPE 2, 2 WIPE 3 and 3 MIX." }
     send: "TRS:{pattern};"
     expect: { contains: "ACK" }
     returns: ack
@@ -125,7 +135,9 @@ commands:
   set_transition_time:
     summary: "Set the video transition time, 0-40 tenths of a second (TIM)"
     params:
-      time: { type: int, min: 0, max: 40, required: true }
+      time: { type: int, min: 0, max: 40, required: true,
+              label: Transition time,
+              description: "The video transition time in tenths of a second, from 0 to 40 (0.0 to 4.0 s)." }
     send: "TIM:{time};"
     expect: { contains: "ACK" }
     returns: ack
@@ -145,7 +157,9 @@ commands:
   set_composition_type:
     summary: "Select the COMPOSITION type: 0 None, 1 PinP1-1, 2 PinP1-2, 3 Key1, 4 PinP1-1+Key1, 5 PinP1-2+Key1 (CTY)"
     params:
-      type: { type: int, min: 0, max: 5, required: true }
+      type: { type: int, min: 0, max: 5, required: true,
+              label: Composition type,
+              description: "Numbered from 0: 0 None, 1 PinP1-1, 2 PinP1-2, 3 Key1, 4 PinP1-1+Key1 and 5 PinP1-2+Key1." }
     send: "CTY:{type};"
     expect: { contains: "ACK" }
     returns: ack
@@ -153,7 +167,9 @@ commands:
   set_dsk_type:
     summary: "Select the DSK type: 0 None, 1 PinP2-1, 2 PinP2-2, 3 DSK, 4 PinP2-1+Key2, 5 PinP2-2+Key2 (DTY)"
     params:
-      type: { type: int, min: 0, max: 5, required: true }
+      type: { type: int, min: 0, max: 5, required: true,
+              label: DSK type,
+              description: "Numbered from 0: 0 None, 1 PinP2-1, 2 PinP2-2, 3 DSK, 4 PinP2-1+Key2 and 5 PinP2-2+Key2." }
     send: "DTY:{type};"
     expect: { contains: "ACK" }
     returns: ack
@@ -173,7 +189,9 @@ commands:
   set_output_fade:
     summary: "Set output fade on or off (FDE)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true,
+                 label: Output fade,
+                 description: "On fades the output out and off fades it back in, over the output fade time." }
     send: "FDE:{enabled:bool01};"
     expect: { contains: "ACK" }
     returns: ack
@@ -181,7 +199,9 @@ commands:
   set_output_fade_time:
     summary: "Set the output fade time, 0-100 tenths of a second (FDT)"
     params:
-      time: { type: int, min: 0, max: 100, required: true }
+      time: { type: int, min: 0, max: 100, required: true,
+              label: Output fade time,
+              description: "The output fade time in tenths of a second, from 0 to 100 (0.0 to 10.0 s)." }
     send: "FDT:{time};"
     expect: { contains: "ACK" }
     returns: ack
@@ -190,8 +210,12 @@ commands:
   set_input_level:
     summary: "Set an input audio level, -800 to 100 (-80.0 to 10.0 dB) or -801 for -INF; inputs 0 (HDMI IN1) to 7 (TEST TONE) (IAL)"
     params:
-      input: { type: int, min: 0, max: 7, required: true }
-      level: { type: int, min: -801, max: 100, required: true }
+      input: { type: int, min: 0, max: 7, required: true,
+               label: Audio input,
+               description: "The audio input numbered from 0, where 0 is HDMI IN1 and 7 is TEST TONE; the manual does not name the inputs between them." }
+      level: { type: int, min: -801, max: 100, required: true,
+               label: Level,
+               description: "Level in tenths of a dB, from -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -INF." }
     send: "IAL:{input},{level};"
     expect: { contains: "ACK" }
     returns: ack
@@ -199,7 +223,9 @@ commands:
   set_master_level:
     summary: "Set the master out level, -800 to 100 (-80.0 to 10.0 dB) or -801 for -INF (OAL)"
     params:
-      level: { type: int, min: -801, max: 100, required: true }
+      level: { type: int, min: -801, max: 100, required: true,
+               label: Level,
+               description: "The master out level in tenths of a dB, from -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -INF." }
     send: "OAL:{level};"
     expect: { contains: "ACK" }
     returns: ack
@@ -207,7 +233,9 @@ commands:
   set_aux_level:
     summary: "Set the AUX bus audio level, -800 to 100 (-80.0 to 10.0 dB) or -801 for -INF (OAX)"
     params:
-      level: { type: int, min: -801, max: 100, required: true }
+      level: { type: int, min: -801, max: 100, required: true,
+               label: Level,
+               description: "The AUX bus level in tenths of a dB, from -800 (-80.0 dB) to 100 (+10.0 dB), or -801 for -INF." }
     send: "OAX:{level};"
     expect: { contains: "ACK" }
     returns: ack
@@ -216,7 +244,9 @@ commands:
   set_hdcp:
     summary: "Set HDCP on or off (HCP)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true,
+                 label: HDCP,
+                 description: "On turns the switcher's HDCP setting on and off turns it off." }
     send: "HCP:{enabled:bool01};"
     expect: { contains: "ACK" }
     returns: ack
@@ -224,7 +254,9 @@ commands:
   recall_memory:
     summary: "Recall a scene memory, 1-64 for 1-1 to 8-8 (bank b, number n is (b-1)*8+n) (MEM)"
     params:
-      memory: { type: int, min: 1, max: 64, required: true }
+      memory: { type: int, min: 1, max: 64, required: true,
+                label: Scene memory,
+                description: "The scene memory numbered from 1, where bank b number n is (b-1)*8+n, so 1 is 1-1 and 64 is 8-8." }
     send: "MEM:{memory:-1};"
     expect: { contains: "ACK" }
     returns: ack

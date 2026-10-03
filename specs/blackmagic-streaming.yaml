@@ -139,7 +139,9 @@ commands:
   set_label:
     summary: Set the device label (display name) in the IDENTITY block
     params:
-      label: { type: string, required: true }
+      label: { type: string, required: true,
+               label: Label,
+               description: "The device's display name, as shown in Blackmagic software and on the network." }
     send: |
       IDENTITY:
       Label: {label}
@@ -172,7 +174,9 @@ commands:
   get_network_interface:
     summary: Ask the device to resend one NETWORK INTERFACE block (0 Ethernet, 1 tethered smartphone); the block follows the ACK and updates state
     params:
-      interface: { type: int, min: 0, max: 1, required: true }
+      interface: { type: int, min: 0, max: 1, required: true,
+                   label: Network interface,
+                   description: "The network interface: 0 is Ethernet, 1 a tethered smartphone." }
     send: "NETWORK INTERFACE {interface}:"
     expect: { matches: "^ACK\\s*$" }
     returns: ack
@@ -181,7 +185,9 @@ commands:
   set_network_dhcp:
     summary: Use DHCP on a network interface (Dynamic IP true)
     params:
-      interface: { type: int, min: 0, max: 1, required: true }
+      interface: { type: int, min: 0, max: 1, required: true,
+                   label: Network interface,
+                   description: "The network interface: 0 is Ethernet, 1 a tethered smartphone." }
     send: |
       NETWORK INTERFACE {interface}:
       Dynamic IP: true
@@ -192,10 +198,18 @@ commands:
   set_network_static:
     summary: Give a network interface a static IP address, subnet mask, gateway and DNS servers (Dynamic IP false)
     params:
-      interface:   { type: int, min: 0, max: 1, required: true }
-      addresses:   { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
-      gateway:     { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
-      dns_servers: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}(, ?[0-9]{1,3}(\\.[0-9]{1,3}){3})*$" }
+      interface:   { type: int, min: 0, max: 1, required: true,
+                     label: Network interface,
+                     description: "The network interface: 0 is Ethernet, 1 a tethered smartphone." }
+      addresses:   { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+                     label: IP address and mask,
+                     description: "The static IP address and subnet mask written as address/mask, such as 192.168.1.50/255.255.255.0." }
+      gateway:     { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$",
+                     label: Gateway,
+                     description: "The default gateway's IP address, such as 192.168.1.1." }
+      dns_servers: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}(, ?[0-9]{1,3}(\\.[0-9]{1,3}){3})*$",
+                     label: DNS servers,
+                     description: "One or more DNS server IP addresses separated by commas, such as 8.8.8.8, 8.8.4.4." }
     send: |
       NETWORK INTERFACE {interface}:
       Dynamic IP: false
@@ -209,8 +223,12 @@ commands:
   set_network_interface_priority:
     summary: Set a network interface's priority; the higher number is the higher priority and becomes the default interface
     params:
-      interface: { type: int, min: 0, max: 1, required: true }
-      priority:  { type: int, min: 0, required: true }
+      interface: { type: int, min: 0, max: 1, required: true,
+                   label: Network interface,
+                   description: "The network interface: 0 is Ethernet, 1 a tethered smartphone." }
+      priority:  { type: int, min: 0, required: true,
+                   label: Priority,
+                   description: "The interface's priority; the interface with the higher number is preferred and becomes the default." }
     send: |
       NETWORK INTERFACE {interface}:
       Priority: {priority}
@@ -229,7 +247,9 @@ commands:
   set_locale:
     summary: Set the front panel and monitor output language, one of the device's Available Locales (e.g. en_US.UTF-8)
     params:
-      locale: { type: string, required: true, pattern: "^[a-z]{2}_[A-Z]{2}\\.UTF-8$" }
+      locale: { type: string, required: true, pattern: "^[a-z]{2}_[A-Z]{2}\\.UTF-8$",
+                label: Language,
+                description: "The front panel and monitor output language as a locale, one of the device's Available Locales, such as en_US.UTF-8." }
     send: |
       UI SETTINGS:
       Current Locale: {locale}
@@ -240,7 +260,9 @@ commands:
   set_audio_meter:
     summary: Set the audio meter type shown on the LCD and monitor output
     params:
-      meter: { type: enum, values: ["PPM -18dB", "PPM -20dB", "VU -18dB", "VU -20dB"], required: true }
+      meter: { type: enum, values: ["PPM -18dB", "PPM -20dB", "VU -18dB", "VU -20dB"], required: true,
+               label: Audio meter,
+               description: "The meter type on the LCD and monitor output: PPM or VU ballistics, aligned to -18 or -20 dBFS." }
     send: |
       UI SETTINGS:
       Current Audio Meter: {meter}
@@ -259,7 +281,9 @@ commands:
   set_video_mode:
     summary: Set the input video mode, one of the device's Available Video Modes (e.g. Auto, 1080p59.94)
     params:
-      mode: { type: string, required: true }
+      mode: { type: string, required: true,
+              label: Video mode,
+              description: "The input video mode, one of the device's Available Video Modes as it reports them, such as Auto or 1080p59.94." }
     send: |
       STREAM SETTINGS:
       Video Mode: {mode}
@@ -270,7 +294,9 @@ commands:
   set_platform:
     summary: Select the streaming platform, from the device's Available Default Platforms or Available Custom Platforms
     params:
-      platform: { type: string, required: true }
+      platform: { type: string, required: true,
+                  label: Platform,
+                  description: "The streaming platform's name, as listed in the device's Available Default Platforms or Available Custom Platforms." }
     send: |
       STREAM SETTINGS:
       Current Platform: {platform}
@@ -281,7 +307,9 @@ commands:
   set_server:
     summary: Select the server of the current platform, from the device's Available Servers
     params:
-      server: { type: string, required: true }
+      server: { type: string, required: true,
+                label: Server,
+                description: "The server's name, as listed in the device's Available Servers for the current platform." }
     send: |
       STREAM SETTINGS:
       Current Server: {server}
@@ -292,7 +320,9 @@ commands:
   set_quality_level:
     summary: Select the streaming quality level of the current platform, from the device's Available Quality Levels
     params:
-      quality: { type: string, required: true }
+      quality: { type: string, required: true,
+                 label: Quality level,
+                 description: "The quality level's name, as listed in the device's Available Quality Levels for the current platform." }
     send: |
       STREAM SETTINGS:
       Current Quality Level: {quality}
@@ -303,7 +333,9 @@ commands:
   set_stream_key:
     summary: Set the stream key for the streaming platform
     params:
-      key: { type: string, required: true }
+      key: { type: string, required: true,
+             label: Stream key,
+             description: "The stream key given by the streaming platform for this stream." }
     send: |
       STREAM SETTINGS:
       Stream Key: {key}
@@ -314,7 +346,9 @@ commands:
   set_stream_password:
     summary: Set the passphrase for an encrypted SRT stream (protocol 1.2)
     params:
-      password: { type: string, required: true }
+      password: { type: string, required: true,
+                  label: SRT passphrase,
+                  description: "The passphrase for an encrypted SRT stream, as agreed with the receiver." }
     send: |
       STREAM SETTINGS:
       Password: {password}
@@ -325,7 +359,9 @@ commands:
   set_stream_url:
     summary: Set the streaming URL; the device accepts it only when the platform reports Customizable URL true (protocol 1.2)
     params:
-      url: { type: string, required: true }
+      url: { type: string, required: true,
+             label: Stream URL,
+             description: "The streaming URL; the device accepts it only when the current platform allows a customised URL." }
     send: |
       STREAM SETTINGS:
       Current URL: {url}
@@ -336,11 +372,21 @@ commands:
   set_stream_settings:
     summary: Set video mode, platform, server, quality level and stream key in one block, as in the document's Twitch example
     params:
-      mode:     { type: string, required: true }
-      platform: { type: string, required: true }
-      server:   { type: string, required: true }
-      quality:  { type: string, required: true }
-      key:      { type: string, required: true }
+      mode:     { type: string, required: true,
+                  label: Video mode,
+                  description: "The input video mode, one of the device's Available Video Modes as it reports them, such as Auto or 1080p59.94." }
+      platform: { type: string, required: true,
+                  label: Platform,
+                  description: "The streaming platform's name, as listed in the device's Available Default Platforms or Available Custom Platforms." }
+      server:   { type: string, required: true,
+                  label: Server,
+                  description: "The server's name, as listed in the device's Available Servers for the current platform." }
+      quality:  { type: string, required: true,
+                  label: Quality level,
+                  description: "The quality level's name, as listed in the device's Available Quality Levels for the current platform." }
+      key:      { type: string, required: true,
+                  label: Stream key,
+                  description: "The stream key given by the streaming platform for this stream." }
     send: |
       STREAM SETTINGS:
       Video Mode: {mode}
@@ -363,8 +409,12 @@ commands:
   add_stream_xml:
     summary: Load a Blackmagic Streaming XML file defining custom platforms; the XML must be given on one line (see quirks)
     params:
-      filename: { type: string, required: true, pattern: "^[^:,\\\\/]+$" }
-      xml:      { type: string, required: true, pattern: "^\\s*<.*>\\s*$" }
+      filename: { type: string, required: true, pattern: "^[^:,\\\\/]+$",
+                  label: File name,
+                  description: "The Streaming XML file's name as the device lists it, without a path, colon or comma." }
+      xml:      { type: string, required: true, pattern: "^\\s*<.*>\\s*$",
+                  label: Streaming XML,
+                  description: "The Blackmagic Streaming XML document defining the custom platforms, written on a single line." }
     send: |
       STREAM XML {filename}:
       {xml}
@@ -375,7 +425,9 @@ commands:
   remove_stream_xml:
     summary: Remove one loaded Streaming XML file
     params:
-      filename: { type: string, required: true, pattern: "^[^:,\\\\/]+$" }
+      filename: { type: string, required: true, pattern: "^[^:,\\\\/]+$",
+                  label: File name,
+                  description: "The Streaming XML file's name as the device lists it, without a path, colon or comma." }
     send: |
       STREAM XML:
       Action: Remove
@@ -430,7 +482,9 @@ commands:
   set_monitor_audio_source:
     summary: Set the monitor output's audio source, one of the device's Available Monitor Out Audio Sources (e.g. Auto, SDI In, Remote Source) (protocol 1.2)
     params:
-      source: { type: string, required: true }
+      source: { type: string, required: true,
+                label: Monitor audio source,
+                description: "The monitor output's audio source, one of the device's Available Monitor Out Audio Sources, such as Auto, SDI In or Remote Source." }
     send: |
       AUDIO SETTINGS:
       Current Monitor Out Audio Source: {source}

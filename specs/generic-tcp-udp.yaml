@@ -25,20 +25,32 @@ source:
 
 settings:
   # tcp: a persistent connection, reconnected 1 s after a failure, doubling to 30 s. udp: datagrams.
-  protocol: { type: enum, values: [tcp, udp], default: tcp }
+  protocol: { type: enum, values: [tcp, udp], default: tcp,
+              label: Protocol,
+              description: "With tcp one connection is kept open and reconnected after a failure (1 s, doubling to 30 s); with udp, datagrams are sent and received." }
   # Where received data is split into messages; the terminator is removed and empty messages are dropped.
   # any: CR, LF or CRLF, whichever the device uses. none: one datagram, or one TCP read, is one message.
-  terminator: { type: enum, values: [any, cr, lf, crlf, custom, none], default: any }
+  terminator: { type: enum, values: [any, cr, lf, crlf, custom, none], default: any,
+                label: Receive terminator,
+                description: "Where received data is split into messages: any splits at CR, LF or CRLF, custom uses the custom terminator, and none treats each datagram or TCP read as one message." }
   # Appended to text sent by send_text and request (not to hex).
-  send_terminator: { type: enum, values: [none, cr, lf, crlf, custom], default: none }
+  send_terminator: { type: enum, values: [none, cr, lf, crlf, custom], default: none,
+                     label: Send terminator,
+                     description: "Bytes appended to text sent by send_text and request (not to hex); custom uses the custom terminator." }
   # The bytes for 'custom', in either setting, written with the escapes of send_text, such as "\x03" or ";".
-  custom_terminator: { type: string, max_length: 64, default: "" }
+  custom_terminator: { type: string, max_length: 64, default: "",
+                       label: Custom terminator,
+                       description: "The bytes used when either terminator setting is custom, written with the escapes of send_text, such as \\x03 or ;." }
   # UDP only. Receive on, and send from, this fixed local port instead of an ephemeral one, for a device that
   # sends to a destination configured on it. Shared with other devices using the same port; each datagram
   # goes to the device it came from.
-  listen_port: { type: int, min: 1, max: 65535 }
+  listen_port: { type: int, min: 1, max: 65535,
+                 label: Local UDP port,
+                 description: "UDP only: a fixed local port to receive on and send from, for a device that sends to a port configured on it; leave unset for an ephemeral port." }
   # How many received messages 'recent' keeps.
-  recent_size: { type: int, min: 1, max: 1000, default: 20 }
+  recent_size: { type: int, min: 1, max: 1000, default: 20,
+                 label: Recent messages kept,
+                 description: "How many received messages the recent list in state keeps." }
 
 ports:
   - { port: null, protocol: tcp, role: control, note: "a generic device has no standard port: the port is given when the device is opened; UDP when the protocol setting is udp" }
@@ -58,14 +70,18 @@ commands:
       sequence is refused. The rest is sent as UTF-8. Returns unverified: neither TCP nor UDP says whether the
       device acted on it
     params:
-      text: { type: string, max_length: 65536, required: true }
+      text: { type: string, max_length: 65536, required: true,
+              label: Text,
+              description: "Text to send, with escapes \\r, \\n, \\t, \\0, \\\\ and \\xNN for a byte; the send terminator is appended." }
     returns: none
   send_hex:
     summary: >
       Send bytes given as hex digit pairs, optionally separated by spaces, ':', ',' or '-', each group
       optionally prefixed 0x (so "81 01 04 00 02 FF", "810104" and "0x81,0x1" all work). Returns unverified
     params:
-      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 131072, required: true }
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 131072, required: true,
+             label: Hex bytes,
+             description: "Bytes as hex digit pairs, optionally separated by spaces, colons, commas or dashes and prefixed 0x, such as 81 01 04 00 02 FF." }
     returns: none
   request:
     summary: >
@@ -73,10 +89,18 @@ commands:
       or the next one whose text matches the regex 'match', within timeout_ms, as {text, hex}. Fails with
       timeout otherwise. Requests waiting together are answered in the order they were sent
     params:
-      text: { type: string, max_length: 65536 }
-      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 131072 }
-      match: { type: string, max_length: 1024 }
-      timeout_ms: { type: int, min: 1, max: 25000, default: 2000 }
+      text: { type: string, max_length: 65536,
+              label: Text,
+              description: "Text to send, with the escapes of send_text and the send terminator appended; give either this or hex, not both." }
+      hex: { type: string, pattern: "^[0-9A-Fa-fxX :,-]*$", max_length: 131072,
+             label: Hex bytes,
+             description: "Bytes to send as hex digit pairs, as for send_hex; give either this or text, not both." }
+      match: { type: string, max_length: 1024,
+               label: Reply pattern,
+               description: "A regex the reply's text must match; leave it unset to take the next message received." }
+      timeout_ms: { type: int, min: 1, max: 25000, default: 2000,
+                    label: Timeout,
+                    description: "How long to wait for the reply, in milliseconds, before the request fails with timeout." }
     returns: value
 
 state:

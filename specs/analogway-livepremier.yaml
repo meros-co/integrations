@@ -49,9 +49,13 @@ settings:
     type: string
     max_length: 4096
     default: ''
+    label: Extra subscriptions
+    description: "More AWJ path prefixes to subscribe to on every connection, comma separated, such as DeviceObject/audio, on top of the screens, auxiliaries, presets, inputs and multiviewers subscribed by default."
   read_on_connect:
     type: bool
     default: true
+    label: Read on connect
+    description: "True reads the subscribed objects once on connecting so the state starts filled; false waits for pushed changes only."
 ports:
   - { port: 10606, protocol: tcp, role: control }
 
@@ -472,6 +476,8 @@ commands:
         min: 1
         max: 24
         required: true
+        label: Screen
+        description: "The screen number, from 1 as on the device (1 to 24)."
     returns: none
   take_aux:
     summary: 'TAKE on an auxiliary screen (Aquilon guide 3.2: the same xTake on the A item of $screenAuxGroup)'
@@ -481,6 +487,8 @@ commands:
         min: 1
         max: 96
         required: true
+        label: Auxiliary screen
+        description: "The auxiliary screen number, from 1 as on the device (1 to 96)."
     returns: none
   recall_screen_preset:
     summary: Recall a screen preset memory to a screen's program or preview (3.3)
@@ -490,6 +498,8 @@ commands:
         min: 1
         max: 1000
         required: true
+        label: Preset
+        description: "The screen preset memory number, from 1 as on the device (1 to 1000)."
       screen: *id001
       destination: &id003
         type: enum
@@ -497,6 +507,8 @@ commands:
         - program
         - preview
         default: preview
+        label: Destination
+        description: "Program changes what is live on air at once and preview prepares it for the next TAKE."
     returns: none
   recall_aux_preset:
     summary: Recall a screen preset memory to an auxiliary screen's program or preview (3.3)
@@ -506,6 +518,8 @@ commands:
         min: 1
         max: 1000
         required: true
+        label: Preset
+        description: "The screen preset memory number, from 1 as on the device (1 to 1000)."
       aux: *id002
       destination: *id003
     returns: none
@@ -517,6 +531,8 @@ commands:
         min: 1
         max: 500
         required: true
+        label: Master preset
+        description: "The master preset number, from 1 as on the device (1 to 500)."
       destination: *id003
     returns: none
   recall_multiviewer_preset:
@@ -527,11 +543,15 @@ commands:
         min: 1
         max: 50
         required: true
+        label: Multiviewer preset
+        description: "The multiviewer preset number, from 1 as on the device (1 to 50)."
       multiviewer:
         type: int
         min: 1
         max: 8
         required: true
+        label: Multiviewer
+        description: "The multiviewer output number, from 1 as on the device."
     returns: none
   set_layer_source:
     summary: 'Set the source of a live layer on a screen''s program or preview, then send the global update (3.8).
@@ -544,10 +564,14 @@ commands:
         min: 1
         max: 128
         required: true
+        label: Layer
+        description: "The layer number on the screen, from 1 as on the device."
       source: &id004
         type: string
         pattern: ^(NONE|COLOR|LIVE_[0-9]+|STILL_[0-9]+|SCREEN_[0-9]+|NATIVE_[0-9]+)$
         required: true
+        label: Source
+        description: "What the layer shows: LIVE_n for input n, STILL_n for still n, SCREEN_n for screen n, NATIVE_n for background set n, COLOR for a plain colour, or NONE to empty it."
       destination: *id003
     returns: none
   set_aux_layer_source:
@@ -559,6 +583,8 @@ commands:
         min: 1
         max: 8
         required: true
+        label: Layer
+        description: "The layer number on the auxiliary screen, from 1 as on the device."
       source: *id004
       destination: *id003
     returns: none
@@ -572,6 +598,8 @@ commands:
         min: 0
         max: 8
         required: true
+        label: Background set
+        description: "The background set number (NATIVE_n), from 1, or 0 for no background."
       destination: *id003
     returns: none
   set_aux_background:
@@ -583,6 +611,8 @@ commands:
         min: 0
         max: 8
         required: true
+        label: Background set
+        description: "The background set number (NATIVE_n), from 1, or 0 for no background."
       destination: *id003
     returns: none
   set_layer_keying:
@@ -594,10 +624,14 @@ commands:
         min: 1
         max: 128
         required: true
+        label: Layer
+        description: "The layer number on the screen, from 1 as on the device."
       slot:
         type: int
         min: 0
         required: true
+        label: Keying preset
+        description: "The keying preset slot (SLOT_n), from 1, or 0 for none."
       destination: *id003
     returns: none
   enable_layer_keying:
@@ -609,9 +643,13 @@ commands:
         min: 1
         max: 128
         required: true
+        label: Layer
+        description: "The layer number on the screen, from 1 as on the device."
       enabled:
         type: bool
         required: true
+        label: Keying
+        description: "True turns keying on for the layer and false turns it off."
       destination: *id003
     returns: none
   freeze_layer:
@@ -624,12 +662,18 @@ commands:
         min: 1
         max: 128
         required: true
+        label: Layer
+        description: "The layer number on the screen, from 1 as on the device."
       program:
         type: bool
         required: true
+        label: Freeze on program
+        description: "True freezes the layer on program and false unfreezes it there; requires firmware 4.4 or later."
       preview:
         type: bool
         required: true
+        label: Freeze on preview
+        description: "True freezes the layer on preview and false unfreezes it there; requires firmware 4.4 or later."
     returns: none
   freeze_input:
     summary: Freeze or unfreeze a live input (its control freeze property, guide 6.1)
@@ -639,9 +683,13 @@ commands:
         min: 1
         max: 256
         required: true
+        label: Input
+        description: "The input number (IN_n), from 1 as on the device."
       frozen:
         type: bool
         required: true
+        label: Freeze
+        description: "True freezes the input on its current frame and false releases it; writing this is inferred, the guide documents only reading it."
     returns: none
   update:
     summary: Send the global update that applies pending layer changes (3.8, xUpdate)
@@ -653,13 +701,19 @@ commands:
         type: int
         min: 1
         required: true
+        label: Input
+        description: "The video input number, from 1 as on the device."
       channel:
         type: int
         min: 1
         required: true
+        label: Channel
+        description: "The audio channel number, from 1 as on the device."
       muted:
         type: bool
         required: true
+        label: Mute
+        description: "True mutes the channel and false unmutes it."
     returns: none
   mute_dante_input_audio:
     summary: Mute or unmute one channel of a Dante input group (5.1, DANTE_xx_CHANNEL_x)
@@ -668,13 +722,19 @@ commands:
         type: int
         min: 1
         required: true
+        label: Dante input group
+        description: "The Dante input group number, from 1 as on the device."
       channel:
         type: int
         min: 1
         required: true
+        label: Channel
+        description: "The channel number within the Dante group, from 1 as on the device."
       muted:
         type: bool
         required: true
+        label: Mute
+        description: "True mutes the channel and false unmutes it."
     returns: none
   mute_output_audio:
     summary: Mute or unmute one audio channel of an output, Dante output group or multiviewer (5.2.2; OUTPUT_x,
@@ -687,17 +747,25 @@ commands:
         - DANTE
         - MVW
         required: true
+        label: Output type
+        description: "The kind of output: OUTPUT for a video output, DANTE for a Dante output group, MVW for a multiviewer output."
       output:
         type: int
         min: 1
         required: true
+        label: Output
+        description: "The number of the output, Dante output group or multiviewer chosen by the output type, from 1 as on the device."
       channel:
         type: int
         min: 1
         required: true
+        label: Channel
+        description: "The audio channel number, from 1 as on the device."
       muted:
         type: bool
         required: true
+        label: Mute
+        description: "True mutes the channel and false unmutes it."
     returns: none
   set_output_audio_source:
     summary: Route an audio source channel (INPUT_xx_CHANNEL_x, DANTE_xx_CHANNEL_x or NONE) to one channel of an
@@ -710,18 +778,26 @@ commands:
         - DANTE
         - MVW
         required: true
+        label: Output type
+        description: "The kind of output: OUTPUT for a video output, DANTE for a Dante output group, MVW for a multiviewer output."
       output:
         type: int
         min: 1
         required: true
+        label: Output
+        description: "The number of the output, Dante output group or multiviewer chosen by the output type, from 1 as on the device."
       channel:
         type: int
         min: 1
         required: true
+        label: Channel
+        description: "The audio channel of the output to route to, from 1 as on the device."
       source:
         type: string
         pattern: ^(NONE|(INPUT|DANTE)_[0-9]+_CHANNEL_[0-9]+)$
         required: true
+        label: Audio source
+        description: "The source channel as INPUT_n_CHANNEL_m for an input or DANTE_n_CHANNEL_m for a Dante input group, or NONE to leave the channel unrouted."
     returns: none
   set_multiviewer_widget_source:
     summary: 'Set the source of a multiviewer widget, numbered from 1 (sent as n-1, guide 4.3/4.5). Sources: NONE,
@@ -732,15 +808,21 @@ commands:
         min: 1
         max: 8
         required: true
+        label: Multiviewer
+        description: "The multiviewer output number, from 1 as on the device."
       widget:
         type: int
         min: 1
         max: 64
         required: true
+        label: Widget
+        description: "The widget number on the multiviewer, from 1 (the device numbers them from 0 internally)."
       source:
         type: string
         pattern: ^(NONE|PROGRAM_S[0-9]+|PREVIEW_S[0-9]+|A_[0-9]+|IN_[0-9]+|TIMER_[0-9]+|STILL_[0-9]+)$
         required: true
+        label: Source
+        description: "What the widget shows: PROGRAM_Sn or PREVIEW_Sn for screen n, A_n for auxiliary n, IN_n for input n, TIMER_n, STILL_n, or NONE to empty it."
     returns: none
   set_multiviewer_vu_meter:
     summary: 'Show the VU meter on a multiviewer widget: a widget number or None (Aquilon guide 4.6)'
@@ -750,10 +832,14 @@ commands:
         min: 1
         max: 8
         required: true
+        label: Multiviewer
+        description: "The multiviewer output number, from 1 as on the device."
       widget:
         type: string
         pattern: ^(None|[0-9]+)$
         required: true
+        label: Widget
+        description: "The widget to show the VU meter on, sent as given (the spec does not say whether from 0 or 1), or None to hide it."
     returns: none
   trigger_input_backup:
     summary: 'Select an input''s backup source manually: NONE, 1 or 2 (Aquilon guide 6.5)'
@@ -763,6 +849,8 @@ commands:
         min: 1
         max: 256
         required: true
+        label: Input
+        description: "The input number (IN_n), from 1 as on the device."
       slot:
         type: enum
         values:
@@ -770,6 +858,8 @@ commands:
         - '1'
         - '2'
         required: true
+        label: Backup
+        description: "Which backup to use: 1 or 2 for that backup source, or NONE for no backup selected."
     returns: none
   set_input_backup_auto:
     summary: Turn an input's automatic backup on or off (6.6)
@@ -779,9 +869,13 @@ commands:
         min: 1
         max: 256
         required: true
+        label: Input
+        description: "The input number (IN_n), from 1 as on the device."
       enabled:
         type: bool
         required: true
+        label: Automatic backup
+        description: "True lets the device switch the input to its backup by itself and false leaves it to manual selection."
     returns: none
   trigger_background_backup:
     summary: 'Select a background set''s backup manually: NONE, 1 or 2 (6.8)'
@@ -792,6 +886,8 @@ commands:
         min: 1
         max: 8
         required: true
+        label: Background set
+        description: "The background set number (NATIVE_n) whose backup to control, from 1."
       slot:
         type: enum
         values:
@@ -799,6 +895,8 @@ commands:
         - '1'
         - '2'
         required: true
+        label: Backup
+        description: "Which backup to use: 1 or 2 for that backup source, or NONE for no backup selected."
     returns: none
   set_background_backup_auto:
     summary: Turn a background set's automatic backup on or off (6.9)
@@ -809,9 +907,13 @@ commands:
         min: 1
         max: 8
         required: true
+        label: Background set
+        description: "The background set number (NATIVE_n) whose backup to control, from 1."
       enabled:
         type: bool
         required: true
+        label: Automatic backup
+        description: "True lets the device switch the background set to its backup by itself and false leaves it to manual selection."
     returns: none
   trigger_group_backup:
     summary: 'Select a backup group''s backup manually: NONE, 1 or 2 (6.10)'
@@ -820,6 +922,8 @@ commands:
         type: int
         min: 1
         required: true
+        label: Backup group
+        description: "The backup group number, from 1 as on the device."
       slot:
         type: enum
         values:
@@ -827,6 +931,8 @@ commands:
         - '1'
         - '2'
         required: true
+        label: Backup
+        description: "Which backup to use: 1 or 2 for that backup source, or NONE for no backup selected."
     returns: none
   set_group_backup_auto:
     summary: Turn a backup group's automatic backup on or off (6.11)
@@ -835,9 +941,13 @@ commands:
         type: int
         min: 1
         required: true
+        label: Backup group
+        description: "The backup group number, from 1 as on the device."
       enabled:
         type: bool
         required: true
+        label: Automatic backup
+        description: "True lets the device switch the backup group to its backup by itself and false leaves it to manual selection."
     returns: none
   reboot:
     summary: Soft reboot (Aquilon guide 2.4, xRequest REBOOT)
@@ -854,6 +964,8 @@ commands:
         max_length: 512
         pattern: ^\S.*$
         required: true
+        label: AWJ path
+        description: "The path of the property or object in the AWJ object model, as the programmer's guide gives it, such as DeviceObject/$screenAuxGroup/@items/S1/status/@props/transition."
     returns: value
   awj_replace:
     summary: 'Write any property of the AWJ object model: the path and the new value as JSON (guides 1.2, op replace).
@@ -864,9 +976,13 @@ commands:
         max_length: 512
         pattern: ^\S.*$
         required: true
+        label: AWJ path
+        description: "The path of the property in the AWJ object model, as the programmer's guide gives it; the device does not confirm the write."
       value:
         type: json
         required: true
+        label: Value
+        description: "The new value as JSON, such as \"IN_3\", 5 or true, in the type the guide gives for the property."
     returns: none
   subscribe:
     summary: Add path prefixes to this connection's subscription list (guides 1.4); kept and sent again on every
@@ -875,6 +991,8 @@ commands:
       paths:
         type: json
         required: true
+        label: Path prefixes
+        description: "A JSON array of AWJ path prefixes to receive changes for, such as [\"DeviceObject/audio\"]; they are kept and subscribed again after every reconnection."
     returns: none
 quirks:
 - models:

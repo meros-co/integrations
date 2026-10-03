@@ -85,9 +85,15 @@ transport:
   probe: { method: GET, path: /api/v1/public, raw_query: "sys.description" }
 
 settings:
-  scheme: { type: enum, values: [http, https], default: http }
-  username: { type: string, default: "" }
-  password: { type: string, secret: true, default: "" }
+  scheme: { type: enum, values: [http, https], default: http,
+            label: Scheme,
+            description: "With http the API is reached on port 80; with https on port 443, accepting the processor's own certificate." }
+  username: { type: string, default: "",
+              label: Username,
+              description: "A user name of the processor's web application, needed only when authentication is turned on there." }
+  password: { type: string, secret: true, default: "",
+              label: Password,
+              description: "The password of that web application user; leave it empty when authentication is off." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -125,7 +131,9 @@ commands:
   get_properties:
     summary: "Read the properties at these dotted paths, joined with &, such as dev.display.brightness&dev.display.gamma"
     params:
-      paths: { type: string, pattern: "^[A-Za-z0-9_.:()&-]{1,512}$", required: true }
+      paths: { type: string, pattern: "^[A-Za-z0-9_.:()&-]{1,512}$", required: true,
+               label: Property paths,
+               description: "Dotted paths in the property tree, joined with &, such as dev.display.brightness&dev.display.gamma." }
     send: { method: GET, path: /api/v1/public, raw_query: "{paths}" }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -133,7 +141,9 @@ commands:
   set_properties:
     summary: "PATCH any part of the property tree (Public API 3.1.2): a JSON object such as {\"dev\": {\"display\": {\"brightness\": 42}}}; the reply holds the resulting values"
     params:
-      tree: { type: json, required: true }
+      tree: { type: json, required: true,
+              label: Property tree,
+              description: "A JSON object holding the part of the tree to change, such as {\"dev\": {\"display\": {\"brightness\": 42}}}; out-of-range values and unknown properties are ignored." }
     send: { method: PATCH, path: /api/v1/public, body: "{tree}", content_type: application/json }
     expect: { status: 200, json_path: "$" }
     returns: value
@@ -148,7 +158,9 @@ commands:
   set_blackout:
     summary: "Black out the display, or bring it back"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+                 label: Blackout,
+                 description: "True blacks out the display and false brings the picture back; it acts on the live display at once." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"blackout":{enabled}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -156,7 +168,9 @@ commands:
   set_freeze:
     summary: "Freeze the display, or release it"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+                 label: Freeze,
+                 description: "True freezes the display on the current frame and false releases it." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"freeze":{enabled}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -164,7 +178,9 @@ commands:
   set_brightness:
     summary: "Display brightness, 0 to 100 percent"
     params:
-      brightness: { type: float, min: 0, max: 100, required: true }
+      brightness: { type: float, min: 0, max: 100, required: true,
+                    label: Brightness,
+                    description: "Display brightness in percent, 0 black to 100 full." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"brightness":{brightness:.2f}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -172,7 +188,9 @@ commands:
   set_cct:
     summary: "Colour temperature, 1667 to 25000 K"
     params:
-      kelvin: { type: int, min: 1667, max: 25000, required: true }
+      kelvin: { type: int, min: 1667, max: 25000, required: true,
+                label: Colour temperature,
+                description: "The display's white point as a correlated colour temperature in kelvin, such as 6500." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"cct":{kelvin}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -180,7 +198,9 @@ commands:
   set_cct_duv:
     summary: "Colour temperature Duv, -0.03 to 0.03"
     params:
-      duv: { type: float, min: -0.03, max: 0.03, required: true }
+      duv: { type: float, min: -0.03, max: 0.03, required: true,
+             label: Duv,
+             description: "Distance of the white point from the Planckian locus, with 0 on it, negative towards magenta and positive towards green." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"cctDuv":{duv:.4f}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -188,7 +208,9 @@ commands:
   set_gamma:
     summary: "Display gamma, 1 to 4"
     params:
-      gamma: { type: float, min: 1, max: 4, required: true }
+      gamma: { type: float, min: 1, max: 4, required: true,
+               label: Gamma,
+               description: "The display's gamma, such as 2.2 or 2.4." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"gamma":{gamma:.2f}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -196,7 +218,9 @@ commands:
   set_black_clipping:
     summary: "Black clipping, 0 to 0.5 (named in the processor's own data, not the API tables)"
     params:
-      level: { type: float, min: 0, max: 0.5, required: true }
+      level: { type: float, min: 0, max: 0.5, required: true,
+               label: Black clipping,
+               description: "Level below which the image is clipped to black, 0 for none to 0.5; the API tables do not document it, only the processor's own data." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"blackClipping":{level:.3f}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -204,9 +228,15 @@ commands:
   set_display_gains:
     summary: "Display RGB gains, 1 is unity"
     params:
-      r: { type: float, min: 0, required: true }
-      g: { type: float, min: 0, required: true }
-      b: { type: float, min: 0, required: true }
+      r: { type: float, min: 0, required: true,
+           label: Red gain,
+           description: "Display gain for the red channel, where 1 is unity, below 1 dims it and above 1 boosts it." }
+      g: { type: float, min: 0, required: true,
+           label: Green gain,
+           description: "Display gain for the green channel, where 1 is unity, below 1 dims it and above 1 boosts it." }
+      b: { type: float, min: 0, required: true,
+           label: Blue gain,
+           description: "Display gain for the blue channel, where 1 is unity, below 1 dims it and above 1 boosts it." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"gains":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -214,10 +244,18 @@ commands:
   set_display_window:
     summary: "Position and size of the output window on the input canvas, in pixels"
     params:
-      x: { type: int, min: 0, required: true }
-      y: { type: int, min: 0, required: true }
-      width: { type: int, min: 1, required: true }
-      height: { type: int, min: 1, required: true }
+      x: { type: int, min: 0, required: true,
+           label: X,
+           description: "Horizontal position of the output window on the input canvas, in pixels." }
+      y: { type: int, min: 0, required: true,
+           label: "Y",
+           description: "Vertical position of the output window on the input canvas, in pixels." }
+      width: { type: int, min: 1, required: true,
+               label: Width,
+               description: "Width of the output window, in pixels." }
+      height: { type: int, min: 1, required: true,
+                label: Height,
+                description: "Height of the output window, in pixels." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"x":{x},"y":{y},"width":{width},"height":{height}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -225,8 +263,12 @@ commands:
   set_display_size:
     summary: "Size of the output window, in pixels"
     params:
-      width: { type: int, min: 1, required: true }
-      height: { type: int, min: 1, required: true }
+      width: { type: int, min: 1, required: true,
+               label: Width,
+               description: "Width of the output window, in pixels." }
+      height: { type: int, min: 1, required: true,
+                label: Height,
+                description: "Height of the output window, in pixels." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"width":{width},"height":{height}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -234,7 +276,9 @@ commands:
   set_output_adjust_enabled:
     summary: "Turn output adjustments on or off (dev.display.out.adjust.enabled)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+                 label: Output adjustments,
+                 description: "True applies the output adjustment gain, gamma, lift, offset and saturation, and false bypasses them." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"enabled":{enabled}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -242,9 +286,15 @@ commands:
   set_output_adjust_gain:
     summary: "Output adjustment RGB gain"
     params:
-      r: { type: float, min: 0, required: true }
-      g: { type: float, min: 0, required: true }
-      b: { type: float, min: 0, required: true }
+      r: { type: float, min: 0, required: true,
+           label: Red gain,
+           description: "Output adjustment gain for the red channel, applied when output adjustments are on; 1 is unity." }
+      g: { type: float, min: 0, required: true,
+           label: Green gain,
+           description: "Output adjustment gain for the green channel, applied when output adjustments are on; 1 is unity." }
+      b: { type: float, min: 0, required: true,
+           label: Blue gain,
+           description: "Output adjustment gain for the blue channel, applied when output adjustments are on; 1 is unity." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"gain":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -252,9 +302,15 @@ commands:
   set_output_adjust_gamma:
     summary: "Output adjustment RGB gamma"
     params:
-      r: { type: float, min: 0, required: true }
-      g: { type: float, min: 0, required: true }
-      b: { type: float, min: 0, required: true }
+      r: { type: float, min: 0, required: true,
+           label: Red gamma,
+           description: "Output adjustment gamma for the red channel, applied when output adjustments are on." }
+      g: { type: float, min: 0, required: true,
+           label: Green gamma,
+           description: "Output adjustment gamma for the green channel, applied when output adjustments are on." }
+      b: { type: float, min: 0, required: true,
+           label: Blue gamma,
+           description: "Output adjustment gamma for the blue channel, applied when output adjustments are on." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"gamma":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -262,9 +318,15 @@ commands:
   set_output_adjust_lift:
     summary: "Output adjustment RGB lift, 0 is none"
     params:
-      r: { type: float, required: true }
-      g: { type: float, required: true }
-      b: { type: float, required: true }
+      r: { type: float, required: true,
+           label: Red lift,
+           description: "Output adjustment lift for the red channel, raising or lowering the dark end, applied when output adjustments are on; 0 is none." }
+      g: { type: float, required: true,
+           label: Green lift,
+           description: "Output adjustment lift for the green channel, raising or lowering the dark end, applied when output adjustments are on; 0 is none." }
+      b: { type: float, required: true,
+           label: Blue lift,
+           description: "Output adjustment lift for the blue channel, raising or lowering the dark end, applied when output adjustments are on; 0 is none." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"lift":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -272,9 +334,15 @@ commands:
   set_output_adjust_offset:
     summary: "Output adjustment RGB offset, 0 is none"
     params:
-      r: { type: float, required: true }
-      g: { type: float, required: true }
-      b: { type: float, required: true }
+      r: { type: float, required: true,
+           label: Red offset,
+           description: "Output adjustment offset for the red channel, added across the whole range when output adjustments are on; 0 is none." }
+      g: { type: float, required: true,
+           label: Green offset,
+           description: "Output adjustment offset for the green channel, added across the whole range when output adjustments are on; 0 is none." }
+      b: { type: float, required: true,
+           label: Blue offset,
+           description: "Output adjustment offset for the blue channel, added across the whole range when output adjustments are on; 0 is none." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"offset":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -282,7 +350,9 @@ commands:
   set_output_adjust_saturation:
     summary: "Output adjustment saturation, 1 is unity"
     params:
-      saturation: { type: float, min: 0, required: true }
+      saturation: { type: float, min: 0, required: true,
+                    label: Saturation,
+                    description: "Output adjustment saturation, where 1 is unity, 0 is greyscale and above 1 is more saturated." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"saturation":{saturation:.3f}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -291,7 +361,9 @@ commands:
   set_redundancy_mode:
     summary: "Redundancy mode: none, failover or seamless (the processor's own list also has manual and single)"
     params:
-      mode: { type: enum, values: [none, failover, seamless, manual, single], required: true }
+      mode: { type: enum, values: [none, failover, seamless, manual, single], required: true,
+              label: Redundancy mode,
+              description: "With none there is no redundancy, with failover the processor flips to the backup by itself on loss of video, and seamless is seamless redundancy; manual and single are in the processor's own list but the API does not describe them." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"redundancy":{"mode":"{mode}"}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -299,7 +371,9 @@ commands:
   set_redundancy_role:
     summary: "This processor's long-term redundancy role: main, backup or offline"
     params:
-      role: { type: enum, values: [main, backup, offline], required: true }
+      role: { type: enum, values: [main, backup, offline], required: true,
+              label: Redundancy role,
+              description: "This processor's long-term role in the redundant pair: main, backup or offline." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"redundancy":{"role":"{role}"}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -307,7 +381,9 @@ commands:
   redundancy_flip:
     summary: "Flip the display to the main or the backup processor (redundancy state)"
     params:
-      to: { type: enum, values: [main, backup], required: true }
+      to: { type: enum, values: [main, backup], required: true,
+            label: Flip to,
+            description: "The processor to put the display on, main or backup; the state then reads active, standby or mixed." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"redundancy":{"state":"{to}"}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -316,7 +392,9 @@ commands:
   select_input:
     summary: "Select the input by its key, such as hdmi1, hdmi2, sdi1 to sdi4, or a stitched input such as hdmi2X1"
     params:
-      input: { type: string, pattern: "^[A-Za-z0-9]{1,32}$", required: true }
+      input: { type: string, pattern: "^[A-Za-z0-9]{1,32}$", required: true,
+               label: Input,
+               description: "The input's key, such as hdmi1, hdmi2, sdi1 to sdi4 or a stitched input such as hdmi2X1, depending on the installed input cards." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"input":{input:json}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -324,7 +402,9 @@ commands:
   set_test_pattern:
     summary: "Show a test pattern of this type, such as colorBars, red or grid (Public API 8.5.1)"
     params:
-      type: { type: string, pattern: "^[A-Za-z0-9]{1,32}$", required: true }
+      type: { type: string, pattern: "^[A-Za-z0-9]{1,32}$", required: true,
+              label: Test pattern,
+              description: "The pattern type as the web application names it, such as colorBars, red or grid; showing it turns the test pattern on." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"testPattern":{"enabled":true,"type":{type:json}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -332,7 +412,9 @@ commands:
   set_test_pattern_enabled:
     summary: "Turn the test pattern on or off (Public API 8.5.2)"
     params:
-      enabled: { type: bool, default: false }
+      enabled: { type: bool, default: false,
+                 label: Test pattern,
+                 description: "True shows the test pattern instead of the input and false turns it off." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"testPattern":{"enabled":{enabled}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -340,7 +422,9 @@ commands:
   set_test_pattern_motion:
     summary: "Turn test pattern motion on or off"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+                 label: Motion,
+                 description: "True makes the test pattern move and false keeps it still." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"testPattern":{"motion":{enabled}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -349,8 +433,12 @@ commands:
   set_group_blackout:
     summary: "Black out a group of tiles, or bring it back; groups are indexed from 0"
     params:
-      group: { type: int, min: 0, required: true }
-      enabled: { type: bool, default: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      enabled: { type: bool, default: true,
+                 label: Blackout,
+                 description: "True blacks out the group's tiles and false brings their picture back." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"blackout":{enabled}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -358,8 +446,12 @@ commands:
   set_group_name:
     summary: "Rename a group"
     params:
-      group: { type: int, min: 0, required: true }
-      name: { type: string, max_length: 64, required: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      name: { type: string, max_length: 64, required: true,
+              label: Name,
+              description: "The group's name, up to 64 characters." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"name":{name:json}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -367,11 +459,21 @@ commands:
   set_group_gains:
     summary: "A group's RGB and intensity gains"
     params:
-      group: { type: int, min: 0, required: true }
-      r: { type: float, min: 0, required: true }
-      g: { type: float, min: 0, required: true }
-      b: { type: float, min: 0, required: true }
-      i: { type: float, min: 0, required: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      r: { type: float, min: 0, required: true,
+           label: Red gain,
+           description: "The group's gain for the red channel; the spec gives no unity value, so read the current gains first." }
+      g: { type: float, min: 0, required: true,
+           label: Green gain,
+           description: "The group's gain for the green channel; the spec gives no unity value, so read the current gains first." }
+      b: { type: float, min: 0, required: true,
+           label: Blue gain,
+           description: "The group's gain for the blue channel; the spec gives no unity value, so read the current gains first." }
+      i: { type: float, min: 0, required: true,
+           label: Intensity gain,
+           description: "The group's overall intensity gain; the spec gives no unity value, so read the current gains first." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"gains":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f},"i":{i:.3f}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -379,8 +481,12 @@ commands:
   set_group_mask_enabled:
     summary: "Turn a group's mask on or off"
     params:
-      group: { type: int, min: 0, required: true }
-      enabled: { type: bool, default: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      enabled: { type: bool, default: true,
+                 label: Mask,
+                 description: "True turns the group's mask on and false turns it off." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"mask":{"enabled":{enabled}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -388,11 +494,21 @@ commands:
   set_group_mask:
     summary: "A group's mask edge offsets: left, top, bottom and right"
     params:
-      group: { type: int, min: 0, required: true }
-      l: { type: float, min: 0, required: true }
-      t: { type: float, min: 0, required: true }
-      b: { type: float, min: 0, required: true }
-      r: { type: float, min: 0, required: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      l: { type: float, min: 0, required: true,
+           label: Left,
+           description: "How far the mask comes in from the group's left edge; the API does not state the unit." }
+      t: { type: float, min: 0, required: true,
+           label: Top,
+           description: "How far the mask comes in from the group's top edge; the API does not state the unit." }
+      b: { type: float, min: 0, required: true,
+           label: Bottom,
+           description: "How far the mask comes in from the group's bottom edge; the API does not state the unit." }
+      r: { type: float, min: 0, required: true,
+           label: Right,
+           description: "How far the mask comes in from the group's right edge; the API does not state the unit." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"mask":{"l":{l:.3f},"t":{t:.3f},"b":{b:.3f},"r":{r:.3f}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -400,8 +516,12 @@ commands:
   set_group_test_pattern_enabled:
     summary: "Turn a group's test pattern on or off"
     params:
-      group: { type: int, min: 0, required: true }
-      enabled: { type: bool, default: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      enabled: { type: bool, default: true,
+                 label: Test pattern,
+                 description: "True shows the group's test pattern colour on its tiles and false turns it off." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"testPattern":{"enabled":{enabled}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -409,11 +529,21 @@ commands:
   set_group_test_pattern_color:
     summary: "A group's test pattern colour, R, G, B and A"
     params:
-      group: { type: int, min: 0, required: true }
-      r: { type: float, min: 0, required: true }
-      g: { type: float, min: 0, required: true }
-      b: { type: float, min: 0, required: true }
-      a: { type: float, min: 0, required: true }
+      group: { type: int, min: 0, required: true,
+               label: Group,
+               description: "The group's index, counted from 0, with gaps where groups were removed." }
+      r: { type: float, min: 0, required: true,
+           label: Red,
+           description: "The red component of the group's test pattern colour; the API does not state its scale." }
+      g: { type: float, min: 0, required: true,
+           label: Green,
+           description: "The green component of the group's test pattern colour; the API does not state its scale." }
+      b: { type: float, min: 0, required: true,
+           label: Blue,
+           description: "The blue component of the group's test pattern colour; the API does not state its scale." }
+      a: { type: float, min: 0, required: true,
+           label: Alpha,
+           description: "The alpha (opacity) of the group's test pattern colour; the API does not state its scale." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"testPattern":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f},"a":{a:.3f}}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -422,8 +552,12 @@ commands:
   set_receiver_group:
     summary: "Put a receiver (tile), by MAC address, in a group; -1 for none"
     params:
-      mac: { type: string, pattern: "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", required: true }
-      group: { type: int, min: -1, required: true }
+      mac: { type: string, pattern: "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", required: true,
+             label: Receiver MAC address,
+             description: "The receiver (tile) by its MAC address, in lower-case hex pairs separated by colons." }
+      group: { type: int, min: -1, required: true,
+               label: Group,
+               description: "The index of the group to put the receiver in, from 0, or -1 for no group." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"receivers":{"{mac}":{"groupId":{group}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -431,9 +565,15 @@ commands:
   set_receiver_position:
     summary: "Move a receiver (tile), by MAC address, on the processor's canvas"
     params:
-      mac: { type: string, pattern: "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", required: true }
-      x: { type: int, min: 0, required: true }
-      y: { type: int, min: 0, required: true }
+      mac: { type: string, pattern: "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", required: true,
+             label: Receiver MAC address,
+             description: "The receiver (tile) by its MAC address, in lower-case hex pairs separated by colons." }
+      x: { type: int, min: 0, required: true,
+           label: X,
+           description: "The receiver's horizontal position on the processor's canvas, from 0 (presumably pixels); a wrong position shows the wrong part of the picture." }
+      y: { type: int, min: 0, required: true,
+           label: "Y",
+           description: "The receiver's vertical position on the processor's canvas, from 0 (presumably pixels); a wrong position shows the wrong part of the picture." }
     send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"receivers":{"{mac}":{"x":{x},"y":{y}}}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -442,7 +582,9 @@ commands:
   set_processor_name:
     summary: "The processor's name, as on its front panel and web application (sys.description)"
     params:
-      name: { type: string, max_length: 64, required: true }
+      name: { type: string, max_length: 64, required: true,
+              label: Processor name,
+              description: "The name shown on the processor's front panel and web application, up to 64 characters." }
     send: { method: PATCH, path: /api/v1/public, body: '{"sys":{"description":{name:json}}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -463,7 +605,9 @@ commands:
   recall_preset:
     summary: "Apply a saved configuration by id; answers with the applied state"
     params:
-      id: { type: int, min: 0, required: true }
+      id: { type: int, min: 0, required: true,
+            label: Preset,
+            description: "The id of the saved configuration to apply, as list_presets gives it; it changes the live display at once." }
     send: { method: POST, path: "/api/v1/presets/{id}/apply" }
     expect: { status: 200 }
     returns: ack
@@ -471,7 +615,9 @@ commands:
   recall_preset_by_name:
     summary: "Apply the first saved configuration with this name"
     params:
-      name: { type: string, max_length: 128, required: true }
+      name: { type: string, max_length: 128, required: true,
+              label: Preset name,
+              description: "The saved configuration's name; the first one with this name is applied to the live display at once." }
     send: { method: POST, path: /api/v1/presets/apply, body: '{"presetName":{name:json}}', content_type: application/json }
     expect: { status: 200 }
     returns: ack
@@ -486,7 +632,9 @@ commands:
   show_still:
     summary: "Show the still with this id on the display"
     params:
-      id: { type: int, min: 0, required: true }
+      id: { type: int, min: 0, required: true,
+            label: Still,
+            description: "The id of the still to show, as list_stills gives it." }
     send: { method: POST, path: "/api/v1/media/{id}/show" }
     expect: { status: 204 }
     returns: ack
@@ -494,7 +642,9 @@ commands:
   show_still_by_name:
     summary: "Show the first still with this name"
     params:
-      name: { type: string, max_length: 255, required: true }
+      name: { type: string, max_length: 255, required: true,
+              label: Still name,
+              description: "The still's name; the first still with this name is shown." }
     send: { method: POST, path: /api/v1/media/show, body: '{"name":{name:json}}', content_type: application/json }
     expect: { status: 204 }
     returns: ack

@@ -158,7 +158,9 @@ commands:
   run_timeline:
     summary: Run an auxiliary timeline, by name (run "<timeline>")
     params:
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]run "{timeline}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -166,7 +168,9 @@ commands:
   halt_timeline:
     summary: Pause an auxiliary timeline, by name (halt "<timeline>")
     params:
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]halt "{timeline}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -174,7 +178,9 @@ commands:
   kill_timeline:
     summary: Stop and deactivate an auxiliary timeline, by name (kill "<timeline>")
     params:
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]kill "{timeline}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -182,7 +188,9 @@ commands:
   goto_time:
     summary: Move the main timeline to a time in milliseconds, keeping its run or pause state (gotoTime)
     params:
-      time_ms: { type: int, min: 0, required: true }
+      time_ms: { type: int, min: 0, required: true,
+                 label: Time,
+                 description: "The main timeline position to move to, in milliseconds from its start." }
     send: "[m]gotoTime {time_ms}"
     expect: { not_contains: "Error" }
     returns: ack
@@ -190,7 +198,9 @@ commands:
   goto_time_timecode:
     summary: Move the main timeline to a time given as HH:MM:SS.FFF (gotoTime "HH:MM:SS.FFF")
     params:
-      time: { type: string, pattern: "^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}$", required: true }
+      time: { type: string, pattern: "^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}$", required: true,
+              label: Time,
+              description: "The main timeline position to move to, as HH:MM:SS.FFF with milliseconds, such as 00:01:30.000." }
     send: '[m]gotoTime "{time}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -198,8 +208,12 @@ commands:
   goto_time_timeline:
     summary: Move an auxiliary timeline to a time in milliseconds (gotoTime <ms> "<timeline>")
     params:
-      time_ms:  { type: int, min: 0, required: true }
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      time_ms:  { type: int, min: 0, required: true,
+                  label: Time,
+                  description: "The timeline position to move to, in milliseconds from its start." }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]gotoTime {time_ms} "{timeline}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -209,8 +223,12 @@ commands:
       Move the main timeline to a named control cue, searching forward then
       backward, or backward only (gotoControlCue); the run or pause state is kept
     params:
-      cue:          { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      reverse_only: { type: bool, default: false }
+      cue:          { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                      label: Control cue,
+                      description: "The control cue's name on the main timeline, case sensitive." }
+      reverse_only: { type: bool, default: false,
+                      label: Search backward only,
+                      description: "Off searches forward from the current time, then backward; on searches backward only." }
     send: '[m]gotoControlCue "{cue}" {reverse_only}'
     expect: { not_contains: "Error" }
     returns: ack
@@ -218,9 +236,15 @@ commands:
   goto_control_cue_timeline:
     summary: Move an auxiliary timeline to a named control cue (gotoControlCue "<cue>" <reverse> "<timeline>")
     params:
-      cue:          { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      reverse_only: { type: bool, default: false }
-      timeline:     { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      cue:          { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                      label: Control cue,
+                      description: "The control cue's name on the auxiliary timeline, case sensitive." }
+      reverse_only: { type: bool, default: false,
+                      label: Search backward only,
+                      description: "Off searches forward from the current time, then backward; on searches backward only." }
+      timeline:     { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                      label: Timeline,
+                      description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]gotoControlCue "{cue}" {reverse_only} "{timeline}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -235,9 +259,15 @@ commands:
   set_input:
     summary: Set a generic input to a value, usually 0.0 to 1.0, over a transition in ms (setInput)
     params:
-      input:         { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      value:         { type: float, min: 0.0, required: true }
-      transition_ms: { type: int, min: 0, default: 0 }
+      input:         { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                       label: Input,
+                       description: "The generic input's name as shown in WATCHOUT's Input window, case sensitive." }
+      value:         { type: float, min: 0.0, required: true,
+                       label: Value,
+                       description: "The input's new value, usually 0.0 to 1.0, depending on the input's limits in the show." }
+      transition_ms: { type: int, min: 0, default: 0,
+                       label: Transition time,
+                       description: "How long the input takes to reach its new value, in milliseconds; 0 is immediate." }
     send: '[m]setInput "{input}" {value:.4f} {transition_ms}'
     expect: { not_contains: "Error" }
     returns: ack
@@ -245,9 +275,15 @@ commands:
   adjust_input:
     summary: Change a generic input by a signed amount, such as +0.1 or -0.25, over a transition in ms (setInput with +/-)
     params:
-      input:         { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      delta:         { type: string, pattern: "^[+-][0-9]+(\\.[0-9]+)?$", required: true }
-      transition_ms: { type: int, min: 0, default: 0 }
+      input:         { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                       label: Input,
+                       description: "The generic input's name as shown in WATCHOUT's Input window, case sensitive." }
+      delta:         { type: string, pattern: "^[+-][0-9]+(\\.[0-9]+)?$", required: true,
+                       label: Change,
+                       description: "The signed amount to add to the input's value, such as +0.1 or -0.25." }
+      transition_ms: { type: int, min: 0, default: 0,
+                       label: Transition time,
+                       description: "How long the input takes to reach its new value, in milliseconds; 0 is immediate." }
     send: '[m]setInput "{input}" {delta} {transition_ms}'
     expect: { not_contains: "Error" }
     returns: ack
@@ -255,11 +291,21 @@ commands:
   set_inputs_2:
     summary: Set two generic inputs on the same frame, over one transition in ms (setInputs)
     params:
-      transition_ms: { type: int, min: 0, default: 0 }
-      input1:        { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      value1:        { type: float, min: 0.0, required: true }
-      input2:        { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      value2:        { type: float, min: 0.0, required: true }
+      transition_ms: { type: int, min: 0, default: 0,
+                       label: Transition time,
+                       description: "How long the input takes to reach its new value, in milliseconds; 0 is immediate." }
+      input1:        { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                       label: First input,
+                       description: "The first generic input's name as shown in WATCHOUT's Input window, case sensitive." }
+      value1:        { type: float, min: 0.0, required: true,
+                       label: First value,
+                       description: "The first input's new value, usually 0.0 to 1.0, depending on the input's limits in the show." }
+      input2:        { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                       label: Second input,
+                       description: "The second generic input's name as shown in WATCHOUT's Input window, case sensitive." }
+      value2:        { type: float, min: 0.0, required: true,
+                       label: Second value,
+                       description: "The second input's new value, usually 0.0 to 1.0, depending on the input's limits in the show." }
     send: '[m]setInputs {transition_ms} "{input1}" {value1:.4f} "{input2}" {value2:.4f}'
     expect: { not_contains: "Error" }
     returns: ack
@@ -267,7 +313,9 @@ commands:
   enable_layer_conditions:
     summary: Set the enabled layer conditions as a bit mask, condition 1 = 1, condition 2 = 2, condition 3 = 4 and so on (enableLayerCond)
     params:
-      conditions: { type: int, min: 0, max: 4294967295, required: true }
+      conditions: { type: int, min: 0, max: 4294967295, required: true,
+                    label: Layer conditions,
+                    description: "The layer conditions to enable as a bit mask, condition 1 being 1, condition 2 being 2, condition 3 being 4 and so on; conditions not in the mask are disabled." }
     send: "[m]enableLayerCond {conditions}"
     expect: { not_contains: "Error" }
     returns: ack
@@ -275,8 +323,12 @@ commands:
   standby:
     summary: Enter or leave standby over a fade in ms; standby blanks picture and sound, or plays the show's standby layers (standBy)
     params:
-      enter:   { type: bool, default: true }
-      fade_ms: { type: int, min: 0, default: 0 }
+      enter:   { type: bool, default: true,
+                 label: Standby,
+                 description: "On enters standby, which blanks picture and sound or plays the show's standby layers; off leaves it." }
+      fade_ms: { type: int, min: 0, default: 0,
+                 label: Fade time,
+                 description: "How long the fade into or out of standby takes, in milliseconds; 0 is immediate." }
     send: "[m]standBy {enter} {fade_ms}"
     expect: { not_contains: "Error" }
     returns: ack
@@ -286,8 +338,12 @@ commands:
       The front-most visible interactive media cue at a stage position (hitTest):
       true or false, then the interaction name and the hit position
     params:
-      x: { type: int, required: true }
-      y: { type: int, required: true }
+      x: { type: int, required: true,
+           label: X position,
+           description: "Horizontal stage position to test, in WATCHOUT's stage coordinates." }
+      y: { type: int, required: true,
+           label: Y position,
+           description: "Vertical stage position to test, in WATCHOUT's stage coordinates." }
     send: "[m]hitTest {x} {y}"
     expect: { matches: "^\\[m\\]Reply (.*)$" }
     returns: value
@@ -296,7 +352,9 @@ commands:
   online:
     summary: Take the production computer online or offline (online)
     params:
-      online: { type: bool, default: true }
+      online: { type: bool, default: true,
+                label: Online,
+                description: "On takes the production computer online, so the displays follow it; off takes it offline." }
     send: "[m]online {online}"
     expect: { not_contains: "Error" }
     returns: ack
@@ -306,9 +364,15 @@ commands:
       Open a show file on the production computer by its full path, with the
       layer conditions to enable and whether to go online afterwards (load); see quirks
     params:
-      path:       { type: string, pattern: "^[^\"]+$", max_length: 1024, required: true }
-      conditions: { type: int, min: 0, max: 4294967295, default: 0 }
-      go_online:  { type: bool, default: true }
+      path:       { type: string, pattern: "^[^\"]+$", max_length: 1024, required: true,
+                    label: Show file path,
+                    description: "The show file's full path on the production computer, such as C:\\Shows\\Main.watch." }
+      conditions: { type: int, min: 0, max: 4294967295, default: 0,
+                    label: Layer conditions,
+                    description: "The layer conditions to enable as a bit mask, condition 1 being 1, condition 2 being 2, condition 3 being 4 and so on; 0 enables none." }
+      go_online:  { type: bool, default: true,
+                    label: Go online,
+                    description: "Whether to take the production computer online once the show is loaded." }
     send: '[m]load "{path}" {conditions} {go_online}'
     expect: { not_contains: "Error" }
     returns: ack
@@ -318,10 +382,18 @@ commands:
       Load a show, by name, from the display computer's Shows folder, managing the
       cluster as its conductor (load); the last reply is Ready once loaded; see quirks
     params:
-      show:           { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
-      manage_cluster: { type: bool, default: true }
-      as_conductor:   { type: bool, default: true }
-      conditions:     { type: int, min: 0, max: 4294967295, default: 0 }
+      show:           { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                        label: Show,
+                        description: "The show's name in the display computer's Shows folder, case sensitive." }
+      manage_cluster: { type: bool, default: true,
+                        label: Manage cluster,
+                        description: "Whether this display computer loads the show on the other display computers of the cluster too." }
+      as_conductor:   { type: bool, default: true,
+                        label: As conductor,
+                        description: "Whether this display computer conducts the cluster, so the others follow its timing." }
+      conditions:     { type: int, min: 0, max: 4294967295, default: 0,
+                        label: Layer conditions,
+                        description: "The layer conditions to enable as a bit mask, condition 1 being 1, condition 2 being 2, condition 3 being 4 and so on; 0 enables none." }
     send: '[m]load "{show}" {manage_cluster} {as_conductor} {conditions}'
     expect: { not_contains: "Error" }
     returns: ack
@@ -329,7 +401,9 @@ commands:
   set_logo_string:
     summary: Show a text beside the WATCHOUT logo on the displays (setLogoString)
     params:
-      text: { type: string, pattern: "^[^\"\\\\]*$", max_length: 256, required: true }
+      text: { type: string, pattern: "^[^\"\\\\]*$", max_length: 256, required: true,
+              label: Text,
+              description: "Text to show beside the WATCHOUT logo on the displays." }
     send: '[m]setLogoString "{text}"'
     expect: { not_contains: "Error" }
     returns: ack
@@ -340,8 +414,12 @@ commands:
       2 EBU 25, 3 SMPTE 29.97 non-drop, 4 SMPTE 29.97 drop, 5 SMPTE 30, 6 24 fps,
       with an offset in ms
     params:
-      mode:      { type: int, min: 0, max: 6, required: true }
-      offset_ms: { type: int, default: 0 }
+      mode:      { type: int, min: 0, max: 6, required: true,
+                   label: Timecode mode,
+                   description: "The timecode input: 0 off, 1 auto-detect, 2 EBU 25, 3 SMPTE 29.97 non-drop, 4 SMPTE 29.97 drop, 5 SMPTE 30, 6 24 fps." }
+      offset_ms: { type: int, default: 0,
+                   label: Timecode offset,
+                   description: "Offset applied to the incoming timecode, in milliseconds." }
     send: "[m]timecodeMode {mode} {offset_ms}"
     expect: { not_contains: "Error" }
     returns: ack
@@ -356,7 +434,9 @@ commands:
   subscribe_timeline:
     summary: Have WATCHOUT push an auxiliary timeline's state and position as it changes (getStatus 1 with the timeline's path)
     params:
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]getStatus 1 "TaskList:mItemList:mItems:TimelineTask \"{timeline}\""'
     expect: { not_contains: "Error" }
     returns: ack
@@ -364,7 +444,9 @@ commands:
   unsubscribe_timeline:
     summary: Stop pushes for an auxiliary timeline (getStatus 0 with the timeline's path)
     params:
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]getStatus 0 "TaskList:mItemList:mItems:TimelineTask \"{timeline}\""'
     expect: { not_contains: "Error" }
     returns: ack
@@ -380,7 +462,9 @@ commands:
       The main timeline's control cues as JSON (getControlCues), filtered by a bit
       mask: 1 no-op cues, 2 cues targeting another timeline, 4 unnamed cues
     params:
-      filter: { type: int, min: 0, max: 7, default: 0 }
+      filter: { type: int, min: 0, max: 7, default: 0,
+                label: Exclude cues,
+                description: "Cues to leave out as a bit mask: 1 no-op cues, 2 cues targeting another timeline, 4 unnamed cues; 0 lists every cue." }
     send: "[m]getControlCues {filter}"
     expect: { matches: "^\\[m\\]Reply (.*)$" }
     returns: value
@@ -388,8 +472,12 @@ commands:
   get_control_cues_timeline:
     summary: An auxiliary timeline's control cues as JSON (getControlCues <filter> "<timeline>")
     params:
-      filter:   { type: int, min: 0, max: 7, default: 0 }
-      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      filter:   { type: int, min: 0, max: 7, default: 0,
+                  label: Exclude cues,
+                  description: "Cues to leave out as a bit mask: 1 no-op cues, 2 cues targeting another timeline, 4 unnamed cues; 0 lists every cue." }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true,
+                  label: Timeline,
+                  description: "The auxiliary timeline's name as shown in WATCHOUT, case sensitive; names with a double quote or backslash are refused." }
     send: '[m]getControlCues {filter} "{timeline}"'
     expect: { matches: "^\\[m\\]Reply (.*)$" }
     returns: value

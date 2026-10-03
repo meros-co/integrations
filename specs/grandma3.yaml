@@ -100,7 +100,9 @@ transport:
   listen_port: { setting: feedback_port }
 
 settings:
-  feedback_port: { type: int, min: 1, max: 65535 }
+  feedback_port: { type: int, min: 1, max: 65535,
+                   label: Feedback port,
+                   description: "Local UDP port this host listens on for the console's feedback; set the OSC line's Destination IP to this host, Port to this value and Send to Yes, or leave it empty to read nothing back." }
 
 ports:
   - { port: 8000, protocol: udp, role: control }
@@ -399,46 +401,66 @@ commands:
   fader:
     summary: "Set the fader of an executor on the selected page in the selected data pool, in percent (/[DataPoolZ/][PageY/]FaderX, f)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: float, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the selected data pool; which exist depends on the page." }
+      level:    { type: float, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in percent, 0 to 100 with decimals (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
     send: { address: "/Fader{executor}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   fader_fade:
     summary: "Set the fader of an executor on the selected page in the selected data pool, in whole percent, with a fade time in seconds (ii)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the selected data pool; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in whole percent to fade to, 0 to 100 (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fader to reach the level, 0 for a snap; MA documents no upper bound, 3600 s is the one used here." }
     send: { address: "/Fader{executor}", args: [ { value: "{level}", type: int }, { value: "{fade}", type: int } ] }
     returns: none
 
   encoder:
     summary: "Turn the encoder of an executor on the selected page in the selected data pool: move its fader by a percentage, or -1/1 to run an assigned EncoderLeft/EncoderRight function (i)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      delta:    { type: int, min: -100, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the selected data pool; which exist depends on the page." }
+      delta:    { type: int, min: -100, max: 100, required: true,
+                  label: Amount,
+                  description: "Percentage to move the fader by, negative down and positive up; -1 and 1 instead run EncoderLeft and EncoderRight when those are assigned to the executor." }
     send: { address: "/Encoder{executor}", args: [ { value: "{delta}", type: int } ] }
     returns: none
 
   key_down:
     summary: "Press (and hold) the key of an executor on the selected page in the selected data pool (i 1)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the selected data pool; which exist depends on the page." }
     send: { address: "/Key{executor}", args: [ { value: "1", type: int } ] }
     returns: none
 
   key_up:
     summary: "Release the key of an executor on the selected page in the selected data pool (i 0)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the selected data pool; which exist depends on the page." }
     send: { address: "/Key{executor}", args: [ { value: "0", type: int } ] }
     returns: none
 
   press_key:
     summary: "Press and release the key of an executor on the selected page in the selected data pool"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the selected data pool; which exist depends on the page." }
     send:
       - { address: "/Key{executor}", args: [ { value: "1", type: int } ] }
       - { address: "/Key{executor}", args: [ { value: "0", type: int } ] }
@@ -447,52 +469,84 @@ commands:
   fader_page:
     summary: "Set the fader of an executor on a page in the selected data pool, in percent (/[DataPoolZ/][PageY/]FaderX, f)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: float, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the selected data pool." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the selected data pool; which exist depends on the page." }
+      level:    { type: float, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in percent, 0 to 100 with decimals (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
     send: { address: "/Page{page}/Fader{executor}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   fader_fade_page:
     summary: "Set the fader of an executor on a page in the selected data pool, in whole percent, with a fade time in seconds (ii)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the selected data pool." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the selected data pool; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in whole percent to fade to, 0 to 100 (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fader to reach the level, 0 for a snap; MA documents no upper bound, 3600 s is the one used here." }
     send: { address: "/Page{page}/Fader{executor}", args: [ { value: "{level}", type: int }, { value: "{fade}", type: int } ] }
     returns: none
 
   encoder_page:
     summary: "Turn the encoder of an executor on a page in the selected data pool: move its fader by a percentage, or -1/1 to run an assigned EncoderLeft/EncoderRight function (i)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      delta:    { type: int, min: -100, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the selected data pool." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the selected data pool; which exist depends on the page." }
+      delta:    { type: int, min: -100, max: 100, required: true,
+                  label: Amount,
+                  description: "Percentage to move the fader by, negative down and positive up; -1 and 1 instead run EncoderLeft and EncoderRight when those are assigned to the executor." }
     send: { address: "/Page{page}/Encoder{executor}", args: [ { value: "{delta}", type: int } ] }
     returns: none
 
   key_down_page:
     summary: "Press (and hold) the key of an executor on a page in the selected data pool (i 1)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the selected data pool." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the selected data pool; which exist depends on the page." }
     send: { address: "/Page{page}/Key{executor}", args: [ { value: "1", type: int } ] }
     returns: none
 
   key_up_page:
     summary: "Release the key of an executor on a page in the selected data pool (i 0)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the selected data pool." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the selected data pool; which exist depends on the page." }
     send: { address: "/Page{page}/Key{executor}", args: [ { value: "0", type: int } ] }
     returns: none
 
   press_key_page:
     summary: "Press and release the key of an executor on a page in the selected data pool"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the selected data pool." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the selected data pool; which exist depends on the page." }
     send:
       - { address: "/Page{page}/Key{executor}", args: [ { value: "1", type: int } ] }
       - { address: "/Page{page}/Key{executor}", args: [ { value: "0", type: int } ] }
@@ -501,52 +555,84 @@ commands:
   fader_datapool:
     summary: "Set the fader of an executor on the selected page in a data pool, in percent (/[DataPoolZ/][PageY/]FaderX, f)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: float, min: 0, max: 100, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the data pool given; which exist depends on the page." }
+      level:    { type: float, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in percent, 0 to 100 with decimals (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
     send: { address: "/DataPool{datapool}/Fader{executor}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   fader_fade_datapool:
     summary: "Set the fader of an executor on the selected page in a data pool, in whole percent, with a fade time in seconds (ii)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the data pool given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in whole percent to fade to, 0 to 100 (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fader to reach the level, 0 for a snap; MA documents no upper bound, 3600 s is the one used here." }
     send: { address: "/DataPool{datapool}/Fader{executor}", args: [ { value: "{level}", type: int }, { value: "{fade}", type: int } ] }
     returns: none
 
   encoder_datapool:
     summary: "Turn the encoder of an executor on the selected page in a data pool: move its fader by a percentage, or -1/1 to run an assigned EncoderLeft/EncoderRight function (i)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      delta:    { type: int, min: -100, max: 100, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the data pool given; which exist depends on the page." }
+      delta:    { type: int, min: -100, max: 100, required: true,
+                  label: Amount,
+                  description: "Percentage to move the fader by, negative down and positive up; -1 and 1 instead run EncoderLeft and EncoderRight when those are assigned to the executor." }
     send: { address: "/DataPool{datapool}/Encoder{executor}", args: [ { value: "{delta}", type: int } ] }
     returns: none
 
   key_down_datapool:
     summary: "Press (and hold) the key of an executor on the selected page in a data pool (i 1)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the data pool given; which exist depends on the page." }
     send: { address: "/DataPool{datapool}/Key{executor}", args: [ { value: "1", type: int } ] }
     returns: none
 
   key_up_datapool:
     summary: "Release the key of an executor on the selected page in a data pool (i 0)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the data pool given; which exist depends on the page." }
     send: { address: "/DataPool{datapool}/Key{executor}", args: [ { value: "0", type: int } ] }
     returns: none
 
   press_key_datapool:
     summary: "Press and release the key of an executor on the selected page in a data pool"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page in the data pool given; which exist depends on the page." }
     send:
       - { address: "/DataPool{datapool}/Key{executor}", args: [ { value: "1", type: int } ] }
       - { address: "/DataPool{datapool}/Key{executor}", args: [ { value: "0", type: int } ] }
@@ -555,58 +641,102 @@ commands:
   fader_datapool_page:
     summary: "Set the fader of an executor on a page in a data pool, in percent (/[DataPoolZ/][PageY/]FaderX, f)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: float, min: 0, max: 100, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the data pool given." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the data pool given; which exist depends on the page." }
+      level:    { type: float, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in percent, 0 to 100 with decimals (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
     send: { address: "/DataPool{datapool}/Page{page}/Fader{executor}", args: [ { value: "{level}", type: float } ] }
     returns: none
 
   fader_fade_datapool_page:
     summary: "Set the fader of an executor on a page in a data pool, in whole percent, with a fade time in seconds (ii)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the data pool given." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the data pool given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader position in whole percent to fade to, 0 to 100 (for the line's default FaderRange 0-100); what it moves depends on the executor's assigned fader function." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fader to reach the level, 0 for a snap; MA documents no upper bound, 3600 s is the one used here." }
     send: { address: "/DataPool{datapool}/Page{page}/Fader{executor}", args: [ { value: "{level}", type: int }, { value: "{fade}", type: int } ] }
     returns: none
 
   encoder_datapool_page:
     summary: "Turn the encoder of an executor on a page in a data pool: move its fader by a percentage, or -1/1 to run an assigned EncoderLeft/EncoderRight function (i)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      delta:    { type: int, min: -100, max: 100, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the data pool given." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the data pool given; which exist depends on the page." }
+      delta:    { type: int, min: -100, max: 100, required: true,
+                  label: Amount,
+                  description: "Percentage to move the fader by, negative down and positive up; -1 and 1 instead run EncoderLeft and EncoderRight when those are assigned to the executor." }
     send: { address: "/DataPool{datapool}/Page{page}/Encoder{executor}", args: [ { value: "{delta}", type: int } ] }
     returns: none
 
   key_down_datapool_page:
     summary: "Press (and hold) the key of an executor on a page in a data pool (i 1)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the data pool given." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the data pool given; which exist depends on the page." }
     send: { address: "/DataPool{datapool}/Page{page}/Key{executor}", args: [ { value: "1", type: int } ] }
     returns: none
 
   key_up_datapool_page:
     summary: "Release the key of an executor on a page in a data pool (i 0)"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the data pool given." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the data pool given; which exist depends on the page." }
     send: { address: "/DataPool{datapool}/Page{page}/Key{executor}", args: [ { value: "0", type: int } ] }
     returns: none
 
   press_key_datapool_page:
     summary: "Press and release the key of an executor on a page in a data pool"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "Data pool number as on the console." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page number as on the console, in the data pool given." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given in the data pool given; which exist depends on the page." }
     send:
       - { address: "/DataPool{datapool}/Page{page}/Key{executor}", args: [ { value: "1", type: int } ] }
       - { address: "/DataPool{datapool}/Page{page}/Key{executor}", args: [ { value: "0", type: int } ] }
@@ -615,24 +745,36 @@ commands:
   object_key_down:
     summary: "Press the key function of a pool object by its enumerated address, e.g. 13.13.1.6.1 (si <function>,1)"
     params:
-      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true }
-      function: { type: enum, values: ["Go+", "Go-", "<<<", ">>>", "Flash", "Black", "Temp", "Swap", "On", "Off", "Toggle", "Top", "Kill", "Pause", "Select", "SelectFixtures", "Rate1", "Speed1", "DoubleSpeed", "HalfSpeed", "Learn", "LearnSpeed", "ReSync", "FastSync", "Time"], required: true }
+      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true,
+                  label: Object address,
+                  description: "The object's enumerated address in the show's directory without the leading slash, such as 13.13.1.6.1 for sequence 1 as the OSC page gives it; addresses can change between software versions, so look it up on the console." }
+      function: { type: enum, values: ["Go+", "Go-", "<<<", ">>>", "Flash", "Black", "Temp", "Swap", "On", "Off", "Toggle", "Top", "Kill", "Pause", "Select", "SelectFixtures", "Rate1", "Speed1", "DoubleSpeed", "HalfSpeed", "Learn", "LearnSpeed", "ReSync", "FastSync", "Time"], required: true,
+                  label: Key function,
+                  description: "The key function to run, by its assign-menu name; MA shows only Flash and Black on the wire, so the other spellings are not confirmed for OSC." }
     send: { address: "/{object}", args: [ { value: "{function}", type: string }, { value: "1", type: int } ] }
     returns: none
 
   object_key_up:
     summary: "Release the key function of a pool object by its enumerated address (si <function>,0)"
     params:
-      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true }
-      function: { type: enum, values: ["Go+", "Go-", "<<<", ">>>", "Flash", "Black", "Temp", "Swap", "On", "Off", "Toggle", "Top", "Kill", "Pause", "Select", "SelectFixtures", "Rate1", "Speed1", "DoubleSpeed", "HalfSpeed", "Learn", "LearnSpeed", "ReSync", "FastSync", "Time"], required: true }
+      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true,
+                  label: Object address,
+                  description: "The object's enumerated address in the show's directory without the leading slash, such as 13.13.1.6.1 for sequence 1 as the OSC page gives it; addresses can change between software versions, so look it up on the console." }
+      function: { type: enum, values: ["Go+", "Go-", "<<<", ">>>", "Flash", "Black", "Temp", "Swap", "On", "Off", "Toggle", "Top", "Kill", "Pause", "Select", "SelectFixtures", "Rate1", "Speed1", "DoubleSpeed", "HalfSpeed", "Learn", "LearnSpeed", "ReSync", "FastSync", "Time"], required: true,
+                  label: Key function,
+                  description: "The key function to run, by its assign-menu name; MA shows only Flash and Black on the wire, so the other spellings are not confirmed for OSC." }
     send: { address: "/{object}", args: [ { value: "{function}", type: string }, { value: "0", type: int } ] }
     returns: none
 
   object_press_key:
     summary: "Press and release the key function of a pool object by its enumerated address"
     params:
-      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true }
-      function: { type: enum, values: ["Go+", "Go-", "<<<", ">>>", "Flash", "Black", "Temp", "Swap", "On", "Off", "Toggle", "Top", "Kill", "Pause", "Select", "SelectFixtures", "Rate1", "Speed1", "DoubleSpeed", "HalfSpeed", "Learn", "LearnSpeed", "ReSync", "FastSync", "Time"], required: true }
+      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true,
+                  label: Object address,
+                  description: "The object's enumerated address in the show's directory without the leading slash, such as 13.13.1.6.1 for sequence 1 as the OSC page gives it; addresses can change between software versions, so look it up on the console." }
+      function: { type: enum, values: ["Go+", "Go-", "<<<", ">>>", "Flash", "Black", "Temp", "Swap", "On", "Off", "Toggle", "Top", "Kill", "Pause", "Select", "SelectFixtures", "Rate1", "Speed1", "DoubleSpeed", "HalfSpeed", "Learn", "LearnSpeed", "ReSync", "FastSync", "Time"], required: true,
+                  label: Key function,
+                  description: "The key function to run, by its assign-menu name; MA shows only Flash and Black on the wire, so the other spellings are not confirmed for OSC." }
     send:
       - { address: "/{object}", args: [ { value: "{function}", type: string }, { value: "1", type: int } ] }
       - { address: "/{object}", args: [ { value: "{function}", type: string }, { value: "0", type: int } ] }
@@ -641,833 +783,1239 @@ commands:
   object_fader:
     summary: "Set a fader function of a pool object by its enumerated address, in percent (sif <function>,3,value)"
     params:
-      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true }
-      function: { type: enum, values: ["FaderMaster", "FaderCrossFade", "FaderCrossFadeA", "FaderCrossFadeB", "FaderTemp", "FaderRate", "FaderSpeed", "FaderTime"], default: FaderMaster }
-      level:    { type: float, min: 0, max: 100, required: true }
+      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true,
+                  label: Object address,
+                  description: "The object's enumerated address in the show's directory without the leading slash, such as 13.13.1.6.1 for sequence 1 as the OSC page gives it; addresses can change between software versions, so look it up on the console." }
+      function: { type: enum, values: ["FaderMaster", "FaderCrossFade", "FaderCrossFadeA", "FaderCrossFadeB", "FaderTemp", "FaderRate", "FaderSpeed", "FaderTime"], default: FaderMaster,
+                  label: Fader function,
+                  description: "The fader function to move, FaderMaster (intensity) by default; MA shows only FaderMaster on the wire, so the other spellings are not confirmed for OSC." }
+      level:    { type: float, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Position of the fader function in percent, 0 to 100 with decimals." }
     send: { address: "/{object}", args: [ { value: "{function}", type: string }, { value: "3", type: int }, { value: "{level}", type: float } ] }
     returns: none
 
   object_fader_relative:
     summary: "Move a fader function of a pool object by a percentage (sii <function>,handle,delta)"
     params:
-      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true }
-      function: { type: enum, values: ["FaderMaster", "FaderCrossFade", "FaderCrossFadeA", "FaderCrossFadeB", "FaderTemp", "FaderRate", "FaderSpeed", "FaderTime"], default: FaderMaster }
-      handle:   { type: int, min: 0, max: 3, default: 1 }
-      delta:    { type: int, min: -100, max: 100, required: true }
+      object:   { type: string, max_length: 32, pattern: "^[0-9]+(\\.[0-9]+)+$", required: true,
+                  label: Object address,
+                  description: "The object's enumerated address in the show's directory without the leading slash, such as 13.13.1.6.1 for sequence 1 as the OSC page gives it; addresses can change between software versions, so look it up on the console." }
+      function: { type: enum, values: ["FaderMaster", "FaderCrossFade", "FaderCrossFadeA", "FaderCrossFadeB", "FaderTemp", "FaderRate", "FaderSpeed", "FaderTime"], default: FaderMaster,
+                  label: Fader function,
+                  description: "The fader function to move, FaderMaster (intensity) by default; MA shows only FaderMaster on the wire, so the other spellings are not confirmed for OSC." }
+      handle:   { type: int, min: 0, max: 3, default: 1,
+                  label: Handle,
+                  description: "Handle type sent with the move, as MA's feedback names them: 0 is a physical rotary knob and 1 (the default) an on-screen knob or command; 2 and 3 are not described." }
+      delta:    { type: int, min: -100, max: 100, required: true,
+                  label: Amount,
+                  description: "Percentage to move the fader function by, negative down and positive up." }
     send: { address: "/{object}", args: [ { value: "{function}", type: string }, { value: "{handle}", type: int }, { value: "{delta}", type: int } ] }
     returns: none
 
   command:
     summary: "Raw grandMA3 command-line input, executed as typed (/cmd,s)"
     params:
-      line: { type: string, max_length: 1024, required: true }
+      line: { type: string, max_length: 1024, required: true,
+              label: Command line,
+              description: "Command-line input run as typed, such as Go+ Exec 402, up to 1024 characters; it needs Receive Command on the OSC line and runs anything, including Delete and Store." }
     send: { address: "/cmd", args: [ { value: "{line}", type: string } ] }
     returns: none
 
   go_executor:
     summary: "Go+: next cue, using its fade and delay times (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Go+ Executor {executor}", type: string } ] }
     returns: none
 
   go_back_executor:
     summary: "Go-: previous cue, using its normal fade time (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Go- Executor {executor}", type: string } ] }
     returns: none
 
   top_executor:
     summary: "Top: fade to the first cue (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Top Executor {executor}", type: string } ] }
     returns: none
 
   on_executor:
     summary: "On: start or restart (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "On Executor {executor}", type: string } ] }
     returns: none
 
   off_executor:
     summary: "Off: switch off (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Off Executor {executor}", type: string } ] }
     returns: none
 
   toggle_executor:
     summary: "Toggle: switch an active object off and an inactive object on (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Toggle Executor {executor}", type: string } ] }
     returns: none
 
   kill_executor:
     summary: "Kill: on, and every other playback without kill protection off (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Kill Executor {executor}", type: string } ] }
     returns: none
 
   pause_executor:
     summary: "Pause: toggle pause of the active fade, delay and phasers (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Pause Executor {executor}", type: string } ] }
     returns: none
 
   fast_forward_executor:
     summary: ">>> (GoFastForward): next cue without cue timing (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: ">>> Executor {executor}", type: string } ] }
     returns: none
 
   fast_back_executor:
     summary: "<<< (GoFastBackward): previous cue without cue timing (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "<<< Executor {executor}", type: string } ] }
     returns: none
 
   select_executor:
     summary: "Select: make it the selected object (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Select Executor {executor}", type: string } ] }
     returns: none
 
   rate1_executor:
     summary: "Rate1: reset the rate to 1:1 (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Rate1 Executor {executor}", type: string } ] }
     returns: none
 
   speed1_executor:
     summary: "Speed1: reset the speed to the default (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Speed1 Executor {executor}", type: string } ] }
     returns: none
 
   double_speed_executor:
     summary: "DoubleSpeed: double the resulting speed (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "DoubleSpeed Executor {executor}", type: string } ] }
     returns: none
 
   half_speed_executor:
     summary: "HalfSpeed: halve the resulting speed (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "HalfSpeed Executor {executor}", type: string } ] }
     returns: none
 
   learn_speed_executor:
     summary: "LearnSpeed: one tap of the speed (tap at least twice) (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "LearnSpeed Executor {executor}", type: string } ] }
     returns: none
 
   top_fade_executor:
     summary: "Top with a fade time in seconds (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fade to the first cue, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "Top Executor {executor} Fade {fade}", type: string } ] }
     returns: none
 
   flash_executor:
     summary: "Flash On (press) or Off (release): on with the master at full while held (an executor on the selected page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Flash,
+                  description: "On presses Flash (on with the master at full while held) and Off releases it." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Flash {state} Executor {executor}", type: string } ] }
     returns: none
 
   temp_executor:
     summary: "Temp On (press) or Off (release): on while held, following cue timing and the master (an executor on the selected page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Temp,
+                  description: "On presses Temp (on while held, following cue timing and the master) and Off releases it." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Temp {state} Executor {executor}", type: string } ] }
     returns: none
 
   swap_executor:
     summary: "Swap On (press) or Off (release): this master to full, all others to zero while held (an executor on the selected page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Swap,
+                  description: "On presses Swap (this master to full, all others to zero while held) and Off releases it." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Swap {state} Executor {executor}", type: string } ] }
     returns: none
 
   black_executor:
     summary: "Black On (press) or Off (release): master level to zero while held (an executor on the selected page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Black,
+                  description: "On presses Black (master level to zero while held) and Off releases it." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Black {state} Executor {executor}", type: string } ] }
     returns: none
 
   set_pause_executor:
     summary: "Pause On or Pause Off (an executor on the selected page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Pause,
+                  description: "On pauses the active fade, delay and phasers and Off resumes them." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Pause {state} Executor {executor}", type: string } ] }
     returns: none
 
   fix_executor:
     summary: "Fix On or Off: keep the executor on every page (an executor on the selected page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Fix,
+                  description: "On fixes the executor so it stays on every page and Off releases it." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Fix {state} Executor {executor}", type: string } ] }
     returns: none
 
   goto_cue_executor:
     summary: "Goto a cue (an executor on the selected page)"
     params:
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
     send: { address: "/cmd", args: [ { value: "Goto Cue {cue} Executor {executor}", type: string } ] }
     returns: none
 
   goto_cue_fade_executor:
     summary: "Goto a cue with a fade time in seconds (an executor on the selected page)"
     params:
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fade to the cue, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "Goto Cue {cue} Executor {executor} Fade {fade}", type: string } ] }
     returns: none
 
   load_cue_executor:
     summary: "Load a cue so the next Go+ or Go- jumps to it (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5; the next Go+ or Go- jumps to it." }
     send: { address: "/cmd", args: [ { value: "Load Executor {executor} Cue {cue}", type: string } ] }
     returns: none
 
   set_master_executor:
     summary: "FaderMaster: set the master (intensity) fader, in percent (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Master level,
+                  description: "Master (intensity) fader position in whole percent, 0 is zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_fader_temp_executor:
     summary: "FaderTemp: set the temp fader, in percent (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Temp fader,
+                  description: "Temp fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderTemp Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_executor:
     summary: "FaderCrossFade: set the crossfade fader, in percent (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade,
+                  description: "Crossfade fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFade Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_a_executor:
     summary: "FaderCrossFadeA: set the crossfade A fader, in percent (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade A,
+                  description: "Crossfade A fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFadeA Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_b_executor:
     summary: "FaderCrossFadeB: set the crossfade B fader, in percent (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade B,
+                  description: "Crossfade B fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFadeB Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_rate_executor:
     summary: "FaderRate: set the rate fader, in percent (100 is 1:1) (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Rate fader,
+                  description: "Rate fader position in whole percent, where 100 is a rate of 1:1." }
     send: { address: "/cmd", args: [ { value: "FaderRate Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_time_executor:
     summary: "FaderTime: set the time fader, in percent of the time range (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Time fader,
+                  description: "Time fader position in whole percent of the executor's time range." }
     send: { address: "/cmd", args: [ { value: "FaderTime Executor {executor} At {level}", type: string } ] }
     returns: none
 
   set_master_fade_executor:
     summary: "FaderMaster with a fade time in seconds (an executor on the selected page)"
     params:
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the selected page, which the operator can change." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Master level,
+                  description: "Master (intensity) fader position in whole percent to fade to, 0 is zero and 100 is full." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the master to fade to the level, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Executor {executor} At {level} Fade {fade}", type: string } ] }
     returns: none
 
   go_page_executor:
     summary: "Go+: next cue, using its fade and delay times (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Go+ Page {page}.{executor}", type: string } ] }
     returns: none
 
   go_back_page_executor:
     summary: "Go-: previous cue, using its normal fade time (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Go- Page {page}.{executor}", type: string } ] }
     returns: none
 
   top_page_executor:
     summary: "Top: fade to the first cue (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Top Page {page}.{executor}", type: string } ] }
     returns: none
 
   on_page_executor:
     summary: "On: start or restart (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "On Page {page}.{executor}", type: string } ] }
     returns: none
 
   off_page_executor:
     summary: "Off: switch off (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Off Page {page}.{executor}", type: string } ] }
     returns: none
 
   toggle_page_executor:
     summary: "Toggle: switch an active object off and an inactive object on (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Toggle Page {page}.{executor}", type: string } ] }
     returns: none
 
   kill_page_executor:
     summary: "Kill: on, and every other playback without kill protection off (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Kill Page {page}.{executor}", type: string } ] }
     returns: none
 
   pause_page_executor:
     summary: "Pause: toggle pause of the active fade, delay and phasers (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Pause Page {page}.{executor}", type: string } ] }
     returns: none
 
   fast_forward_page_executor:
     summary: ">>> (GoFastForward): next cue without cue timing (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: ">>> Page {page}.{executor}", type: string } ] }
     returns: none
 
   fast_back_page_executor:
     summary: "<<< (GoFastBackward): previous cue without cue timing (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "<<< Page {page}.{executor}", type: string } ] }
     returns: none
 
   select_page_executor:
     summary: "Select: make it the selected object (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Select Page {page}.{executor}", type: string } ] }
     returns: none
 
   rate1_page_executor:
     summary: "Rate1: reset the rate to 1:1 (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Rate1 Page {page}.{executor}", type: string } ] }
     returns: none
 
   speed1_page_executor:
     summary: "Speed1: reset the speed to the default (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Speed1 Page {page}.{executor}", type: string } ] }
     returns: none
 
   double_speed_page_executor:
     summary: "DoubleSpeed: double the resulting speed (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "DoubleSpeed Page {page}.{executor}", type: string } ] }
     returns: none
 
   half_speed_page_executor:
     summary: "HalfSpeed: halve the resulting speed (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "HalfSpeed Page {page}.{executor}", type: string } ] }
     returns: none
 
   learn_speed_page_executor:
     summary: "LearnSpeed: one tap of the speed (tap at least twice) (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "LearnSpeed Page {page}.{executor}", type: string } ] }
     returns: none
 
   top_fade_page_executor:
     summary: "Top with a fade time in seconds (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fade to the first cue, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "Top Page {page}.{executor} Fade {fade}", type: string } ] }
     returns: none
 
   flash_page_executor:
     summary: "Flash On (press) or Off (release): on with the master at full while held (an executor on a page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Flash,
+                  description: "On presses Flash (on with the master at full while held) and Off releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Flash {state} Page {page}.{executor}", type: string } ] }
     returns: none
 
   temp_page_executor:
     summary: "Temp On (press) or Off (release): on while held, following cue timing and the master (an executor on a page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Temp,
+                  description: "On presses Temp (on while held, following cue timing and the master) and Off releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Temp {state} Page {page}.{executor}", type: string } ] }
     returns: none
 
   swap_page_executor:
     summary: "Swap On (press) or Off (release): this master to full, all others to zero while held (an executor on a page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Swap,
+                  description: "On presses Swap (this master to full, all others to zero while held) and Off releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Swap {state} Page {page}.{executor}", type: string } ] }
     returns: none
 
   black_page_executor:
     summary: "Black On (press) or Off (release): master level to zero while held (an executor on a page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Black,
+                  description: "On presses Black (master level to zero while held) and Off releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Black {state} Page {page}.{executor}", type: string } ] }
     returns: none
 
   set_pause_page_executor:
     summary: "Pause On or Pause Off (an executor on a page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Pause,
+                  description: "On pauses the active fade, delay and phasers and Off resumes them." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Pause {state} Page {page}.{executor}", type: string } ] }
     returns: none
 
   fix_page_executor:
     summary: "Fix On or Off: keep the executor on every page (an executor on a page)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Fix,
+                  description: "On fixes the executor so it stays on every page and Off releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Fix {state} Page {page}.{executor}", type: string } ] }
     returns: none
 
   goto_cue_page_executor:
     summary: "Goto a cue (an executor on a page)"
     params:
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
     send: { address: "/cmd", args: [ { value: "Goto Cue {cue} Page {page}.{executor}", type: string } ] }
     returns: none
 
   goto_cue_fade_page_executor:
     summary: "Goto a cue with a fade time in seconds (an executor on a page)"
     params:
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fade to the cue, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "Goto Cue {cue} Page {page}.{executor} Fade {fade}", type: string } ] }
     returns: none
 
   load_cue_page_executor:
     summary: "Load a cue so the next Go+ or Go- jumps to it (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5; the next Go+ or Go- jumps to it." }
     send: { address: "/cmd", args: [ { value: "Load Page {page}.{executor} Cue {cue}", type: string } ] }
     returns: none
 
   set_master_page_executor:
     summary: "FaderMaster: set the master (intensity) fader, in percent (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Master level,
+                  description: "Master (intensity) fader position in whole percent, 0 is zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_fader_temp_page_executor:
     summary: "FaderTemp: set the temp fader, in percent (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Temp fader,
+                  description: "Temp fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderTemp Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_page_executor:
     summary: "FaderCrossFade: set the crossfade fader, in percent (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade,
+                  description: "Crossfade fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFade Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_a_page_executor:
     summary: "FaderCrossFadeA: set the crossfade A fader, in percent (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade A,
+                  description: "Crossfade A fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFadeA Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_b_page_executor:
     summary: "FaderCrossFadeB: set the crossfade B fader, in percent (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade B,
+                  description: "Crossfade B fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFadeB Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_rate_page_executor:
     summary: "FaderRate: set the rate fader, in percent (100 is 1:1) (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Rate fader,
+                  description: "Rate fader position in whole percent, where 100 is a rate of 1:1." }
     send: { address: "/cmd", args: [ { value: "FaderRate Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_time_page_executor:
     summary: "FaderTime: set the time fader, in percent of the time range (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Time fader,
+                  description: "Time fader position in whole percent of the executor's time range." }
     send: { address: "/cmd", args: [ { value: "FaderTime Page {page}.{executor} At {level}", type: string } ] }
     returns: none
 
   set_master_fade_page_executor:
     summary: "FaderMaster with a fade time in seconds (an executor on a page)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 101, max: 490, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 101, max: 490, required: true,
+                  label: Executor,
+                  description: "Executor number as on the console (101-190, 201-290, 301-390 or 401-490, with Xkeys at 191-198 and 291-298) on the page given; which exist depends on the page." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Master level,
+                  description: "Master (intensity) fader position in whole percent to fade to, 0 is zero and 100 is full." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the master to fade to the level, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Page {page}.{executor} At {level} Fade {fade}", type: string } ] }
     returns: none
 
   go_sequence:
     summary: "Go+: next cue, using its fade and delay times (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Go+ Sequence {sequence}", type: string } ] }
     returns: none
 
   go_back_sequence:
     summary: "Go-: previous cue, using its normal fade time (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Go- Sequence {sequence}", type: string } ] }
     returns: none
 
   top_sequence:
     summary: "Top: fade to the first cue (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Top Sequence {sequence}", type: string } ] }
     returns: none
 
   on_sequence:
     summary: "On: start or restart (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "On Sequence {sequence}", type: string } ] }
     returns: none
 
   off_sequence:
     summary: "Off: switch off (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Off Sequence {sequence}", type: string } ] }
     returns: none
 
   toggle_sequence:
     summary: "Toggle: switch an active object off and an inactive object on (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Toggle Sequence {sequence}", type: string } ] }
     returns: none
 
   kill_sequence:
     summary: "Kill: on, and every other playback without kill protection off (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Kill Sequence {sequence}", type: string } ] }
     returns: none
 
   pause_sequence:
     summary: "Pause: toggle pause of the active fade, delay and phasers (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Pause Sequence {sequence}", type: string } ] }
     returns: none
 
   fast_forward_sequence:
     summary: ">>> (GoFastForward): next cue without cue timing (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: ">>> Sequence {sequence}", type: string } ] }
     returns: none
 
   fast_back_sequence:
     summary: "<<< (GoFastBackward): previous cue without cue timing (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "<<< Sequence {sequence}", type: string } ] }
     returns: none
 
   select_sequence:
     summary: "Select: make it the selected object (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Select Sequence {sequence}", type: string } ] }
     returns: none
 
   rate1_sequence:
     summary: "Rate1: reset the rate to 1:1 (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Rate1 Sequence {sequence}", type: string } ] }
     returns: none
 
   speed1_sequence:
     summary: "Speed1: reset the speed to the default (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Speed1 Sequence {sequence}", type: string } ] }
     returns: none
 
   double_speed_sequence:
     summary: "DoubleSpeed: double the resulting speed (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "DoubleSpeed Sequence {sequence}", type: string } ] }
     returns: none
 
   half_speed_sequence:
     summary: "HalfSpeed: halve the resulting speed (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "HalfSpeed Sequence {sequence}", type: string } ] }
     returns: none
 
   learn_speed_sequence:
     summary: "LearnSpeed: one tap of the speed (tap at least twice) (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "LearnSpeed Sequence {sequence}", type: string } ] }
     returns: none
 
   top_fade_sequence:
     summary: "Top with a fade time in seconds (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fade to the first cue, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "Top Sequence {sequence} Fade {fade}", type: string } ] }
     returns: none
 
   flash_sequence:
     summary: "Flash On (press) or Off (release): on with the master at full while held (a sequence)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Flash,
+                  description: "On presses Flash (on with the master at full while held) and Off releases it." }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Flash {state} Sequence {sequence}", type: string } ] }
     returns: none
 
   temp_sequence:
     summary: "Temp On (press) or Off (release): on while held, following cue timing and the master (a sequence)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Temp,
+                  description: "On presses Temp (on while held, following cue timing and the master) and Off releases it." }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Temp {state} Sequence {sequence}", type: string } ] }
     returns: none
 
   swap_sequence:
     summary: "Swap On (press) or Off (release): this master to full, all others to zero while held (a sequence)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Swap,
+                  description: "On presses Swap (this master to full, all others to zero while held) and Off releases it." }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Swap {state} Sequence {sequence}", type: string } ] }
     returns: none
 
   black_sequence:
     summary: "Black On (press) or Off (release): master level to zero while held (a sequence)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Black,
+                  description: "On presses Black (master level to zero while held) and Off releases it." }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Black {state} Sequence {sequence}", type: string } ] }
     returns: none
 
   set_pause_sequence:
     summary: "Pause On or Pause Off (a sequence)"
     params:
-      state:    { type: enum, values: ["On", "Off"], required: true }
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      state:    { type: enum, values: ["On", "Off"], required: true,
+                  label: Pause,
+                  description: "On pauses the active fade, delay and phasers and Off resumes them." }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Pause {state} Sequence {sequence}", type: string } ] }
     returns: none
 
   goto_cue_sequence:
     summary: "Goto a cue (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5." }
     send: { address: "/cmd", args: [ { value: "Goto Sequence {sequence} Cue {cue}", type: string } ] }
     returns: none
 
   goto_cue_fade_sequence:
     summary: "Goto a cue with a fade time in seconds (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the fade to the cue, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "Goto Sequence {sequence} Cue {cue} Fade {fade}", type: string } ] }
     returns: none
 
   load_cue_sequence:
     summary: "Load a cue so the next Go+ or Go- jumps to it (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      cue:      { type: string, max_length: 9, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, up to four digits with up to three decimals, such as 5 or 12.5; the next Go+ or Go- jumps to it." }
     send: { address: "/cmd", args: [ { value: "Load Sequence {sequence} Cue {cue}", type: string } ] }
     returns: none
 
   set_master_sequence:
     summary: "FaderMaster: set the master (intensity) fader, in percent (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Master level,
+                  description: "Master (intensity) fader position in whole percent, 0 is zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_fader_temp_sequence:
     summary: "FaderTemp: set the temp fader, in percent (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Temp fader,
+                  description: "Temp fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderTemp Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_sequence:
     summary: "FaderCrossFade: set the crossfade fader, in percent (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade,
+                  description: "Crossfade fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFade Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_a_sequence:
     summary: "FaderCrossFadeA: set the crossfade A fader, in percent (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade A,
+                  description: "Crossfade A fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFadeA Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_crossfade_b_sequence:
     summary: "FaderCrossFadeB: set the crossfade B fader, in percent (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade B,
+                  description: "Crossfade B fader position in whole percent, 0 to 100." }
     send: { address: "/cmd", args: [ { value: "FaderCrossFadeB Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_rate_sequence:
     summary: "FaderRate: set the rate fader, in percent (100 is 1:1) (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Rate fader,
+                  description: "Rate fader position in whole percent, where 100 is a rate of 1:1." }
     send: { address: "/cmd", args: [ { value: "FaderRate Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_time_sequence:
     summary: "FaderTime: set the time fader, in percent of the time range (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Time fader,
+                  description: "Time fader position in whole percent of the executor's time range." }
     send: { address: "/cmd", args: [ { value: "FaderTime Sequence {sequence} At {level}", type: string } ] }
     returns: none
 
   set_master_fade_sequence:
     summary: "FaderMaster with a fade time in seconds (a sequence)"
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
-      level:    { type: int, min: 0, max: 100, required: true }
-      fade:     { type: int, min: 0, max: 3600, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Master level,
+                  description: "Master (intensity) fader position in whole percent to fade to, 0 is zero and 100 is full." }
+      fade:     { type: int, min: 0, max: 3600, required: true,
+                  label: Fade time,
+                  description: "Time in whole seconds for the master to fade to the level, 0 for a snap." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Sequence {sequence} At {level} Fade {fade}", type: string } ] }
     returns: none
 
   call_page:
     summary: "Change to an executor page"
     params:
-      page: { type: int, min: 1, max: 9999, required: true }
+      page: { type: int, min: 1, max: 9999, required: true,
+              label: Page,
+              description: "The executor page to change to, numbered as on the console." }
     send: { address: "/cmd", args: [ { value: "Page {page}", type: string } ] }
     returns: none
 
@@ -1479,28 +2027,36 @@ commands:
   select_datapool:
     summary: "Select a data pool"
     params:
-      datapool: { type: int, min: 1, max: 9999, required: true }
+      datapool: { type: int, min: 1, max: 9999, required: true,
+                  label: Data pool,
+                  description: "The data pool to select, numbered as on the console." }
     send: { address: "/cmd", args: [ { value: "Select DataPool {datapool}", type: string } ] }
     returns: none
 
   go_macro:
     summary: "Start a macro (Go+ Macro)"
     params:
-      macro: { type: int, min: 1, max: 9999, required: true }
+      macro: { type: int, min: 1, max: 9999, required: true,
+               label: Macro,
+               description: "Macro number in the macro pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Go+ Macro {macro}", type: string } ] }
     returns: none
 
   set_grand_master:
     summary: "Set the grand master (Master 2.1) in percent"
     params:
-      level: { type: int, min: 0, max: 100, required: true }
+      level: { type: int, min: 0, max: 100, required: true,
+               label: Grand master,
+               description: "Grand master level in whole percent, 0 takes every intensity to zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "FaderMaster Master 2.1 At {level}", type: string } ] }
     returns: none
 
   set_blind:
     summary: "Blind On or Off"
     params:
-      state: { type: enum, values: ["On", "Off"], required: true }
+      state: { type: enum, values: ["On", "Off"], required: true,
+               label: Blind,
+               description: "On switches Blind on, so programmer changes do not reach the output, and Off switches it off." }
     send: { address: "/cmd", args: [ { value: "Blind {state}", type: string } ] }
     returns: none
 
@@ -1512,7 +2068,9 @@ commands:
   set_freeze:
     summary: "Freeze On or Off (programmer above playbacks)"
     params:
-      state: { type: enum, values: ["On", "Off"], required: true }
+      state: { type: enum, values: ["On", "Off"], required: true,
+               label: Freeze,
+               description: "On switches Freeze on (programmer above playbacks) and Off switches it off." }
     send: { address: "/cmd", args: [ { value: "Freeze {state}", type: string } ] }
     returns: none
 
@@ -1524,7 +2082,9 @@ commands:
   set_highlight:
     summary: "Highlight On or Off"
     params:
-      state: { type: enum, values: ["On", "Off"], required: true }
+      state: { type: enum, values: ["On", "Off"], required: true,
+               label: Highlight,
+               description: "On switches Highlight on and Off switches it off." }
     send: { address: "/cmd", args: [ { value: "Highlight {state}", type: string } ] }
     returns: none
 
@@ -1536,7 +2096,9 @@ commands:
   set_solo:
     summary: "Solo On or Off (fixtures not selected to zero)"
     params:
-      state: { type: enum, values: ["On", "Off"], required: true }
+      state: { type: enum, values: ["On", "Off"], required: true,
+               label: Solo,
+               description: "On switches Solo on, taking fixtures that are not selected to zero, and Off switches it off." }
     send: { address: "/cmd", args: [ { value: "Solo {state}", type: string } ] }
     returns: none
 
@@ -1563,45 +2125,63 @@ commands:
   select_fixture:
     summary: "Select a fixture"
     params:
-      fixture: { type: int, min: 1, max: 99999, required: true }
+      fixture: { type: int, min: 1, max: 99999, required: true,
+                 label: Fixture,
+                 description: "Fixture ID as patched on the console." }
     send: { address: "/cmd", args: [ { value: "Fixture {fixture}", type: string } ] }
     returns: none
 
   fixture_at:
     summary: "Select a fixture and set its dimmer in percent"
     params:
-      fixture: { type: int, min: 1, max: 99999, required: true }
-      level:   { type: int, min: 0, max: 100, required: true }
+      fixture: { type: int, min: 1, max: 99999, required: true,
+                 label: Fixture,
+                 description: "Fixture ID as patched on the console." }
+      level:   { type: int, min: 0, max: 100, required: true,
+                 label: Dimmer,
+                 description: "Dimmer value in whole percent set in the programmer, 0 is zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "Fixture {fixture} At {level}", type: string } ] }
     returns: none
 
   select_group:
     summary: "Select the fixtures of a group"
     params:
-      group: { type: int, min: 1, max: 9999, required: true }
+      group: { type: int, min: 1, max: 9999, required: true,
+               label: Group,
+               description: "Group number in the group pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Group {group}", type: string } ] }
     returns: none
 
   group_at:
     summary: "Select a group and set its dimmer in percent"
     params:
-      group: { type: int, min: 1, max: 9999, required: true }
-      level: { type: int, min: 0, max: 100, required: true }
+      group: { type: int, min: 1, max: 9999, required: true,
+               label: Group,
+               description: "Group number in the group pool, as on the console." }
+      level: { type: int, min: 0, max: 100, required: true,
+               label: Dimmer,
+               description: "Dimmer value in whole percent set in the programmer, 0 is zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "Group {group} At {level}", type: string } ] }
     returns: none
 
   at_level:
     summary: "Set the dimmer of the current selection in percent"
     params:
-      level: { type: int, min: 0, max: 100, required: true }
+      level: { type: int, min: 0, max: 100, required: true,
+               label: Dimmer,
+               description: "Dimmer value in whole percent set in the programmer, 0 is zero and 100 is full." }
     send: { address: "/cmd", args: [ { value: "At {level}", type: string } ] }
     returns: none
 
   at_preset:
     summary: "Apply a preset (feature group.preset) to the selection"
     params:
-      feature_group: { type: int, min: 1, max: 9999, required: true }
-      preset:        { type: int, min: 1, max: 9999, required: true }
+      feature_group: { type: int, min: 1, max: 9999, required: true,
+                       label: Feature group,
+                       description: "The first number of the preset's address, the feature group, such as 21 in Preset 21.45." }
+      preset:        { type: int, min: 1, max: 9999, required: true,
+                       label: Preset,
+                       description: "The preset's number within the feature group, such as 45 in Preset 21.45." }
     send: { address: "/cmd", args: [ { value: "At Preset {feature_group}.{preset}", type: string } ] }
     returns: none
 
@@ -1618,63 +2198,81 @@ commands:
   call_view:
     summary: "Call a view on the screen it was stored for"
     params:
-      view: { type: int, min: 1, max: 9999, required: true }
+      view: { type: int, min: 1, max: 9999, required: true,
+              label: View,
+              description: "View number in the view pool; it is called on the screen it was stored for." }
     send: { address: "/cmd", args: [ { value: "View {view}", type: string } ] }
     returns: none
 
   call_world:
     summary: "Call a world"
     params:
-      world: { type: int, min: 1, max: 9999, required: true }
+      world: { type: int, min: 1, max: 9999, required: true,
+               label: World,
+               description: "World number in the world pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "World {world}", type: string } ] }
     returns: none
 
   go_timecode:
     summary: "Start a timecode show (Go+ Timecode)"
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Go+ Timecode {timecode}", type: string } ] }
     returns: none
 
   off_timecode:
     summary: "Switch a timecode show off"
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Off Timecode {timecode}", type: string } ] }
     returns: none
 
   pause_timecode:
     summary: "Toggle pause of a timecode show"
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Pause Timecode {timecode}", type: string } ] }
     returns: none
 
   top_timecode:
     summary: "Jump to the top of a timecode show"
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Top Timecode {timecode}", type: string } ] }
     returns: none
 
   go_timer:
     summary: "Start a timer (Go+ Timer)"
     params:
-      timer: { type: int, min: 1, max: 9999, required: true }
+      timer: { type: int, min: 1, max: 9999, required: true,
+               label: Timer,
+               description: "Timer number in the timer pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Go+ Timer {timer}", type: string } ] }
     returns: none
 
   off_timer:
     summary: "Switch a timer off"
     params:
-      timer: { type: int, min: 1, max: 9999, required: true }
+      timer: { type: int, min: 1, max: 9999, required: true,
+               label: Timer,
+               description: "Timer number in the timer pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Off Timer {timer}", type: string } ] }
     returns: none
 
   pause_timer:
     summary: "Toggle pause of a timer"
     params:
-      timer: { type: int, min: 1, max: 9999, required: true }
+      timer: { type: int, min: 1, max: 9999, required: true,
+               label: Timer,
+               description: "Timer number in the timer pool, as on the console." }
     send: { address: "/cmd", args: [ { value: "Pause Timer {timer}", type: string } ] }
     returns: none
 

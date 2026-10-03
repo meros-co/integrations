@@ -71,12 +71,16 @@ settings:
     default: administrator
     max_length: 64
     pattern: '^[^"]+$'
+    label: Username
+    description: "The show user the telnet session logs in as, case sensitive, so match the installation's exact spelling (administrator or Administrator)."
   password:
     type: string
     secret: true
     default: admin
     max_length: 64
     pattern: '^[^"]+$'
+    label: Password
+    description: "That user's password, case sensitive; a user without a password cannot be configured."
 
 on_connect:
   - 'Login "{settings.username}" "{settings.password}"'
@@ -322,7 +326,9 @@ commands:
   goto_cue:
     summary: Jump to a cue on the selected executor(s)
     params:
-      cue: { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
+      cue: { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+             label: Cue,
+             description: "Cue number as on the console, 0.001 to 9999.999 with up to three decimals, such as 5 or 12.5, jumped to on every selected executor." }
     send: "Goto Cue {cue}"
     returns: none
 
@@ -336,549 +342,807 @@ commands:
   go_executor:
     summary: "Go (Go+): next step of the executor's sequence, or start a step-less object (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Go Executor {executor}"
     returns: none
 
   go_page_executor:
     summary: "Go (Go+): next step of the executor's sequence, or start a step-less object (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Go Executor {page}.{executor}"
     returns: none
 
   go_back_executor:
     summary: "GoBack (Go-): previous step of the executor's sequence (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "GoBack Executor {executor}"
     returns: none
 
   go_back_page_executor:
     summary: "GoBack (Go-): previous step of the executor's sequence (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "GoBack Executor {page}.{executor}"
     returns: none
 
   goto_cue_executor:
     summary: "Jump to a cue on the executor (the current page's executor)"
     params:
-      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, 0.001 to 9999.999 with up to three decimals, such as 5 or 12.5." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Goto Cue {cue} Executor {executor}"
     returns: none
 
   goto_cue_page_executor:
     summary: "Jump to a cue on the executor (a page's executor)"
     params:
-      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, 0.001 to 9999.999 with up to three decimals, such as 5 or 12.5." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Goto Cue {cue} Executor {page}.{executor}"
     returns: none
 
   load_cue_executor:
     summary: "Load a cue so the next Go jumps to it (the current page's executor)"
     params:
-      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, 0.001 to 9999.999 with up to three decimals, such as 5 or 12.5; the next Go jumps to it." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Load Cue {cue} Executor {executor}"
     returns: none
 
   load_cue_page_executor:
     summary: "Load a cue so the next Go jumps to it (a page's executor)"
     params:
-      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, 0.001 to 9999.999 with up to three decimals, such as 5 or 12.5; the next Go jumps to it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Load Cue {cue} Executor {page}.{executor}"
     returns: none
 
   load_next_executor:
     summary: "Load the cue after the current (or loaded) cue (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "LoadNext Executor {executor}"
     returns: none
 
   load_next_page_executor:
     summary: "Load the cue after the current (or loaded) cue (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "LoadNext Executor {page}.{executor}"
     returns: none
 
   load_prev_executor:
     summary: "Load the cue before the current (or loaded) cue (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "LoadPrev Executor {executor}"
     returns: none
 
   load_prev_page_executor:
     summary: "Load the cue before the current (or loaded) cue (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "LoadPrev Executor {page}.{executor}"
     returns: none
 
   fast_forward_executor:
     summary: "GoFastForward (>>>): jump quickly to the next step (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: ">>> Executor {executor}"
     returns: none
 
   fast_forward_page_executor:
     summary: "GoFastForward (>>>): jump quickly to the next step (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: ">>> Executor {page}.{executor}"
     returns: none
 
   fast_back_executor:
     summary: "GoFastBack (<<<): jump quickly to the previous step (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "<<< Executor {executor}"
     returns: none
 
   fast_back_page_executor:
     summary: "GoFastBack (<<<): jump quickly to the previous step (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "<<< Executor {page}.{executor}"
     returns: none
 
   pause_executor:
     summary: "Toggle pause of the executor's crossfade, chaser or effect (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Pause Executor {executor}"
     returns: none
 
   pause_page_executor:
     summary: "Toggle pause of the executor's crossfade, chaser or effect (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Pause Executor {page}.{executor}"
     returns: none
 
   set_pause_executor:
     summary: "Pause On or Pause Off on the executor (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Pause,
+                  description: "True is Pause On and false is Pause Off for the executor." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Pause {active:on_off} Executor {executor}"
     returns: none
 
   set_pause_page_executor:
     summary: "Pause On or Pause Off on the executor (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Pause,
+                  description: "True is Pause On and false is Pause Off for the executor." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Pause {active:on_off} Executor {page}.{executor}"
     returns: none
 
   on_executor:
     summary: "Start or restart the executor (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "On Executor {executor}"
     returns: none
 
   on_page_executor:
     summary: "Start or restart the executor (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "On Executor {page}.{executor}"
     returns: none
 
   off_executor:
     summary: "Stop (switch off) the executor (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Off Executor {executor}"
     returns: none
 
   off_page_executor:
     summary: "Stop (switch off) the executor (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Off Executor {page}.{executor}"
     returns: none
 
   toggle_executor:
     summary: "Toggle the executor on or off (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Toggle Executor {executor}"
     returns: none
 
   toggle_page_executor:
     summary: "Toggle the executor on or off (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Toggle Executor {page}.{executor}"
     returns: none
 
   top_executor:
     summary: "Jump to the beginning of the executor's cue list (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Top Executor {executor}"
     returns: none
 
   top_page_executor:
     summary: "Jump to the beginning of the executor's cue list (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Top Executor {page}.{executor}"
     returns: none
 
   kill_executor:
     summary: "Go on the executor and switch off every executor without kill protect (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Kill Executor {executor}"
     returns: none
 
   kill_page_executor:
     summary: "Go on the executor and switch off every executor without kill protect (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Kill Executor {page}.{executor}"
     returns: none
 
   flash_executor:
     summary: "Flash On (press) or Flash Off (release): master to full without timing (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Flash,
+                  description: "True presses Flash (master to full without timing) and false releases it." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Flash {active:on_off} Executor {executor}"
     returns: none
 
   flash_page_executor:
     summary: "Flash On (press) or Flash Off (release): master to full without timing (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Flash,
+                  description: "True presses Flash (master to full without timing) and false releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Flash {active:on_off} Executor {page}.{executor}"
     returns: none
 
   flash_go_executor:
     summary: "FlashGo: flash and go to the next cue (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "FlashGo Executor {executor}"
     returns: none
 
   flash_go_page_executor:
     summary: "FlashGo: flash and go to the next cue (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "FlashGo Executor {page}.{executor}"
     returns: none
 
   flash_on_executor:
     summary: "FlashOn keyword: activate the cue ignoring fade times and master level (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "FlashOn Executor {executor}"
     returns: none
 
   flash_on_page_executor:
     summary: "FlashOn keyword: activate the cue ignoring fade times and master level (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "FlashOn Executor {page}.{executor}"
     returns: none
 
   temp_executor:
     summary: "Temp On (press) or Temp Off (release), following cue timing and the master (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Temp,
+                  description: "True presses Temp (following cue timing and the master) and false releases it." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Temp {active:on_off} Executor {executor}"
     returns: none
 
   temp_page_executor:
     summary: "Temp On (press) or Temp Off (release), following cue timing and the master (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Temp,
+                  description: "True presses Temp (following cue timing and the master) and false releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Temp {active:on_off} Executor {page}.{executor}"
     returns: none
 
   swop_executor:
     summary: "Swop On or Off: this master to full, all others to zero; off again on release (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Swop,
+                  description: "True presses Swop (this master to full, all others to zero) and false releases it, switching it off again." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Swop {active:on_off} Executor {executor}"
     returns: none
 
   swop_page_executor:
     summary: "Swop On or Off: this master to full, all others to zero; off again on release (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Swop,
+                  description: "True presses Swop (this master to full, all others to zero) and false releases it, switching it off again." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Swop {active:on_off} Executor {page}.{executor}"
     returns: none
 
   swop_on_executor:
     summary: "SwopOn On or Off: as Swop, but the executor stays on after release (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: SwopOn,
+                  description: "True presses SwopOn (this master to full, all others to zero) and false releases it, leaving the executor on." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "SwopOn {active:on_off} Executor {executor}"
     returns: none
 
   swop_on_page_executor:
     summary: "SwopOn On or Off: as Swop, but the executor stays on after release (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: SwopOn,
+                  description: "True presses SwopOn (this master to full, all others to zero) and false releases it, leaving the executor on." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "SwopOn {active:on_off} Executor {page}.{executor}"
     returns: none
 
   swop_go_executor:
     summary: "SwopGo On or Off: as SwopOn, and go to the next cue (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: SwopGo,
+                  description: "True presses SwopGo (as SwopOn, and go to the next cue) and false releases it." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "SwopGo {active:on_off} Executor {executor}"
     returns: none
 
   swop_go_page_executor:
     summary: "SwopGo On or Off: as SwopOn, and go to the next cue (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: SwopGo,
+                  description: "True presses SwopGo (as SwopOn, and go to the next cue) and false releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "SwopGo {active:on_off} Executor {page}.{executor}"
     returns: none
 
   black_executor:
     summary: "Black On or Off: master level temporarily to zero (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Black,
+                  description: "True takes the master level to zero (Black On) and false restores it (Black Off)." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Black {active:on_off} Executor {executor}"
     returns: none
 
   black_page_executor:
     summary: "Black On or Off: master level temporarily to zero (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Black,
+                  description: "True takes the master level to zero (Black On) and false restores it (Black Off)." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Black {active:on_off} Executor {page}.{executor}"
     returns: none
 
   to_full_executor:
     summary: "Set the executor's master level to 100% (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "ToFull Executor {executor}"
     returns: none
 
   to_full_page_executor:
     summary: "Set the executor's master level to 100% (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "ToFull Executor {page}.{executor}"
     returns: none
 
   to_zero_executor:
     summary: "Set the executor's master level to zero (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "ToZero Executor {executor}"
     returns: none
 
   to_zero_page_executor:
     summary: "Set the executor's master level to zero (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "ToZero Executor {page}.{executor}"
     returns: none
 
   set_crossfade_executor:
     summary: "Set the executor's crossfade position in percent (the current page's executor)"
     params:
-      level:    { type: int, min: 0, max: 100, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade,
+                  description: "Crossfade position in whole percent, 0 to 100." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Crossfade {level} Executor {executor}"
     returns: none
 
   set_crossfade_page_executor:
     summary: "Set the executor's crossfade position in percent (a page's executor)"
     params:
-      level:    { type: int, min: 0, max: 100, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Crossfade,
+                  description: "Crossfade position in whole percent, 0 to 100." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Crossfade {level} Executor {page}.{executor}"
     returns: none
 
   learn_executor:
     summary: "Tap the executor's speed (one tap per call) (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Learn Executor {executor}"
     returns: none
 
   learn_page_executor:
     summary: "Tap the executor's speed (one tap per call) (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Learn Executor {page}.{executor}"
     returns: none
 
   reset_rate_executor:
     summary: "Reset the executor's rate to 1:1 (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Rate1 Executor {executor}"
     returns: none
 
   reset_rate_page_executor:
     summary: "Reset the executor's rate to 1:1 (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Rate1 Executor {page}.{executor}"
     returns: none
 
   double_rate_executor:
     summary: "Double the executor's rate (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "DoubleRate Executor {executor}"
     returns: none
 
   double_rate_page_executor:
     summary: "Double the executor's rate (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "DoubleRate Executor {page}.{executor}"
     returns: none
 
   half_rate_executor:
     summary: "Halve the executor's rate (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "HalfRate Executor {executor}"
     returns: none
 
   half_rate_page_executor:
     summary: "Halve the executor's rate (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "HalfRate Executor {page}.{executor}"
     returns: none
 
   double_speed_executor:
     summary: "Double the executor's speed (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "DoubleSpeed Executor {executor}"
     returns: none
 
   double_speed_page_executor:
     summary: "Double the executor's speed (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "DoubleSpeed Executor {page}.{executor}"
     returns: none
 
   half_speed_executor:
     summary: "Halve the executor's speed (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "HalfSpeed Executor {executor}"
     returns: none
 
   half_speed_page_executor:
     summary: "Halve the executor's speed (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "HalfSpeed Executor {page}.{executor}"
     returns: none
 
   fix_executor:
     summary: "Fix On or Off: keep the executor in place on page changes (the current page's executor)"
     params:
-      active:   { type: bool, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Fix,
+                  description: "True fixes the executor so it stays in place on page changes and false releases it." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Fix {active:on_off} Executor {executor}"
     returns: none
 
   fix_page_executor:
     summary: "Fix On or Off: keep the executor in place on page changes (a page's executor)"
     params:
-      active:   { type: bool, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      active:   { type: bool, required: true,
+                  label: Fix,
+                  description: "True fixes the executor so it stays in place on page changes and false releases it." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Fix {active:on_off} Executor {page}.{executor}"
     returns: none
 
   select_executor:
     summary: "Make the executor the selected executor (the current page's executor)"
     params:
-      executor: { type: int, min: 1, max: 220, required: true }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Select Executor {executor}"
     returns: none
 
   select_page_executor:
     summary: "Make the executor the selected executor (a page's executor)"
     params:
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Select Executor {page}.{executor}"
     returns: none
 
   set_fader_executor:
     summary: Set the fader (master level) of the current page's executor, in percent
     params:
-      level:    { type: int, min: 0, max: 100, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader (master level) in whole percent, 0 is zero and 100 is full." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the current fader or button page, which an operator can change: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Executor {executor} At {level}"
     returns: none
 
   set_fader_page_executor:
     summary: Set the fader (master level) of a page's executor, in percent
     params:
-      level:    { type: int, min: 0, max: 100, required: true }
-      page:     { type: int, min: 1, max: 9999, required: true }
-      executor: { type: int, min: 1, max: 220, required: true }
+      level:    { type: int, min: 0, max: 100, required: true,
+                  label: Level,
+                  description: "Fader (master level) in whole percent, 0 is zero and 100 is full." }
+      page:     { type: int, min: 1, max: 9999, required: true,
+                  label: Page,
+                  description: "Executor page the executor is on, numbered as on the console." }
+      executor: { type: int, min: 1, max: 220, required: true,
+                  label: Executor,
+                  description: "Executor number on the page given, as on the console: fader executors 1-30 (1-15 on a light or ultra light) and button executors 101-190, depending on the hardware and wings." }
     send: "Executor {page}.{executor} At {level}"
     returns: none
 
@@ -886,57 +1150,75 @@ commands:
   fire_macro:
     summary: Start a macro (Go Macro)
     params:
-      macro: { type: int, min: 1, max: 9999, required: true }
+      macro: { type: int, min: 1, max: 9999, required: true,
+               label: Macro,
+               description: "Macro number in the macro pool, as on the console." }
     send: "Go Macro {macro}"
     returns: none
 
   pause_macro:
     summary: Toggle pause of a running macro
     params:
-      macro: { type: int, min: 1, max: 9999, required: true }
+      macro: { type: int, min: 1, max: 9999, required: true,
+               label: Macro,
+               description: "Number of the running macro in the macro pool, as on the console." }
     send: "Pause Macro {macro}"
     returns: none
 
   goto_cue_sequence:
     summary: Jump to a cue of a sequence, addressed by sequence rather than executor
     params:
-      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true }
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      cue:      { type: string, max_length: 8, pattern: "^[0-9]{1,4}(\\.[0-9]{1,3})?$", required: true,
+                  label: Cue,
+                  description: "Cue number as on the console, 0.001 to 9999.999 with up to three decimals, such as 5 or 12.5." }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: "Goto Cue {cue} Sequence {sequence}"
     returns: none
 
   toggle_sequence:
     summary: Toggle a sequence on or off
     params:
-      sequence: { type: int, min: 1, max: 9999, required: true }
+      sequence: { type: int, min: 1, max: 9999, required: true,
+                  label: Sequence,
+                  description: "Sequence number in the sequence pool, as on the console." }
     send: "Toggle Sequence {sequence}"
     returns: none
 
   go_timecode:
     summary: Play a timecode show
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: "Go Timecode {timecode}"
     returns: none
 
   top_timecode:
     summary: Rewind a timecode show to its beginning
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: "Top Timecode {timecode}"
     returns: none
 
   pause_timecode:
     summary: Toggle pause of a timecode show
     params:
-      timecode: { type: int, min: 1, max: 9999, required: true }
+      timecode: { type: int, min: 1, max: 9999, required: true,
+                  label: Timecode show,
+                  description: "Timecode show number in the timecode pool, as on the console." }
     send: "Pause Timecode {timecode}"
     returns: none
 
   pause_timer:
     summary: Toggle pause of a timer
     params:
-      timer: { type: int, min: 1, max: 9999, required: true }
+      timer: { type: int, min: 1, max: 9999, required: true,
+               label: Timer,
+               description: "Timer number in the timer pool, as on the console." }
     send: "Pause Timer {timer}"
     returns: none
 
@@ -944,35 +1226,45 @@ commands:
   call_page:
     summary: Change both fader and button executors to a page
     params:
-      page: { type: int, min: 1, max: 9999, required: true }
+      page: { type: int, min: 1, max: 9999, required: true,
+              label: Page,
+              description: "The page to change both fader and button executors to, numbered as on the console." }
     send: "Page {page}"
     returns: none
 
   fader_page:
     summary: Change the fader executors to a page
     params:
-      page: { type: int, min: 1, max: 9999, required: true }
+      page: { type: int, min: 1, max: 9999, required: true,
+              label: Page,
+              description: "The page to change the fader executors to, numbered as on the console." }
     send: "FaderPage {page}"
     returns: none
 
   button_page:
     summary: Change the button executors (101-190) to a page that already exists
     params:
-      page: { type: int, min: 1, max: 9999, required: true }
+      page: { type: int, min: 1, max: 9999, required: true,
+              label: Page,
+              description: "The page to change the button executors to, numbered as on the console; it must already exist." }
     send: "ButtonPage {page}"
     returns: none
 
   channel_page:
     summary: Change the executor faders to a channel page
     params:
-      page: { type: int, min: 1, max: 9999, required: true }
+      page: { type: int, min: 1, max: 9999, required: true,
+              label: Channel page,
+              description: "The channel page to change the executor faders to, numbered as on the console." }
     send: "ChannelPage {page}"
     returns: none
 
   pause_page:
     summary: Toggle pause of every executor on a page
     params:
-      page: { type: int, min: 1, max: 9999, required: true }
+      page: { type: int, min: 1, max: 9999, required: true,
+              label: Page,
+              description: "The page whose executors all have their pause toggled, numbered as on the console." }
     send: "Pause Page {page}"
     returns: none
 
@@ -980,7 +1272,9 @@ commands:
   set_grand_master:
     summary: Set the Grand Master (SpecialMaster 2.1) in percent
     params:
-      level: { type: int, min: 0, max: 100, required: true }
+      level: { type: int, min: 0, max: 100, required: true,
+               label: Grand master,
+               description: "Grand Master level in whole percent, 0 takes every intensity to zero and 100 is full." }
     send: "SpecialMaster 2.1 At {level}"
     returns: none
 
@@ -997,7 +1291,9 @@ commands:
   set_blackout:
     summary: Blackout On or Off (forces dimmer output to zero)
     params:
-      active: { type: bool, required: true }
+      active: { type: bool, required: true,
+                label: Blackout,
+                description: "True forces dimmer output to zero (Blackout On) and false releases it." }
     send: "Blackout {active:on_off}"
     returns: none
 
@@ -1009,7 +1305,9 @@ commands:
   set_blind:
     summary: Blind On or Off (suppress live programmer output)
     params:
-      active: { type: bool, required: true }
+      active: { type: bool, required: true,
+                label: Blind,
+                description: "True switches Blind on, suppressing live programmer output, and false switches it off." }
     send: "Blind {active:on_off}"
     returns: none
 
@@ -1021,7 +1319,9 @@ commands:
   set_freeze:
     summary: Freeze On or Off (programmer above playbacks except Super priority)
     params:
-      active: { type: bool, required: true }
+      active: { type: bool, required: true,
+                label: Freeze,
+                description: "True switches Freeze on (programmer above playbacks except Super priority) and false switches it off." }
     send: "Freeze {active:on_off}"
     returns: none
 
@@ -1033,7 +1333,9 @@ commands:
   set_solo:
     summary: Solo On or Off (only selected fixtures keep intensity)
     params:
-      active: { type: bool, required: true }
+      active: { type: bool, required: true,
+                label: Solo,
+                description: "True switches Solo on, so only the selected fixtures keep intensity, and false switches it off." }
     send: "Solo {active:on_off}"
     returns: none
 
@@ -1045,7 +1347,9 @@ commands:
   set_highlight:
     summary: Highlight On or Off for the selected fixtures
     params:
-      active: { type: bool, required: true }
+      active: { type: bool, required: true,
+                label: Highlight,
+                description: "True switches Highlight on for the selected fixtures and false switches it off." }
     send: "Highlight {active:on_off}"
     returns: none
 
@@ -1058,21 +1362,27 @@ commands:
   call_view:
     summary: Call a view from the view pool on the screen it was stored from
     params:
-      view: { type: int, min: 1, max: 9999, required: true }
+      view: { type: int, min: 1, max: 9999, required: true,
+              label: View,
+              description: "View number in the view pool; it is called on the screen it was stored from." }
     send: "View {view}"
     returns: none
 
   view_page:
     summary: Call one of the 11 view pages
     params:
-      page: { type: int, min: 1, max: 11, required: true }
+      page: { type: int, min: 1, max: 11, required: true,
+              label: View page,
+              description: "The view page to call, 1 to 11 as on the console." }
     send: "ViewPage {page}"
     returns: none
 
   call_world:
     summary: Call a world
     params:
-      world: { type: int, min: 1, max: 9999, required: true }
+      world: { type: int, min: 1, max: 9999, required: true,
+               label: World,
+               description: "World number in the world pool, as on the console." }
     send: "World {world}"
     returns: none
 
@@ -1080,39 +1390,57 @@ commands:
   select_group:
     summary: Select the fixtures of a group (SelFix)
     params:
-      group: { type: int, min: 1, max: 9999, required: true }
+      group: { type: int, min: 1, max: 9999, required: true,
+               label: Group,
+               description: "Group number in the group pool, as on the console." }
     send: "Group {group}"
     returns: none
 
   group_at:
     summary: Select a group and set its dimmer in percent in the programmer
     params:
-      group: { type: int, min: 1, max: 9999, required: true }
-      level: { type: int, min: 0, max: 100, required: true }
+      group: { type: int, min: 1, max: 9999, required: true,
+               label: Group,
+               description: "Group number in the group pool, as on the console." }
+      level: { type: int, min: 0, max: 100, required: true,
+               label: Dimmer,
+               description: "Dimmer value in whole percent set in the programmer, 0 is zero and 100 is full." }
     send: "Group {group} At {level}"
     returns: none
 
   fixture_at:
     summary: Select a fixture and set its dimmer in percent in the programmer
     params:
-      fixture: { type: int, min: 1, max: 99999, required: true }
-      level:   { type: int, min: 0, max: 100, required: true }
+      fixture: { type: int, min: 1, max: 99999, required: true,
+                 label: Fixture,
+                 description: "Fixture ID as patched on the console." }
+      level:   { type: int, min: 0, max: 100, required: true,
+                 label: Dimmer,
+                 description: "Dimmer value in whole percent set in the programmer, 0 is zero and 100 is full." }
     send: "Fixture {fixture} At {level}"
     returns: none
 
   channel_at:
     summary: Select a channel and set its dimmer in percent in the programmer
     params:
-      channel: { type: int, min: 1, max: 99999, required: true }
-      level:   { type: int, min: 0, max: 100, required: true }
+      channel: { type: int, min: 1, max: 99999, required: true,
+                 label: Channel,
+                 description: "Channel ID as patched on the console." }
+      level:   { type: int, min: 0, max: 100, required: true,
+                 label: Dimmer,
+                 description: "Dimmer value in whole percent set in the programmer, 0 is zero and 100 is full." }
     send: "Channel {channel} At {level}"
     returns: none
 
   at_preset:
     summary: Apply a preset (preset type.preset) to the current selection
     params:
-      preset_type: { type: int, min: 1, max: 9999, required: true }
-      preset:      { type: int, min: 1, max: 9999, required: true }
+      preset_type: { type: int, min: 1, max: 9999, required: true,
+                     label: Preset type,
+                     description: "The first number of the preset's address, the preset type, such as 2 in Preset 2.5." }
+      preset:      { type: int, min: 1, max: 9999, required: true,
+                     label: Preset,
+                     description: "The preset's number within the preset type, such as 5 in Preset 2.5." }
     send: "At Preset {preset_type}.{preset}"
     returns: none
 
@@ -1145,7 +1473,9 @@ commands:
   command:
     summary: Raw console command-line input, executed as typed
     params:
-      line: { type: string, max_length: 256, required: true }
+      line: { type: string, max_length: 256, required: true,
+              label: Command line,
+              description: "Console command-line input run as typed, up to 256 characters; it runs anything, including Delete and Store, and line breaks are rejected." }
     send: "{line}"
     returns: none
 
