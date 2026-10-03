@@ -57,6 +57,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
+    ("vendor-christie", &["christie-spyder"]),
     ("vendor-etc", &["etc-eos"]),
     ("vendor-figure53", &["qlab"]),
     (
