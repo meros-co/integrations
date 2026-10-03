@@ -249,6 +249,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On protocol 1.8 and 1.11 decks, check which other documented commands work. ([specs/blackmagic-hyperdeck.yaml:2261](specs/blackmagic-hyperdeck.yaml#L2261))
 - [ ] Check how many clients may connect at once. ([specs/blackmagic-hyperdeck.yaml:2190](specs/blackmagic-hyperdeck.yaml#L2190))
 
+## blackmagic-multiview — Blackmagic MultiView 16 / MultiView 4
+
+- [ ] On MultiView 4, check which routing output is the solo source (wire 4 assumed) and whether its solo source can be set over Ethernet at all. ([specs/blackmagic-multiview.yaml:420](specs/blackmagic-multiview.yaml#L420))
+- [ ] Check that every CONFIGURATION line can be set by sending the block (the manual shows only Solo enabled being sent), and the boolean case the unit reports. ([specs/blackmagic-multiview.yaml:439](specs/blackmagic-multiview.yaml#L439))
+- [ ] Check how Output format values map on MultiView 4. ([specs/blackmagic-multiview.yaml:451](specs/blackmagic-multiview.yaml#L451))
+- [ ] Check whether the MultiView accepts F (force unlock) on VIDEO OUTPUT LOCKS. ([specs/blackmagic-multiview.yaml:460](specs/blackmagic-multiview.yaml#L460))
+- [ ] Confirm the MULTIVIEW DEVICE output count (16 in the manual's example, with 18 routing outputs). ([specs/blackmagic-multiview.yaml:393](specs/blackmagic-multiview.yaml#L393))
+
+## blackmagic-smartview — Blackmagic SmartView / SmartScope
+
+- [ ] Check that the monitor answers commands with ACK/NAK, answers header-only status requests and PING, as the Videohub protocol does. ([specs/blackmagic-smartview.yaml:389](specs/blackmagic-smartview.yaml#L389))
+- [ ] Check how the name is set (Name in the SMARTVIEW DEVICE block assumed). ([specs/blackmagic-smartview.yaml:389](specs/blackmagic-smartview.yaml#L389))
+- [ ] Record how WidescreenSD and Border are reported (case, ON/OFF or true/false). ([specs/blackmagic-smartview.yaml:418](specs/blackmagic-smartview.yaml#L418))
+- [ ] Check how a single-monitor model answers a MONITOR B block. ([specs/blackmagic-smartview.yaml:426](specs/blackmagic-smartview.yaml#L426))
+- [ ] On SmartView 4K, check MonitorInput (community-observed), and whether SmartView 4K G3 has it. ([specs/blackmagic-smartview.yaml:439](specs/blackmagic-smartview.yaml#L439))
+- [ ] Check whether SmartView 4K accepts contrast and saturation. ([specs/blackmagic-smartview.yaml:447](specs/blackmagic-smartview.yaml#L447))
 ## blackmagic-streaming — Blackmagic Web Presenter / Streaming
 
 - [ ] Check whether the device accepts a Streaming XML file sent on a single line. ([specs/blackmagic-streaming.yaml:681](specs/blackmagic-streaming.yaml#L681))
