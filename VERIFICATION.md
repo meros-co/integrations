@@ -547,6 +547,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On ILCE-7CM2, ILCE-7CR and ILX-LR1 firmware 1.00, check focus indication from AF status events and whether focal distance reads sensibly. ([specs/sony-camera.yaml:2371](specs/sony-camera.yaml#L2371))
 - [ ] Opened for commands only, confirm the camera tolerates GetDeviceInfo once a second as the liveness check. ([crates/core/src/modules/sony_camera.rs:48](crates/core/src/modules/sony_camera.rs#L48))
 
+## symetrix-composer — Symetrix Composer DSPs
+
+- [ ] Check that pushed GSYSS strings (with "Enable System String Pushing") do not start with "#" lines that look like controller pushes, and what they look like; they are currently ignored, or taken as an answer. ([specs/symetrix-composer.yaml:44](specs/symetrix-composer.yaml#L44))
+- [ ] Check that EH 0 and SQ 1 are answered ACK on a unit already in quiet mode with echo off, and what they answer when echo was on. ([specs/symetrix-composer.yaml:51](specs/symetrix-composer.yaml#L51))
+- [ ] Check whether a GS2 answer pads the controller number, and whether GS answers are padded. ([specs/symetrix-composer.yaml:138](specs/symetrix-composer.yaml#L138))
+- [ ] Check what a GSB2 block read answers for a block within range (no ACK is expected after the lines). ([specs/symetrix-composer.yaml:138](specs/symetrix-composer.yaml#L138))
+- [ ] Check that the fader conversion (-72 to +12 dB over 0-65535) matches Composer's display on a typical volume fader. ([specs/symetrix-composer.yaml:145](specs/symetrix-composer.yaml#L145))
+- [ ] Check what GSYSS answers for an empty string, and that NAK is its failure answer. ([specs/symetrix-composer.yaml:225](specs/symetrix-composer.yaml#L225))
+- [ ] Check whether CMV Toggle needs the trailing value the document's example carries ("CMV Toggle 0.1.OMute.O2 1"), and whether the documented feature names (CPGain, IGain, OGain) or the examples' (InGain, OutGain, CPVol) are the ones accepted. ([specs/symetrix-composer.yaml:393](specs/symetrix-composer.yaml#L393))
+- [ ] Check that PU 1 and PUR on connecting send every push-enabled value to this TCP session. ([specs/symetrix-composer.yaml:417](specs/symetrix-composer.yaml#L417))
+- [ ] Confirm the model list: which current products (Radius NX, Prism, Edge, Solus NX) speak this protocol revision unchanged. ([specs/symetrix-composer.yaml:475](specs/symetrix-composer.yaml#L475))
+
+## symetrix-jupiter — Symetrix Jupiter
+
+- [ ] Check that Jupiter accepts GPR D as the liveness probe at any time and answers PrstD=nnnn. ([specs/symetrix-jupiter.yaml:132](specs/symetrix-jupiter.yaml#L132))
+- [ ] Check that PU 1, PUE and PUR on connecting make every controller's value arrive at this session's UDP port. ([specs/symetrix-jupiter.yaml:212](specs/symetrix-jupiter.yaml#L212))
+- [ ] Check which buttons of each Jupiter app use negative logic. ([specs/symetrix-jupiter.yaml:113](specs/symetrix-jupiter.yaml#L113))
+- [ ] Check that answers never start with "#", which is how pushes are told apart. ([specs/symetrix-jupiter.yaml:38](specs/symetrix-jupiter.yaml#L38))
+
 ## tsl-umd-listener — TSL UMD tally received from a switcher
 
 - [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))

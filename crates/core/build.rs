@@ -111,6 +111,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-shure", &["shure-wireless"]),
     ("vendor-sony", &["sony-camera", "visca"]),
     ("vendor-studiocoast", &["vmix"]),
+    (
+        "vendor-symetrix",
+        &["symetrix-composer", "symetrix-jupiter"],
+    ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (
         "vendor-yamaha",

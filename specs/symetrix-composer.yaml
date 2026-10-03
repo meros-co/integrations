@@ -1,0 +1,486 @@
+spec: 1
+id: symetrix-composer
+name: Symetrix Composer DSPs (Composer Control Protocol)
+vendor: Symetrix
+category: mixer
+
+# Written from Symetrix's Composer Control Protocol document. Everything a
+# designer can adjust in Composer is reached by the controller number the
+# designer assigns to it (1-10000), with a 16-bit position (0-65535), so
+# commands take the controller number as a parameter. RS-232, the UDP form of
+# the same protocol on 48631, and the Set Baud command (RS-232 only) are not
+# used here.
+source:
+  - title: "Composer v7.0 Control Protocol (document dated 08/09/18, (c) 2016 Symetrix)"
+    author: Symetrix, Inc.
+    url: "https://www.symetrix.co/wp-content/uploads/2024/04/Composer-Control-Protocol-v7.0-080918.pdf"
+    note: >
+      Manufacturer document, also at
+      https://audiobrains.com/data/symetrix/others/Composer-Control-Protocol-v7.0-080918.pdf
+      and linked from https://www.symetrix.co/knowledge/composer-control-protocol/ .
+      Ethernet control: TCP or UDP port 48631, commands end in CR, up to six
+      TCP sessions (the least recently used closed for a seventh), responses
+      end in CR, quiet mode on and echo off by default, push data goes to
+      every TCP session p.3-4; site identifier p.4; parameter notes (faders
+      linear in dB, -72 to +12 dB for most volume faders, 0 = off; buttons 0
+      and 65535; selectors; meters linear in dB with 65535 = +24 dBu; LEDs
+      0/65535; diagnostics) p.5-7; CS, CSQ, CC, GS, GS2, GPR, GSB, GSB2,
+      GSB3 p.7-10; LP, FU, SSYSS p.11; VoIP dialing, GSYSS and call status
+      p.12; push (format #nnnnn=vvvvv, 100 ms interval, up to 64 values per
+      interval, state at power-up, PU, PUE, PUD, GPU, PUR, PUC) p.13-17; PUI,
+      PUT p.18; SB, SQ, EH p.19; NOP, Q!, RI, V, R! p.20; command prefixes
+      $e, $v, $q and the Super Matrix Mixer CMV commands p.21-24.
+
+transport:
+  type: line-tcp
+  port: 48631
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Pushed values (and GSB2 block reads) are "#nnnnn=vvvvv" lines; every
+  # answer to a command is something else (ACK, NAK, a value, a string).
+  reply_match: "^[^#]"
+  # NOP: "will always return an ACK in Quiet mode" (p.20).
+  probe: "NOP"
+
+# Answers are parsed in quiet mode with echo off, the documented defaults
+# (p.3, p.19). Both are kept per port in non-volatile memory, so a terminal
+# session may have changed them; they are put back on every connection.
+on_connect:
+  - send: "EH 0"
+    await_reply: true
+  - send: "SQ 1"
+    await_reply: true
+
+conversions:
+  # "Volume dB = -72 + 84*(CONTROLLER POSITION/65535)" (p.5).
+  symetrix_fader:
+    points: [[0, -72.0], [65535, 12.0]]
+
+models:
+  - id: radius-nx
+    name: "Symetrix Radius NX 4x4 and 12x8 (Dante, AEC and VoIP variants)"
+    supports: &all
+      [set_controller, set_controller_quick, increment_controller, decrement_controller,
+       get_controller, get_controller_value, read_controller_block, set_fader_db, get_fader_db,
+       button_on, button_off, load_preset, get_preset, flash_unit, stop_flashing,
+       set_system_string, get_system_string, set_dial_number, set_speed_dial_number,
+       set_speed_dial_name, get_speed_dial_number, get_speed_dial_name, get_dialed_number,
+       get_caller_id, get_call_status, get_call_elapsed, set_push_global,
+       push_enable, push_enable_range, push_disable, push_disable_range, push_refresh,
+       push_refresh_range, push_clear, set_push_interval, set_push_threshold, nop, get_ip,
+       reboot, matrix_set, matrix_get, matrix_modify, matrix_toggle, matrix_reset,
+       get_matrix_change_count]
+    verification: none
+  - id: prism
+    name: "Symetrix Prism (4x4, 8x8, 12x12, 16x16 and larger frames)"
+    supports: *all
+    verification: none
+  - id: edge
+    name: "Symetrix Edge"
+    supports: *all
+    verification: none
+  - id: solus-nx
+    name: "Symetrix Solus NX (4x4, 8x8, 16x16)"
+    supports: *all
+    verification: none
+  - id: radius-legacy
+    name: "Symetrix Radius 12x8 EX / Radius AEC and xControl-era Composer units"
+    supports: *all
+    verification: none
+    notes: >
+      The document names Edge, Radius, Radius AEC and xControl. Units without
+      a VoIP or telephony card answer NAK to the dialing commands, and units
+      whose design has no Super Matrix Mixer answer NAK to CMV.
+
+commands:
+  # ── Controllers ─────────────────────────────────────────────────────────
+  set_controller:
+    summary: "CS: move a controller to an absolute position, 0-65535; ACK, or NAK when the controller number does not exist"
+    params:
+      controller: &controller { type: int, min: 1, max: 10000, required: true }
+      position: &position { type: int, min: 0, max: 65535, required: true }
+    send: "CS {controller} {position}"
+    expect: &ack { matches: "^ACK\\s*$" }
+    returns: ack
+  set_controller_quick:
+    summary: "CSQ: as CS but answered within 5-10 ms, without checking that the controller exists (always ACK)"
+    params: { controller: *controller, position: *position }
+    send: "CSQ {controller} {position}"
+    expect: *ack
+    returns: ack
+  increment_controller:
+    summary: "CC <n> 1 <amount>: raise a controller's position by an amount, limited to 65535"
+    params: { controller: *controller, amount: &amount { type: int, min: 0, max: 65535, required: true } }
+    send: "CC {controller} 1 {amount}"
+    expect: *ack
+    returns: ack
+  decrement_controller:
+    summary: "CC <n> 0 <amount>: lower a controller's position by an amount, limited to 0"
+    params: { controller: *controller, amount: *amount }
+    send: "CC {controller} 0 {amount}"
+    expect: *ack
+    returns: ack
+  get_controller:
+    summary: "GS2: a controller's position, answered with its number (\"368 47114\"), which also updates controllers.<n>.value"
+    params: { controller: *controller }
+    send: "GS2 {controller}"
+    expect: { matches: "^\\s*\\d+\\s+(\\d+)\\s*$" }
+    returns: value
+  get_controller_value:
+    summary: "GS: a controller's position alone (0-65535); two-state buttons read 0 or 65535"
+    params: { controller: *controller }
+    send: "GS {controller}"
+    expect: { matches: "^\\s*(\\d+)\\s*$" }
+    returns: value
+  read_controller_block:
+    summary: "GSB2: read up to 256 consecutive controllers into controllers.<n>.value (answered as #nnnnn=vvvvv lines, -0001 for a controller that does not exist)"
+    params:
+      controller: *controller
+      count: { type: int, min: 1, max: 256, required: true }
+    send: "GSB2 {controller} {count}"
+    returns: none
+  set_fader_db:
+    summary: "CS with a level in dB for a volume fader whose range is -72 to +12 dB (most are, p.5); -72 is off"
+    params:
+      controller: *controller
+      level_db: { type: float, min: -72, max: 12, required: true }
+    send: "CS {controller} {level_db:to.symetrix_fader:.0f}"
+    expect: *ack
+    returns: ack
+  get_fader_db:
+    summary: "GS: a -72 to +12 dB volume fader's level in dB"
+    params: { controller: *controller }
+    send: "GS {controller}"
+    expect: { matches: "^\\s*(\\d+)\\s*$", convert: symetrix_fader }
+    returns: value
+  button_on:
+    summary: "CS <n> 65535: switch a button (mute, bypass, preset trigger, dial) on"
+    params: { controller: *controller }
+    send: "CS {controller} 65535"
+    expect: *ack
+    returns: ack
+  button_off:
+    summary: "CS <n> 0: switch a button off"
+    params: { controller: *controller }
+    send: "CS {controller} 0"
+    expect: *ack
+    returns: ack
+
+  # ── Presets and unit ────────────────────────────────────────────────────
+  load_preset:
+    summary: "LP: load a preset, 1-1000; NAK when the preset is not defined"
+    params:
+      preset: { type: int, min: 1, max: 1000, required: true }
+    send: "LP {preset}"
+    expect: *ack
+    returns: ack
+  get_preset:
+    summary: "GPR: the last preset loaded, 0 when none has been"
+    send: "GPR"
+    expect: { matches: "^0*(\\d+)\\s*$" }
+    returns: value
+  flash_unit:
+    summary: "FU: flash the front-panel LEDs for a number of cycles (8 by default)"
+    params:
+      cycles: { type: int, min: 1, max: 255, default: 8 }
+    send: "FU {cycles}"
+    expect: *ack
+    returns: ack
+  stop_flashing:
+    summary: "FU 0: stop flashing the LEDs"
+    send: "FU 0"
+    expect: *ack
+    returns: ack
+  nop:
+    summary: "NOP: no operation, answered ACK"
+    send: "NOP"
+    expect: *ack
+    returns: ack
+  get_ip:
+    summary: "RI: the unit's IP address"
+    send: "RI"
+    expect: { matches: "^\\s*(\\d+\\.\\d+\\.\\d+\\.\\d+)" }
+    returns: value
+  reboot:
+    summary: "R!: reboot the unit"
+    send: "R!"
+    returns: none
+
+  # ── System strings: speed dials, VoIP dialing, call status ──────────────
+  set_system_string:
+    summary: "SSYSS <unit>.<resource>.<enum>.<card>.<channel>=<value>: set a system string (1000 speed-dial number, 1001 speed-dial name, 1004 number to dial)"
+    params:
+      unit: &unit { type: int, min: 1, max: 255, required: true }
+      resource: { type: enum, values: ["1000", "1001", "1004"], required: true }
+      entry: &entry { type: int, min: 0, max: 19, default: 0 }
+      card: &card { type: int, min: 0, max: 3, required: true }
+      channel: &tchannel { type: int, min: 0, max: 15, default: 0 }
+      value: { type: string, max_length: 63, required: true }
+    send: "SSYSS {unit}.{resource}.{entry}.{card}.{channel}={value}"
+    expect: *ack
+    returns: ack
+  get_system_string:
+    summary: "GSYSS <unit>.<resource>.<enum>.<card>.<channel>: read a system string (1000-1006)"
+    params:
+      unit: *unit
+      resource: { type: enum, values: ["1000", "1001", "1002", "1003", "1004", "1005", "1006"], required: true }
+      entry: *entry
+      card: *card
+      channel: *tchannel
+    send: "GSYSS {unit}.{resource}.{entry}.{card}.{channel}"
+    expect: &string { matches: "^(.*?)\\s*$", not_contains: "NAK" }
+    returns: value
+  set_dial_number:
+    summary: "SSYSS <unit>.1004.0.<card>.0: the number a VoIP card dials next (then press its connect button); up to 63 of 0-9 # * . and letters"
+    params:
+      unit: *unit
+      card: *card
+      number: { type: string, max_length: 63, pattern: "^[0-9#*.A-Za-z@:_-]+$", required: true }
+    send: "SSYSS {unit}.1004.0.{card}.0={number}"
+    expect: *ack
+    returns: ack
+  set_speed_dial_number:
+    summary: "SSYSS <unit>.1000.<entry>.<card>.0: a speed dial's number (entries 0-19 for speed dials 1-20)"
+    params:
+      unit: *unit
+      card: *card
+      entry: { type: int, min: 0, max: 19, required: true }
+      number: { type: string, max_length: 63, required: true }
+    send: "SSYSS {unit}.1000.{entry}.{card}.0={number}"
+    expect: *ack
+    returns: ack
+  set_speed_dial_name:
+    summary: "SSYSS <unit>.1001.<entry>.<card>.0: a speed dial's name"
+    params:
+      unit: *unit
+      card: *card
+      entry: { type: int, min: 0, max: 19, required: true }
+      name: { type: string, max_length: 63, required: true }
+    send: "SSYSS {unit}.1001.{entry}.{card}.0={name}"
+    expect: *ack
+    returns: ack
+  get_speed_dial_number:
+    summary: "GSYSS <unit>.1000.<entry>.<card>.0: a speed dial's number"
+    params: { unit: *unit, card: *card, entry: { type: int, min: 0, max: 19, required: true } }
+    send: "GSYSS {unit}.1000.{entry}.{card}.0"
+    expect: *string
+    returns: value
+  get_speed_dial_name:
+    summary: "GSYSS <unit>.1001.<entry>.<card>.0: a speed dial's name"
+    params: { unit: *unit, card: *card, entry: { type: int, min: 0, max: 19, required: true } }
+    send: "GSYSS {unit}.1001.{entry}.{card}.0"
+    expect: *string
+    returns: value
+  get_dialed_number:
+    summary: "GSYSS <unit>.1002.0.<card>.<channel>: the number dialed"
+    params: { unit: *unit, card: *card, channel: *tchannel }
+    send: "GSYSS {unit}.1002.0.{card}.{channel}"
+    expect: *string
+    returns: value
+  get_caller_id:
+    summary: "GSYSS <unit>.1003.0.<card>.<channel>: the caller ID"
+    params: { unit: *unit, card: *card, channel: *tchannel }
+    send: "GSYSS {unit}.1003.0.{card}.{channel}"
+    expect: *string
+    returns: value
+  get_call_status:
+    summary: "GSYSS <unit>.1005.0.<card>.<channel>: a VoIP call appearance's status (Idle, Dialing, Ringing, In Call: <number>, Hold, Busy, ...)"
+    params: { unit: *unit, card: *card, channel: *tchannel }
+    send: "GSYSS {unit}.1005.0.{card}.{channel}"
+    expect: *string
+    returns: value
+  get_call_elapsed:
+    summary: "GSYSS <unit>.1006.0.<card>.<channel>: the elapsed time of a VoIP call (\"Time 0:00:35\")"
+    params: { unit: *unit, card: *card, channel: *tchannel }
+    send: "GSYSS {unit}.1006.0.{card}.{channel}"
+    expect: *string
+    returns: value
+
+  # ── Push ────────────────────────────────────────────────────────────────
+  set_push_global:
+    summary: "PU 1 / PU 0: turn pushing on or off for the whole unit (and every control system using it)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "PU {enabled:bool01}"
+    expect: *ack
+    returns: ack
+  push_enable:
+    summary: "PUE: enable push for every controller (1-10000)"
+    send: "PUE"
+    expect: *ack
+    returns: ack
+  push_enable_range:
+    summary: "PUE <low> <high>: enable push for a range of controllers (additive)"
+    params: { low: *controller, high: *controller }
+    send: "PUE {low} {high}"
+    expect: *ack
+    returns: ack
+  push_disable:
+    summary: "PUD: disable push for every controller"
+    send: "PUD"
+    expect: *ack
+    returns: ack
+  push_disable_range:
+    summary: "PUD <low> <high>: disable push for a range of controllers"
+    params: { low: *controller, high: *controller }
+    send: "PUD {low} {high}"
+    expect: *ack
+    returns: ack
+  push_refresh:
+    summary: "PUR: push every push-enabled controller's value now, changed or not"
+    send: "PUR"
+    expect: *ack
+    returns: ack
+  push_refresh_range:
+    summary: "PUR <low> <high>: push a range of controllers now"
+    params: { low: *controller, high: *controller }
+    send: "PUR {low} {high}"
+    expect: *ack
+    returns: ack
+  push_clear:
+    summary: "PUC: forget changes not yet pushed"
+    send: "PUC"
+    expect: *ack
+    returns: ack
+  set_push_interval:
+    summary: "PUI: the minimum time between pushes, 20-30000 ms (100 at power-up)"
+    params:
+      interval_ms: { type: int, min: 20, max: 30000, required: true }
+    send: "PUI {interval_ms}"
+    expect: *ack
+    returns: ack
+  set_push_threshold:
+    summary: "PUT: how far a value must move before it is pushed again, for parameters and for meters (1 at power-up)"
+    params:
+      parameter_threshold: { type: int, min: 0, max: 65535, required: true }
+      meter_threshold: { type: int, min: 0, max: 65535, required: true }
+    send: "PUT {parameter_threshold} {meter_threshold}"
+    expect: *ack
+    returns: ack
+
+  # ── Super Matrix Mixer (CMV) ────────────────────────────────────────────
+  matrix_set:
+    summary: "CMV Set: set a Super Matrix parameter in its native unit (dB for gains, 0/1 for switches, ms for delay, % for pan); enumerator I3O6, I2, O1, or a {range,set}"
+    params:
+      unit: &cmvunit { type: int, min: 0, max: 255, default: 0 }
+      module: &module { type: int, min: 1, max: 255, default: 1 }
+      feature: &feature { type: enum, values: [CPGain, CPConnect, CPDelay, IMute, IGain, ISolo, IPan, OMute, OGain, OPre], required: true }
+      enumerator: &enumerator { type: string, max_length: 128, pattern: "^(I[0-9]+O[0-9]+|I[0-9]+|O[0-9]+|\\{[IO0-9:, ]+\\})$", required: true }
+      value: { type: float, min: -1000, max: 10000, required: true }
+    send: "CMV Set {unit}.{module}.{feature}.{enumerator} {value:.2f}"
+    expect: *ack
+    returns: ack
+  matrix_get:
+    summary: "CMV Get: a Super Matrix parameter in its native unit"
+    params: { unit: *cmvunit, module: *module, feature: *feature, enumerator: *enumerator }
+    send: "CMV Get {unit}.{module}.{feature}.{enumerator}"
+    expect: { matches: "^(?:[^=]*=)?\\s*(-?[0-9.]+)%?\\s*$" }
+    returns: value
+  matrix_modify:
+    summary: "CMV Modify: change a Super Matrix parameter by an offset (for switches, positive turns on, negative off)"
+    params:
+      unit: *cmvunit
+      module: *module
+      feature: *feature
+      enumerator: *enumerator
+      offset: { type: float, min: -1000, max: 1000, required: true }
+    send: "CMV Modify {unit}.{module}.{feature}.{enumerator} {offset:.2f}"
+    expect: *ack
+    returns: ack
+  matrix_toggle:
+    summary: "CMV Toggle: toggle a Super Matrix switch (crosspoint connect, mute, solo, pre/post)"
+    params: { unit: *cmvunit, module: *module, feature: *feature, enumerator: *enumerator }
+    send: "CMV Toggle {unit}.{module}.{feature}.{enumerator} 1"
+    expect: *ack
+    returns: ack
+  matrix_reset:
+    summary: "CMV Reset: put a Super Matrix parameter back to its default"
+    params: { unit: *cmvunit, module: *module, feature: *feature, enumerator: *enumerator }
+    send: "CMV Reset {unit}.{module}.{feature}.{enumerator}"
+    expect: *ack
+    returns: ack
+  get_matrix_change_count:
+    summary: "GSYSC <unit>.3060.-1,0: a counter that rises whenever anything in the Super Matrix changes"
+    params: { unit: *cmvunit }
+    send: "GSYSC {unit}.3060.-1,0"
+    expect: { matches: "^\\s*(\\d+)\\s*$" }
+    returns: value
+
+state:
+  controllers.*.value:
+    type: int
+    description: "A controller's position, 0-65535, keyed by controller number, from push data, GSB2 block reads and GS2 answers; -1 when a block read names a controller that does not exist. Faders are linear in dB (usually -72 to +12 dB), buttons and LEDs 0 or 65535"
+
+telemetry:
+  # Push is on at power-up for every controller (p.15); turn it on again in
+  # case another control system turned it off, and ask for every value now.
+  subscribe:
+    send: ["PU 1", "PUR"]
+  updates:
+    - match: '^#(\d+)=(-?\d+)\s*$'
+      state: { "controllers.{1}.value": "{2}" }
+    - match: '^\s*(\d+)\s+(\d+)\s*$'
+      state: { "controllers.{1}.value": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Controller numbers are the ones assigned in Composer's Controller
+      Manager; only controllers with "Enable Push" ticked in Composer are ever
+      pushed, so state covers those (and whatever is read with get_controller
+      or read_controller_block). Push settings (PU, PUE, PUD, PUI, PUT) are
+      the unit's, shared by every control system and by RS-232.
+  - models: [all]
+    severity: info
+    text: >
+      Pushed values arrive as "#nnnnn=vvvvv" lines at most every 100 ms (up
+      to 64 per interval); answers to commands never start with "#", which is
+      how they are told apart. read_controller_block's answer has the same
+      form as push data, so it is sent without waiting for an answer and its
+      lines go straight to state; it is reported unverified.
+  - models: [all]
+    severity: warning
+    text: >
+      Answers are parsed in quiet mode with echo off. The session sends EH 0
+      and SQ 1 on connecting; both are stored per port in the unit's
+      non-volatile memory, so this also restores the defaults for other
+      Ethernet control systems that changed them.
+  - models: [all]
+    severity: info
+    text: >
+      set_fader_db and get_fader_db assume a -72 to +12 dB fader; a fader with
+      another range must be set by position (dB = min + (max - min) *
+      position / 65535). A meter reads 72 * position / 65535 - 48 dBu.
+      Two-state controls read back 0 or 65535 whatever was sent; selectors
+      are spread evenly over 0-65535 ((n - 1) * 65535 / (count - 1)).
+  - models: [all]
+    severity: info
+    text: >
+      CSQ is answered ACK even for a controller that does not exist; CS checks
+      and may take up to 40 ms. In native CMV mode a value outside the
+      parameter's range is clipped, not refused.
+  - models: [all]
+    severity: info
+    text: >
+      A string answer (GSYSS) is returned as text, with no marker of its own;
+      a name that is literally "NAK" is reported as a failure. GSYSS
+      call-status values follow the VoIP or analog telephony card (p.12).
+  - models: [all]
+    severity: info
+    text: >
+      Up to six TCP sessions at once; a seventh closes the least recently used
+      one, which then reconnects and may in turn close another.
+  - models: [all]
+    severity: critical
+    text: >
+      load_preset changes every parameter the preset holds, on a live system,
+      and cannot be undone except by loading another preset.
+  - models: [all]
+    severity: critical
+    text: >
+      reboot restarts the unit, interrupting its audio; it is sent without
+      waiting for an answer.
