@@ -54,6 +54,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "blackmagic-videohub",
         ],
     ),
+    ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-etc", &["etc-eos"]),
     ("vendor-figure53", &["qlab"]),

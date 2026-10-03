@@ -250,6 +250,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## brompton-tessera — Brompton Tessera
+
+- [ ] Confirm that GET /api/ answers the whole tree under an "api" key, with groups, input ports, cable loops and frame remapping frames keyed "1", "2", ... (ports and frames numbered from 1), as the poll reads it. ([specs/brompton-tessera.yaml:3315](specs/brompton-tessera.yaml#L3315))
+- [ ] Confirm that a section read (GET /api/override) answers {"override": {...}}, and that every single-endpoint read and write answers {"<last path segment>": value}. ([specs/brompton-tessera.yaml:4707](specs/brompton-tessera.yaml#L4707))
+- [ ] Record the HTTP status of a failed request ({"response-code": "..."}), such as a write out of range, a path that does not exist and a read with no project loaded. ([specs/brompton-tessera.yaml:5465](specs/brompton-tessera.yaml#L5465))
+- [ ] Measure how long GET /api/ takes on a large wall (thousands of panels) and whether reading it every 5 seconds affects the processor. ([specs/brompton-tessera.yaml:3327](specs/brompton-tessera.yaml#L3327))
+- [ ] On each model, list which genlock, ShutterSync, frame remapping, hidden marker, failover and cable redundancy endpoints answer "Not supported". ([specs/brompton-tessera.yaml:5484](specs/brompton-tessera.yaml#L5484))
+- [ ] Confirm each model's input ports (SX40 and S8: HDMI and SDI; S4 and T1: DVI; M2: DVI and two SDI) and that the port number starts at 1. ([specs/brompton-tessera.yaml:85](specs/brompton-tessera.yaml#L85))
+- [ ] Check what a brightness above an active brightness limit does: refused, or held at the limit. ([specs/brompton-tessera.yaml:5551](specs/brompton-tessera.yaml#L5551))
+- [ ] Check reboot and shutdown with and without a processor password, and what a wrong password answers. ([specs/brompton-tessera.yaml:5529](specs/brompton-tessera.yaml#L5529))
+- [ ] Confirm that set_input_source (GET ?set=1&port-type=...&port-number=...) switches the input in one request on 3.5. ([specs/brompton-tessera.yaml:3306](specs/brompton-tessera.yaml#L3306))
+- [ ] Check how the tree reports the test pattern type after a frame store user number was set (a number or a string). ([specs/brompton-tessera.yaml:5560](specs/brompton-tessera.yaml#L5560))
+- [ ] Check that request_failover with an empty string hands over to the partner, and what it answers with no partner present. ([specs/brompton-tessera.yaml:1556](specs/brompton-tessera.yaml#L1556))
+- [ ] On 3.6 or later, confirm the TrueLight endpoints and their ranges. ([specs/brompton-tessera.yaml:5584](specs/brompton-tessera.yaml#L5584))
+
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
 - [ ] Check the blackout sense: whether /dbo 0 turns blackout on (manual) or off (Companion). ([specs/chamsys-magicq.yaml:1104](specs/chamsys-magicq.yaml#L1104))
