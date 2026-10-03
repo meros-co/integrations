@@ -173,3 +173,9 @@ class Core:
 
     def close(self, device: int) -> None:
         self._native.close(device)
+
+    def close_all(self, grace_ms: int = 5_000) -> None:
+        """Shut down cleanly before the process exits: refuse new devices and
+        commands ("closing"), give commands in flight up to grace_ms, then close
+        every device so each ends what it started on the device."""
+        self._native.close_all(grace_ms)

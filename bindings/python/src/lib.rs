@@ -163,6 +163,13 @@ impl NativeCore {
     fn close(&self, py: Python<'_>, device: u64) {
         py.detach(|| self.core.block_on(self.core.close(device)));
     }
+
+    fn close_all(&self, py: Python<'_>, grace_ms: u64) {
+        py.detach(|| {
+            self.core
+                .close_all_blocking(std::time::Duration::from_millis(grace_ms))
+        });
+    }
 }
 
 #[pymodule]

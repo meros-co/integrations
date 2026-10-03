@@ -121,3 +121,42 @@ async fn shure_end_to_end() {
     .await
     .expect("metering turned off on close");
 }
+
+/// Shutting down closes every device before returning: the metering
+/// subscription is cancelled on the wire by the time `close_all` returns, and
+/// nothing new is accepted afterwards.
+#[tokio::test(flavor = "multi_thread")]
+async fn close_all_ends_what_each_device_started() {
+    let (port, received) = simulated_ulxd().await;
+    let core = Core::new().unwrap();
+    let request = OpenRequest {
+        device: "shure-wireless".into(),
+        model: "ulxd4".into(),
+        host: "127.0.0.1".into(),
+        port: Some(port),
+        settings: Default::default(),
+        monitor: true,
+    };
+    let id = core.open(request.clone()).unwrap();
+    wait_for(&core, |e| {
+        matches!(e, Event::State { device, patch } if *device == id
+            && patch["channels"]["1"]["rf"]["rssi_dbm"]["a"] == -50)
+    })
+    .await;
+
+    core.close_all(Duration::from_secs(1)).await;
+    assert!(received
+        .lock()
+        .unwrap()
+        .contains("< SET 1 METER_RATE 00000 >"));
+    assert!(core.snapshot(id).is_none());
+    assert_eq!(
+        core.execute(id, "mute", params(json!({"channel": 1, "muted": true})))
+            .await,
+        Err(meros_integrations::CommandError::Closed)
+    );
+    assert_eq!(
+        core.open(request),
+        Err(meros_integrations::OpenError::Closing)
+    );
+}

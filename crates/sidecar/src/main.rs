@@ -47,6 +47,13 @@
 //! (unknown stream, or device not open) or 406 (not a JPEG stream).
 //!
 //! Events are one queue: run one event consumer per service.
+//!
+//! SIGTERM (systemd's stop) and SIGINT stop the service cleanly, as do
+//! Ctrl-C, closing the console and a system shutdown on Windows: it stops
+//! taking requests, lets those in flight finish (up to 10 s), refuses new
+//! devices and commands, gives commands already sent up to 5 s, then closes
+//! every device so each ends what it started on the device (subscriptions,
+//! metering, sessions) before the process exits.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -423,11 +430,66 @@ fn main() {
             json!({"listening": listener.local_addr().unwrap().to_string()})
         );
         let app = Arc::new(App { core, token });
-        axum::serve(listener, router(app))
-            .with_graceful_shutdown(async {
-                let _ = tokio::signal::ctrl_c().await;
-            })
-            .await
-            .expect("serve");
+        let (stop, stopping) = tokio::sync::watch::channel(false);
+        let signalled = app.clone();
+        tokio::spawn(async move {
+            shutdown_signal().await;
+            // Long polls answer now, so the requests in flight can finish.
+            signalled.core.interrupt_events();
+            let _ = stop.send(true);
+        });
+        let mut until_stop = stopping.clone();
+        let server =
+            axum::serve(listener, router(app.clone())).with_graceful_shutdown(async move {
+                let _ = until_stop.wait_for(|s| *s).await;
+            });
+        let mut after_stop = stopping;
+        tokio::select! {
+            result = server => result.expect("serve"),
+            // Requests still open this long after the signal (an MJPEG
+            // stream, a command to a device that never answers) are cut off.
+            _ = async move {
+                let _ = after_stop.wait_for(|s| *s).await;
+                tokio::time::sleep(REQUEST_GRACE).await;
+            } => {}
+        }
+        // Then every device is closed cleanly: subscriptions and metering
+        // ended, last messages written.
+        app.core.close_all(CLOSE_GRACE).await;
+        eprintln!("stopped");
     });
+}
+
+/// How long requests in flight get to finish after a stop signal.
+const REQUEST_GRACE: Duration = Duration::from_secs(10);
+/// How long commands still in flight get before devices are closed.
+const CLOSE_GRACE: Duration = Duration::from_secs(5);
+
+/// SIGINT or SIGTERM (systemd's stop) on Unix; Ctrl-C, closing the console
+/// window or a system shutdown on Windows.
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        let mut term = signal(SignalKind::terminate()).expect("SIGTERM handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = term.recv() => {}
+        }
+    }
+    #[cfg(windows)]
+    {
+        use tokio::signal::windows::{ctrl_close, ctrl_shutdown};
+        let mut close = ctrl_close().expect("console close handler");
+        let mut shutdown = ctrl_shutdown().expect("shutdown handler");
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = close.recv() => {}
+            _ = shutdown.recv() => {}
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }

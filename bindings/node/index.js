@@ -127,6 +127,15 @@ class Core extends EventEmitter {
   }
 
   /**
+   * Shut down cleanly before the process exits: refuse new devices and
+   * commands, give commands in flight up to `graceMs`, then close every
+   * device so each ends what it started on the device.
+   */
+  async closeAll(graceMs = 5000) {
+    await this.#native.closeAll(graceMs);
+  }
+
+  /**
    * Watch a stream the catalogue declares under the device's `streams`.
    * Returns a Stream emitting 'frame' and 'end'. Throws an IntegrationsError
    * ('unknown_stream', 'unsupported_for_model', 'closed').

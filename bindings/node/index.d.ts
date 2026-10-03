@@ -105,7 +105,8 @@ export type ErrorCode =
   | 'invalid_settings'
   | 'unresolvable_host'
   | 'not_implemented'
-  | 'unknown_stream';
+  | 'unknown_stream'
+  | 'closing';
 
 export class IntegrationsError extends Error {
   readonly code: ErrorCode;
@@ -156,6 +157,12 @@ export class Core extends EventEmitter {
   execute(device: DeviceId, command: string, params?: Record<string, unknown>): Promise<Outcome>;
   snapshot(device: DeviceId): Snapshot | null;
   close(device: DeviceId): Promise<void>;
+  /**
+   * Shut down cleanly before the process exits: refuse new devices and
+   * commands ('closing'), give commands in flight up to `graceMs` (default
+   * 5000), then close every device so each ends what it started on it.
+   */
+  closeAll(graceMs?: number): Promise<void>;
   /**
    * Watch a stream declared under the device's `streams` in the catalogue,
    * such as a camera's 'live' preview. Throws an IntegrationsError

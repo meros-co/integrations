@@ -154,4 +154,12 @@ impl NativeCore {
         self.core.close(device_id(device)?).await;
         Ok(())
     }
+
+    #[napi]
+    pub async fn close_all(&self, grace_ms: u32) -> Result<()> {
+        self.core
+            .close_all(std::time::Duration::from_millis(grace_ms as u64))
+            .await;
+        Ok(())
+    }
 }

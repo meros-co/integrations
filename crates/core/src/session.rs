@@ -29,6 +29,9 @@ pub type DeviceId = u64;
 /// modules enforce their own protocol timeouts well inside this.
 const COMMAND_SAFETY_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// How long closing a session waits for its last messages to be written.
+const FLUSH: Duration = Duration::from_secs(1);
+
 /// Alive events are rate-limited so a device streaming telemetry does not flood
 /// consumers with liveness.
 const ALIVE_EVERY: Duration = Duration::from_secs(1);
@@ -706,6 +709,10 @@ impl Session {
     async fn shutdown(&mut self) {
         let mut cx = self.cx();
         self.module.stop(&mut cx);
+        // What the module sends on stopping (a subscription cancelled, a
+        // QUIT) is waited for, within FLUSH, so a host that exits right after
+        // closing does not cut it off.
+        let mut flushing: Vec<futures_util::future::BoxFuture<'static, ()>> = Vec::new();
         // Sends only: a stopping module may cancel subscriptions, but nothing
         // else it asks for can matter any more.
         for action in cx.take() {
@@ -721,10 +728,13 @@ impl Session {
                         let _ = c.writer.send(crate::ws::Outgoing::Text(text));
                     }
                 }
-                // Sent, with nobody waiting for the reply.
+                // Sent; the reply only says it arrived.
                 Action::Http { id, request } => {
-                    let (tx, _rx) = tokio::sync::mpsc::channel(1);
+                    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
                     self.services.http.spawn_request(id, &request, tx);
+                    flushing.push(Box::pin(async move {
+                        let _ = rx.recv().await;
+                    }));
                 }
                 _ => {}
             }
@@ -736,20 +746,23 @@ impl Session {
         for key in keys {
             self.drop_socket(key);
         }
-        // Let each connection write what the module queued (a subscription
-        // cancelled, a QUIT) before it closes, within a second.
+        // Each connection writes what the module queued, then closes.
+        let mut aborts = Vec::new();
         for (_, c) in self.tcp.drain() {
             let crate::tcp::Connection { writer, task, .. } = c;
             drop(writer);
-            tokio::spawn(async move {
-                let abort = task.abort_handle();
-                if tokio::time::timeout(Duration::from_secs(1), task)
-                    .await
-                    .is_err()
-                {
-                    abort.abort();
-                }
-            });
+            aborts.push(task.abort_handle());
+            flushing.push(Box::pin(async move {
+                let _ = task.await;
+            }));
+        }
+        if tokio::time::timeout(FLUSH, futures_util::future::join_all(flushing))
+            .await
+            .is_err()
+        {
+            for abort in aborts {
+                abort.abort();
+            }
         }
         let streams: Vec<Key> = self.streams.keys().copied().collect();
         for key in streams {

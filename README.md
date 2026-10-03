@@ -68,6 +68,12 @@ doesn't take a subscription slot the device has few of (a Behringer WING has
 one). Each device's most recent request-to-reply time is reported as
 `latency_ms` on its snapshot and `alive` events.
 
+**When shutting down**, call `close_all` (`closeAll` in Node, `mi_close_all`
+in C) before the process exits. The core refuses new work, gives commands in
+flight a few seconds, then closes every device so each ends what it started
+on it (subscriptions, metering, sessions). The HTTP service does this itself
+on SIGTERM or SIGINT, so it can run under systemd.
+
 ## How devices are described
 
 Most devices are described in a YAML file in `specs/`: their models, commands,

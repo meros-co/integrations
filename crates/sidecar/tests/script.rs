@@ -363,3 +363,96 @@ async fn a_sidecar_started_for_some_devices() {
     assert_eq!(status.code(), Some(2));
     let _ = std::fs::remove_file(&token_file);
 }
+
+/// SIGTERM, systemd's stop, closes every device before the service exits:
+/// a Shure receiver's metering is turned off on the wire.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn sigterm_closes_every_device_before_exiting() {
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // A Shure ULX-D that records what it receives.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let device_port = listener.local_addr().unwrap().port();
+    let received = Arc::new(Mutex::new(String::new()));
+    let log = received.clone();
+    tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut buf = [0u8; 1024];
+        loop {
+            let n = stream.read(&mut buf).await.unwrap_or(0);
+            if n == 0 {
+                return;
+            }
+            let text = String::from_utf8_lossy(&buf[..n]).to_string();
+            log.lock().unwrap().push_str(&text);
+            if text.contains("< GET 1 ALL >") {
+                let _ = stream.write_all(b"< REP 1 CHAN_NAME {Pulpit} >").await;
+            }
+        }
+    });
+
+    let token_file = std::env::temp_dir().join(format!(
+        "meros-integrations-test-sigterm-{}.token",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_file(&token_file);
+    let mut sidecar = KillOnDrop(
+        Command::new(env!("CARGO_BIN_EXE_meros-integrations"))
+            .args(["serve", "--listen", "127.0.0.1:0", "--token-file"])
+            .arg(&token_file)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let listening = first_line(&mut sidecar.0)["listening"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let client = Client {
+        base: format!("http://{listening}"),
+        token: std::fs::read_to_string(&token_file).unwrap(),
+        http: reqwest::Client::new(),
+    };
+    let opened = client
+        .post(
+            "/v1/open",
+            json!({"device": "shure-wireless", "model": "ulxd4",
+                   "host": "127.0.0.1", "port": device_port}),
+        )
+        .await;
+    assert!(opened["device"].is_u64(), "{opened}");
+    let started = Instant::now();
+    while !received.lock().unwrap().contains("METER_RATE 01000") {
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "metering never started"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+
+    let status = Command::new("kill")
+        .args(["-TERM", &sidecar.0.id().to_string()])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let started = Instant::now();
+    let exit = loop {
+        if let Some(exit) = sidecar.0.try_wait().unwrap() {
+            break exit;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(20),
+            "still running after SIGTERM"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    };
+    assert!(exit.success(), "{exit:?}");
+    assert!(received
+        .lock()
+        .unwrap()
+        .contains("< SET 1 METER_RATE 00000 >"));
+    let _ = std::fs::remove_file(&token_file);
+}

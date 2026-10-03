@@ -248,6 +248,22 @@ pub unsafe extern "C" fn mi_interrupt_events(core: *const MiCore) {
     let _ = catch_unwind(AssertUnwindSafe(|| (*core).core.interrupt_events()));
 }
 
+/// Shut down cleanly before the host exits: refuse new devices and
+/// commands, give commands in flight up to `grace_ms` to finish, then close
+/// every device so each ends what it started on the device. Returns once all
+/// are closed; the core accepts nothing afterwards, but must still be freed.
+///
+/// # Safety
+/// `core` must be a live core. Do not call from inside an async runtime.
+#[no_mangle]
+pub unsafe extern "C" fn mi_close_all(core: *const MiCore, grace_ms: u32) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        (*core)
+            .core
+            .close_all_blocking(std::time::Duration::from_millis(grace_ms as u64));
+    }));
+}
+
 /// End a device's session and wait for it to close.
 ///
 /// # Safety

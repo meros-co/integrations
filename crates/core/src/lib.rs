@@ -69,8 +69,9 @@ mod ws;
 
 use std::collections::{BTreeSet, HashMap};
 use std::net::{IpAddr, ToSocketAddrs};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
@@ -139,6 +140,9 @@ pub enum OpenError {
     UnresolvableHost { host: String, message: String },
     #[error("device '{device}' cannot be driven: {reason}")]
     NotImplemented { device: String, reason: String },
+    /// The core is shutting down (`Core::close_all`).
+    #[error("the core is closing")]
+    Closing,
 }
 
 struct DeviceEntry {
@@ -158,6 +162,19 @@ pub struct Core {
     next_device: AtomicU64,
     services: Arc<Services>,
     discovery: discovery::Discovery,
+    /// Set by `close_all`: no device is opened and no command started.
+    closing: AtomicBool,
+    /// Commands started and not yet finished.
+    in_flight: Arc<AtomicUsize>,
+}
+
+/// Counts a command in flight for as long as it lives.
+struct InFlight(Arc<AtomicUsize>);
+
+impl Drop for InFlight {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 /// How a core is set up. Every option has a default suitable for most hosts.
@@ -268,6 +285,8 @@ impl Core {
                 http: http::HttpClients::new().map_err(std::io::Error::other)?,
                 streams: Default::default(),
             }),
+            closing: AtomicBool::new(false),
+            in_flight: Arc::new(AtomicUsize::new(0)),
         })
     }
 
@@ -295,6 +314,9 @@ impl Core {
     /// Start a session. The connection is made in the background; watch
     /// `Connection` events or the snapshot for its progress.
     pub fn open(&self, request: OpenRequest) -> Result<DeviceId, OpenError> {
+        if self.closing.load(Ordering::SeqCst) {
+            return Err(OpenError::Closing);
+        }
         let spec = self.catalog.device(&request.device).ok_or_else(|| {
             let device = request.device.clone();
             if self.excluded.contains(&device) {
@@ -356,6 +378,11 @@ impl Core {
     /// Run a command. Parameters are validated against the spec, and the
     /// command against the model's `supports` list, before anything is sent.
     pub async fn execute(&self, device: DeviceId, command: &str, params: Params) -> CommandResult {
+        if self.closing.load(Ordering::SeqCst) {
+            return Err(CommandError::Closed);
+        }
+        self.in_flight.fetch_add(1, Ordering::SeqCst);
+        let _counted = InFlight(self.in_flight.clone());
         let (tx, name, params) = {
             let devices = self.devices.lock().unwrap();
             let entry = devices.get(&device).ok_or(CommandError::Closed)?;
@@ -480,6 +507,29 @@ impl Core {
                 let _ = finished.await;
             }
         }
+    }
+
+    /// Shut down cleanly, for a host that is about to exit: refuse new
+    /// devices and commands, give commands already sent up to `grace` to
+    /// finish, then close every device as [`Core::close`] does, so each
+    /// module ends what it started on the device (subscriptions, metering,
+    /// sessions) and its last messages are written. Commands still waiting
+    /// after `grace` fail with `Closed`. Returns once every device is
+    /// closed; the core accepts nothing afterwards.
+    pub async fn close_all(&self, grace: Duration) {
+        self.closing.store(true, Ordering::SeqCst);
+        let deadline = tokio::time::Instant::now() + grace;
+        while self.in_flight.load(Ordering::SeqCst) > 0 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let devices: Vec<DeviceId> = self.devices.lock().unwrap().keys().copied().collect();
+        futures_util::future::join_all(devices.into_iter().map(|d| self.close(d))).await;
+    }
+
+    /// Blocking form of [`Core::close_all`], for hosts without an async
+    /// runtime. Must not be called from within an async task.
+    pub fn close_all_blocking(&self, grace: Duration) {
+        self.runtime().block_on(self.close_all(grace));
     }
 
     fn runtime(&self) -> &tokio::runtime::Runtime {

@@ -69,6 +69,12 @@ void mi_interrupt_events(const MiCore *core);
 /* End a device's session and wait until it has closed. */
 void mi_close(const MiCore *core, uint64_t device);
 
+/* Shut down cleanly before exiting: refuse new devices and commands
+ * (open answers {"error":{"error":"closing"}}), give commands in flight up
+ * to grace_ms, then close every device so each ends what it started on the
+ * device (subscriptions, metering). Call before mi_core_free. */
+void mi_close_all(const MiCore *core, uint32_t grace_ms);
+
 /* Streams: continuous media such as a camera's live view, declared in the
  * catalogue under a device's "streams". Frames do not come as events: each
  * open stream holds only the newest frame, and frames replaced before they
