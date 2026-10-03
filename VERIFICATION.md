@@ -268,6 +268,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
+
+- [ ] Confirm every control.cgi key and value against a camera: they come from the Companion module, not from Canon's gated XC specification. ([specs/canon-ptz.yaml:1226](specs/canon-ptz.yaml#L1226))
+- [ ] Record what control.cgi, standby.cgi, preset/set and trace/control answer on success and on a refused value (status 200 assumed for success). ([specs/canon-ptz.yaml:219](specs/canon-ptz.yaml#L219))
+- [ ] Record a full info.cgi reply: the key:=value line format, line endings, and the values of f.standby, f.tally/f.tally.mode, shutter, iris, gain and ND. ([specs/canon-ptz.yaml:1129](specs/canon-ptz.yaml#L1129))
+- [ ] Check whether info.cgi reports program and preview tally separately, or only the last-set tally with its mode. ([specs/canon-ptz.yaml:1141](specs/canon-ptz.yaml#L1141))
+- [ ] On CR-N100, CR-N300, CR-N350 and CR-N400, check whether the iris value key is c.1.me.diaphragm (sent here) or me.diaphragm (sent by the Companion module). ([specs/canon-ptz.yaml:1265](specs/canon-ptz.yaml#L1265))
+- [ ] Check the pan/tilt speed scale for pan.speed.dir and tilt.speed.dir (10-10000 assumed) and zoom.speed.dir (0-127). ([specs/canon-ptz.yaml:341](specs/canon-ptz.yaml#L341))
+- [ ] Check the units and ranges of the absolute pan, tilt and zoom positions in pan_tilt_zoom_to and zoom_to. ([specs/canon-ptz.yaml:452](specs/canon-ptz.yaml#L452))
+- [ ] Check that p.ptztime is in milliseconds (2000-99000) and p.ptzspeed 1-100. ([specs/canon-ptz.yaml:960](specs/canon-ptz.yaml#L960))
+- [ ] Check save_preset_selective's option keys (ptz, focus, exp, wb, is, cp) and what cp saves. ([specs/canon-ptz.yaml:1003](specs/canon-ptz.yaml#L1003))
+- [ ] Check whether set_exposure_mode needs manual shooting first, and the per-model value lists (shutter, iris, gain, ND, kelvin, digital magnification). ([specs/canon-ptz.yaml:648](specs/canon-ptz.yaml#L648))
+- [ ] Check that on1 is the only "on" value of c.1.is. ([specs/canon-ptz.yaml:317](specs/canon-ptz.yaml#L317))
+- [ ] Check Digest authentication with an administrator account and with guest access, on firmware with HTTPS enabled. ([specs/canon-ptz.yaml:57](specs/canon-ptz.yaml#L57))
+- [ ] On the EOS C80 and XF605, confirm the XC protocol is enabled over the network the same way, and which commands they accept. ([specs/canon-ptz.yaml:305](specs/canon-ptz.yaml#L305))
+
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
 - [ ] Check the blackout sense: whether /dbo 0 turns blackout on (manual) or off (Companion). ([specs/chamsys-magicq.yaml:1104](specs/chamsys-magicq.yaml#L1104))
@@ -288,6 +304,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On QuickQ, check the jump cue form (whole numbers only) and the X zone range 0-10. ([specs/chamsys-magicq-udp.yaml:836](specs/chamsys-magicq-udp.yaml#L836))
 - [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
 - [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
+
+## digico-sd — DiGiCo SD and Quantum consoles
+
+- [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
+- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:2684](specs/digico-sd.yaml#L2684))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:2692](specs/digico-sd.yaml#L2692))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:2701](specs/digico-sd.yaml#L2701))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:2709](specs/digico-sd.yaml#L2709))
+- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:2639](specs/digico-sd.yaml#L2639))
+- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:776](specs/digico-sd.yaml#L776))
+- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:832](specs/digico-sd.yaml#L832))
+- [ ] Check the addresses left out (Channel_Input/main/alt_in, CGs_level, CGs_mute, Matrix_Inputs sends, Multis) and what they do. ([specs/digico-sd.yaml:2722](specs/digico-sd.yaml#L2722))
 
 ## emberplus — Ember+
 
@@ -312,6 +340,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the reply shape of get_session, which is not documented. ([specs/etc-eos.yaml:4817](specs/etc-eos.yaml#L4817))
 - [ ] Confirm macro text arrives on /eos/out/get/macro/<n>/text/list/... ([specs/etc-eos.yaml:4807](specs/etc-eos.yaml#L4807))
 - [ ] Confirm the console uses the default /eos cue OSC strings, or note the configured ones. ([specs/etc-eos.yaml:4801](specs/etc-eos.yaml#L4801))
+
+## freeshow — FreeShow
+
+- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1482](specs/freeshow.yaml#L1482))
+- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1490](specs/freeshow.yaml#L1490))
+- [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:59](specs/freeshow.yaml#L59))
+- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1474](specs/freeshow.yaml#L1474))
+- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:314](specs/freeshow.yaml#L314))
+- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:761](specs/freeshow.yaml#L761))
+- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:208](specs/freeshow.yaml#L208))
+- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1198](specs/freeshow.yaml#L1198))
 
 ## grandma2 — MA Lighting grandMA2
 
