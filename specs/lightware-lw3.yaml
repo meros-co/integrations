@@ -129,6 +129,8 @@ settings:
     secret: true
     default: ''
     pattern: '^[^\\{}#%()\r\n\t]*$'
+    label: Password
+    description: "The login password set on the device; empty when login is not enabled."
 
 on_connect:
   - when_set: password
@@ -428,7 +430,7 @@ commands:
   set_device_label:
     summary: 'Set the device label (up to 49 ASCII characters; longer is truncated by the device)'
     params:
-      label: { type: string, max_length: 49, pattern: '^[ -~]*$', required: true }
+      label: { type: string, max_length: 49, pattern: '^[ -~]*$', required: true, label: Device label, description: "Device label in printable ASCII; the device truncates anything over 49 characters." }
     send: 'SET /V1/MANAGEMENT/LABEL.DeviceLabel={label}'
     expect: { matches: '^pw /V1/MANAGEMENT/LABEL\.DeviceLabel=' }
     returns: ack
@@ -454,7 +456,7 @@ commands:
   set_control_lock:
     summary: 'Lock or unlock the front panel buttons'
     params:
-      mode: { type: enum, values: [None, Locked, Force locked], required: true }
+      mode: { type: enum, values: [None, Locked, Force locked], required: true, label: Front panel lock, description: "None unlocks the buttons, Locked locks them but they can be unlocked from the panel, Force locked locks them fully." }
     send: 'SET /V1/MANAGEMENT/UI.ControlLock={mode}'
     expect: { matches: '^pw /V1/MANAGEMENT/UI\.ControlLock=' }
     returns: ack
@@ -462,7 +464,7 @@ commands:
   set_dark_mode:
     summary: 'Switch the LEDs off (dark mode) or back on'
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true, label: Dark mode, description: "On switches the LEDs off, off switches them back on." }
     send: 'SET /V1/MANAGEMENT/UI/DARKMODE.Enable={enabled}'
     expect: { matches: '^pw /V1/MANAGEMENT/UI/DARKMODE\.Enable=' }
     returns: ack
@@ -470,7 +472,7 @@ commands:
   set_dark_mode_delay:
     summary: 'Set the delay before dark mode starts, in seconds (0 for none)'
     params:
-      seconds: { type: int, min: 0, required: true }
+      seconds: { type: int, min: 0, required: true, label: Delay, description: "Seconds before dark mode starts; 0 for none." }
     send: 'SET /V1/MANAGEMENT/UI/DARKMODE.Delay={seconds}'
     expect: { matches: '^pw /V1/MANAGEMENT/UI/DARKMODE\.Delay=' }
     returns: ack
@@ -479,9 +481,9 @@ commands:
   switch:
     summary: 'Route an input to an output on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, required: true }
-      output: { type: int, min: 1, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input to route, numbered from 1 as on the device." }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /V1/MEDIA/{layer}/XP:switch(I{input}:O{output})'
     expect: { matches: '^mO /V1/MEDIA/(?:VIDEO|AUDIO)/XP:switch(?:=|$)' }
     returns: ack
@@ -489,8 +491,8 @@ commands:
   disconnect:
     summary: 'Disconnect an output (route input 0) on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /V1/MEDIA/{layer}/XP:switch(0:O{output})'
     expect: { matches: '^mO /V1/MEDIA/(?:VIDEO|AUDIO)/XP:switch(?:=|$)' }
     returns: ack
@@ -498,7 +500,7 @@ commands:
   switch_video_all:
     summary: 'Route a video input to every video output'
     params:
-      input: { type: int, min: 1, required: true }
+      input: { type: int, min: 1, required: true, label: Input, description: "Video input to route to every video output, numbered from 1." }
     send: 'CALL /V1/MEDIA/VIDEO/XP:switchAll(I{input})'
     expect: { matches: '^mO /V1/MEDIA/VIDEO/XP:switchAll(?:=|$)' }
     returns: ack
@@ -506,9 +508,9 @@ commands:
   set_port_lock:
     summary: 'Lock or unlock a crosspoint port (input I<n> or output O<n>)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      locked: { type: bool, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      locked: { type: bool, required: true, label: Lock, description: "On locks it, off unlocks it." }
     send: 'SET /V1/MEDIA/{layer}/XP/{port}.Lock={locked}'
     expect: { matches: '^pw /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Lock=' }
     returns: ack
@@ -516,9 +518,9 @@ commands:
   set_port_mute:
     summary: 'Mute or unmute a crosspoint port (input I<n> or output O<n>); the route is kept'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      muted: { type: bool, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      muted: { type: bool, required: true, label: Mute, description: "On mutes the port and keeps its route, off unmutes it." }
     send: 'SET /V1/MEDIA/{layer}/XP/{port}.Mute={muted}'
     expect: { matches: '^pw /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Mute=' }
     returns: ack
@@ -526,8 +528,8 @@ commands:
   get_connected_source:
     summary: 'Get the input routed to an output (I<n>, or 0 when disconnected)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'GET /V1/MEDIA/{layer}/XP/O{output}.ConnectedSource'
     expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/O\d+\.ConnectedSource=(.*)$' }
     returns: value
@@ -535,8 +537,8 @@ commands:
   get_connected_destinations:
     summary: 'Get the outputs an input is routed to, semicolon-separated'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'GET /V1/MEDIA/{layer}/XP/I{input}.ConnectedDestinations'
     expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/I\d+\.ConnectedDestinations=(.*)$' }
     returns: value
@@ -544,8 +546,8 @@ commands:
   get_port_lock:
     summary: 'Get whether a crosspoint port is locked (true/false)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
     send: 'GET /V1/MEDIA/{layer}/XP/{port}.Lock'
     expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Lock=(.*)$' }
     returns: value
@@ -553,8 +555,8 @@ commands:
   get_port_mute:
     summary: 'Get whether a crosspoint port is muted (true/false)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
     send: 'GET /V1/MEDIA/{layer}/XP/{port}.Mute'
     expect: { matches: '^p[rw] /V1/MEDIA/(?:VIDEO|AUDIO)/XP/[IO]\d+\.Mute=(.*)$' }
     returns: value
@@ -562,8 +564,8 @@ commands:
   get_switchable:
     summary: 'Get whether an input can be routed to an output now (OK or Busy)'
     params:
-      output: { type: int, min: 1, required: true }
-      input: { type: int, min: 1, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input to check, numbered from 1 as on the device." }
     send: 'GET /V1/MEDIA/VIDEO/XP/O{output}/SWITCHABLE.I{input}'
     expect: { matches: '^pr /V1/MEDIA/VIDEO/XP/O\d+/SWITCHABLE\.I\d+=(.*)$' }
     returns: value
@@ -572,8 +574,8 @@ commands:
   get_signal_present:
     summary: 'Get whether a video or audio port has a signal (true/false)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
     send: 'GET /V1/MEDIA/{layer}/{port}.SignalPresent'
     expect: { matches: '^pr /V1/MEDIA/(?:VIDEO|AUDIO)/[IO]\d+\.SignalPresent=(.*)$' }
     returns: value
@@ -581,7 +583,7 @@ commands:
   get_port_connected:
     summary: 'Get whether a device is connected to a video port (true/false)'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
     send: 'GET /V1/MEDIA/VIDEO/{port}.Connected'
     expect: { matches: '^pr /V1/MEDIA/VIDEO/[IO]\d+\.Connected=(.*)$' }
     returns: value
@@ -589,7 +591,7 @@ commands:
   get_embedded_audio_present:
     summary: 'Get whether a video port carries embedded audio (true/false)'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
     send: 'GET /V1/MEDIA/VIDEO/{port}.EmbeddedAudioPresent'
     expect: { matches: '^pr /V1/MEDIA/VIDEO/[IO]\d+\.EmbeddedAudioPresent=(.*)$' }
     returns: value
@@ -597,7 +599,7 @@ commands:
   get_port_name:
     summary: 'Get the name of a video port'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
     send: 'GET /V1/MEDIA/VIDEO/{port}.Name'
     expect: { matches: '^p[rw] /V1/MEDIA/VIDEO/[IO]\d+\.Name=(.*)$' }
     returns: value
@@ -605,8 +607,8 @@ commands:
   set_port_name:
     summary: 'Set the name of a video port'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      name: { type: string, pattern: '^[^\\{}#%()]*$', required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      name: { type: string, pattern: '^[^\\{}#%()]*$', required: true, label: Name, description: "Port name as shown on the device; it cannot contain \\, {, }, #, %, ( or )." }
     send: 'SET /V1/MEDIA/VIDEO/{port}.Name={name}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/[IO]\d+\.Name=' }
     returns: ack
@@ -615,8 +617,8 @@ commands:
   set_embedded_audio_mute:
     summary: 'Mute or unmute the embedded audio of a video output'
     params:
-      output: { type: int, min: 1, required: true }
-      muted: { type: bool, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      muted: { type: bool, required: true, label: Mute, description: "On mutes the output's embedded audio, off unmutes it." }
     send: 'SET /V1/MEDIA/VIDEO/O{output}.EmbeddedAudioMute={muted}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/O\d+\.EmbeddedAudioMute=' }
     returns: ack
@@ -624,8 +626,8 @@ commands:
   set_input_hdcp:
     summary: 'Set the HDCP capability an input reports to the source'
     params:
-      input: { type: int, min: 1, required: true }
-      version: { type: enum, values: [HDCP 1.4, HDCP 2.2, 'Off'], required: true }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      version: { type: enum, values: [HDCP 1.4, HDCP 2.2, 'Off'], required: true, label: HDCP, description: "HDCP capability the input reports to the source: HDCP 1.4, HDCP 2.2 or Off." }
     send: 'SET /V1/MEDIA/VIDEO/I{input}/HDCP.AllowedHdcpVersion={version}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/I\d+/HDCP\.AllowedHdcpVersion=' }
     returns: ack
@@ -633,8 +635,8 @@ commands:
   set_output_signal_type:
     summary: 'Set the signal type of a video output (Auto is HDMI)'
     params:
-      output: { type: int, min: 1, required: true }
-      signal_type: { type: enum, values: [Auto, DVI], required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      signal_type: { type: enum, values: [Auto, DVI], required: true, label: Signal type, description: "Auto sends HDMI, DVI sends DVI." }
     send: 'SET /V1/MEDIA/VIDEO/O{output}.OutputSignalType={signal_type}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/O\d+\.OutputSignalType=' }
     returns: ack
@@ -642,8 +644,8 @@ commands:
   set_autoselect_policy:
     summary: 'Set the video autoselect policy of an output'
     params:
-      output: { type: int, min: 1, required: true }
-      policy: { type: enum, values: ['Off', Last detect, First detect], required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      policy: { type: enum, values: ['Off', Last detect, First detect], required: true, label: Autoselect policy, description: "Off, Last detect to switch to the input that last got a signal, or First detect to keep the first." }
     send: 'SET /V1/MEDIA/VIDEO/AUTOSELECT/O{output}.Policy={policy}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/AUTOSELECT/O\d+\.Policy=' }
     returns: ack
@@ -651,9 +653,9 @@ commands:
   set_autoselect_included:
     summary: 'Include or exclude an input from an output''s video autoselect'
     params:
-      output: { type: int, min: 1, required: true }
-      input: { type: int, min: 1, required: true }
-      included: { type: bool, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      included: { type: bool, required: true, label: Included, description: "On includes the input in the output's video autoselect, off excludes it." }
     send: 'SET /V1/MEDIA/VIDEO/AUTOSELECT/O{output}/I{input}.Included={included}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/AUTOSELECT/O\d+/I\d+\.Included=' }
     returns: ack
@@ -661,9 +663,9 @@ commands:
   set_autoselect_priority:
     summary: 'Set an input''s video autoselect priority for an output (1-100, equal values allowed)'
     params:
-      output: { type: int, min: 1, required: true }
-      input: { type: int, min: 1, required: true }
-      priority: { type: int, min: 1, max: 100, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      priority: { type: int, min: 1, max: 100, required: true, label: Priority, description: "Autoselect priority of the input for this output, 1 to 100; equal values are allowed." }
     send: 'SET /V1/MEDIA/VIDEO/AUTOSELECT/O{output}/I{input}.Priority={priority}'
     expect: { matches: '^pw /V1/MEDIA/VIDEO/AUTOSELECT/O\d+/I\d+\.Priority=' }
     returns: ack
@@ -672,8 +674,8 @@ commands:
   cec_send:
     summary: 'Send a CEC code (hex, e.g. 446D power on) from a video output to the sink'
     params:
-      output: { type: int, min: 1, required: true }
-      code: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      code: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', required: true, label: CEC code, description: "CEC code in hex, such as 446D for power on." }
     send: 'CALL /V1/MEDIA/VIDEO/O{output}/CEC:send({code})'
     expect: { matches: '^mO /V1/MEDIA/VIDEO/O\d+/CEC:send(?:=|$)' }
     returns: ack
@@ -681,8 +683,8 @@ commands:
   cec_send_user_control_click:
     summary: 'Send a CEC remote-control key press and release (hex code) to the sink'
     params:
-      output: { type: int, min: 1, required: true }
-      code: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      code: { type: string, pattern: '^([0-9A-Fa-f]{2})+$', required: true, label: CEC key code, description: "CEC remote-control key code in hex, sent as a press and release." }
     send: 'CALL /V1/MEDIA/VIDEO/O{output}/CEC:sendUserControlClick({code})'
     expect: { matches: '^mO /V1/MEDIA/VIDEO/O\d+/CEC:sendUserControlClick(?:=|$)' }
     returns: ack
@@ -691,8 +693,8 @@ commands:
   set_audio_output_mute:
     summary: 'Mute or unmute an analog audio output (sets its volume low)'
     params:
-      output: { type: int, min: 1, required: true }
-      muted: { type: bool, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      muted: { type: bool, required: true, label: Mute, description: "On mutes the analogue audio output by setting its volume low, off unmutes it." }
     send: 'SET /V1/MEDIA/AUDIO/O{output}.Mute={muted}'
     expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.Mute=' }
     returns: ack
@@ -700,8 +702,8 @@ commands:
   set_audio_output_volume_db:
     summary: 'Set an analog audio output volume in dB (0.375 dB steps, rounded by the device)'
     params:
-      output: { type: int, min: 1, required: true }
-      level: { type: float, min: -95.62, max: 0, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      level: { type: float, min: -95.62, max: 0, required: true, label: Volume, description: "Volume in dB, -95.62 to 0; the device rounds to its 0.375 dB steps." }
     send: 'SET /V1/MEDIA/AUDIO/O{output}.VolumedB={level:.2f}'
     expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.VolumedB=' }
     returns: ack
@@ -709,8 +711,8 @@ commands:
   set_audio_output_volume_percent:
     summary: 'Set an analog audio output volume in percent'
     params:
-      output: { type: int, min: 1, required: true }
-      percent: { type: float, min: 0, max: 100, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      percent: { type: float, min: 0, max: 100, required: true, label: Volume, description: "Volume in percent, 0 to 100." }
     send: 'SET /V1/MEDIA/AUDIO/O{output}.VolumePercent={percent:.2f}'
     expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.VolumePercent=' }
     returns: ack
@@ -718,8 +720,8 @@ commands:
   set_audio_output_balance:
     summary: 'Set an analog audio output balance (-100 left, 0 centre, 100 right)'
     params:
-      output: { type: int, min: 1, required: true }
-      balance: { type: int, min: -100, max: 100, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      balance: { type: int, min: -100, max: 100, required: true, label: Balance, description: "Balance from -100 (left) through 0 (centre) to 100 (right)." }
     send: 'SET /V1/MEDIA/AUDIO/O{output}.Balance={balance}'
     expect: { matches: '^pw /V1/MEDIA/AUDIO/O\d+\.Balance=' }
     returns: ack
@@ -727,8 +729,8 @@ commands:
   step_audio_output_volume_db:
     summary: 'Raise or lower an analog audio output volume by a number of dB'
     params:
-      output: { type: int, min: 1, required: true }
-      step: { type: int, min: -96, max: 96, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      step: { type: int, min: -96, max: 96, required: true, label: Step, description: "dB to add to the volume; negative lowers it." }
     send: 'CALL /V1/MEDIA/AUDIO/O{output}:stepVolumedB({step})'
     expect: { matches: '^mO /V1/MEDIA/AUDIO/O\d+:stepVolumedB(?:=|$)' }
     returns: ack
@@ -736,8 +738,8 @@ commands:
   set_audio_autoselect_policy:
     summary: 'Set an analog audio output to follow a video output, or not'
     params:
-      output: { type: int, min: 1, required: true }
-      policy: { type: enum, values: [Follow video, 'Off'], required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      policy: { type: enum, values: [Follow video, 'Off'], required: true, label: Autoselect policy, description: "Follow video makes the analogue output follow a video output, Off stops it." }
     send: 'SET /V1/MEDIA/AUDIO/AUTOSELECT/O{output}.Policy={policy}'
     expect: { matches: '^pw /V1/MEDIA/AUDIO/AUTOSELECT/O\d+\.Policy=' }
     returns: ack
@@ -745,8 +747,8 @@ commands:
   set_audio_follow_port:
     summary: 'Set the video output an analog audio output follows'
     params:
-      output: { type: int, min: 1, required: true }
-      video_output: { type: int, min: 1, required: true }
+      output: { type: int, min: 1, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      video_output: { type: int, min: 1, required: true, label: Video output, description: "Video output the analogue audio output follows, numbered from 1." }
     send: 'SET /V1/MEDIA/AUDIO/AUTOSELECT/O{output}.VideoFollowPort=O{video_output}'
     expect: { matches: '^pw /V1/MEDIA/AUDIO/AUTOSELECT/O\d+\.VideoFollowPort=' }
     returns: ack
@@ -755,7 +757,7 @@ commands:
   switch_usb:
     summary: 'Connect a USB host (U<n>) to the USB hub H1'
     params:
-      host: { type: int, min: 1, max: 4, required: true }
+      host: { type: int, min: 1, max: 4, required: true, label: USB host, description: "USB host port U1 to U4 to connect to the hub, numbered from 1." }
     send: 'CALL /V1/MEDIA/USB/XP:switch(U{host}:H1)'
     expect: { matches: '^mO /V1/MEDIA/USB/XP:switch(?:=|$)' }
     returns: ack
@@ -775,8 +777,8 @@ commands:
   set_usb_port_lock:
     summary: 'Lock or unlock a USB port (U<n> host or H1 hub)'
     params:
-      port: { type: string, pattern: '^(U[1-4]|H1)$', required: true }
-      locked: { type: bool, required: true }
+      port: { type: string, pattern: '^(U[1-4]|H1)$', required: true, label: USB port, description: "U1 to U4 for a host port, or H1 for the hub." }
+      locked: { type: bool, required: true, label: Lock, description: "On locks it, off unlocks it." }
     send: 'SET /V1/MEDIA/USB/XP/{port}.Lock={locked}'
     expect: { matches: '^pw /V1/MEDIA/USB/XP/[UH]\d+\.Lock=' }
     returns: ack
@@ -791,8 +793,8 @@ commands:
   edid_switch:
     summary: 'Emulate an EDID (F<n> factory, U<n> user, D<n> dynamic) on an input'
     params:
-      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
-      input: { type: int, min: 1, required: true }
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true, label: EDID, description: "EDID to emulate: F followed by a factory EDID number, U a user slot, D a dynamic EDID, such as F49." }
+      input: { type: int, min: 1, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /V1/EDID:switch({source}:E{input})'
     expect: { matches: '^mO /V1/EDID:switch(?:=|$)' }
     returns: ack
@@ -800,7 +802,7 @@ commands:
   edid_switch_all:
     summary: 'Emulate an EDID on every input'
     params:
-      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true, label: EDID, description: "EDID to emulate: F followed by a factory EDID number, U a user slot, D a dynamic EDID, such as F49." }
     send: 'CALL /V1/EDID:switchAll({source})'
     expect: { matches: '^mO /V1/EDID:switchAll(?:=|$)' }
     returns: ack
@@ -808,8 +810,8 @@ commands:
   edid_copy:
     summary: 'Copy an EDID into a user EDID slot (overwritten without warning)'
     params:
-      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
-      slot: { type: int, min: 1, max: 100, required: true }
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true, label: EDID, description: "EDID to emulate: F followed by a factory EDID number, U a user slot, D a dynamic EDID, such as F49." }
+      slot: { type: int, min: 1, max: 100, required: true, label: User EDID slot, description: "User EDID slot to copy into, numbered from 1; its EDID is overwritten without warning." }
     send: 'CALL /V1/EDID:copy({source}:U{slot})'
     expect: { matches: '^mO /V1/EDID:copy(?:=|$)' }
     returns: ack
@@ -817,7 +819,7 @@ commands:
   edid_delete:
     summary: 'Delete a user EDID'
     params:
-      slot: { type: int, min: 1, max: 100, required: true }
+      slot: { type: int, min: 1, max: 100, required: true, label: User EDID slot, description: "User EDID slot to delete, numbered from 1." }
     send: 'CALL /V1/EDID:delete(U{slot})'
     expect: { matches: '^mO /V1/EDID:delete(?:=|$)' }
     returns: ack
@@ -839,7 +841,7 @@ commands:
   set_device_label_uid:
     summary: 'Set the device label (MX2 up to 32, UMX up to 39 ASCII characters; longer is truncated)'
     params:
-      label: { type: string, max_length: 39, pattern: '^[ -~]*$', required: true }
+      label: { type: string, max_length: 39, pattern: '^[ -~]*$', required: true, label: Device label, description: "Device label in printable ASCII; an MX2 keeps 32 characters and a UMX 39, truncating the rest." }
     send: 'SET /MANAGEMENT/UID.DeviceLabel={label}'
     expect: { matches: '^pw /MANAGEMENT/UID\.DeviceLabel=' }
     returns: ack
@@ -878,8 +880,8 @@ commands:
   mx2_switch:
     summary: 'Route an input to an output'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
-      output: { type: int, min: 1, max: 48, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:switch(I{input}:O{output})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:switch(?:=|$)' }
     returns: ack
@@ -887,7 +889,7 @@ commands:
   mx2_disconnect:
     summary: 'Disconnect an output (route input 0)'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:switch(0:O{output})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:switch(?:=|$)' }
     returns: ack
@@ -895,7 +897,7 @@ commands:
   mx2_switch_all:
     summary: 'Route an input to every output'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:switchAll(I{input})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:switchAll(?:=|$)' }
     returns: ack
@@ -909,7 +911,7 @@ commands:
   mx2_switch_multi:
     summary: 'Set several outputs at once: the source of each output in order, semicolon-separated (I<n>, 0, or empty to leave it)'
     params:
-      sources: { type: string, pattern: '^((I[1-9][0-9]?|0)?;){0,47}(I[1-9][0-9]?|0)?$', required: true }
+      sources: { type: string, pattern: '^((I[1-9][0-9]?|0)?;){0,47}(I[1-9][0-9]?|0)?$', required: true, label: Sources, description: "Source of each output in order, separated by ;: I followed by an input number, 0 to disconnect, or empty to leave it." }
     send: 'CALL /MEDIA/XP/VIDEO:switchMulti({sources})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:switchMulti(?:=|$)' }
     returns: ack
@@ -917,7 +919,7 @@ commands:
   mx2_mute_input:
     summary: 'Mute an input'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:muteSource(I{input})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:muteSource(?:=|$)' }
     returns: ack
@@ -925,7 +927,7 @@ commands:
   mx2_unmute_input:
     summary: 'Unmute an input'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:unmuteSource(I{input})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:unmuteSource(?:=|$)' }
     returns: ack
@@ -933,7 +935,7 @@ commands:
   mx2_lock_input:
     summary: 'Lock an input'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:lockSource(I{input})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:lockSource(?:=|$)' }
     returns: ack
@@ -941,7 +943,7 @@ commands:
   mx2_unlock_input:
     summary: 'Unlock an input'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:unlockSource(I{input})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:unlockSource(?:=|$)' }
     returns: ack
@@ -949,7 +951,7 @@ commands:
   mx2_mute_output:
     summary: 'Mute an output; the route is kept and restored on unmute'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:muteDestination(O{output})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:muteDestination(?:=|$)' }
     returns: ack
@@ -957,7 +959,7 @@ commands:
   mx2_unmute_output:
     summary: 'Unmute an output'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:unmuteDestination(O{output})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:unmuteDestination(?:=|$)' }
     returns: ack
@@ -965,7 +967,7 @@ commands:
   mx2_lock_output:
     summary: 'Lock an output so its route cannot change'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:lockDestination(O{output})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:lockDestination(?:=|$)' }
     returns: ack
@@ -973,7 +975,7 @@ commands:
   mx2_unlock_output:
     summary: 'Unlock an output'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/XP/VIDEO:unlockDestination(O{output})'
     expect: { matches: '^mO /MEDIA/XP/VIDEO:unlockDestination(?:=|$)' }
     returns: ack
@@ -1000,7 +1002,7 @@ commands:
   mx2_create_preset:
     summary: 'Store the current crosspoint and mute states as a new named preset'
     params:
-      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true, label: Preset, description: "Name for the new preset, up to 16 letters, digits, _ or -." }
     send: 'CALL /MEDIA/PRESET:create({name},VIDEO)'
     expect: { matches: '^mO /MEDIA/PRESET:create(?:=|$)' }
     returns: ack
@@ -1008,7 +1010,7 @@ commands:
   mx2_load_preset:
     summary: 'Load a named preset (every port except locked ones)'
     params:
-      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true, label: Preset, description: "Name of the preset to load; locked ports are left as they are." }
     send: 'CALL /MEDIA/PRESET/{name}:load()'
     expect: { matches: '^mO /MEDIA/PRESET/[A-Za-z0-9_-]+:load(?:=|$)' }
     returns: ack
@@ -1016,8 +1018,8 @@ commands:
   mx2_rename_preset:
     summary: 'Rename a preset'
     params:
-      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
-      new_name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true }
+      name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true, label: Preset, description: "Current preset name." }
+      new_name: { type: string, max_length: 16, pattern: '^[A-Za-z0-9_-]+$', required: true, label: New name, description: "New preset name, up to 16 letters, digits, _ or -." }
     send: 'CALL /MEDIA/PRESET:rename({name},{new_name})'
     expect: { matches: '^mO /MEDIA/PRESET:rename(?:=|$)' }
     returns: ack
@@ -1026,8 +1028,8 @@ commands:
   mx2_set_input_hdcp:
     summary: 'Set an input''s HDCP: 0 off, 1 HDCP 1.4, 2 HDCP 2.3, 3 any version converted up to 2.3'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
-      version: { type: int, min: 0, max: 3, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      version: { type: int, min: 0, max: 3, required: true, label: HDCP, description: "0 off, 1 HDCP 1.4, 2 HDCP 2.3, 3 any version converted up to 2.3." }
     send: 'SET /MEDIA/PORTS/VIDEO/I{input}/SETTINGS.HdcpVersion={version}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/I\d+/SETTINGS\.HdcpVersion=' }
     returns: ack
@@ -1035,8 +1037,8 @@ commands:
   mx2_set_output_hdcp_mode:
     summary: 'Set an output''s HDCP mode: AUTO follows the input, ALWAYS encrypts'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
-      mode: { type: enum, values: [AUTO, ALWAYS], required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      mode: { type: enum, values: [AUTO, ALWAYS], required: true, label: HDCP mode, description: "AUTO follows the input, ALWAYS always encrypts." }
     send: 'SET /MEDIA/PORTS/VIDEO/O{output}/SETTINGS.HdcpMode={mode}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/SETTINGS\.HdcpMode=' }
     returns: ack
@@ -1044,8 +1046,8 @@ commands:
   mx2_set_output_signal_type:
     summary: 'Force an output''s signal type (AUTO: HDMI when audio is present)'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
-      signal_type: { type: enum, values: [DVI, HDMI, AUTO], required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      signal_type: { type: enum, values: [DVI, HDMI, AUTO], required: true, label: Signal type, description: "DVI, HDMI, or AUTO for HDMI when audio is present." }
     send: 'SET /MEDIA/PORTS/VIDEO/O{output}/SETTINGS.ForcedSignalType={signal_type}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/SETTINGS\.ForcedSignalType=' }
     returns: ack
@@ -1053,8 +1055,8 @@ commands:
   mx2_set_output_conversion:
     summary: 'Set an output''s colour conversion (LEFT/RIGHT split a 4K60 4:4:4 picture across two outputs)'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
-      conversion: { type: enum, values: ['OFF', '420', '422', LEFT, RIGHT], required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      conversion: { type: enum, values: ['OFF', '420', '422', LEFT, RIGHT], required: true, label: Colour conversion, description: "OFF, 420 or 422 chroma conversion, or LEFT or RIGHT to split a 4K60 4:4:4 picture across two outputs." }
     send: 'SET /MEDIA/PORTS/VIDEO/O{output}/SETTINGS.Conversion={conversion}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/SETTINGS\.Conversion=' }
     returns: ack
@@ -1062,8 +1064,8 @@ commands:
   mx2_set_embedded_audio_mode:
     summary: 'Set the audio embedded in a video port: OFF, HDMI (original) or ANALOG (-A/-Audio models)'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      mode: { type: enum, values: ['OFF', HDMI, ANALOG], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      mode: { type: enum, values: ['OFF', HDMI, ANALOG], required: true, label: Embedded audio, description: "OFF, HDMI for the original audio, or ANALOG for the analogue audio (-A/-Audio models)." }
     send: 'SET /MEDIA/PORTS/VIDEO/{port}/EMBEDDEDAUDIO.AudioMode={mode}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/[IO]\d+/EMBEDDEDAUDIO\.AudioMode=' }
     returns: ack
@@ -1071,8 +1073,8 @@ commands:
   mx2_set_analog_output_mode:
     summary: 'Set where an output''s audio goes (-A/-Audio models): OFF, HDMI, ANALOG or HDMI+ANALOG'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
-      mode: { type: enum, values: ['OFF', HDMI, ANALOG, HDMI+ANALOG], required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      mode: { type: enum, values: ['OFF', HDMI, ANALOG, HDMI+ANALOG], required: true, label: Audio routing, description: "Where the output's audio goes: OFF, HDMI, ANALOG or HDMI+ANALOG." }
     send: 'SET /MEDIA/PORTS/VIDEO/O{output}/ANALOGAUDIO.AudioMode={mode}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/ANALOGAUDIO\.AudioMode=' }
     returns: ack
@@ -1080,8 +1082,8 @@ commands:
   mx2_set_analog_output_volume_db:
     summary: 'Set an analog audio output volume in dB (-A/-Audio models)'
     params:
-      output: { type: int, min: 1, max: 48, required: true }
-      level: { type: float, min: -95.62, max: 0, required: true }
+      output: { type: int, min: 1, max: 48, required: true, label: Output, description: "Output, numbered from 1 as on the device." }
+      level: { type: float, min: -95.62, max: 0, required: true, label: Volume, description: "Volume in dB, -95.62 to 0; the device rounds to its 0.375 dB steps." }
     send: 'SET /MEDIA/PORTS/VIDEO/O{output}/ANALOGAUDIO.VolumedB={level:.2f}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/O\d+/ANALOGAUDIO\.VolumedB=' }
     returns: ack
@@ -1089,8 +1091,8 @@ commands:
   mx2_set_analog_mute:
     summary: 'Mute or unmute the analog audio of a port (-A/-Audio models)'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      muted: { type: bool, required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      muted: { type: bool, required: true, label: Mute, description: "On mutes the port's analogue audio, off unmutes it." }
     send: 'SET /MEDIA/PORTS/VIDEO/{port}/ANALOGAUDIO.Mute={muted}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/[IO]\d+/ANALOGAUDIO\.Mute=' }
     returns: ack
@@ -1098,8 +1100,8 @@ commands:
   mx2_set_analog_balance:
     summary: 'Set the analog audio balance of a port (-100 left, 0 centre, 100 right)'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      balance: { type: int, min: -100, max: 100, required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      balance: { type: int, min: -100, max: 100, required: true, label: Balance, description: "Balance from -100 (left) through 0 (centre) to 100 (right)." }
     send: 'SET /MEDIA/PORTS/VIDEO/{port}/ANALOGAUDIO.Balance={balance}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/[IO]\d+/ANALOGAUDIO\.Balance=' }
     returns: ack
@@ -1107,8 +1109,8 @@ commands:
   mx2_set_analog_input_gain:
     summary: 'Set an analog audio input gain in dB (rounded by the device)'
     params:
-      input: { type: int, min: 1, max: 48, required: true }
-      gain: { type: int, min: -12, max: 35, required: true }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      gain: { type: int, min: -12, max: 35, required: true, label: Gain, description: "Analogue input gain in dB, -12 to 35; the device rounds it." }
     send: 'SET /MEDIA/PORTS/VIDEO/I{input}/ANALOGAUDIO.Gain={gain}'
     expect: { matches: '^pw /MEDIA/PORTS/VIDEO/I\d+/ANALOGAUDIO\.Gain=' }
     returns: ack
@@ -1116,8 +1118,8 @@ commands:
   mx2_cec_send:
     summary: 'Send a named CEC command from an HDMI port to the connected device'
     params:
-      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true }
-      command: { type: enum, values: [image_view_on, standby, ok, back, up, down, left, right, root_menu, setup_menu, contents_menu, favorite_menu, media_top_menu, media_context_menu, number_0, number_1, number_2, number_3, number_4, number_5, number_6, number_7, number_8, number_9, dot, enter, clear, channel_up, channel_down, sound_select, input_select, display_info, power_legacy, page_up, page_down, volume_up, volume_down, mute_toggle, mute, unmute, play, stop, pause, record, rewind, fast_forward, eject, skip_forward, skip_backward, 3d_mode, stop_record, pause_record, play_forward, play_reverse, select_next_media, select_media_1, select_media_2, select_media_3, select_media_4, select_media_5, power_toggle, power_on, power_off, stop_function, f1, f2, f3, f4, set_osd], required: true }
+      port: { type: string, pattern: '^[IO][1-9][0-9]?$', required: true, label: Port, description: "Port as I followed by the input number or O followed by the output number, such as I1 or O2." }
+      command: { type: enum, values: [image_view_on, standby, ok, back, up, down, left, right, root_menu, setup_menu, contents_menu, favorite_menu, media_top_menu, media_context_menu, number_0, number_1, number_2, number_3, number_4, number_5, number_6, number_7, number_8, number_9, dot, enter, clear, channel_up, channel_down, sound_select, input_select, display_info, power_legacy, page_up, page_down, volume_up, volume_down, mute_toggle, mute, unmute, play, stop, pause, record, rewind, fast_forward, eject, skip_forward, skip_backward, 3d_mode, stop_record, pause_record, play_forward, play_reverse, select_next_media, select_media_1, select_media_2, select_media_3, select_media_4, select_media_5, power_toggle, power_on, power_off, stop_function, f1, f2, f3, f4, set_osd], required: true, label: CEC command, description: "Named CEC command to send to the connected device, such as power_on, standby or volume_up." }
     send: 'CALL /MEDIA/PORTS/VIDEO/{port}/CEC:send({command})'
     expect: { matches: '^mO /MEDIA/PORTS/VIDEO/[IO]\d+/CEC:send(?:=|$)' }
     returns: ack
@@ -1132,8 +1134,8 @@ commands:
   mx2_edid_switch:
     summary: 'Emulate an EDID (F<n> factory, U<n> user, D<n> dynamic) on an input'
     params:
-      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
-      input: { type: int, min: 1, max: 48, required: true }
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true, label: EDID, description: "EDID to emulate: F followed by a factory EDID number, U a user slot, D a dynamic EDID, such as F49." }
+      input: { type: int, min: 1, max: 48, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /EDID:switch({source}:E{input})'
     expect: { matches: '^mO /EDID:switch(?:=|$)' }
     returns: ack
@@ -1141,8 +1143,8 @@ commands:
   mx2_edid_copy:
     summary: 'Copy an EDID into a user EDID slot (overwritten without warning)'
     params:
-      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true }
-      slot: { type: int, min: 1, max: 100, required: true }
+      source: { type: string, pattern: '^[FUD][1-9][0-9]{0,2}$', required: true, label: EDID, description: "EDID to emulate: F followed by a factory EDID number, U a user slot, D a dynamic EDID, such as F49." }
+      slot: { type: int, min: 1, max: 100, required: true, label: User EDID slot, description: "User EDID slot to copy into, numbered from 1; its EDID is overwritten without warning." }
     send: 'CALL /EDID:copy({source}:U{slot})'
     expect: { matches: '^mO /EDID:copy(?:=|$)' }
     returns: ack
@@ -1175,7 +1177,7 @@ commands:
   umx_set_control_lock:
     summary: 'Front panel lock: 0 none, 1 locked (unlockable by buttons), 2 force locked'
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true, label: Front panel lock, description: "0 none, 1 locked but unlockable from the buttons, 2 force locked." }
     send: 'SET /MANAGEMENT/UI.ControlLock={mode}'
     expect: { matches: '^pw /MANAGEMENT/UI\.ControlLock=' }
     returns: ack
@@ -1183,7 +1185,7 @@ commands:
   umx_run_macro:
     summary: 'Run a macro stored in the device (UMX-HDMI-140-Plus)'
     params:
-      name: { type: string, pattern: '^[^\\{}#%()]*$', required: true }
+      name: { type: string, pattern: '^[^\\{}#%()]*$', required: true, label: Macro, description: "Name of the macro stored in the device." }
     send: 'CALL /CTRL/MACROS:run({name})'
     expect: { matches: '^mO /CTRL/MACROS:run(?:=|$)' }
     returns: ack
@@ -1197,9 +1199,9 @@ commands:
   umx_switch:
     summary: 'Route an input to the output on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, max: 6, required: true }
-      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, max: 6, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      output: { type: int, min: 1, max: 1, default: 1, label: Output, description: "The output, which is 1 on this model." }
     send: 'CALL /MEDIA/{layer}/XP:switch(I{input}:O{output})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:switch(?:=|$)' }
     returns: ack
@@ -1207,8 +1209,8 @@ commands:
   umx_mute_input:
     summary: 'Mute an input on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, max: 6, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, max: 6, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/{layer}/XP:muteSource(I{input})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:muteSource(?:=|$)' }
     returns: ack
@@ -1216,8 +1218,8 @@ commands:
   umx_unmute_input:
     summary: 'Unmute an input on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, max: 6, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, max: 6, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/{layer}/XP:unmuteSource(I{input})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unmuteSource(?:=|$)' }
     returns: ack
@@ -1225,8 +1227,8 @@ commands:
   umx_lock_input:
     summary: 'Lock an input on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, max: 6, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, max: 6, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/{layer}/XP:lockSource(I{input})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:lockSource(?:=|$)' }
     returns: ack
@@ -1234,8 +1236,8 @@ commands:
   umx_unlock_input:
     summary: 'Unlock an input on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      input: { type: int, min: 1, max: 6, required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      input: { type: int, min: 1, max: 6, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
     send: 'CALL /MEDIA/{layer}/XP:unlockSource(I{input})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unlockSource(?:=|$)' }
     returns: ack
@@ -1243,8 +1245,8 @@ commands:
   umx_mute_output:
     summary: 'Mute the output; the route is kept on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, max: 1, default: 1, label: Output, description: "The output, which is 1 on this model." }
     send: 'CALL /MEDIA/{layer}/XP:muteDestination(O{output})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:muteDestination(?:=|$)' }
     returns: ack
@@ -1252,8 +1254,8 @@ commands:
   umx_unmute_output:
     summary: 'Unmute the output on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, max: 1, default: 1, label: Output, description: "The output, which is 1 on this model." }
     send: 'CALL /MEDIA/{layer}/XP:unmuteDestination(O{output})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unmuteDestination(?:=|$)' }
     returns: ack
@@ -1261,8 +1263,8 @@ commands:
   umx_lock_output:
     summary: 'Lock the output so its route cannot change on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, max: 1, default: 1, label: Output, description: "The output, which is 1 on this model." }
     send: 'CALL /MEDIA/{layer}/XP:lockDestination(O{output})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:lockDestination(?:=|$)' }
     returns: ack
@@ -1270,8 +1272,8 @@ commands:
   umx_unlock_output:
     summary: 'Unlock the output on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, max: 1, default: 1 }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, max: 1, default: 1, label: Output, description: "The output, which is 1 on this model." }
     send: 'CALL /MEDIA/{layer}/XP:unlockDestination(O{output})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP:unlockDestination(?:=|$)' }
     returns: ack
@@ -1279,7 +1281,7 @@ commands:
   umx_get_connection:
     summary: 'Get the input routed to the output on the video or audio crosspoint'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
     send: 'GET /MEDIA/{layer}/XP.DestinationConnectionList'
     expect: { matches: '^pr /MEDIA/(?:VIDEO|AUDIO)/XP\.DestinationConnectionList=(.*)$' }
     returns: value
@@ -1287,7 +1289,7 @@ commands:
   umx_get_input_status:
     summary: 'Get every input''s status (lock/mute letter and two status bytes), semicolon-separated'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
     send: 'GET /MEDIA/{layer}/XP.SourcePortStatus'
     expect: { matches: '^pr /MEDIA/(?:VIDEO|AUDIO)/XP\.SourcePortStatus=(.*)$' }
     returns: value
@@ -1295,7 +1297,7 @@ commands:
   umx_get_output_status:
     summary: 'Get the output''s status (lock/mute letter and two status bytes)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
     send: 'GET /MEDIA/{layer}/XP.DestinationPortStatus'
     expect: { matches: '^pr /MEDIA/(?:VIDEO|AUDIO)/XP\.DestinationPortStatus=(.*)$' }
     returns: value
@@ -1303,9 +1305,9 @@ commands:
   umx_set_autoselect:
     summary: 'Set the autoselect of the output: E or D (enabled/disabled), optionally followed by F, P or L (first, priority, last detect; S static for audio)'
     params:
-      layer: { type: enum, values: [VIDEO, AUDIO], required: true }
-      output: { type: int, min: 1, max: 1, default: 1 }
-      setting: { type: string, pattern: '^[ED][FPLS]?$', required: true }
+      layer: { type: enum, values: [VIDEO, AUDIO], required: true, label: Crosspoint, description: "VIDEO or AUDIO crosspoint." }
+      output: { type: int, min: 1, max: 1, default: 1, label: Output, description: "The output, which is 1 on this model." }
+      setting: { type: string, pattern: '^[ED][FPLS]?$', required: true, label: Autoselect, description: "E enabled or D disabled, optionally followed by F first detect, P priority, L last detect, or S static for audio." }
     send: 'CALL /MEDIA/{layer}/XP:setDestinationPortAutoselect(O{output}:{setting})'
     expect: { matches: '^mO /MEDIA/(?:VIDEO|AUDIO)/XP[:.]setDestinationPortAutoselect(?:=|$)' }
     returns: ack
@@ -1313,8 +1315,8 @@ commands:
   umx_set_input_hdcp:
     summary: 'Enable or disable HDCP on a digital video input (I2-I4)'
     params:
-      input: { type: int, min: 2, max: 4, required: true }
-      enabled: { type: bool, required: true }
+      input: { type: int, min: 2, max: 4, required: true, label: Input, description: "Digital video input I2 to I4, by its number." }
+      enabled: { type: bool, required: true, label: HDCP, description: "On enables HDCP on the input, off disables it." }
     send: 'SET /MEDIA/VIDEO/I{input}.HdcpEnable={enabled}'
     expect: { matches: '^pw /MEDIA/VIDEO/I\d+\.HdcpEnable=' }
     returns: ack
@@ -1322,7 +1324,7 @@ commands:
   umx_set_output_hdcp_mode:
     summary: 'Set the output HDCP mode: 0 auto, 1 always'
     params:
-      mode: { type: int, min: 0, max: 1, required: true }
+      mode: { type: int, min: 0, max: 1, required: true, label: HDCP mode, description: "0 auto, 1 always." }
     send: 'SET /MEDIA/VIDEO/O1.HdcpModeSetting={mode}'
     expect: { matches: '^pw /MEDIA/VIDEO/O1\.HdcpModeSetting=' }
     returns: ack
@@ -1330,8 +1332,8 @@ commands:
   umx_set_test_pattern_mode:
     summary: 'Set an input''s test pattern: 0 off, 1 on, 2 when the input has no signal'
     params:
-      input: { type: int, min: 1, max: 6, required: true }
-      mode: { type: int, min: 0, max: 2, required: true }
+      input: { type: int, min: 1, max: 6, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Test pattern, description: "0 off, 1 on, 2 only when the input has no signal." }
     send: 'SET /MEDIA/VIDEO/I{input}.FreeRunMode={mode}'
     expect: { matches: '^pw /MEDIA/VIDEO/I\d+\.FreeRunMode=' }
     returns: ack
@@ -1339,7 +1341,7 @@ commands:
   umx_set_hdmi_mode:
     summary: 'Set the output HDMI mode: 0 auto, 1 DVI, 2 HDMI 24-bit, 3 HDMI 30-bit, 4 HDMI 36-bit'
     params:
-      mode: { type: int, min: 0, max: 4, required: true }
+      mode: { type: int, min: 0, max: 4, required: true, label: HDMI mode, description: "0 auto, 1 DVI, 2 HDMI 24-bit, 3 HDMI 30-bit, 4 HDMI 36-bit." }
     send: 'SET /MEDIA/VIDEO/O1.HdmiModeSetting={mode}'
     expect: { matches: '^pw /MEDIA/VIDEO/O1\.HdmiModeSetting=' }
     returns: ack
@@ -1347,7 +1349,7 @@ commands:
   umx_set_color_space:
     summary: 'Set the output colour space: 0 auto, 1 RGB, 2 YCbCr 4:4:4, 3 YCbCr 4:2:2'
     params:
-      mode: { type: int, min: 0, max: 3, required: true }
+      mode: { type: int, min: 0, max: 3, required: true, label: Colour space, description: "0 auto, 1 RGB, 2 YCbCr 4:4:4, 3 YCbCr 4:2:2." }
     send: 'SET /MEDIA/VIDEO/O1.ColorSpaceSetting={mode}'
     expect: { matches: '^pw /MEDIA/VIDEO/O1\.ColorSpaceSetting=' }
     returns: ack
@@ -1355,8 +1357,8 @@ commands:
   umx_set_audio_input_volume:
     summary: 'Set an analog audio input volume in dB (0.375 dB steps, rounded by the device)'
     params:
-      input: { type: int, min: 1, max: 5, required: true }
-      level: { type: float, min: -95.625, max: 0, required: true }
+      input: { type: int, min: 1, max: 5, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      level: { type: float, min: -95.625, max: 0, required: true, label: Volume, description: "Volume in dB, -95.625 to 0; the device rounds to its 0.375 dB steps." }
     send: 'SET /MEDIA/AUDIO/I{input}.Volume={level:.3f}'
     expect: { matches: '^pw /MEDIA/AUDIO/I\d+\.Volume=' }
     returns: ack
@@ -1364,8 +1366,8 @@ commands:
   umx_set_audio_input_balance:
     summary: 'Set an analog audio input balance (0 left, 50 centre, 100 right)'
     params:
-      input: { type: int, min: 1, max: 5, required: true }
-      balance: { type: int, min: 0, max: 100, required: true }
+      input: { type: int, min: 1, max: 5, required: true, label: Input, description: "Input, numbered from 1 as on the device." }
+      balance: { type: int, min: 0, max: 100, required: true, label: Balance, description: "Balance from 0 (left) through 50 (centre) to 100 (right)." }
     send: 'SET /MEDIA/AUDIO/I{input}.Balance={balance}'
     expect: { matches: '^pw /MEDIA/AUDIO/I\d+\.Balance=' }
     returns: ack
