@@ -32,6 +32,7 @@ NATIVE = {
     "allenheath-dlive": "MIDI over TCP 51325 (MixRack) or 51328 (Surface)",
     "allenheath-qu": "MIDI over TCP 51325",
     "allenheath-sq": "MIDI over TCP 51325",
+    "biamp-tesira": "Tesira Text Protocol over Telnet, TCP 23",
     "analogway-alta4k": "AWJ over TCP 10606",
     "analogway-livepremier": "AWJ over TCP 10606",
     "analogway-midra4k": "AWJ over TCP 10606",

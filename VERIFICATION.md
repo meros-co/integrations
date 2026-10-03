@@ -207,6 +207,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2255](specs/behringer-xair.yaml#L2255))
 - [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:2295](specs/behringer-xair.yaml#L2295))
 
+## biamp-tesira — Biamp Tesira
+
+- [ ] Capture the login prompts of a protected system over Telnet (the module looks for a waiting "login:", "username:", "user name:", "user:" or "password:") and what follows a wrong password. ([specs/biamp-tesira.yaml:443](specs/biamp-tesira.yaml#L443))
+- [ ] Check whether an unprotected system asks for a login over Telnet at all (the manual says a login prompt appears; Biamp's negotiation example goes straight to the banner). ([specs/biamp-tesira.yaml:443](specs/biamp-tesira.yaml#L443))
+- [ ] Check that lines sent with LF alone (no CR) are accepted, including the user name and password at the login prompts. ([specs/biamp-tesira.yaml:443](specs/biamp-tesira.yaml#L443))
+- [ ] Check whether a subscription's first publication and its +OK arrive on separate lines (the manual) or on one line (the knowledge-base examples); the module accepts both. ([specs/biamp-tesira.yaml:480](specs/biamp-tesira.yaml#L480))
+- [ ] Check that subscription labels of the form meros1, meros2 are accepted unquoted, and that subscribing again with the same label replaces the subscription rather than adding one. ([specs/biamp-tesira.yaml:480](specs/biamp-tesira.yaml#L480))
+- [ ] Check that DEVICE and SESSION work with the module's tag handling, and that quoted tags with spaces work for every command. ([specs/biamp-tesira.yaml:457](specs/biamp-tesira.yaml#L457))
+- [ ] Check what recallPresetByName and savePresetByName answer for an unknown name, and the value recallPresetShowFailures returns. ([specs/biamp-tesira.yaml:318](specs/biamp-tesira.yaml#L318))
+- [ ] Check which Tesira amplifier models host a TTP server. ([specs/biamp-tesira.yaml:132](specs/biamp-tesira.yaml#L132))
+- [ ] Check that SESSION set verbose true is answered +OK on every firmware the module may meet. ([specs/biamp-tesira.yaml:496](specs/biamp-tesira.yaml#L496))
+
 ## birddog — BirdDog
 
 - [ ] On 2.0 cameras, check whether a single-key POST is accepted or the whole object must be sent. ([specs/birddog.yaml:3178](specs/birddog.yaml#L3178))

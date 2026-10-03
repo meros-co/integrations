@@ -84,6 +84,8 @@ mod sony_camera_http;
 mod sony_camera_props;
 #[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
+#[cfg(feature = "biamp-tesira")]
+mod tesira;
 #[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 mod tsl;
 #[cfg(feature = "visca")]
@@ -138,6 +140,8 @@ pub(crate) fn construct(
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
         #[cfg(feature = "shure-wireless")]
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
+        #[cfg(feature = "biamp-tesira")]
+        "biamp-tesira" => Ok(Box::new(tesira::Tesira::new(context))),
         #[cfg(feature = "sony-camera")]
         "sony-camera" => Ok(Box::new(sony_camera::SonyCamera::new(context)?)),
         // TSL defines no port, so the host must give one.
