@@ -55,13 +55,19 @@ source:
 settings:
   # The mixer's MIDI channel (Utility / General / MIDI). Required: a wrong
   # channel makes every message miss.
-  midi_channel: { type: int, min: 1, max: 16, required: true }
+  midi_channel: { type: int, min: 1, max: 16, required: true,
+    label: MIDI channel,
+    description: "The mixer's MIDI channel, 1 to 16, as set in Utility / General / MIDI; with the wrong channel nothing is answered." }
   # The mixer's "NRPN Fader Law" (Utility / General / MIDI): level values
   # follow the linear taper table or the audio taper table.
-  fader_law: { type: enum, values: [linear, audio], default: linear }
+  fader_law: { type: enum, values: [linear, audio], default: linear,
+    label: NRPN fader law,
+    description: "The mixer's NRPN Fader Law setting in Utility / General / MIDI: linear or audio taper; with the wrong law every level is misread and mis-set." }
   # Also read every send level, pan and assignment on connecting (thousands
   # of requests, paced; several seconds).
-  sync_sends: { type: bool, default: false }
+  sync_sends: { type: bool, default: false,
+    label: Read sends on connect,
+    description: "Also read every send level, pan and assignment on connecting, which takes thousands of paced requests and several seconds." }
 
 ports:
   - { port: 51325, protocol: tcp, role: control }
@@ -130,8 +136,14 @@ commands:
         type: enum
         values: [input, stereo_input, usb, group, fx_return, main, aux, fx_send, matrix, dca, mute_group]
         required: true
-      channel: &channel { type: int, min: 1, max: 48, required: true }
-      muted: { type: bool, default: true }
+        label: Channel type
+        description: "The kind of channel: an input, stereo input, USB, group, FX return, main LR, aux (the Qu's mix), FX send, matrix, DCA or mute group."
+      channel: &channel { type: int, min: 1, max: 48, required: true,
+        label: Channel,
+        description: "Number of the channel within its type, from 1 as on the mixer; for a stereo channel use its left or odd number." }
+      muted: { type: bool, default: true,
+        label: Mute,
+        description: "On mutes the channel, off unmutes it." }
     returns: none
   toggle_mute:
     summary: "Toggle a mute (data increment BN 60 00, p.11)"
@@ -146,15 +158,21 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      level_db: &level_db { type: float, min: -89, max: 10 }
-      level_raw: &level_raw { type: int, min: 0, max: 16383 }
+      level_db: &level_db { type: float, min: -89, max: 10,
+        label: Level,
+        description: "Level in dB from -89 to +10, converted by the fader law's table; give this or the raw level." }
+      level_raw: &level_raw { type: int, min: 0, max: 16383,
+        label: Raw level,
+        description: "Level as the mixer's 14-bit value, 0 (-inf) to 16383; give this or the level in dB." }
     returns: none
   adjust_level:
     summary: "Step a channel's own level 1 dB up or down (BN 60 00 / BN 61 00, p.14)"
     params:
       channel_type: *channel_type
       channel: *channel
-      direction: &updown { type: enum, values: [up, down], required: true }
+      direction: &updown { type: enum, values: [up, down], required: true,
+        label: Direction,
+        description: "Step the level 1 dB up or down." }
     returns: none
   get_level:
     summary: "Read a channel's own level (p.18); returns {level_db, level_raw}, level_db null at -inf"
@@ -165,8 +183,12 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      destination_type: &destination_type { type: enum, values: [aux, fx_send, matrix], required: true }
-      destination: &destination { type: int, min: 1, max: 12, required: true }
+      destination_type: &destination_type { type: enum, values: [aux, fx_send, matrix], required: true,
+        label: Destination type,
+        description: "The kind of mix the send goes to: an aux (the Qu's mix), an FX send or a matrix." }
+      destination: &destination { type: int, min: 1, max: 12, required: true,
+        label: Destination,
+        description: "Number of the destination mix within its type, from 1 as on the mixer; for a stereo pair use its odd number." }
       level_db: *level_db
       level_raw: *level_raw
     returns: none
@@ -192,15 +214,21 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      pan: &pan { type: float, min: -100, max: 100 }
-      pan_raw: &pan_raw { type: int, min: 0, max: 16383 }
+      pan: &pan { type: float, min: -100, max: 100,
+        label: Pan,
+        description: "Pan or balance from -100 (fully left) to 100 (fully right), 0 centre, converted by the mixer's pan table; give this or the raw pan." }
+      pan_raw: &pan_raw { type: int, min: 0, max: 16383,
+        label: Raw pan,
+        description: "Pan or balance as the mixer's 14-bit value, 0 to 16383; give this or the pan from -100 to 100." }
     returns: none
   adjust_pan:
     summary: "Step a pan or balance one step left or right (BN 61 00 / BN 60 00, p.16)"
     params:
       channel_type: *channel_type
       channel: *channel
-      direction: &leftright { type: enum, values: [left, right], required: true }
+      direction: &leftright { type: enum, values: [left, right], required: true,
+        label: Direction,
+        description: "Step the pan or balance one step left or right." }
     returns: none
   get_pan:
     summary: "Read a pan or balance (p.18); returns {pan, pan_raw}"
@@ -211,7 +239,9 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      destination_type: &pan_destination { type: enum, values: [aux, matrix], required: true }
+      destination_type: &pan_destination { type: enum, values: [aux, matrix], required: true,
+        label: Destination type,
+        description: "The kind of mix the send goes to: an aux (the Qu's mix) or a matrix." }
       destination: *destination
       pan: *pan
       pan_raw: *pan_raw
@@ -238,7 +268,9 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      assigned: { type: bool, default: true }
+      assigned: { type: bool, default: true,
+        label: Assigned,
+        description: "On assigns the source to LR, off removes it." }
     returns: none
   toggle_main_assign:
     summary: "Toggle a source's LR assignment (BN 60 00, p.17)"
@@ -253,9 +285,13 @@ commands:
     params:
       channel_type: *channel_type
       channel: *channel
-      destination_type: &assign_destination { type: enum, values: [aux, group, fx_send, matrix], required: true }
+      destination_type: &assign_destination { type: enum, values: [aux, group, fx_send, matrix], required: true,
+        label: Destination type,
+        description: "The kind of mix to assign to: an aux (the Qu's mix), a group, an FX send or a matrix." }
       destination: *destination
-      assigned: { type: bool, default: true }
+      assigned: { type: bool, default: true,
+        label: Assigned,
+        description: "On assigns the source to the destination, off removes it." }
     returns: none
   toggle_send_assign:
     summary: "Toggle an assignment (BN 60 00, p.17)"
@@ -276,33 +312,47 @@ commands:
   recall_scene:
     summary: "Recall scene 1-300 (BN 00 bank 00-02, CN program, p.9). The scene must exist"
     params:
-      scene: { type: int, min: 1, max: 300, required: true }
+      scene: { type: int, min: 1, max: 300, required: true,
+        label: Scene,
+        description: "Scene number, 1 to 300 as on the mixer; the scene must exist." }
     returns: none
   recall_cue:
     summary: "Recall cue list position 1-300 (BN 00 bank 0A-0C, CN program, p.9)"
     params:
-      cue: { type: int, min: 1, max: 300, required: true }
+      cue: { type: int, min: 1, max: 300, required: true,
+        label: Cue,
+        description: "Cue list position, 1 to 300, on SQ and SQ+." }
     returns: none
   soft_key:
     summary: "Press (Note On 7F) or release (Note Off 00) SoftKey 1-16 on notes 30-3F (p.10); SQ-5 and SQ5+ have 8"
     params:
-      key: { type: int, min: 1, max: 16, required: true }
-      pressed: { type: bool, required: true }
+      key: { type: int, min: 1, max: 16, required: true,
+        label: SoftKey,
+        description: "SoftKey number from 1 as on the mixer; SQ-5 and SQ5+ have 8." }
+      pressed: { type: bool, required: true,
+        label: Pressed,
+        description: "On presses the SoftKey, off releases it." }
     returns: none
   set_ufx_global_key:
     summary: "Set the RackUltra FX global key (CC 0C on the main MIDI channel, SQ+ article)"
     params:
-      key: { type: enum, values: [C, "C#", D, "D#", E, F, "F#", G, "G#", A, "A#", B], required: true }
+      key: { type: enum, values: [C, "C#", D, "D#", E, F, "F#", G, "G#", A, "A#", B], required: true,
+        label: Key,
+        description: "The RackUltra FX global musical key, C to B." }
     returns: none
   set_ufx_global_scale:
     summary: "Set the RackUltra FX global scale (CC 0D: 00 major, 01 minor, 02 chromatic, SQ+ article)"
     params:
-      scale: { type: enum, values: [major, minor, chromatic], required: true }
+      scale: { type: enum, values: [major, minor, chromatic], required: true,
+        label: Scale,
+        description: "The RackUltra FX global scale: major, minor or chromatic." }
     returns: none
   raw_midi:
     summary: "Send MIDI bytes given as hex, for messages not modelled here (RackUltra FX units, MIDI Show Control)"
     params:
-      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 512, pattern: "^[0-9A-Fa-f ]+$", required: true,
+        label: MIDI bytes,
+        description: "The MIDI message as hex bytes, spaces allowed, sent as given." }
     returns: none
   refresh:
     summary: "Read the mixer's state again: every mute, own level, pan and LR assignment (and with sync_sends, every send)"

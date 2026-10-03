@@ -49,7 +49,9 @@ settings:
   # @<rate ms> for a meter, % to receive percentages, and :<encoding>
   # (scalar, gain_db, delay_ms, frequency_or_speed, percent_value) to decode
   # the value. For example: 0x010F/3/0x000100/0:gain_db; 0x010F/3/0x000100/1
-  subscriptions: { type: string, default: "", max_length: 8192 }
+  subscriptions: { type: string, default: "", max_length: 8192,
+    label: Subscriptions,
+    description: "State variables to keep current, separated by ; or line breaks, each node/virtual device/object/state variable with optional @rate ms, % and :encoding, e.g. 0x010F/3/0x000100/0:gain_db." }
 
 ports:
   - { port: 1023, protocol: tcp, role: control }
@@ -69,12 +71,24 @@ commands:
   set_sv:
     summary: "SET (0x88): set a state variable; value is encoded per encoding (raw sends the 32-bit integer as is: discrete controls, mutes 0/1)"
     params:
-      node: &node { type: int, min: 0, max: 65535, required: true }
-      virtual_device: &vd { type: int, min: 0, max: 255, default: 3 }
-      object: &object { type: int, min: 0, max: 16777215, required: true }
-      state_variable: &sv { type: int, min: 0, max: 65535, required: true }
-      value: { type: float, min: -2147483648, max: 2147483647, required: true }
-      encoding: &encoding { type: enum, values: [raw, scalar, gain_db, delay_ms, frequency_or_speed, percent_value], default: raw }
+      node: &node { type: int, min: 0, max: 65535, required: true,
+        label: Node,
+        description: "The device's HiQnet node address (the NNNN part, as in the London Architect design's HiQnet address 0xNNNNVVOOOOOO)." }
+      virtual_device: &vd { type: int, min: 0, max: 255, default: 3,
+        label: Virtual device,
+        description: "The HiQnet virtual device (the VV part); 3 for audio processing objects." }
+      object: &object { type: int, min: 0, max: 16777215, required: true,
+        label: Object,
+        description: "The HiQnet object ID (the OOOOOO part) of the processing object in the London Architect design." }
+      state_variable: &sv { type: int, min: 0, max: 65535, required: true,
+        label: State variable,
+        description: "State variable ID within the object, by object type (a gain object: 0 gain, 1 mute, 2 polarity)." }
+      value: { type: float, min: -2147483648, max: 2147483647, required: true,
+        label: Value,
+        description: "The value to set, in the unit its encoding names: an integer for raw, dB for gain_db, ms for delay_ms, Hz for frequency_or_speed." }
+      encoding: &encoding { type: enum, values: [raw, scalar, gain_db, delay_ms, frequency_or_speed, percent_value], default: raw,
+        label: Encoding,
+        description: "How the value is converted: raw (the integer as is, for mutes and selectors), scalar (thresholds, boost/cut, pan), gain_db (by the fader law), delay_ms, frequency_or_speed, or percent_value." }
     returns: none
   set_sv_percent:
     summary: "SET% (0x8D): set a state variable as a percentage of its control's travel, 0-100"
@@ -83,7 +97,9 @@ commands:
       virtual_device: *vd
       object: *object
       state_variable: *sv
-      percent: { type: float, min: 0, max: 100, required: true }
+      percent: { type: float, min: 0, max: 100, required: true,
+        label: Percent,
+        description: "Position of the control within its travel, 0 to 100%." }
     returns: none
   bump_sv_percent:
     summary: "BUMP% (0x90): move a state variable up or down by a signed percentage"
@@ -92,7 +108,9 @@ commands:
       virtual_device: *vd
       object: *object
       state_variable: *sv
-      percent: { type: float, min: -100, max: 100, required: true }
+      percent: { type: float, min: -100, max: 100, required: true,
+        label: Step,
+        description: "Signed percentage of the control's travel to move by, -100 to 100; negative moves down." }
     returns: none
   set_string_sv:
     summary: "SET STRING (0x91): set a string state variable, up to 32 characters (a VoIP number, a label)"
@@ -101,7 +119,9 @@ commands:
       virtual_device: *vd
       object: *object
       state_variable: *sv
-      text: { type: string, max_length: 32, required: true }
+      text: { type: string, max_length: 32, required: true,
+        label: Text,
+        description: "The string to set, up to 32 characters (a VoIP number or a label)." }
     returns: none
   get_sv:
     summary: "Read a state variable: subscribe, return the first value (decoded per encoding), then unsubscribe unless subscribed"
@@ -127,7 +147,9 @@ commands:
       virtual_device: *vd
       object: *object
       state_variable: *sv
-      rate_ms: &rate { type: int, min: 0, max: 3600000, default: 0 }
+      rate_ms: &rate { type: int, min: 0, max: 3600000, default: 0,
+        label: Rate,
+        description: "Period in ms for a meter's updates, in 50 ms steps; 0 sends the value on every change." }
       encoding: *encoding
     returns: value
   subscribe_percent:
@@ -150,7 +172,9 @@ commands:
   recall_venue_preset:
     summary: "Venue preset recall (0x8B), broadcast to every unit, by the preset ID London Architect shows in square brackets"
     params:
-      preset: &preset { type: int, min: 0, max: 4294967295, required: true }
+      preset: &preset { type: int, min: 0, max: 4294967295, required: true,
+        label: Preset,
+        description: "Preset ID, as London Architect shows it (a venue preset's in square brackets); the recall goes to every unit that responds to it." }
     returns: none
   recall_parameter_preset:
     summary: "Parameter preset recall (0x8C), broadcast to every unit, by preset ID"
