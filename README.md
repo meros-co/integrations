@@ -54,6 +54,14 @@ the options JSON in C, `new Core({ devices })` in Node, `Core(devices=...)` in
 Python, `--devices a,b,c` for the HTTP service). Only those devices are
 listed, opened and discovered.
 
+**When opening a device**, the core normally keeps its state current:
+it subscribes to changes, reads the state on connecting, and polls where it
+has to. Open it with `monitor: false` to send commands only. The core then
+asks for nothing but what commands and its connection check need, so it
+doesn't take a subscription slot the device has few of (a Behringer WING has
+one). Each device's most recent request-to-reply time is reported as
+`latency_ms` on its snapshot and `alive` events.
+
 ## How devices are described
 
 Most devices are described in a YAML file in `specs/`: their models, commands,

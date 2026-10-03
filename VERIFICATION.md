@@ -82,6 +82,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that group and aux assignment off, sent as 3F, unassigns. ([specs/allenheath-dlive.yaml:419](specs/allenheath-dlive.yaml#L419))
 - [ ] Check whether dLive accepts the UFX chromatic scale (02), which is offered on Avantis only. ([specs/allenheath-dlive.yaml:426](specs/allenheath-dlive.yaml#L426))
 - [ ] Check how dLive handles a name longer than it allows (presumably truncated). ([specs/allenheath-dlive.yaml:431](specs/allenheath-dlive.yaml#L431))
+- [ ] Opened for commands only, check that the console answers the liveness probe when nothing else has been sent, since that answer is what reports it connected. ([crates/core/src/modules/allenheath.rs:41](crates/core/src/modules/allenheath.rs#L41))
 
 ## allenheath-qu — Allen & Heath Qu
 
@@ -281,6 +282,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether connect and disconnect matrix operations work on 1:N matrices, and which disposition values the provider returns. ([specs/emberplus.yaml:274](specs/emberplus.yaml#L274))
 - [ ] Confirm the FieldFlags values (prose) and connections 5 are accepted. ([specs/emberplus.yaml:258](specs/emberplus.yaml#L258))
 - [ ] Confirm StreamCollection and StreamEntry tags and the templateReference tag match the provider. ([specs/emberplus.yaml:224](specs/emberplus.yaml#L224))
+- [ ] Opened for commands only, check that an Unsubscribe on a looked-up node (or as a bare command at the root) ends the value subscription its GetDirectory created. ([crates/core/src/modules/emberplus.rs:35](crates/core/src/modules/emberplus.rs#L35))
 
 ## etc-eos — ETC Eos
 
@@ -484,6 +486,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:110](specs/sennheiser-digital-6000.yaml#L110))
 - [ ] Confirm that subscriptions lapse after 20 s and that renewal every 6.7 s keeps telemetry flowing. ([specs/sennheiser-digital-6000.yaml:102](specs/sennheiser-digital-6000.yaml#L102))
 - [ ] Confirm out-of-range set_frequency and set_af_out values are adapted and replied with the value applied. ([specs/sennheiser-digital-6000.yaml:116](specs/sennheiser-digital-6000.yaml#L116))
+- [ ] Opened for commands only, confirm the receiver answers an unsubscribed `device.name` read and echoes its `osc.xid`, the liveness check. ([crates/core/src/modules/sennheiser_d6000.rs:129](crates/core/src/modules/sennheiser_d6000.rs#L129))
 
 ## sennheiser-ew-dx — Sennheiser EW-DX
 
@@ -495,11 +498,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Check which bit of States is TX mute against a real receiver, using mute_flags, since the document's examples disagree with its table. ([specs/sennheiser-ew-g3-g4.yaml:187](specs/sennheiser-ew-g3-g4.yaml#L187))
 - [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig and FirmwareRevision behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:205](specs/sennheiser-ew-g3-g4.yaml#L205))
+- [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:31](crates/core/src/modules/sennheiser_mcp.rs#L31))
 
 ## shure-wireless — Shure wireless receivers
 
 - [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:199](specs/shure-wireless.yaml#L199))
 - [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:223](specs/shure-wireless.yaml#L223))
+- [ ] Opened for commands only, confirm a receiver that is not metering answers `GET DEVICE_ID` (`GET DEVICE_NAME` on the PSM1000) promptly enough for the 5 s liveness check. ([crates/core/src/modules/shure.rs:48](crates/core/src/modules/shure.rs#L48))
 
 ## sony-camera — Sony cameras
 
@@ -511,6 +516,12 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a Camera Control PTP 2 body (ILCE-7M3), check which way a positive exposure_step moves for iris, shutter speed, ISO and exposure and flash compensation. ([specs/sony-camera.yaml:2411](specs/sony-camera.yaml#L2411))
 - [ ] On ILME-FR7 and BRC-AM7, confirm pan is positive anticlockwise from above and tilt positive upward, both desk- and ceiling-mounted. ([specs/sony-camera.yaml:2360](specs/sony-camera.yaml#L2360))
 - [ ] On ILCE-7CM2, ILCE-7CR and ILX-LR1 firmware 1.00, check focus indication from AF status events and whether focal distance reads sensibly. ([specs/sony-camera.yaml:2371](specs/sony-camera.yaml#L2371))
+- [ ] Opened for commands only, confirm the camera tolerates GetDeviceInfo once a second as the liveness check. ([crates/core/src/modules/sony_camera.rs:48](crates/core/src/modules/sony_camera.rs#L48))
+
+## tsl-umd-listener — TSL UMD tally received from a switcher
+
+- [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))
+- [ ] On a Carbonite, confirm tally 1 is preview and tally 2 program on the TSL feed, and what ShowUMDId and ShowBusName add to the text. ([specs/tsl-umd-listener.yaml:94](specs/tsl-umd-listener.yaml#L94))
 
 ## visca — VISCA over IP
 
@@ -584,4 +595,4 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## Integrations with no open items
 
-Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio, tsl-umd-display, tsl-umd-listener, vmix.
+Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio, tsl-umd-display, vmix.
