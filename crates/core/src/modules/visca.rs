@@ -27,6 +27,11 @@
 //!   busy (p.5, p.12).
 //! - Nothing is pushed: zoom, focus and pan/tilt positions are polled often,
 //!   settings rarely, and their replies become state.
+//!
+//! Opened for commands only (`monitor` false), nothing is polled and a
+//! command is not followed by an inquiry to refresh its state. Since VISCA
+//! pushes nothing, the version inquiry every 5 s (the settings poll's
+//! default period) is kept as the liveness check.
 
 use std::collections::{BTreeSet, VecDeque};
 use std::net::SocketAddr;
@@ -78,6 +83,8 @@ const COMPLETION: Key = "completion";
 const FAST: Key = "poll-fast";
 const SLOW: Key = "poll-slow";
 const PROBE: Key = "probe";
+/// Commands only: the version inquiry that stands in for the polls.
+const LIVENESS: Key = "liveness";
 const TALLY: Key = "tally";
 const BUSY: Key = "busy";
 
@@ -876,6 +883,7 @@ struct Flight {
     msg: Msg,
     seq: u32,
     retransmitted: bool,
+    sent_at: Millis,
 }
 
 #[derive(Debug)]
@@ -931,6 +939,10 @@ pub(crate) struct Visca {
     misses: u32,
     retry_after: Millis,
     tally_on: bool,
+    /// When the Sony IP RESET was sent, until it is answered.
+    reset_sent_at: Option<Millis>,
+    /// False: commands only, no polls and no follow-up inquiries.
+    monitor: bool,
 }
 
 impl Visca {
@@ -962,6 +974,7 @@ impl Visca {
         let mut m = Visca::for_device(SocketAddr::new(ctx.host, port), profile);
         m.fast_ms = ms("poll_position_ms", DEFAULT_FAST_MS);
         m.slow_ms = ms("poll_settings_ms", DEFAULT_SLOW_MS);
+        m.monitor = ctx.monitor;
         m
     }
 
@@ -991,6 +1004,8 @@ impl Visca {
             misses: 0,
             retry_after: RETRY_MIN,
             tally_on: false,
+            reset_sent_at: None,
+            monitor: true,
         }
     }
 
@@ -1585,16 +1600,11 @@ impl Visca {
                 self.ready = false;
                 let frame = ip_frame(T_CONTROL, self.seq, &[0x01]);
                 cx.udp_send(SOCKET, self.device, frame);
+                self.reset_sent_at = Some(cx.now());
             }
             _ => {
                 self.ready = true;
-                if !self
-                    .polls
-                    .iter()
-                    .any(|m| m.inquiry.is_some_and(|d| d.name == "get_version"))
-                {
-                    self.queue_poll(inquiry("get_version").unwrap());
-                }
+                self.queue_liveness();
                 self.pump(cx);
             }
         }
@@ -1630,6 +1640,25 @@ impl Visca {
             busy_attempts: 0,
             seq_resets: 0,
         });
+    }
+
+    /// The version inquiry, unless one is already waiting.
+    fn queue_liveness(&mut self) {
+        if !self
+            .polls
+            .iter()
+            .any(|m| m.inquiry.is_some_and(|d| d.name == "get_version"))
+        {
+            self.queue_poll(inquiry("get_version").unwrap());
+        }
+    }
+
+    /// A reply to the message awaiting its first reply: report the time
+    /// from sending, unless it was sent twice and the reply may be the first.
+    fn timed(cx: &mut Cx, f: &Flight) {
+        if !f.retransmitted {
+            cx.round_trip(cx.now().saturating_sub(f.sent_at));
+        }
     }
 
     fn schedule_polls(&mut self, which: Poll) {
@@ -1672,6 +1701,7 @@ impl Visca {
             msg,
             seq,
             retransmitted: false,
+            sent_at: cx.now(),
         });
         cx.set_timer(REPLY, REPLY_TIMEOUT);
     }
@@ -1689,19 +1719,19 @@ impl Visca {
             Origin::User(id) => cx.complete(id, result),
             Origin::Poll | Origin::Tally => {}
         }
-        if ok {
+        if ok && self.monitor {
             if let Some(follow) = msg.follow.and_then(inquiry) {
                 if !self.unsupported.contains(follow.name) {
                     self.queue_poll(follow);
                 }
             }
-            if msg.follow == Some("get_tally") && self.transport == Transport::SonyIp {
-                self.tally_on = msg.payload.get(6) == Some(&0x02);
-                if self.tally_on {
-                    cx.set_timer(TALLY, TALLY_REFRESH);
-                } else {
-                    cx.cancel_timer(TALLY);
-                }
+        }
+        if ok && msg.follow == Some("get_tally") && self.transport == Transport::SonyIp {
+            self.tally_on = msg.payload.get(6) == Some(&0x02);
+            if self.tally_on {
+                cx.set_timer(TALLY, TALLY_REFRESH);
+            } else {
+                cx.cancel_timer(TALLY);
             }
         }
     }
@@ -1714,6 +1744,15 @@ impl Visca {
             self.retry_after = RETRY_MIN;
             cx.cancel_timer(PROBE);
             cx.connection(Connection::Connected);
+            if !self.monitor {
+                // Commands only: the version inquiry is the liveness check
+                // (headerless transports have just asked it as their probe).
+                if self.transport == Transport::SonyIp {
+                    self.queue_liveness();
+                }
+                cx.set_timer(LIVENESS, self.liveness_every());
+                return;
+            }
             // Headerless transports asked for it as their probe.
             if self.transport == Transport::SonyIp {
                 self.queue_poll(inquiry("get_version").unwrap());
@@ -1726,6 +1765,15 @@ impl Visca {
             if self.slow_ms > 0 {
                 cx.set_timer(SLOW, self.slow_ms);
             }
+        }
+    }
+
+    /// The settings poll's period, or its default when polling is off.
+    fn liveness_every(&self) -> Millis {
+        if self.slow_ms > 0 {
+            self.slow_ms
+        } else {
+            DEFAULT_SLOW_MS as Millis
         }
     }
 
@@ -1749,7 +1797,7 @@ impl Visca {
             }
         }
         self.polls.clear();
-        for key in [REPLY, COMPLETION, FAST, SLOW, TALLY, BUSY] {
+        for key in [REPLY, COMPLETION, FAST, SLOW, TALLY, BUSY, LIVENESS] {
             cx.cancel_timer(key);
         }
         self.connected = false;
@@ -1793,6 +1841,9 @@ impl Visca {
         match payload {
             [0x01] => {
                 // RESET acknowledged: the camera's sequence number is 0.
+                if let Some(at) = self.reset_sent_at.take() {
+                    cx.round_trip(cx.now().saturating_sub(at));
+                }
                 self.seq = 0;
                 self.ready = true;
                 self.mark_alive(cx);
@@ -1804,6 +1855,7 @@ impl Visca {
                     return;
                 };
                 cx.cancel_timer(REPLY);
+                Self::timed(cx, &f);
                 if f.retransmitted && f.msg.kind == Kind::Command {
                     // The first copy was performed; only its reply was lost
                     // (p.12).
@@ -1834,6 +1886,7 @@ impl Visca {
                 cx.alive();
                 if let Some(f) = self.in_flight.take_if(|f| f.seq == seq) {
                     cx.cancel_timer(REPLY);
+                    Self::timed(cx, &f);
                     let msg = f.msg;
                     self.finish(
                         cx,
@@ -1877,6 +1930,7 @@ impl Visca {
                 if let Some(f) = self.take_in_flight(seq) {
                     cx.cancel_timer(REPLY);
                     if matches!(f.msg.kind, Kind::Command) {
+                        Self::timed(cx, &f);
                         self.executing.push(Executing {
                             msg: f.msg,
                             socket,
@@ -1904,6 +1958,7 @@ impl Visca {
                     // The ACK was lost.
                     cx.cancel_timer(REPLY);
                     if matches!(f.msg.kind, Kind::Command) {
+                        Self::timed(cx, &f);
                         self.finish(cx, &f.msg, Ok(Outcome::Ack));
                     } else {
                         self.in_flight = Some(f);
@@ -1916,6 +1971,7 @@ impl Visca {
                     return;
                 };
                 cx.cancel_timer(REPLY);
+                Self::timed(cx, &f);
                 let msg = f.msg;
                 match (msg.kind, msg.inquiry) {
                     (Kind::Inquiry, Some(def)) => match decode(def.decode, m) {
@@ -1983,6 +2039,7 @@ impl Visca {
             return;
         };
         cx.cancel_timer(REPLY);
+        Self::timed(cx, &f);
         let mut msg = f.msg;
         match (msg.kind, code) {
             (Kind::Cancel(s), 0x04) => {
@@ -2184,6 +2241,13 @@ impl Module for Visca {
                         seq_resets: 0,
                     });
                     cx.set_timer(TALLY, TALLY_REFRESH);
+                    self.pump(cx);
+                }
+            }
+            LIVENESS => {
+                if self.connected {
+                    self.queue_liveness();
+                    cx.set_timer(LIVENESS, self.liveness_every());
                     self.pump(cx);
                 }
             }
@@ -2997,5 +3061,115 @@ mod tests {
         let other = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 41)), SONY_PORT);
         m.datagram(&mut cx, SOCKET, other, &h("02 01 00 01 00 00 00 00 01"));
         assert!(!m.connected);
+    }
+
+    #[test]
+    fn opened_for_commands_only_only_the_version_is_asked() {
+        let mut m = visca("sony-visca-ip");
+        m.monitor = false;
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        drain(&mut cx);
+        let mut cx = Cx::new(10);
+        m.datagram(&mut cx, SOCKET, from(), &h("02 01 00 01 00 00 00 00 01"));
+        let a = drain(&mut cx);
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert_eq!(sent(&a), [h("01 10 00 05 00 00 00 01 81 09 00 02 FF")]);
+        assert!(!a.iter().any(|x| matches!(
+            x,
+            Action::SetTimer {
+                key: FAST | SLOW,
+                ..
+            }
+        )));
+        assert!(a.contains(&Action::SetTimer {
+            key: LIVENESS,
+            after: DEFAULT_SLOW_MS as Millis
+        }));
+        assert!(m.polls.is_empty());
+        let mut cx = Cx::new(20);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 0A 00 00 00 01 90 50 00 01 06 17 01 00 02 FF"),
+        );
+        drain(&mut cx);
+
+        // A command completes and is not followed by an inquiry.
+        let mut cx = Cx::new(30);
+        m.command(&mut cx, 1, "power", &params(json!({"on": true})));
+        assert_eq!(sent(&drain(&mut cx)).len(), 1);
+        let mut cx = Cx::new(40);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 03 00 00 00 02 90 41 FF"),
+        );
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 03 00 00 00 02 90 51 FF"),
+        );
+        let a = drain(&mut cx);
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Ok(Outcome::Ack)
+        }));
+        assert!(sent(&a).is_empty());
+
+        // The liveness check is the version inquiry again.
+        let mut cx = Cx::new(5_010);
+        m.timer(&mut cx, LIVENESS);
+        assert_eq!(
+            sent(&drain(&mut cx)),
+            [h("01 10 00 05 00 00 00 03 81 09 00 02 FF")]
+        );
+    }
+
+    #[test]
+    fn the_time_to_each_first_reply_is_reported() {
+        let mut m = visca("sony-visca-ip");
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        drain(&mut cx);
+        // RESET answered after 8 ms.
+        let mut cx = Cx::new(8);
+        m.datagram(&mut cx, SOCKET, from(), &h("02 01 00 01 00 00 00 00 01"));
+        assert!(drain(&mut cx).contains(&Action::RoundTrip(8)));
+        m.polls.clear();
+        // The version inquiry, sent at 8, answered at 20.
+        let mut cx = Cx::new(20);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 0A 00 00 00 01 90 50 00 01 06 17 01 00 02 FF"),
+        );
+        assert!(drain(&mut cx).contains(&Action::RoundTrip(12)));
+        // A command: timed to its ACK, not to its Completion.
+        let mut cx = Cx::new(30);
+        m.command(&mut cx, 1, "zoom_to", &params(json!({"position": 0x4000})));
+        drain(&mut cx);
+        let mut cx = Cx::new(45);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 03 00 00 00 02 90 41 FF"),
+        );
+        assert!(drain(&mut cx).contains(&Action::RoundTrip(15)));
+        let mut cx = Cx::new(900);
+        m.datagram(
+            &mut cx,
+            SOCKET,
+            from(),
+            &h("01 11 00 03 00 00 00 02 90 51 FF"),
+        );
+        assert!(!drain(&mut cx)
+            .iter()
+            .any(|x| matches!(x, Action::RoundTrip(_))));
     }
 }

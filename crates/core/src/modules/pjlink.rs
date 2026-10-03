@@ -38,6 +38,12 @@
 //!   `%2POWR`, `%2INPT`) by UDP to port 4352 of a controller address
 //!   registered on the projector (§3.3). With the `notifications` setting the
 //!   module listens there and applies them.
+//!
+//! Opened for commands only (`monitor` false), the module reads no state of
+//! its own: every 5 s it asks only CLSS, which is the liveness check (PJLink
+//! pushes nothing over TCP) and gives the class commands are checked
+//! against. A set is not followed by a query, and `refresh` still reads
+//! everything once, since the consumer asked for it.
 
 use std::collections::{HashSet, VecDeque};
 use std::hash::{BuildHasher, Hasher};
@@ -210,6 +216,10 @@ pub(crate) struct PjLink {
     commands: VecDeque<Job>,
     polls: VecDeque<Job>,
     in_flight: Option<Job>,
+    /// When `in_flight` was sent.
+    sent_at: Millis,
+    /// False: commands only, CLSS as the liveness check and nothing else.
+    monitor: bool,
     /// Why the projector refused the password. Terminal.
     refused: Option<String>,
     retry_after: Millis,
@@ -246,13 +256,15 @@ impl PjLink {
             .and_then(Value::as_bool)
             .unwrap_or(false);
         let port = ctx.port.unwrap_or(DEFAULT_PORT);
-        Ok(PjLink::with(
+        let mut m = PjLink::with(
             SocketAddr::new(ctx.host, port),
             model_class,
             password,
             auth,
             notifications,
-        ))
+        );
+        m.monitor = ctx.monitor;
+        Ok(m)
     }
 
     fn with(
@@ -277,6 +289,8 @@ impl PjLink {
             commands: VecDeque::new(),
             polls: VecDeque::new(),
             in_flight: None,
+            sent_at: 0,
+            monitor: true,
             refused: None,
             retry_after: RETRY_MIN,
             cycle: 0,
@@ -306,6 +320,16 @@ impl PjLink {
         if !self.polls.is_empty() {
             return;
         }
+        if !self.monitor {
+            // Commands only: one cheap query, as the liveness check.
+            self.polls.push_back(Job::query("CLSS", None));
+            return;
+        }
+        self.queue_reads();
+    }
+
+    /// Identity when needed, status, and every minute lamp and filter hours.
+    fn queue_reads(&mut self) {
         let mut bodies: Vec<&'static str> = Vec::new();
         if self.need_identity {
             self.need_identity = false;
@@ -362,6 +386,7 @@ impl PjLink {
                 out.push('\r');
                 cx.tcp_send(SOCKET, out.into_bytes());
                 cx.set_timer(REPLY, REPLY_TIMEOUT);
+                self.sent_at = cx.now();
                 self.in_flight = Some(job);
             }
             _ => {}
@@ -566,6 +591,7 @@ impl PjLink {
 
     fn answered(&mut self, cx: &mut Cx, job: Job, param: &str) {
         cx.cancel_timer(REPLY);
+        cx.round_trip(cx.now().saturating_sub(self.sent_at));
         self.retry_after = RETRY_MIN;
         self.set_status(cx, Status::Connected, "");
         let result = if let Some(code) = error_code(param) {
@@ -590,7 +616,7 @@ impl PjLink {
                 }
             }
         };
-        if result.is_ok() {
+        if result.is_ok() && self.monitor {
             if let Some(follow) = job.follow {
                 self.polls.push_front(Job::query(follow, None));
             }
@@ -797,7 +823,8 @@ impl Module for PjLink {
             self.need_identity = true;
             self.polls.clear();
             self.cycle = 0;
-            self.queue_cycle();
+            // Everything, once, even when opened for commands only.
+            self.queue_reads();
             cx.complete(id, Ok(Outcome::Ack));
             self.pump(cx);
             return;
@@ -1768,5 +1795,56 @@ mod tests {
         }
         assert!(matches!(notification("%2POWR=1"), Some(Notice::Poll)));
         assert!(notification("%2SRCH").is_none());
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_asks_only_the_class() {
+        let mut m = module(2, "", AuthMode::Auto);
+        m.monitor = false;
+        let a = greeted(&mut m, "PJLINK 0\r");
+        assert_eq!(sent(&a), ["%1CLSS ?\r"]);
+        let a = feed(&mut m, "%1CLSS=2\r");
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        // Nothing else queued: the connection closes.
+        assert!(sent(&a).is_empty());
+        assert!(a.contains(&Action::TcpClose { socket: SOCKET }));
+
+        // The next poll is the same single query.
+        let mut cx = Cx::new(POLL_EVERY);
+        m.timer(&mut cx, POLL);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"PJLINK 0\r".to_vec()));
+        assert_eq!(sent(&cx.take()), ["%1CLSS ?\r"]);
+        feed(&mut m, "%1CLSS=2\r");
+
+        // A set is completed by its reply and not followed by a query.
+        let mut cx = Cx::new(POLL_EVERY + 100);
+        m.command(
+            &mut cx,
+            5,
+            "set_power",
+            json!({"on": true}).as_object().unwrap(),
+        );
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"PJLINK 0\r".to_vec()));
+        assert_eq!(sent(&cx.take()), ["%1POWR 1\r"]);
+        let a = feed(&mut m, "%1POWR=OK\r");
+        assert_eq!(completed(&a, 5), Some(Ok(Outcome::Ack)));
+        assert!(sent(&a).is_empty());
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut m = module(1, "", AuthMode::Auto);
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        let mut cx = Cx::new(20);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"PJLINK 0\r".to_vec()));
+        assert_eq!(sent(&cx.take()), ["%1CLSS ?\r"]);
+        let mut cx = Cx::new(75);
+        m.tcp(&mut cx, SOCKET, TcpInput::Data(b"%1CLSS=1\r".to_vec()));
+        assert!(cx.take().contains(&Action::RoundTrip(55)));
     }
 }

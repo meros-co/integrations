@@ -28,6 +28,12 @@
 //! `Control.Get`, `Component.Get`, `Component.GetControls` or a
 //! `Component.Set` with `ResponseValues` reports, PA zone and page status
 //! notifications, and the last Loop Player error.
+//!
+//! Opened for commands only (`monitor` false), the module creates, polls and
+//! recreates no change group of its own: change-group commands the consumer
+//! sends go to the Core as sent, without the default AutoPoll and without
+//! being rebuilt after a reconnection. StatusGet on connecting and the
+//! keepalive stay, as they are how the module knows the Core is there.
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
@@ -856,6 +862,7 @@ enum Purpose {
 struct Pending {
     purpose: Purpose,
     method: String,
+    sent_at: Millis,
     deadline: Millis,
     edit: Option<Edit>,
 }
@@ -884,6 +891,8 @@ pub(crate) struct Qsys {
     last_sent: Millis,
     last_heard: Millis,
     retry_after: Millis,
+    /// False: commands only, no change groups of the module's own.
+    monitor: bool,
 }
 
 fn setting<'a>(settings: &'a Params, key: &str) -> &'a str {
@@ -912,6 +921,7 @@ impl Qsys {
             last_sent: 0,
             last_heard: 0,
             retry_after: RETRY_MIN,
+            monitor: ctx.monitor,
         }
     }
 
@@ -937,6 +947,7 @@ impl Qsys {
             Pending {
                 purpose,
                 method: method.into(),
+                sent_at: cx.now(),
                 deadline: cx.now() + REPLY_TIMEOUT,
                 edit,
             },
@@ -1011,6 +1022,7 @@ impl Qsys {
         self.pending.retain(|_, p| p.purpose != Purpose::Logon);
         self.arm_reply_timer(cx);
         cx.connection(Connection::Connected);
+        // Commands only: `groups` is never filled, so nothing is rebuilt.
         let groups: Vec<(String, Group)> = self
             .groups
             .iter()
@@ -1049,6 +1061,11 @@ impl Qsys {
     }
 
     fn apply_edit(&mut self, cx: &mut Cx, edit: Edit) {
+        if !self.monitor {
+            // Commands only: the consumer's change groups are theirs to keep
+            // and poll; none is remembered, auto-polled or rebuilt.
+            return;
+        }
         let added = match edit {
             Edit::Add { group, controls } => {
                 let g = self.groups.entry(group.clone()).or_default();
@@ -1208,8 +1225,9 @@ impl Qsys {
             .get("id")
             .and_then(reply_id)
             .and_then(|id| self.pending.remove(&id));
-        if pending.is_some() {
+        if let Some(p) = &pending {
             self.arm_reply_timer(cx);
+            cx.round_trip(cx.now().saturating_sub(p.sent_at));
         }
         let error = o.get("error").filter(|e| !e.is_null());
         if let Some(error) = error {
@@ -2445,5 +2463,86 @@ mod tests {
             x,
             Action::Connection(Connection::Disconnected { reason }) if reason.contains("stopped")
         )));
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_keeps_no_change_group_of_its_own() {
+        let mut m = module(json!({"auto_poll_rate": 0.5}));
+        m.monitor = false;
+        // On connecting: only StatusGet, which says the Core is there.
+        let a = connect(&mut m);
+        let methods: Vec<Value> = sent(&a).iter().map(|r| r["method"].clone()).collect();
+        assert_eq!(methods, ["StatusGet"]);
+        let status = sent(&a).pop().unwrap();
+        let a = feed(
+            &mut m,
+            10,
+            json!({"jsonrpc": "2.0", "id": status["id"], "result": {"State": "Active", "DesignCode": "abc"}}),
+        );
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+
+        // The consumer's change-group command goes as sent, with no AutoPoll
+        // added, and its reply completes it.
+        let a = run(
+            &mut m,
+            20,
+            1,
+            "change_group_add_controls",
+            json!({"controls": ["MainGain"]}),
+        );
+        let req = sent(&a).pop().unwrap();
+        assert_eq!(req["method"], "ChangeGroup.AddControl");
+        let a = feed(
+            &mut m,
+            30,
+            json!({"jsonrpc": "2.0", "id": req["id"], "result": true}),
+        );
+        assert!(sent(&a).is_empty());
+        assert!(a.contains(&Action::Complete {
+            id: 1,
+            result: Ok(Outcome::Ack)
+        }));
+
+        // After a reconnection nothing is rebuilt.
+        let mut cx = Cx::new(700);
+        m.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Closed {
+                reason: "reset".into(),
+            },
+        );
+        cx.take();
+        let mut cx = Cx::new(1_700);
+        m.timer(&mut cx, RETRY);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let status = sent(&cx.take()).pop().unwrap();
+        let a = feed(
+            &mut m,
+            1_710,
+            json!({"jsonrpc": "2.0", "id": status["id"], "result": {"State": "Active", "DesignCode": "abc"}}),
+        );
+        assert!(sent(&a).is_empty());
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut m = ready(json!({}));
+        let a = run(&mut m, 100, 4, "no_op", json!({}));
+        let req = sent(&a).pop().unwrap();
+        let a = feed(
+            &mut m,
+            163,
+            json!({"jsonrpc": "2.0", "id": req["id"], "result": true}),
+        );
+        assert!(a.contains(&Action::RoundTrip(63)));
+        // A pushed notification is not a reply.
+        let a = feed(
+            &mut m,
+            170,
+            json!({"jsonrpc": "2.0", "method": "EngineStatus", "params": {"State": "Active",
+                "DesignCode": "abc"}}),
+        );
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
     }
 }
