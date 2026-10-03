@@ -189,6 +189,7 @@ async fn qrc_end_to_end() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"username": "control", "pin": "1234", "auto_poll_rate": 0.5})),
+            monitor: true,
         })
         .unwrap();
 
@@ -282,6 +283,7 @@ async fn a_refused_logon_is_terminal() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"username": "control", "pin": "9999"})),
+            monitor: true,
         })
         .unwrap();
     wait_for(&core, |e| {

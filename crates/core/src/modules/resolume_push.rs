@@ -945,6 +945,7 @@ mod tests {
             model: "arena".into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         };
         let engine = SpecEngine::new(Arc::new(spec.clone()), ctx.clone()).unwrap();
         ResolumePush::new(engine, &spec, &ctx)

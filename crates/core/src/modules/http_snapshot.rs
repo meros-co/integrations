@@ -262,6 +262,7 @@ mod tests {
             model: "generic".into(),
             channels: None,
             settings: s,
+            monitor: true,
         })
         .unwrap()
     }

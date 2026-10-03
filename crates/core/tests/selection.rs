@@ -31,6 +31,7 @@ fn open(core: &Core, device: &str, model: &str) -> Result<u64, OpenError> {
         host: "127.0.0.1".into(),
         port: Some(9),
         settings: Default::default(),
+        monitor: true,
     })
 }
 

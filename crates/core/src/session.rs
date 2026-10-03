@@ -107,6 +107,10 @@ pub(crate) struct Services {
 pub struct DeviceSnapshot {
     pub connection: Connection,
     pub state: Value,
+    /// The device's most recent request-to-reply time in milliseconds, where
+    /// its protocol answers requests; absent until one has been measured.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
 }
 
 enum Socket {
@@ -572,10 +576,15 @@ impl Session {
                     let now = Instant::now();
                     if self.last_alive.is_none_or(|t| now - t >= ALIVE_EVERY) {
                         self.last_alive = Some(now);
+                        let latency_ms = self.snapshot.lock().unwrap().latency_ms;
                         self.services.events.push(Event::Alive {
                             device: self.device,
+                            latency_ms,
                         });
                     }
+                }
+                Action::RoundTrip(millis) => {
+                    self.snapshot.lock().unwrap().latency_ms = Some(millis);
                 }
                 Action::Log { level, message } => {
                     self.services.events.push(Event::Log {

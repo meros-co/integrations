@@ -24,7 +24,13 @@ pub enum Event {
     /// An RFC 7386 merge patch against the device's state.
     State { device: DeviceId, patch: Value },
     /// The device was heard from. At most one per device per second.
-    Alive { device: DeviceId },
+    /// `latency_ms` is the device's most recent request-to-reply time, where
+    /// its protocol answers requests: what a ping would measure.
+    Alive {
+        device: DeviceId,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        latency_ms: Option<u64>,
+    },
     Log {
         device: DeviceId,
         level: Level,

@@ -3635,6 +3635,7 @@ mod tests {
             model: model.into(),
             channels: None,
             settings: s,
+            monitor: true,
         })
         .unwrap()
     }
@@ -4095,6 +4096,7 @@ mod tests {
             model: "x".into(),
             channels: None,
             settings: settings(json!({"connection": "ssh"})),
+            monitor: true,
         })
         .is_err());
     }
@@ -5990,6 +5992,7 @@ mod tests {
                 model: "ilce-7sm3".into(),
                 channels: None,
                 settings: settings(json!({"live_view_transfer_interval_ms": v})),
+                monitor: true,
             })
             .map(|m| m.live.transfer_interval)
         };

@@ -198,6 +198,8 @@ struct InFlight {
     expect: Map<String, Value>,
     returns: String,
     awaiting: Option<Await>,
+    /// When the message now awaiting its reply was sent.
+    sent_at: Millis,
 }
 
 struct Job {
@@ -248,6 +250,10 @@ pub(crate) struct SpecEngine {
     /// `telemetry.websocket`: a push channel beside the transport.
     push: Option<Push>,
     push_backoff: Millis,
+    /// `OpenRequest::monitor`. Without it nothing in `telemetry` is sent or
+    /// opened: no subscription, poll or push websocket. Replies and anything
+    /// the device sends unasked still go to the rules.
+    monitor: bool,
 }
 
 fn str_field<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
@@ -547,6 +553,7 @@ impl SpecEngine {
         Ok(SpecEngine {
             spec,
             host: ctx.host,
+            monitor: ctx.monitor,
             settings: ctx.settings,
             transport,
             timeout,
@@ -778,6 +785,7 @@ impl SpecEngine {
             expect,
             returns,
             awaiting: None,
+            sent_at: 0,
         })
     }
 
@@ -860,7 +868,9 @@ impl SpecEngine {
                 }
             };
             if waits || matches!(awaiting, Await::Http(_)) {
-                self.current.as_mut().unwrap().awaiting = Some(awaiting);
+                let flight = self.current.as_mut().unwrap();
+                flight.awaiting = Some(awaiting);
+                flight.sent_at = cx.now();
                 cx.set_timer(REPLY, self.timeout);
                 return;
             }
@@ -881,7 +891,9 @@ impl SpecEngine {
         let Some(flight) = self.current.as_mut() else {
             return;
         };
-        flight.awaiting = None;
+        if flight.awaiting.take().is_some() {
+            cx.round_trip(cx.now().saturating_sub(flight.sent_at));
+        }
 
         if flight.id.is_none() {
             // Probe answered.
@@ -1220,7 +1232,7 @@ impl SpecEngine {
 
     /// After connecting: subscribe, poll once, and schedule both.
     fn start_telemetry(&mut self, cx: &mut Cx) {
-        if self.telemetry.is_empty() {
+        if self.telemetry.is_empty() || !self.monitor {
             return;
         }
         let subscribe = self.telemetry.subscribe.clone();
@@ -1330,6 +1342,9 @@ impl SpecEngine {
 
     /// The push channel (`telemetry.websocket`).
     fn open_push(&mut self, cx: &mut Cx) {
+        if !self.monitor {
+            return;
+        }
         if let Some(push) = &self.push {
             cx.ws_open(PUSH, push.request.clone());
         }
@@ -1690,6 +1705,7 @@ impl Module for SpecEngine {
                     self.lost(cx, "no login prompt within the timeout".into());
                 }
             }
+            RENEW | POLL if !self.monitor => {}
             RENEW => {
                 let items = self.telemetry.subscribe.clone();
                 self.send_telemetry(cx, items, false);
@@ -1781,6 +1797,7 @@ mod tests {
                 model: "propresenter-7".into(),
                 channels: None,
                 settings,
+                monitor: true,
             },
         )
         .unwrap()
@@ -1805,6 +1822,7 @@ mod tests {
                 model: "p3000-generic".into(),
                 channels: None,
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap()
@@ -1845,6 +1863,7 @@ mod tests {
                 model: "propresenter-7".into(),
                 channels: None,
                 settings: settings.as_object().unwrap().clone(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -1883,6 +1902,7 @@ mod tests {
                 model: "carbonite".into(),
                 channels: None,
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -1932,6 +1952,7 @@ mod tests {
                     model: "x32".into(),
                     channels: Some(32),
                     settings: settings.as_object().unwrap().clone(),
+                    monitor: true,
                 },
             )
             .unwrap();
@@ -2007,6 +2028,7 @@ mod tests {
                 model: "p3000-generic".into(),
                 channels: None,
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -2083,6 +2105,7 @@ mod tests {
                 model: "x32".into(),
                 channels: Some(32),
                 settings: Params::new(),
+                monitor: true,
             },
         )
         .unwrap();
@@ -2167,6 +2190,7 @@ mod tests {
                 model: model.into(),
                 channels: None,
                 settings: settings.as_object().unwrap().clone(),
+                monitor: true,
             },
         )
         .unwrap()
@@ -2575,5 +2599,100 @@ mod tests {
             sent,
             [osc::encode("/ch/01/mix/fader", &[osc::Arg::Float(0.75)])]
         );
+    }
+
+    fn x32(monitor: bool) -> SpecEngine {
+        let spec = Catalog::source_tree()
+            .device("behringer-x32")
+            .unwrap()
+            .clone();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "x32".into(),
+                channels: Some(32),
+                settings: Params::new(),
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    fn osc_addresses(actions: &[Action]) -> Vec<String> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { data, .. } => {
+                    let end = data.iter().position(|b| *b == 0).unwrap_or(data.len());
+                    Some(String::from_utf8_lossy(&data[..end]).into_owned())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_device_opened_for_commands_only_is_not_subscribed_or_read() {
+        // Monitored: the subscription and the connect-time read go out.
+        let mut e = x32(true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let sent = osc_addresses(&cx.take());
+        assert!(sent.iter().any(|a| a == "/xremote"), "{sent:?}");
+
+        // Commands only: nothing but the liveness probe, and commands still go.
+        let mut e = x32(false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let sent = osc_addresses(&cx.take());
+        assert_eq!(sent, ["/info"]);
+        let mut cx = Cx::new(10);
+        e.timer(&mut cx, RENEW);
+        e.timer(&mut cx, POLL);
+        assert!(osc_addresses(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        spec.telemetry = None;
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let params = json!({"input": 3, "output": 2})
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut cx = Cx::new(100);
+        e.command(&mut cx, 7, "route_video", &params);
+        cx.take();
+        let mut cx = Cx::new(142);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(
+                b"~01@ROUTE 1,2,3 OK
+"
+                .to_vec(),
+            ),
+        );
+        assert!(cx.take().contains(&Action::RoundTrip(42)));
     }
 }

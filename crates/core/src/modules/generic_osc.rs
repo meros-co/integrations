@@ -759,6 +759,7 @@ mod tests {
             model: "osc".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
         .unwrap()
     }
@@ -1074,6 +1075,7 @@ mod tests {
             model: "osc".into(),
             channels: None,
             settings: params(json!({"transport": "tcp", "listen_port": 9000})),
+            monitor: true,
         });
         assert!(tcp.is_err());
     }

@@ -2488,6 +2488,7 @@ mod tests {
             model: d.into(),
             channels: None,
             settings: params(json!({"read_on_connect": false})),
+            monitor: true,
         }
     }
 

@@ -173,6 +173,7 @@ async fn dlive_end_to_end() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"midi_channel": 1, "sync_preamps": false})),
+            monitor: true,
         })
         .unwrap();
 
@@ -246,6 +247,7 @@ async fn sq_end_to_end() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"midi_channel": 1})),
+            monitor: true,
         })
         .unwrap();
 

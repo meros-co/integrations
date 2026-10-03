@@ -527,6 +527,7 @@ mod tests {
             model: "generic".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
         .unwrap()
     }
@@ -613,6 +614,7 @@ mod tests {
                 model: "generic".into(),
                 channels: None,
                 settings: params(settings),
+                monitor: true,
             })
         };
         assert!(open(json!({"terminator": "custom"})).is_err());
@@ -626,6 +628,7 @@ mod tests {
             model: "generic".into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         });
         assert!(no_port.is_err());
     }

@@ -375,6 +375,9 @@ pub enum Action {
     Connection(Connection),
     /// Heard from the device, whether or not it carried telemetry.
     Alive,
+    /// How long the device took to answer a request just answered, in
+    /// milliseconds: the time from sending it to its reply.
+    RoundTrip(Millis),
     Log {
         level: Level,
         message: String,
@@ -548,6 +551,12 @@ impl Cx {
         self.push(Action::Alive);
     }
 
+    /// A request was answered `millis` after it was sent. Report it for
+    /// requests the device answers directly, not for pushed telemetry.
+    pub fn round_trip(&mut self, millis: Millis) {
+        self.push(Action::RoundTrip(millis));
+    }
+
     pub fn log(&mut self, level: Level, message: impl Into<String>) {
         self.push(Action::Log {
             level,
@@ -636,4 +645,7 @@ pub struct OpenContext {
     pub model: String,
     pub channels: Option<u32>,
     pub settings: Params,
+    /// `OpenRequest::monitor`: false means commands only, so the module
+    /// sends no subscription, connect-time read or poll of its own.
+    pub monitor: bool,
 }

@@ -633,6 +633,7 @@ mod tests {
             model: "obs-studio-28".into(),
             channels: None,
             settings: json!({"password": password}).as_object().unwrap().clone(),
+            monitor: true,
         })
     }
 

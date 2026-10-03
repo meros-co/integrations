@@ -146,6 +146,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         model: model.id.clone(),
         channels: model.channels,
         settings,
+        monitor: true,
     };
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
     let mut cx = Cx::new(0);
@@ -333,6 +334,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         model: model.id.clone(),
         channels: model.channels,
         settings,
+        monitor: true,
     };
     let mut engine = SpecEngine::new(Arc::new(spec.clone()), ctx)?;
 
@@ -592,6 +594,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
             model: model.id.clone(),
             channels: model.channels,
             settings: validate(&spec.settings, &Default::default()).unwrap_or_default(),
+            monitor: true,
         };
         if let Err(e) = SpecEngine::new(Arc::new(spec.clone()), ctx) {
             panic!("{}: {e}", spec.id);

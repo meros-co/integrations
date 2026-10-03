@@ -1030,6 +1030,7 @@ mod tests {
                 model: model.into(),
                 channels: None,
                 settings: params(settings),
+                monitor: true,
             },
         )
     }

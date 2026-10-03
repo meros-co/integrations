@@ -764,6 +764,7 @@ mod tests {
             model: model.into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         };
         let params = json!({"index": 3, "screen": 0, "text": "CAM 1", "brightness": 3,
                             "lh": "red", "text_tally": "green", "rh": "amber", "lamps": 5})

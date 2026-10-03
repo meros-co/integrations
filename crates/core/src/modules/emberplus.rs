@@ -1960,6 +1960,7 @@ mod tests {
             model: "provider".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
     }
 

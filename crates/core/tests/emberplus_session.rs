@@ -509,6 +509,7 @@ async fn ember_plus_end_to_end() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({})),
+            monitor: true,
         })
         .unwrap();
 
@@ -619,6 +620,7 @@ async fn ember_plus_lazy_walk() {
             host: "127.0.0.1".into(),
             port: Some(port),
             settings: params(json!({"walk": "lazy"})),
+            monitor: true,
         })
         .unwrap();
 

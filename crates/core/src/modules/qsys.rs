@@ -2113,6 +2113,7 @@ mod tests {
             model: "core".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
     }
 

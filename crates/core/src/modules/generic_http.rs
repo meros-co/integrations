@@ -513,6 +513,7 @@ mod tests {
             model: "http".into(),
             channels: None,
             settings: params(settings),
+            monitor: true,
         })
         .unwrap()
     }
@@ -595,6 +596,7 @@ mod tests {
             model: "http".into(),
             channels: None,
             settings: Params::new(),
+            monitor: true,
         })
         .unwrap();
         assert_eq!(m.base, "http://[::1]:8080");
@@ -625,6 +627,7 @@ mod tests {
             model: "http".into(),
             channels: None,
             settings: params(json!({"poll_path": "status"})),
+            monitor: true,
         })
         .is_err());
     }

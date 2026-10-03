@@ -13,6 +13,7 @@
 //!     host: "192.168.1.40".into(),
 //!     port: None,
 //!     settings: Default::default(),
+//!     monitor: true,
 //! })?;
 //! let outcome = core
 //!     .execute(device, "mute", json!({"muted": true}).as_object().unwrap().clone())
@@ -103,6 +104,18 @@ pub struct OpenRequest {
     /// Per-installation settings declared by the spec, such as passwords.
     #[serde(default)]
     pub settings: Params,
+    /// Whether the core keeps the device's state current: subscribing to its
+    /// changes, reading its state on connecting, and polling. `false` opens
+    /// it for commands only: the core asks for nothing beyond what commands
+    /// and its liveness check need, and so takes none of a device's limited
+    /// subscription slots (a WING has one). What the device sends unasked is
+    /// still applied to the state. Defaults to `true`.
+    #[serde(default = "monitor_default")]
+    pub monitor: bool,
+}
+
+fn monitor_default() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, thiserror::Error)]
@@ -311,6 +324,7 @@ impl Core {
             model: model.id.clone(),
             channels: model.channels,
             settings,
+            monitor: request.monitor,
         };
         let module =
             modules::construct(spec, context).map_err(|reason| OpenError::NotImplemented {
@@ -322,6 +336,7 @@ impl Core {
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
             connection: Connection::Connecting,
             state: serde_json::Value::Object(Default::default()),
+            latency_ms: None,
         }));
         let (tx, rx) = mpsc::channel(256);
         let session = Session::new(id, host, module, self.services.clone(), snapshot.clone());
