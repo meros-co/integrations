@@ -390,8 +390,8 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 7] = [
-        "200 ok", "~01@ok", "ACK;", "ACK", "ack,ok", "OK ok", "\u{6}",
+    const SUCCESS: [&str; 8] = [
+        "200 ok", "~01@ok", "ACK;", "ACK", "ack,ok", "OK ok", "\u{6}", "REP ok",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
@@ -401,11 +401,21 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         | super::Transport::LineUdp {
             reply_match: Some(re),
             ..
-        } => SUCCESS
-            .iter()
-            .find(|s| re.is_match(s))
-            .copied()
-            .unwrap_or(SUCCESS[0]),
+        } => {
+            // A delimited reply is matched with its markers.
+            let wrap = |s: &str| match &engine.transport {
+                super::Transport::LineTcp {
+                    reply: super::ReplyFraming::Delimited { open, close },
+                    ..
+                } => format!("{open}{s}{close}"),
+                _ => s.to_string(),
+            };
+            SUCCESS
+                .iter()
+                .find(|s| re.is_match(&wrap(s)))
+                .copied()
+                .unwrap_or(SUCCESS[0])
+        }
         _ => SUCCESS[0],
     };
     // A block transport's reply ends at a blank line; a delimited one is

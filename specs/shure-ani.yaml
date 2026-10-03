@@ -1,0 +1,890 @@
+spec: 1
+id: shure-ani
+name: "Shure ANI audio network interfaces (ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22)"
+vendor: Shure
+category: mixer
+
+# Written from Shure's command strings for each interface. Channels:
+# ANI4IN 1-4 inputs; ANI4OUT 1-4 outputs; ANI22 01-02 analog inputs, 03-04
+# analog outputs; ANIUSB-MATRIX 00-10 (see its document); 0 or 00 is all.
+source:
+  - title: "ANI4IN Command Strings, Version 2.2 (2024-F)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/ANI4IN/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7317.pdf . TCP 2202; GET ALL,
+      device information, CHAN_NAME, presets, AUDIO_GAIN_HI_RES and the analog AUDIO_GAIN (00-51 in
+      3 dB steps) with INC/DEC, AUDIO_MUTE, FLASH, METER_RATE, sig/clip LED, LED_BRIGHTNESS,
+      PHANTOM_PWR_ENABLE, HW_GATING_LOGIC, CHAN_LED_IN_STATE (no answer), REBOOT, INPUT_METER_MODE,
+      LIMITER_ENGAGED, AUDIO_SUMMING_MODE, levels, NA names, DEFAULT_SETTINGS, PEQ, ENCRYPTION.
+  - title: "ANI4OUT Command Strings, Version 3 (2019-G)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/ANI4OUT/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7106.pdf . TCP 2202; as the
+      ANI4IN for outputs, with AUDIO_OUT_LVL_SWITCH (LINE_LVL, AUX_LVL, MIC_LVL), LAST_ERROR_EVENT
+      and OUTPUT_METER_MODE.
+  - title: "ANIUSB-Matrix Command Strings, Version 4.7 (2024-E)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/ANIUSB-MATRIX/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7125.pdf . TCP 2202; GET ALL (V1
+      only), presets incl. PRESET_AUDIO_ROUTE, gain, level switches, AUDIO_MUTE, DEVICE_AUDIO_MUTE,
+      metering, LED, limiter, ENCRYPTION_CH, PEQ, meter modes, USB_CONNECT, matrix routing and gain,
+      LOGIC_MUTE, call status.
+  - title: "ANI22 Command Strings, Version 2.2 (2024-L)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/ANI22/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7123.pdf . TCP 2202; channel
+      table p.3; gain (digital and analog), AUDIO_MUTE, DEVICE_AUDIO_MUTE, output level switch,
+      metering, LED, PHANTOM_PWR_ENABLE, AUDIO_SUMMING_MODE, logic, PEQ.
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP; SAMPLE (metering) never answers.
+  # Commands name the parameter their REP carries (expect.reply_contains), so
+  # a change pushed meanwhile is never taken for an answer.
+  reply_match: "^< REP "
+  error_match: "^< REP ERR"
+  probe: "GET MODEL"
+
+conversions:
+  # AUDIO_GAIN_HI_RES and similar: tenths of a dB offset by 1100 (0-1400 = -110.0 to +30.0 dB)
+  shure_gain:
+    points: [[0, -110.0], [1400, 30.0]]
+
+models:
+  - id: ani4in
+    name: "Shure ANI4IN (XLR and BLOCK)"
+    supports:
+      - get_model
+      - get_serial_number
+      - get_firmware
+      - get_device_id
+      - get_ip_address
+      - get_subnet
+      - get_gateway
+      - get_encryption
+      - get_preset
+      - recall_preset
+      - get_preset_name
+      - flash
+      - reboot
+      - restore_defaults
+      - get_all
+      - get_parameter
+      - set_parameter
+      - get_device_parameter
+      - set_device_parameter
+      - get_name
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_analog_gain
+      - set_analog_gain
+      - increase_analog_gain
+      - decrease_analog_gain
+      - get_phantom
+      - set_phantom
+      - get_logic_out
+      - set_led_in
+      - get_clip_indicator
+      - get_limiter_engaged
+      - get_sig_clip_led
+      - get_led_brightness
+      - set_led_brightness
+      - get_summing_mode
+      - set_summing_mode
+      - get_input_meter_mode
+      - set_input_meter_mode
+      - get_meter_rate
+      - set_meter_rate
+      - get_peq_filter
+      - set_peq_filter
+    verification: none
+  - id: ani4out
+    name: "Shure ANI4OUT (XLR and BLOCK)"
+    supports:
+      - get_model
+      - get_serial_number
+      - get_firmware
+      - get_device_id
+      - get_ip_address
+      - get_subnet
+      - get_gateway
+      - get_encryption
+      - get_preset
+      - recall_preset
+      - get_preset_name
+      - flash
+      - reboot
+      - restore_defaults
+      - get_all
+      - get_parameter
+      - set_parameter
+      - get_device_parameter
+      - set_device_parameter
+      - get_name
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_output_level
+      - set_output_level
+      - get_clip_indicator
+      - get_limiter_engaged
+      - get_sig_clip_led
+      - get_led_brightness
+      - set_led_brightness
+      - get_summing_mode
+      - set_summing_mode
+      - get_output_meter_mode
+      - set_output_meter_mode
+      - get_last_error
+      - get_meter_rate
+      - set_meter_rate
+      - get_peq_filter
+      - set_peq_filter
+    verification: none
+  - id: aniusb-matrix
+    name: "Shure ANIUSB-MATRIX"
+    supports:
+      - get_model
+      - get_serial_number
+      - get_firmware
+      - get_device_id
+      - get_ip_address
+      - get_subnet
+      - get_gateway
+      - get_encryption
+      - get_preset
+      - recall_preset
+      - get_preset_name
+      - flash
+      - reboot
+      - restore_defaults
+      - get_all
+      - get_parameter
+      - set_parameter
+      - get_device_parameter
+      - set_device_parameter
+      - get_name
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_device_mute
+      - set_device_mute
+      - toggle_device_mute
+      - get_output_level
+      - set_output_level
+      - get_clip_indicator
+      - get_limiter_engaged
+      - get_sig_clip_led
+      - get_led_brightness
+      - set_led_brightness
+      - get_input_meter_mode
+      - set_input_meter_mode
+      - get_output_meter_mode
+      - set_output_meter_mode
+      - get_usb_connected
+      - get_logic_mute
+      - set_logic_mute
+      - toggle_logic_mute
+      - get_meter_rate
+      - set_meter_rate
+      - get_matrix_route
+      - set_matrix_route
+      - set_matrix_gain
+      - get_matrix_gain
+      - increase_matrix_gain
+      - decrease_matrix_gain
+      - get_peq_filter
+      - set_peq_filter
+    verification: none
+  - id: ani22
+    name: "Shure ANI22 (XLR and BLOCK)"
+    supports:
+      - get_model
+      - get_serial_number
+      - get_firmware
+      - get_device_id
+      - get_ip_address
+      - get_subnet
+      - get_gateway
+      - get_encryption
+      - get_preset
+      - recall_preset
+      - get_preset_name
+      - flash
+      - reboot
+      - restore_defaults
+      - get_all
+      - get_parameter
+      - set_parameter
+      - get_device_parameter
+      - set_device_parameter
+      - get_name
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_analog_gain
+      - set_analog_gain
+      - increase_analog_gain
+      - decrease_analog_gain
+      - get_device_mute
+      - set_device_mute
+      - toggle_device_mute
+      - get_output_level
+      - set_output_level
+      - get_phantom
+      - set_phantom
+      - get_logic_out
+      - set_led_in
+      - get_clip_indicator
+      - get_limiter_engaged
+      - get_sig_clip_led
+      - get_led_brightness
+      - set_led_brightness
+      - get_summing_mode
+      - set_summing_mode
+      - get_input_meter_mode
+      - set_input_meter_mode
+      - get_meter_rate
+      - set_meter_rate
+      - get_peq_filter
+      - set_peq_filter
+    verification: none
+
+commands:
+  get_model:
+    summary: "Read the model (MODEL)"
+    send: "GET MODEL"
+    expect: { reply_contains: " MODEL ", matches: " MODEL \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (SERIAL_NUM)"
+    send: "GET SERIAL_NUM"
+    expect: { reply_contains: " SERIAL_NUM ", matches: " SERIAL_NUM \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_firmware:
+    summary: "Read the firmware version (FW_VER)"
+    send: "GET FW_VER"
+    expect: { reply_contains: " FW_VER ", matches: " FW_VER \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_device_id:
+    summary: "Read the device ID (name) (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_ip_address:
+    summary: "Read the primary audio network IP address (IP_ADDR_NET_AUDIO_PRIMARY)"
+    send: "GET IP_ADDR_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_ADDR_NET_AUDIO_PRIMARY ", matches: " IP_ADDR_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_subnet:
+    summary: "Read the primary audio network subnet mask (IP_SUBNET_NET_AUDIO_PRIMARY)"
+    send: "GET IP_SUBNET_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_SUBNET_NET_AUDIO_PRIMARY ", matches: " IP_SUBNET_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_gateway:
+    summary: "Read the primary audio network gateway (IP_GATEWAY_NET_AUDIO_PRIMARY)"
+    send: "GET IP_GATEWAY_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_GATEWAY_NET_AUDIO_PRIMARY ", matches: " IP_GATEWAY_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_encryption:
+    summary: "Read audio encryption (ENCRYPTION)"
+    send: "GET ENCRYPTION"
+    expect: { reply_contains: " ENCRYPTION ", matches: " ENCRYPTION \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_preset:
+    summary: "The preset last recalled (PRESET), 1-10"
+    send: "GET PRESET"
+    expect: { reply_contains: " PRESET ", matches: " PRESET \\{?(.*?) *\\}? *>$" }
+    returns: value
+  recall_preset:
+    summary: "Recall a preset (SET PRESET), 1-10"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "SET PRESET {preset:02d}"
+    expect: { reply_contains: " PRESET ", contains: " PRESET " }
+    returns: ack
+  get_preset_name:
+    summary: "A preset's name (PRESET1-PRESET10)"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "GET PRESET{preset}"
+    expect: { reply_contains: " PRESET", matches: " PRESET\\d+ \\{?(.*?) *\\}? *>$" }
+    returns: value
+  flash:
+    summary: "Flash the device's lights to identify it (FLASH); it stops by itself after about 30 s"
+    params:
+      enabled: { type: bool, default: true }
+    send: "SET FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  reboot:
+    summary: "Reboot the device (SET REBOOT); not acknowledged"
+    send: "SET REBOOT"
+    returns: none
+  restore_defaults:
+    summary: "Restore default settings (SET DEFAULT_SETTINGS)"
+    send: "SET DEFAULT_SETTINGS"
+    expect: { reply_contains: "DEFAULT_SETTINGS", contains: "DEFAULT_SETTINGS" }
+    returns: ack
+  get_all:
+    summary: "Ask for every parameter of a channel (0: the device and all channels); the answers update state"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} ALL"
+    returns: none
+  get_parameter:
+    summary: "Read any documented channel parameter by name (GET <channel> <PARAM>), returning its value text"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+    send: "GET {channel:02d} {parameter}"
+    expect: { reply_contains: " {parameter} ", matches: "^< REP (?:\\d+ )?[A-Z][A-Z0-9_]* \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_parameter:
+    summary: "Set any documented channel parameter by name (SET <channel> <PARAM> <value>), the value in the document's form"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+      value: { type: string, pattern: "^[^<>]+$", max_length: 64, required: true }
+    send: "SET {channel:02d} {parameter} {value}"
+    expect: { reply_contains: " {parameter} ", not_contains: "REP ERR" }
+    returns: ack
+  get_device_parameter:
+    summary: "Read any documented device parameter by name (GET <PARAM>)"
+    params:
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+    send: "GET {parameter}"
+    expect: { reply_contains: " {parameter} ", matches: "^< REP (?:\\d+ )?[A-Z][A-Z0-9_]* \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_parameter:
+    summary: "Set any documented device parameter by name (SET <PARAM> <value>)"
+    params:
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+      value: { type: string, pattern: "^[^<>]+$", max_length: 128, required: true }
+    send: "SET {parameter} {value}"
+    expect: { reply_contains: " {parameter} ", not_contains: "REP ERR" }
+    returns: ack
+  get_name:
+    summary: "Read a channel's name (CHAN_NAME)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} CHAN_NAME"
+    expect: { reply_contains: " CHAN_NAME ", matches: " CHAN_NAME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_mute:
+    summary: "Read a channel's mute (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_MUTE"
+    expect: { reply_contains: " AUDIO_MUTE ", matches: " AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_mute:
+    summary: "Turn a channel's mute on or off (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "SET {channel:02d} AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle a channel's mute (AUDIO_MUTE TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  get_gain:
+    summary: "Read a channel's digital gain (AUDIO_GAIN_HI_RES)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_GAIN_HI_RES"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", matches: " AUDIO_GAIN_HI_RES \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_gain:
+    summary: "Set a channel's digital gain (AUDIO_GAIN_HI_RES), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  increase_gain:
+    summary: "Increase a channel's digital gain by a step (AUDIO_GAIN_HI_RES INC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES INC {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  decrease_gain:
+    summary: "Decrease a channel's digital gain by a step (AUDIO_GAIN_HI_RES DEC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES DEC {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  get_analog_gain:
+    summary: "Read an analog input's preamp gain, dB in 3 dB steps (00-51) (AUDIO_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_GAIN"
+    expect: { reply_contains: " AUDIO_GAIN ", matches: " AUDIO_GAIN \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_analog_gain:
+    summary: "Set an analog input's preamp gain, dB in 3 dB steps (00-51) (AUDIO_GAIN), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_db: { type: int, min: 0, max: 51, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN {gain_db:02d}"
+    expect: { reply_contains: " AUDIO_GAIN ", contains: " AUDIO_GAIN " }
+    returns: ack
+  increase_analog_gain:
+    summary: "Increase an analog input's preamp gain, dB in 3 dB steps (00-51) by a step (AUDIO_GAIN INC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 3, max: 51, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN INC {step}"
+    expect: { reply_contains: " AUDIO_GAIN ", contains: " AUDIO_GAIN " }
+    returns: ack
+  decrease_analog_gain:
+    summary: "Decrease an analog input's preamp gain, dB in 3 dB steps (00-51) by a step (AUDIO_GAIN DEC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 3, max: 51, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN DEC {step}"
+    expect: { reply_contains: " AUDIO_GAIN ", contains: " AUDIO_GAIN " }
+    returns: ack
+  get_device_mute:
+    summary: "Read the device mute (DEVICE_AUDIO_MUTE)"
+    send: "GET DEVICE_AUDIO_MUTE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", matches: " DEVICE_AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_mute:
+    summary: "Turn the device mute on or off (DEVICE_AUDIO_MUTE)"
+    params:
+      muted: { type: bool, default: true }
+    send: "SET DEVICE_AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  toggle_device_mute:
+    summary: "Toggle the device mute (DEVICE_AUDIO_MUTE TOGGLE)"
+    send: "SET DEVICE_AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  get_output_level:
+    summary: "Read an analog output's level switch (AUDIO_OUT_LVL_SWITCH)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_OUT_LVL_SWITCH"
+    expect: { reply_contains: " AUDIO_OUT_LVL_SWITCH ", matches: " AUDIO_OUT_LVL_SWITCH \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_output_level:
+    summary: "Set an analog output's level switch (AUDIO_OUT_LVL_SWITCH)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["LINE_LVL", "AUX_LVL", "MIC_LVL"], required: true }
+    send: "SET {channel:02d} AUDIO_OUT_LVL_SWITCH {value}"
+    expect: { reply_contains: " AUDIO_OUT_LVL_SWITCH ", contains: " AUDIO_OUT_LVL_SWITCH " }
+    returns: ack
+  get_phantom:
+    summary: "Read an input's phantom power (PHANTOM_PWR_ENABLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} PHANTOM_PWR_ENABLE"
+    expect: { reply_contains: " PHANTOM_PWR_ENABLE ", matches: " PHANTOM_PWR_ENABLE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_phantom:
+    summary: "Turn an input's phantom power on or off (PHANTOM_PWR_ENABLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} PHANTOM_PWR_ENABLE {enabled:on_off}"
+    expect: { reply_contains: " PHANTOM_PWR_ENABLE ", contains: " PHANTOM_PWR_ENABLE " }
+    returns: ack
+  get_logic_out:
+    summary: "Read an input's mic logic switch out (HW_GATING_LOGIC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} HW_GATING_LOGIC"
+    expect: { reply_contains: " HW_GATING_LOGIC ", matches: " HW_GATING_LOGIC \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_led_in:
+    summary: "Set an input's mic logic LED in (CHAN_LED_IN_STATE); not answered on the ANI4IN"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} CHAN_LED_IN_STATE {enabled:on_off}"
+    returns: none
+  get_clip_indicator:
+    summary: "Read a channel's clip indicator (AUDIO_OUT_CLIP_INDICATOR)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_OUT_CLIP_INDICATOR"
+    expect: { reply_contains: " AUDIO_OUT_CLIP_INDICATOR ", matches: " AUDIO_OUT_CLIP_INDICATOR \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_limiter_engaged:
+    summary: "Read a channel's limiter engaged (LIMITER_ENGAGED)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} LIMITER_ENGAGED"
+    expect: { reply_contains: " LIMITER_ENGAGED ", matches: " LIMITER_ENGAGED \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_sig_clip_led:
+    summary: "Read a channel's sig/clip LED colour (OFF, GREEN, AMBER, RED) (LED_COLOR_SIG_CLIP)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} LED_COLOR_SIG_CLIP"
+    expect: { reply_contains: " LED_COLOR_SIG_CLIP ", matches: " LED_COLOR_SIG_CLIP \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_led_brightness:
+    summary: "Read the LED brightness (0 off, 1 dim, 2 default) (LED_BRIGHTNESS)"
+    send: "GET LED_BRIGHTNESS"
+    expect: { reply_contains: " LED_BRIGHTNESS ", matches: " LED_BRIGHTNESS \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_led_brightness:
+    summary: "Set the LED brightness (0 off, 1 dim, 2 default) (LED_BRIGHTNESS)"
+    params:
+      value: { type: int, min: 0, max: 2, required: true }
+    send: "SET LED_BRIGHTNESS {value}"
+    expect: { reply_contains: " LED_BRIGHTNESS ", contains: " LED_BRIGHTNESS " }
+    returns: ack
+  get_summing_mode:
+    summary: "Read the audio summing mode (AUDIO_SUMMING_MODE)"
+    send: "GET AUDIO_SUMMING_MODE"
+    expect: { reply_contains: " AUDIO_SUMMING_MODE ", matches: " AUDIO_SUMMING_MODE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_summing_mode:
+    summary: "Set the audio summing mode (AUDIO_SUMMING_MODE)"
+    params:
+      value: { type: enum, values: ["OFF", "1+2", "3+4", "1+2/3+4", "1+2+3+4"], required: true }
+    send: "SET AUDIO_SUMMING_MODE {value}"
+    expect: { reply_contains: " AUDIO_SUMMING_MODE ", contains: " AUDIO_SUMMING_MODE " }
+    returns: ack
+  get_input_meter_mode:
+    summary: "Read the input meter tap (INPUT_METER_MODE)"
+    send: "GET INPUT_METER_MODE"
+    expect: { reply_contains: " INPUT_METER_MODE ", matches: " INPUT_METER_MODE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_input_meter_mode:
+    summary: "Set the input meter tap (INPUT_METER_MODE)"
+    params:
+      value: { type: enum, values: ["PRE_FADER", "POST_FADER"], required: true }
+    send: "SET INPUT_METER_MODE {value}"
+    expect: { reply_contains: " INPUT_METER_MODE ", contains: " INPUT_METER_MODE " }
+    returns: ack
+  get_output_meter_mode:
+    summary: "Read the output meter tap (OUTPUT_METER_MODE)"
+    send: "GET OUTPUT_METER_MODE"
+    expect: { reply_contains: " OUTPUT_METER_MODE ", matches: " OUTPUT_METER_MODE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_output_meter_mode:
+    summary: "Set the output meter tap (OUTPUT_METER_MODE)"
+    params:
+      value: { type: enum, values: ["PRE_FADER", "POST_FADER"], required: true }
+    send: "SET OUTPUT_METER_MODE {value}"
+    expect: { reply_contains: " OUTPUT_METER_MODE ", contains: " OUTPUT_METER_MODE " }
+    returns: ack
+  get_usb_connected:
+    summary: "Read a USB host connected (ANIUSB-MATRIX) (USB_CONNECT)"
+    send: "GET USB_CONNECT"
+    expect: { reply_contains: " USB_CONNECT ", matches: " USB_CONNECT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_logic_mute:
+    summary: "Read the logic mute (ANIUSB-MATRIX) (LOGIC_MUTE)"
+    send: "GET LOGIC_MUTE"
+    expect: { reply_contains: " LOGIC_MUTE ", matches: " LOGIC_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_logic_mute:
+    summary: "Turn the logic mute (ANIUSB-MATRIX) on or off (LOGIC_MUTE)"
+    params:
+      muted: { type: bool, default: true }
+    send: "SET LOGIC_MUTE {muted:on_off}"
+    expect: { reply_contains: " LOGIC_MUTE ", contains: " LOGIC_MUTE " }
+    returns: ack
+  toggle_logic_mute:
+    summary: "Toggle the logic mute (ANIUSB-MATRIX) (LOGIC_MUTE TOGGLE)"
+    send: "SET LOGIC_MUTE TOGGLE"
+    expect: { reply_contains: " LOGIC_MUTE ", contains: " LOGIC_MUTE " }
+    returns: ack
+  get_last_error:
+    summary: "Read the last error event (ANI4OUT) (LAST_ERROR_EVENT)"
+    send: "GET LAST_ERROR_EVENT"
+    expect: { reply_contains: " LAST_ERROR_EVENT ", matches: " LAST_ERROR_EVENT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_meter_rate:
+    summary: "Read the metering interval, ms (0: off; 1-99 refused) (METER_RATE)"
+    send: "GET METER_RATE"
+    expect: { reply_contains: " METER_RATE ", matches: " METER_RATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate:
+    summary: "Set the metering interval, ms (0: off; 1-99 refused) (METER_RATE), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE ", contains: " METER_RATE " }
+    returns: ack
+  get_matrix_route:
+    summary: "Matrix mixer: whether an input is routed to an output (MATRIX_MXR_ROUTE)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+    send: "GET {input:02d} MATRIX_MXR_ROUTE {output:02d}"
+    expect: { reply_contains: " MATRIX_MXR_ROUTE ", matches: " MATRIX_MXR_ROUTE \\d+ \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_matrix_route:
+    summary: "Matrix mixer: route or unroute an input to an output"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {input:02d} MATRIX_MXR_ROUTE {output:02d} {enabled:on_off}"
+    expect: { reply_contains: " MATRIX_MXR_ROUTE ", contains: " MATRIX_MXR_ROUTE " }
+    returns: ack
+  set_matrix_gain:
+    summary: "Matrix mixer: a crosspoint's gain in tenths of a dB, -1100 to 300 (-110.0 to +30.0 dB)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  get_matrix_gain:
+    summary: "Matrix mixer: a crosspoint's gain (wire value, tenths of a dB offset by 1100)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+    send: "GET {input:02d} MATRIX_MXR_GAIN {output:02d}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", matches: " MATRIX_MXR_GAIN \\d+ ?(\\d{4}) *>$", convert: shure_gain }
+    returns: value
+  increase_matrix_gain:
+    summary: "Matrix mixer: increase a crosspoint's gain by a step in tenths of a dB"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} INC {step}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  decrease_matrix_gain:
+    summary: "Matrix mixer: decrease a crosspoint's gain by a step in tenths of a dB"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} DEC {step}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  get_peq_filter:
+    summary: "Whether a PEQ filter is enabled (PEQ <block> <filter>)"
+    params:
+      block: { type: int, min: 0, max: 99, required: true }
+      filter: { type: int, min: 0, max: 16, required: true }
+    send: "GET {block:02d} PEQ {filter:02d}"
+    expect: { reply_contains: " PEQ ", matches: " PEQ \\d+ (ON|OFF) *>$" }
+    returns: value
+  set_peq_filter:
+    summary: "Enable, disable or toggle a PEQ filter (0: every block or filter)"
+    params:
+      block: { type: int, min: 0, max: 99, required: true }
+      filter: { type: int, min: 0, max: 16, required: true }
+      state: { type: enum, values: ["ON", "OFF", "TOGGLE"], required: true }
+    send: "SET {block:02d} PEQ {filter:02d} {state}"
+    expect: { reply_contains: " PEQ ", contains: " PEQ " }
+    returns: ack
+
+state:
+  device.model: { type: string, description: "the model" }
+  device.serial_number: { type: string, description: "the serial number" }
+  device.firmware: { type: string, description: "the firmware version" }
+  device.device_id: { type: string, description: "the device ID (name)" }
+  device.ip_address: { type: string, description: "the primary audio network IP address" }
+  device.subnet: { type: string, description: "the primary audio network subnet mask" }
+  device.gateway: { type: string, description: "the primary audio network gateway" }
+  device.encryption: { type: bool, description: "audio encryption (on/true)" }
+  device.preset: { type: int, description: "The preset last recalled, 1-10" }
+  channels.*.name: { type: string, description: "a channel's name" }
+  channels.*.mute: { type: bool, description: "a channel's mute (on/true)" }
+  channels.*.gain: { type: float, unit: "dB", description: "A channel's digital gain, -110.0 to +30.0 dB (wire 0-1400 in tenths offset by 1100); set_gain takes tenths of a dB, -1100 to 300" }
+  channels.*.analog_gain: { type: int, unit: "dB", description: "an analog input's preamp gain, dB in 3 dB steps (00-51)" }
+  device.device_mute: { type: bool, description: "the device mute (on/true)" }
+  channels.*.output_level: { type: string, description: "an analog output's level switch" }
+  channels.*.phantom: { type: bool, description: "an input's phantom power (on/true)" }
+  channels.*.logic_out: { type: bool, description: "an input's mic logic switch out (on/true)" }
+  channels.*.clip_indicator: { type: bool, description: "a channel's clip indicator (on/true)" }
+  channels.*.limiter_engaged: { type: bool, description: "a channel's limiter engaged (on/true)" }
+  channels.*.sig_clip_led: { type: string, description: "a channel's sig/clip LED colour (OFF, GREEN, AMBER, RED)" }
+  device.led_brightness: { type: int, description: "the LED brightness (0 off, 1 dim, 2 default)" }
+  device.summing_mode: { type: string, description: "the audio summing mode" }
+  device.input_meter_mode: { type: string, description: "the input meter tap" }
+  device.output_meter_mode: { type: string, description: "the output meter tap" }
+  device.usb_connected: { type: bool, description: "a USB host connected (ANIUSB-MATRIX) (on/true)" }
+  device.logic_mute: { type: bool, description: "the logic mute (ANIUSB-MATRIX) (on/true)" }
+  device.last_error: { type: string, description: "the last error event (ANI4OUT)" }
+  device.meter_rate: { type: int, unit: "ms", description: "the metering interval, ms (0: off; 1-99 refused)" }
+  matrix.*.*.routed: { type: bool, description: "Matrix mixer crosspoint routed, keyed by input then output channel" }
+  matrix.*.*.gain: { type: float, unit: "dB", description: "Matrix mixer crosspoint gain, keyed by input then output channel" }
+  peq.*.*.enabled: { type: bool, description: "A PEQ filter's enable, keyed by block then filter" }
+
+telemetry:
+  # Every parameter is reported once on connecting; after that the device
+  # sends a REP whenever a value changes, so nothing is polled.
+  poll:
+    send: ["GET 00 ALL"]
+  updates:
+    - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP SERIAL_NUM \\{?(.*?) *\\}? >$"
+      state: { "device.serial_number": "{1}" }
+    - match: "^< REP FW_VER \\{?(.*?) *\\}? >$"
+      state: { "device.firmware": "{1}" }
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.device_id": "{1}" }
+    - match: "^< REP IP_ADDR_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.ip_address": "{1}" }
+    - match: "^< REP IP_SUBNET_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.subnet": "{1}" }
+    - match: "^< REP IP_GATEWAY_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.gateway": "{1}" }
+    - match: "^< REP ENCRYPTION (ON|OFF|On|Off) >$"
+      state: { "device.encryption": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP PRESET (\\d+) >$"
+      state: { "device.preset": "{1}" }
+    - match: "^< REP (\\d+) CHAN_NAME \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.name": "{2}" }
+    - match: "^< REP (\\d+) AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.mute": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_GAIN_HI_RES (\\d+) >$"
+      state: { "channels.{1}.gain": "{2:from.shure_gain}" }
+    - match: "^< REP (\\d+) AUDIO_GAIN (-?\\d+) >$"
+      state: { "channels.{1}.analog_gain": "{2}" }
+    - match: "^< REP DEVICE_AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "device.device_mute": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_OUT_LVL_SWITCH \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.output_level": "{2}" }
+    - match: "^< REP (\\d+) PHANTOM_PWR_ENABLE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.phantom": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) HW_GATING_LOGIC (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.logic_out": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_OUT_CLIP_INDICATOR (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.clip_indicator": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) LIMITER_ENGAGED (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.limiter_engaged": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) LED_COLOR_SIG_CLIP \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.sig_clip_led": "{2}" }
+    - match: "^< REP LED_BRIGHTNESS (-?\\d+) >$"
+      state: { "device.led_brightness": "{1}" }
+    - match: "^< REP AUDIO_SUMMING_MODE \\{?(.*?) *\\}? >$"
+      state: { "device.summing_mode": "{1}" }
+    - match: "^< REP INPUT_METER_MODE \\{?(.*?) *\\}? >$"
+      state: { "device.input_meter_mode": "{1}" }
+    - match: "^< REP OUTPUT_METER_MODE \\{?(.*?) *\\}? >$"
+      state: { "device.output_meter_mode": "{1}" }
+    - match: "^< REP USB_CONNECT (ON|OFF|On|Off) >$"
+      state: { "device.usb_connected": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP LOGIC_MUTE (ON|OFF|On|Off) >$"
+      state: { "device.logic_mute": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP LAST_ERROR_EVENT \\{?(.*?) *\\}? >$"
+      state: { "device.last_error": "{1}" }
+    - match: "^< REP METER_RATE (-?\\d+) >$"
+      state: { "device.meter_rate": "{1}" }
+    - match: "^< REP (\\d+) MATRIX_MXR_ROUTE (\\d+) (ON|OFF) >$"
+      state: { "matrix.{1}.{2}.routed": { value: "{3}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) MATRIX_MXR_GAIN (\\d+) ?(\\d{4}) >$"
+      state: { "matrix.{1}.{2}.gain": "{3:from.shure_gain}" }
+    - match: "^< REP (\\d+) PEQ (\\d+) (ON|OFF) >$"
+      state: { "peq.{1}.{2}.enabled": { value: "{3}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the channel: a change to the
+      same parameter on another channel arriving in the same moment could be taken for the answer.
+      An error answer is < REP ERR >, which names nothing; it fails the command waiting.
+  - models: [all]
+    severity: info
+    text: >
+      Text values (names, model, serial number, addresses) are padded with spaces to a fixed width,
+      sometimes in braces; the spaces and braces are removed. Channel 0 (or 00) means every channel,
+      answered with one REP per channel.
+  - models: [all]
+    severity: info
+    text: >
+      Gains are sent and reported in tenths of a dB offset by 1100 (0000-1400 = -110.0 to +30.0 dB);
+      set commands take tenths of a dB (-1100 to 300), and state holds dB. Increase and decrease
+      steps are in tenths of a dB.
+  - models: [all]
+    severity: info
+    text: >
+      Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval until set
+      to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not kept in
+      state. Values 1-99 ms are refused by the device.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the session sends one GET ALL; the device answers with a REP for every
+      parameter, and thereafter reports every change unasked, so state stays current without
+      polling. Opened for commands only, the GET ALL is not sent.
+  - models: [all]
+    severity: info
+    text: >
+      get_parameter, set_parameter, get_device_parameter and set_device_parameter reach any
+      parameter the command-string document lists, with the value in the document's form, for those
+      not given a command of their own.
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset replaces the device's whole configuration with the preset's, live, and cannot be
+      undone except by recalling another preset.
+  - models: [all]
+    severity: critical
+    text: >
+      restore_defaults erases the device's configuration (presets aside) and cannot be undone;
+      reboot restarts the device, interrupting its audio, and is not acknowledged.
+  - models: [all]
+    severity: info
+    text: >
+      The ANI4IN and ANI4OUT documents write channel numbers as one digit (x); the session sends two
+      (01), as the ANI22 and ANIUSB-MATRIX documents do.
+  - models: [all]
+    severity: info
+    text: >
+      set_led_in (CHAN_LED_IN_STATE) is not answered on the ANI4IN, so it is sent without waiting.
+  - models: [all]
+    severity: info
+    text: >
+      Phantom power and the analog gain (00-51 dB in 3 dB steps) are on the analog inputs only.

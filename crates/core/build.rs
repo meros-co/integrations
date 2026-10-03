@@ -108,7 +108,17 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-ew-g3-g4",
         ],
     ),
-    ("vendor-shure", &["shure-wireless"]),
+    (
+        "vendor-shure",
+        &[
+            "shure-ani",
+            "shure-imx-room",
+            "shure-mxa",
+            "shure-mxn5",
+            "shure-p300",
+            "shure-wireless",
+        ],
+    ),
     ("vendor-sony", &["sony-camera", "visca"]),
     ("vendor-studiocoast", &["vmix"]),
     (

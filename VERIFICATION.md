@@ -529,6 +529,48 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig and FirmwareRevision behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:205](specs/sennheiser-ew-g3-g4.yaml#L205))
 - [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:31](crates/core/src/modules/sennheiser_mcp.rs#L31))
 
+## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
+
+- [ ] Check that the ANI4IN and ANI4OUT accept two-digit channel numbers (01), which the session sends, though their documents write one digit. ([specs/shure-ani.yaml:443](specs/shure-ani.yaml#L443))
+- [ ] Check that < REP ERR > is the answer to an invalid command and nothing else. ([specs/shure-ani.yaml:60](specs/shure-ani.yaml#L60))
+- [ ] Check that GET 00 ALL is accepted by every ANI (the ANIUSB-MATRIX document limits GET ALL to V1 units) and that the answers end. ([specs/shure-ani.yaml:766](specs/shure-ani.yaml#L766))
+- [ ] Check that the analog gain is sent and reported as two digits (00-51) and in 3 dB steps. ([specs/shure-ani.yaml:466](specs/shure-ani.yaml#L466))
+- [ ] Confirm that CHAN_LED_IN_STATE is not answered on the ANI4IN and whether it is on the ANI22. ([specs/shure-ani.yaml:544](specs/shure-ani.yaml#L544))
+- [ ] Check LED_BRIGHTNESS's range on current firmware (0-2 documented). ([specs/shure-ani.yaml:577](specs/shure-ani.yaml#L577))
+
+## shure-imx-room — Shure IntelliMix Room
+
+- [ ] Check that GET 00 ALL is answered by IntelliMix Room and that its answers end. ([specs/shure-imx-room.yaml:398](specs/shure-imx-room.yaml#L398))
+- [ ] Check that the gain step keywords are accepted in lower case (inc, dec), as the document writes them. ([specs/shure-imx-room.yaml:185](specs/shure-imx-room.yaml#L185))
+- [ ] Check how licence values are padded (LIC_TYPE is documented as 10 characters). ([specs/shure-imx-room.yaml:260](specs/shure-imx-room.yaml#L260))
+- [ ] Check the matrix gain REP's spacing (the document shows the gain run into the output number in one example). ([specs/shure-imx-room.yaml:343](specs/shure-imx-room.yaml#L343))
+
+## shure-mxa — Shure Microflex Advance arrays
+
+- [ ] Check whether the MXA910 and MXA310 accept lower-case inc and dec (their documents write INC and DEC). ([specs/shure-mxa.yaml:1077](specs/shure-mxa.yaml#L1077))
+- [ ] Check that GET 00 ALL is accepted on every model and firmware (some documents write GET 0 ALL or GET ALL). ([specs/shure-mxa.yaml:1834](specs/shure-mxa.yaml#L1834))
+- [ ] Check PRESET_NAME's answer form (< REP PRESET_NAME nn name >) on the MXA910 and MXA310, whose documents use PRESET1-PRESET10 instead. ([specs/shure-mxa.yaml:972](specs/shure-mxa.yaml#L972))
+- [ ] Check the speech gating and noise filter values each model accepts (Off/Low/Medium/High on the MXA920, ON/OFF on the MXA902 and MXA901) and their case in REP. ([specs/shure-mxa.yaml:1232](specs/shure-mxa.yaml#L1232))
+- [ ] Check LED_BRIGHTNESS's range per model and firmware (0-2 or 0-5). ([specs/shure-mxa.yaml:1337](specs/shure-mxa.yaml#L1337))
+- [ ] Check that lobe X and Y are accepted as four digits (0000-3048) on SET. ([specs/shure-mxa.yaml:1472](specs/shure-mxa.yaml#L1472))
+- [ ] Check the MXA310 polar pattern names (SUPER, HYPER, BIDIRECTION as documented). ([specs/shure-mxa.yaml:1731](specs/shure-mxa.yaml#L1731))
+
+## shure-mxn5 — Shure MXN5-C
+
+- [ ] Check what an MXN5-C that is not V1 answers to GET 00 ALL. ([specs/shure-mxn5.yaml:459](specs/shure-mxn5.yaml#L459))
+- [ ] Check that the gain step keywords are accepted in lower case. ([specs/shure-mxn5.yaml:267](specs/shure-mxn5.yaml#L267))
+- [ ] Check that SIG_GEN on channel 03 starts and stops the generator and what the 00 index does. ([specs/shure-mxn5.yaml:403](specs/shure-mxn5.yaml#L403))
+- [ ] Check the PRESET_NAME answer for an empty preset ({empty}). ([specs/shure-mxn5.yaml:162](specs/shure-mxn5.yaml#L162))
+
+## shure-p300 — Shure P300
+
+- [ ] Check that a SET answered by the REP of the new value is never interleaved with a change report for the same parameter on another channel, or note how often it happens. ([specs/shure-p300.yaml:40](specs/shure-p300.yaml#L40))
+- [ ] Check that recall_preset accepts the two-digit form (SET PRESET 03). ([specs/shure-p300.yaml:261](specs/shure-p300.yaml#L261))
+- [ ] Check that INC and DEC steps are in tenths of a dB as documented, and how a step beyond the range is answered. ([specs/shure-p300.yaml:366](specs/shure-p300.yaml#L366))
+- [ ] Check the AEC reference values on firmware 4.1 and later (Dante outputs 3-8 added). ([specs/shure-p300.yaml:554](specs/shure-p300.yaml#L554))
+- [ ] Check what GATE_INHIBIT answers on firmware 4.1 and later, where it is documented not to work. ([specs/shure-p300.yaml:681](specs/shure-p300.yaml#L681))
+- [ ] Check the matrix gain REP's spacing (the document shows < REP xx MATRIX_MXR_GAIN yyzzzz > once). ([specs/shure-p300.yaml:991](specs/shure-p300.yaml#L991))
+
 ## shure-wireless — Shure wireless receivers
 
 - [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:199](specs/shure-wireless.yaml#L199))

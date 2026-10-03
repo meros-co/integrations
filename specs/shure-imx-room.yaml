@@ -1,0 +1,495 @@
+spec: 1
+id: shure-imx-room
+name: "Shure IntelliMix Room (software DSP)"
+vendor: Shure
+category: mixer
+
+# Written from Shure's IntelliMix Room command strings. Channels: 01-16
+# Dante mic inputs (8 or 16 licensed), 17-24 Dante line inputs, 25 virtual
+# audio in, 26 PC in, 27-34 Dante outputs, 35 virtual audio out, 36 PC out,
+# 37 automix output, 55 VAD input right; 00 is all.
+source:
+  - title: "IntelliMix Room Command Strings, Version 7.5 (2024-G)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/IntelliMixRoom/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7549.pdf . TCP 2202 on the
+      computer running IntelliMix Room; channel table p.3; device information (GET ALL, MODEL,
+      FW_VER, DEVICE_ID, NA_DEVICE_NAME, PRESET, call status), AUDIO_GAIN_HI_RES with inc/dec,
+      DEVICE_AUDIO_MUTE, AUDIO_MUTE, matrix routing and gain, AUTOMXR_MUTE, AUDIO_GAIN_POSTGATE,
+      AUTOMXR_GATE, licence commands (CHAN_CONFIG, CHAN_COUNT, LIC_EXP_DATE, LIC_TYPE, LIC_VALID)
+      and DENOISER_ENABLE / DENOISER_LEVEL.
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP; SAMPLE (metering) never answers.
+  # Commands name the parameter their REP carries (expect.reply_contains), so
+  # a change pushed meanwhile is never taken for an answer.
+  reply_match: "^< REP "
+  error_match: "^< REP ERR"
+  probe: "GET MODEL"
+
+conversions:
+  # AUDIO_GAIN_HI_RES and similar: tenths of a dB offset by 1100 (0-1400 = -110.0 to +30.0 dB)
+  shure_gain:
+    points: [[0, -110.0], [1400, 30.0]]
+
+models:
+  - id: intellimix-room
+    name: "Shure IntelliMix Room (8 or 16 channels)"
+    supports:
+      - get_model
+      - get_firmware
+      - get_device_id
+      - get_na_device_name
+      - get_preset
+      - recall_preset
+      - get_all
+      - get_device_mute
+      - set_device_mute
+      - toggle_device_mute
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_postgate_gain
+      - set_postgate_gain
+      - get_automixer_mute
+      - set_automixer_mute
+      - toggle_automixer_mute
+      - get_automixer_gate
+      - get_channels_configured
+      - get_licensed_channels
+      - get_licence_expiry
+      - get_licence_type
+      - get_licence_valid
+      - get_denoiser
+      - set_denoiser
+      - get_denoiser_level
+      - set_denoiser_level
+      - get_call_status_enabled
+      - set_call_status_enabled
+      - get_call_state
+      - get_matrix_route
+      - set_matrix_route
+      - set_matrix_gain
+      - get_matrix_gain
+      - increase_matrix_gain
+      - decrease_matrix_gain
+    verification: none
+
+commands:
+  get_model:
+    summary: "Read the model (MODEL)"
+    send: "GET MODEL"
+    expect: { reply_contains: " MODEL ", matches: " MODEL \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_firmware:
+    summary: "Read the software version (FW_VER)"
+    send: "GET FW_VER"
+    expect: { reply_contains: " FW_VER ", matches: " FW_VER \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_device_id:
+    summary: "Read the device ID (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_na_device_name:
+    summary: "Read the Dante device name (NA_DEVICE_NAME)"
+    send: "GET NA_DEVICE_NAME"
+    expect: { reply_contains: " NA_DEVICE_NAME ", matches: " NA_DEVICE_NAME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_preset:
+    summary: "The preset last recalled (PRESET)"
+    send: "GET PRESET"
+    expect: { reply_contains: " PRESET ", matches: " PRESET \\{?(.*?) *\\}? *>$" }
+    returns: value
+  recall_preset:
+    summary: "Recall a preset (SET PRESET), 1-10"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "SET PRESET {preset:02d}"
+    expect: { reply_contains: " PRESET ", contains: " PRESET " }
+    returns: ack
+  get_all:
+    summary: "Ask for every parameter of a channel (0: all); the answers update state"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} ALL"
+    returns: none
+  get_device_mute:
+    summary: "Read the device mute (DEVICE_AUDIO_MUTE)"
+    send: "GET DEVICE_AUDIO_MUTE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", matches: " DEVICE_AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_mute:
+    summary: "Turn the device mute on or off (DEVICE_AUDIO_MUTE)"
+    params:
+      muted: { type: bool, default: true }
+    send: "SET DEVICE_AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  toggle_device_mute:
+    summary: "Toggle the device mute (DEVICE_AUDIO_MUTE TOGGLE)"
+    send: "SET DEVICE_AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  get_mute:
+    summary: "Read a channel's mute (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_MUTE"
+    expect: { reply_contains: " AUDIO_MUTE ", matches: " AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_mute:
+    summary: "Turn a channel's mute on or off (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "SET {channel:02d} AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle a channel's mute (AUDIO_MUTE TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  get_gain:
+    summary: "Read a channel's digital gain (AUDIO_GAIN_HI_RES)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_GAIN_HI_RES"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", matches: " AUDIO_GAIN_HI_RES \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_gain:
+    summary: "Set a channel's digital gain (AUDIO_GAIN_HI_RES), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  increase_gain:
+    summary: "Increase a channel's digital gain by a step (AUDIO_GAIN_HI_RES inc)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES inc {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  decrease_gain:
+    summary: "Decrease a channel's digital gain by a step (AUDIO_GAIN_HI_RES dec)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES dec {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  get_postgate_gain:
+    summary: "Read a channel's post-gate gain (01-16, 37) (AUDIO_GAIN_POSTGATE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_GAIN_POSTGATE"
+    expect: { reply_contains: " AUDIO_GAIN_POSTGATE ", matches: " AUDIO_GAIN_POSTGATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_postgate_gain:
+    summary: "Set a channel's post-gate gain (01-16, 37) (AUDIO_GAIN_POSTGATE), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1099, max: 300, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_POSTGATE {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " AUDIO_GAIN_POSTGATE ", contains: " AUDIO_GAIN_POSTGATE " }
+    returns: ack
+  get_automixer_mute:
+    summary: "Read the automixer post-gate mute (01-16, 37) (AUTOMXR_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_MUTE"
+    expect: { reply_contains: " AUTOMXR_MUTE ", matches: " AUTOMXR_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_mute:
+    summary: "Turn the automixer post-gate mute (01-16, 37) on or off (AUTOMXR_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "SET {channel:02d} AUTOMXR_MUTE {muted:on_off}"
+    expect: { reply_contains: " AUTOMXR_MUTE ", contains: " AUTOMXR_MUTE " }
+    returns: ack
+  toggle_automixer_mute:
+    summary: "Toggle the automixer post-gate mute (01-16, 37) (AUTOMXR_MUTE TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUTOMXR_MUTE TOGGLE"
+    expect: { reply_contains: " AUTOMXR_MUTE ", contains: " AUTOMXR_MUTE " }
+    returns: ack
+  get_automixer_gate:
+    summary: "Read a channel's automixer gate (open) (AUTOMXR_GATE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_GATE"
+    expect: { reply_contains: " AUTOMXR_GATE ", matches: " AUTOMXR_GATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_channels_configured:
+    summary: "Read whether the channels are configured (TRUE/FALSE) (CHAN_CONFIG)"
+    send: "GET CHAN_CONFIG"
+    expect: { reply_contains: " CHAN_CONFIG ", matches: " CHAN_CONFIG \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_licensed_channels:
+    summary: "Read the licensed channel count (8 or 16) (CHAN_COUNT)"
+    send: "GET CHAN_COUNT"
+    expect: { reply_contains: " CHAN_COUNT ", matches: " CHAN_COUNT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_licence_expiry:
+    summary: "Read the licence expiry date (yyyy-mm-dd) (LIC_EXP_DATE)"
+    send: "GET LIC_EXP_DATE"
+    expect: { reply_contains: " LIC_EXP_DATE ", matches: " LIC_EXP_DATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_licence_type:
+    summary: "Read the licence type (DEMO, PAID, TRIAL) (LIC_TYPE)"
+    send: "GET LIC_TYPE"
+    expect: { reply_contains: " LIC_TYPE ", matches: " LIC_TYPE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_licence_valid:
+    summary: "Read whether the licence is valid (TRUE/FALSE) (LIC_VALID)"
+    send: "GET LIC_VALID"
+    expect: { reply_contains: " LIC_VALID ", matches: " LIC_VALID \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_denoiser:
+    summary: "Read the denoiser (channel 00 or 37) (DENOISER_ENABLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} DENOISER_ENABLE"
+    expect: { reply_contains: " DENOISER_ENABLE ", matches: " DENOISER_ENABLE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_denoiser:
+    summary: "Turn the denoiser (channel 00 or 37) on or off (DENOISER_ENABLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} DENOISER_ENABLE {enabled:on_off}"
+    expect: { reply_contains: " DENOISER_ENABLE ", contains: " DENOISER_ENABLE " }
+    returns: ack
+  get_denoiser_level:
+    summary: "Read the denoiser level (channel 00 or 37) (DENOISER_LEVEL)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} DENOISER_LEVEL"
+    expect: { reply_contains: " DENOISER_LEVEL ", matches: " DENOISER_LEVEL \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_denoiser_level:
+    summary: "Set the denoiser level (channel 00 or 37) (DENOISER_LEVEL)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["LOW", "MEDIUM", "HIGH"], required: true }
+    send: "SET {channel:02d} DENOISER_LEVEL {value}"
+    expect: { reply_contains: " DENOISER_LEVEL ", contains: " DENOISER_LEVEL " }
+    returns: ack
+  get_call_status_enabled:
+    summary: "Read the call status feature (ONHOOK_ENABLE)"
+    send: "GET ONHOOK_ENABLE"
+    expect: { reply_contains: " ONHOOK_ENABLE ", matches: " ONHOOK_ENABLE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_call_status_enabled:
+    summary: "Turn the call status feature on or off (ONHOOK_ENABLE)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "SET ONHOOK_ENABLE {enabled:on_off}"
+    expect: { reply_contains: " ONHOOK_ENABLE ", contains: " ONHOOK_ENABLE " }
+    returns: ack
+  get_call_state:
+    summary: "Read the call status (ONHOOK or OFFHOOK) (ONHOOK_STATE)"
+    send: "GET ONHOOK_STATE"
+    expect: { reply_contains: " ONHOOK_STATE ", matches: " ONHOOK_STATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_matrix_route:
+    summary: "Matrix mixer: whether an input is routed to an output (MATRIX_MXR_ROUTE)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+    send: "GET {input:02d} MATRIX_MXR_ROUTE {output:02d}"
+    expect: { reply_contains: " MATRIX_MXR_ROUTE ", matches: " MATRIX_MXR_ROUTE \\d+ \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_matrix_route:
+    summary: "Matrix mixer: route or unroute an input to an output"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {input:02d} MATRIX_MXR_ROUTE {output:02d} {enabled:on_off}"
+    expect: { reply_contains: " MATRIX_MXR_ROUTE ", contains: " MATRIX_MXR_ROUTE " }
+    returns: ack
+  set_matrix_gain:
+    summary: "Matrix mixer: a crosspoint's gain in tenths of a dB, -1100 to 300 (-110.0 to +30.0 dB)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  get_matrix_gain:
+    summary: "Matrix mixer: a crosspoint's gain (wire value, tenths of a dB offset by 1100)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+    send: "GET {input:02d} MATRIX_MXR_GAIN {output:02d}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", matches: " MATRIX_MXR_GAIN \\d+ ?(\\d{4}) *>$", convert: shure_gain }
+    returns: value
+  increase_matrix_gain:
+    summary: "Matrix mixer: increase a crosspoint's gain by a step in tenths of a dB"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} inc {step}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  decrease_matrix_gain:
+    summary: "Matrix mixer: decrease a crosspoint's gain by a step in tenths of a dB"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} dec {step}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+
+state:
+  device.model: { type: string, description: "the model" }
+  device.firmware: { type: string, description: "the software version" }
+  device.device_id: { type: string, description: "the device ID" }
+  device.na_device_name: { type: string, description: "the Dante device name" }
+  device.preset: { type: int, description: "The preset last recalled" }
+  device.device_mute: { type: bool, description: "the device mute (on/true)" }
+  channels.*.mute: { type: bool, description: "a channel's mute (on/true)" }
+  channels.*.gain: { type: float, unit: "dB", description: "A channel's digital gain, -110.0 to +30.0 dB (wire 0-1400 in tenths offset by 1100); set_gain takes tenths of a dB, -1100 to 300" }
+  channels.*.postgate_gain: { type: float, unit: "dB", description: "a channel's post-gate gain (01-16, 37)" }
+  channels.*.automixer_mute: { type: bool, description: "the automixer post-gate mute (01-16, 37) (on/true)" }
+  channels.*.automixer_gate: { type: bool, description: "a channel's automixer gate (open) (on/true)" }
+  device.channels_configured: { type: string, description: "whether the channels are configured (TRUE/FALSE)" }
+  device.licensed_channels: { type: int, description: "the licensed channel count (8 or 16)" }
+  device.licence_expiry: { type: string, description: "the licence expiry date (yyyy-mm-dd)" }
+  device.licence_type: { type: string, description: "the licence type (DEMO, PAID, TRIAL)" }
+  device.licence_valid: { type: string, description: "whether the licence is valid (TRUE/FALSE)" }
+  channels.*.denoiser: { type: bool, description: "the denoiser (channel 00 or 37) (on/true)" }
+  channels.*.denoiser_level: { type: string, description: "the denoiser level (channel 00 or 37)" }
+  device.call_status_enabled: { type: bool, description: "the call status feature (on/true)" }
+  device.call_state: { type: string, description: "the call status (ONHOOK or OFFHOOK)" }
+  matrix.*.*.routed: { type: bool, description: "Matrix mixer crosspoint routed, keyed by input then output channel" }
+  matrix.*.*.gain: { type: float, unit: "dB", description: "Matrix mixer crosspoint gain, keyed by input then output channel" }
+
+telemetry:
+  # Every parameter is reported once on connecting; after that the device
+  # sends a REP whenever a value changes, so nothing is polled.
+  poll:
+    send: ["GET 00 ALL"]
+  updates:
+    - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP FW_VER \\{?(.*?) *\\}? >$"
+      state: { "device.firmware": "{1}" }
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.device_id": "{1}" }
+    - match: "^< REP NA_DEVICE_NAME \\{?(.*?) *\\}? >$"
+      state: { "device.na_device_name": "{1}" }
+    - match: "^< REP PRESET (\\d+) >$"
+      state: { "device.preset": "{1}" }
+    - match: "^< REP DEVICE_AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "device.device_mute": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.mute": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_GAIN_HI_RES (\\d+) >$"
+      state: { "channels.{1}.gain": "{2:from.shure_gain}" }
+    - match: "^< REP (\\d+) AUDIO_GAIN_POSTGATE (\\d+) >$"
+      state: { "channels.{1}.postgate_gain": "{2:from.shure_gain}" }
+    - match: "^< REP (\\d+) AUTOMXR_MUTE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_mute": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUTOMXR_GATE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_gate": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP CHAN_CONFIG \\{?(.*?) *\\}? >$"
+      state: { "device.channels_configured": "{1}" }
+    - match: "^< REP CHAN_COUNT (-?\\d+) >$"
+      state: { "device.licensed_channels": "{1}" }
+    - match: "^< REP LIC_EXP_DATE \\{?(.*?) *\\}? >$"
+      state: { "device.licence_expiry": "{1}" }
+    - match: "^< REP LIC_TYPE \\{?(.*?) *\\}? >$"
+      state: { "device.licence_type": "{1}" }
+    - match: "^< REP LIC_VALID \\{?(.*?) *\\}? >$"
+      state: { "device.licence_valid": "{1}" }
+    - match: "^< REP (\\d+) DENOISER_ENABLE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.denoiser": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) DENOISER_LEVEL \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.denoiser_level": "{2}" }
+    - match: "^< REP ONHOOK_ENABLE (ON|OFF|On|Off) >$"
+      state: { "device.call_status_enabled": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP ONHOOK_STATE \\{?(.*?) *\\}? >$"
+      state: { "device.call_state": "{1}" }
+    - match: "^< REP (\\d+) MATRIX_MXR_ROUTE (\\d+) (ON|OFF) >$"
+      state: { "matrix.{1}.{2}.routed": { value: "{3}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) MATRIX_MXR_GAIN (\\d+) ?(\\d{4}) >$"
+      state: { "matrix.{1}.{2}.gain": "{3:from.shure_gain}" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the channel: a change to the
+      same parameter on another channel arriving in the same moment could be taken for the answer.
+      An error answer is < REP ERR >, which names nothing; it fails the command waiting.
+  - models: [all]
+    severity: info
+    text: >
+      Text values (names, model, serial number, addresses) are padded with spaces to a fixed width,
+      sometimes in braces; the spaces and braces are removed. Channel 0 (or 00) means every channel,
+      answered with one REP per channel.
+  - models: [all]
+    severity: info
+    text: >
+      Gains are sent and reported in tenths of a dB offset by 1100 (0000-1400 = -110.0 to +30.0 dB);
+      set commands take tenths of a dB (-1100 to 300), and state holds dB. Increase and decrease
+      steps are in tenths of a dB.
+  - models: [all]
+    severity: info
+    text: >
+      Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval until set
+      to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not kept in
+      state. Values 1-99 ms are refused by the device.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the session sends one GET ALL; the device answers with a REP for every
+      parameter, and thereafter reports every change unasked, so state stays current without
+      polling. Opened for commands only, the GET ALL is not sent.
+  - models: [all]
+    severity: info
+    text: >
+      get_parameter, set_parameter, get_device_parameter and set_device_parameter reach any
+      parameter the command-string document lists, with the value in the document's form, for those
+      not given a command of their own.
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset replaces the device's whole configuration with the preset's, live, and cannot be
+      undone except by recalling another preset.
+  - models: [all]
+    severity: critical
+    text: >
+      restore_defaults erases the device's configuration (presets aside) and cannot be undone;
+      reboot restarts the device, interrupting its audio, and is not acknowledged.
+  - models: [all]
+    severity: info
+    text: >
+      Commands for channels beyond the licensed count (8-channel licences) fail with REP ERR.

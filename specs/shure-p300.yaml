@@ -1,0 +1,1268 @@
+spec: 1
+id: shure-p300
+name: "Shure P300 IntelliMix Audio Conferencing Processor"
+vendor: Shure
+category: mixer
+
+# Written from Shure's P300 command strings. The channel numbers are the
+# P300's (document p.3-4): 01-08 Dante mic inputs, 09-10 Dante inputs, 11-12
+# analog inputs, 13 USB in, 14 mobile in, 15-16 Dante outputs 1-2, 17-18
+# analog outputs, 19 USB out, 20 mobile out, 21 automixer output, 22 AEC
+# reference, 23-28 Dante outputs 3-8 (firmware 4.1 and later); 00 is all.
+source:
+  - title: "P300 Command Strings, Version 4.4 (2024-D)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/P300/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7171.pdf . TCP 2202; GET, SET,
+      REP and SAMPLE; REP sent on change; channel table p.3-4; common commands p.5-41 (GET ALL,
+      MODEL, SERIAL_NUM, CHAN_NAME, DEVICE_ID, FW_VER, PRESET and PRESET1-10, AUDIO_GAIN_HI_RES with
+      INC/DEC, input and output level switches, AUDIO_MUTE, DEVICE_AUDIO_MUTE, FLASH, metering,
+      LED_BRIGHTNESS, network, ENCRYPTION, REBOOT, PEQ, meter modes, USB_CONNECT, matrix routing and
+      gain, CONTROL_MAC_ADDR, NA names, DEFAULT_SETTINGS, AEC, AEC_REF, ERLE metering, AEC_NLP,
+      NOISE_RED, AGC, gate inhibit, automixer, compressor, delay, direct out tap point, call
+      status).
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP; SAMPLE (metering) never answers.
+  # Commands name the parameter their REP carries (expect.reply_contains), so
+  # a change pushed meanwhile is never taken for an answer.
+  reply_match: "^< REP "
+  error_match: "^< REP ERR"
+  probe: "GET MODEL"
+
+conversions:
+  # AGC maximum boost: tenths of a dB (0-200 = 0.0 to +20.0 dB)
+  shure_agc_boost:
+    points: [[0, 0.0], [200, 20.0]]
+  # AGC maximum cut: tenths of a dB offset by 200 (0-200 = -20.0 to 0.0 dB)
+  shure_agc_cut:
+    points: [[0, -20.0], [200, 0.0]]
+  # AGC target: tenths of a dBFS offset by 500 (0-500 = -50.0 to 0.0 dBFS)
+  shure_agc_target:
+    points: [[0, -50.0], [500, 0.0]]
+  # compressor ratio: tenths (0010-1000 = 1.0:1 to 100.0:1)
+  shure_comp_ratio:
+    points: [[10, 1.0], [1000, 100.0]]
+  # compressor threshold: tenths of a dB offset by 600 (0-600 = -60.0 to 0.0 dB)
+  shure_comp_threshold:
+    points: [[0, -60.0], [600, 0.0]]
+  # AUDIO_GAIN_HI_RES and similar: tenths of a dB offset by 1100 (0-1400 = -110.0 to +30.0 dB)
+  shure_gain:
+    points: [[0, -110.0], [1400, 30.0]]
+  # automixer off attenuation: dB offset by 110 (0-107 = -110 to -3 dB)
+  shure_off_att:
+    points: [[0, -110.0], [107, -3.0]]
+
+models:
+  - id: p300
+    name: "Shure P300 IntelliMix Audio Conferencing Processor"
+    supports:
+      - get_model
+      - get_serial_number
+      - get_firmware
+      - get_device_id
+      - get_ip_address
+      - get_subnet
+      - get_gateway
+      - get_na_device_name
+      - get_mac_address
+      - get_encryption
+      - get_usb_connected
+      - get_preset
+      - recall_preset
+      - get_preset_name
+      - flash
+      - reboot
+      - restore_defaults
+      - get_all
+      - get_parameter
+      - set_parameter
+      - get_device_parameter
+      - set_device_parameter
+      - get_name
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_device_mute
+      - set_device_mute
+      - toggle_device_mute
+      - get_input_level
+      - set_input_level
+      - get_output_level
+      - set_output_level
+      - get_led_brightness
+      - set_led_brightness
+      - get_input_meter_mode
+      - set_input_meter_mode
+      - get_output_meter_mode
+      - set_output_meter_mode
+      - get_meter_rate_in
+      - set_meter_rate_in
+      - get_meter_rate_out
+      - set_meter_rate_out
+      - get_meter_rate_proc
+      - set_meter_rate_proc
+      - get_meter_rate_erle
+      - set_meter_rate_erle
+      - get_meter_rate_agc
+      - set_meter_rate_agc
+      - get_aec
+      - set_aec
+      - toggle_aec
+      - get_aec_reference
+      - set_aec_reference
+      - get_aec_nlp
+      - set_aec_nlp
+      - get_noise_reduction
+      - set_noise_reduction
+      - get_noise_reduction_level
+      - set_noise_reduction_level
+      - get_agc
+      - set_agc
+      - toggle_agc
+      - get_agc_max_cut
+      - set_agc_max_cut
+      - get_agc_max_boost
+      - set_agc_max_boost
+      - get_agc_target
+      - set_agc_target
+      - get_gate_inhibit
+      - set_gate_inhibit
+      - toggle_gate_inhibit
+      - get_automixer_mode
+      - set_automixer_mode
+      - get_automixer_off_attenuation
+      - set_automixer_off_attenuation
+      - get_automixer_gate_sensitivity
+      - set_automixer_gate_sensitivity
+      - get_automixer_max_open
+      - set_automixer_max_open
+      - get_automixer_last_mic_lock
+      - set_automixer_last_mic_lock
+      - toggle_automixer_last_mic_lock
+      - get_automixer_hold_time
+      - set_automixer_hold_time
+      - get_automixer_always_on
+      - set_automixer_always_on
+      - toggle_automixer_always_on
+      - get_automixer_priority
+      - set_automixer_priority
+      - toggle_automixer_priority
+      - get_automixer_mute
+      - set_automixer_mute
+      - toggle_automixer_mute
+      - get_automixer_gate
+      - get_compressor
+      - set_compressor
+      - toggle_compressor
+      - get_compressor_threshold
+      - set_compressor_threshold
+      - get_compressor_ratio
+      - set_compressor_ratio
+      - get_delay
+      - set_delay
+      - get_direct_out_point
+      - set_direct_out_point
+      - get_call_status_enabled
+      - set_call_status_enabled
+      - get_call_state
+      - get_matrix_route
+      - set_matrix_route
+      - set_matrix_gain
+      - get_matrix_gain
+      - increase_matrix_gain
+      - decrease_matrix_gain
+      - get_peq_filter
+      - set_peq_filter
+    verification: none
+
+commands:
+  get_model:
+    summary: "Read the model (MODEL)"
+    send: "GET MODEL"
+    expect: { reply_contains: " MODEL ", matches: " MODEL \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (SERIAL_NUM)"
+    send: "GET SERIAL_NUM"
+    expect: { reply_contains: " SERIAL_NUM ", matches: " SERIAL_NUM \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_firmware:
+    summary: "Read the firmware version (FW_VER)"
+    send: "GET FW_VER"
+    expect: { reply_contains: " FW_VER ", matches: " FW_VER \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_device_id:
+    summary: "Read the device ID (name) (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_ip_address:
+    summary: "Read the primary audio network IP address (IP_ADDR_NET_AUDIO_PRIMARY)"
+    send: "GET IP_ADDR_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_ADDR_NET_AUDIO_PRIMARY ", matches: " IP_ADDR_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_subnet:
+    summary: "Read the primary audio network subnet mask (IP_SUBNET_NET_AUDIO_PRIMARY)"
+    send: "GET IP_SUBNET_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_SUBNET_NET_AUDIO_PRIMARY ", matches: " IP_SUBNET_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_gateway:
+    summary: "Read the primary audio network gateway (IP_GATEWAY_NET_AUDIO_PRIMARY)"
+    send: "GET IP_GATEWAY_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_GATEWAY_NET_AUDIO_PRIMARY ", matches: " IP_GATEWAY_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_na_device_name:
+    summary: "Read the Dante device name (NA_DEVICE_NAME)"
+    send: "GET NA_DEVICE_NAME"
+    expect: { reply_contains: " NA_DEVICE_NAME ", matches: " NA_DEVICE_NAME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_mac_address:
+    summary: "Read the control MAC address (CONTROL_MAC_ADDR)"
+    send: "GET CONTROL_MAC_ADDR"
+    expect: { reply_contains: " CONTROL_MAC_ADDR ", matches: " CONTROL_MAC_ADDR \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_encryption:
+    summary: "Read audio encryption (ENCRYPTION)"
+    send: "GET ENCRYPTION"
+    expect: { reply_contains: " ENCRYPTION ", matches: " ENCRYPTION \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_usb_connected:
+    summary: "Read a USB host connected (USB_CONNECT)"
+    send: "GET USB_CONNECT"
+    expect: { reply_contains: " USB_CONNECT ", matches: " USB_CONNECT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_preset:
+    summary: "The preset last recalled (PRESET), 1-10"
+    send: "GET PRESET"
+    expect: { reply_contains: " PRESET ", matches: " PRESET \\{?(.*?) *\\}? *>$" }
+    returns: value
+  recall_preset:
+    summary: "Recall a preset (SET PRESET), 1-10"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "SET PRESET {preset:02d}"
+    expect: { reply_contains: " PRESET ", contains: " PRESET " }
+    returns: ack
+  get_preset_name:
+    summary: "A preset's name (PRESET1-PRESET10)"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "GET PRESET{preset}"
+    expect: { reply_contains: " PRESET", matches: " PRESET\\d+ \\{?(.*?) *\\}? *>$" }
+    returns: value
+  flash:
+    summary: "Flash the device's lights to identify it (FLASH); it stops by itself after about 30 s"
+    params:
+      enabled: { type: bool, default: true }
+    send: "SET FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  reboot:
+    summary: "Reboot the device (SET REBOOT); not acknowledged"
+    send: "SET REBOOT"
+    returns: none
+  restore_defaults:
+    summary: "Restore default settings (SET DEFAULT_SETTINGS)"
+    send: "SET DEFAULT_SETTINGS"
+    expect: { reply_contains: "DEFAULT_SETTINGS", contains: "DEFAULT_SETTINGS" }
+    returns: ack
+  get_all:
+    summary: "Ask for every parameter of a channel (0: the device and all channels); the answers update state"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} ALL"
+    returns: none
+  get_parameter:
+    summary: "Read any documented channel parameter by name (GET <channel> <PARAM>), returning its value text"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+    send: "GET {channel:02d} {parameter}"
+    expect: { reply_contains: " {parameter} ", matches: "^< REP (?:\\d+ )?[A-Z][A-Z0-9_]* \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_parameter:
+    summary: "Set any documented channel parameter by name (SET <channel> <PARAM> <value>), the value in the document's form"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+      value: { type: string, pattern: "^[^<>]+$", max_length: 64, required: true }
+    send: "SET {channel:02d} {parameter} {value}"
+    expect: { reply_contains: " {parameter} ", not_contains: "REP ERR" }
+    returns: ack
+  get_device_parameter:
+    summary: "Read any documented device parameter by name (GET <PARAM>)"
+    params:
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+    send: "GET {parameter}"
+    expect: { reply_contains: " {parameter} ", matches: "^< REP (?:\\d+ )?[A-Z][A-Z0-9_]* \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_parameter:
+    summary: "Set any documented device parameter by name (SET <PARAM> <value>)"
+    params:
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+      value: { type: string, pattern: "^[^<>]+$", max_length: 128, required: true }
+    send: "SET {parameter} {value}"
+    expect: { reply_contains: " {parameter} ", not_contains: "REP ERR" }
+    returns: ack
+  get_name:
+    summary: "Read a channel's name (CHAN_NAME)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} CHAN_NAME"
+    expect: { reply_contains: " CHAN_NAME ", matches: " CHAN_NAME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_mute:
+    summary: "Read a channel's mute (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_MUTE"
+    expect: { reply_contains: " AUDIO_MUTE ", matches: " AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_mute:
+    summary: "Turn a channel's mute on or off (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "SET {channel:02d} AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle a channel's mute (AUDIO_MUTE TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  get_gain:
+    summary: "Read a channel's digital gain (AUDIO_GAIN_HI_RES)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_GAIN_HI_RES"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", matches: " AUDIO_GAIN_HI_RES \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_gain:
+    summary: "Set a channel's digital gain (AUDIO_GAIN_HI_RES), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  increase_gain:
+    summary: "Increase a channel's digital gain by a step (AUDIO_GAIN_HI_RES INC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES INC {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  decrease_gain:
+    summary: "Decrease a channel's digital gain by a step (AUDIO_GAIN_HI_RES DEC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES DEC {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  get_device_mute:
+    summary: "Read the device mute (DEVICE_AUDIO_MUTE)"
+    send: "GET DEVICE_AUDIO_MUTE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", matches: " DEVICE_AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_mute:
+    summary: "Turn the device mute on or off (DEVICE_AUDIO_MUTE)"
+    params:
+      muted: { type: bool, default: true }
+    send: "SET DEVICE_AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  toggle_device_mute:
+    summary: "Toggle the device mute (DEVICE_AUDIO_MUTE TOGGLE)"
+    send: "SET DEVICE_AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  get_input_level:
+    summary: "Read an analog input's level switch (11-12) (AUDIO_IN_LVL_SWITCH)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_IN_LVL_SWITCH"
+    expect: { reply_contains: " AUDIO_IN_LVL_SWITCH ", matches: " AUDIO_IN_LVL_SWITCH \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_input_level:
+    summary: "Set an analog input's level switch (11-12) (AUDIO_IN_LVL_SWITCH)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["LINE_LVL", "AUX_LVL"], required: true }
+    send: "SET {channel:02d} AUDIO_IN_LVL_SWITCH {value}"
+    expect: { reply_contains: " AUDIO_IN_LVL_SWITCH ", contains: " AUDIO_IN_LVL_SWITCH " }
+    returns: ack
+  get_output_level:
+    summary: "Read an analog output's level switch (17-18) (AUDIO_OUT_LVL_SWITCH)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_OUT_LVL_SWITCH"
+    expect: { reply_contains: " AUDIO_OUT_LVL_SWITCH ", matches: " AUDIO_OUT_LVL_SWITCH \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_output_level:
+    summary: "Set an analog output's level switch (17-18) (AUDIO_OUT_LVL_SWITCH)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["LINE_LVL", "AUX_LVL", "MIC_LVL"], required: true }
+    send: "SET {channel:02d} AUDIO_OUT_LVL_SWITCH {value}"
+    expect: { reply_contains: " AUDIO_OUT_LVL_SWITCH ", contains: " AUDIO_OUT_LVL_SWITCH " }
+    returns: ack
+  get_led_brightness:
+    summary: "Read the LED brightness (0 off, 1 dim, 2 default) (LED_BRIGHTNESS)"
+    send: "GET LED_BRIGHTNESS"
+    expect: { reply_contains: " LED_BRIGHTNESS ", matches: " LED_BRIGHTNESS \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_led_brightness:
+    summary: "Set the LED brightness (0 off, 1 dim, 2 default) (LED_BRIGHTNESS)"
+    params:
+      value: { type: int, min: 0, max: 2, required: true }
+    send: "SET LED_BRIGHTNESS {value}"
+    expect: { reply_contains: " LED_BRIGHTNESS ", contains: " LED_BRIGHTNESS " }
+    returns: ack
+  get_input_meter_mode:
+    summary: "Read the input meter tap (INPUT_METER_MODE)"
+    send: "GET INPUT_METER_MODE"
+    expect: { reply_contains: " INPUT_METER_MODE ", matches: " INPUT_METER_MODE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_input_meter_mode:
+    summary: "Set the input meter tap (INPUT_METER_MODE)"
+    params:
+      value: { type: enum, values: ["PRE_FADER", "POST_FADER"], required: true }
+    send: "SET INPUT_METER_MODE {value}"
+    expect: { reply_contains: " INPUT_METER_MODE ", contains: " INPUT_METER_MODE " }
+    returns: ack
+  get_output_meter_mode:
+    summary: "Read the output meter tap (OUTPUT_METER_MODE)"
+    send: "GET OUTPUT_METER_MODE"
+    expect: { reply_contains: " OUTPUT_METER_MODE ", matches: " OUTPUT_METER_MODE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_output_meter_mode:
+    summary: "Set the output meter tap (OUTPUT_METER_MODE)"
+    params:
+      value: { type: enum, values: ["PRE_FADER", "POST_FADER"], required: true }
+    send: "SET OUTPUT_METER_MODE {value}"
+    expect: { reply_contains: " OUTPUT_METER_MODE ", contains: " OUTPUT_METER_MODE " }
+    returns: ack
+  get_meter_rate_in:
+    summary: "Read the input metering interval, ms (0: off; 1-99 refused) (METER_RATE_IN)"
+    send: "GET METER_RATE_IN"
+    expect: { reply_contains: " METER_RATE_IN ", matches: " METER_RATE_IN \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate_in:
+    summary: "Set the input metering interval, ms (0: off; 1-99 refused) (METER_RATE_IN), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE_IN {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE_IN ", contains: " METER_RATE_IN " }
+    returns: ack
+  get_meter_rate_out:
+    summary: "Read the output metering interval, ms (0: off; 1-99 refused) (METER_RATE_OUT)"
+    send: "GET METER_RATE_OUT"
+    expect: { reply_contains: " METER_RATE_OUT ", matches: " METER_RATE_OUT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate_out:
+    summary: "Set the output metering interval, ms (0: off; 1-99 refused) (METER_RATE_OUT), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE_OUT {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE_OUT ", contains: " METER_RATE_OUT " }
+    returns: ack
+  get_meter_rate_proc:
+    summary: "Read the processing-block metering interval, ms (0: off; 1-99 refused) (METER_RATE_PROC)"
+    send: "GET METER_RATE_PROC"
+    expect: { reply_contains: " METER_RATE_PROC ", matches: " METER_RATE_PROC \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate_proc:
+    summary: "Set the processing-block metering interval, ms (0: off; 1-99 refused) (METER_RATE_PROC), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE_PROC {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE_PROC ", contains: " METER_RATE_PROC " }
+    returns: ack
+  get_meter_rate_erle:
+    summary: "Read the AEC ERLE metering interval, ms (0: off; 1-99 refused) (METER_RATE_ERLE)"
+    send: "GET METER_RATE_ERLE"
+    expect: { reply_contains: " METER_RATE_ERLE ", matches: " METER_RATE_ERLE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate_erle:
+    summary: "Set the AEC ERLE metering interval, ms (0: off; 1-99 refused) (METER_RATE_ERLE), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE_ERLE {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE_ERLE ", contains: " METER_RATE_ERLE " }
+    returns: ack
+  get_meter_rate_agc:
+    summary: "Read the AGC gain metering interval, ms (0: off; 1-99 refused) (METER_RATE_AGC)"
+    send: "GET METER_RATE_AGC"
+    expect: { reply_contains: " METER_RATE_AGC ", matches: " METER_RATE_AGC \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate_agc:
+    summary: "Set the AGC gain metering interval, ms (0: off; 1-99 refused) (METER_RATE_AGC), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE_AGC {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE_AGC ", contains: " METER_RATE_AGC " }
+    returns: ack
+  get_aec:
+    summary: "Read the AEC of a Dante mic channel (01-08) (AEC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AEC"
+    expect: { reply_contains: " AEC ", matches: " AEC \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_aec:
+    summary: "Turn the AEC of a Dante mic channel (01-08) on or off (AEC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} AEC {enabled:on_off}"
+    expect: { reply_contains: " AEC ", contains: " AEC " }
+    returns: ack
+  toggle_aec:
+    summary: "Toggle the AEC of a Dante mic channel (01-08) (AEC TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AEC TOGGLE"
+    expect: { reply_contains: " AEC ", contains: " AEC " }
+    returns: ack
+  get_aec_reference:
+    summary: "Read the AEC reference source (channel 22) (AEC_REF)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AEC_REF"
+    expect: { reply_contains: " AEC_REF ", matches: " AEC_REF \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_aec_reference:
+    summary: "Set the AEC reference source (channel 22) (AEC_REF)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["DANTEOUT1", "DANTEOUT2", "DANTEOUT3", "DANTEOUT4", "DANTEOUT5", "DANTEOUT6", "DANTEOUT7", "DANTEOUT8", "ANALOGOUT1", "ANALOGOUT2", "DANTEIN9", "DANTEIN10", "ANALOGIN1", "ANALOGIN2", "USBIN", "MOBILEIN"], required: true }
+    send: "SET {channel:02d} AEC_REF {value}"
+    expect: { reply_contains: " AEC_REF ", contains: " AEC_REF " }
+    returns: ack
+  get_aec_nlp:
+    summary: "Read the AEC non-linear processing (AEC_NLP)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AEC_NLP"
+    expect: { reply_contains: " AEC_NLP ", matches: " AEC_NLP \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_aec_nlp:
+    summary: "Set the AEC non-linear processing (AEC_NLP)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["LOW", "MEDIUM", "HIGH"], required: true }
+    send: "SET {channel:02d} AEC_NLP {value}"
+    expect: { reply_contains: " AEC_NLP ", contains: " AEC_NLP " }
+    returns: ack
+  get_noise_reduction:
+    summary: "Read noise reduction (NOISE_RED)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} NOISE_RED"
+    expect: { reply_contains: " NOISE_RED ", matches: " NOISE_RED \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_noise_reduction:
+    summary: "Turn noise reduction on or off (NOISE_RED)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} NOISE_RED {enabled:on_off}"
+    expect: { reply_contains: " NOISE_RED ", contains: " NOISE_RED " }
+    returns: ack
+  get_noise_reduction_level:
+    summary: "Read the noise reduction level (NOISE_RED_LVL)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} NOISE_RED_LVL"
+    expect: { reply_contains: " NOISE_RED_LVL ", matches: " NOISE_RED_LVL \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_noise_reduction_level:
+    summary: "Set the noise reduction level (NOISE_RED_LVL)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["LOW", "MEDIUM", "HIGH"], required: true }
+    send: "SET {channel:02d} NOISE_RED_LVL {value}"
+    expect: { reply_contains: " NOISE_RED_LVL ", contains: " NOISE_RED_LVL " }
+    returns: ack
+  get_agc:
+    summary: "Read automatic gain control (AGC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AGC"
+    expect: { reply_contains: " AGC ", matches: " AGC \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_agc:
+    summary: "Turn automatic gain control on or off (AGC)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} AGC {enabled:on_off}"
+    expect: { reply_contains: " AGC ", contains: " AGC " }
+    returns: ack
+  toggle_agc:
+    summary: "Toggle automatic gain control (AGC TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AGC TOGGLE"
+    expect: { reply_contains: " AGC ", contains: " AGC " }
+    returns: ack
+  get_agc_max_cut:
+    summary: "Read the AGC maximum cut, tenths of a dB (-200 to 0) (AGC_MAX_CUT)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AGC_MAX_CUT"
+    expect: { reply_contains: " AGC_MAX_CUT ", matches: " AGC_MAX_CUT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_agc_max_cut:
+    summary: "Set the AGC maximum cut, tenths of a dB (-200 to 0) (AGC_MAX_CUT), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      cut_tenth_db: { type: int, min: -200, max: 0, required: true }
+    send: "SET {channel:02d} AGC_MAX_CUT {cut_tenth_db:+200:03d}"
+    expect: { reply_contains: " AGC_MAX_CUT ", contains: " AGC_MAX_CUT " }
+    returns: ack
+  get_agc_max_boost:
+    summary: "Read the AGC maximum boost, tenths of a dB (0 to 200) (AGC_MAX_BOOST)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AGC_MAX_BOOST"
+    expect: { reply_contains: " AGC_MAX_BOOST ", matches: " AGC_MAX_BOOST \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_agc_max_boost:
+    summary: "Set the AGC maximum boost, tenths of a dB (0 to 200) (AGC_MAX_BOOST), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      boost_tenth_db: { type: int, min: 0, max: 200, required: true }
+    send: "SET {channel:02d} AGC_MAX_BOOST {boost_tenth_db:03d}"
+    expect: { reply_contains: " AGC_MAX_BOOST ", contains: " AGC_MAX_BOOST " }
+    returns: ack
+  get_agc_target:
+    summary: "Read the AGC target, tenths of a dBFS (-500 to 0) (AGC_TARGET)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AGC_TARGET"
+    expect: { reply_contains: " AGC_TARGET ", matches: " AGC_TARGET \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_agc_target:
+    summary: "Set the AGC target, tenths of a dBFS (-500 to 0) (AGC_TARGET), dBFS"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      target_tenth_dbfs: { type: int, min: -500, max: 0, required: true }
+    send: "SET {channel:02d} AGC_TARGET {target_tenth_dbfs:+500:03d}"
+    expect: { reply_contains: " AGC_TARGET ", contains: " AGC_TARGET " }
+    returns: ack
+  get_gate_inhibit:
+    summary: "Read the gate inhibit (channel 22; firmware before 4.1) (GATE_INHIBIT)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} GATE_INHIBIT"
+    expect: { reply_contains: " GATE_INHIBIT ", matches: " GATE_INHIBIT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_gate_inhibit:
+    summary: "Turn the gate inhibit (channel 22; firmware before 4.1) on or off (GATE_INHIBIT)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} GATE_INHIBIT {enabled:on_off}"
+    expect: { reply_contains: " GATE_INHIBIT ", contains: " GATE_INHIBIT " }
+    returns: ack
+  toggle_gate_inhibit:
+    summary: "Toggle the gate inhibit (channel 22; firmware before 4.1) (GATE_INHIBIT TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} GATE_INHIBIT TOGGLE"
+    expect: { reply_contains: " GATE_INHIBIT ", contains: " GATE_INHIBIT " }
+    returns: ack
+  get_automixer_mode:
+    summary: "Read the automixer mode (channel 21) (AUTOMXR_MODE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_MODE"
+    expect: { reply_contains: " AUTOMXR_MODE ", matches: " AUTOMXR_MODE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_mode:
+    summary: "Set the automixer mode (channel 21) (AUTOMXR_MODE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["MANUAL", "GAINSHARE", "GATING"], required: true }
+    send: "SET {channel:02d} AUTOMXR_MODE {value}"
+    expect: { reply_contains: " AUTOMXR_MODE ", contains: " AUTOMXR_MODE " }
+    returns: ack
+  get_automixer_off_attenuation:
+    summary: "Read the automixer off attenuation, dB (-110 to -3) (AUTOMXR_OFF_ATT)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_OFF_ATT"
+    expect: { reply_contains: " AUTOMXR_OFF_ATT ", matches: " AUTOMXR_OFF_ATT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_off_attenuation:
+    summary: "Set the automixer off attenuation, dB (-110 to -3) (AUTOMXR_OFF_ATT), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      attenuation_db: { type: int, min: -110, max: -3, required: true }
+    send: "SET {channel:02d} AUTOMXR_OFF_ATT {attenuation_db:+110:03d}"
+    expect: { reply_contains: " AUTOMXR_OFF_ATT ", contains: " AUTOMXR_OFF_ATT " }
+    returns: ack
+  get_automixer_gate_sensitivity:
+    summary: "Read the automixer gating sensitivity (1-9) (AUTOMXR_GATE_SEN)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_GATE_SEN"
+    expect: { reply_contains: " AUTOMXR_GATE_SEN ", matches: " AUTOMXR_GATE_SEN \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_gate_sensitivity:
+    summary: "Set the automixer gating sensitivity (1-9) (AUTOMXR_GATE_SEN)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: int, min: 1, max: 9, required: true }
+    send: "SET {channel:02d} AUTOMXR_GATE_SEN {value}"
+    expect: { reply_contains: " AUTOMXR_GATE_SEN ", contains: " AUTOMXR_GATE_SEN " }
+    returns: ack
+  get_automixer_max_open:
+    summary: "Read the automixer maximum number of open mics (1-8) (AUTOMXR_MAX_NOM)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_MAX_NOM"
+    expect: { reply_contains: " AUTOMXR_MAX_NOM ", matches: " AUTOMXR_MAX_NOM \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_max_open:
+    summary: "Set the automixer maximum number of open mics (1-8) (AUTOMXR_MAX_NOM)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: int, min: 1, max: 8, required: true }
+    send: "SET {channel:02d} AUTOMXR_MAX_NOM {value}"
+    expect: { reply_contains: " AUTOMXR_MAX_NOM ", contains: " AUTOMXR_MAX_NOM " }
+    returns: ack
+  get_automixer_last_mic_lock:
+    summary: "Read the automixer last mic lock-on (AUTOMXR_LMLO)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_LMLO"
+    expect: { reply_contains: " AUTOMXR_LMLO ", matches: " AUTOMXR_LMLO \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_last_mic_lock:
+    summary: "Turn the automixer last mic lock-on on or off (AUTOMXR_LMLO)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} AUTOMXR_LMLO {enabled:on_off}"
+    expect: { reply_contains: " AUTOMXR_LMLO ", contains: " AUTOMXR_LMLO " }
+    returns: ack
+  toggle_automixer_last_mic_lock:
+    summary: "Toggle the automixer last mic lock-on (AUTOMXR_LMLO TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUTOMXR_LMLO TOGGLE"
+    expect: { reply_contains: " AUTOMXR_LMLO ", contains: " AUTOMXR_LMLO " }
+    returns: ack
+  get_automixer_hold_time:
+    summary: "Read the automixer hold time, ms (AUTOMXR_HOLDTIME)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_HOLDTIME"
+    expect: { reply_contains: " AUTOMXR_HOLDTIME ", matches: " AUTOMXR_HOLDTIME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_hold_time:
+    summary: "Set the automixer hold time, ms (AUTOMXR_HOLDTIME), ms"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: int, min: 100, max: 1500, required: true }
+    send: "SET {channel:02d} AUTOMXR_HOLDTIME {value:04d}"
+    expect: { reply_contains: " AUTOMXR_HOLDTIME ", contains: " AUTOMXR_HOLDTIME " }
+    returns: ack
+  get_automixer_always_on:
+    summary: "Read a channel always on in the automixer (AUTOMXR_ALWAYS_ON)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_ALWAYS_ON"
+    expect: { reply_contains: " AUTOMXR_ALWAYS_ON ", matches: " AUTOMXR_ALWAYS_ON \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_always_on:
+    summary: "Turn a channel always on in the automixer on or off (AUTOMXR_ALWAYS_ON)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} AUTOMXR_ALWAYS_ON {enabled:on_off}"
+    expect: { reply_contains: " AUTOMXR_ALWAYS_ON ", contains: " AUTOMXR_ALWAYS_ON " }
+    returns: ack
+  toggle_automixer_always_on:
+    summary: "Toggle a channel always on in the automixer (AUTOMXR_ALWAYS_ON TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUTOMXR_ALWAYS_ON TOGGLE"
+    expect: { reply_contains: " AUTOMXR_ALWAYS_ON ", contains: " AUTOMXR_ALWAYS_ON " }
+    returns: ack
+  get_automixer_priority:
+    summary: "Read a channel's automixer priority (AUTOMXR_PRIORITY)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_PRIORITY"
+    expect: { reply_contains: " AUTOMXR_PRIORITY ", matches: " AUTOMXR_PRIORITY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_priority:
+    summary: "Turn a channel's automixer priority on or off (AUTOMXR_PRIORITY)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} AUTOMXR_PRIORITY {enabled:on_off}"
+    expect: { reply_contains: " AUTOMXR_PRIORITY ", contains: " AUTOMXR_PRIORITY " }
+    returns: ack
+  toggle_automixer_priority:
+    summary: "Toggle a channel's automixer priority (AUTOMXR_PRIORITY TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUTOMXR_PRIORITY TOGGLE"
+    expect: { reply_contains: " AUTOMXR_PRIORITY ", contains: " AUTOMXR_PRIORITY " }
+    returns: ack
+  get_automixer_mute:
+    summary: "Read the automixer post-gate mute (channel 21: the system mute) (AUTOMXR_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_MUTE"
+    expect: { reply_contains: " AUTOMXR_MUTE ", matches: " AUTOMXR_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_automixer_mute:
+    summary: "Turn the automixer post-gate mute (channel 21: the system mute) on or off (AUTOMXR_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "SET {channel:02d} AUTOMXR_MUTE {muted:on_off}"
+    expect: { reply_contains: " AUTOMXR_MUTE ", contains: " AUTOMXR_MUTE " }
+    returns: ack
+  toggle_automixer_mute:
+    summary: "Toggle the automixer post-gate mute (channel 21: the system mute) (AUTOMXR_MUTE TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUTOMXR_MUTE TOGGLE"
+    expect: { reply_contains: " AUTOMXR_MUTE ", contains: " AUTOMXR_MUTE " }
+    returns: ack
+  get_automixer_gate:
+    summary: "Read a channel's automixer gate (open) (AUTOMXR_GATE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUTOMXR_GATE"
+    expect: { reply_contains: " AUTOMXR_GATE ", matches: " AUTOMXR_GATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_compressor:
+    summary: "Read the compressor (channel 21) (COMPRESSOR)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} COMPRESSOR"
+    expect: { reply_contains: " COMPRESSOR ", matches: " COMPRESSOR \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_compressor:
+    summary: "Turn the compressor (channel 21) on or off (COMPRESSOR)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {channel:02d} COMPRESSOR {enabled:on_off}"
+    expect: { reply_contains: " COMPRESSOR ", contains: " COMPRESSOR " }
+    returns: ack
+  toggle_compressor:
+    summary: "Toggle the compressor (channel 21) (COMPRESSOR TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} COMPRESSOR TOGGLE"
+    expect: { reply_contains: " COMPRESSOR ", contains: " COMPRESSOR " }
+    returns: ack
+  get_compressor_threshold:
+    summary: "Read the compressor threshold, tenths of a dB (-600 to 0) (COMP_THRESHOLD)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} COMP_THRESHOLD"
+    expect: { reply_contains: " COMP_THRESHOLD ", matches: " COMP_THRESHOLD \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_compressor_threshold:
+    summary: "Set the compressor threshold, tenths of a dB (-600 to 0) (COMP_THRESHOLD), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      threshold_tenth_db: { type: int, min: -600, max: 0, required: true }
+    send: "SET {channel:02d} COMP_THRESHOLD {threshold_tenth_db:+600:03d}"
+    expect: { reply_contains: " COMP_THRESHOLD ", contains: " COMP_THRESHOLD " }
+    returns: ack
+  get_compressor_ratio:
+    summary: "Read the compressor ratio in tenths (10 = 1.0:1 to 1000 = 100.0:1) (COMP_RATIO)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} COMP_RATIO"
+    expect: { reply_contains: " COMP_RATIO ", matches: " COMP_RATIO \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_compressor_ratio:
+    summary: "Set the compressor ratio in tenths (10 = 1.0:1 to 1000 = 100.0:1) (COMP_RATIO)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      ratio_tenths: { type: int, min: 10, max: 1000, required: true }
+    send: "SET {channel:02d} COMP_RATIO {ratio_tenths:04d}"
+    expect: { reply_contains: " COMP_RATIO ", contains: " COMP_RATIO " }
+    returns: ack
+  get_delay:
+    summary: "Read an output's delay, ms (0 off; channels 17-19) (DELAY)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} DELAY"
+    expect: { reply_contains: " DELAY ", matches: " DELAY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_delay:
+    summary: "Set an output's delay, ms (0 off; channels 17-19) (DELAY), ms"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: int, min: 0, max: 1000, required: true }
+    send: "SET {channel:02d} DELAY {value:04d}"
+    expect: { reply_contains: " DELAY ", contains: " DELAY " }
+    returns: ack
+  get_direct_out_point:
+    summary: "Read the direct output tap point (0 pre-gate/pre-processing, 1 pre-gate/post, 2 post-gate/pre, 3 post-gate/post; firmware 4.1 and later) (DIRECTOUT_POINT)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} DIRECTOUT_POINT"
+    expect: { reply_contains: " DIRECTOUT_POINT ", matches: " DIRECTOUT_POINT \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_direct_out_point:
+    summary: "Set the direct output tap point (0 pre-gate/pre-processing, 1 pre-gate/post, 2 post-gate/pre, 3 post-gate/post; firmware 4.1 and later) (DIRECTOUT_POINT)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: int, min: 0, max: 3, required: true }
+    send: "SET {channel:02d} DIRECTOUT_POINT {value}"
+    expect: { reply_contains: " DIRECTOUT_POINT ", contains: " DIRECTOUT_POINT " }
+    returns: ack
+  get_call_status_enabled:
+    summary: "Read the call status feature (ONHOOK_ENABLE)"
+    send: "GET ONHOOK_ENABLE"
+    expect: { reply_contains: " ONHOOK_ENABLE ", matches: " ONHOOK_ENABLE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_call_status_enabled:
+    summary: "Turn the call status feature on or off (ONHOOK_ENABLE)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "SET ONHOOK_ENABLE {enabled:on_off}"
+    expect: { reply_contains: " ONHOOK_ENABLE ", contains: " ONHOOK_ENABLE " }
+    returns: ack
+  get_call_state:
+    summary: "Read the call status (ONHOOK or OFFHOOK) (ONHOOK_STATE)"
+    send: "GET ONHOOK_STATE"
+    expect: { reply_contains: " ONHOOK_STATE ", matches: " ONHOOK_STATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_matrix_route:
+    summary: "Matrix mixer: whether an input is routed to an output (MATRIX_MXR_ROUTE)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+    send: "GET {input:02d} MATRIX_MXR_ROUTE {output:02d}"
+    expect: { reply_contains: " MATRIX_MXR_ROUTE ", matches: " MATRIX_MXR_ROUTE \\d+ \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_matrix_route:
+    summary: "Matrix mixer: route or unroute an input to an output"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      enabled: { type: bool, default: true }
+    send: "SET {input:02d} MATRIX_MXR_ROUTE {output:02d} {enabled:on_off}"
+    expect: { reply_contains: " MATRIX_MXR_ROUTE ", contains: " MATRIX_MXR_ROUTE " }
+    returns: ack
+  set_matrix_gain:
+    summary: "Matrix mixer: a crosspoint's gain in tenths of a dB, -1100 to 300 (-110.0 to +30.0 dB)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  get_matrix_gain:
+    summary: "Matrix mixer: a crosspoint's gain (wire value, tenths of a dB offset by 1100)"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+    send: "GET {input:02d} MATRIX_MXR_GAIN {output:02d}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", matches: " MATRIX_MXR_GAIN \\d+ ?(\\d{4}) *>$", convert: shure_gain }
+    returns: value
+  increase_matrix_gain:
+    summary: "Matrix mixer: increase a crosspoint's gain by a step in tenths of a dB"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} INC {step}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  decrease_matrix_gain:
+    summary: "Matrix mixer: decrease a crosspoint's gain by a step in tenths of a dB"
+    params:
+      input: { type: int, min: 0, max: 99, required: true }
+      output: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {input:02d} MATRIX_MXR_GAIN {output:02d} DEC {step}"
+    expect: { reply_contains: " MATRIX_MXR_GAIN ", contains: " MATRIX_MXR_GAIN " }
+    returns: ack
+  get_peq_filter:
+    summary: "Whether a PEQ filter is enabled (PEQ <block> <filter>)"
+    params:
+      block: { type: int, min: 0, max: 99, required: true }
+      filter: { type: int, min: 0, max: 16, required: true }
+    send: "GET {block:02d} PEQ {filter:02d}"
+    expect: { reply_contains: " PEQ ", matches: " PEQ \\d+ (ON|OFF) *>$" }
+    returns: value
+  set_peq_filter:
+    summary: "Enable, disable or toggle a PEQ filter (0: every block or filter)"
+    params:
+      block: { type: int, min: 0, max: 99, required: true }
+      filter: { type: int, min: 0, max: 16, required: true }
+      state: { type: enum, values: ["ON", "OFF", "TOGGLE"], required: true }
+    send: "SET {block:02d} PEQ {filter:02d} {state}"
+    expect: { reply_contains: " PEQ ", contains: " PEQ " }
+    returns: ack
+
+state:
+  device.model: { type: string, description: "the model" }
+  device.serial_number: { type: string, description: "the serial number" }
+  device.firmware: { type: string, description: "the firmware version" }
+  device.device_id: { type: string, description: "the device ID (name)" }
+  device.ip_address: { type: string, description: "the primary audio network IP address" }
+  device.subnet: { type: string, description: "the primary audio network subnet mask" }
+  device.gateway: { type: string, description: "the primary audio network gateway" }
+  device.na_device_name: { type: string, description: "the Dante device name" }
+  device.mac_address: { type: string, description: "the control MAC address" }
+  device.encryption: { type: bool, description: "audio encryption (on/true)" }
+  device.usb_connected: { type: bool, description: "a USB host connected (on/true)" }
+  device.preset: { type: int, description: "The preset last recalled, 1-10" }
+  channels.*.name: { type: string, description: "a channel's name" }
+  channels.*.mute: { type: bool, description: "a channel's mute (on/true)" }
+  channels.*.gain: { type: float, unit: "dB", description: "A channel's digital gain, -110.0 to +30.0 dB (wire 0-1400 in tenths offset by 1100); set_gain takes tenths of a dB, -1100 to 300" }
+  device.device_mute: { type: bool, description: "the device mute (on/true)" }
+  channels.*.input_level: { type: string, description: "an analog input's level switch (11-12)" }
+  channels.*.output_level: { type: string, description: "an analog output's level switch (17-18)" }
+  device.led_brightness: { type: int, description: "the LED brightness (0 off, 1 dim, 2 default)" }
+  device.input_meter_mode: { type: string, description: "the input meter tap" }
+  device.output_meter_mode: { type: string, description: "the output meter tap" }
+  device.meter_rate_in: { type: int, unit: "ms", description: "the input metering interval, ms (0: off; 1-99 refused)" }
+  device.meter_rate_out: { type: int, unit: "ms", description: "the output metering interval, ms (0: off; 1-99 refused)" }
+  device.meter_rate_proc: { type: int, unit: "ms", description: "the processing-block metering interval, ms (0: off; 1-99 refused)" }
+  device.meter_rate_erle: { type: int, unit: "ms", description: "the AEC ERLE metering interval, ms (0: off; 1-99 refused)" }
+  device.meter_rate_agc: { type: int, unit: "ms", description: "the AGC gain metering interval, ms (0: off; 1-99 refused)" }
+  channels.*.aec: { type: bool, description: "the AEC of a Dante mic channel (01-08) (on/true)" }
+  channels.*.aec_reference: { type: string, description: "the AEC reference source (channel 22)" }
+  channels.*.aec_nlp: { type: string, description: "the AEC non-linear processing" }
+  channels.*.noise_reduction: { type: bool, description: "noise reduction (on/true)" }
+  channels.*.noise_reduction_level: { type: string, description: "the noise reduction level" }
+  channels.*.agc: { type: bool, description: "automatic gain control (on/true)" }
+  channels.*.agc_max_cut: { type: float, unit: "dB", description: "the AGC maximum cut, tenths of a dB (-200 to 0)" }
+  channels.*.agc_max_boost: { type: float, unit: "dB", description: "the AGC maximum boost, tenths of a dB (0 to 200)" }
+  channels.*.agc_target: { type: float, unit: "dBFS", description: "the AGC target, tenths of a dBFS (-500 to 0)" }
+  channels.*.gate_inhibit: { type: bool, description: "the gate inhibit (channel 22; firmware before 4.1) (on/true)" }
+  channels.*.automixer_mode: { type: string, description: "the automixer mode (channel 21)" }
+  channels.*.automixer_off_attenuation: { type: float, unit: "dB", description: "the automixer off attenuation, dB (-110 to -3)" }
+  channels.*.automixer_gate_sensitivity: { type: int, description: "the automixer gating sensitivity (1-9)" }
+  channels.*.automixer_max_open: { type: int, description: "the automixer maximum number of open mics (1-8)" }
+  channels.*.automixer_last_mic_lock: { type: bool, description: "the automixer last mic lock-on (on/true)" }
+  channels.*.automixer_hold_time: { type: int, unit: "ms", description: "the automixer hold time, ms" }
+  channels.*.automixer_always_on: { type: bool, description: "a channel always on in the automixer (on/true)" }
+  channels.*.automixer_priority: { type: bool, description: "a channel's automixer priority (on/true)" }
+  channels.*.automixer_mute: { type: bool, description: "the automixer post-gate mute (channel 21: the system mute) (on/true)" }
+  channels.*.automixer_gate: { type: bool, description: "a channel's automixer gate (open) (on/true)" }
+  channels.*.compressor: { type: bool, description: "the compressor (channel 21) (on/true)" }
+  channels.*.compressor_threshold: { type: float, unit: "dB", description: "the compressor threshold, tenths of a dB (-600 to 0)" }
+  channels.*.compressor_ratio: { type: float, description: "the compressor ratio in tenths (10 = 1.0:1 to 1000 = 100.0:1)" }
+  channels.*.delay: { type: int, unit: "ms", description: "an output's delay, ms (0 off; channels 17-19)" }
+  channels.*.direct_out_point: { type: int, description: "the direct output tap point (0 pre-gate/pre-processing, 1 pre-gate/post, 2 post-gate/pre, 3 post-gate/post; firmware 4.1 and later)" }
+  device.call_status_enabled: { type: bool, description: "the call status feature (on/true)" }
+  device.call_state: { type: string, description: "the call status (ONHOOK or OFFHOOK)" }
+  matrix.*.*.routed: { type: bool, description: "Matrix mixer crosspoint routed, keyed by input then output channel" }
+  matrix.*.*.gain: { type: float, unit: "dB", description: "Matrix mixer crosspoint gain, keyed by input then output channel" }
+  peq.*.*.enabled: { type: bool, description: "A PEQ filter's enable, keyed by block then filter" }
+
+telemetry:
+  # Every parameter is reported once on connecting; after that the device
+  # sends a REP whenever a value changes, so nothing is polled.
+  poll:
+    send: ["GET 00 ALL"]
+  updates:
+    - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP SERIAL_NUM \\{?(.*?) *\\}? >$"
+      state: { "device.serial_number": "{1}" }
+    - match: "^< REP FW_VER \\{?(.*?) *\\}? >$"
+      state: { "device.firmware": "{1}" }
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.device_id": "{1}" }
+    - match: "^< REP IP_ADDR_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.ip_address": "{1}" }
+    - match: "^< REP IP_SUBNET_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.subnet": "{1}" }
+    - match: "^< REP IP_GATEWAY_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.gateway": "{1}" }
+    - match: "^< REP NA_DEVICE_NAME \\{?(.*?) *\\}? >$"
+      state: { "device.na_device_name": "{1}" }
+    - match: "^< REP CONTROL_MAC_ADDR \\{?(.*?) *\\}? >$"
+      state: { "device.mac_address": "{1}" }
+    - match: "^< REP ENCRYPTION (ON|OFF|On|Off) >$"
+      state: { "device.encryption": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP USB_CONNECT (ON|OFF|On|Off) >$"
+      state: { "device.usb_connected": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP PRESET (\\d+) >$"
+      state: { "device.preset": "{1}" }
+    - match: "^< REP (\\d+) CHAN_NAME \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.name": "{2}" }
+    - match: "^< REP (\\d+) AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.mute": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_GAIN_HI_RES (\\d+) >$"
+      state: { "channels.{1}.gain": "{2:from.shure_gain}" }
+    - match: "^< REP DEVICE_AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "device.device_mute": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_IN_LVL_SWITCH \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.input_level": "{2}" }
+    - match: "^< REP (\\d+) AUDIO_OUT_LVL_SWITCH \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.output_level": "{2}" }
+    - match: "^< REP LED_BRIGHTNESS (-?\\d+) >$"
+      state: { "device.led_brightness": "{1}" }
+    - match: "^< REP INPUT_METER_MODE \\{?(.*?) *\\}? >$"
+      state: { "device.input_meter_mode": "{1}" }
+    - match: "^< REP OUTPUT_METER_MODE \\{?(.*?) *\\}? >$"
+      state: { "device.output_meter_mode": "{1}" }
+    - match: "^< REP METER_RATE_IN (-?\\d+) >$"
+      state: { "device.meter_rate_in": "{1}" }
+    - match: "^< REP METER_RATE_OUT (-?\\d+) >$"
+      state: { "device.meter_rate_out": "{1}" }
+    - match: "^< REP METER_RATE_PROC (-?\\d+) >$"
+      state: { "device.meter_rate_proc": "{1}" }
+    - match: "^< REP METER_RATE_ERLE (-?\\d+) >$"
+      state: { "device.meter_rate_erle": "{1}" }
+    - match: "^< REP METER_RATE_AGC (-?\\d+) >$"
+      state: { "device.meter_rate_agc": "{1}" }
+    - match: "^< REP (\\d+) AEC (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.aec": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AEC_REF \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.aec_reference": "{2}" }
+    - match: "^< REP (\\d+) AEC_NLP \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.aec_nlp": "{2}" }
+    - match: "^< REP (\\d+) NOISE_RED (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.noise_reduction": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) NOISE_RED_LVL \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.noise_reduction_level": "{2}" }
+    - match: "^< REP (\\d+) AGC (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.agc": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AGC_MAX_CUT (\\d+) >$"
+      state: { "channels.{1}.agc_max_cut": "{2:from.shure_agc_cut}" }
+    - match: "^< REP (\\d+) AGC_MAX_BOOST (\\d+) >$"
+      state: { "channels.{1}.agc_max_boost": "{2:from.shure_agc_boost}" }
+    - match: "^< REP (\\d+) AGC_TARGET (\\d+) >$"
+      state: { "channels.{1}.agc_target": "{2:from.shure_agc_target}" }
+    - match: "^< REP (\\d+) GATE_INHIBIT (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.gate_inhibit": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUTOMXR_MODE \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.automixer_mode": "{2}" }
+    - match: "^< REP (\\d+) AUTOMXR_OFF_ATT (\\d+) >$"
+      state: { "channels.{1}.automixer_off_attenuation": "{2:from.shure_off_att}" }
+    - match: "^< REP (\\d+) AUTOMXR_GATE_SEN (-?\\d+) >$"
+      state: { "channels.{1}.automixer_gate_sensitivity": "{2}" }
+    - match: "^< REP (\\d+) AUTOMXR_MAX_NOM (-?\\d+) >$"
+      state: { "channels.{1}.automixer_max_open": "{2}" }
+    - match: "^< REP (\\d+) AUTOMXR_LMLO (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_last_mic_lock": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUTOMXR_HOLDTIME (-?\\d+) >$"
+      state: { "channels.{1}.automixer_hold_time": "{2}" }
+    - match: "^< REP (\\d+) AUTOMXR_ALWAYS_ON (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_always_on": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUTOMXR_PRIORITY (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_priority": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUTOMXR_MUTE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_mute": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUTOMXR_GATE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.automixer_gate": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) COMPRESSOR (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.compressor": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) COMP_THRESHOLD (\\d+) >$"
+      state: { "channels.{1}.compressor_threshold": "{2:from.shure_comp_threshold}" }
+    - match: "^< REP (\\d+) COMP_RATIO (\\d+) >$"
+      state: { "channels.{1}.compressor_ratio": "{2:from.shure_comp_ratio}" }
+    - match: "^< REP (\\d+) DELAY (-?\\d+) >$"
+      state: { "channels.{1}.delay": "{2}" }
+    - match: "^< REP (\\d+) DIRECTOUT_POINT (-?\\d+) >$"
+      state: { "channels.{1}.direct_out_point": "{2}" }
+    - match: "^< REP ONHOOK_ENABLE (ON|OFF|On|Off) >$"
+      state: { "device.call_status_enabled": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP ONHOOK_STATE \\{?(.*?) *\\}? >$"
+      state: { "device.call_state": "{1}" }
+    - match: "^< REP (\\d+) MATRIX_MXR_ROUTE (\\d+) (ON|OFF) >$"
+      state: { "matrix.{1}.{2}.routed": { value: "{3}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) MATRIX_MXR_GAIN (\\d+) ?(\\d{4}) >$"
+      state: { "matrix.{1}.{2}.gain": "{3:from.shure_gain}" }
+    - match: "^< REP (\\d+) PEQ (\\d+) (ON|OFF) >$"
+      state: { "peq.{1}.{2}.enabled": { value: "{3}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the channel: a change to the
+      same parameter on another channel arriving in the same moment could be taken for the answer.
+      An error answer is < REP ERR >, which names nothing; it fails the command waiting.
+  - models: [all]
+    severity: info
+    text: >
+      Text values (names, model, serial number, addresses) are padded with spaces to a fixed width,
+      sometimes in braces; the spaces and braces are removed. Channel 0 (or 00) means every channel,
+      answered with one REP per channel.
+  - models: [all]
+    severity: info
+    text: >
+      Gains are sent and reported in tenths of a dB offset by 1100 (0000-1400 = -110.0 to +30.0 dB);
+      set commands take tenths of a dB (-1100 to 300), and state holds dB. Increase and decrease
+      steps are in tenths of a dB.
+  - models: [all]
+    severity: info
+    text: >
+      Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval until set
+      to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not kept in
+      state. Values 1-99 ms are refused by the device.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the session sends one GET ALL; the device answers with a REP for every
+      parameter, and thereafter reports every change unasked, so state stays current without
+      polling. Opened for commands only, the GET ALL is not sent.
+  - models: [all]
+    severity: info
+    text: >
+      get_parameter, set_parameter, get_device_parameter and set_device_parameter reach any
+      parameter the command-string document lists, with the value in the document's form, for those
+      not given a command of their own.
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset replaces the device's whole configuration with the preset's, live, and cannot be
+      undone except by recalling another preset.
+  - models: [all]
+    severity: critical
+    text: >
+      restore_defaults erases the device's configuration (presets aside) and cannot be undone;
+      reboot restarts the device, interrupting its audio, and is not acknowledged.
+  - models: [all]
+    severity: info
+    text: >
+      AUTOMXR_MUTE on channel 21 is the system mute Shure recommends for conferencing (mute after
+      the AEC, not at the microphones).
+  - models: [all]
+    severity: info
+    text: >
+      GATE_INHIBIT works only on firmware before 4.1; channels 23-28 (Dante outputs 3-8) need
+      firmware 4.1 or later.
