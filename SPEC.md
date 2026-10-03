@@ -25,6 +25,7 @@ source:                       # provenance of the protocol details, required
     author: Patrick-Gilles Maillot
     url: https://…
 transport: { … }              # §2
+ports: [ … ]                  # §2, every port it uses, required
 models: [ … ]                 # §3, at least one
 commands: { … }               # §4
 quirks: [ … ]                 # §6, optional
@@ -292,6 +293,35 @@ the core. `wss` uses TLS 1.2 or later and checks the device's certificate
 against the same public roots as `https`; a device with a self-signed
 certificate declares `accept_invalid_certs: true`, as for `http`: the
 connection is encrypted, but the device's identity is not checked.
+
+### Ports
+
+Every spec, spec-driven or native, lists every port the integration uses and
+its default, so a consumer can show and firewall them before opening
+anything. The catalogue serves the list unchanged.
+
+```yaml
+ports:
+  - { port: 10023, protocol: udp, role: control }
+  - { port: 9000, protocol: udp, role: feedback, listener: core, setting: feedback_port }
+  - { port: 52381, protocol: udp, role: control, when: "transport sony-ip" }
+  - { port: null, protocol: tcp, role: control, note: "no standard port: the port is given when the device is opened" }
+```
+
+| Field | Meaning |
+|---|---|
+| `port` | The default. `null` when there is none and one must be given; a `note` then says so |
+| `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls` or `ssh` |
+| `role` | `control` (where commands go; the port given when opening a device overrides it), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
+| `listener` | Who listens: `device` (the default) or `core` |
+| `setting` | The setting that changes this port, if any |
+| `when` | When the entry applies, if not always: a setting's value or a model |
+
+There is always at least one `control` entry. For a spec-driven device the
+transport's `port` must be one of them, `listen_port` needs a `feedback`
+entry naming its setting, and a push channel needs a `push` entry;
+`tools/validate.py` checks this. A test checks that each native module,
+opened without a port, uses its unconditional control default.
 
 ### Settings and connection setup
 

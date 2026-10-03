@@ -428,6 +428,35 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     return errors
 
 
+def port_checks(doc: dict) -> list[str]:
+    """`ports` must list the ports the core really uses (SPEC.md §2, Ports)."""
+    errors = []
+    ports = doc.get("ports") or []
+    settings = doc.get("settings") or {}
+    control = [e for e in ports if e["role"] == "control"]
+    if not control:
+        errors.append("ports: no control port")
+    for i, e in enumerate(ports):
+        name = e.get("setting")
+        if name and name not in settings:
+            errors.append(f"ports[{i}].setting: '{name}' is not a declared setting")
+        if e["port"] is None and e["role"] == "control" and "note" not in e:
+            errors.append(f"ports[{i}]: a control port with no default needs a note saying so")
+    t = doc.get("transport")
+    if t is not None:
+        if t.get("port") not in [e["port"] for e in control]:
+            errors.append(f"ports: the transport's port {t.get('port')} is not a control port")
+        listen = t.get("listen_port")
+        if isinstance(listen, dict) and not any(e.get("setting") == listen["setting"] for e in ports):
+            errors.append(f"ports: no entry for the listen port setting '{listen['setting']}'")
+        if isinstance(listen, int) and not any(e["port"] == listen and e.get("listener") == "core" for e in ports):
+            errors.append(f"ports: no core-listener entry for listen_port {listen}")
+        tel = doc.get("telemetry") or {}
+        if ("websocket" in tel or "sse" in tel) and not any(e["role"] == "push" for e in ports):
+            errors.append("ports: the push channel has no push entry")
+    return errors
+
+
 def main() -> int:
     schema = json.loads((ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
     files = sorted(glob.glob(str(ROOT / "specs" / "*.yaml")))
@@ -465,7 +494,7 @@ def main() -> int:
             print(f"    {exc.message}")
             continue
 
-        errors = cross_field_checks(doc, rel)
+        errors = cross_field_checks(doc, rel) + port_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

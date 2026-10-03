@@ -224,3 +224,113 @@ pub(crate) fn construct(
         other => Err(format!("no native module for '{other}'")),
     }
 }
+
+#[cfg(all(test, feature = "all"))]
+mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
+    use serde_json::Value;
+
+    use super::construct;
+    use crate::catalog::{Catalog, Implementation, ParamType, Params};
+    use crate::module::{Action, Cx, OpenContext};
+
+    /// The port the module's first outgoing connection or message goes to.
+    fn first_port(actions: &[Action]) -> Option<u16> {
+        let from_url = |url: &str| {
+            let authority = url.split("://").nth(1)?.split('/').next()?;
+            authority.rsplit(':').next()?.parse().ok()
+        };
+        actions.iter().find_map(|a| match a {
+            Action::TcpOpen { to, .. } | Action::UdpSend { to, .. } => Some(to.port()),
+            Action::TcpOpenTls { target, .. } => Some(target.to.port()),
+            Action::TcpOpenSsh { tunnel, .. } => Some(tunnel.ssh.port()),
+            Action::Http { request, .. } | Action::SseOpen { request, .. } => {
+                from_url(&request.url)
+            }
+            Action::WsOpen { request, .. } => from_url(&request.url),
+            _ => None,
+        })
+    }
+
+    /// Every native module, opened with no port, uses the control port its
+    /// spec declares, so the catalogue's defaults are the ones in force.
+    #[test]
+    fn native_modules_use_the_control_port_their_spec_declares() {
+        let catalog = Catalog::source_tree();
+        let mut checked = 0;
+        for spec in catalog.devices.values() {
+            if spec.implementation != Implementation::Native {
+                continue;
+            }
+            // Only the unconditional default can be checked without choosing
+            // settings or a model.
+            let Some(declared) = spec
+                .ports
+                .iter()
+                .find(|p| p.role == "control" && p.when.is_none())
+            else {
+                continue;
+            };
+            let model = &spec.models[0];
+            let mut settings = Params::new();
+            for (name, setting) in &spec.settings {
+                // A plausible value where there is no default, since some
+                // modules need one (a console's MIDI channel).
+                let value = match (&setting.default, setting.kind) {
+                    (Some(default), _) => default.clone(),
+                    (None, ParamType::Int) => Value::from(setting.min.unwrap_or(1.0) as i64),
+                    (None, ParamType::Float) => Value::from(setting.min.unwrap_or(0.0)),
+                    (None, ParamType::Bool) => Value::Bool(false),
+                    (None, ParamType::Enum) => {
+                        match setting.values.as_ref().and_then(|v| v.first()) {
+                            Some(v) => Value::String(v.clone()),
+                            None => continue,
+                        }
+                    }
+                    (None, ParamType::String) if setting.required => {
+                        Value::String(if name.contains("path") { "/x" } else { "x" }.into())
+                    }
+                    (None, _) => continue,
+                };
+                settings.insert(name.clone(), value);
+            }
+            let context = OpenContext {
+                host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)),
+                port: None,
+                model: model.id.clone(),
+                channels: model.channels,
+                settings,
+                monitor: true,
+            };
+            match (declared.port, construct(spec, context)) {
+                (None, Err(_)) => {}
+                (None, Ok(_)) => panic!(
+                    "{}: declares no default port but opens without one",
+                    spec.id
+                ),
+                (Some(port), Ok(mut module)) => {
+                    let mut cx = Cx::new(0);
+                    module.start(&mut cx);
+                    let used = first_port(&cx.take());
+                    // These send nothing until asked (a request, a watched
+                    // stream), so there is nothing to compare on starting.
+                    if used.is_none()
+                        && ["generic-http", "http-snapshot"].contains(&spec.id.as_str())
+                    {
+                        continue;
+                    }
+                    assert_eq!(
+                        used,
+                        Some(port),
+                        "{}: the module's default port differs from its spec's",
+                        spec.id
+                    );
+                    checked += 1;
+                }
+                (Some(_), Err(e)) => panic!("{}: cannot be opened with defaults: {e}", spec.id),
+            }
+        }
+        assert!(checked >= 20, "only {checked} native modules checked");
+    }
+}

@@ -29,6 +29,12 @@ pub struct DeviceSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extension: Option<String>,
     pub source: Vec<Source>,
+    /// Every port the integration uses, with its default: the device's
+    /// control port (which `OpenRequest::port` overrides), and any push,
+    /// feedback, notification or discovery ports. A `port` of `None` means
+    /// there is no default and one must be given.
+    #[serde(default)]
+    pub ports: Vec<PortSpec>,
     #[serde(default)]
     pub settings: BTreeMap<String, ParamSpec>,
     pub models: Vec<ModelSpec>,
@@ -58,6 +64,33 @@ pub struct DeviceSpec {
     /// template directives; kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub conversions: Option<Value>,
+}
+
+/// One port an integration uses (SPEC.md §2, Ports).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PortSpec {
+    /// The default; `None` when there is none and it must be given.
+    pub port: Option<u16>,
+    /// `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls` or `ssh`.
+    pub protocol: String,
+    /// `control` (where commands go; `OpenRequest::port` overrides it),
+    /// `push`, `feedback`, `notification` or `discovery`.
+    pub role: String,
+    /// Who listens on it: `device` (the default) or `core`.
+    #[serde(default = "device_listener")]
+    pub listener: String,
+    /// The setting that changes it, when one does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setting: Option<String>,
+    /// When it applies, if not always: a setting's value or a model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+fn device_listener() -> String {
+    "device".into()
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

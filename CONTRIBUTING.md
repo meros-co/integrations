@@ -123,6 +123,7 @@ core named after its spec id. Adding a spec means adding its feature:
 
 - [ ] `python tools/validate.py` passes
 - [ ] Every command is backed by a cited source
+- [ ] `ports` lists every port the integration uses, with its default
 - [ ] Parameter ranges are the device's limits, not guesses
 - [ ] Each model's `supports` list is accurate; a model doesn't inherit a
       command from a sibling it doesn't have
