@@ -52,6 +52,8 @@ mod generic_osc;
 mod generic_tcp_udp;
 #[cfg(feature = "http-snapshot")]
 mod http_snapshot;
+#[cfg(feature = "novastar-central-control")]
+mod novastar_ccp;
 #[cfg(feature = "obs-studio")]
 mod obs;
 #[cfg(feature = "panasonic-ptz")]
@@ -134,6 +136,8 @@ pub(crate) fn construct(
         "sennheiser-digital-6000" => Ok(Box::new(sennheiser_d6000::D6000::new(context))),
         #[cfg(feature = "blackmagic-atem")]
         "blackmagic-atem" => Ok(Box::new(atem::Atem::new(context))),
+        #[cfg(feature = "novastar-central-control")]
+        "novastar-central-control" => Ok(Box::new(novastar_ccp::NovastarCcp::new(context))),
         #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
         #[cfg(feature = "shure-wireless")]

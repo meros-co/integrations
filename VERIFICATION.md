@@ -397,6 +397,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the response body of a shortcut request, since whether the shortcut applied is not confirmed by the 200. ([specs/newtek-tricaster.yaml:269](specs/newtek-tricaster.yaml#L269))
 - [ ] Confirm the login scheme (Basic sent, Digest answered if challenged). ([specs/newtek-tricaster.yaml:262](specs/newtek-tricaster.yaml#L262))
 
+## novastar-central-control — NovaStar COEX central control protocol
+
+- [ ] Record a refused request's answer (a non-zero ACK byte is assumed) and whether its checksum covers the aa 55 header as the documented answer's does. ([specs/novastar-central-control.yaml:153](specs/novastar-central-control.yaml#L153))
+- [ ] Check whether the controller keeps an idle TCP connection open, and whether it answers anything that could serve as a liveness check. ([specs/novastar-central-control.yaml:146](specs/novastar-central-control.yaml#L146))
+- [ ] Confirm that output card 255 addresses every card on single-card controllers and that card numbers start from 1 on MX6000 Pro and MX2000 Pro. ([specs/novastar-central-control.yaml:169](specs/novastar-central-control.yaml#L169))
+- [ ] Confirm the card-based MX6000 Pro and MX2000 Pro answer the same frames as the single-card controllers. ([specs/novastar-central-control.yaml:52](specs/novastar-central-control.yaml#L52))
+
 ## novastar-coex — NovaStar COEX
 
 - [ ] Check which API generation each model and firmware answers: the current OpenAPI paths (/api/v1/screen/..., /api/v1/preset/...) or the 2023 manual's (/api/v1/device/screen/..., /api/v1/device/currentpreset). ([specs/novastar-coex.yaml:854](specs/novastar-coex.yaml#L854))

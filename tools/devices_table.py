@@ -41,6 +41,7 @@ NATIVE = {
     "generic-osc": "OSC over UDP or TCP",
     "generic-tcp-udp": "Text or bytes over TCP or UDP",
     "http-snapshot": "HTTP JPEG snapshots",
+    "novastar-central-control": "Binary frames over TCP 5200",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
     "pjlink": "PJLink over TCP 4352",
     "qsys": "QRC JSON-RPC over TCP 1710",
