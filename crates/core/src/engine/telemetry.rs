@@ -57,9 +57,14 @@ enum Matcher {
         each: Option<String>,
     },
     /// The JSON reply to an HTTP request whose path matches; `json` names the
-    /// values to take, by JSON path.
+    /// values to take, by JSON path. `select` (`json_match`) must match the
+    /// reply and `request` (`request_match`) the JSON body of the request it
+    /// answers, so replies that share a path, as JSON-RPC's do, can be told
+    /// apart. Their captures follow the path's, in order.
     HttpJson {
         path: Regex,
+        select: Vec<(String, Regex)>,
+        request: Vec<(String, Regex)>,
         json: BTreeMap<String, String>,
         /// A JSON path to an array: the rule matches once per element, and
         /// `json` paths are taken from the element.
@@ -71,6 +76,42 @@ enum Matcher {
 }
 
 /// A rule's `json:` names and JSON paths; empty when it has none.
+/// `json_match`-style selectors: JSON paths to regexes.
+fn selectors(v: Option<&Value>, what: &str) -> Result<Vec<(String, Regex)>, String> {
+    let Some(v) = v else {
+        return Ok(Vec::new());
+    };
+    let mut out = Vec::new();
+    for (path, re) in v
+        .as_object()
+        .ok_or(format!("telemetry: {what} maps JSON paths to regexes"))?
+    {
+        out.push((path.clone(), regex(re, what)?));
+    }
+    Ok(out)
+}
+
+/// Whether every selector matches `doc`; their captures are appended to
+/// `base`, numbered on from those already there.
+fn select(doc: &Value, selectors: &[(String, Regex)], base: &mut Vec<(String, Value)>) -> bool {
+    for (path, re) in selectors {
+        let text = match super::expect::json_path(doc, path) {
+            Some(Value::String(s)) => s.clone(),
+            Some(other) => other.to_string(),
+            None => return false,
+        };
+        let Some(caps) = re.captures(&text) else {
+            return false;
+        };
+        let offset = base.len();
+        for (i, v) in captures(&caps) {
+            let n: usize = i.parse().unwrap_or(0);
+            base.push(((n + offset).to_string(), v));
+        }
+    }
+    true
+}
+
 fn json_paths(rule: &Value) -> Result<BTreeMap<String, String>, String> {
     rule.get("json")
         .and_then(Value::as_object)
@@ -101,10 +142,12 @@ pub(crate) enum Inbound<'a> {
     },
     /// A JSON message received on a websocket.
     Json(&'a Value),
-    /// An HTTP reply, with the path and query it answered.
+    /// An HTTP reply, with the path and query it answered and the request's
+    /// body where that was JSON.
     Http {
         path: &'a str,
         body: &'a [u8],
+        request: Option<&'a Value>,
     },
 }
 
@@ -254,22 +297,6 @@ impl Telemetry {
                         .and_then(Value::as_str)
                         .map(str::to_string),
                 }
-            } else if let Some(select) = rule.get("json_match") {
-                let mut out = Vec::new();
-                for (path, re) in select
-                    .as_object()
-                    .ok_or("telemetry: json_match maps JSON paths to regexes")?
-                {
-                    out.push((path.clone(), regex(re, "json_match")?));
-                }
-                Matcher::Json {
-                    select: out,
-                    json: json_paths(rule)?,
-                    each: rule
-                        .get("json_each")
-                        .and_then(Value::as_str)
-                        .map(str::to_string),
-                }
             } else if let Some(p) = rule.get("path") {
                 let path = regex(p, "path")?;
                 if rule.get("json").is_some() {
@@ -278,7 +305,13 @@ impl Telemetry {
                         .get("json_each")
                         .and_then(Value::as_str)
                         .map(str::to_string);
-                    Matcher::HttpJson { path, json, each }
+                    Matcher::HttpJson {
+                        path,
+                        select: selectors(rule.get("json_match"), "json_match")?,
+                        request: selectors(rule.get("request_match"), "request_match")?,
+                        json,
+                        each,
+                    }
                 } else if let Some(e) = rule.get("xml_each").and_then(Value::as_str) {
                     Matcher::HttpXml {
                         path,
@@ -286,6 +319,15 @@ impl Telemetry {
                     }
                 } else {
                     return Err("telemetry: a path rule needs json or xml_each".into());
+                }
+            } else if rule.get("json_match").is_some() {
+                Matcher::Json {
+                    select: selectors(rule.get("json_match"), "json_match")?,
+                    json: json_paths(rule)?,
+                    each: rule
+                        .get("json_each")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
                 }
             } else if let Some(h) = rule.get("header") {
                 let header = regex(h, "header")?;
@@ -414,10 +456,16 @@ impl Telemetry {
                 (
                     Matcher::HttpJson {
                         path: re,
+                        select: reply_select,
+                        request: request_select,
                         json,
                         each,
                     },
-                    Inbound::Http { path, body },
+                    Inbound::Http {
+                        path,
+                        body,
+                        request,
+                    },
                 ) => {
                     let Some(caps) = re.captures(path) else {
                         continue;
@@ -425,6 +473,15 @@ impl Telemetry {
                     let Ok(doc) = serde_json::from_slice::<Value>(body) else {
                         continue;
                     };
+                    let mut base = captures(&caps);
+                    if !request_select.is_empty()
+                        && !request.is_some_and(|r| select(r, request_select, &mut base))
+                    {
+                        continue;
+                    }
+                    if !select(&doc, reply_select, &mut base) {
+                        continue;
+                    }
                     let items: Vec<&Value> = match each {
                         Some(each) => super::expect::json_path(&doc, each)
                             .and_then(Value::as_array)
@@ -433,7 +490,7 @@ impl Telemetry {
                         None => vec![&doc],
                     };
                     for item in items {
-                        let mut values = captures(&caps);
+                        let mut values = base.clone();
                         for (name, json_path) in json {
                             if let Some(v) = super::expect::json_path(item, json_path) {
                                 values.push((name.clone(), v.clone()));
@@ -442,7 +499,7 @@ impl Telemetry {
                         any |= self.assign_all(&rule.assign, &values, &mut patch);
                     }
                 }
-                (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body }) => {
+                (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body, .. }) => {
                     let Some(caps) = re.captures(path) else {
                         continue;
                     };
@@ -465,29 +522,16 @@ impl Telemetry {
                         any |= self.assign_all(&rule.assign, &values, &mut patch);
                     }
                 }
-                (Matcher::Json { select, json, each }, Inbound::Json(doc)) => {
+                (
+                    Matcher::Json {
+                        select: selectors,
+                        json,
+                        each,
+                    },
+                    Inbound::Json(doc),
+                ) => {
                     let mut base = Vec::new();
-                    let mut matched = true;
-                    for (path, re) in select {
-                        let text = match super::expect::json_path(doc, path) {
-                            Some(Value::String(s)) => s.clone(),
-                            Some(other) => other.to_string(),
-                            None => {
-                                matched = false;
-                                break;
-                            }
-                        };
-                        let Some(caps) = re.captures(&text) else {
-                            matched = false;
-                            break;
-                        };
-                        let offset = base.len();
-                        for (i, v) in captures(&caps) {
-                            let n: usize = i.parse().unwrap_or(0);
-                            base.push(((n + offset).to_string(), v));
-                        }
-                    }
-                    if !matched {
+                    if !select(doc, selectors, &mut base) {
                         continue;
                     }
                     let items: Vec<&Value> = match each {
@@ -974,5 +1018,73 @@ mod tests {
         )
         .unwrap();
         assert!(t.apply(&Inbound::Text("SPEED fast")).is_none());
+    }
+
+    #[test]
+    fn replies_sharing_a_path_are_told_apart_by_their_request() {
+        // JSON-RPC: every request goes to one path, and the reply names
+        // neither the method nor what it answers.
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {
+                    "path": "^/$",
+                    "request_match": {"$.method": "^Pixera\\.Timelines\\.Timeline\\.getCurrentTime$",
+                                      "$.params.handle": "^(\\d+)$"},
+                    "json_match": {"$.result": "^\\d+$"},
+                    "json": {"frame": "$.result"},
+                    "state": {"timelines.{1}.frame": "{frame}"},
+                },
+                {
+                    "path": "^/$",
+                    "request_match": {"$.method": "^Pixera\\.Utility\\.getApiRevision$"},
+                    "json": {"revision": "$.result"},
+                    "state": {"device.api_revision": "{revision}"},
+                },
+            ]})),
+            &state(json!({
+                "timelines.*.frame": {"type": "int", "description": "x"},
+                "device.api_revision": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let time = json!({"jsonrpc": "2.0", "id": 4,
+            "method": "Pixera.Timelines.Timeline.getCurrentTime", "params": {"handle": 7}});
+        let revision =
+            json!({"jsonrpc": "2.0", "id": 5, "method": "Pixera.Utility.getApiRevision"});
+        let reply = br#"{"jsonrpc":"2.0","id":4,"result":1250}"#;
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/",
+                body: reply,
+                request: Some(&time)
+            }),
+            Some(json!({"timelines": {"7": {"frame": 1250}}}))
+        );
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/",
+                body: reply,
+                request: Some(&revision)
+            }),
+            Some(json!({"device": {"api_revision": 1250}}))
+        );
+        // Without the request, neither rule can claim the reply.
+        assert!(t
+            .apply(&Inbound::Http {
+                path: "/",
+                body: reply,
+                request: None
+            })
+            .is_none());
+        // json_match on the reply: an error reply is not a time.
+        let error = br#"{"jsonrpc":"2.0","id":4,"error":{"code":-32601}}"#;
+        assert!(t
+            .apply(&Inbound::Http {
+                path: "/",
+                body: error,
+                request: Some(&time)
+            })
+            .is_none());
     }
 }

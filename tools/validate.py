@@ -369,7 +369,12 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
             except re.error as e:
                 errors.append(f"telemetry.poll.send[{i}].reply_address: {e}")
 
-    has_ws = transport_type == "ws" or "websocket" in telemetry
+    # JSON messages arrive on a websocket, an event stream, or as the lines of
+    # a line transport; HTTP replies are matched with `path`.
+    has_json = (transport_type in ("ws", "line-tcp", "line-udp")
+                or "websocket" in telemetry or "sse" in telemetry)
+    if "sse" in telemetry and transport_type != "http":
+        errors.append("telemetry.sse needs an http transport")
     declared = [key.split(".") for key in (doc.get("state") or {})]
 
     def is_declared(path: str) -> bool:
@@ -387,15 +392,19 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     re.compile(rule[key])
                 except re.error as e:
                     errors.append(f"{where}.{key}: {e}")
-        for jpath, pattern in (rule.get("json_match") or {}).items():
-            if not jpath.startswith("$"):
-                errors.append(f"{where}.json_match: '{jpath}' is not a JSON path")
-            try:
-                re.compile(pattern)
-            except re.error as e:
-                errors.append(f"{where}.json_match: {e}")
-        if "json_match" in rule and not has_ws:
-            errors.append(f"{where}: json_match reads websocket messages; the spec has no websocket")
+        for key in ("json_match", "request_match"):
+            for jpath, pattern in (rule.get(key) or {}).items():
+                if not jpath.startswith("$"):
+                    errors.append(f"{where}.{key}: '{jpath}' is not a JSON path")
+                try:
+                    re.compile(pattern)
+                except re.error as e:
+                    errors.append(f"{where}.{key}: {e}")
+        if "json_match" in rule and "path" not in rule and not has_json:
+            errors.append(f"{where}: json_match reads JSON messages; the spec has no websocket, "
+                          "event stream or line transport")
+        if "request_match" in rule and "path" not in rule:
+            errors.append(f"{where}: request_match applies to a path rule")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
         for value in (rule.get("state") or {}).values():

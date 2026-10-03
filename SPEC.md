@@ -77,7 +77,9 @@ transport:
 `terminated` requires `terminator`: `cr`, `crlf` or `lf`.
 
 Templates and `probe` hold the payload only; the framing is added when the
-message is sent. A `delimited` reply is the text from `open` to `close`; for
+message is sent. A `delimited` reply is the text from `open` to `close`. With
+no `open`, `close` is a separator after each message and is dropped from it
+(PIXERA ends each JSON message with `0xPX`). For
 the other framings, CR, LF and CRLF all end a received line, whichever the
 device uses.
 
@@ -178,8 +180,8 @@ transport:
 
 ### `http`
 
-HTTP GET/POST. Covers REST/JSON devices and CGI devices taking positional query
-arguments.
+HTTP GET, POST, PUT, PATCH and DELETE. Covers REST/JSON devices, JSON-RPC over
+HTTP and CGI devices taking positional query arguments.
 
 ```yaml
 transport:
@@ -747,6 +749,20 @@ offered to `path` rules, which match the request's path and query:
 | `path` + `json` | A JSON reply | `json` names values by JSON path (`$`, `$.a.b`) |
 | `path` + `json` + `json_each` | A JSON reply holding an array at `json_each` | once per element; `json` paths relative to it |
 | `path` + `xml_each` | An XML reply | once per element of that name; its attributes |
+| `path` + `json` + `json_match` | A JSON reply whose value at each JSON path matches its regex | the path's, then `json_match`'s, in order |
+| `path` + `json` + `request_match` | A JSON reply to a request whose JSON body matches | the path's, then `request_match`'s, then `json_match`'s |
+
+`request_match` is for protocols whose replies all arrive on one path and
+don't say what they answer, such as JSON-RPC: the rule looks at the request
+that the reply answers.
+
+```yaml
+    - path: "^/$"
+      request_match: { "$.method": "^Pixera\\.Timelines\\.Timeline\\.getCurrentTime$", "$.params.handle": "^(\\d+)$" }
+      json_match: { "$.result": "^\\d+$" }
+      json: { frame: "$.result" }
+      state: { "timelines.{1}.frame": "{frame}" }
+```
 
 ```yaml
     - path: "^/v1/timers/current$"
@@ -760,7 +776,7 @@ offered to `path` rules, which match the request's path and query:
 ```
 
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
-`inbound`.
+`inbound`, plus `request` (the JSON request body) for a `request_match` rule.
 
 #### Poll replies on another address
 
@@ -796,10 +812,11 @@ exactly those type tags:
       state: { "sequences.{1}.faders.{arg0}": "{arg2}" }
 ```
 
-#### Websocket messages
+#### JSON messages
 
-A message on a websocket, the transport's (§2) or `telemetry.websocket`'s, is
-offered to the text rules and, when it is JSON, to `json_match` rules:
+A message on a websocket (the transport's, §2, or `telemetry.websocket`'s), an
+event on `telemetry.sse`, and a line or block of a line transport are offered
+to the text rules and, when they are JSON, to `json_match` rules:
 
 | Rule | Matches | Captures |
 |---|---|---|
@@ -836,6 +853,28 @@ over settings. Its messages go through the rules like any other.
 
 A telemetry vector for a websocket gives `inbound_ws` (the message text), and
 optionally `expect_connect_ws`, the messages sent when it opens.
+
+#### An event stream beside an HTTP transport
+
+`telemetry.sse` opens a server-sent event stream (`text/event-stream`) on the
+http transport's host, with its scheme and credential, when the device is
+opened, and reopens it with backoff when it closes. Like the push websocket it
+carries no commands and doesn't decide whether the device is connected. A
+refused credential (`refusal_status`) is the terminal refusal of §2.
+
+```yaml
+telemetry:
+  sse:
+    path: /api/v1/events      # required
+  updates:
+    - json_match: { "$.event": "^brightness$" }
+      json: { value: "$.data.value" }
+      state: { output.brightness: "{value}" }
+```
+
+Each event goes to the `json_match` rules as `{"event": <name>, "data":
+<data>}`, with `data` parsed where it is JSON (the event name is `message`
+when the stream gives none), and its data to the text rules.
 
 ## Native modules
 

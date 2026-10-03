@@ -234,10 +234,13 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         // The reply to a request for this path, as the engine offers it.
         let path = r["path"].as_str().ok_or("inbound_http needs a path")?;
         let body = r["body"].as_str().unwrap_or("").as_bytes();
-        if let Some(patch) = engine
-            .telemetry
-            .apply(&super::telemetry::Inbound::Http { path, body })
-        {
+        // The JSON body of the request it answers, for `request_match`.
+        let request = r.get("request");
+        if let Some(patch) = engine.telemetry.apply(&super::telemetry::Inbound::Http {
+            path,
+            body,
+            request,
+        }) {
             cx.state(patch);
         }
         // As the engine does: a text reply also goes to the text rules.
