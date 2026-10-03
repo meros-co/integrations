@@ -284,6 +284,12 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
             engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &reply);
         }
         Some(super::Await::Ws(_)) => engine.ws(cx, "device", WsInput::Text("{}".into())),
+        // One reply line per datagram.
+        _ if matches!(engine.transport, super::Transport::LineUdp { .. }) => {
+            let line = String::from_utf8_lossy(success);
+            let line = line.trim_end().as_bytes().to_vec();
+            engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &line);
+        }
         _ => engine.tcp(cx, "device", TcpInput::Data(success.to_vec())),
     }
 }
@@ -391,6 +397,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         super::Transport::LineTcp {
             reply_match: Some(re),
             ..
+        }
+        | super::Transport::LineUdp {
+            reply_match: Some(re),
+            ..
         } => SUCCESS
             .iter()
             .find(|s| re.is_match(s))
@@ -398,15 +408,20 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             .unwrap_or(SUCCESS[0]),
         _ => SUCCESS[0],
     };
-    // A block transport's reply ends at a blank line.
-    let end = match &engine.transport {
+    // A block transport's reply ends at a blank line; a delimited one is
+    // wrapped in its markers (Shure's `< ... >`).
+    let success = match &engine.transport {
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::Delimited { open, close },
+            ..
+        } => format!("{open}{line}{close}"),
         super::Transport::LineTcp {
             reply: super::ReplyFraming::Block,
             ..
-        } => "\r\n\r\n",
-        _ => "\r\n",
-    };
-    let success = format!("{line}{end}").into_bytes();
+        } => format!("{line}\r\n\r\n"),
+        _ => format!("{line}\r\n"),
+    }
+    .into_bytes();
     let success = success.as_slice();
     let internal = |e: &SpecEngine| e.current.as_ref().is_some_and(|f| f.id.is_none());
     let mut guard = 0;

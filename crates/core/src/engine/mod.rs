@@ -63,6 +63,9 @@ enum Transport {
         ascii: bool,
         replies: bool,
         reply_match: Option<Regex>,
+        /// An error answer, which names nothing it answers: taken as the
+        /// reply of a command waiting with `expect.reply_contains`.
+        error_match: Option<Regex>,
     },
     /// Text messages, one per datagram (ChamSys, XPression over UDP).
     LineUdp {
@@ -71,6 +74,8 @@ enum Transport {
         ascii: bool,
         replies: bool,
         listen: Option<u16>,
+        /// As for line-tcp: a datagram not matching it is never a reply.
+        reply_match: Option<Regex>,
     },
     OscUdp {
         port: u16,
@@ -441,6 +446,10 @@ impl SpecEngine {
                     ascii: str_field(&t, "encoding") != Some("utf-8"),
                     replies: str_field(&t, "reply") != Some("none"),
                     reply_match,
+                    error_match: match str_field(&t, "error_match") {
+                        Some(p) => Some(Regex::new(p).map_err(|e| format!("error_match: {e}"))?),
+                        None => None,
+                    },
                 }
             }
             "line-udp" => Transport::LineUdp {
@@ -455,6 +464,10 @@ impl SpecEngine {
                 ascii: str_field(&t, "encoding") != Some("utf-8"),
                 replies: str_field(&t, "reply") == Some("to-source"),
                 listen: listen_port(t.get("listen_port"), &ctx.settings)?,
+                reply_match: match str_field(&t, "reply_match") {
+                    Some(p) => Some(Regex::new(p).map_err(|e| format!("reply_match: {e}"))?),
+                    None => None,
+                },
             },
             "osc-udp" => Transport::OscUdp {
                 port,
@@ -1339,10 +1352,17 @@ impl SpecEngine {
             Some(Await::Text(None)) => true,
             // `expect.reply_contains`: a message that does not hold the text
             // answers something else, or nothing.
-            Some(Await::Text(Some(text))) => message.contains(text.as_str()),
+            Some(Await::Text(Some(text))) => {
+                message.contains(text.as_str())
+                    || matches!(&self.transport, Transport::LineTcp { error_match: Some(re), .. } if re.is_match(&message))
+            }
             _ => false,
         };
         if let Transport::LineTcp {
+            reply_match: Some(re),
+            ..
+        }
+        | Transport::LineUdp {
             reply_match: Some(re),
             ..
         } = &self.transport

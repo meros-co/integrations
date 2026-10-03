@@ -137,6 +137,11 @@ are not the reply, and still go to the telemetry rules. As with `reply_json`
 (§2, `ws`), a command whose reply never comes times out without the stream
 being reset, since a late reply names what it answers.
 
+A device whose error answer names nothing (Shure's `< REP ERR >`) declares it
+as the transport's `error_match`, a regex: such a message is taken as the
+reply of a command waiting with `reply_contains`, which then fails on its
+`expect`.
+
 ### `line-udp`
 
 Text messages over UDP, one message per datagram (ChamSys MagicQ's remote
@@ -152,7 +157,10 @@ transport:
 
 Templates and directives are as for `line-tcp`. With `reply: to-source`, each
 datagram from the device is one reply line, its trailing line ending removed;
-`listen_port` works as for `osc-udp`.
+`listen_port` works as for `osc-udp`. `reply_match` works as for `line-tcp`: a
+device that pushes changes to the last sender (Symetrix Jupiter's
+`#nnnnn=vvvvv`) names what a reply looks like, and other datagrams go only to
+the telemetry rules.
 
 ### `osc-udp`
 
