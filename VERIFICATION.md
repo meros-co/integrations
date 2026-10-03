@@ -271,6 +271,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
 - [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
 
+## digico-sd — DiGiCo SD and Quantum consoles
+
+- [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
+- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:2684](specs/digico-sd.yaml#L2684))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:2692](specs/digico-sd.yaml#L2692))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:2701](specs/digico-sd.yaml#L2701))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:2709](specs/digico-sd.yaml#L2709))
+- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:2639](specs/digico-sd.yaml#L2639))
+- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:776](specs/digico-sd.yaml#L776))
+- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:832](specs/digico-sd.yaml#L832))
+- [ ] Check the addresses left out (Channel_Input/main/alt_in, CGs_level, CGs_mute, Matrix_Inputs sends, Multis) and what they do. ([specs/digico-sd.yaml:2722](specs/digico-sd.yaml#L2722))
+
 ## emberplus — Ember+
 
 - [ ] Check the device's Ember+ port, since the module's default of 9000 is a common choice, not a standard. ([specs/emberplus.yaml:199](specs/emberplus.yaml#L199))
