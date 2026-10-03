@@ -457,6 +457,21 @@ def port_checks(doc: dict) -> list[str]:
     return errors
 
 
+def label_checks(doc: dict) -> list[str]:
+    """Every parameter and setting has a label and a description (SPEC.md §4)."""
+    errors = []
+    for name, spec in (doc.get("settings") or {}).items():
+        for field in ("label", "description"):
+            if not spec.get(field):
+                errors.append(f"settings.{name}: no {field}")
+    for command, cs in (doc.get("commands") or {}).items():
+        for name, spec in ((cs or {}).get("params") or {}).items():
+            for field in ("label", "description"):
+                if not spec.get(field):
+                    errors.append(f"commands.{command}.params.{name}: no {field}")
+    return errors
+
+
 def main() -> int:
     schema = json.loads((ROOT / "schema" / "device-spec-1.json").read_text("utf-8"))
     files = sorted(glob.glob(str(ROOT / "specs" / "*.yaml")))
@@ -494,7 +509,7 @@ def main() -> int:
             print(f"    {exc.message}")
             continue
 
-        errors = cross_field_checks(doc, rel) + port_checks(doc)
+        errors = cross_field_checks(doc, rel) + port_checks(doc) + label_checks(doc)
 
         # Spec ids are the consumer-facing contract; they must be unique.
         spec_id = doc["id"]

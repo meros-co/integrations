@@ -125,6 +125,7 @@ core named after its spec id. Adding a spec means adding its feature:
 - [ ] Every command is backed by a cited source
 - [ ] `ports` lists every port the integration uses, with its default
 - [ ] Parameter ranges are the device's limits, not guesses
+- [ ] Every parameter and setting has a `label` and a one-sentence `description`
 - [ ] Each model's `supports` list is accurate; a model doesn't inherit a
       command from a sibling it doesn't have
 - [ ] Verification status matches the recorded vectors
