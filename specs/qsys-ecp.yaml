@@ -67,12 +67,18 @@ transport:
 settings:
   # A Q-SYS Administrator user with External Control Protocol access, and its
   # PIN. Leave the username empty when Access Control is off: no login is sent.
-  username: { type: string, default: "", max_length: 128, pattern: "^[A-Za-z0-9._-]*$" }
-  pin: { type: string, secret: true, default: "", max_length: 128, pattern: "^[^\\s\"\\\\]*$" }
+  username: { type: string, default: "", max_length: 128, pattern: "^[A-Za-z0-9._-]*$",
+              label: Username,
+              description: "A Q-SYS Administrator user with External Control Protocol access; leave it empty when Access Control is off, and no login is sent." }
+  pin: { type: string, secret: true, default: "", max_length: 128, pattern: "^[^\\s\"\\\\]*$",
+         label: PIN,
+         description: "The PIN of that Q-SYS Administrator user, without spaces or quotation marks." }
   # The schedule given to change group 1, the group the core keeps state
   # from: the Core sends what changed in it this often (minimum 30, 0: none,
   # poll with change_group_poll instead).
-  change_group_poll_ms: { type: int, min: 0, max: 3600000, default: 200 }
+  change_group_poll_ms: { type: int, min: 0, max: 3600000, default: 200,
+                          label: Change group poll interval,
+                          description: "How often, in milliseconds, the Core sends what changed in change group 1, the group state is kept from; 30 at least, or 0 for none, then poll with change_group_poll." }
 
 on_connect:
   - when_set: username
@@ -119,7 +125,9 @@ commands:
   control_get:
     summary: "Control Get (cg): a Named Control's cv line (string, value, position), or a vector control's cvv line; also updates controls.*"
     params:
-      name: &name { type: string, required: true, max_length: 256 }
+      name: &name { type: string, required: true, max_length: 256,
+              label: Control,
+              description: "The Named Control's name exactly as in the design." }
     send: "cg {name:json}"
     expect:
       reply_contains: " {name:json}"
@@ -137,7 +145,9 @@ commands:
     summary: "Control Set Value (csv): set a Named Control from a number in its own units (e.g. dB); answered with the new cv"
     params:
       name: *name
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+               label: Value,
+               description: "The value in the control's own units, such as dB for a gain." }
     send: "csv {name:json} {value:.6f}"
     expect:
       reply_contains: " {name:json}"
@@ -148,8 +158,12 @@ commands:
     summary: "Control Set Value Ramp (csvr): ramp a Named Control to a value over ramp seconds; the Core sends no cv for the final value"
     params:
       name: *name
-      value: { type: float, required: true }
-      ramp: &ramp { type: float, min: 0, required: true }
+      value: { type: float, required: true,
+               label: Value,
+               description: "The value in the control's own units, such as dB for a gain." }
+      ramp: &ramp { type: float, min: 0, required: true,
+              label: Ramp,
+              description: "Time in seconds to move to the new value." }
     send: "csvr {name:json} {value:.6f} {ramp:.3f}"
     returns: none
 
@@ -157,7 +171,9 @@ commands:
     summary: "Control Set Position (csp): set a Named Control from a position 0 to 1 within its range, through its mapping; answered with the new cv"
     params:
       name: *name
-      position: &position { type: float, min: 0, max: 1, required: true }
+      position: &position { type: float, min: 0, max: 1, required: true,
+                  label: Position,
+                  description: "Where to set the control within its range, from 0 (bottom) to 1 (top), through the control's own mapping." }
     send: "csp {name:json} {position:.6f}"
     expect:
       reply_contains: " {name:json}"
@@ -177,7 +193,9 @@ commands:
     summary: "Control Set String (css): set a Named Control from its text form, such as \"5.0dB\" or a text box's text; answered with the new cv"
     params:
       name: *name
-      text: { type: string, required: true, max_length: 4096 }
+      text: { type: string, required: true, max_length: 4096,
+              label: Text,
+              description: "The control's value as text, such as 5.0dB, or a text box's text." }
     send: "css {name:json} {text:json}"
     expect:
       reply_contains: " {name:json}"
@@ -190,12 +208,16 @@ commands:
       by single spaces, exactly count of them
     params:
       name: *name
-      count: &count { type: int, min: 1, max: 4096, required: true }
+      count: &count { type: int, min: 1, max: 4096, required: true,
+               label: Count,
+               description: "How many elements of the vector control to set, which must match the number of entries given." }
       values: &numbers
         type: string
         required: true
         max_length: 65536
         pattern: '^-?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?( -?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)*$'
+        label: Values
+        description: "Numbers separated by single spaces, exactly count of them: values in the control's own units for the value commands, or positions from 0 to 1 for the position commands."
     send: "csvv {name:json} {count} {values}"
     returns: none
 
@@ -240,6 +262,8 @@ commands:
         required: true
         max_length: 65536
         pattern: '^"([^"\\]|\\.)*"( "([^"\\]|\\.)*")*$'
+        label: Strings
+        description: "Exactly count strings, each in double quotes with any quotation mark or back slash in it escaped with a back slash, separated by single spaces."
     send: "cssv {name:json} {count} {strings}"
     returns: none
 
@@ -255,7 +279,9 @@ commands:
       Change Group Create (cgc): create a change group, at most four per connection. Group 1 is the one the core
       creates and schedules itself to keep controls.* current; ignored when the group exists
     params:
-      group: &group { type: int, min: 0, max: 4294967294, default: 1 }
+      group: &group { type: int, min: 0, max: 4294967294, default: 1,
+               label: Change group,
+               description: "The change group's number, scoped to this connection, which holds at most four; group 1 is the one the module creates and keeps state from." }
     send: "cgc {group}"
     returns: none
 
@@ -318,7 +344,9 @@ commands:
     summary: "Change Group Schedule (cgs): poll a change group automatically every period_ms (minimum 30; 0 stops), with a cgpa after each"
     params:
       group: *group
-      period_ms: &period { type: int, min: 0, max: 4294967294, required: true }
+      period_ms: &period { type: int, min: 0, max: 4294967294, required: true,
+                   label: Period,
+                   description: "How often the Core polls the group, in milliseconds; 30 at least, or 0 to stop." }
     send: "cgs {group} {period_ms}"
     returns: none
 
@@ -333,9 +361,15 @@ commands:
   snapshot_load:
     summary: "Snapshot Load (ssl): load snapshot number of a snapshot bank, ramped over ramp seconds"
     params:
-      bank: &bank { type: string, required: true, max_length: 256 }
-      number: &snapshot { type: int, min: 1, max: 4294967294, required: true }
-      ramp: { type: float, min: 0, default: 0 }
+      bank: &bank { type: string, required: true, max_length: 256,
+              label: Snapshot bank,
+              description: "The snapshot bank component's name as in the design." }
+      number: &snapshot { type: int, min: 1, max: 4294967294, required: true,
+                label: Snapshot,
+                description: "The snapshot's number within the bank, from 1, as numbered in Q-SYS Designer." }
+      ramp: { type: float, min: 0, default: 0,
+              label: Ramp,
+              description: "Time in seconds over which the snapshot's controls move to their stored values; 0 recalls at once." }
     send: "ssl {bank:json} {number} {ramp:.3f}"
     returns: none
 
@@ -350,7 +384,9 @@ commands:
   command:
     summary: "Send one raw ECP command line, such as \"cg gain1\"; replies and errors it causes go to the telemetry rules"
     params:
-      line: { type: string, required: true, max_length: 65536 }
+      line: { type: string, required: true, max_length: 65536,
+              label: Command line,
+              description: "One ECP command line exactly as the Core expects it, such as cg gain1, without the line ending." }
     send: "{line}"
     returns: none
 

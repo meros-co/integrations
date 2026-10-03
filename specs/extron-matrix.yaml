@@ -104,7 +104,9 @@ transport:
 settings:
   # Administrator or user password. Left empty for a unit without passwords;
   # nothing is then sent and no prompt is awaited.
-  password: { type: string, secret: true, default: "", max_length: 128, pattern: '^[^|]*$' }
+  password: { type: string, secret: true, default: "", max_length: 128, pattern: '^[^|]*$',
+              label: Password,
+              description: "The switcher's administrator or user password; leave it empty for a unit without passwords, and a user-level login gets E24 for administrator commands." }
 
 on_connect:
   # A password-protected unit sends "Password:" after the copyright banner;
@@ -215,8 +217,12 @@ commands:
   tie:
     summary: Tie an input's video and audio to an output; input 0 unties the output
     params:
-      input:  { type: int, min: 0, max: 128, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      input:  { type: int, min: 0, max: 128, required: true,
+                label: Input,
+                description: "The input number, from 1 as on the switcher; 0 unties the output." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{input}*{output}!"
     expect: { matches: '^Out\s*\d+\s+In\s*\d+\s+All$' }
     returns: ack
@@ -224,8 +230,12 @@ commands:
   tie_video:
     summary: Tie an input's video only to an output (breakaway); input 0 unties it
     params:
-      input:  { type: int, min: 0, max: 128, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      input:  { type: int, min: 0, max: 128, required: true,
+                label: Input,
+                description: "The input number, from 1 as on the switcher; 0 unties the output's video." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{input}*{output}%"
     expect: { matches: '^Out\s*\d+\s+In\s*\d+\s+(Vid|RGB)$' }
     returns: ack
@@ -233,8 +243,12 @@ commands:
   tie_audio:
     summary: Tie an input's audio only to an output (breakaway); input 0 unties it
     params:
-      input:  { type: int, min: 0, max: 128, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      input:  { type: int, min: 0, max: 128, required: true,
+                label: Input,
+                description: "The input number, from 1 as on the switcher; 0 unties the output's audio." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{input}*{output}$"
     expect: { matches: '^Out\s*\d+\s+In\s*\d+\s+Aud$' }
     returns: ack
@@ -242,7 +256,9 @@ commands:
   tie_input_to_all:
     summary: Tie an input's video and audio to every output
     params:
-      input: { type: int, min: 0, max: 128, required: true }
+      input: { type: int, min: 0, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher; 0 is accepted, which by the SIS tie grammar unties every output, though the guides do not say so for this command." }
     send: "{input}*!"
     expect: { matches: '^In\s*\d+\s+All$' }
     returns: ack
@@ -250,7 +266,9 @@ commands:
   tie_video_to_all:
     summary: Tie an input's video to every output
     params:
-      input: { type: int, min: 0, max: 128, required: true }
+      input: { type: int, min: 0, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher; 0 is accepted, which by the SIS tie grammar unties every output's video, though the guides do not say so for this command." }
     send: "{input}*%"
     expect: { matches: '^In\s*\d+\s+(Vid|RGB)$' }
     returns: ack
@@ -258,7 +276,9 @@ commands:
   tie_audio_to_all:
     summary: Tie an input's audio to every output
     params:
-      input: { type: int, min: 0, max: 128, required: true }
+      input: { type: int, min: 0, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher; 0 is accepted, which by the SIS tie grammar unties every output's audio, though the guides do not say so for this command." }
     send: "{input}*$"
     expect: { matches: '^In\s*\d+\s+Aud$' }
     returns: ack
@@ -269,7 +289,9 @@ commands:
       input*output followed by ! (video and audio), % (video) or $ (audio),
       such as 3*4%6*1$3*2!
     params:
-      ties: { type: string, max_length: 240, pattern: '^(\d{1,3}\*\d{1,3}[!%&$])+$', required: true }
+      ties: { type: string, max_length: 240, pattern: '^(\d{1,3}\*\d{1,3}[!%&$])+$', required: true,
+              label: Ties,
+              description: "A run of input*output pairs, each followed by ! for video and audio, % or & for video or $ for audio, such as 3*4%6*1$3*2!, all switched together." }
     send: "\x1b+Q{ties}"
     expect: { matches: '^Qik$' }
     returns: ack
@@ -277,7 +299,9 @@ commands:
   get_tie:
     summary: Input tied to an output for video and audio (E13/E14 when the output is broken away)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}!"
     expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+All)?$' }
     returns: value
@@ -285,7 +309,9 @@ commands:
   get_video_tie:
     summary: Input tied to an output's video
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}%"
     expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+(?:Vid|RGB))?$' }
     returns: value
@@ -293,7 +319,9 @@ commands:
   get_audio_tie:
     summary: Input tied to an output's audio
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}$"
     expect: { matches: '^(?:Out\s*\d+\s+In\s*)?(\d+)(?:\s+Aud)?$' }
     returns: value
@@ -302,8 +330,10 @@ commands:
   set_video_mute:
     summary: Mute or unmute an output's video
     params:
-      output: { type: int, min: 1, max: 128, required: true }
-      muted:  { type: bool, default: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
+      muted:  { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{output}*{muted:bool01}B"
     expect: { matches: '^Vmt\s*\d+\*[01]$' }
     returns: ack
@@ -311,7 +341,9 @@ commands:
   set_video_sync_mute:
     summary: Mute an output's video and sync (mute mode 2); unmute with set_video_mute
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}*2B"
     expect: { matches: '^Vmt\s*\d+\*2$' }
     returns: ack
@@ -319,7 +351,9 @@ commands:
   get_video_mute:
     summary: An output's video mute (0 off, 1 video muted, 2 video and sync muted)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}B"
     expect: { matches: '^(?:Vmt\s*\d+\*)?([0-2])$' }
     returns: value
@@ -327,7 +361,7 @@ commands:
   set_video_mute_all:
     summary: Mute or unmute every output's video
     params:
-      muted: { type: bool, default: true }
+      muted: { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{muted:bool01}*B"
     expect: { matches: '^Vmt\s*[01]$' }
     returns: ack
@@ -337,8 +371,10 @@ commands:
       Mute or unmute an output's audio (on DXP HD 4K PLUS, mute 1 is the HDMI
       audio only; on XTP II, the HDMI/S/PDIF audio only; see set_audio_mute_mode)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
-      muted:  { type: bool, default: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
+      muted:  { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{output}*{muted:bool01}Z"
     expect: { matches: '^Amt\s*\d+\*[0-7]$' }
     returns: ack
@@ -350,8 +386,12 @@ commands:
       and S/PDIF, 7 all (outputs 3-8 take 0-1). XTP II: 0 off, 1 HDMI/S/PDIF,
       2 analog, 3 all
     params:
-      output: { type: int, min: 1, max: 128, required: true }
-      mode:   { type: int, min: 0, max: 7, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
+      mode:   { type: int, min: 0, max: 7, required: true,
+                label: Audio mute mode,
+                description: "Which audio is muted: on DXP HD 4K PLUS 0 unmuted, 1 HDMI, 2 analog, 3 HDMI and analog, 4 S/PDIF, 5 HDMI and S/PDIF, 6 analog and S/PDIF, 7 all (outputs 3-8 take 0-1 only); on XTP II 0 off, 1 HDMI/S/PDIF, 2 analog, 3 all." }
     send: "{output}*{mode}Z"
     expect: { matches: '^Amt\s*\d+\*[0-7]$' }
     returns: ack
@@ -359,7 +399,9 @@ commands:
   get_audio_mute:
     summary: An output's audio mute mode (0 unmuted; see set_audio_mute_mode)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}Z"
     expect: { matches: '^(?:Amt\s*\d+\*)?([0-7])$' }
     returns: value
@@ -367,7 +409,7 @@ commands:
   set_audio_mute_all:
     summary: Mute or unmute every output's audio
     params:
-      muted: { type: bool, default: true }
+      muted: { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{muted:bool01}*Z"
     expect: { matches: '^Amt\s*[01]$' }
     returns: ack
@@ -384,7 +426,9 @@ commands:
   save_global_preset:
     summary: Save the current ties as a global preset
     params:
-      preset: { type: int, min: 1, max: 32, required: true }
+      preset: { type: int, min: 1, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher, to save the current ties to, replacing what it held." }
     send: "{preset},"
     expect: { matches: '^Spr\s*\d+$' }
     returns: ack
@@ -392,7 +436,9 @@ commands:
   recall_global_preset:
     summary: Recall a global preset, replacing the current ties (E11 if never saved)
     params:
-      preset: { type: int, min: 1, max: 32, required: true }
+      preset: { type: int, min: 1, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher; a preset never saved answers E11 and changes nothing." }
     send: "{preset}."
     expect: { matches: '^Rpr\s*\d+$' }
     returns: ack
@@ -400,7 +446,9 @@ commands:
   recall_global_preset_prst:
     summary: Recall a global preset, replacing the current ties (XTP II, Esc R..PRST)
     params:
-      preset: { type: int, min: 1, max: 32, required: true }
+      preset: { type: int, min: 1, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher, saved from the front panel; a preset never saved answers E11 and changes nothing." }
     send: "\x1bR{preset}PRST"
     expect: { matches: '^PrstR\s*\d+$' }
     returns: ack
@@ -410,7 +458,9 @@ commands:
       Inputs tied to outputs 1-16 for video in a global preset, preset 0 for the
       current ties ("--" past the last output)
     params:
-      preset: { type: int, min: 0, max: 32, required: true }
+      preset: { type: int, min: 0, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher, or 0 for the current ties." }
     send: "\x1b{preset}*1*1VC"
     expect: { matches: '^(?:Vgp\d+\*\s*Out\d+\s+)?(.*\S)\s+Vid$' }
     returns: value
@@ -418,7 +468,9 @@ commands:
   get_global_preset_audio_ties:
     summary: Inputs tied to outputs 1-16 for audio in a global preset, preset 0 for the current ties
     params:
-      preset: { type: int, min: 0, max: 32, required: true }
+      preset: { type: int, min: 0, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher, or 0 for the current ties." }
     send: "\x1b{preset}*1*2VC"
     expect: { matches: '^(?:Vgp\d+\*\s*Out\d+\s+)?(.*\S)\s+Aud$' }
     returns: value
@@ -426,8 +478,12 @@ commands:
   set_global_preset_name:
     summary: Name a global preset (up to 16 characters, no |)
     params:
-      preset: { type: int, min: 1, max: 32, required: true }
-      name:   { type: string, max_length: 16, pattern: '^[^|]+$', required: true }
+      preset: { type: int, min: 1, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher." }
+      name:   { type: string, max_length: 16, pattern: '^[^|]+$', required: true,
+                label: Name,
+                description: "The preset's name, up to 16 characters, without |." }
     send: "\x1b{preset},{name}NG"
     expect: { matches: '^Nmg\s*\d+,' }
     returns: ack
@@ -435,7 +491,9 @@ commands:
   get_global_preset_name:
     summary: A global preset's name ([unassigned] when never saved)
     params:
-      preset: { type: int, min: 1, max: 32, required: true }
+      preset: { type: int, min: 1, max: 32, required: true,
+                label: Preset,
+                description: "The global preset number, from 1 to 32 as on the switcher." }
     send: "\x1b{preset}NG"
     expect: { matches: '^Nmg\s*\d+,(.*)$' }
     returns: value
@@ -443,8 +501,12 @@ commands:
   save_room_preset:
     summary: Save the current ties of a room's outputs as one of its presets
     params:
-      room:   { type: int, min: 1, max: 10, required: true }
-      preset: { type: int, min: 1, max: 10, required: true }
+      room:   { type: int, min: 1, max: 10, required: true,
+                label: Room,
+                description: "The room number, from 1 to 10 as on the switcher, a room being a group of outputs set up on the unit." }
+      preset: { type: int, min: 1, max: 10, required: true,
+                label: Room preset,
+                description: "The room's preset number, from 1 to 10, to save the room's current ties to, replacing what it held." }
     send: "{room}*{preset},"
     expect: { matches: '^Rmm?\s*\d+\s*Spr\s*\d+$' }
     returns: ack
@@ -452,8 +514,12 @@ commands:
   recall_room_preset:
     summary: Recall a room preset, replacing the ties of that room's outputs
     params:
-      room:   { type: int, min: 1, max: 10, required: true }
-      preset: { type: int, min: 1, max: 10, required: true }
+      room:   { type: int, min: 1, max: 10, required: true,
+                label: Room,
+                description: "The room number, from 1 to 10 as on the switcher, a room being a group of outputs set up on the unit." }
+      preset: { type: int, min: 1, max: 10, required: true,
+                label: Room preset,
+                description: "The room's preset number, from 1 to 10; a preset never saved answers E11 and changes nothing." }
     send: "{room}*{preset}."
     expect: { matches: '^Rmm?\s*\d+\s*Rpr\s*\d+$' }
     returns: ack
@@ -461,8 +527,12 @@ commands:
   set_room_name:
     summary: Name a room (up to 12 characters, no |)
     params:
-      room: { type: int, min: 1, max: 10, required: true }
-      name: { type: string, max_length: 12, pattern: '^[^|]+$', required: true }
+      room: { type: int, min: 1, max: 10, required: true,
+              label: Room,
+              description: "The room number, from 1 to 10 as on the switcher, a room being a group of outputs set up on the unit." }
+      name: { type: string, max_length: 12, pattern: '^[^|]+$', required: true,
+              label: Name,
+              description: "The room's name, up to 12 characters, without |." }
     send: "\x1b{room},{name}NR"
     expect: { matches: '^Nmr\s*\d+,' }
     returns: ack
@@ -470,7 +540,9 @@ commands:
   get_room_name:
     summary: A room's name
     params:
-      room: { type: int, min: 1, max: 10, required: true }
+      room: { type: int, min: 1, max: 10, required: true,
+              label: Room,
+              description: "The room number, from 1 to 10 as on the switcher, a room being a group of outputs set up on the unit." }
     send: "\x1b{room}NR"
     expect: { matches: '^Nmr\s*\d+,(.*)$' }
     returns: value
@@ -479,8 +551,12 @@ commands:
   set_input_name:
     summary: Name an input (up to 16 characters, no |)
     params:
-      input: { type: int, min: 1, max: 128, required: true }
-      name:  { type: string, max_length: 16, pattern: '^[^|]+$', required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
+      name:  { type: string, max_length: 16, pattern: '^[^|]+$', required: true,
+               label: Name,
+               description: "The input's name, up to 16 characters, without |." }
     send: "\x1b{input},{name}NI"
     expect: { matches: '^Nmi\s*\d+,' }
     returns: ack
@@ -488,7 +564,9 @@ commands:
   get_input_name:
     summary: An input's name
     params:
-      input: { type: int, min: 1, max: 128, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
     send: "\x1b{input}NI"
     expect: { matches: '^Nmi\s*\d+,(.*)$' }
     returns: value
@@ -496,8 +574,12 @@ commands:
   set_output_name:
     summary: Name an output (up to 16 characters, no |)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
-      name:   { type: string, max_length: 16, pattern: '^[^|]+$', required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
+      name:   { type: string, max_length: 16, pattern: '^[^|]+$', required: true,
+                label: Name,
+                description: "The output's name, up to 16 characters, without |." }
     send: "\x1b{output},{name}NO"
     expect: { matches: '^Nmo\s*\d+,' }
     returns: ack
@@ -505,7 +587,9 @@ commands:
   get_output_name:
     summary: An output's name
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "\x1b{output}NO"
     expect: { matches: '^Nmo\s*\d+,(.*)$' }
     returns: value
@@ -514,8 +598,12 @@ commands:
   set_input_attenuation_db:
     summary: Set an input's attenuation, -20 to 0 dB (DXP HD 4K PLUS)
     params:
-      input: { type: int, min: 1, max: 128, required: true }
-      level: { type: int, min: -20, max: 0, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
+      level: { type: int, min: -20, max: 0, required: true,
+               label: Attenuation,
+               description: "The input's level in dB, from -20 to 0, where 0 is no attenuation." }
     send: "{input}*{level}G"
     expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
     returns: ack
@@ -523,8 +611,12 @@ commands:
   set_input_gain:
     summary: Set an analog input's gain, 0 to +24 dB (XTP II)
     params:
-      input: { type: int, min: 1, max: 128, required: true }
-      gain:  { type: int, min: 0, max: 24, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
+      gain:  { type: int, min: 0, max: 24, required: true,
+               label: Gain,
+               description: "The analog input's gain in dB, from 0 to 24." }
     send: "{input}*{gain}G"
     expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
     returns: ack
@@ -532,8 +624,12 @@ commands:
   set_input_attenuation:
     summary: Set an analog input's attenuation, 1 to 18 dB (XTP II; lowercase g is significant)
     params:
-      input:       { type: int, min: 1, max: 128, required: true }
-      attenuation: { type: int, min: 1, max: 18, required: true }
+      input:       { type: int, min: 1, max: 128, required: true,
+                     label: Input,
+                     description: "The input number, from 1 as on the switcher." }
+      attenuation: { type: int, min: 1, max: 18, required: true,
+                     label: Attenuation,
+                     description: "How far to cut the analog input, in dB from 1 to 18." }
     send: "{input}*{attenuation}g"
     expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
     returns: ack
@@ -541,7 +637,9 @@ commands:
   increase_input_level:
     summary: Raise an input's level by 1 dB
     params:
-      input: { type: int, min: 1, max: 128, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
     send: "{input}+G"
     expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
     returns: ack
@@ -549,7 +647,9 @@ commands:
   decrease_input_level:
     summary: Lower an input's level by 1 dB
     params:
-      input: { type: int, min: 1, max: 128, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
     send: "{input}-G"
     expect: { matches: '^In\s*\d+\s+Aud\s*[+-]?\d+$' }
     returns: ack
@@ -557,7 +657,9 @@ commands:
   get_input_level:
     summary: An input's gain (positive) or attenuation (negative) in dB
     params:
-      input: { type: int, min: 1, max: 128, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
     send: "{input}G"
     expect: { matches: '^(?:In\s*\d+\s+Aud\s*)?([+-]?\d+)$' }
     returns: value
@@ -567,8 +669,12 @@ commands:
       Set an output's volume: 0-100 percent on DXP HD 4K PLUS (0-64 in MKP
       mode), 0-64 dB steps on XTP II
     params:
-      output: { type: int, min: 1, max: 128, required: true }
-      level:  { type: int, min: 0, max: 100, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
+      level:  { type: int, min: 0, max: 100, required: true,
+                label: Volume,
+                description: "On DXP HD 4K PLUS a percentage from 0 to 100 (0 to 64 in MKP mode); on XTP II a step from 0 to 64 in 1 dB steps; 0 is the lowest." }
     send: "{output}*{level}V"
     expect: { matches: '^Out\s*\d+\s+Vol\s*\d+$' }
     returns: ack
@@ -576,7 +682,9 @@ commands:
   increase_output_volume:
     summary: Raise an output's volume by one step (about 1 dB)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}+V"
     expect: { matches: '^Out\s*\d+\s+Vol\s*\d+$' }
     returns: ack
@@ -584,7 +692,9 @@ commands:
   decrease_output_volume:
     summary: Lower an output's volume by one step (about 1 dB)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}-V"
     expect: { matches: '^Out\s*\d+\s+Vol\s*\d+$' }
     returns: ack
@@ -592,7 +702,9 @@ commands:
   get_output_volume:
     summary: An output's volume
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "{output}V"
     expect: { matches: '^(?:Out\s*\d+\s+Vol\s*)?(\d+)$' }
     returns: value
@@ -601,7 +713,9 @@ commands:
   set_front_panel_lock:
     summary: Front panel lockout (executive mode) 0 unlocked, 1 fully locked, 2 basic functions only
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Lockout mode,
+              description: "The front panel lockout (executive mode): 0 unlocked, 1 fully locked, 2 only basic functions available." }
     send: "{mode}X"
     expect: { matches: '^Exe\s*[0-2]$' }
     returns: ack
@@ -617,7 +731,9 @@ commands:
       XTP II front panel executive mode: 0 unlocked, 1 locked (view only), 2
       locked except basic features (default)
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Executive mode,
+              description: "The front panel executive mode: 0 unlocked, 1 locked (view only), 2 locked except basic features, the default." }
     send: "\x1b{mode}EXEC"
     expect: { matches: '^Exec\s*[0-2]$' }
     returns: ack
@@ -638,7 +754,9 @@ commands:
   get_input_hdcp_status:
     summary: An input's HDCP status (0 no source, 1 HDCP source, 2 source without HDCP)
     params:
-      input: { type: int, min: 1, max: 128, required: true }
+      input: { type: int, min: 1, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher." }
     send: "\x1bI{input}HDCP"
     expect: { matches: '^(?:HdcpI\s*\d+\*)?([0-2])$' }
     returns: value
@@ -648,7 +766,9 @@ commands:
       An output's HDCP status (0 no sink, 1 sink without HDCP, 2 HDCP sink not
       encrypted, 3 HDCP sink encrypted)
     params:
-      output: { type: int, min: 1, max: 128, required: true }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher." }
     send: "\x1bO{output}HDCP"
     expect: { matches: '^(?:HdcpO\s*\d+\*)?([0-3])$' }
     returns: value
@@ -656,7 +776,9 @@ commands:
   set_power_save:
     summary: Power save mode 0 normal, 1 limited (any front panel or SIS action wakes it), 2 limited until Esc 0PSAV
     params:
-      mode: { type: int, min: 0, max: 2, required: true }
+      mode: { type: int, min: 0, max: 2, required: true,
+              label: Power save mode,
+              description: "The power state: 0 normal; 1 limited, woken by any front panel or SIS action; 2 limited until Esc 0PSAV is sent." }
     send: "\x1b{mode}PSAV"
     expect: { matches: '^Psav\s*[0-2]$' }
     returns: ack
@@ -672,7 +794,9 @@ commands:
       XTP II test pattern on all outputs: 0 off, 1/2 colour bars/black at
       720p50, 3/4 at 720p60, 5/6 at 1080p60
     params:
-      pattern: { type: int, min: 0, max: 6, required: true }
+      pattern: { type: int, min: 0, max: 6, required: true,
+                 label: Test pattern,
+                 description: "The pattern on all outputs: 0 off, 1 colour bars and 2 black at 720p50, 3 and 4 the same at 720p60, 5 and 6 at 1080p60." }
     send: "\x1b{pattern:02d}TEST"
     expect: { matches: '^Tst\s*\d+$' }
     returns: ack
@@ -688,7 +812,9 @@ commands:
       Verbose mode of this connection: 0 none, 1 change reports, 2 tagged
       replies, 3 both (set on connecting; lower modes stop the state updates)
     params:
-      mode: { type: int, min: 0, max: 3, required: true }
+      mode: { type: int, min: 0, max: 3, required: true,
+              label: Verbose mode,
+              description: "This connection's verbose mode: 0 none, 1 change reports, 2 tagged replies, 3 both, set on connecting; a lower mode stops the state updates." }
     send: "\x1b{mode}CV"
     expect: { matches: '^Vrb\s*[0-3]$' }
     returns: ack
@@ -733,9 +859,15 @@ commands:
   smx_tie:
     summary: Tie an input's video and audio to an output on one plane; input 0 unties
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      input:  { type: int, min: 0, max: 128, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      input:  { type: int, min: 0, max: 128, required: true,
+                label: Input,
+                description: "The input number, from 1 as on the switcher on that plane; 0 unties the output." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{input}*{output}!"
     expect: { matches: '^\d+\s+Out\s*\d+\s+In\s*\d+\s+All$' }
     returns: ack
@@ -743,9 +875,15 @@ commands:
   smx_tie_video:
     summary: Tie an input's video to an output on one plane
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      input:  { type: int, min: 0, max: 128, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      input:  { type: int, min: 0, max: 128, required: true,
+                label: Input,
+                description: "The input number, from 1 as on the switcher on that plane; 0 is accepted and by the SIS tie grammar unties the output's video, which the guide does not state for this command." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{input}*{output}%"
     expect: { matches: '^\d+\s+Out\s*\d+\s+In\s*\d+\s+(Vid|RGB)$' }
     returns: ack
@@ -753,9 +891,15 @@ commands:
   smx_tie_audio:
     summary: Tie an input's audio to an output on one plane
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      input:  { type: int, min: 0, max: 128, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      input:  { type: int, min: 0, max: 128, required: true,
+                label: Input,
+                description: "The input number, from 1 as on the switcher on that plane; 0 is accepted and by the SIS tie grammar unties the output's audio, which the guide does not state for this command." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{input}*{output}$"
     expect: { matches: '^\d+\s+Out\s*\d+\s+In\s*\d+\s+Aud$' }
     returns: ack
@@ -763,8 +907,12 @@ commands:
   smx_tie_input_to_all:
     summary: Tie an input's video and audio to every output of one plane
     params:
-      plane: { type: int, min: 0, max: 99, required: true }
-      input: { type: int, min: 0, max: 128, required: true }
+      plane: { type: int, min: 0, max: 99, required: true,
+               label: Plane,
+               description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      input: { type: int, min: 0, max: 128, required: true,
+               label: Input,
+               description: "The input number, from 1 as on the switcher on that plane; 0 is accepted, which by the SIS tie grammar unties every output of the plane, though the guide does not say so." }
     send: "{plane:02d}*{input}*!"
     expect: { matches: '^\d+\s+In\s*\d+\s+All$' }
     returns: ack
@@ -774,7 +922,9 @@ commands:
       Make several plane ties at once (Esc +Q); ties is a run of
       plane*input*output followed by !, % or $, such as 01*3*4!01*3*5%
     params:
-      ties: { type: string, max_length: 240, pattern: '^(\d{1,2}\*\d{1,3}\*\d{1,3}[!%&$])+$', required: true }
+      ties: { type: string, max_length: 240, pattern: '^(\d{1,2}\*\d{1,3}\*\d{1,3}[!%&$])+$', required: true,
+              label: Ties,
+              description: "A run of plane*input*output ties, plane as two digits, each followed by ! for video and audio, % or & for video or $ for audio, such as 01*3*4!01*3*5%, all switched together." }
     send: "\x1b+Q{ties}"
     expect: { matches: '^Qik$' }
     returns: ack
@@ -782,8 +932,12 @@ commands:
   smx_get_video_tie:
     summary: Input tied to an output's video on one plane
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{output}%"
     expect: { matches: '^(?:\d+\s+Out\s*\d+\s+In\s*)?(\d+)(?:\s+(?:Vid|RGB))?$' }
     returns: value
@@ -791,8 +945,12 @@ commands:
   smx_get_audio_tie:
     summary: Input tied to an output's audio on one plane
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{output}$"
     expect: { matches: '^(?:\d+\s+Out\s*\d+\s+In\s*)?(\d+)(?:\s+Aud)?$' }
     returns: value
@@ -800,9 +958,13 @@ commands:
   smx_set_video_mute:
     summary: Mute or unmute an output's video on one plane
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
-      muted:  { type: bool, default: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
+      muted:  { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{plane:02d}*{output}*{muted:bool01}B"
     expect: { matches: '^\d+\s+Vmt\s*\d+\*[01]$' }
     returns: ack
@@ -810,8 +972,12 @@ commands:
   smx_get_video_mute:
     summary: An output's video mute on one plane (0 off, 1 on)
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{output}B"
     expect: { matches: '^(?:\d+\s+Vmt\s*\d+\*)?([01])$' }
     returns: value
@@ -819,8 +985,10 @@ commands:
   smx_set_plane_video_mute:
     summary: Mute or unmute the video of every output on one plane
     params:
-      plane: { type: int, min: 0, max: 99, required: true }
-      muted: { type: bool, default: true }
+      plane: { type: int, min: 0, max: 99, required: true,
+               label: Plane,
+               description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      muted: { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{plane:02d}*{muted:bool01}*B"
     expect: { matches: '^\d+\s+Vmt\s*00\*[01]$' }
     returns: ack
@@ -828,9 +996,13 @@ commands:
   smx_set_audio_mute:
     summary: Mute or unmute an output's audio on one plane
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
-      muted:  { type: bool, default: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
+      muted:  { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{plane:02d}*{output}*{muted:bool01}Z"
     expect: { matches: '^\d+\s+Amt\s*\d+\*[01]$' }
     returns: ack
@@ -838,8 +1010,12 @@ commands:
   smx_get_audio_mute:
     summary: An output's audio mute on one plane (0 off, 1 on)
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      output: { type: int, min: 1, max: 128, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      output: { type: int, min: 1, max: 128, required: true,
+                label: Output,
+                description: "The output number, from 1 as on the switcher on that plane." }
     send: "{plane:02d}*{output}Z"
     expect: { matches: '^(?:\d+\s+Amt\s*\d+\*)?([01])$' }
     returns: value
@@ -847,8 +1023,10 @@ commands:
   smx_set_plane_audio_mute:
     summary: Mute or unmute the audio of every output on one plane
     params:
-      plane: { type: int, min: 0, max: 99, required: true }
-      muted: { type: bool, default: true }
+      plane: { type: int, min: 0, max: 99, required: true,
+               label: Plane,
+               description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      muted: { type: bool, default: true, label: Muted, description: "True mutes, false unmutes." }
     send: "{plane:02d}*{muted:bool01}*Z"
     expect: { matches: '^\d+\s+Amt\s*00\*[01]$' }
     returns: ack
@@ -856,7 +1034,9 @@ commands:
   smx_get_mutes:
     summary: Every output's mute status on one plane, one digit per output (0 none, 1 video, 2 audio, 3 both)
     params:
-      plane: { type: int, min: 0, max: 99, required: true }
+      plane: { type: int, min: 0, max: 99, required: true,
+               label: Plane,
+               description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
     send: "\x1b{plane:02d}VM"
     expect: { matches: '^(?:Mut\s*\d+\*)?([0-3][0-3\s]*)$' }
     returns: value
@@ -864,8 +1044,12 @@ commands:
   smx_save_plane_preset:
     summary: Save one plane's current ties as a plane preset
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      preset: { type: int, min: 1, max: 10, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      preset: { type: int, min: 1, max: 10, required: true,
+                label: Plane preset,
+                description: "The plane preset number, from 1 to 10, to save the plane's current ties to, replacing what it held." }
     send: "{plane:02d}*{preset}*0,"
     expect: { matches: '^\d+\s+Spr\s*\d+$' }
     returns: ack
@@ -873,8 +1057,12 @@ commands:
   smx_recall_plane_preset:
     summary: Recall a plane preset, replacing that plane's ties
     params:
-      plane:  { type: int, min: 0, max: 99, required: true }
-      preset: { type: int, min: 1, max: 10, required: true }
+      plane:  { type: int, min: 0, max: 99, required: true,
+                label: Plane,
+                description: "The SMX plane as numbered on the frame: 0 to 15 for the switching boards and 90 to 99 for virtual planes defined on the unit." }
+      preset: { type: int, min: 1, max: 10, required: true,
+                label: Plane preset,
+                description: "The plane preset number, from 1 to 10; a preset never saved answers E11 and changes nothing." }
     send: "{plane:02d}*{preset}*0."
     expect: { matches: '^\d+\s+Rpr\s*\d+$' }
     returns: ack

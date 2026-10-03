@@ -97,11 +97,17 @@ settings:
   # A Q-SYS Administrator user with External Control access, and its PIN.
   # Leave both unset when Access Control is off (or Guest has External
   # Control access): no Logon is sent then.
-  username: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]*$" }
-  pin: { type: string, secret: true }
+  username: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]*$",
+              label: Username,
+              description: "A Q-SYS Administrator user with External Control access; leave unset when Access Control is off or Guest has External Control access, and no Logon is sent." }
+  pin: { type: string, secret: true,
+         label: PIN,
+         description: "The PIN of that Q-SYS Administrator user; leave unset with the username." }
   # The AutoPoll rate, in seconds, a change group is given when controls are
   # first added to it (0: none; poll with change_group_poll instead).
-  auto_poll_rate: { type: float, min: 0, max: 3600, default: 0.25 }
+  auto_poll_rate: { type: float, min: 0, max: 3600, default: 0.25,
+                    label: AutoPoll rate,
+                    description: "Seconds between the Core's automatic polls of a change group, given to a group when controls are first added to it; 0 sets none, and groups are then polled with change_group_poll." }
 
 ports:
   - { port: 1710, protocol: tcp, role: control }
@@ -142,24 +148,40 @@ commands:
   control_get:
     summary: "Control.Get: the named controls' values; returns the result array [{Name, Value, String}] and updates controls.*"
     params:
-      controls: { type: json, required: true }
+      controls: { type: json, required: true,
+                  label: Controls,
+                  description: "A JSON array of Named Control names as they appear in the design, such as [\"Gain\", \"Mute\"]." }
     returns: value
   control_set:
     summary: >
       Control.Set: set a named control's Value, a number (value), string (value_string) or boolean (value_bool),
       exactly one, with an optional ramp in seconds
     params:
-      name: &control_name { type: string, required: true, max_length: 256 }
-      value: &number { type: float }
-      value_string: &value_string { type: string }
-      value_bool: &value_bool { type: bool }
-      ramp: &ramp { type: float, min: 0 }
+      name: &control_name { type: string, required: true, max_length: 256,
+              label: Control,
+              description: "The control's name as in the design: a Named Control for control_set, or a control of the component for component_set." }
+      value: &number { type: float,
+               label: Value,
+               description: "The number to set the control's Value to, in the control's own units (dB for a gain); give exactly one of value, value string and value bool." }
+      value_string: &value_string { type: string,
+                      label: Value string,
+                      description: "A string to set the control's Value to, for a text or list control; give exactly one of value, value string and value bool." }
+      value_bool: &value_bool { type: bool,
+                    label: Value bool,
+                    description: "True or false to set a boolean control's Value, such as a mute; give exactly one of value, value string and value bool." }
+      ramp: &ramp { type: float, min: 0,
+              label: Ramp,
+              description: "Time in seconds to move to the new value; leave unset or 0 to change at once." }
     returns: ack
   component_get:
     summary: "Component.Get: values of controls of a named component; controls is an array of control names. Returns {Name, Controls} and updates components.*"
     params:
-      component: &component { type: string, required: true, max_length: 256 }
-      controls: { type: json, required: true }
+      component: &component { type: string, required: true, max_length: 256,
+                   label: Component,
+                   description: "The component's name as in the design (its Code Name), where the control lives." }
+      controls: { type: json, required: true,
+                  label: Controls,
+                  description: "A JSON array of the component's control names, such as [\"gain\", \"mute\"]; names may contain dots." }
     returns: value
   component_get_controls:
     summary: "Component.GetControls: every control of a named component with Type, Value, ranges, String, Position and Direction; updates components.*"
@@ -180,7 +202,9 @@ commands:
       value_string: *value_string
       value_bool: *value_bool
       ramp: *ramp
-      response_values: &response_values { type: bool, default: false }
+      response_values: &response_values { type: bool, default: false,
+                         label: Return new values,
+                         description: "When true the Core returns the controls' new values, which also become state; when false it returns only the controls it did not recognise." }
     returns: value
   component_set_controls:
     summary: >
@@ -188,7 +212,9 @@ commands:
       Component.Set example 2)
     params:
       component: *component
-      controls: { type: json, required: true }
+      controls: { type: json, required: true,
+                  label: Controls,
+                  description: "A JSON array of controls to set, each {\"Name\", \"Value\"} with an optional \"Ramp\" in seconds, as in QRC's Component.Set." }
       response_values: *response_values
     returns: value
   change_group_add_controls:
@@ -196,21 +222,29 @@ commands:
       ChangeGroup.AddControl: add named controls (array of names) to a change group, creating it. A group's first
       controls start its AutoPoll at the auto_poll_rate setting; its results update controls.*
     params:
-      group: &group { type: string, default: meros, max_length: 128 }
-      controls: { type: json, required: true }
+      group: &group { type: string, default: meros, max_length: 128,
+               label: Change group,
+               description: "The change group's Id, any name of your choosing; a connection holds at most four groups, and they are deleted when the connection drops." }
+      controls: { type: json, required: true,
+                  label: Controls,
+                  description: "A JSON array of Named Control names to add to the group; the group is created if it does not exist." }
     returns: ack
   change_group_add_component_controls:
     summary: "ChangeGroup.AddComponentControl: add a named component's controls (array of names) to a change group; results update components.*"
     params:
       group: *group
       component: *component
-      controls: { type: json, required: true }
+      controls: { type: json, required: true,
+                  label: Controls,
+                  description: "A JSON array of the component's control names to add to the group; the group is created if it does not exist." }
     returns: ack
   change_group_remove:
     summary: "ChangeGroup.Remove: remove named controls (array of names) from a change group; returns the unknown controls"
     params:
       group: *group
-      controls: { type: json, required: true }
+      controls: { type: json, required: true,
+                  label: Controls,
+                  description: "A JSON array of Named Control names to remove from the group; a component's controls cannot be removed this way." }
     returns: value
   change_group_poll:
     summary: "ChangeGroup.Poll: the controls changed since the last poll (all on the first); returns {Id, Changes} and updates state"
@@ -221,7 +255,9 @@ commands:
     summary: "ChangeGroup.AutoPoll: have the Core poll the group every rate seconds and push the results"
     params:
       group: *group
-      rate: { type: float, min: 0, max: 3600, required: true }
+      rate: { type: float, min: 0, max: 3600, required: true,
+              label: Rate,
+              description: "Seconds between the Core's automatic polls of the group, whose changes it then pushes." }
     returns: ack
   change_group_clear:
     summary: "ChangeGroup.Clear: remove every control from a change group"
@@ -241,10 +277,18 @@ commands:
   mixer_set_crosspoint_gain:
     summary: "Mixer.SetCrossPointGain: crosspoint gain for inputs x outputs (QRC string syntax: '*', '1 2 3', '1-6 9', '1-8 !3'), optional ramp"
     params:
-      mixer: &mixer { type: string, required: true, max_length: 256 }
-      inputs: &inputs { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$" }
-      outputs: &outputs { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$" }
-      value: &gain { type: float, required: true }
+      mixer: &mixer { type: string, required: true, max_length: 256,
+               label: Mixer,
+               description: "The mixer component's name as in the design (its Code Name)." }
+      inputs: &inputs { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$",
+                label: Inputs,
+                description: "Mixer inputs numbered from 1 as in Q-SYS: * for all, numbers separated by spaces, ranges such as 1-6, and ! to exclude, as in 1-8 !3." }
+      outputs: &outputs { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$",
+                 label: Outputs,
+                 description: "Mixer outputs numbered from 1 as in Q-SYS: * for all, numbers separated by spaces, ranges such as 1-6, and ! to exclude, as in 1-8 !3." }
+      value: &gain { type: float, required: true,
+               label: Level,
+               description: "The gain in dB for the gain methods, or the crosspoint delay for set crosspoint delay, whose unit QSC does not document." }
       ramp: *ramp
     returns: ack
   mixer_set_crosspoint_delay:
@@ -257,7 +301,9 @@ commands:
       mixer: *mixer
       inputs: *inputs
       outputs: *outputs
-      value: &flag { type: bool, required: true }
+      value: &flag { type: bool, required: true,
+               label: State,
+               description: "True turns the mute, solo, cue enable or AFL on for the selected channels, false turns it off." }
     returns: ack
   mixer_set_crosspoint_solo:
     summary: "Mixer.SetCrossPointSolo: crosspoint solo for inputs x outputs"
@@ -287,7 +333,9 @@ commands:
     summary: "Mixer.SetCueMute: cue mute"
     params:
       mixer: *mixer
-      cues: &cues { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$" }
+      cues: &cues { type: string, required: true, max_length: 256, pattern: "^[0-9 ,*!-]+$",
+              label: Cues,
+              description: "Mixer cues numbered from 1 as in Q-SYS: * for all, numbers separated by spaces, ranges such as 1-6, and ! to exclude, as in 1-8 !3." }
       value: *flag
     returns: ack
   mixer_set_cue_gain:
@@ -308,21 +356,41 @@ commands:
       [{"Name": path, "Output": n}] or one file with output. start_time -1 now, -2 after the current track, 0 or
       more a time of day in seconds; failures arrive as LoopPlayer.Error (loop_player.last_error)
     params:
-      name: &loop_player { type: string, required: true, max_length: 256 }
-      files: { type: json }
-      file: { type: string, max_length: 1024 }
-      output: { type: int, min: 1 }
-      start_time: { type: float, min: -2 }
-      loop: { type: bool }
-      log: &log { type: bool }
-      ref_id: &ref_id { type: string, max_length: 256 }
-      seek: { type: float, min: 0 }
+      name: &loop_player { type: string, required: true, max_length: 256,
+              label: Loop Player,
+              description: "The Loop Player component's Code Name in the design." }
+      files: { type: json,
+               label: Files,
+               description: "A JSON array of files to play, each {\"Name\": path, \"Output\": n} with outputs numbered from 1; use this or file with output." }
+      file: { type: string, max_length: 1024,
+              label: File,
+              description: "Path of one audio file on the Core to play on output; use this or files." }
+      output: { type: int, min: 1,
+                label: Output,
+                description: "The Loop Player output to play file on, numbered from 1." }
+      start_time: { type: float, min: -2,
+                    label: Start time,
+                    description: "When to start: -1 now, -2 after the current track, or 0 or more for a time of day in seconds since midnight." }
+      loop: { type: bool,
+              label: Loop,
+              description: "True repeats the files until stopped; false plays them once." }
+      log: &log { type: bool,
+             label: Log,
+             description: "True asks the Core to record the job in its event log." }
+      ref_id: &ref_id { type: string, max_length: 256,
+                label: Reference,
+                description: "Your own reference for the job, returned with any LoopPlayer.Error so you can tell which job failed." }
+      seek: { type: float, min: 0,
+              label: Seek,
+              description: "Seconds into the file at which playback starts." }
     returns: ack
   loop_player_stop:
     summary: "LoopPlayer.Stop: stop playback on outputs (array of output numbers)"
     params:
       name: *loop_player
-      outputs: &outputs_list { type: json, required: true }
+      outputs: &outputs_list { type: json, required: true,
+                 label: Outputs,
+                 description: "A JSON array of Loop Player output numbers, from 1, to stop or whose queued job to cancel." }
       log: *log
       ref_id: *ref_id
     returns: ack
@@ -333,8 +401,12 @@ commands:
   snapshot_load:
     summary: "Snapshot.Load: load snapshot number snapshot (QRC 'Bank') of the bank named bank (QRC 'Name'), optional ramp"
     params:
-      bank: &bank { type: string, required: true, max_length: 256 }
-      snapshot: &snapshot { type: int, min: 1, required: true }
+      bank: &bank { type: string, required: true, max_length: 256,
+              label: Snapshot bank,
+              description: "The snapshot bank component's name as in the design." }
+      snapshot: &snapshot { type: int, min: 1, required: true,
+                  label: Snapshot,
+                  description: "The snapshot's number within the bank, from 1 to the bank's size, as numbered in Q-SYS Designer." }
       ramp: *ramp
     returns: ack
   snapshot_save:
@@ -347,29 +419,65 @@ commands:
       zone_tags an array of tags (one or both); a message page needs message, a voice page station.
       Progress arrives as PA.PageStatus (pa.pages.*)
     params:
-      mode: { type: enum, values: [message, live, delay, auto], required: true }
-      description: { type: string, max_length: 1024 }
-      zones: { type: json }
-      zone_tags: { type: json }
-      priority: { type: int, min: 1, required: true }
-      preamble: { type: string, max_length: 1024 }
-      message: { type: string, max_length: 1024 }
-      message_delete: { type: bool }
-      station: { type: int, min: 1 }
-      start: { type: bool }
-      queue_timeout: { type: int, min: -1 }
-      archive: { type: bool }
-      split: { type: bool }
-      retry_count: { type: int, min: 0 }
-      max_page_time: { type: int, min: 0 }
-      cancel_delay: { type: int, min: 0 }
-      originator: { type: string, max_length: 256 }
-      split_on_interrupt: { type: bool }
+      mode: { type: enum, values: [message, live, delay, auto], required: true,
+              label: Mode,
+              description: "The kind of page: message plays a stored message, live is a live voice page from a page station, delay records the announcement and plays it afterwards, and auto lets the PA Router choose as it is configured." }
+      description: { type: string, max_length: 1024,
+                     label: Description,
+                     description: "Text describing the page, for the PA Router's records." }
+      zones: { type: json,
+               label: Zones,
+               description: "A JSON array of PA Router zone numbers (from 1) and zone names to page; give this, zone tags or both." }
+      zone_tags: { type: json,
+                   label: Zone tags,
+                   description: "A JSON array of zone tags configured in the PA Router, each paging every zone that carries it; give this, zones or both." }
+      priority: { type: int, min: 1, required: true,
+                  label: Priority,
+                  description: "The page priority number as configured in the PA Router, listed by pa_get_config." }
+      preamble: { type: string, max_length: 1024,
+                  label: Preamble,
+                  description: "The file name of a message, such as a chime, to play before the page." }
+      message: { type: string, max_length: 1024,
+                 label: Message,
+                 description: "The file name of the stored message to play; required for a message page." }
+      message_delete: { type: bool,
+                        label: Delete message,
+                        description: "True deletes the message file once it has played." }
+      station: { type: int, min: 1,
+                 label: Page station,
+                 description: "The page station number, from 1, whose microphone carries a live or delayed voice page; required for a voice page." }
+      start: { type: bool,
+               label: Start,
+               description: "True starts the page as soon as it is submitted; false waits for pa_page_start." }
+      queue_timeout: { type: int, min: -1,
+                       label: Queue timeout,
+                       description: "Seconds the page may wait in the queue for its zones before it is dropped; the spec allows -1 but does not say what it means." }
+      archive: { type: bool, label: Archive, description: "True asks the PA Router to archive the page." }
+      split: { type: bool,
+               label: Split,
+               description: "True lets the page play in the zones that are free while others are busy, rather than waiting for all of them." }
+      retry_count: { type: int, min: 0,
+                     label: Retry count,
+                     description: "How many times the PA Router retries the page." }
+      max_page_time: { type: int, min: 0,
+                       label: Max page time,
+                       description: "The longest the page may run, in seconds." }
+      cancel_delay: { type: int, min: 0,
+                      label: Cancel delay,
+                      description: "Seconds the page waits before it plays, counted down in state, during which it can still be cancelled." }
+      originator: { type: string, max_length: 256,
+                    label: Originator,
+                    description: "Who or what originated the page, for the PA Router's records." }
+      split_on_interrupt: { type: bool,
+                            label: Split on interrupt,
+                            description: "True keeps the page playing in its other zones when a higher-priority page takes some of them." }
     returns: value
   pa_page_start:
     summary: "PA.PageStart: start a submitted page"
     params:
-      page_id: &page_id { type: int, min: 0, required: true }
+      page_id: &page_id { type: int, min: 0, required: true,
+                 label: Page ID,
+                 description: "The PageID returned by pa_page_submit." }
     returns: ack
   pa_page_stop:
     summary: "PA.PageStop: end a voice page (the announcer has finished)"
@@ -386,7 +494,9 @@ commands:
   pa_zone_status_configure:
     summary: "PA.ZoneStatusConfigure: start or stop PA.ZoneStatus notifications (pa.zones.*); enabling sends every zone's status at once"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+                 label: Enabled,
+                 description: "True starts PA.ZoneStatus notifications, sending every zone's status at once; false stops them." }
     returns: ack
   pa_get_config:
     summary: "PA.GetConfig: the PA Router's configured Zones, Tags and Priorities"
@@ -394,15 +504,21 @@ commands:
   pa_source_watchdog:
     summary: "PA.SourceWatchdog: start a watchdog on a remote system; a page playing when its client disconnects is ended"
     params:
-      remote_system: { type: string, required: true, max_length: 256 }
+      remote_system: { type: string, required: true, max_length: 256,
+                       label: Remote system,
+                       description: "The name of the remote paging system to watch; a page it is playing is ended if its client disconnects." }
     returns: ack
   raw_rpc:
     summary: >
       Any QRC method by name with its params as JSON (default {}), for methods the help documents later than
       this spec; returns the result. Replies that carry change group Changes still update state
     params:
-      method: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z][A-Za-z0-9.]*$" }
-      params: { type: json }
+      method: { type: string, required: true, max_length: 128, pattern: "^[A-Za-z][A-Za-z0-9.]*$",
+                label: Method,
+                description: "The QRC method name exactly as in the Q-SYS help, such as StatusGet or Mixer.SetInputGain." }
+      params: { type: json,
+                label: Params,
+                description: "The method's params as JSON, as documented in the Q-SYS help; {} when unset." }
     returns: value
 
 state:
