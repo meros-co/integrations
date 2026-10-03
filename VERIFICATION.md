@@ -268,6 +268,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## canon-ptz — Canon PTZ and pro video cameras (XC protocol)
+
+- [ ] Confirm every control.cgi key and value against a camera: they come from the Companion module, not from Canon's gated XC specification. ([specs/canon-ptz.yaml:1226](specs/canon-ptz.yaml#L1226))
+- [ ] Record what control.cgi, standby.cgi, preset/set and trace/control answer on success and on a refused value (status 200 assumed for success). ([specs/canon-ptz.yaml:219](specs/canon-ptz.yaml#L219))
+- [ ] Record a full info.cgi reply: the key:=value line format, line endings, and the values of f.standby, f.tally/f.tally.mode, shutter, iris, gain and ND. ([specs/canon-ptz.yaml:1129](specs/canon-ptz.yaml#L1129))
+- [ ] Check whether info.cgi reports program and preview tally separately, or only the last-set tally with its mode. ([specs/canon-ptz.yaml:1141](specs/canon-ptz.yaml#L1141))
+- [ ] On CR-N100, CR-N300, CR-N350 and CR-N400, check whether the iris value key is c.1.me.diaphragm (sent here) or me.diaphragm (sent by the Companion module). ([specs/canon-ptz.yaml:1265](specs/canon-ptz.yaml#L1265))
+- [ ] Check the pan/tilt speed scale for pan.speed.dir and tilt.speed.dir (10-10000 assumed) and zoom.speed.dir (0-127). ([specs/canon-ptz.yaml:341](specs/canon-ptz.yaml#L341))
+- [ ] Check the units and ranges of the absolute pan, tilt and zoom positions in pan_tilt_zoom_to and zoom_to. ([specs/canon-ptz.yaml:452](specs/canon-ptz.yaml#L452))
+- [ ] Check that p.ptztime is in milliseconds (2000-99000) and p.ptzspeed 1-100. ([specs/canon-ptz.yaml:960](specs/canon-ptz.yaml#L960))
+- [ ] Check save_preset_selective's option keys (ptz, focus, exp, wb, is, cp) and what cp saves. ([specs/canon-ptz.yaml:1003](specs/canon-ptz.yaml#L1003))
+- [ ] Check whether set_exposure_mode needs manual shooting first, and the per-model value lists (shutter, iris, gain, ND, kelvin, digital magnification). ([specs/canon-ptz.yaml:648](specs/canon-ptz.yaml#L648))
+- [ ] Check that on1 is the only "on" value of c.1.is. ([specs/canon-ptz.yaml:317](specs/canon-ptz.yaml#L317))
+- [ ] Check Digest authentication with an administrator account and with guest access, on firmware with HTTPS enabled. ([specs/canon-ptz.yaml:57](specs/canon-ptz.yaml#L57))
+- [ ] On the EOS C80 and XF605, confirm the XC protocol is enabled over the network the same way, and which commands they accept. ([specs/canon-ptz.yaml:305](specs/canon-ptz.yaml#L305))
+
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
 - [ ] Check the blackout sense: whether /dbo 0 turns blackout on (manual) or off (Companion). ([specs/chamsys-magicq.yaml:1104](specs/chamsys-magicq.yaml#L1104))
