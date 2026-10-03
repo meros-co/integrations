@@ -81,51 +81,77 @@ settings:
   #   approve friendly_name, and the module waits without a timeout.
   # ssh: Access Authentication is on; PTP-IP goes through an SSH tunnel to the
   #   camera's localhost:15740 (the port override then applies to SSH, 22).
-  connection: { type: enum, values: [plain, pairing, ssh], default: plain }
+  connection: { type: enum, values: [plain, pairing, ssh], default: plain,
+    label: Connection,
+    description: "plain for PTP-IP on port 15740, pairing when the camera's pairing menu is showing (the operator approves on the camera), or ssh when Access Authentication is on." }
   # Shown on the camera's pairing prompt and stored with the approval.
-  friendly_name: { type: string, max_length: 39, default: Meros }
+  friendly_name: { type: string, max_length: 39, default: Meros,
+    label: Friendly name,
+    description: "The name shown on the camera's pairing prompt and stored with the approval." }
   # The initiator GUID the camera remembers after pairing (up to 20 per
   # camera). Unset: derived from friendly_name, so it is stable as long as the
   # name is. Set it to keep one approval across renamed installations.
-  guid: { type: string, pattern: "^([0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$" }
+  guid: { type: string, pattern: "^([0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+    label: GUID,
+    description: "The initiator GUID the camera remembers after pairing, as 32 hex digits; empty derives it from the friendly name." }
   # The camera's SSH user and password (set on the camera under its access
   # authentication settings), for connection: ssh.
-  ssh_username: { type: string }
-  ssh_password: { type: string, secret: true }
+  ssh_username: { type: string,
+    label: SSH username,
+    description: "The SSH user set on the camera under its access authentication settings, for the ssh connection." }
+  ssh_password: { type: string, secret: true,
+    label: SSH password,
+    description: "The SSH password set on the camera under its access authentication settings, for the ssh connection." }
   # The camera's SSH host key fingerprint as OpenSSH prints it
   # (SHA256:...), checked on every connection. Unset: not verified.
-  ssh_fingerprint: { type: string, pattern: "^SHA256:[A-Za-z0-9+/=]+$" }
+  ssh_fingerprint: { type: string, pattern: "^SHA256:[A-Za-z0-9+/=]+$",
+    label: SSH fingerprint,
+    description: "The camera's SSH host key fingerprint as OpenSSH prints it (SHA256:...); empty leaves the camera unverified." }
   # How often the camera's changed properties are read, in addition to the
   # reads its change events trigger.
-  poll_ms: { type: int, min: 250, max: 60000, default: 1000 }
+  poll_ms: { type: int, min: 250, max: 60000, default: 1000,
+    label: Poll interval,
+    description: "How often the camera's changed properties are read, in milliseconds, besides the reads its change events trigger." }
   # Which Camera Control protocol to speak. auto: PTP 2 for bodies that have
   # only PTP 2 (ILCE-7M3), PTP 3 for the rest; a body that answers PTP 3 with
   # a 2.xx version is driven with PTP 2.
-  protocol: { type: enum, values: [auto, ptp3, ptp2], default: auto }
+  protocol: { type: enum, values: [auto, ptp3, ptp2], default: auto,
+    label: Protocol,
+    description: "auto picks PTP 2 for bodies with only PTP 2 and PTP 3 for the rest; ptp3 or ptp2 forces one." }
   # The session's function mode. auto: remote_with_transfer on bodies whose
   # compatibility tables list its content operations, remote otherwise. A
   # mode the camera refuses falls back to remote. switch_session_mode changes
   # it while connected.
-  session_mode: { type: enum, values: [auto, remote, remote_with_transfer, content_transfer], default: auto }
+  session_mode: { type: enum, values: [auto, remote, remote_with_transfer, content_transfer], default: auto,
+    label: Session mode,
+    description: "remote for control only, remote_with_transfer for control and the content list, content_transfer for card access without control; auto picks by model." }
   # In content_transfer mode, who chooses the content: remote (this side
   # reaches the whole card) or camera (the operator picks on the camera and
   # only that reaches this side).
-  content_selection: { type: enum, values: [remote, camera], default: remote }
+  content_selection: { type: enum, values: [remote, camera], default: remote,
+    label: Content selection,
+    description: "In content_transfer mode: remote reaches the whole card, camera reaches only what the operator picks on the camera." }
   # The shortest time between the starts of two live view image requests
   # while the live stream is watched (PTP bodies). 33 ms is the 30 frames a
   # second a camera serves at most; raise it to spare the network.
-  live_interval_ms: { type: int, min: 0, max: 10000, default: 33 }
+  live_interval_ms: { type: int, min: 0, max: 10000, default: 33,
+    label: Live view interval,
+    description: "Shortest time between two live view image requests, in milliseconds; 33 is the camera's 30 frames a second." }
   # What the live stream does while a file is downloaded from the card of a
   # PTP body. keep: frames go between download parts (spaced by
   # live_view_transfer_interval_ms), and
   # the transfer is somewhat slower. pause: the transfer runs at full speed and
   # the picture waits until it ends. set_live_view_during_transfers changes it
   # while connected. Pan/tilt bodies are not affected.
-  live_view_during_transfers: { type: enum, values: [keep, pause], default: keep }
+  live_view_during_transfers: { type: enum, values: [keep, pause], default: keep,
+    label: Live view during downloads,
+    description: "keep shows frames between download parts and slows the download a little; pause runs the download at full speed and holds the picture." }
   # With keep, the shortest time between two live view frames while a
   # download runs: 100 ms is at most 10 frames a second; lower keeps the
   # picture smoother and slows the transfer more.
-  live_view_transfer_interval_ms: { type: int, min: 20, max: 5000, default: 100 }
+  live_view_transfer_interval_ms: { type: int, min: 20, max: 5000, default: 100,
+    label: Live view interval during downloads,
+    description: "With keep, the shortest time between live view frames during a download, in milliseconds; 100 is at most 10 frames a second." }
 
 
 ports:
@@ -877,515 +903,725 @@ commands:
   set_exposure_mode:
     summary: "Set exposure mode (Sony: Exposure Program Mode, 0x500E)"
     params:
-      value: { type: enum, values: [manual, program, aperture_priority, shutter_priority, program_creative, program_action, portrait, auto, auto_plus, program_aperture, program_shutter, scene_sports, scene_sunset, scene_night, scene_landscape, scene_macro, scene_handheld_twilight, scene_night_portrait, scene_anti_motion_blur, scene_pet, scene_food, scene_fireworks, scene_high_sensitivity, memory_recall, continuous_priority_ae, tele_zoom_continuous_8, tele_zoom_continuous_10, continuous_priority_ae_12, sweep_panorama_3d, sweep_panorama, movie_program, movie_aperture_priority, movie_shutter_priority, movie_manual, movie_auto, movie_sq_program, movie_sq_aperture_priority, movie_sq_shutter_priority, movie_sq_manual, movie_sq_auto, flash_off, picture_effect, hfr_program, hfr_aperture_priority, hfr_shutter_priority, hfr_manual, sq_program, sq_aperture_priority, sq_shutter_priority, sq_manual, movie, still, flexible_movie_or_sq, movie_flexible, sq_flexible, interval_movie_flexible, interval_movie_program, interval_movie_aperture_priority, interval_movie_shutter_priority, interval_movie_manual, interval_movie_auto], required: true }
+      value: { type: enum, values: [manual, program, aperture_priority, shutter_priority, program_creative, program_action, portrait, auto, auto_plus, program_aperture, program_shutter, scene_sports, scene_sunset, scene_night, scene_landscape, scene_macro, scene_handheld_twilight, scene_night_portrait, scene_anti_motion_blur, scene_pet, scene_food, scene_fireworks, scene_high_sensitivity, memory_recall, continuous_priority_ae, tele_zoom_continuous_8, tele_zoom_continuous_10, continuous_priority_ae_12, sweep_panorama_3d, sweep_panorama, movie_program, movie_aperture_priority, movie_shutter_priority, movie_manual, movie_auto, movie_sq_program, movie_sq_aperture_priority, movie_sq_shutter_priority, movie_sq_manual, movie_sq_auto, flash_off, picture_effect, hfr_program, hfr_aperture_priority, hfr_shutter_priority, hfr_manual, sq_program, sq_aperture_priority, sq_shutter_priority, sq_manual, movie, still, flexible_movie_or_sq, movie_flexible, sq_flexible, interval_movie_flexible, interval_movie_program, interval_movie_aperture_priority, interval_movie_shutter_priority, interval_movie_manual, interval_movie_auto], required: true,
+        label: Exposure mode,
+        description: "The exposure program, such as manual, program, aperture_priority, shutter_priority, auto or a scene mode; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_exposure_control_type:
     summary: "Set exposure control type (Sony: Exposure Ctrl Type, 0xD099)"
     params:
-      value: { type: enum, values: [pasm, flexible], required: true }
+      value: { type: enum, values: [pasm, flexible], required: true,
+        label: Exposure control type,
+        description: "pasm for the P/A/S/M modes or flexible for flexible exposure." }
     returns: ack
   set_iris:
     summary: "Set exposure iris (Sony: F-Number, 0x5007)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+        label: Iris,
+        description: "Aperture as an F-number, such as 2.8; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_iris_control:
     summary: "Set exposure iris control (Sony: Iris Mode Setting, 0xD001)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: Iris control,
+        description: "auto or manual iris." }
     returns: ack
   set_shutter_angle:
     summary: "Set exposure shutter angle (Sony: Shutter Angle, 0xD00E)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+        label: Shutter angle,
+        description: "Shutter angle in degrees, such as 180; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_shutter_mode:
     summary: "Set exposure shutter mode (Sony: Shutter Mode, 0xD010)"
     params:
-      value: { type: enum, values: [speed, angle], required: true }
+      value: { type: enum, values: [speed, angle], required: true,
+        label: Shutter mode,
+        description: "Set the shutter by speed or by angle." }
     returns: ack
   set_shutter_control:
     summary: "Set exposure shutter control (Sony: Shutter Mode Setting, 0xD013)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: Shutter control,
+        description: "auto or manual shutter." }
     returns: ack
   set_shutter_enabled:
     summary: "Set exposure shutter enabled (Sony: Shutter Setting, 0xD00F)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Shutter on,
+        description: "On turns the shutter setting on, off turns it off." }
     returns: ack
   set_iso:
     summary: "Set exposure iso (Sony: ISO Sensitivity, 0xD21E)"
     params:
-      value: { type: string, pattern: "^(auto|[0-9]{1,7})$", required: true }
+      value: { type: string, pattern: "^(auto|[0-9]{1,7})$", required: true,
+        label: ISO,
+        description: "ISO sensitivity as a number, such as 800, or auto; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_exposure_index:
     summary: "Set exposure exposure index (Sony: Exposure Index, 0xD022)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Exposure index,
+        description: "Exposure index (EI) value; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_gain_db:
     summary: "Set exposure gain db (Sony: Gain dB Value, 0xD01E)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Gain,
+        description: "Gain in dB; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_gain_control:
     summary: "Set exposure gain control (Sony: Gain Control Setting, 0xD01C)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: Gain control,
+        description: "auto or manual gain." }
     returns: ack
   set_gain_unit:
     summary: "Set exposure gain unit (Sony: Gain Unit Setting, 0xD01D)"
     params:
-      value: { type: enum, values: [db, iso], required: true }
+      value: { type: enum, values: [db, iso], required: true,
+        label: Gain unit,
+        description: "Show gain in dB or as ISO." }
     returns: ack
   set_base_iso:
     summary: "Set exposure base iso (Sony: Gain Base ISO Sensitivity, 0xD020)"
     params:
-      value: { type: enum, values: [high, low], required: true }
+      value: { type: enum, values: [high, low], required: true,
+        label: Base ISO,
+        description: "The high or low base ISO sensitivity." }
     returns: ack
   set_base_sensitivity:
     summary: "Set exposure base sensitivity (Sony: Gain Base Sensitivity, 0xD021)"
     params:
-      value: { type: enum, values: [high, low], required: true }
+      value: { type: enum, values: [high, low], required: true,
+        label: Base sensitivity,
+        description: "The high or low base sensitivity." }
     returns: ack
   set_exposure_compensation:
     summary: "Set exposure compensation (Sony: Exposure Bias Compensation, 0x5010)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+        label: Exposure compensation,
+        description: "Exposure compensation in EV, such as -0.7; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_metering_mode:
     summary: "Set exposure metering (Sony: Exposure Metering Mode, 0x500B)"
     params:
-      value: { type: enum, values: [average, center_weighted_average, multi_spot, center_spot, multi, center_weighted, entire_screen_average, spot_standard, spot_large, highlight, standard, backlight, spotlight], required: true }
+      value: { type: enum, values: [average, center_weighted_average, multi_spot, center_spot, multi, center_weighted, entire_screen_average, spot_standard, spot_large, highlight, standard, backlight, spotlight], required: true,
+        label: Metering mode,
+        description: "How the camera meters, such as multi, center_weighted, spot_standard or highlight; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_flash_compensation:
     summary: "Set exposure flash compensation (Sony: Flash Compensation, 0xD200)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+        label: Flash compensation,
+        description: "Flash compensation in EV; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_dro:
     summary: "Set exposure dro (Sony: Dynamic Range Optimizer, 0xD201)"
     params:
-      value: { type: enum, values: ["off", dro, dro_plus, dro_manual_1, dro_manual_2, dro_manual_3, dro_manual_4, dro_manual_5, dro_manual_6, dro_manual_7, dro_manual_8, dro_auto, hdr_auto, hdr_1ev, hdr_2ev, hdr_3ev, hdr_4ev, hdr_5ev, hdr_6ev], required: true }
+      value: { type: enum, values: ["off", dro, dro_plus, dro_manual_1, dro_manual_2, dro_manual_3, dro_manual_4, dro_manual_5, dro_manual_6, dro_manual_7, dro_manual_8, dro_auto, hdr_auto, hdr_1ev, hdr_2ev, hdr_3ev, hdr_4ev, hdr_5ev, hdr_6ev], required: true,
+        label: DRO,
+        description: "Dynamic Range Optimizer: off, auto or a DRO level; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_nd_filter:
     summary: "Set nd enabled (Sony: ND Filter, 0xD018)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: ND filter,
+        description: "On puts the ND filter in, off takes it out." }
     returns: ack
   set_nd_control:
     summary: "Set nd control (Sony: ND Filter Mode Setting, 0xD01A)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: ND control,
+        description: "auto or manual ND filter." }
     returns: ack
   set_white_balance:
     summary: "Set white balance mode (Sony: White Balance, 0x5005)"
     params:
-      value: { type: enum, values: [manual, auto, one_push_auto, daylight, fluorescent, tungsten, flash, fluorescent_warm_white, fluorescent_cool_white, fluorescent_day_white, fluorescent_daylight, cloudy, shade, color_temperature, custom_1, custom_2, custom_3, custom, underwater_auto], required: true }
+      value: { type: enum, values: [manual, auto, one_push_auto, daylight, fluorescent, tungsten, flash, fluorescent_warm_white, fluorescent_cool_white, fluorescent_day_white, fluorescent_daylight, cloudy, shade, color_temperature, custom_1, custom_2, custom_3, custom, underwater_auto], required: true,
+        label: White balance,
+        description: "White balance mode, such as auto, daylight, tungsten, a colour temperature or a custom setting; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_white_balance_control:
     summary: "Set white balance control (Sony: White Balance Mode Setting, 0xD00C)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: White balance control,
+        description: "auto or manual white balance." }
     returns: ack
   set_color_temperature:
     summary: "Set white balance color temperature (Sony: Color Temperature, 0xD20F)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Colour temperature,
+        description: "Colour temperature in kelvin, such as 5600; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_tint:
     summary: "Set white balance tint (Sony: White Balance Tint, 0xD00D)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Tint,
+        description: "White balance tint on the camera's scale; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_white_balance_memory:
     summary: "Set white balance memory (Sony: White Balance Switch, 0xD085)"
     params:
-      value: { type: enum, values: [preset, memory_a, memory_b], required: true }
+      value: { type: enum, values: [preset, memory_a, memory_b], required: true,
+        label: White balance memory,
+        description: "preset, memory A or memory B." }
     returns: ack
   set_preset_color_temperature:
     summary: "Set white balance preset color temperature (Sony: White Balance Preset Color Temperature, 0xD086)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Preset colour temperature,
+        description: "Colour temperature of the white balance preset, in kelvin; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_white_balance_r_gain:
     summary: "Set white balance r gain (Sony: White Balance R Gain, 0xD087)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+        label: R gain,
+        description: "White balance red gain; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_white_balance_b_gain:
     summary: "Set white balance b gain (Sony: White Balance B Gain, 0xD088)"
     params:
-      value: { type: float, required: true }
+      value: { type: float, required: true,
+        label: B gain,
+        description: "White balance blue gain; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_focus_mode:
     summary: "Set focus mode (Sony: Focus Mode, 0x500A)"
     params:
-      value: { type: enum, values: [manual, af_single, af_macro, af_continuous, af_auto, direct_manual, manual_reverse, af_d, preset_focus], required: true }
+      value: { type: enum, values: [manual, af_single, af_macro, af_continuous, af_auto, direct_manual, manual_reverse, af_d, preset_focus], required: true,
+        label: Focus mode,
+        description: "manual, a continuous, single or automatic AF mode, direct manual focus or preset focus; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_focus_control:
     summary: "Set focus control (Sony: Focus Mode Setting, 0xD007)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: Focus control,
+        description: "auto or manual focus." }
     returns: ack
   set_focus_area:
     summary: "Set focus area (Sony: Focus Area, 0xD22C)"
     params:
-      value: { type: enum, values: [unknown, wide, zone, center, flexible_spot_s, flexible_spot_m, flexible_spot_l, expand_flexible_spot, flexible_spot, flexible_spot_xs, flexible_spot_xl, flexible_spot_free_1, flexible_spot_free_2, flexible_spot_free_3, tracking_wide, tracking_zone, tracking_center, tracking_flexible_spot_s, tracking_flexible_spot_m, tracking_flexible_spot_l, tracking_expand_flexible_spot, tracking_flexible_spot, tracking_flexible_spot_xs, tracking_flexible_spot_xl, tracking_flexible_spot_free_1, tracking_flexible_spot_free_2, tracking_flexible_spot_free_3], required: true }
+      value: { type: enum, values: [unknown, wide, zone, center, flexible_spot_s, flexible_spot_m, flexible_spot_l, expand_flexible_spot, flexible_spot, flexible_spot_xs, flexible_spot_xl, flexible_spot_free_1, flexible_spot_free_2, flexible_spot_free_3, tracking_wide, tracking_zone, tracking_center, tracking_flexible_spot_s, tracking_flexible_spot_m, tracking_flexible_spot_l, tracking_expand_flexible_spot, tracking_flexible_spot, tracking_flexible_spot_xs, tracking_flexible_spot_xl, tracking_flexible_spot_free_1, tracking_flexible_spot_free_2, tracking_flexible_spot_free_3], required: true,
+        label: Focus area,
+        description: "The AF area, such as wide, zone, center or a flexible spot size; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_subject_recognition_af:
     summary: "Set focus subject recognition (Sony: Subject Recognition AF, 0xD060)"
     params:
-      value: { type: enum, values: ["off", af_only, af_priority], required: true }
+      value: { type: enum, values: ["off", af_only, af_priority], required: true,
+        label: Subject recognition,
+        description: "off, AF only, or AF with priority on recognised subjects." }
     returns: ack
   set_af_transition_speed:
     summary: "Set focus af transition speed (Sony: AF Transition Speed, 0xD061)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: AF transition speed,
+        description: "How fast focus moves to a new subject, on the camera's scale; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_af_subject_shift_sensitivity:
     summary: "Set focus af subject shift sensitivity (Sony: AF Subj Shift Sens, 0xD062)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: AF subject shift sensitivity,
+        description: "How readily AF switches to another subject, on the camera's scale; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_zoom_setting:
     summary: "Set zoom setting (Sony: Zoom Setting, 0xD25F)"
     params:
-      value: { type: enum, values: [optical_only, smart_only, clear_image_zoom, digital_zoom], required: true }
+      value: { type: enum, values: [optical_only, smart_only, clear_image_zoom, digital_zoom], required: true,
+        label: Zoom setting,
+        description: "Optical zoom only, Smart zoom, Clear Image Zoom or digital zoom." }
     returns: ack
   set_remote_zoom_speed_type:
     summary: "Set zoom remote speed type (Sony: Remote Control Zoom Speed Type, 0xD299)"
     params:
-      value: { type: enum, values: [invalid, variable, fixed], required: true }
+      value: { type: enum, values: [invalid, variable, fixed], required: true,
+        label: Remote zoom speed type,
+        description: "variable or fixed zoom speed for remote zoom." }
     returns: ack
   set_movie_file_format:
     summary: "Set recording file format (Sony: File Format (Movie), 0xD241)"
     params:
-      value: { type: enum, values: [dvd, m2ps, avchd, mp4, dv, xavc, mxf, xavc_s_4k, xavc_s_hd, xavc_hs_8k, xavc_hs_4k, xavc_s_l_4k, xavc_s_l_hd, xavc_s_i_4k, xavc_s_i_hd, xavc_i, xavc_l, xavc_proxy, xavc_hs_hd, xavc_s_i_dci_4k, xavc_h_i_hq, xavc_h_i_sq, xavc_h_l, x_ocn_xt, x_ocn_st, x_ocn_lt, xavc_hs_l_422, xavc_hs_l_420, xavc_s_l_422, xavc_s_l_420, xavc_s_i_422, mpeg_hd_422], required: true }
+      value: { type: enum, values: [dvd, m2ps, avchd, mp4, dv, xavc, mxf, xavc_s_4k, xavc_s_hd, xavc_hs_8k, xavc_hs_4k, xavc_s_l_4k, xavc_s_l_hd, xavc_s_i_4k, xavc_s_i_hd, xavc_i, xavc_l, xavc_proxy, xavc_hs_hd, xavc_s_i_dci_4k, xavc_h_i_hq, xavc_h_i_sq, xavc_h_l, x_ocn_xt, x_ocn_st, x_ocn_lt, xavc_hs_l_422, xavc_hs_l_420, xavc_s_l_422, xavc_s_l_420, xavc_s_i_422, mpeg_hd_422], required: true,
+        label: Movie file format,
+        description: "The movie recording format, such as xavc_s_4k or xavc_hs_4k; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_movie_recording_setting:
     summary: "Set recording setting (Sony: Recording Setting (Movie), 0xD242)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Recording setting,
+        description: "The movie recording setting as the camera's raw value; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_movie_frame_rate:
     summary: "Set recording frame rate (Sony: Recording Frame Rate Setting (Movie), 0xD286)"
     params:
-      value: { type: enum, values: ["120p", "100p", "60p", "50p", "30p", "25p", "24p", "23.98p", "29.97p", "59.94p", "19.98p", "14.99p", "12.50p", "12.00p", "11.99p", "10.00p", "9.99p", "6.00p", "5.99p", "5.00p", "4.995p", "24.00p", "119.88p", "120i", "100i", "60i", "50i", "30i", "25i", "24i", "23.98i", "29.97i", "59.94i", "19.98i", "14.99i", "12.50i", "12.00i", "11.99i", "10.00i", "9.99i", "6.00i", "5.99i", "5.00i", "4.995i", "24.00i", "119.88i"], required: true }
+      value: { type: enum, values: ["120p", "100p", "60p", "50p", "30p", "25p", "24p", "23.98p", "29.97p", "59.94p", "19.98p", "14.99p", "12.50p", "12.00p", "11.99p", "10.00p", "9.99p", "6.00p", "5.99p", "5.00p", "4.995p", "24.00p", "119.88p", "120i", "100i", "60i", "50i", "30i", "25i", "24i", "23.98i", "29.97i", "59.94i", "19.98i", "14.99i", "12.50i", "12.00i", "11.99i", "10.00i", "9.99i", "6.00i", "5.99i", "5.00i", "4.995i", "24.00i", "119.88i"], required: true,
+        label: Frame rate,
+        description: "Movie recording frame rate, such as 24p, 25p or 59.94p; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_simul_rec:
     summary: "Set recording simul rec (Sony: Simul Rec Setting, 0xD050)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Simul rec,
+        description: "On records to both card slots at once, off to one." }
     returns: ack
   set_audio_recording:
     summary: "Set recording audio (Sony: Audio Recording, 0xD0D2)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Audio recording,
+        description: "On records audio with movies, off records none." }
     returns: ack
   set_slow_and_quick:
     summary: "Set recording slow and quick (Sony: S&Q Mode Setting, 0xD051)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Slow and quick,
+        description: "On turns S&Q motion on, off turns it off." }
     returns: ack
   set_slow_and_quick_frame_rate:
     summary: "Set recording slow and quick frame rate (Sony: S&Q Frame Rate, 0xD052)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: "S&Q frame rate",
+        description: "Frame rate used in S&Q motion; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_movie_shooting_mode:
     summary: "Set recording shooting mode (Sony: Movie Shooting Mode, 0xE000)"
     params:
-      value: { type: enum, values: ["off", sdr, hdr, cine_ei, cine_ei_quick, custom, flexible_iso], required: true }
+      value: { type: enum, values: ["off", sdr, hdr, cine_ei, cine_ei_quick, custom, flexible_iso], required: true,
+        label: Shooting mode,
+        description: "Movie shooting mode: off, SDR, HDR, Cine EI, Cine EI Quick, custom or flexible ISO." }
     returns: ack
   set_drive_mode:
     summary: "Set still drive mode (Sony: Still Capture Mode, 0x5013)"
     params:
-      value: { type: enum, values: [single, continuous_hi, continuous_hi_plus, continuous_hi_live, continuous_lo, continuous, continuous_speed_priority, continuous_mid, continuous_mid_live, continuous_lo_live, timelapse, self_timer_5s, self_timer_10s, self_timer_2s, remote_commander, mirror_up, self_portrait_1, self_portrait_2, self_timer_continuous_3, self_timer_continuous_5, self_timer_continuous_3_5s, self_timer_continuous_5_5s, self_timer_continuous_3_2s, self_timer_continuous_5_2s, spot_burst_lo, spot_burst_mid, spot_burst_hi], required: true }
+      value: { type: enum, values: [single, continuous_hi, continuous_hi_plus, continuous_hi_live, continuous_lo, continuous, continuous_speed_priority, continuous_mid, continuous_mid_live, continuous_lo_live, timelapse, self_timer_5s, self_timer_10s, self_timer_2s, remote_commander, mirror_up, self_portrait_1, self_portrait_2, self_timer_continuous_3, self_timer_continuous_5, self_timer_continuous_3_5s, self_timer_continuous_5_5s, self_timer_continuous_3_2s, self_timer_continuous_5_2s, spot_burst_lo, spot_burst_mid, spot_burst_hi], required: true,
+        label: Drive mode,
+        description: "Still drive mode, such as single, a continuous speed, a self-timer or bracketing; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_still_file_format:
     summary: "Set still file format (Sony: File Format (Still), 0xD253)"
     params:
-      value: { type: enum, values: [raw, raw_jpeg, jpeg, raw_heif, heif], required: true }
+      value: { type: enum, values: [raw, raw_jpeg, jpeg, raw_heif, heif], required: true,
+        label: Still file format,
+        description: "RAW, JPEG, HEIF, or RAW with JPEG or HEIF." }
     returns: ack
   set_still_quality:
     summary: "Set still quality (Sony: Still Image Quality, 0xD252)"
     params:
-      value: { type: enum, values: [extra_fine, fine, standard, light], required: true }
+      value: { type: enum, values: [extra_fine, fine, standard, light], required: true,
+        label: Still quality,
+        description: "JPEG or HEIF quality: extra fine, fine, standard or light." }
     returns: ack
   set_aspect_ratio:
     summary: "Set still aspect ratio (Sony: Aspect Ratio, 0xD211)"
     params:
-      value: { type: enum, values: ["3:2", "16:9", "4:3", "1:1"], required: true }
+      value: { type: enum, values: ["3:2", "16:9", "4:3", "1:1"], required: true,
+        label: Aspect ratio,
+        description: "Still image aspect ratio: 3:2, 16:9, 4:3 or 1:1." }
     returns: ack
   set_picture_profile:
     summary: "Set image picture profile (Sony: Picture Profile, 0xD23F)"
     params:
-      value: { type: enum, values: ["off", pp1, pp2, pp3, pp4, pp5, pp6, pp7, pp8, pp9, pp10, pp11, pp_lut1, pp_lut2, pp_lut3, pp_lut4], required: true }
+      value: { type: enum, values: ["off", pp1, pp2, pp3, pp4, pp5, pp6, pp7, pp8, pp9, pp10, pp11, pp_lut1, pp_lut2, pp_lut3, pp_lut4], required: true,
+        label: Picture profile,
+        description: "off, or a picture profile from PP1 up, as the camera has them." }
     returns: ack
   set_gamma:
     summary: "Set image gamma (Sony: Picture Profile Gamma, 0xD0E1)"
     params:
-      value: { type: enum, values: [movie, still, s_cinetone, cine1, cine2, cine3, cine4, itu709, itu709_800, s_log2, s_log3, hlg, hlg1, hlg2, hlg3], required: true }
+      value: { type: enum, values: [movie, still, s_cinetone, cine1, cine2, cine3, cine4, itu709, itu709_800, s_log2, s_log3, hlg, hlg1, hlg2, hlg3], required: true,
+        label: Gamma,
+        description: "The picture profile's gamma, such as s_cinetone, itu709, s_log3 or hlg; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_creative_look:
     summary: "Set image creative look (Sony: Creative Look, 0xD0FA)"
     params:
-      value: { type: enum, values: [st, pt, nt, vv, vv2, fl, in, sh, bw, se, fl2, fl3, custom_1, custom_2, custom_3, custom_4, custom_5, custom_6], required: true }
+      value: { type: enum, values: [st, pt, nt, vv, vv2, fl, in, sh, bw, se, fl2, fl3, custom_1, custom_2, custom_3, custom_4, custom_5, custom_6], required: true,
+        label: Creative look,
+        description: "The creative look, such as ST, PT, NT, VV or FL; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_creative_style:
     summary: "Set image creative style (Sony: Creative Style, 0xD240)"
     params:
-      value: { type: enum, values: [standard, vivid, portrait, landscape, sunset, black_and_white, light, neutral, clear, deep, night_view, autumn_leaves, sepia, creative_box_1, creative_box_2, creative_box_3, creative_box_4, creative_box_5, creative_box_6], required: true }
+      value: { type: enum, values: [standard, vivid, portrait, landscape, sunset, black_and_white, light, neutral, clear, deep, night_view, autumn_leaves, sepia, creative_box_1, creative_box_2, creative_box_3, creative_box_4, creative_box_5, creative_box_6], required: true,
+        label: Creative style,
+        description: "The creative style, such as standard, vivid, portrait or black_and_white; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_base_look:
     summary: "Set image base look (Sony: BaseLook Value, 0xD03C)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Base look,
+        description: "The base look as the camera numbers it; its display name is in image.base_look_name; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_steady_shot:
     summary: "Set image steady shot (Sony: Image Stabilization Steady Shot, 0xD0D9)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: SteadyShot,
+        description: "On turns still image stabilisation on, off turns it off." }
     returns: ack
   set_steady_shot_movie:
     summary: "Set image steady shot movie (Sony: Image Stabilization Steady Shot (Movie), 0xD0DA)"
     params:
-      value: { type: enum, values: ["off", standard, active, hybrid], required: true }
+      value: { type: enum, values: ["off", standard, active, hybrid], required: true,
+        label: SteadyShot (movie),
+        description: "Movie image stabilisation: off, standard, active or hybrid." }
     returns: ack
   set_timecode_preset:
     summary: "Set timecode preset (Sony: Time Code Preset, 0xD0D3)"
     params:
-      value: { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]:[0-5][0-9]$", required: true }
+      value: { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]:[0-5][0-9]:[0-5][0-9]$", required: true,
+        label: Timecode preset,
+        description: "Timecode to preset, as HH:MM:SS:FF." }
     returns: ack
   set_user_bits_preset:
     summary: "Set timecode user bits preset (Sony: User Bit Preset, 0xD0D4)"
     params:
-      value: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true }
+      value: { type: string, pattern: "^[0-9A-Fa-f]{8}$", required: true,
+        label: User bits preset,
+        description: "User bits to preset, as eight hex digits." }
     returns: ack
   set_timecode_format:
     summary: "Set timecode format (Sony: Time Code Format, 0xD0D5)"
     params:
-      value: { type: enum, values: [df, ndf], required: true }
+      value: { type: enum, values: [df, ndf], required: true,
+        label: Timecode format,
+        description: "df drop frame or ndf non-drop frame." }
     returns: ack
   set_timecode_run:
     summary: "Set timecode run (Sony: Time Code Run, 0xD0D6)"
     params:
-      value: { type: enum, values: [rec_run, free_run], required: true }
+      value: { type: enum, values: [rec_run, free_run], required: true,
+        label: Timecode run,
+        description: "rec_run runs only while recording, free_run runs all the time." }
     returns: ack
   set_timecode_make:
     summary: "Set timecode make (Sony: Time Code Make, 0xD0D7)"
     params:
-      value: { type: enum, values: [preset, regenerate], required: true }
+      value: { type: enum, values: [preset, regenerate], required: true,
+        label: Timecode make,
+        description: "preset starts from the preset value, regenerate continues from the last recording." }
     returns: ack
   set_user_bits_time_rec:
     summary: "Set timecode user bits time rec (Sony: User Bit Time Rec, 0xD0D8)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: User bits time rec,
+        description: "On records the time of day in the user bits, off does not." }
     returns: ack
   set_peaking:
     summary: "Set monitoring peaking (Sony: Peaking Display, 0xE11A)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Peaking,
+        description: "On shows focus peaking, off hides it." }
     returns: ack
   set_zebra:
     summary: "Set monitoring zebra (Sony: Zebra Display, 0xE11D)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Zebra,
+        description: "On shows zebra, off hides it." }
     returns: ack
   set_zebra_level:
     summary: "Set monitoring zebra level (Sony: Zebra Level, 0xE11E)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Zebra level,
+        description: "Zebra level as the camera numbers it; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_marker:
     summary: "Set monitoring marker (Sony: Marker Display, 0xE123)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Marker,
+        description: "On shows the markers, off hides them." }
     returns: ack
   set_grid_line:
     summary: "Set monitoring grid line (Sony: Grid Line Display, 0xD1DE)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Grid line,
+        description: "On shows the grid lines, off hides them." }
     returns: ack
   set_gamma_display_assist:
     summary: "Set monitoring gamma assist (Sony: Gamma Display Assist, 0xD1FE)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Gamma assist,
+        description: "On turns gamma display assist on, off turns it off." }
     returns: ack
   set_monitor_lut:
     summary: "Set monitoring lut (Sony: Monitor LUT Setting (All Line), 0xD04D)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Monitor LUT,
+        description: "On applies the monitor LUT to all outputs, off turns it off." }
     returns: ack
   set_audio_master_level:
     summary: "Set audio master level (Sony: Audio Input Master Level, 0xE050)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Master level,
+        description: "Audio input master level on the camera's scale; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_live_view_quality:
     summary: "Set live view quality (Sony: Live View Image Quality, 0xD26A)"
     params:
-      value: { type: enum, values: [low, high], required: true }
+      value: { type: enum, values: [low, high], required: true,
+        label: Live view quality,
+        description: "low or high live view image quality; low suits previews." }
     returns: ack
   set_live_view_quality_level:
     summary: "Set live view quality level (Sony: Live View Image Quality by Numerical Value, 0xE0CE)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Live view quality level,
+        description: "Live view image quality as a number; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_ftp_function:
     summary: "Set ftp enabled (Sony: FTP Function, 0xD041)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: FTP function,
+        description: "On turns the camera's FTP function on, off turns it off." }
     returns: ack
   set_auto_ftp_transfer:
     summary: "Set ftp auto transfer (Sony: Auto FTP Transfer, 0xD04E)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Auto FTP transfer,
+        description: "On makes the camera upload each shot automatically, off stops it." }
     returns: ack
   set_auto_ftp_transfer_target:
     summary: "Set ftp auto transfer target (Sony: Auto FTP Transfer Target, 0xD04F)"
     params:
-      value: { type: enum, values: [still, movie, still_and_movie], required: true }
+      value: { type: enum, values: [still, movie, still_and_movie], required: true,
+        label: Auto transfer target,
+        description: "Upload stills, movies, or both." }
     returns: ack
   set_auto_ftp_transfer_stills:
     summary: "Set ftp auto transfer stills (Sony: Auto FTP Transfer Target (Still), 0xD216)"
     params:
-      value: { type: enum, values: [all, protected_only], required: true }
+      value: { type: enum, values: [all, protected_only], required: true,
+        label: Auto transfer stills,
+        description: "Upload all stills or only protected ones." }
     returns: ack
   set_auto_ftp_transfer_movies:
     summary: "Set ftp auto transfer movies (Sony: Auto FTP Transfer Target (Movie), 0xD199)"
     params:
-      value: { type: enum, values: [all, shot_mark_only, protected_only], required: true }
+      value: { type: enum, values: [all, shot_mark_only, protected_only], required: true,
+        label: Auto transfer movies,
+        description: "Upload all movies, only those with shot marks, or only protected ones." }
     returns: ack
   set_ftp_transfer_files:
     summary: "Set ftp transfer files (Sony: FTP Transfer Target, 0xD19A)"
     params:
-      value: { type: enum, values: [jpeg_heif_only, raw_only, raw_and_jpeg_heif], required: true }
+      value: { type: enum, values: [jpeg_heif_only, raw_only, raw_and_jpeg_heif], required: true,
+        label: Transfer files,
+        description: "Upload JPEG or HEIF only, RAW only, or both." }
     returns: ack
   set_ftp_transfer_proxy:
     summary: "Set ftp transfer proxy (Sony: FTP Transfer Target (Proxy), 0xD14B)"
     params:
-      value: { type: enum, values: [proxy_only, original_only, proxy_and_original], required: true }
+      value: { type: enum, values: [proxy_only, original_only, proxy_and_original], required: true,
+        label: Transfer proxy,
+        description: "Upload the proxy only, the original only, or both." }
     returns: ack
   set_ftp_still_size:
     summary: "Set ftp still size (Sony: FTP Transfer Still Quality Size, 0xD14A)"
     params:
-      value: { type: enum, values: [small, large], required: true }
+      value: { type: enum, values: [small, large], required: true,
+        label: Still size,
+        description: "Upload stills at small or large size." }
     returns: ack
   set_ftp_power_save:
     summary: "Set ftp power save (Sony: FTP Power Save, 0xD14C)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: FTP power save,
+        description: "On turns FTP power save on, off turns it off." }
     returns: ack
   set_ftp_protect_after_transfer:
     summary: "Set ftp protect after transfer (Sony: Protect Image in FTP Transfer, 0xD225)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Protect after transfer,
+        description: "On protects each image once it is uploaded." }
     returns: ack
   select_ftp_server:
     summary: "Set ftp server (Sony: Select FTP Server, 0xD27C)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: FTP server,
+        description: "The FTP server entry to use, as the camera numbers its list; it must be one the camera lists now, as get_property shows." }
     returns: ack
   select_ftp_server_id:
     summary: "Set ftp server id (Sony: Select FTP ServerID, 0xD02E)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: FTP server ID,
+        description: "ID of the FTP server entry to use; it must be one the camera lists now, as get_property shows." }
     returns: ack
   select_scene_file:
     summary: "Set files scene index (Sony: SceneFile Index, 0xE01F)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Scene file,
+        description: "The scene file to select, as the camera numbers it; its name is in files.scene.name; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_camera_eframing:
     summary: "Set eframing enabled (Sony: Camera Eframing, 0xD0CF)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Eframing,
+        description: "On turns eframing on, off turns it off." }
     returns: ack
   set_eframing_mode:
     summary: "Set eframing mode (Sony: Eframing Mode (Auto), 0xD124)"
     params:
-      value: { type: enum, values: [auto, touch_kick, time_sequence_a, time_sequence_b], required: true }
+      value: { type: enum, values: [auto, touch_kick, time_sequence_a, time_sequence_b], required: true,
+        label: Eframing mode,
+        description: "auto, touch kick, or time sequence A or B." }
     returns: ack
   set_eframing_scale:
     summary: "Set eframing scale (Sony: Eframing Scale (Auto), 0xD0CD)"
     params:
-      value: { type: enum, values: [low, mid, high], required: true }
+      value: { type: enum, values: [low, mid, high], required: true,
+        label: Eframing scale,
+        description: "low, mid or high framing scale for auto eframing." }
     returns: ack
   set_eframing_speed:
     summary: "Set eframing speed (Sony: Eframing Speed (Auto), 0xD0CE)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Eframing speed,
+        description: "Speed of auto eframing, on the camera's scale; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_eframing_ptz_speed:
     summary: "Set eframing ptz speed (Sony: Eframing Speed (PTZ), 0xD127)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Eframing PTZ speed,
+        description: "Speed of eframing PTZ moves, on the camera's scale; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_eframing_tracking_start:
     summary: "Set eframing tracking start (Sony: Eframing Tracking Start Mode, 0xE0F0)"
     params:
-      value: { type: enum, values: [auto, manual], required: true }
+      value: { type: enum, values: [auto, manual], required: true,
+        label: Tracking start,
+        description: "Start eframing tracking automatically or by hand." }
     returns: ack
   set_eframing_effect:
     summary: "Set eframing effect (Sony: Eframing Production Effect, 0xE0F1)"
     params:
-      value: { type: enum, values: ["off", interval_zoom_15s, interval_zoom_30s], required: true }
+      value: { type: enum, values: ["off", interval_zoom_15s, interval_zoom_30s], required: true,
+        label: Production effect,
+        description: "off, or an interval zoom every 15 or 30 seconds." }
     returns: ack
   set_eframing_auto_framing:
     summary: "Set eframing auto framing (Sony: Eframing Auto Framing, 0xE0F8)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: Auto framing,
+        description: "On turns eframing auto framing on, off turns it off." }
     returns: ack
   set_osd_image_mode:
     summary: "Set live view osd image mode (Sony: OSD Image Mode, 0xD207)"
     params:
-      value: { type: bool, required: true }
+      value: { type: bool, required: true,
+        label: OSD image mode,
+        description: "On makes the camera serve its on-screen display image, off stops it." }
     returns: ack
   set_pixel_shift_shots:
     summary: "Set pixel shift shots (Sony: Pixel Shift Shooting Number, 0xD23A)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Pixel shift shots,
+        description: "Number of shots in a pixel shift multi shooting; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_pixel_shift_interval:
     summary: "Set pixel shift interval (Sony: Pixel Shift Shooting Interval, 0xD23B)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: Pixel shift interval,
+        description: "Interval between pixel shift shots, as the camera lists it; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_user_base_look_input:
     summary: "Set base look input (Sony: UserBaseLook Input, 0xD0C9)"
     params:
-      value: { type: enum, values: [s_gamut3_slog3, s_gamut3_cine_slog3], required: true }
+      value: { type: enum, values: [s_gamut3_slog3, s_gamut3_cine_slog3], required: true,
+        label: Base look input,
+        description: "The colour space the user base look expects: S-Gamut3/S-Log3 or S-Gamut3.Cine/S-Log3." }
     returns: ack
   set_user_base_look_output:
     summary: "Set base look output (Sony: UserBaseLook Output, 0xD2B1)"
     params:
-      value: { type: enum, values: [bt709, bt709_legal, hlg, hlg_legal], required: true }
+      value: { type: enum, values: [bt709, bt709_legal, hlg, hlg_legal], required: true,
+        label: Base look output,
+        description: "The user base look's output: BT.709 or HLG, full or legal range." }
     returns: ack
   set_user_base_look_ae_offset:
     summary: "Set base look ae level offset (Sony: UserBaseLook AE Level Offset, 0xD0CA)"
     params:
-      value: { type: int, required: true }
+      value: { type: int, required: true,
+        label: AE level offset,
+        description: "The user base look's AE level offset; its display text is in base_look.ae_level_offset_name; it must be one the camera lists now, as get_property shows." }
     returns: ack
   set_property:
     summary: "Write any property by code, with a raw value in the property's own type (a number, 0x-hex text, or text for string properties). Checked against what the camera reports as writable and accepted"
     params:
-      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true }
-      value: { type: json, required: true }
+      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true,
+        label: Code,
+        description: "The property or control code as four hex digits, with or without 0x, such as D20F." }
+      value: { type: json, required: true,
+        label: Value,
+        description: "The raw value in the property's own type: a number, 0x-hex text, or text for a string property." }
     returns: ack
   get_property:
     summary: "The property as last read from the camera: value, type, writable, enabled, and its accepted values or range"
     params:
-      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true }
+      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true,
+        label: Code,
+        description: "The property or control code as four hex digits, with or without 0x, such as D20F." }
     returns: value
   control:
     summary: "Send any SDIO control code with a raw value. The value's type is the documented one for known codes, else uint16 unless 'type' says otherwise"
     params:
-      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true }
-      value: { type: json, required: true }
-      type: { type: enum, values: [int8, uint8, int16, uint16, int32, uint32, int64, uint64, string] }
+      code: { type: string, pattern: "^(0[xX])?[0-9A-Fa-f]{1,4}$", required: true,
+        label: Code,
+        description: "The property or control code as four hex digits, with or without 0x, such as D20F." }
+      value: { type: json, required: true,
+        label: Value,
+        description: "The raw value for the control, in its documented type or the type given." }
+      type: { type: enum, values: [int8, uint8, int16, uint16, int32, uint32, int64, uint64, string],
+        label: Value type,
+        description: "The value's data type, for a control code the module does not know; uint16 when left out." }
     returns: ack
   refresh:
     summary: "Read every property again now rather than waiting for the next changes-only read"
@@ -1393,41 +1629,63 @@ commands:
   set_shutter_speed:
     summary: "Set the shutter speed: 1/50, 1.5\" (seconds), or bulb. Uses the stills shutter speed where the camera has it, otherwise the cinema shutter speed value"
     params:
-      value: { type: string, pattern: "^(1/[0-9]{1,5}|[0-9]{1,4}(\\.[0-9])?\"?|bulb)$", required: true }
+      value: { type: string, pattern: "^(1/[0-9]{1,5}|[0-9]{1,4}(\\.[0-9])?\"?|bulb)$", required: true,
+        label: Shutter speed,
+        description: "Shutter speed as a fraction such as 1/50, seconds such as 1.5\", or bulb; it must be one the camera lists now." }
     returns: ack
   set_tally:
     summary: "Turn one tally lamp on the camera on or off"
     params:
-      lamp: { type: enum, values: [red, green, yellow], required: true }
-      lit: { type: bool, required: true }
+      lamp: { type: enum, values: [red, green, yellow], required: true,
+        label: Lamp,
+        description: "The red, green or yellow tally lamp." }
+      lit: { type: bool, required: true,
+        label: Lit,
+        description: "On lights the lamp, off turns it off." }
     returns: ack
   set_audio_level:
     summary: "Set the recording level of an audio input channel, in the range the camera reports"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      level: { type: int, min: 0, max: 65535, required: true }
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Audio channel,
+        description: "Audio input channel, 1 to 4." }
+      level: { type: int, min: 0, max: 65535, required: true,
+        label: Level,
+        description: "Recording level within the range the camera reports for the channel." }
     returns: ack
   set_audio_level_control:
     summary: "Set automatic or manual level control for an audio input channel"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      mode: { type: enum, values: [auto, manual], required: true }
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Audio channel,
+        description: "Audio input channel, 1 to 4." }
+      mode: { type: enum, values: [auto, manual], required: true,
+        label: Level control,
+        description: "auto or manual level control." }
     returns: ack
   set_audio_input:
     summary: "Select the source of an audio input channel"
     params:
-      channel: { type: int, min: 1, max: 4, required: true }
-      input: { type: enum, values: ["off", input1, input2, internal_mic, shoe_ch1, shoe_ch2, mic_jack_left, mic_jack_right], required: true }
+      channel: { type: int, min: 1, max: 4, required: true,
+        label: Audio channel,
+        description: "Audio input channel, 1 to 4." }
+      input: { type: enum, values: ["off", input1, input2, internal_mic, shoe_ch1, shoe_ch2, mic_jack_left, mic_jack_right], required: true,
+        label: Input,
+        description: "The channel's source: off, input 1 or 2, the internal mic, the shoe's channel 1 or 2, or the mic jack's left or right." }
     returns: ack
   set_zoom_position:
     summary: "Drive the zoom to an absolute position, in the range the camera reports; the result arrives as zoom.last_position_result"
     params:
-      position: { type: int, min: 0, max: 65535, required: true }
+      position: { type: int, min: 0, max: 65535, required: true,
+        label: Zoom position,
+        description: "Absolute zoom position within the range the camera reports." }
     returns: ack
   set_focus_position:
     summary: "Drive the focus to an absolute position, in the range the camera reports; the result arrives as focus.last_position_result"
     params:
-      position: { type: int, min: 0, max: 65535, required: true }
+      position: { type: int, min: 0, max: 65535, required: true,
+        label: Focus position,
+        description: "Absolute focus position within the range the camera reports." }
     returns: ack
   cancel_zoom_position:
     summary: "Stop a zoom position drive"
@@ -1438,37 +1696,51 @@ commands:
   zoom:
     summary: "Zoom continuously: positive toward tele, negative toward wide, 0 stops. Sent at full resolution where the camera has the 16-bit zoom control, otherwise scaled to its coarse zoom speed range"
     params:
-      speed: { type: int, min: -32767, max: 32767, required: true }
+      speed: { type: int, min: -32767, max: 32767, required: true,
+        label: Speed,
+        description: "Zoom speed: positive toward tele, negative toward wide, 0 stops." }
     returns: ack
   focus:
     summary: "Focus continuously: positive toward far, negative toward near, 0 stops. Scaled as for zoom"
     params:
-      speed: { type: int, min: -32767, max: 32767, required: true }
+      speed: { type: int, min: -32767, max: 32767, required: true,
+        label: Speed,
+        description: "Focus speed: positive toward far, negative toward near, 0 stops." }
     returns: ack
   focus_near_far:
     summary: "Step the focus toward near (negative) or far (positive)"
     params:
-      step: { type: int, min: -7, max: 7, required: true }
+      step: { type: int, min: -7, max: 7, required: true,
+        label: Step,
+        description: "Focus step size and direction: negative toward near, positive toward far." }
     returns: ack
   save_zoom_focus_position:
     summary: "Store the current zoom and focus positions in a slot"
     params:
-      slot: { type: int, min: 0, max: 255, required: true }
+      slot: { type: int, min: 0, max: 255, required: true,
+        label: Slot,
+        description: "Zoom and focus preset slot, numbered from 0." }
     returns: ack
   load_zoom_focus_position:
     summary: "Recall zoom and focus positions stored in a slot"
     params:
-      slot: { type: int, min: 0, max: 255, required: true }
+      slot: { type: int, min: 0, max: 255, required: true,
+        label: Slot,
+        description: "Zoom and focus preset slot, numbered from 0." }
     returns: ack
   shutter_half_press:
     summary: "Half-press the shutter button (focus and meter). Without pressed, press and release; with it, hold or release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   shutter_full_press:
     summary: "Fully press the shutter button. Press it only while half-pressed, and release in the reverse order"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On fully presses the shutter (only while half-pressed), off releases it." }
     returns: ack
   take_photo:
     summary: "Half and full press together, then release: one still (on Camera Control PTP 2 bodies without that button, the one-shot release)"
@@ -1476,7 +1748,9 @@ commands:
   record:
     summary: "Start or stop movie recording (the hold-type record button: pressed starts, released stops)"
     params:
-      recording: { type: bool, required: true }
+      recording: { type: bool, required: true,
+        label: Recording,
+        description: "On starts movie recording, off stops it." }
     returns: ack
   record_toggle:
     summary: "Press and release the movie record button, toggling recording"
@@ -1484,63 +1758,89 @@ commands:
   ae_lock:
     summary: "The AE lock button. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   awb_lock:
     summary: "The AWB lock button. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   fe_lock:
     summary: "The flash exposure lock button. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   tracking_af_on:
     summary: "The tracking on + AF on button. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   push_auto_focus:
     summary: "Push auto focus (one-shot AF in manual focus, manual while held in AF). Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   push_auto_iris:
     summary: "Push auto iris. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   push_agc:
     summary: "Push automatic gain control. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   push_auto_nd:
     summary: "Push auto ND filter. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   one_push_awb:
     summary: "One-push auto white balance. Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   af_area_position:
     summary: "Move the AF area to a point on a 640 x 480 grid"
     params:
-      x: { type: int, min: 0, max: 639, required: true }
-      y: { type: int, min: 0, max: 479, required: true }
+      x: { type: int, min: 0, max: 639, required: true,
+        label: X,
+        description: "Horizontal position on a 640 x 480 grid, 0 at the left." }
+      y: { type: int, min: 0, max: 479, required: true,
+        label: Y,
+        description: "Vertical position on a 640 x 480 grid, 0 at the top." }
     returns: ack
   color_temperature_step:
     summary: "Step the colour temperature"
     params:
-      step: { type: int, min: -30, max: 30, required: true }
+      step: { type: int, min: -30, max: 30, required: true,
+        label: Steps,
+        description: "Steps to move the colour temperature, negative down and positive up." }
     returns: ack
   tint_step:
     summary: "Step the white balance tint"
     params:
-      step: { type: int, min: -198, max: 198, required: true }
+      step: { type: int, min: -198, max: 198, required: true,
+        label: Steps,
+        description: "Steps to move the tint, negative and positive in the camera's directions." }
     returns: ack
   custom_wb_capture_standby:
     summary: "Enter custom white balance capture standby"
@@ -1551,8 +1851,12 @@ commands:
   custom_wb_capture:
     summary: "Capture custom white balance at a point inside the area the camera reports; the result arrives as white_balance.custom_capture_result"
     params:
-      x: { type: int, min: 0, max: 65535, required: true }
-      y: { type: int, min: 0, max: 65535, required: true }
+      x: { type: int, min: 0, max: 65535, required: true,
+        label: X,
+        description: "Horizontal position of the capture point, inside the area the camera reports." }
+      y: { type: int, min: 0, max: 65535, required: true,
+        label: Y,
+        description: "Vertical position of the capture point, inside the area the camera reports." }
     returns: ack
   flicker_scan:
     summary: "Scan for light flicker"
@@ -1560,8 +1864,12 @@ commands:
   format_media:
     summary: "Format the card in a slot. Erases everything on it; the result arrives as media.last_format_result. Camera Control PTP 2 bodies format their one card and ignore slot and quick"
     params:
-      slot: { type: int, min: 1, max: 2, required: true }
-      quick: { type: bool, default: false }
+      slot: { type: int, min: 1, max: 2, required: true,
+        label: Slot,
+        description: "Card slot to format, 1 or 2; everything on it is erased." }
+      quick: { type: bool, default: false,
+        label: Quick format,
+        description: "On formats quickly, off fully." }
     returns: ack
   cancel_media_format:
     summary: "Cancel a format in progress"
@@ -1578,7 +1886,9 @@ commands:
   stream:
     summary: "Start or stop streaming to the selected destination"
     params:
-      streaming: { type: bool, required: true }
+      streaming: { type: bool, required: true,
+        label: Streaming,
+        description: "On starts streaming to the selected destination, off stops it." }
     returns: ack
   timecode_preset_reset:
     summary: "Reset the timecode preset"
@@ -1589,30 +1899,54 @@ commands:
   remote_key:
     summary: "A menu navigation key. Without pressed, press and release"
     params:
-      key: { type: enum, values: [up, down, left, right, up_right, down_right, up_left, down_left, set, menu, back, display], required: true }
-      pressed: { type: bool }
+      key: { type: enum, values: [up, down, left, right, up_right, down_right, up_left, down_left, set, menu, back, display], required: true,
+        label: Key,
+        description: "The menu navigation key: a direction, set, menu, back or display." }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   pan_tilt_absolute:
     summary: "Move pan and/or tilt to absolute angles in degrees (pan positive anticlockwise seen from above, tilt positive upward), at speeds up to the model maximum; the result arrives as pan_tilt.last_result"
     params:
-      pan: { type: float, min: -360, max: 360 }
-      tilt: { type: float, min: -360, max: 360 }
-      pan_speed: { type: int, min: 0, max: 127, default: 12 }
-      tilt_speed: { type: int, min: 0, max: 127, default: 12 }
+      pan: { type: float, min: -360, max: 360,
+        label: Pan,
+        description: "Pan angle in degrees, positive anticlockwise seen from above." }
+      tilt: { type: float, min: -360, max: 360,
+        label: Tilt,
+        description: "Tilt angle in degrees, positive upward." }
+      pan_speed: { type: int, min: 0, max: 127, default: 12,
+        label: Pan speed,
+        description: "Pan speed: up to 24 in the camera's Normal speed step, further in Extended (127 on BRC-AM7, 50 on ILME-FR7)." }
+      tilt_speed: { type: int, min: 0, max: 127, default: 12,
+        label: Tilt speed,
+        description: "Tilt speed: up to 24 in the camera's Normal speed step, further in Extended (127 on BRC-AM7, 50 on ILME-FR7)." }
     returns: ack
   pan_tilt_relative:
     summary: "Move pan and/or tilt by angles in degrees from where they are; a move past the pan range is ignored by the camera"
     params:
-      pan: { type: float, min: -360, max: 360 }
-      tilt: { type: float, min: -360, max: 360 }
-      pan_speed: { type: int, min: 0, max: 127, default: 12 }
-      tilt_speed: { type: int, min: 0, max: 127, default: 12 }
+      pan: { type: float, min: -360, max: 360,
+        label: Pan,
+        description: "Degrees to pan from where it is, positive anticlockwise seen from above." }
+      tilt: { type: float, min: -360, max: 360,
+        label: Tilt,
+        description: "Degrees to tilt from where it is, positive upward." }
+      pan_speed: { type: int, min: 0, max: 127, default: 12,
+        label: Pan speed,
+        description: "Pan speed: up to 24 in the camera's Normal speed step, further in Extended (127 on BRC-AM7, 50 on ILME-FR7)." }
+      tilt_speed: { type: int, min: 0, max: 127, default: 12,
+        label: Tilt speed,
+        description: "Tilt speed: up to 24 in the camera's Normal speed step, further in Extended (127 on BRC-AM7, 50 on ILME-FR7)." }
     returns: ack
   pan_tilt_drive:
     summary: "Pan and tilt continuously at signed speeds until stopped or at the end of travel; both 0 stops"
     params:
-      pan_speed: { type: int, min: -127, max: 127, default: 0 }
-      tilt_speed: { type: int, min: -127, max: 127, default: 0 }
+      pan_speed: { type: int, min: -127, max: 127, default: 0,
+        label: Pan speed,
+        description: "Signed pan speed, positive anticlockwise seen from above; 0 with tilt 0 stops." }
+      tilt_speed: { type: int, min: -127, max: 127, default: 0,
+        label: Tilt speed,
+        description: "Signed tilt speed, positive upward; 0 with pan 0 stops." }
     returns: ack
   pan_tilt_stop:
     summary: "Stop any pan/tilt move or preset recall"
@@ -1626,39 +1960,57 @@ commands:
   preset_recall:
     summary: "Recall a pan/tilt/zoom/focus preset; completion arrives as pan_tilt.preset_result"
     params:
-      preset: { type: int, min: 0, max: 65535, required: true }
+      preset: { type: int, min: 0, max: 65535, required: true,
+        label: Preset,
+        description: "Pan/tilt/zoom/focus preset number, within pan_tilt.preset_slots." }
     returns: ack
   preset_set:
     summary: "Store the current pan, tilt, zoom and focus as a preset"
     params:
-      preset: { type: int, min: 0, max: 65535, required: true }
-      thumbnail: { type: bool, default: true }
+      preset: { type: int, min: 0, max: 65535, required: true,
+        label: Preset,
+        description: "Pan/tilt/zoom/focus preset number, within pan_tilt.preset_slots." }
+      thumbnail: { type: bool, default: true,
+        label: Thumbnail,
+        description: "On stores a thumbnail with the preset." }
     returns: ack
   preset_clear:
     summary: "Delete a preset"
     params:
-      preset: { type: int, min: 0, max: 65535, required: true }
+      preset: { type: int, min: 0, max: 65535, required: true,
+        label: Preset,
+        description: "Pan/tilt/zoom/focus preset number, within pan_tilt.preset_slots." }
     returns: ack
   exposure_step:
     summary: "Step a value a Camera Control PTP 2 body only reports (iris, shutter speed, ISO, exposure or flash compensation) up or down by notches; the typed setters convert a target value into such steps"
     params:
-      target: { type: enum, values: [iris, exposure_compensation, flash_compensation, shutter_speed, iso], required: true }
-      steps: { type: int, min: -127, max: 127, required: true }
+      target: { type: enum, values: [iris, exposure_compensation, flash_compensation, shutter_speed, iso], required: true,
+        label: Value,
+        description: "Which value to step: iris, shutter speed, ISO, or exposure or flash compensation." }
+      steps: { type: int, min: -127, max: 127, required: true,
+        label: Steps,
+        description: "Notches to step by, positive one entry further along the camera's value list; check the direction on a new body." }
     returns: ack
   af_lock:
     summary: "The AF lock button (Camera Control PTP 2). Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   release_lock:
     summary: "Lock or unlock the shutter release (Camera Control PTP 2)"
     params:
-      locked: { type: bool, required: true }
+      locked: { type: bool, required: true,
+        label: Locked,
+        description: "On locks the shutter release, off unlocks it." }
     returns: ack
   af_mf_hold:
     summary: "The AF/MF hold button (Camera Control PTP 2). Without pressed, press and release"
     params:
-      pressed: { type: bool }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
     returns: ack
   focus_magnifier:
     summary: "Press the focus magnifier button (Camera Control PTP 2)"
@@ -1669,7 +2021,9 @@ commands:
   focus_step:
     summary: "One focus step toward near or far (Camera Control PTP 2)"
     params:
-      direction: { type: enum, values: [near, far], required: true }
+      direction: { type: enum, values: [near, far], required: true,
+        label: Direction,
+        description: "One focus step toward near or far." }
     returns: ack
   hfr_standby:
     summary: "Enter high frame rate recording standby (Camera Control PTP 2)"
@@ -1683,32 +2037,52 @@ commands:
   list_content:
     summary: "List the contents of a card slot: the content list in remote_with_transfer mode, the PTP objects in content_transfer mode, or the MediaProfile clips of a video-only body (over SSH). Each file has the id download_content takes"
     params:
-      slot: { type: int, min: 1, max: 3, default: 1 }
-      limit: { type: int, min: 1, max: 10000, default: 100 }
-      since: { type: int, min: 0 }
+      slot: { type: int, min: 1, max: 3, default: 1,
+        label: Slot,
+        description: "Card slot to list, from 1." }
+      limit: { type: int, min: 1, max: 10000, default: 100,
+        label: Limit,
+        description: "Most files to return." }
+      since: { type: int, min: 0,
+        label: Since,
+        description: "Return only entries after this one, to page through a long list." }
     returns: value
   download_content:
     summary: "Download a listed file into a file on the host, streamed as it arrives; the result is the path and the byte count. Name the file by id, or by umid (remote_with_transfer lists), which stays valid when the camera renumbers its contents. resume continues a partial file already at path instead of starting again"
     params:
-      id: { type: string, max_length: 1024 }
-      umid: { type: string, pattern: "^[0-9A-Fa-f]{64}$" }
-      path: { type: string, max_length: 4096, required: true }
-      resume: { type: bool, default: false }
+      id: { type: string, max_length: 1024,
+        label: Content ID,
+        description: "The file's id from list_content; give this or the UMID." }
+      umid: { type: string, pattern: "^[0-9A-Fa-f]{64}$",
+        label: UMID,
+        description: "The file's UMID from a remote_with_transfer list, 64 hex digits; stays valid when the camera renumbers its content." }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      resume: { type: bool, default: false,
+        label: Resume,
+        description: "On continues a partial download already at the path (remote_with_transfer list files only)." }
     returns: value
   download_captured_image:
     summary: "Download the image just shot from the camera transfer buffer (while still.pending_files is not zero) into a file on the host"
     params:
-      path: { type: string, max_length: 4096, required: true }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
     returns: value
   get_thumbnail:
     summary: "The thumbnail of a listed still (remote_with_transfer mode) as a base64 JPEG"
     params:
-      id: { type: string, max_length: 1024, required: true }
+      id: { type: string, max_length: 1024, required: true,
+        label: Content ID,
+        description: "The still's id from list_content." }
     returns: value
   switch_session_mode:
     summary: "Close the session and open it again in another mode: remote (control only), remote_with_transfer (control and content list), content_transfer (card access, no control)"
     params:
-      mode: { type: enum, values: [remote, remote_with_transfer, content_transfer], required: true }
+      mode: { type: enum, values: [remote, remote_with_transfer, content_transfer], required: true,
+        label: Session mode,
+        description: "remote (control only), remote_with_transfer (control and the content list) or content_transfer (card access, no control)." }
     returns: ack
   get_ftp_settings:
     summary: "The camera's FTP server list (no passwords); also kept in ftp.servers"
@@ -1716,18 +2090,42 @@ commands:
   set_ftp_server:
     summary: "Write one FTP server entry. The password goes to the camera only and is never put in the state; leave it out to keep the one the camera has"
     params:
-      server_id: { type: int, min: 1, max: 65535, required: true }
-      name: { type: string, max_length: 64 }
-      host: { type: string, max_length: 255, required: true }
-      port: { type: int, min: 1, max: 65535, default: 21 }
-      username: { type: string, max_length: 64 }
-      password: { type: string, max_length: 64 }
-      passive: { type: bool, default: true }
-      directory: { type: string, max_length: 255 }
-      secure: { type: enum, values: ["off", ftps, sftp], default: "off" }
-      directory_hierarchy: { type: enum, values: [standard, same_as_camera], default: standard }
-      overwrite: { type: bool, default: false }
-      certificate_error: { type: enum, values: [connect, do_not_connect], default: do_not_connect }
+      server_id: { type: int, min: 1, max: 65535, required: true,
+        label: Server,
+        description: "The FTP server entry to write, from 1." }
+      name: { type: string, max_length: 64,
+        label: Display name,
+        description: "The server entry's name as shown on the camera." }
+      host: { type: string, max_length: 255, required: true,
+        label: Host,
+        description: "The FTP server's host name or address." }
+      port: { type: int, min: 1, max: 65535, default: 21,
+        label: Port,
+        description: "The FTP server's port, 21 by default." }
+      username: { type: string, max_length: 64,
+        label: Username,
+        description: "The FTP login user." }
+      password: { type: string, max_length: 64,
+        label: Password,
+        description: "The FTP login password, sent to the camera only; leave it out to keep the camera's." }
+      passive: { type: bool, default: true,
+        label: Passive mode,
+        description: "On uses passive FTP." }
+      directory: { type: string, max_length: 255,
+        label: Directory,
+        description: "Destination directory on the server." }
+      secure: { type: enum, values: ["off", ftps, sftp], default: "off",
+        label: Secure,
+        description: "off for plain FTP, ftps or sftp." }
+      directory_hierarchy: { type: enum, values: [standard, same_as_camera], default: standard,
+        label: Directory hierarchy,
+        description: "standard, or same_as_camera to keep the card's folders." }
+      overwrite: { type: bool, default: false,
+        label: Overwrite,
+        description: "On overwrites a file of the same name on the server." }
+      certificate_error: { type: enum, values: [connect, do_not_connect], default: do_not_connect,
+        label: On certificate error,
+        description: "connect anyway, or do_not_connect." }
     returns: ack
   get_ftp_jobs:
     summary: "The camera's FTP transfer jobs (video bodies); also kept in ftp.jobs"
@@ -1735,92 +2133,152 @@ commands:
   add_ftp_job:
     summary: "Queue a clip for FTP upload by the camera, by its path relative to the MediaProfile (for example /Clip/C0001.MXF)"
     params:
-      server_id: { type: int, min: 0, max: 4294967295, required: true }
-      slot: { type: int, min: 1, max: 3, required: true }
-      clip_path: { type: string, max_length: 254, required: true }
-      directory: { type: string, max_length: 255 }
-      name: { type: string, max_length: 127 }
+      server_id: { type: int, min: 0, max: 4294967295, required: true,
+        label: Server,
+        description: "The FTP server entry to upload to, as the camera numbers it." }
+      slot: { type: int, min: 1, max: 3, required: true,
+        label: Slot,
+        description: "Card slot holding the clip, from 1." }
+      clip_path: { type: string, max_length: 254, required: true,
+        label: Clip path,
+        description: "The clip's path relative to the MediaProfile, such as /Clip/C0001.MXF." }
+      directory: { type: string, max_length: 255,
+        label: Directory,
+        description: "Destination directory on the server." }
+      name: { type: string, max_length: 127,
+        label: File name,
+        description: "Name to give the uploaded file." }
     returns: ack
   ftp_job:
     summary: "Suspend, resume or delete a transfer job, or delete all or all finished jobs"
     params:
-      action: { type: enum, values: [suspend, resume, delete, delete_all, delete_finished], required: true }
-      job_id: { type: int, min: 0, max: 4294967295 }
+      action: { type: enum, values: [suspend, resume, delete, delete_all, delete_finished], required: true,
+        label: Action,
+        description: "suspend, resume or delete one job, or delete all jobs or all finished ones." }
+      job_id: { type: int, min: 0, max: 4294967295,
+        label: Job ID,
+        description: "The transfer job's ID, as get_ftp_jobs lists it." }
     returns: ack
   get_ftp_result:
     summary: "How many images the camera has transferred and failed to transfer by FTP from a slot"
     params:
-      slot: { type: int, min: 1, max: 2, required: true }
+      slot: { type: int, min: 1, max: 2, required: true,
+        label: Slot,
+        description: "Card slot, 1 or 2." }
     returns: value
   import_lut:
     summary: "Import a cube LUT (.cube with a LUT_3D_SIZE or LUT_1D_SIZE line) from a host file into a user base look; the result is the camera's import result. Refused while files.lut.import_available is false"
     params:
-      path: { type: string, max_length: 4096, required: true }
-      user_base_look: { type: int, min: 1, max: 16, required: true }
-      name: { type: string, max_length: 255 }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      user_base_look: { type: int, min: 1, max: 16, required: true,
+        label: User base look,
+        description: "User base look to import into, 1 to 16; the import replaces it." }
+      name: { type: string, max_length: 255,
+        label: Name,
+        description: "Name to give the imported base look." }
     returns: value
   import_scene_file:
     summary: "Import a scene file from a host file into a scene slot; the result is the camera's import result"
     params:
-      path: { type: string, max_length: 4096, required: true }
-      scene: { type: int, min: 1, max: 16, required: true }
-      name: { type: string, max_length: 255 }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      scene: { type: int, min: 1, max: 16, required: true,
+        label: Scene,
+        description: "Scene file slot, 1 to 16." }
+      name: { type: string, max_length: 255,
+        label: Name,
+        description: "Name to give the imported scene file." }
     returns: value
   export_scene_file:
     summary: "Save a scene slot to a host file (files.scene.exportable lists what the camera offers)"
     params:
-      scene: { type: int, min: 1, max: 16, required: true }
-      path: { type: string, max_length: 4096, required: true }
+      scene: { type: int, min: 1, max: 16, required: true,
+        label: Scene,
+        description: "Scene file slot, 1 to 16." }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
     returns: value
   import_grid_line_file:
     summary: "Import a custom grid line image (at most 1 MB) from a host file into Custom 1 to 4, sent in parts no larger than the camera takes; needs the camera's grid line licence"
     params:
-      path: { type: string, max_length: 4096, required: true }
-      custom: { type: int, min: 1, max: 4, required: true }
-      name: { type: string, max_length: 255 }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      custom: { type: int, min: 1, max: 4, required: true,
+        label: Custom slot,
+        description: "Custom grid line 1 to 4; the import replaces it." }
+      name: { type: string, max_length: 255,
+        label: Name,
+        description: "Name to give the imported grid line." }
     returns: value
   export_camera_settings:
     summary: "Save the camera-setting file to a host file"
     params:
-      path: { type: string, max_length: 4096, required: true }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
     returns: value
   import_camera_settings:
     summary: "Load a camera-setting file from a host file into the camera; the result is the camera's read result"
     params:
-      path: { type: string, max_length: 4096, required: true }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
     returns: value
   export_ftp_settings_file:
     summary: "Save the camera's FTP-setting file to a host file, protected with the password given (empty for none)"
     params:
-      path: { type: string, max_length: 4096, required: true }
-      password: { type: string, pattern: "^[A-Za-z0-9]{0,32}$" }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      password: { type: string, pattern: "^[A-Za-z0-9]{0,32}$",
+        label: File password,
+        description: "Password of up to 32 letters and digits to protect the file, or empty for none." }
     returns: value
   import_ftp_settings_file:
     summary: "Load an FTP-setting file from a host file into the camera, with the password it was saved with"
     params:
-      path: { type: string, max_length: 4096, required: true }
-      password: { type: string, pattern: "^[A-Za-z0-9]{0,32}$" }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      password: { type: string, pattern: "^[A-Za-z0-9]{0,32}$",
+        label: File password,
+        description: "The password the file was saved with, or empty for none." }
     returns: value
   apply_settings_file:
     summary: "Send a general setting XML file to the camera to check it (check_only) or apply it; the value holds the result and the camera's result XML"
     params:
-      path: { type: string, max_length: 4096, required: true }
-      check_only: { type: bool, default: false }
+      path: { type: string, max_length: 4096, required: true,
+        label: Host path,
+        description: "Path of the file on the host to read or write." }
+      check_only: { type: bool, default: false,
+        label: Check only,
+        description: "On only checks the file, off applies it." }
     returns: value
   delete_content:
     summary: "Delete one content (all of its files) from a card, by the id list_content gave (c:slot:content); needs remote_with_transfer mode. The camera's result decides success; protected content is not deleted"
     params:
-      id: { type: string, max_length: 64, pattern: "^c:[12]:[0-9]{1,10}(:[0-9]{1,5})?$", required: true }
+      id: { type: string, max_length: 64, pattern: "^c:[12]:[0-9]{1,10}(:[0-9]{1,5})?$", required: true,
+        label: Content ID,
+        description: "The id list_content gave (c:slot:content); all its files are deleted, with no undo." }
     returns: ack
   get_display_lists:
     summary: "The camera's own display names for values (base looks, scene files, buttons, stream destinations and more), one list type or all (0); also kept in display_lists and used to name the base look, scene file and stream destination in the state"
     params:
-      list_type: { type: int, min: 0, max: 27, default: 0 }
+      list_type: { type: int, min: 0, max: 27, default: 0,
+        label: List type,
+        description: "The display list to read, by the camera's number, or 0 for all." }
     returns: value
   get_lens_information:
     summary: "The attached lens's focus conversion tables (normalised focus position to distance, in metres or feet); the metre tables are also kept in lens.focus_tables. Needs lens.information_available"
     params:
-      unit: { type: enum, values: [meters, feet], default: meters }
+      unit: { type: enum, values: [meters, feet], default: meters,
+        label: Unit,
+        description: "Distances in metres or feet." }
     returns: value
   get_zoom_focus_presets:
     summary: "The zoom and focus presets the camera holds (the slots save_zoom_focus_position uses, numbered from 0): whether set, the lens, zoom and focus distance, and the zoom-only setting; also kept in zoom_focus_presets"
@@ -1828,8 +2286,12 @@ commands:
   set_preset_zoom_only:
     summary: "Make a zoom and focus preset recall only the zoom, or zoom and focus"
     params:
-      slot: { type: int, min: 0, max: 255, required: true }
-      zoom_only: { type: bool, required: true }
+      slot: { type: int, min: 0, max: 255, required: true,
+        label: Slot,
+        description: "Zoom and focus preset slot, numbered from 0." }
+      zoom_only: { type: bool, required: true,
+        label: Zoom only,
+        description: "On makes the preset recall only the zoom, off zoom and focus." }
     returns: ack
   get_osd_image:
     summary: "The camera's on-screen display overlay as a base64 PNG with its size and where it sits on the picture. Needs set_osd_image_mode true first"
@@ -1849,14 +2311,22 @@ commands:
   set_clock:
     summary: "Set the camera's date and time (local, YYYYMMDDThhmmss.s), UTC offset (+hhmm or -hhmm) and daylight saving, any of them; the result arrives as clock.last_result"
     params:
-      date_time: { type: string, pattern: "^[0-9]{8}T[0-9]{6}(\\.[0-9])?$" }
-      utc_offset: { type: string, pattern: "^[+-][0-9]{4}$" }
-      daylight_saving: { type: bool }
+      date_time: { type: string, pattern: "^[0-9]{8}T[0-9]{6}(\\.[0-9])?$",
+        label: Date and time,
+        description: "Local date and time as YYYYMMDDThhmmss.s, such as 20261003T143000.0." }
+      utc_offset: { type: string, pattern: "^[+-][0-9]{4}$",
+        label: UTC offset,
+        description: "Offset from UTC as +hhmm or -hhmm." }
+      daylight_saving: { type: bool,
+        label: Daylight saving,
+        description: "On when daylight saving time is in effect." }
     returns: ack
   set_date_time:
     summary: "Set the camera's date and time from an ISO 8601 text; the result arrives as clock.last_result"
     params:
-      value: { type: string, max_length: 64, required: true }
+      value: { type: string, max_length: 64, required: true,
+        label: Date and time,
+        description: "The camera's new local date and time as ISO 8601 text, such as 2026-10-03T14:30:00." }
     returns: ack
   get_stream_settings:
     summary: "The camera's stream destinations (protocol, URL, port, latency and so on; keys only as set or not); also kept in streaming.settings"
@@ -1864,50 +2334,98 @@ commands:
   set_stream_settings:
     summary: "Write one stream destination. Keys go to the camera only and are never put in the state; the camera's check of the URL, port and key decides success"
     params:
-      stream: { type: int, min: 1, max: 65535, required: true }
-      protocol: { type: enum, values: [rtmp, srt], required: true }
-      url: { type: string, max_length: 1024, required: true }
-      port: { type: int, min: 1, max: 65535 }
-      key: { type: string, max_length: 1024 }
-      latency_ms: { type: int, min: 20, max: 8000 }
-      ttl: { type: int, min: 1, max: 255 }
-      cipher_type: { type: int, min: 0, max: 255 }
-      cipher_key: { type: string, max_length: 79 }
-      mode: { type: int, min: 0, max: 255 }
+      stream: { type: int, min: 1, max: 65535, required: true,
+        label: Stream,
+        description: "The stream destination entry to write, from 1." }
+      protocol: { type: enum, values: [rtmp, srt], required: true,
+        label: Protocol,
+        description: "RTMP or SRT." }
+      url: { type: string, max_length: 1024, required: true,
+        label: URL,
+        description: "The destination URL." }
+      port: { type: int, min: 1, max: 65535,
+        label: Port,
+        description: "The destination port." }
+      key: { type: string, max_length: 1024,
+        label: Stream key,
+        description: "The stream key, sent to the camera only and never kept in the state." }
+      latency_ms: { type: int, min: 20, max: 8000,
+        label: Latency,
+        description: "SRT latency in milliseconds." }
+      ttl: { type: int, min: 1, max: 255,
+        label: TTL,
+        description: "Time to live of the stream's packets." }
+      cipher_type: { type: int, min: 0, max: 255,
+        label: Cipher type,
+        description: "SRT encryption type as the camera numbers it." }
+      cipher_key: { type: string, max_length: 79,
+        label: Passphrase,
+        description: "SRT encryption passphrase, sent to the camera only." }
+      mode: { type: int, min: 0, max: 255,
+        label: Mode,
+        description: "The stream mode as the camera numbers it." }
     returns: ack
   execute_eframing:
     summary: "Run an eframing command: none, auto, single or ptz (single and ptz frame the rectangle given as fractions of the picture, from the top left, absolute or relative to the current crop), hold, or zoom_out"
     params:
-      type: { type: enum, values: [none, auto, single, ptz, hold, zoom_out], required: true }
-      x: { type: float, min: 0, max: 1 }
-      y: { type: float, min: 0, max: 1 }
-      width: { type: float, min: 0, max: 1 }
-      height: { type: float, min: 0, max: 1 }
-      relative: { type: bool, default: false }
+      type: { type: enum, values: [none, auto, single, ptz, hold, zoom_out], required: true,
+        label: Eframing command,
+        description: "none, auto, single or ptz (framing the rectangle given), hold, or zoom_out." }
+      x: { type: float, min: 0, max: 1,
+        label: X,
+        description: "Left edge of the rectangle as a fraction of the picture width, from the left." }
+      y: { type: float, min: 0, max: 1,
+        label: Y,
+        description: "Top edge of the rectangle as a fraction of the picture height, from the top." }
+      width: { type: float, min: 0, max: 1,
+        label: Width,
+        description: "Width of the rectangle as a fraction of the picture." }
+      height: { type: float, min: 0, max: 1,
+        label: Height,
+        description: "Height of the rectangle as a fraction of the picture." }
+      relative: { type: bool, default: false,
+        label: Relative,
+        description: "On takes the rectangle relative to the current crop, off to the whole picture." }
     returns: ack
   camera_button:
     summary: "Press one of the camera's own buttons (camera_controls.buttons lists them), by name or hex code. Without pressed, press and release; simultaneous uses the function that may hold several at once"
     params:
-      button: { type: string, pattern: "^([a-z0-9_]{1,20}|0x[0-9A-Fa-f]{1,4})$", required: true }
-      pressed: { type: bool }
-      simultaneous: { type: bool, default: false }
+      button: { type: string, pattern: "^([a-z0-9_]{1,20}|0x[0-9A-Fa-f]{1,4})$", required: true,
+        label: Button,
+        description: "The camera button by name or hex code, as camera_controls.buttons lists it." }
+      pressed: { type: bool,
+        label: Pressed,
+        description: "On presses and holds the button, off releases it; left out, the button is pressed and released." }
+      simultaneous: { type: bool, default: false,
+        label: Simultaneous,
+        description: "On uses the function that can hold several buttons at once." }
     returns: ack
   camera_dial:
     summary: "Turn one of the camera's dials (camera_controls.dials) by a number of clicks, negative anticlockwise"
     params:
-      dial: { type: enum, values: [control_wheel, front_dial, rear_dial_left, rear_dial_right], required: true }
-      steps: { type: int, min: -32767, max: 32767, required: true }
+      dial: { type: enum, values: [control_wheel, front_dial, rear_dial_left, rear_dial_right], required: true,
+        label: Dial,
+        description: "The dial to turn, as camera_controls.dials lists it." }
+      steps: { type: int, min: -32767, max: 32767, required: true,
+        label: Clicks,
+        description: "Clicks to turn the dial, negative anticlockwise." }
     returns: ack
   camera_lever:
     summary: "Move the camera's zoom lever to a position in camera_controls.lever_range (0 releases it)"
     params:
-      lever: { type: enum, values: [tele_wide], default: tele_wide }
-      value: { type: int, min: -128, max: 127, required: true }
+      lever: { type: enum, values: [tele_wide], default: tele_wide,
+        label: Lever,
+        description: "The camera's zoom lever." }
+      value: { type: int, min: -128, max: 127, required: true,
+        label: Position,
+        description: "Lever position within camera_controls.lever_range; 0 releases it." }
     returns: ack
   pixel_shift_mode:
     summary: "Turn pixel shift multi shooting on or off (Camera Control PTP 2)"
     params:
-      enabled: { type: bool, required: true }
+      enabled: { type: bool, required: true,
+        label: Pixel shift,
+        description: "On turns pixel shift multi shooting on, off turns it off." }
     returns: ack
   pixel_shift_cancel:
     summary: "Cancel pixel shift shooting in progress (Camera Control PTP 2)"
@@ -1915,24 +2433,36 @@ commands:
   delete_user_base_look:
     summary: "Delete a user base look (1 to 16), or all of them. There is no undo"
     params:
-      user: { type: int, min: 1, max: 16 }
-      all: { type: bool, default: false }
+      user: { type: int, min: 1, max: 16,
+        label: User base look,
+        description: "User base look, 1 to 16." }
+      all: { type: bool, default: false,
+        label: All,
+        description: "On deletes every user base look; there is no undo." }
     returns: ack
   select_user_base_look:
     summary: "Choose the user base look (1 to 16) that set_user_base_look_input, _output and _ae_offset change"
     params:
-      user: { type: int, min: 1, max: 16, required: true }
+      user: { type: int, min: 1, max: 16, required: true,
+        label: User base look,
+        description: "User base look, 1 to 16." }
     returns: ack
   set_pplut_base_look:
     summary: "Choose the user base look (1 to 16) applied in the camera PPLUT"
     params:
-      user: { type: int, min: 1, max: 16, required: true }
+      user: { type: int, min: 1, max: 16, required: true,
+        label: User base look,
+        description: "User base look, 1 to 16." }
     returns: ack
   set_live_view_during_transfers:
     summary: "Choose what the live stream does while a file is downloaded from the card of a PTP body: keep (frames go between download parts, no closer than interval_ms apart; the transfer is somewhat slower) or pause (the transfer runs at full speed and the picture waits until it ends), and the frame spacing for keep. Give either or both; takes effect at once, for a transfer already running too"
     params:
-      mode: { type: enum, values: [keep, pause] }
-      interval_ms: { type: int, min: 20, max: 5000 }
+      mode: { type: enum, values: [keep, pause],
+        label: Live view during downloads,
+        description: "keep shows frames between download parts and slows the download a little; pause runs it at full speed and holds the picture." }
+      interval_ms: { type: int, min: 20, max: 5000,
+        label: Interval,
+        description: "With keep, the shortest time between live view frames during a download, in milliseconds." }
     returns: ack
 
 streams:

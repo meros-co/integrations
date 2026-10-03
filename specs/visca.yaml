@@ -118,14 +118,22 @@ settings:
   # sony-ip (UDP with Sony's 8-byte header), raw-tcp or raw-udp (no header).
   # Unset: the model's own (raw-tcp for PTZOptics, sony-ip otherwise). The
   # port defaults to 52381, 5678 or 1259 by transport.
-  transport: { type: enum, values: ["sony-ip", "raw-tcp", "raw-udp"] }
+  transport: { type: enum, values: ["sony-ip", "raw-tcp", "raw-udp"],
+    label: Transport,
+    description: "sony-ip (UDP with Sony's header, port 52381), raw-tcp (port 5678) or raw-udp (port 1259); unset uses the model's own." }
   # Bind local UDP 52381 because the camera replies there rather than to the
   # sending port. Unset: on for Canon, off otherwise.
-  fixed_reply_port: { type: bool }
+  fixed_reply_port: { type: bool,
+    label: Fixed reply port,
+    description: "On listens on local UDP 52381, for cameras that reply there rather than to the sending port; unset is on for Canon and off otherwise." }
   # How often to poll zoom, focus and pan/tilt positions; 0 = never.
-  poll_position_ms: { type: int, min: 0, max: 60000, default: 500 }
+  poll_position_ms: { type: int, min: 0, max: 60000, default: 500,
+    label: Position poll interval,
+    description: "How often zoom, focus and pan/tilt positions are read, in milliseconds; 0 never." }
   # How often to poll the settings held in the state; 0 = never.
-  poll_settings_ms: { type: int, min: 0, max: 600000, default: 5000 }
+  poll_settings_ms: { type: int, min: 0, max: 600000, default: 5000,
+    label: Settings poll interval,
+    description: "How often the settings held in the state are read, in milliseconds; 0 never." }
 
 ports:
   - { port: 52381, protocol: udp, role: control, when: "transport sony-ip (the Sony, BirdDog, Lumens, Marshall, AVer, Canon and Datavideo models)" }
@@ -294,7 +302,9 @@ commands:
   power:
     summary: "Power on, or to standby (CAM_Power 8x 01 04 00 0p: 2 on, 3 standby)"
     params:
-      "on": { type: bool, default: true }
+      "on": { type: bool, default: true,
+        label: Power on,
+        description: "On powers the camera on, off puts it in standby." }
     returns: ack
   if_clear:
     summary: "Clear the camera's command buffers (IF_Clear 8x 01 00 01, sent as a device setting command; answered 90 50 FF)"
@@ -302,54 +312,78 @@ commands:
   cancel:
     summary: "Cancel the command executing in a socket (8x 2z FF). The cancelled command fails with error 04"
     params:
-      socket: { type: int, min: 1, max: 2, required: true }
+      socket: { type: int, min: 1, max: 2, required: true,
+        label: Socket,
+        description: "The command socket, 1 or 2, whose command to cancel." }
     returns: ack
   camera_id:
     summary: "Set the camera ID, 0000-FFFF (8x 01 04 22 0p 0p 0p 0p)"
     params:
-      id: { type: int, min: 0, max: 65535, required: true }
+      id: { type: int, min: 0, max: 65535, required: true,
+        label: Camera ID,
+        description: "The camera ID, 0 to 65535 (0000-FFFF hex)." }
     returns: ack
   raw_command:
     summary: "Send any VISCA command, given as hex '81 01 ... FF' (3-16 bytes, FF only at the end); completes on Completion. For vendor commands not modelled here"
     params:
-      hex: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f ]+$", required: true,
+        label: Command bytes,
+        description: "The VISCA command as hex bytes, such as 81 01 04 00 02 FF: 3 to 16 bytes, FF only at the end." }
     returns: ack
   raw_inquiry:
     summary: "Send any VISCA inquiry, given as hex '81 09 ... FF'; returns the whole reply as hex"
     params:
-      hex: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f ]+$", required: true }
+      hex: { type: string, max_length: 64, pattern: "^[0-9A-Fa-f ]+$", required: true,
+        label: Inquiry bytes,
+        description: "The VISCA inquiry as hex bytes, such as 81 09 04 00 FF." }
     returns: value
   zoom:
     summary: "Zoom tele or wide, at the standard speed or a variable speed 0 (low) - 7 (high), or stop (8x 01 04 07 ...)"
     params:
-      action: { type: enum, values: ["tele", "wide", "stop"], required: true }
-      speed: { type: int, min: 0, max: 7 }
+      action: { type: enum, values: ["tele", "wide", "stop"], required: true,
+        label: Direction,
+        description: "Zoom toward tele or wide, or stop." }
+      speed: { type: int, min: 0, max: 7,
+        label: Speed,
+        description: "Variable zoom speed, 0 (low) to 7 (high); left out, the standard speed." }
     returns: ack
   zoom_to:
     summary: "Zoom to a position, 0000 (wide) to the model's tele end: 4000 optical on SRG-X400, 7AC0 with digital zoom (p.39); written as four nibbles (8x 01 04 47 0z 0z 0z 0z)"
     params:
-      position: { type: int, min: 0, max: 31424, required: true }
+      position: { type: int, min: 0, max: 31424, required: true,
+        label: Zoom position,
+        description: "Zoom position from 0 (wide) to the model's tele end: 16384 (4000 hex) optical on SRG-X400, 31424 (7AC0 hex) with digital zoom." }
     returns: ack
   zoom_mode:
     summary: "Optical only, Clear Image Zoom or digital zoom (8x 01 04 06 0p)"
     params:
-      mode: { type: enum, values: ["optical", "clear_image", "digital"], required: true }
+      mode: { type: enum, values: ["optical", "clear_image", "digital"], required: true,
+        label: Zoom mode,
+        description: "Optical zoom only, Clear Image Zoom, or digital zoom." }
     returns: ack
   focus:
     summary: "Focus far or near, at the standard speed or a variable speed 0-7, or stop (8x 01 04 08 ...)"
     params:
-      action: { type: enum, values: ["far", "near", "stop"], required: true }
-      speed: { type: int, min: 0, max: 7 }
+      action: { type: enum, values: ["far", "near", "stop"], required: true,
+        label: Direction,
+        description: "Focus toward far or near, or stop." }
+      speed: { type: int, min: 0, max: 7,
+        label: Speed,
+        description: "Variable focus speed, 0 (low) to 7 (high); left out, the standard speed." }
     returns: ack
   focus_to:
     summary: "Focus to a position, 1000 (far, infinity) to F000 (near) on Sony (p.39); four nibbles (8x 01 04 48)"
     params:
-      position: { type: int, min: 0, max: 61440, required: true }
+      position: { type: int, min: 0, max: 61440, required: true,
+        label: Focus position,
+        description: "Focus position, on Sony from 4096 (1000 hex, far, infinity) to 61440 (F000 hex, near)." }
     returns: ack
   focus_mode:
     summary: "Auto focus, manual focus, or toggle (8x 01 04 38 02/03/10)"
     params:
-      mode: { type: enum, values: ["auto", "manual", "toggle"], required: true }
+      mode: { type: enum, values: ["auto", "manual", "toggle"], required: true,
+        label: Focus mode,
+        description: "Auto focus, manual focus, or toggle between them." }
     returns: ack
   focus_one_push:
     summary: "One-push auto focus (8x 01 04 18 01)"
@@ -360,36 +394,56 @@ commands:
   focus_near_limit:
     summary: "Nearest distance auto focus will use, 1000 (infinity) to F000 (8 cm); the low byte is fixed at 00 (p.39)"
     params:
-      position: { type: int, min: 4096, max: 61440, required: true }
+      position: { type: int, min: 4096, max: 61440, required: true,
+        label: Near limit,
+        description: "Nearest distance auto focus will use, from 4096 (1000 hex, infinity) to 61440 (F000 hex, 8 cm); the low byte is fixed at 00." }
     returns: ack
   af_mode:
     summary: "Auto focus mode: normal, interval, or triggered by zoom (8x 01 04 57 0p)"
     params:
-      mode: { type: enum, values: ["normal", "interval", "zoom_trigger"], required: true }
+      mode: { type: enum, values: ["normal", "interval", "zoom_trigger"], required: true,
+        label: AF mode,
+        description: "normal continuous AF, interval AF, or AF triggered by zoom." }
     returns: ack
   af_interval:
     summary: "Interval AF timing in seconds, 0-255 each (8x 01 04 27 0p 0p 0q 0q)"
     params:
-      operating_s: { type: int, min: 0, max: 255, required: true }
-      staying_s: { type: int, min: 0, max: 255, required: true }
+      operating_s: { type: int, min: 0, max: 255, required: true,
+        label: Operating time,
+        description: "Interval AF: seconds the auto focus runs, 0 to 255." }
+      staying_s: { type: int, min: 0, max: 255, required: true,
+        label: Staying time,
+        description: "Interval AF: seconds the focus stays put, 0 to 255." }
     returns: ack
   af_sensitivity:
     summary: "Auto focus sensitivity (8x 01 04 58 0p: 1 high on PTZOptics/BirdDog, 2 normal, 3 low)"
     params:
-      level: { type: enum, values: ["high", "normal", "low"], required: true }
+      level: { type: enum, values: ["high", "normal", "low"], required: true,
+        label: AF sensitivity,
+        description: "high (PTZOptics and BirdDog), normal or low." }
     returns: ack
   ir_correction:
     summary: "Focus correction for IR light (8x 01 04 11 0p)"
     params:
-      mode: { type: enum, values: ["standard", "ir_light"], required: true }
+      mode: { type: enum, values: ["standard", "ir_light"], required: true,
+        label: IR correction,
+        description: "Focus for standard light or for IR light." }
     returns: ack
   pan_tilt:
     summary: "Drive pan and tilt in a direction until stopped. Speeds 01-18 hex; the tilt maximum differs by model (17 Sony SRG/BRC-X400, 18 BRC-H800/Lumens/Marshall, 14 PTZOptics/BirdDog, 12 Datavideo) (8x 01 06 01 vv ww 0p 0t)"
     params:
-      pan: { type: enum, values: ["left", "right", "stop"], required: true }
-      tilt: { type: enum, values: ["up", "down", "stop"], required: true }
-      pan_speed: { type: int, min: 1, max: 24, required: true }
-      tilt_speed: { type: int, min: 1, max: 24, required: true }
+      pan: { type: enum, values: ["left", "right", "stop"], required: true,
+        label: Pan,
+        description: "Pan left or right, or stop." }
+      tilt: { type: enum, values: ["up", "down", "stop"], required: true,
+        label: Tilt,
+        description: "Tilt up or down, or stop." }
+      pan_speed: { type: int, min: 1, max: 24, required: true,
+        label: Pan speed,
+        description: "Pan speed, 1 to 24 (01-18 hex)." }
+      tilt_speed: { type: int, min: 1, max: 24, required: true,
+        label: Tilt speed,
+        description: "Tilt speed from 1; the maximum differs by model: 23 Sony SRG/BRC-X400, 24 BRC-H800/Lumens/Marshall, 20 PTZOptics/BirdDog, 18 Datavideo." }
     returns: ack
   pan_tilt_stop:
     summary: "Stop pan/tilt drive (8x 01 06 01 vv ww 03 03)"
@@ -397,18 +451,34 @@ commands:
   pan_tilt_absolute:
     summary: "Move to a pan/tilt position, signed, in the camera's own units (SRG-X400: pan DE00-2200 = -170 to +170 degrees, p.37). Pan is four nibbles, or five on BRC-X1000/H800 and Datavideo. tilt_speed is used by models whose move carries one (PTZOptics, BirdDog, Lumens, Marshall) and defaults to speed (8x 01 06 02)"
     params:
-      pan: { type: int, min: -524288, max: 524287, required: true }
-      tilt: { type: int, min: -32768, max: 32767, required: true }
-      speed: { type: int, min: 1, max: 24, required: true }
-      tilt_speed: { type: int, min: 1, max: 24 }
+      pan: { type: int, min: -524288, max: 524287, required: true,
+        label: Pan,
+        description: "Pan position, signed, in the camera's own units (SRG-X400: -8704 to 8704 for -170 to +170 degrees)." }
+      tilt: { type: int, min: -32768, max: 32767, required: true,
+        label: Tilt,
+        description: "Tilt position, signed, in the camera's own units." }
+      speed: { type: int, min: 1, max: 24, required: true,
+        label: Speed,
+        description: "Move speed, 1 to 24 (01-18 hex); the pan speed where the model takes two." }
+      tilt_speed: { type: int, min: 1, max: 24,
+        label: Tilt speed,
+        description: "Tilt speed for models whose move carries one (PTZOptics, BirdDog, Lumens, Marshall); left out, the same as speed." }
     returns: ack
   pan_tilt_relative:
     summary: "Move by a pan/tilt offset, as pan_tilt_absolute (8x 01 06 03)"
     params:
-      pan: { type: int, min: -524288, max: 524287, required: true }
-      tilt: { type: int, min: -32768, max: 32767, required: true }
-      speed: { type: int, min: 1, max: 24, required: true }
-      tilt_speed: { type: int, min: 1, max: 24 }
+      pan: { type: int, min: -524288, max: 524287, required: true,
+        label: Pan,
+        description: "Pan offset from the current position, signed, in the camera's own units." }
+      tilt: { type: int, min: -32768, max: 32767, required: true,
+        label: Tilt,
+        description: "Tilt offset from the current position, signed, in the camera's own units." }
+      speed: { type: int, min: 1, max: 24, required: true,
+        label: Speed,
+        description: "Move speed, 1 to 24 (01-18 hex); the pan speed where the model takes two." }
+      tilt_speed: { type: int, min: 1, max: 24,
+        label: Tilt speed,
+        description: "Tilt speed for models whose move carries one (PTZOptics, BirdDog, Lumens, Marshall); left out, the same as speed." }
     returns: ack
   pan_tilt_home:
     summary: "Move to the home position (8x 01 06 04)"
@@ -419,190 +489,270 @@ commands:
   pan_tilt_limit_set:
     summary: "Set the up-right or down-left pan/tilt limit (8x 01 06 07 00 0w ...)"
     params:
-      corner: { type: enum, values: ["up_right", "down_left"], required: true }
-      pan: { type: int, min: -524288, max: 524287, required: true }
-      tilt: { type: int, min: -32768, max: 32767, required: true }
+      corner: { type: enum, values: ["up_right", "down_left"], required: true,
+        label: Corner,
+        description: "The up-right or the down-left limit." }
+      pan: { type: int, min: -524288, max: 524287, required: true,
+        label: Pan,
+        description: "Pan position of the limit, in the camera's own units." }
+      tilt: { type: int, min: -32768, max: 32767, required: true,
+        label: Tilt,
+        description: "Tilt position of the limit, in the camera's own units." }
     returns: ack
   pan_tilt_limit_clear:
     summary: "Clear the up-right or down-left pan/tilt limit (8x 01 06 07 01 0w 07 0F ...)"
     params:
-      corner: { type: enum, values: ["up_right", "down_left"], required: true }
+      corner: { type: enum, values: ["up_right", "down_left"], required: true,
+        label: Corner,
+        description: "The up-right or the down-left limit." }
     returns: ack
   pan_tilt_ramp_curve:
     summary: "Acceleration curve (8x 01 06 31 0p; SRG-X400 documents only sharpness)"
     params:
-      curve: { type: enum, values: ["sharpness", "standard", "gentle"], required: true }
+      curve: { type: enum, values: ["sharpness", "standard", "gentle"], required: true,
+        label: Ramp curve,
+        description: "Acceleration curve: sharpness, standard or gentle (SRG-X400 documents only sharpness)." }
     returns: ack
   pan_tilt_slow:
     summary: "Slow pan/tilt mode (8x 01 06 44 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Slow mode,
+        description: "On turns slow pan/tilt mode on, off turns it off." }
     returns: ack
   pan_reverse:
     summary: "Reverse pan direction (8x 01 7E 01 06 00 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Reverse pan,
+        description: "On reverses the pan direction." }
     returns: ack
   tilt_reverse:
     summary: "Reverse tilt direction (8x 01 7E 01 09 00 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Reverse tilt,
+        description: "On reverses the tilt direction." }
     returns: ack
   preset_recall:
     summary: "Recall a preset, numbered from 1 (wire number - 1); the model's range applies (100 Sony, 128 PTZOptics/Datavideo, 64 BirdDog, 256 Lumens/Marshall) (8x 01 04 3F 02 pp)"
     params:
-      preset: { type: int, min: 1, max: 256, required: true }
+      preset: { type: int, min: 1, max: 256, required: true,
+        label: Preset,
+        description: "Preset number from 1; the range depends on the model (100 Sony, 128 PTZOptics and Datavideo, 64 BirdDog, 256 Lumens and Marshall)." }
     returns: ack
   preset_set:
     summary: "Store the current position and settings in a preset (8x 01 04 3F 01 pp)"
     params:
-      preset: { type: int, min: 1, max: 256, required: true }
+      preset: { type: int, min: 1, max: 256, required: true,
+        label: Preset,
+        description: "Preset number from 1; the range depends on the model (100 Sony, 128 PTZOptics and Datavideo, 64 BirdDog, 256 Lumens and Marshall)." }
     returns: ack
   preset_reset:
     summary: "Clear a preset (8x 01 04 3F 00 pp)"
     params:
-      preset: { type: int, min: 1, max: 256, required: true }
+      preset: { type: int, min: 1, max: 256, required: true,
+        label: Preset,
+        description: "Preset number from 1; the range depends on the model (100 Sony, 128 PTZOptics and Datavideo, 64 BirdDog, 256 Lumens and Marshall)." }
     returns: ack
   preset_speed:
     summary: "Recall speed for one preset, 01-19 hex on SRG-X400 (300 deg/s pan at 19, p.38), 01-18 on BRC-H800, 01-12 on Datavideo (8x 01 7E 01 0B pp qq)"
     params:
-      preset: { type: int, min: 1, max: 128, required: true }
-      speed: { type: int, min: 1, max: 25, required: true }
+      preset: { type: int, min: 1, max: 128, required: true,
+        label: Preset,
+        description: "Preset number from 1." }
+      speed: { type: int, min: 1, max: 25, required: true,
+        label: Recall speed,
+        description: "Recall speed for the preset, from 1: up to 25 (19 hex) on SRG-X400, 24 on BRC-H800, 18 on Datavideo." }
     returns: ack
   preset_speed_mode:
     summary: "Whether recall speed is per preset (separate), shared (common), or given with the recall (compatible) (8x 01 7E 04 1B 0p)"
     params:
-      mode: { type: enum, values: ["compatible", "separate", "common"], required: true }
+      mode: { type: enum, values: ["compatible", "separate", "common"], required: true,
+        label: Speed mode,
+        description: "separate speed per preset, common speed for all, or compatible (the speed given with each recall)." }
     returns: ack
   preset_common_speed:
     summary: "Recall speed shared by all presets, 01-19 hex (8x 01 7E 04 1C 0p 0p)"
     params:
-      speed: { type: int, min: 1, max: 25, required: true }
+      speed: { type: int, min: 1, max: 25, required: true,
+        label: Common speed,
+        description: "Recall speed shared by all presets, 1 to 25 (01-19 hex)." }
     returns: ack
   preset_call_mode:
     summary: "Freeze the picture while a preset is recalled, or not (8x 01 7E 04 3B 0p)"
     params:
-      mode: { type: enum, values: ["freeze", "normal"], required: true }
+      mode: { type: enum, values: ["freeze", "normal"], required: true,
+        label: Recall mode,
+        description: "freeze holds the picture while a preset is recalled, normal does not." }
     returns: ack
   preset_mode:
     summary: "BRC preset mode: MODE1 recalls positions and picture settings, MODE2 positions only, TRACE makes presets drive PTZ trace (8x 01 7E 04 3D pp)"
     params:
-      mode: { type: enum, values: ["mode1", "mode2", "trace"], required: true }
+      mode: { type: enum, values: ["mode1", "mode2", "trace"], required: true,
+        label: Preset mode,
+        description: "mode1 recalls positions and picture settings, mode2 positions only, trace makes presets drive PTZ trace." }
     returns: ack
   exposure_mode:
     summary: "Exposure mode (8x 01 04 39 0p: 0 full auto, 3 manual, A shutter priority, B iris priority, D bright, E gain priority). Not every model has every mode"
     params:
-      mode: { type: enum, values: ["full_auto", "manual", "shutter_priority", "iris_priority", "bright", "gain_priority"], required: true }
+      mode: { type: enum, values: ["full_auto", "manual", "shutter_priority", "iris_priority", "bright", "gain_priority"], required: true,
+        label: Exposure mode,
+        description: "full auto, manual, shutter priority, iris priority, bright or gain priority; not every model has every mode." }
     returns: ack
   iris:
     summary: "Iris one step open (up), closed (down), or to default (8x 01 04 0B)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step open (up), one step closed (down), or reset to the default." }
     returns: ack
   iris_direct:
     summary: "Iris position, in the camera's table (SRG-X400: 19 = F2.0 open ... 05 = F11, 00 closed, p.35) (8x 01 04 4B 00 00 0p 0p)"
     params:
-      position: { type: int, min: 0, max: 25, required: true }
+      position: { type: int, min: 0, max: 25, required: true,
+        label: Iris,
+        description: "Iris position in the camera's table (SRG-X400: 25 is F2.0 open down to 5 for F11, 0 closed)." }
     returns: ack
   gain:
     summary: "Gain one step up, down, or to default (8x 01 04 0C)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step up, one step down, or reset to the default." }
     returns: ack
   gain_direct:
     summary: "Gain position, in the camera's table (SRG-X400: 01 = 0 dB ... 11 = 48 dB, p.35) (8x 01 04 4C 00 00 0p 0p)"
     params:
-      position: { type: int, min: 0, max: 17, required: true }
+      position: { type: int, min: 0, max: 17, required: true,
+        label: Gain,
+        description: "Gain position in the camera's table (SRG-X400: 1 is 0 dB up to 17 for 48 dB)." }
     returns: ack
   gain_limit:
     summary: "Gain limit (SRG-X400: 4-D = 9-36 dB, p.36; BRC-H800: 4-9, F off) (8x 01 04 2C 0p)"
     params:
-      limit: { type: int, min: 0, max: 15, required: true }
+      limit: { type: int, min: 0, max: 15, required: true,
+        label: Gain limit,
+        description: "Gain limit in the camera's table (SRG-X400: 4 to 13 for 9 to 36 dB; BRC-H800: 4 to 9, 15 off)." }
     returns: ack
   shutter:
     summary: "Shutter one step faster (up), slower (down), or to default (8x 01 04 0A)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step faster (up), one step slower (down), or reset to the default." }
     returns: ack
   shutter_direct:
     summary: "Shutter position, in the camera's table (SRG-X400: 06 = 1/1 ... 21 = 1/10000 s, by frame rate, p.34) (8x 01 04 4A 00 00 0p 0p)"
     params:
-      position: { type: int, min: 0, max: 33, required: true }
+      position: { type: int, min: 0, max: 33, required: true,
+        label: Shutter,
+        description: "Shutter position in the camera's table, which depends on the frame rate (SRG-X400: 6 is 1/1 s up to 33 for 1/10000 s)." }
     returns: ack
   max_shutter:
     summary: "Fastest shutter auto exposure may use, in the shutter table (8x 01 05 2A 00 0p 0p)"
     params:
-      position: { type: int, min: 0, max: 33, required: true }
+      position: { type: int, min: 0, max: 33, required: true,
+        label: Fastest shutter,
+        description: "Fastest shutter auto exposure may use, as a shutter table position." }
     returns: ack
   min_shutter:
     summary: "Slowest shutter auto exposure may use, in the shutter table (8x 01 05 2A 01 0p 0p)"
     params:
-      position: { type: int, min: 0, max: 33, required: true }
+      position: { type: int, min: 0, max: 33, required: true,
+        label: Slowest shutter,
+        description: "Slowest shutter auto exposure may use, as a shutter table position." }
     returns: ack
   auto_slow_shutter:
     summary: "Auto slow shutter (8x 01 04 5A 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Auto slow shutter,
+        description: "On lets auto exposure use slower shutter speeds in low light." }
     returns: ack
   ae_speed:
     summary: "Auto exposure response speed, 01-30 hex (8x 01 04 5D pp)"
     params:
-      speed: { type: int, min: 1, max: 48, required: true }
+      speed: { type: int, min: 1, max: 48, required: true,
+        label: AE speed,
+        description: "Auto exposure response speed, 1 to 48 (01-30 hex)." }
     returns: ack
   bright:
     summary: "Bright (exposure level in bright mode) one step up, down, or to default (8x 01 04 0D)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step up, one step down, or reset to the default." }
     returns: ack
   bright_direct:
     summary: "Bright position (8x 01 04 4D 00 00 0p 0q; BirdDog X4 0-17 hex)"
     params:
-      position: { type: int, min: 0, max: 31, required: true }
+      position: { type: int, min: 0, max: 31, required: true,
+        label: Bright,
+        description: "Exposure level in bright mode, as the camera's table position (BirdDog X4: 0 to 23)." }
     returns: ack
   exposure_compensation:
     summary: "Exposure compensation on or off (8x 01 04 3E 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Exposure compensation,
+        description: "On turns exposure compensation on, off turns it off." }
     returns: ack
   exposure_compensation_level:
     summary: "Exposure compensation level, 00 (-7, -10.5 dB) to 0E (+7, +10.5 dB), 07 = 0 (p.36) (8x 01 04 4E 00 00 0p 0p)"
     params:
-      level: { type: int, min: 0, max: 14, required: true }
+      level: { type: int, min: 0, max: 14, required: true,
+        label: Compensation level,
+        description: "0 (-7, -10.5 dB) to 14 (+7, +10.5 dB); 7 is no compensation." }
     returns: ack
   exposure_compensation_step:
     summary: "Exposure compensation one step up, down, or to 0 (8x 01 04 0E)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step up, one step down, or reset to 0." }
     returns: ack
   backlight:
     summary: "Backlight compensation (8x 01 04 33 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Backlight compensation,
+        description: "On turns backlight compensation on, off turns it off." }
     returns: ack
   spotlight:
     summary: "Spotlight compensation (8x 01 04 3A 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Spotlight compensation,
+        description: "On turns spotlight compensation on, off turns it off." }
     returns: ack
   high_sensitivity:
     summary: "High sensitivity mode, which moves the gain and gain-limit tables up 12 dB (8x 01 04 5E 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: High sensitivity,
+        description: "On moves the gain and gain limit tables up 12 dB." }
     returns: ack
   visibility_enhancer:
     summary: "Visibility enhancer (8x 01 04 3D 06 on / 03 off)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Visibility enhancer,
+        description: "On turns the visibility enhancer on, off turns it off." }
     returns: ack
   nd_filter:
     summary: "ND filter: off, 1/4, 1/16, 1/64 (8x 01 7E 01 53 0p, BRC-X1000/H800)"
     params:
-      filter: { type: enum, values: ["off", "nd4", "nd16", "nd64"], required: true }
+      filter: { type: enum, values: ["off", "nd4", "nd16", "nd64"], required: true,
+        label: ND filter,
+        description: "off, ND 1/4, ND 1/16 or ND 1/64 (BRC-X1000 and BRC-H800)." }
     returns: ack
   white_balance_mode:
     summary: "White balance mode (8x 01 04 35 pp: 00 auto, 01 indoor, 02 outdoor, 03 one push, 04 auto2/ATW, 05 manual, 20 colour temperature on PTZOptics/BirdDog)"
     params:
-      mode: { type: enum, values: ["auto", "indoor", "outdoor", "one_push", "auto2", "manual", "color_temperature"], required: true }
+      mode: { type: enum, values: ["auto", "indoor", "outdoor", "one_push", "auto2", "manual", "color_temperature"], required: true,
+        label: White balance,
+        description: "auto, indoor, outdoor, one push, auto2 (ATW), manual, or colour temperature (PTZOptics and BirdDog)." }
     returns: ack
   white_balance_one_push:
     summary: "Trigger one-push white balance (8x 01 04 10 05)"
@@ -610,107 +760,149 @@ commands:
   red_gain:
     summary: "Red gain, 00 (-128) - 80 (0) - FF (+127) on Sony (8x 01 04 43 00 00 0p 0p)"
     params:
-      gain: { type: int, min: 0, max: 255, required: true }
+      gain: { type: int, min: 0, max: 255, required: true,
+        label: Red gain,
+        description: "Red gain, 0 to 255; on Sony 128 is 0, 0 is -128 and 255 is +127." }
     returns: ack
   blue_gain:
     summary: "Blue gain, 00 (-128) - 80 (0) - FF (+127) on Sony (8x 01 04 44 00 00 0p 0p)"
     params:
-      gain: { type: int, min: 0, max: 255, required: true }
+      gain: { type: int, min: 0, max: 255, required: true,
+        label: Blue gain,
+        description: "Blue gain, 0 to 255; on Sony 128 is 0, 0 is -128 and 255 is +127." }
     returns: ack
   red_gain_step:
     summary: "Red gain one step up, down, or to default (8x 01 04 03)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step up, one step down, or reset to the default." }
     returns: ack
   blue_gain_step:
     summary: "Blue gain one step up, down, or to default (8x 01 04 04)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step up, one step down, or reset to the default." }
     returns: ack
   white_balance_speed:
     summary: "Auto white balance speed, 1 (slow) - 5 (fast) (8x 01 04 56 0p)"
     params:
-      speed: { type: int, min: 1, max: 5, required: true }
+      speed: { type: int, min: 1, max: 5, required: true,
+        label: AWB speed,
+        description: "Auto white balance speed, 1 (slow) to 5 (fast)." }
     returns: ack
   color_temperature:
     summary: "Colour temperature, 00 = 2500 K to 37 = 8000 K in 100 K steps (PTZOptics p.7, BirdDog X4) (8x 01 04 20 0p 0q)"
     params:
-      position: { type: int, min: 0, max: 55, required: true }
+      position: { type: int, min: 0, max: 55, required: true,
+        label: Colour temperature,
+        description: "0 is 2500 K up to 55 for 8000 K, in 100 K steps (PTZOptics, BirdDog X4)." }
     returns: ack
   detail_level:
     summary: "Detail (aperture/sharpness) level, 00-0F (8x 01 04 42 00 00 0p 0p)"
     params:
-      level: { type: int, min: 0, max: 15, required: true }
+      level: { type: int, min: 0, max: 15, required: true,
+        label: Detail level,
+        description: "Detail (sharpness) level, 0 to 15." }
     returns: ack
   detail_step:
     summary: "Detail (aperture) one step up, down, or to default (8x 01 04 02)"
     params:
-      action: { type: enum, values: ["up", "down", "reset"], required: true }
+      action: { type: enum, values: ["up", "down", "reset"], required: true,
+        label: Action,
+        description: "One step up, one step down, or reset to the default." }
     returns: ack
   aperture_mode:
     summary: "Sharpness auto or manual (8x 01 04 05 02/03, PTZOptics)"
     params:
-      mode: { type: enum, values: ["auto", "manual"], required: true }
+      mode: { type: enum, values: ["auto", "manual"], required: true,
+        label: Sharpness mode,
+        description: "auto or manual sharpness (PTZOptics)." }
     returns: ack
   noise_reduction:
     summary: "Noise reduction level, 00 off, 01 weak - 05 strong (8x 01 04 53 pp)"
     params:
-      level: { type: int, min: 0, max: 5, required: true }
+      level: { type: int, min: 0, max: 5, required: true,
+        label: Noise reduction,
+        description: "0 off, 1 weak up to 5 strong." }
     returns: ack
   picture_effect:
     summary: "Picture effect (8x 01 04 63 0p: 0 off, 2 negative, 4 black and white; Sony SRG-X400 has off and B&W only)"
     params:
-      effect: { type: enum, values: ["off", "negative", "black_white"], required: true }
+      effect: { type: enum, values: ["off", "negative", "black_white"], required: true,
+        label: Picture effect,
+        description: "off, negative, or black and white (SRG-X400 has off and black and white only)." }
     returns: ack
   flip:
     summary: "Image flip, vertical (8x 01 04 66 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Flip,
+        description: "On flips the image vertically." }
     returns: ack
   mirror:
     summary: "Image mirror, horizontal (8x 01 04 61 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Mirror,
+        description: "On mirrors the image horizontally." }
     returns: ack
   image_stabilizer:
     summary: "Image stabiliser (8x 01 04 34 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Image stabiliser,
+        description: "On turns the image stabiliser on, off turns it off." }
     returns: ack
   freeze:
     summary: "Freeze the picture (8x 01 04 62 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Freeze,
+        description: "On freezes the picture, off releases it." }
     returns: ack
   tally:
     summary: "Tally lamp on or off (8x 01 7E 01 0A 00 0p). Over Sony VISCA over IP the core repeats ON every 10 s while on"
     params:
-      "on": { type: bool, default: true }
+      "on": { type: bool, default: true,
+        label: Tally on,
+        description: "On lights the tally lamp, off turns it off." }
     returns: ack
   tally_level:
     summary: "Tally lamp brightness: off, low, high (8x 01 7E 01 0A 01 0p: 0, 4, 5)"
     params:
-      level: { type: enum, values: ["off", "low", "high"], required: true }
+      level: { type: enum, values: ["off", "low", "high"], required: true,
+        label: Tally brightness,
+        description: "Tally lamp brightness: off, low or high." }
     returns: ack
   ir_receive:
     summary: "Accept the IR remote, or not, or toggle (8x 01 06 08 pp)"
     params:
-      mode: { type: enum, values: ["on", "off", "toggle"], required: true }
+      mode: { type: enum, values: ["on", "off", "toggle"], required: true,
+        label: IR receive,
+        description: "on accepts the IR remote, off ignores it, toggle switches." }
     returns: ack
   ir_cut_filter:
     summary: "IR cut filter out (night) or in (day) (8x 01 04 01 0p)"
     params:
-      night: { type: bool, default: true }
+      night: { type: bool, default: true,
+        label: Night mode,
+        description: "On takes the IR cut filter out (night), off puts it in (day)." }
     returns: ack
   auto_icr:
     summary: "Automatic day/night switching (8x 01 04 51 0p)"
     params:
-      enabled: { type: bool, default: true }
+      enabled: { type: bool, default: true,
+        label: Auto day/night,
+        description: "On switches between day and night automatically." }
     returns: ack
   menu:
     summary: "Open, close or toggle the on-screen menu (8x 01 06 06 pp)"
     params:
-      mode: { type: enum, values: ["on", "off", "toggle"], required: true }
+      mode: { type: enum, values: ["on", "off", "toggle"], required: true,
+        label: Menu,
+        description: "on opens the on-screen menu, off closes it, toggle switches." }
     returns: ack
   menu_enter:
     summary: "Select the highlighted menu item (Sony 8x 01 7E 01 02 00 01; PTZOptics 8x 01 06 06 05)"
@@ -721,7 +913,9 @@ commands:
   menu_navigate:
     summary: "Move the menu cursor (pan/tilt drive at speed 0E, PTZOptics p.23)"
     params:
-      direction: { type: enum, values: ["up", "down", "left", "right"], required: true }
+      direction: { type: enum, values: ["up", "down", "left", "right"], required: true,
+        label: Direction,
+        description: "Move the menu cursor up, down, left or right." }
     returns: ack
   get_version:
     summary: "Vendor ID, model ID, ROM revision and socket count (CAM_VersionInq 8x 09 00 02)"
@@ -765,7 +959,9 @@ commands:
   get_pan_tilt_limit:
     summary: "{pan, tilt} of one corner's limit (8x 09 06 07 0q)"
     params:
-      corner: { type: enum, values: ["up_right", "down_left"], required: true }
+      corner: { type: enum, values: ["up_right", "down_left"], required: true,
+        label: Corner,
+        description: "The up-right or the down-left limit." }
     returns: value
   get_pan_reverse:
     summary: "Pan reversed (8x 09 7E 01 06)"
@@ -869,7 +1065,9 @@ commands:
   get_preset_speed:
     summary: "One preset's recall speed (8x 09 7E 01 0B pp)"
     params:
-      preset: { type: int, min: 1, max: 128, required: true }
+      preset: { type: int, min: 1, max: 128, required: true,
+        label: Preset,
+        description: "Preset number from 1." }
     returns: value
   get_preset_speed_mode:
     summary: "Preset speed mode (8x 09 7E 04 1B)"

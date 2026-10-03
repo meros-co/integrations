@@ -46,6 +46,9 @@ class Spec:
     def chv(self, n):
         return format(n, self.chan_fmt) if self.chan_fmt else str(n)
 
+    def chan(self):
+        return lab(CH, "Channel", CHAN_DESC[self.sid])
+
     def cmd(self, name, summary, params, send, expect, returns):
         lines = [f"  {name}:", f"    summary: {q(summary)}"]
         if params:
@@ -71,6 +74,123 @@ CH = "{ type: int, min: 0, max: 99, required: true }"
 CH1 = "{ type: int, min: 1, max: 99, required: true }"
 
 
+def lab(base, label, desc):
+    """A parameter's flow map with its label and description added."""
+    assert desc.endswith("."), desc
+    return base[:-1].rstrip() + f", label: {q(label)}, description: {q(desc)} }}"
+
+
+# What a channel number means, per spec (each document's channel table).
+CHAN_DESC = {
+    "shure-p300": "P300 channel: 1-8 Dante mic inputs, 9-10 Dante inputs, 11-12 analog inputs, 13 USB in, 14 mobile in, 15-16 Dante outputs 1-2, 17-18 analog outputs, 19 USB out, 20 mobile out, 21 automixer output, 22 AEC reference, 23-28 Dante outputs 3-8; 0 is all.",
+    "shure-imx-room": "Channel: 1-16 Dante mic inputs, 17-24 Dante line inputs, 25 virtual audio in, 26 PC in, 27-34 Dante outputs, 35 virtual audio out, 36 PC out, 37 automix output, 55 VAD input right; 0 is all.",
+    "shure-ani": "Channel: ANI4IN 1-4 inputs, ANI4OUT 1-4 outputs, ANI22 1-2 analog inputs and 3-4 analog outputs, ANIUSB-MATRIX as its document numbers them; 0 is all.",
+    "shure-mxa": "Channel in the microphone's channel table: lobes or Dante outputs first, then the automixer output (9 on MXA910 and MXA920, 5 on MXA310) and the AEC reference; 0 is all.",
+    "shure-mxn5": "Channel: 1-2 Dante inputs, 3 summed input, 4 Dante output; 0 is all.",
+}
+
+ON_OFF = "{ type: bool, default: true }"
+TENTHS = "in tenths of a dB"
+
+# Label and description of each settable parameter's value, by (spec, key) or key.
+HELP = {
+    "mute": ("Mute", "On mutes the channel, off unmutes it."),
+    "gain": ("Gain", f"Digital gain {TENTHS}, -1100 (-110.0 dB) to 300 (+30.0 dB)."),
+    "device_mute": ("Device mute", "On mutes the whole device, off unmutes it."),
+    "input_level": ("Input level", "LINE_LVL for line level or AUX_LVL for aux level, on the analog inputs (11-12)."),
+    ("shure-p300", "output_level"): ("Output level", "LINE_LVL, AUX_LVL or MIC_LVL, on the analog outputs (17-18)."),
+    "output_level": ("Output level", "LINE_LVL, AUX_LVL or MIC_LVL, on an analog output."),
+    "led_brightness": ("LED brightness", "0 off, 1 dim, 2 the default brightness."),
+    ("shure-mxa", "led_brightness"): ("LED brightness", "0 off, 1-5 for 20% to 100%; older firmware takes 0-2."),
+    "input_meter_mode": ("Input meter tap", "Meter the inputs PRE_FADER or POST_FADER."),
+    "output_meter_mode": ("Output meter tap", "Meter the outputs PRE_FADER or POST_FADER."),
+    "meter": ("Metering interval", "Interval in ms at which SAMPLE meter messages are sent, from 100, or 0 to stop; 1-99 are refused."),
+    "aec": ("AEC", "On turns the acoustic echo canceller on for the Dante mic channel (1-8), off turns it off."),
+    "aec_reference": ("AEC reference", "The signal the AEC takes as its reference (channel 22): a Dante or analog output, a Dante or analog input, USB in or mobile in."),
+    "aec_nlp": ("AEC NLP", "Strength of the AEC's non-linear processing: LOW, MEDIUM or HIGH."),
+    "noise_reduction": ("Noise reduction", "On turns noise reduction on, off turns it off."),
+    "noise_reduction_level": ("Noise reduction level", "LOW, MEDIUM or HIGH noise reduction."),
+    "agc": ("AGC", "On turns automatic gain control on, off turns it off."),
+    "agc_max_cut": ("AGC maximum cut", f"Most the AGC may cut, {TENTHS}, -200 (-20.0 dB) to 0."),
+    "agc_max_boost": ("AGC maximum boost", f"Most the AGC may boost, {TENTHS}, 0 to 200 (+20.0 dB)."),
+    "agc_target": ("AGC target", "Level the AGC aims for, in tenths of a dBFS, -500 (-50.0 dBFS) to 0."),
+    "gate_inhibit": ("Gate inhibit", "On turns the gate inhibit on (channel 22, firmware before 4.1), off turns it off."),
+    "automixer_mode": ("Automixer mode", "MANUAL, GAINSHARE or GATING (channel 21)."),
+    "automixer_off_attenuation": ("Off attenuation", "How far the automixer turns down channels that are off, in dB, -110 to -3 (channel 21)."),
+    "automixer_gate_sensitivity": ("Gating sensitivity", "Automixer gating sensitivity on the device's scale of 1 to 9 (channel 21)."),
+    "automixer_max_open": ("Maximum open mics", "Most microphones the automixer opens at once, 1 to 8 (channel 21)."),
+    "automixer_last_mic_lock": ("Last mic lock-on", "On keeps the last microphone used open (channel 21), off lets it close."),
+    "automixer_hold_time": ("Hold time", "Automixer hold time in ms, 100 to 1500 (channel 21)."),
+    "automixer_always_on": ("Always on", "On keeps the channel open in the automixer at all times."),
+    "automixer_priority": ("Priority", "On gives the channel priority in the automixer."),
+    ("shure-p300", "automixer_mute"): ("Automixer mute", "On mutes after the automixer gate, off unmutes; on channel 21 this is the system mute."),
+    "automixer_mute": ("Automixer mute", "On mutes the channel after the automixer gate (1-16, 37), off unmutes it."),
+    ("shure-p300", "compressor"): ("Compressor", "On turns the compressor on (channel 21), off turns it off."),
+    "compressor": ("Compressor", "On turns the compressor on (MXA902), off turns it off."),
+    "compressor_threshold": ("Threshold", f"Compressor threshold {TENTHS}, -600 (-60.0 dB) to 0 (channel 21)."),
+    "compressor_ratio": ("Ratio", "Compressor ratio in tenths, 10 (1.0:1) to 1000 (100.0:1) (channel 21)."),
+    ("shure-p300", "delay"): ("Delay", "Output delay in ms, 0 (off) to 1000, on channels 17-19."),
+    ("shure-mxa", "delay"): ("Delay", "Loudspeaker delay in ms, 0 (off) to 160, on channel 10 (MXA902)."),
+    ("shure-mxn5", "delay"): ("Delay", "Delay in ms, 0 (off) to 160, on channel 3."),
+    "direct_out_point": ("Direct out tap point", "0 pre-gate and pre-processing, 1 pre-gate and post-processing, 2 post-gate and pre-processing, 3 post-gate and post-processing (firmware 4.1 and later)."),
+    "call_status_enabled": ("Call status", "On turns the call status feature on, off turns it off."),
+    ("shure-imx-room", "postgate_gain"): ("Post-gate gain", f"Post-gate gain {TENTHS}, -1099 to 300 (+30.0 dB), on channels 1-16 and 37."),
+    "postgate_gain": ("Post-gate gain", f"Post-gate gain {TENTHS}, -1099 to 300 (+30.0 dB)."),
+    "denoiser": ("Denoiser", "On turns the denoiser on (channel 0 or 37), off turns it off."),
+    "denoiser_level": ("Denoiser level", "LOW, MEDIUM or HIGH (channel 0 or 37)."),
+    "analog_gain": ("Analog gain", "Preamp gain of an analog input in dB, 0 to 51 in 3 dB steps."),
+    "phantom": ("Phantom power", "On turns phantom power on for the analog input, off turns it off."),
+    "summing_mode": ("Summing mode", "OFF, or the channels summed together: 1+2, 3+4, 1+2/3+4 or 1+2+3+4."),
+    "logic_mute": ("Logic mute", "On sets the logic mute, off clears it (ANIUSB-MATRIX)."),
+    "postgate_mute": ("Post-gate mute", "On mutes the channel after the gate (MXA920 with automatic coverage off), off unmutes it."),
+    "coverage_mute": ("Coverage area mute", "On mutes the coverage area (MXA920 with automatic coverage on), off unmutes it."),
+    "coverage_gain": ("Coverage area gain", f"Coverage area gain {TENTHS}, -1100 to 300 (MXA920 with automatic coverage on)."),
+    "solo": ("Automix solo", "ENABLE or DISABLE the channel's automix solo."),
+    "speech_gating": ("Speech gating", "Off, Low, Medium or High on the MXA920; ON or OFF on the MXA902 and MXA901."),
+    "noise_filter": ("Noise filter", "Enhanced noise filtering: Off, Low, Medium or High on the MXA920; ON or OFF on the MXA902 and MXA901."),
+    "led_color_unmuted": ("Unmuted LED colour", "The LED colour while unmuted, by Shure's colour name."),
+    "led_color_muted": ("Muted LED colour", "The LED colour while muted, by Shure's colour name."),
+    "led_state_muted": ("Muted LED state", "The LED while muted: ON, FLASHING or OFF."),
+    "led_state_unmuted": ("Unmuted LED state", "The LED while unmuted: ON, FLASHING or OFF."),
+    "led_in": ("LED in", "On sets the LED-in state to unmuted, off to muted."),
+    "bypass_eq": ("Bypass EQ", "On bypasses all EQ, off restores it."),
+    "bypass_intellimix": ("Bypass IntelliMix", "On bypasses the IntelliMix DSP, off restores it."),
+    "eq_contour": ("EQ contour", "On turns the EQ contour on, off turns it off."),
+    "lobe_width": ("Lobe width", "NARROW, MEDIUM or WIDE."),
+    "lobe_x": ("Lobe X", "Lobe X position in cm from the array's centre, -1524 to 1524."),
+    "lobe_y": ("Lobe Y", "Lobe Y position in cm from the array's centre, -1524 to 1524."),
+    "lobe_z": ("Lobe height", "Lobe height below the array in cm, 0 to 914."),
+    "autofocus": ("Autofocus", "On turns autofocus on, off turns it off."),
+    "array_height": ("Array height", "Height of the array above the floor in cm, 122 to 914."),
+    "automatic_coverage": ("Automatic coverage", "On turns automatic coverage on (MXA920), making channels 1-8 coverage areas; off turns it off."),
+    "acoustic_boundary": ("Acoustic boundary", "Virtual acoustic boundary strength, 0 (off) to 20 (MXA920)."),
+    "talker_position_rate": ("Talker position interval", "Interval in ms at which talker positions are reported, or 0 for off."),
+    "talker_sensitivity": ("Talker sensitivity", "The talker position sensitivity setting: 0-2 localisation, 4-7 voice detection, 8, 9 or 11 reflection and height correction."),
+    "installation": ("Installation", "How the array is mounted: CEILING, WALL_HORIZONTAL, WALL_VERTICAL or TABLE (MXA710)."),
+    "lobe_angle": ("Lobe angle", "Lobe angle in degrees, -90 to 90 (MXA710)."),
+    "speaker": ("Loudspeaker", "On turns the loudspeaker on (MXA902), off turns it off."),
+    ("shure-mxa", "signal_generator_type"): ("Generator type", "PINK or WHITE noise, or a TONE (MXA902)."),
+    "signal_generator_type": ("Generator type", "PINK or WHITE noise, a TONE or a SWEEP (channel 3)."),
+    ("shure-mxa", "signal_generator_frequency"): ("Tone frequency", "Frequency of the generator's tone in Hz, 100 to 20000 (MXA902)."),
+    "signal_generator_frequency": ("Tone frequency", "Frequency of the generator's tone in Hz, 125 to 20000."),
+    "signal_generator": ("Signal generator", "START, STOP or TOGGLE the signal generator (MXA902)."),
+    "polar_pattern": ("Polar pattern", "TOROID, OMNI, CARDIOID, SUPER, HYPER or BIDIRECTION (MXA310)."),
+    "bypass_dsp": ("Bypass DSP", "On bypasses the EQ, delay and limiter, off restores them."),
+    "signal_generator_gain": ("Generator gain", f"Signal generator gain {TENTHS}, -1100 to 210 (+21.0 dB); set it before starting the generator."),
+}
+
+STEP_HELP = {
+    "analog_gain": ("Step", "Amount to change the analog gain by, in dB (3 dB steps)."),
+}
+STEP_DEFAULT = ("Step", "Amount to change the gain by, in tenths of a dB.")
+
+
+def help_for(s, key):
+    h = HELP.get((s.sid, key)) or HELP.get(key)
+    assert h, (s.sid, key)
+    return h
+
+
 def get_expect(param):
     return "{ reply_contains: " + q(f" {param} ") + ", matches: " + q(f" {param} " + r"\{?(.*?) *\}? *>$") + " }"
 
@@ -90,7 +210,7 @@ def add_param(s, p):
     desc = p.get("desc", P)
     dev = scope == "dev"
     prefix = f"GET {P}" if dev else f"GET {s.ch()} {P}"
-    params_get = {} if dev else {"channel": p.get("chan", CH)}
+    params_get = {} if dev else {"channel": s.chan()}
     path = f"device.{key}" if dev else f"channels.*.{key}"
     rule_re = (f"^< REP {P} " if dev else f"^< REP (\\d+) {P} ")
     target = f"device.{key}" if dev else "channels.{1}." + key
@@ -132,7 +252,7 @@ def add_param(s, p):
     params_set = dict(params_get)
     if kind in ("onoff", "onoff_toggle"):
         word = p.get("set_key", "enabled")
-        s.cmd(f"set_{key}", f"Turn {desc} on or off ({P})", {**params_set, word: "{ type: bool, default: true }"},
+        s.cmd(f"set_{key}", f"Turn {desc} on or off ({P})", {**params_set, word: lab(ON_OFF, *help_for(s, key))},
               f"{head} {{{word}:on_off}}", set_expect(P), "ack")
         s.vec(f"set_{key}", {**exin, word: True}, wire_head + " ON >", rep_head + "ON >", ACK)
         if kind == "onoff_toggle":
@@ -140,7 +260,7 @@ def add_param(s, p):
             s.vec(f"toggle_{key}", exin, wire_head + " TOGGLE >", rep_head + "OFF >", ACK)
     elif kind == "enum":
         vals = p["values"]
-        s.cmd(f"set_{key}", f"Set {desc} ({P})", {**params_set, "value": "{ type: enum, values: [" + ", ".join(q(v) for v in vals) + "], required: true }"},
+        s.cmd(f"set_{key}", f"Set {desc} ({P})", {**params_set, "value": lab("{ type: enum, values: [" + ", ".join(q(v) for v in vals) + "], required: true }", *help_for(s, key))},
               f"{head} {{value}}", set_expect(P), "ack")
         s.vec(f"set_{key}", {**exin, "value": vals[-1]}, wire_head + f" {vals[-1]} >", rep_head + f"{vals[-1]} >", ACK)
     elif kind == "int":
@@ -153,7 +273,7 @@ def add_param(s, p):
         if width:
             fmt += f":0{width}d"
         name = p.get("set_param", "value")
-        s.cmd(f"set_{key}", f"Set {desc} ({P}){', ' + unit if unit else ''}", {**params_set, name: f"{{ type: int, min: {lo}, max: {hi}, required: true }}"},
+        s.cmd(f"set_{key}", f"Set {desc} ({P}){', ' + unit if unit else ''}", {**params_set, name: lab(f"{{ type: int, min: {lo}, max: {hi}, required: true }}", *help_for(s, p.get("help_key", key)))},
               f"{head} {{{name}{fmt}}}", set_expect(P), "ack")
         exv = p.get("set_example", hi)
         wv = exv + off
@@ -162,7 +282,7 @@ def add_param(s, p):
         if p.get("incdec"):
             for verb, word in (("increase", s.inc[0]), ("decrease", s.inc[1])):
                 s.cmd(f"{verb}_{key}", f"{verb.capitalize()} {desc} by a step ({P} {word})",
-                      {**params_set, "step": p["incdec"]}, f"{head} {word} {{step}}", set_expect(P), "ack")
+                      {**params_set, "step": lab(p["incdec"], *STEP_HELP.get(key, STEP_DEFAULT))}, f"{head} {word} {{step}}", set_expect(P), "ack")
                 s.vec(f"{verb}_{key}", {**exin, "step": 10}, wire_head + f" {word} 10 >", rep_head + f"{wtxt} >", ACK)
 
 
@@ -183,19 +303,19 @@ def presets_etc(s, legacy_names, flash_get=True, defaults=True):
     s.vec("get_preset", {}, "< GET PRESET >", "< REP PRESET 03 >", VALUE("03"))
     s.state["device.preset"] = ("int", None, "The preset last recalled, 1-10")
     s.rules.append("    - match: \"^< REP PRESET (\\\\d+) >$\"\n      state: { \"device.preset\": \"{1}\" }")
-    s.cmd("recall_preset", "Recall a preset (SET PRESET), 1-10", {"preset": "{ type: int, min: 1, max: 10, required: true }"},
+    s.cmd("recall_preset", "Recall a preset (SET PRESET), 1-10", {"preset": lab("{ type: int, min: 1, max: 10, required: true }", "Preset", "Preset number, 1 to 10, as on the device.")},
           "SET PRESET {preset:02d}", set_expect("PRESET"), "ack")
     s.vec("recall_preset", {"preset": 3}, "< SET PRESET 03 >", "< REP PRESET 03 >", ACK)
     s.vec("recall_preset", {"preset": 10}, "< SET PRESET 10 >", "< REP ERR >", ERR)
     if legacy_names:
-        s.cmd("get_preset_name", "A preset's name (PRESET1-PRESET10)", {"preset": "{ type: int, min: 1, max: 10, required: true }"},
+        s.cmd("get_preset_name", "A preset's name (PRESET1-PRESET10)", {"preset": lab("{ type: int, min: 1, max: 10, required: true }", "Preset", "Preset number, 1 to 10, as on the device.")},
               "GET PRESET{preset}", "{ reply_contains: \" PRESET\", matches: \" PRESET\\\\d+ \\\\{?(.*?) *\\\\}? *>$\" }", "value")
         s.vec("get_preset_name", {"preset": 2}, "< GET PRESET2 >", "< REP PRESET2 {Lecture                  } >", VALUE("Lecture"))
     else:
-        s.cmd("get_preset_name", "A preset's name (PRESET_NAME); {empty} for an empty preset", {"preset": "{ type: int, min: 1, max: 10, required: true }"},
+        s.cmd("get_preset_name", "A preset's name (PRESET_NAME); {empty} for an empty preset", {"preset": lab("{ type: int, min: 1, max: 10, required: true }", "Preset", "Preset number, 1 to 10, as on the device.")},
               "GET PRESET_NAME {preset:02d}", "{ reply_contains: \" PRESET_NAME \", matches: \" PRESET_NAME \\\\d+ (.*?) *>$\" }", "value")
         s.vec("get_preset_name", {"preset": 2}, "< GET PRESET_NAME 02 >", "< REP PRESET_NAME 02 Lecture >", VALUE("Lecture"))
-    s.cmd("flash", "Flash the device's lights to identify it (FLASH); it stops by itself after about 30 s", {"enabled": "{ type: bool, default: true }"},
+    s.cmd("flash", "Flash the device's lights to identify it (FLASH); it stops by itself after about 30 s", {"enabled": lab(ON_OFF, "Flash", "On flashes the lights, off stops them; they stop by themselves after about 30 s.")},
           "SET FLASH {enabled:on_off}", set_expect("FLASH"), "ack")
     s.vec("flash", {"enabled": True}, "< SET FLASH ON >", "< REP FLASH ON >", ACK)
     s.cmd("reboot", "Reboot the device (SET REBOOT); not acknowledged", {}, "SET REBOOT", None, "none")
@@ -204,19 +324,19 @@ def presets_etc(s, legacy_names, flash_get=True, defaults=True):
         s.cmd("restore_defaults", "Restore default settings (SET DEFAULT_SETTINGS)", {}, "SET DEFAULT_SETTINGS",
               "{ reply_contains: \"DEFAULT_SETTINGS\", contains: \"DEFAULT_SETTINGS\" }", "ack")
         s.vec("restore_defaults", {}, "< SET DEFAULT_SETTINGS >", "< REP DEFAULT_SETTINGS 00 >", ACK)
-    s.cmd("get_all", "Ask for every parameter of a channel (0: the device and all channels); the answers update state", {"channel": CH},
+    s.cmd("get_all", "Ask for every parameter of a channel (0: the device and all channels); the answers update state", {"channel": lab(CH, "Channel", "Channel whose parameters to read; 0 reads the device and every channel.")},
           f"GET {s.ch()} ALL", None, "none")
     s.vec("get_all", {"channel": 0}, f"< GET {s.chv(0)} ALL >", None, "{'ok': {'kind': 'unverified'}}")
-    s.cmd("get_parameter", "Read any documented channel parameter by name (GET <channel> <PARAM>), returning its value text", {"channel": CH, "parameter": "{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }"},
+    s.cmd("get_parameter", "Read any documented channel parameter by name (GET <channel> <PARAM>), returning its value text", {"channel": s.chan(), "parameter": lab("{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }", "Parameter", "The parameter name as the command-string document writes it, such as AUDIO_MUTE.")},
           f"GET {s.ch()} {{parameter}}", "{ reply_contains: \" {parameter} \", matches: \"^< REP (?:\\\\d+ )?[A-Z][A-Z0-9_]* \\\\{?(.*?) *\\\\}? *>$\" }", "value")
     s.vec("get_parameter", {"channel": 1, "parameter": "AUDIO_MUTE"}, f"< GET {s.chv(1)} AUDIO_MUTE >", f"< REP {s.chv(1)} AUDIO_MUTE OFF >", VALUE("OFF"))
-    s.cmd("set_parameter", "Set any documented channel parameter by name (SET <channel> <PARAM> <value>), the value in the document's form", {"channel": CH, "parameter": "{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }", "value": "{ type: string, pattern: \"^[^<>]+$\", max_length: 64, required: true }"},
+    s.cmd("set_parameter", "Set any documented channel parameter by name (SET <channel> <PARAM> <value>), the value in the document's form", {"channel": s.chan(), "parameter": lab("{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }", "Parameter", "The parameter name as the command-string document writes it, such as AUDIO_MUTE."), "value": lab("{ type: string, pattern: \"^[^<>]+$\", max_length: 64, required: true }", "Value", "The value in the document's form, such as ON or 1100.")},
           f"SET {s.ch()} {{parameter}} {{value}}", "{ reply_contains: \" {parameter} \", not_contains: \"REP ERR\" }", "ack")
     s.vec("set_parameter", {"channel": 1, "parameter": "AUDIO_MUTE", "value": "ON"}, f"< SET {s.chv(1)} AUDIO_MUTE ON >", f"< REP {s.chv(1)} AUDIO_MUTE ON >", ACK)
-    s.cmd("get_device_parameter", "Read any documented device parameter by name (GET <PARAM>)", {"parameter": "{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }"},
+    s.cmd("get_device_parameter", "Read any documented device parameter by name (GET <PARAM>)", {"parameter": lab("{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }", "Parameter", "The device parameter name as the command-string document writes it, such as ENCRYPTION.")},
           "GET {parameter}", "{ reply_contains: \" {parameter} \", matches: \"^< REP (?:\\\\d+ )?[A-Z][A-Z0-9_]* \\\\{?(.*?) *\\\\}? *>$\" }", "value")
     s.vec("get_device_parameter", {"parameter": "ENCRYPTION"}, "< GET ENCRYPTION >", "< REP ENCRYPTION OFF >", VALUE("OFF"))
-    s.cmd("set_device_parameter", "Set any documented device parameter by name (SET <PARAM> <value>)", {"parameter": "{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }", "value": "{ type: string, pattern: \"^[^<>]+$\", max_length: 128, required: true }"},
+    s.cmd("set_device_parameter", "Set any documented device parameter by name (SET <PARAM> <value>)", {"parameter": lab("{ type: string, pattern: \"^[A-Z][A-Z0-9_]*$\", max_length: 40, required: true }", "Parameter", "The device parameter name as the command-string document writes it, such as LED_BRIGHTNESS."), "value": lab("{ type: string, pattern: \"^[^<>]+$\", max_length: 128, required: true }", "Value", "The value in the document's form, such as 2.")},
           "SET {parameter} {value}", "{ reply_contains: \" {parameter} \", not_contains: \"REP ERR\" }", "ack")
     s.vec("set_device_parameter", {"parameter": "LED_BRIGHTNESS", "value": "2"}, "< SET LED_BRIGHTNESS 2 >", "< REP LED_BRIGHTNESS 2 >", ACK)
 
@@ -229,26 +349,28 @@ def gain(s, P="AUDIO_GAIN_HI_RES", key="gain", desc="a channel's digital gain"):
 
 
 def meter(s, P, key, desc):
-    add_param(s, dict(key=key, P=P, scope="dev", kind="int", desc=desc + " metering interval, ms (0: off; 1-99 refused)",
+    add_param(s, dict(key=key, P=P, scope="dev", kind="int", desc=desc + " metering interval, ms (0: off; 1-99 refused)", help_key="meter",
                       min=0, max=99999, width=5, set_param="rate_ms", set_example=1000, example="01000", example_value="01000", unit="ms"))
 
 
 def matrix(s):
     io = "{ type: int, min: 0, max: 99, required: true }"
-    s.cmd("get_matrix_route", "Matrix mixer: whether an input is routed to an output (MATRIX_MXR_ROUTE)", {"input": io, "output": io},
+    mi = lab(io, "Input", "Matrix mixer input, by its channel number in the device's channel table.")
+    mo = lab(io, "Output", "Matrix mixer output, by its channel number in the device's channel table.")
+    s.cmd("get_matrix_route", "Matrix mixer: whether an input is routed to an output (MATRIX_MXR_ROUTE)", {"input": mi, "output": mo},
           f"GET {s.ch('input')} MATRIX_MXR_ROUTE {s.ch('output')}", get_expect("MATRIX_MXR_ROUTE").replace('" MATRIX_MXR_ROUTE \\\\{?', '" MATRIX_MXR_ROUTE \\\\d+ \\\\{?'), "value")
     s.vec("get_matrix_route", {"input": 1, "output": 15}, f"< GET {s.chv(1)} MATRIX_MXR_ROUTE {s.chv(15)} >", f"< REP {s.chv(1)} MATRIX_MXR_ROUTE {s.chv(15)} ON >", VALUE("ON"))
-    s.cmd("set_matrix_route", "Matrix mixer: route or unroute an input to an output", {"input": io, "output": io, "enabled": "{ type: bool, default: true }"},
+    s.cmd("set_matrix_route", "Matrix mixer: route or unroute an input to an output", {"input": mi, "output": mo, "enabled": lab(ON_OFF, "Routed", "On routes the input to the output, off unroutes it.")},
           f"SET {s.ch('input')} MATRIX_MXR_ROUTE {s.ch('output')} {{enabled:on_off}}", set_expect("MATRIX_MXR_ROUTE"), "ack")
     s.vec("set_matrix_route", {"input": 1, "output": 15, "enabled": False}, f"< SET {s.chv(1)} MATRIX_MXR_ROUTE {s.chv(15)} OFF >", f"< REP {s.chv(1)} MATRIX_MXR_ROUTE {s.chv(15)} OFF >", ACK)
-    s.cmd("set_matrix_gain", "Matrix mixer: a crosspoint's gain in tenths of a dB, -1100 to 300 (-110.0 to +30.0 dB)", {"input": io, "output": io, "gain_tenth_db": "{ type: int, min: -1100, max: 300, required: true }"},
+    s.cmd("set_matrix_gain", "Matrix mixer: a crosspoint's gain in tenths of a dB, -1100 to 300 (-110.0 to +30.0 dB)", {"input": mi, "output": mo, "gain_tenth_db": lab("{ type: int, min: -1100, max: 300, required: true }", "Gain", "Crosspoint gain in tenths of a dB, -1100 (-110.0 dB) to 300 (+30.0 dB).")},
           f"SET {s.ch('input')} MATRIX_MXR_GAIN {s.ch('output')} {{gain_tenth_db:+1100:04d}}", set_expect("MATRIX_MXR_GAIN"), "ack")
     s.vec("set_matrix_gain", {"input": 21, "output": 17, "gain_tenth_db": -35}, f"< SET {s.chv(21)} MATRIX_MXR_GAIN {s.chv(17)} 1065 >", f"< REP {s.chv(21)} MATRIX_MXR_GAIN {s.chv(17)} 1065 >", ACK)
-    s.cmd("get_matrix_gain", "Matrix mixer: a crosspoint's gain (wire value, tenths of a dB offset by 1100)", {"input": io, "output": io},
+    s.cmd("get_matrix_gain", "Matrix mixer: a crosspoint's gain (wire value, tenths of a dB offset by 1100)", {"input": mi, "output": mo},
           f"GET {s.ch('input')} MATRIX_MXR_GAIN {s.ch('output')}", "{ reply_contains: \" MATRIX_MXR_GAIN \", matches: \" MATRIX_MXR_GAIN \\\\d+ ?(\\\\d{4}) *>$\", convert: shure_gain }", "value")
     s.vec("get_matrix_gain", {"input": 21, "output": 17}, f"< GET {s.chv(21)} MATRIX_MXR_GAIN {s.chv(17)} >", f"< REP {s.chv(21)} MATRIX_MXR_GAIN {s.chv(17)} 1100 >", VALUE(0.0))
     for verb, word in (("increase", s.inc[0]), ("decrease", s.inc[1])):
-        s.cmd(f"{verb}_matrix_gain", f"Matrix mixer: {verb} a crosspoint's gain by a step in tenths of a dB", {"input": io, "output": io, "step": "{ type: int, min: 1, max: 1400, required: true }"},
+        s.cmd(f"{verb}_matrix_gain", f"Matrix mixer: {verb} a crosspoint's gain by a step in tenths of a dB", {"input": mi, "output": mo, "step": lab("{ type: int, min: 1, max: 1400, required: true }", "Step", "Amount to change the crosspoint gain by, in tenths of a dB.")},
               f"SET {s.ch('input')} MATRIX_MXR_GAIN {s.ch('output')} {word} {{step}}", set_expect("MATRIX_MXR_GAIN"), "ack")
         s.vec(f"{verb}_matrix_gain", {"input": 21, "output": 17, "step": 25}, f"< SET {s.chv(21)} MATRIX_MXR_GAIN {s.chv(17)} {word} 25 >", f"< REP {s.chv(21)} MATRIX_MXR_GAIN {s.chv(17)} 1125 >", ACK)
     s.conversions.add("shure_gain")
@@ -261,10 +383,12 @@ def matrix(s):
 def peq(s):
     io = "{ type: int, min: 0, max: 99, required: true }"
     flt = "{ type: int, min: 0, max: 16, required: true }"
-    s.cmd("get_peq_filter", "Whether a PEQ filter is enabled (PEQ <block> <filter>)", {"block": io, "filter": flt},
+    blk = lab(io, "Block", "PEQ block, by the channel number it sits on; 0 is every block.")
+    fl = lab(flt, "Filter", "Filter number within the block, from 1; 0 is every filter.")
+    s.cmd("get_peq_filter", "Whether a PEQ filter is enabled (PEQ <block> <filter>)", {"block": blk, "filter": fl},
           f"GET {s.ch('block')} PEQ {{filter:02d}}", "{ reply_contains: \" PEQ \", matches: \" PEQ \\\\d+ (ON|OFF) *>$\" }", "value")
     s.vec("get_peq_filter", {"block": 1, "filter": 2}, f"< GET {s.chv(1)} PEQ 02 >", f"< REP {s.chv(1)} PEQ 02 ON >", VALUE("ON"))
-    s.cmd("set_peq_filter", "Enable, disable or toggle a PEQ filter (0: every block or filter)", {"block": io, "filter": flt, "state": "{ type: enum, values: [\"ON\", \"OFF\", \"TOGGLE\"], required: true }"},
+    s.cmd("set_peq_filter", "Enable, disable or toggle a PEQ filter (0: every block or filter)", {"block": blk, "filter": fl, "state": lab("{ type: enum, values: [\"ON\", \"OFF\", \"TOGGLE\"], required: true }", "State", "ON enables the filter, OFF disables it, TOGGLE switches it.")},
           f"SET {s.ch('block')} PEQ {{filter:02d}} {{state}}", set_expect("PEQ"), "ack")
     s.vec("set_peq_filter", {"block": 1, "filter": 2, "state": "OFF"}, f"< SET {s.chv(1)} PEQ 02 OFF >", f"< REP {s.chv(1)} PEQ 02 OFF >", ACK)
     s.state["peq.*.*.enabled"] = ("bool", None, "A PEQ filter's enable, keyed by block then filter")
@@ -317,6 +441,9 @@ transport:
         out.append(f"  # {why}")
         out.append(f"  {c}:")
         out.append(f"    points: {pts}")
+    out.append("")
+    out.append("ports:")
+    out.append("  - { port: 2202, protocol: tcp, role: control }")
     out.append("")
     out.append("models:")
     names = list(s.commands)
@@ -471,9 +598,9 @@ def imx():
     s.vec("get_preset", {}, "< GET PRESET >", "< REP PRESET 03 >", VALUE("03"))
     s.state["device.preset"] = ("int", None, "The preset last recalled")
     s.rules.append("    - match: \"^< REP PRESET (\\\\d+) >$\"\n      state: { \"device.preset\": \"{1}\" }")
-    s.cmd("recall_preset", "Recall a preset (SET PRESET), 1-10", {"preset": "{ type: int, min: 1, max: 10, required: true }"}, "SET PRESET {preset:02d}", set_expect("PRESET"), "ack")
+    s.cmd("recall_preset", "Recall a preset (SET PRESET), 1-10", {"preset": lab("{ type: int, min: 1, max: 10, required: true }", "Preset", "Preset number, 1 to 10, as on the device.")}, "SET PRESET {preset:02d}", set_expect("PRESET"), "ack")
     s.vec("recall_preset", {"preset": 3}, "< SET PRESET 03 >", "< REP PRESET 03 >", ACK)
-    s.cmd("get_all", "Ask for every parameter of a channel (0: all); the answers update state", {"channel": CH}, "GET {channel:02d} ALL", None, "none")
+    s.cmd("get_all", "Ask for every parameter of a channel (0: all); the answers update state", {"channel": lab(CH, "Channel", "Channel whose parameters to read; 0 reads every channel.")}, "GET {channel:02d} ALL", None, "none")
     s.vec("get_all", {"channel": 0}, "< GET 00 ALL >", None, "{'ok': {'kind': 'unverified'}}")
     add_param(s, dict(key="device_mute", P="DEVICE_AUDIO_MUTE", scope="dev", kind="onoff_toggle", desc="the device mute", set_key="muted"))
     add_param(s, dict(key="mute", P="AUDIO_MUTE", scope="ch", kind="onoff_toggle", desc="a channel's mute", set_key="muted"))
@@ -519,7 +646,7 @@ def ani():
     add_param(s, dict(key="output_level", P="AUDIO_OUT_LVL_SWITCH", scope="ch", kind="enum", values=["LINE_LVL", "AUX_LVL", "MIC_LVL"], desc="an analog output's level switch", example="LINE_LVL"))
     add_param(s, dict(key="phantom", P="PHANTOM_PWR_ENABLE", scope="ch", kind="onoff", desc="an input's phantom power"))
     add_param(s, dict(key="logic_out", P="HW_GATING_LOGIC", scope="ch", kind="ro_onoff", desc="an input's mic logic switch out"))
-    s.cmd("set_led_in", "Set an input's mic logic LED in (CHAN_LED_IN_STATE); not answered on the ANI4IN", {"channel": CH, "enabled": "{ type: bool, default: true }"}, "SET {channel:02d} CHAN_LED_IN_STATE {enabled:on_off}", None, "none")
+    s.cmd("set_led_in", "Set an input's mic logic LED in (CHAN_LED_IN_STATE); not answered on the ANI4IN", {"channel": s.chan(), "enabled": lab(ON_OFF, "LED in", "On sets the input's mic logic LED in on, off sets it off.")}, "SET {channel:02d} CHAN_LED_IN_STATE {enabled:on_off}", None, "none")
     s.vec("set_led_in", {"channel": 1, "enabled": True}, "< SET 01 CHAN_LED_IN_STATE ON >", None, "{'ok': {'kind': 'unverified'}}")
     add_param(s, dict(key="clip_indicator", P="AUDIO_OUT_CLIP_INDICATOR", scope="ch", kind="ro_onoff", desc="a channel's clip indicator"))
     add_param(s, dict(key="limiter_engaged", P="LIMITER_ENGAGED", scope="ch", kind="ro_onoff", desc="a channel's limiter engaged"))
@@ -637,7 +764,7 @@ def mxn5():
     add_param(s, dict(key="signal_generator_type", P="SIG_GEN_TYPE", scope="ch", kind="enum", values=["PINK", "WHITE", "TONE", "SWEEP"], desc="the signal generator type (channel 03)", example="PINK", example_channel=3))
     add_param(s, dict(key="signal_generator_frequency", P="SIG_GEN_FREQ", scope="ch", kind="int", min=125, max=20000, unit="Hz", set_param="frequency_hz", set_example=1000, desc="the signal generator tone frequency, Hz", example="1000", example_value="1000", example_channel=3))
     add_param(s, dict(key="signal_generator_gain", P="SIG_GEN_GAIN", scope="ch", kind="int", conv="shure_gain", unit="dB", min=-1100, max=210, offset=1100, width=4, set_param="gain_tenth_db", set_example=-200, desc="the signal generator gain, tenths of a dB (-1100 to 210)", example="0900", example_value="0900", example_channel=3))
-    s.cmd("set_signal_generator", "Start, stop or toggle the signal generator (SIG_GEN)", {"channel": CH, "state": "{ type: enum, values: [START, STOP, TOGGLE], required: true }"},
+    s.cmd("set_signal_generator", "Start, stop or toggle the signal generator (SIG_GEN)", {"channel": s.chan(), "state": lab("{ type: enum, values: [START, STOP, TOGGLE], required: true }", "Signal generator", "START, STOP or TOGGLE the signal generator through the loudspeaker (channel 3).")},
           "SET {channel:02d} SIG_GEN {state}", set_expect("SIG_GEN"), "ack")
     s.vec("set_signal_generator", {"channel": 3, "state": "STOP"}, "< SET 03 SIG_GEN STOP >", "< REP 03 SIG_GEN STOP >", ACK)
     peq(s)
