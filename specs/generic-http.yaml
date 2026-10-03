@@ -41,21 +41,41 @@ source:
     note: "Percent-encoding (§2.1); a path and query are sent as given, already encoded."
 
 settings:
-  scheme: { type: enum, values: [http, https], default: http }
+  scheme: { type: enum, values: [http, https], default: http,
+    label: Scheme,
+    description: "http, or https for an encrypted connection." }
   # For a device serving HTTPS with a self-signed certificate: still encrypted, the device's identity not checked.
-  accept_invalid_certs: { type: bool, default: false }
+  accept_invalid_certs: { type: bool, default: false,
+    label: Accept invalid certificates,
+    description: "On accepts a self-signed HTTPS certificate: the connection is still encrypted but the device's identity is not checked." }
   # basic: Authorization: Basic on every request, and a Digest challenge answered. digest: a Digest challenge
   # answered. bearer: Authorization: Bearer <token> (none while the token is empty).
-  auth: { type: enum, values: [none, basic, digest, bearer], default: none }
-  username: { type: string, default: "" }
-  password: { type: string, secret: true, default: "" }
-  token: { type: string, secret: true, default: "" }
+  auth: { type: enum, values: [none, basic, digest, bearer], default: none,
+    label: Authentication,
+    description: "none; basic sends the username and password on every request and also answers a Digest challenge; digest answers a Digest challenge only; bearer sends the token." }
+  username: { type: string, default: "",
+    label: Username,
+    description: "Username for basic or digest authentication." }
+  password: { type: string, secret: true, default: "",
+    label: Password,
+    description: "Password for basic or digest authentication." }
+  token: { type: string, secret: true, default: "",
+    label: Token,
+    description: "Bearer token sent as Authorization: Bearer with every request; empty sends none." }
   # Headers sent with every request, as an object of name to value, such as {"X-Api-Key": "..."}.
-  headers: { type: json, default: {} }
-  timeout_ms: { type: int, min: 100, max: 25000, default: 5000 }
+  headers: { type: json, default: {},
+    label: Headers,
+    description: "Headers sent with every request, as a JSON object of name to value, such as {\"X-Api-Key\": \"...\"}." }
+  timeout_ms: { type: int, min: 100, max: 25000, default: 5000,
+    label: Timeout,
+    description: "How long to wait for a response, in milliseconds, unless a request gives its own." }
   # A path (and query) to GET on connecting and then every poll_interval_ms, into 'poll'. Empty: no polling.
-  poll_path: { type: string, max_length: 2048, default: "" }
-  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 5000 }
+  poll_path: { type: string, max_length: 2048, default: "",
+    label: Poll path,
+    description: "A path and query, percent-encoded, to GET on connecting and then every poll interval into the poll state; empty turns polling off." }
+  poll_interval_ms: { type: int, min: 100, max: 86400000, default: 5000,
+    label: Poll interval,
+    description: "Time between polls of the poll path, in milliseconds." }
 
 ports:
   - { port: 80, protocol: http, role: control }
@@ -79,13 +99,27 @@ commands:
       401 and 403 fail with auth and other 4xx and 5xx with device_error carrying the status as its code and
       the start of the body; without it every status is returned. timeout_ms defaults to the setting
     params:
-      method: { type: enum, values: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS], default: GET }
-      path: { type: string, pattern: "^/[!-~]*$", max_length: 8192, required: true }
-      headers: { type: json }
-      body: { type: json }
-      content_type: { type: string, max_length: 256 }
-      timeout_ms: { type: int, min: 100, max: 25000 }
-      fail_on_status: { type: bool, default: true }
+      method: { type: enum, values: [GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS], default: GET,
+        label: Method,
+        description: "The HTTP method, GET by default." }
+      path: { type: string, pattern: "^/[!-~]*$", max_length: 8192, required: true,
+        label: Path,
+        description: "The path starting with /, query string included, percent-encoded and sent as given." }
+      headers: { type: json,
+        label: Headers,
+        description: "Extra headers as a JSON object of name to value; they replace same-named configured headers, and an Authorization header replaces the configured credentials." }
+      body: { type: json,
+        label: Body,
+        description: "The request body: a string is sent as text, any other JSON value as compact JSON." }
+      content_type: { type: string, max_length: 256,
+        label: Content type,
+        description: "The Content-Type to send; by default text/plain for a string body and application/json otherwise." }
+      timeout_ms: { type: int, min: 100, max: 25000,
+        label: Timeout,
+        description: "How long to wait for this response, in milliseconds; the timeout setting when left out." }
+      fail_on_status: { type: bool, default: true,
+        label: Fail on error status,
+        description: "On makes 401 and 403 fail as unauthorized and other 4xx and 5xx statuses fail as device errors; off returns every status." }
     returns: value
   poll_now:
     summary: "GET poll_path now, outside the schedule; the result goes into 'poll' and is returned as for request, whatever its status"
