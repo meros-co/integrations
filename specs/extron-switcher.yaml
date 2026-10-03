@@ -1,0 +1,1194 @@
+spec: 1
+id: extron-switcher
+name: Extron IN-series scaling presentation switchers (IN1806, IN1808, IN1606, IN1608)
+vendor: Extron
+category: switcher
+
+# Extron's Simple Instruction Set (SIS) as the IN-series scaling presentation
+# switchers speak it over Telnet (TCP 23). The two current families share the
+# SIS grammar but not every command: the IN1806/IN1808 address picture
+# controls by input and the output by number (1*), while the IN1606/IN1608
+# adjust the current input. Commands whose syntax differs are separate
+# commands, the IN1606/IN1608 forms ending in _current_input or _in1600, and
+# each model supports only the forms its own guide documents. Page numbers are
+# the guides' printed page numbers.
+#
+# Not here: EDID import/export and assignment, logos and audio files (file
+# names on the unit), CEC, serial port and IP settings, passwords, firmware,
+# backup/restore and resets (Esc ZXXX/ZQQQ/ZY reset settings or the network
+# and passwords), pixel-level analog input timing (HSRT, VSRT, PHAS, TPIX,
+# APIX, ALIN on IN1606/IN1608), DTP remote power and twisted-pair format
+# (wrong DTP2 power can damage a DTP endpoint, IN1808 guide p.80).
+source:
+  - title: "IN1806 and IN1808 Series Scaling Presentation Switchers User Guide, 68-3131-01 Rev. B"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/68-3131-01_B_IN1806-1808_UG.pdf
+    note: >
+      Manufacturer document. SIS chapter p.52-93: host communication (no start or end characters, CR LF
+      after every response), copyright message and part numbers p.52; Password prompt, serial-number
+      factory password, Login Administrator / Login User, prompt repeated on a wrong password p.53;
+      scaler-initiated messages (Reconfig, HplgO, HdcpI, HdcpO, IN00 signal list) p.53; error codes p.54;
+      symbols (| for CR, W for Esc) and variables p.55-62, verbose mode 0-3 and tagged responses p.59;
+      input selection 1!, 1%, 1$, views, input format and names, loop out p.63; Auto-Image p.64; HDCP
+      authorized, aspect ratio, film mode p.65; auto-input switching p.66; freeze p.66; contrast,
+      brightness, detail, image position and size p.67-68; output video mute, output rate and names
+      p.69; HDMI output format and power save p.70; screen saver and OSD duration p.71; input presets
+      and auto memories p.74; audio input format p.75; audio names and file playback p.76-77; test pattern,
+      switch effect, signal presence, front panel lock p.78; HDCP output mode, notification and status
+      p.79; information requests, temperature, verbose mode p.83-84; port timeout p.85; group masters
+      (groups 1-10, 0.1 dB units) p.88-90; DSP gain, mute and phantom power by OID p.91-92.
+  - title: "IN1606 and IN1608 Series Scaling Presentation Switchers User Guide, 68-2290-01 Rev. J"
+    author: Extron Electronics
+    url: https://media.extron.com/public/download/files/userman/IN1606-1608_UG_68-2290-01_J.pdf
+    note: >
+      Manufacturer document. SIS chapter p.42-65: host communication, scaler-initiated messages (In X!
+      All on a front panel switch, Reconfig, HplgO) and copyright message p.42; password prompt and Login
+      replies p.43; error codes p.43; symbols and variables p.44-49; input selection X!!, X!&, X!$ and
+      views, auto switch mode p.50; input video format, EDID, input names (NI, 16 characters) p.51;
+      Auto-Image and threshold p.52; film mode p.53; output and all-output video mute, color, tint,
+      contrast, brightness p.54; detail, image position and size p.55; output rate, HDMI output format,
+      power save, screen saver p.56; audio input format, DSP gain and mute by control number p.57;
+      volume knob, group volume, mute, bass and treble p.58; user and input presets, auto memories p.59;
+      test pattern, freeze, switch effect, aspect ratio, front panel lock p.60; overscan, HDCP notification,
+      status and authorization p.61; HDCP mode and signal presence p.62; OSD duration and verbose mode
+      p.63; information requests p.64.
+  - title: Bitfocus Companion modules extron-dxp and extron-mmx-tcp (MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-extron-dxp
+    note: >
+      Community code, read for corroboration only (top-level LICENSE is MIT; no code copied): answers the
+      "Password:" prompt with the password and CR, and ends every command with a line ending.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  # Simple commands need no terminator; Esc commands end with CR or |. Every
+  # command here is sent with a CR, as in extron-matrix (see the quirks).
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  # Every response shape the commands here can get; the banner, its date line,
+  # "Password:", "Login ...", "Reconfig" and "HplgO" never match.
+  reply_match: '^(E\d\d$|In|Vmt|Exe|Frz|Img|Cont|Brit|Hdet|Colr|Tint|Hctr|Vctr|Hsiz|Vsiz|Ximg|Rate|Vtpo|Psav|Swef|Aspr|Ausw|Afmt|Grpm|Ds[GMZ]|Knob|\dRpr|\dSpr|Prst|Pnam|Amem|Test|Hdcp|Lout|Vnam|Nmi|Nam|Mdur|Ssav|Play|Vrb|Ver|Bld|Pno|Inf|Vid|20Stat|Film|Typ|Vtyp|\d)'
+  # Q (firmware version) keeps the Telnet session from timing out (5 minutes by default).
+  probe: "Q"
+
+settings:
+  # Administrator or user password; empty for a unit without passwords. The factory password is the unit's
+  # serial number (IN1808 guide p.53, IN1608 guide p.43).
+  password: { type: string, secret: true, default: "", max_length: 128, pattern: '^[^|/\\* ]*$' }
+
+on_connect:
+  - when_set: password
+    after_prompt: "Password:"
+    send: "{settings.password}"
+    refused: '^Password:?$'
+    accepted: '^Login (Administrator|User)$'
+  # Verbose mode 3: tagged replies and change reports from the front panel and other connections
+  # (IN1808 guide p.59 and p.84, IN1608 guide p.63). Telnet connections start in mode 0. Answered "Vrb3".
+  - send: "\x1b3CV"
+    await_reply: true
+
+models:
+  - id: in1808-series
+    name: Extron IN1806, IN1808, IN1808 IPCP SA / MA 70 / Q SA / Q MA 70
+    supports:
+      [select_input, select_video_input, select_audio_input, get_input, get_video_input, get_audio_input,
+       set_loop_out_input, get_loop_out_input, set_input_name, get_input_name, set_output_name,
+       get_output_name, auto_image, set_input_hdcp_authorized, get_input_hdcp_authorized, set_aspect_ratio,
+       get_aspect_ratio, set_film_mode, get_film_mode, set_auto_switch_mode, get_auto_switch_mode,
+       set_auto_switch_timeout, get_auto_switch_timeout, set_freeze, get_freeze, set_contrast, get_contrast,
+       set_brightness, get_brightness, set_detail, get_detail, set_image_position, get_image_position,
+       set_video_mute, get_video_mute, set_video_mute_all, get_video_mute_all, set_output_rate,
+       get_output_rate, set_hdmi_output_format, get_hdmi_output_format, set_power_save, get_power_save,
+       set_osd_duration, get_osd_duration, recall_input_preset, save_input_preset, set_auto_memory,
+       get_auto_memory, set_audio_input_format, get_audio_input_format, set_group_level,
+       increase_group_level, decrease_group_level, get_group_level, set_group_mute, get_group_mute,
+       set_dsp_gain, get_dsp_gain, set_dsp_mute, get_dsp_mute, set_phantom_power, play_audio_file,
+       stop_audio_file, get_playing_audio_file, set_test_pattern, get_test_pattern, set_switch_effect,
+       get_switch_effect, get_signal_status, set_front_panel_lock, get_front_panel_lock,
+       set_output_hdcp_mode, get_output_hdcp_mode, set_hdcp_notification, get_hdcp_notification,
+       get_input_hdcp_status, get_output_hdcp_status, get_input_info, get_model_name, get_firmware,
+       get_firmware_full, get_part_number, get_temperature, set_verbose_mode, get_verbose_mode]
+    verification: none
+    notes: >
+      DisplayPort input 1, HDMI inputs 2-6, DTP2/XTP inputs 7 and 8 (IN1808 Series only), aux audio 9;
+      outputs 1A (1), 1B DTP2/XTP/HDBT (2) and loop (3) (p.55). Picture controls are per input; image
+      position and size, switch effect and test pattern address the scaler output as 1 (p.66-68, p.78).
+      Group masters 1-10: 1 mic volume, 2 mic mute, 3 program volume, 4 program mute, 5 line volume,
+      6 line mute, 7 bass, 8 treble, 9 output volume, 10 output mute (p.89).
+  - id: in1608-series
+    name: Extron IN1606, IN1608, IN1608 SA / MA / xi
+    supports:
+      [select_input_in1600, select_video_input_in1600, select_audio_input_in1600, get_input_in1600,
+       get_video_input_in1600, get_audio_input_in1600, set_input_name_in1600, get_input_name_in1600,
+       auto_image_in1600, auto_image_fill_in1600, auto_image_keep_aspect_in1600, set_auto_image, get_auto_image, set_input_hdcp_authorized,
+       get_input_hdcp_authorized, set_aspect_ratio, get_aspect_ratio, set_film_mode, get_film_mode,
+       set_auto_switch_mode, get_auto_switch_mode, set_freeze_in1600, get_freeze_in1600,
+       set_contrast_current_input, get_contrast_current_input, set_brightness_current_input,
+       get_brightness_current_input, set_detail_current_input, get_detail_current_input,
+       set_color_current_input, get_color_current_input, set_tint_current_input, get_tint_current_input,
+       set_image_position_in1600, get_image_position_in1600, set_video_mute, get_video_mute,
+       set_video_mute_all, get_video_mute_all, set_output_rate_in1600, get_output_rate_in1600,
+       set_hdmi_output_format, get_hdmi_output_format, set_power_save, get_power_save, set_osd_duration,
+       get_osd_duration, recall_user_preset, save_user_preset, recall_input_preset, save_input_preset,
+       set_auto_memory, get_auto_memory, set_audio_input_format, get_audio_input_format,
+       set_group_level, increase_group_level, decrease_group_level, get_group_level, set_group_mute,
+       get_group_mute, set_dsp_gain, get_dsp_gain, set_dsp_mute, get_dsp_mute, set_volume_knob_group,
+       get_volume_knob_group, set_test_pattern_in1600, get_test_pattern_in1600, set_switch_effect_in1600,
+       get_switch_effect_in1600, get_signal_status, set_front_panel_lock, get_front_panel_lock,
+       set_output_hdcp_mode_in1600, get_output_hdcp_mode_in1600, set_hdcp_notification_in1600,
+       get_hdcp_notification_in1600, get_input_hdcp_status, get_output_hdcp_status, get_info_in1600,
+       get_firmware, get_firmware_full, get_part_number, get_temperature, set_verbose_mode,
+       get_verbose_mode]
+    verification: none
+    notes: >
+      Inputs 1-6 (IN1606) or 1-8 (IN1608 Series), analog on inputs 1 and 2; outputs HDMI A (1), HDMI B (2)
+      and Out C (3) (p.44). Picture controls adjust the current input (p.54-55). Group masters: 1 program
+      volume, 2 program mute, 3 mic volume, 4 mic mute, 5 bass, 6 treble, 7 output mute, 8 variable volume
+      (p.58). Front panel lock modes 0-2 only.
+
+commands:
+  # ── Input selection (IN1808 p.63; IN1608 p.50) ──────────────────────────
+  select_input:
+    summary: Select an input's video and audio for the output (X!*1!); 9 is the aux audio input
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "{input}*1!"
+    expect: { matches: '^In\s*\d+(?:\*1)?\s*All$' }
+    returns: ack
+  select_video_input:
+    summary: Select an input's video only (breakaway) (X!*1%)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "{input}*1%"
+    expect: { matches: '^In\s*\d+(?:\*1)?\s*Vid$' }
+    returns: ack
+  select_audio_input:
+    summary: Select an input's audio only (breakaway) (X!*1$); 9 is the aux audio input
+    params:
+      input: { type: int, min: 1, max: 9, required: true }
+    send: "{input}*1$"
+    expect: { matches: '^In\s*\d+(?:\*1)?\s*Aud$' }
+    returns: ack
+  get_input:
+    summary: Get the input whose video and audio go to the output (1!); E13 in breakaway
+    send: "1!"
+    expect: { matches: '^(?:In\s*)?0*(\d+)(?:\*1)?(?:\s*All)?$' }
+    returns: value
+  get_video_input:
+    summary: Get the video input (1%)
+    send: "1%"
+    expect: { matches: '^(?:In\s*)?0*(\d+)(?:\*1)?(?:\s*Vid)?$' }
+    returns: value
+  get_audio_input:
+    summary: Get the audio input (1$)
+    send: "1$"
+    expect: { matches: '^(?:In\s*)?0*(\d+)(?:\*1)?(?:\s*Aud)?$' }
+    returns: value
+  select_input_in1600:
+    summary: Select an input's video and audio (X!!)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "{input}!"
+    expect: { matches: '^In\s*\d+\s*All$' }
+    returns: ack
+  select_video_input_in1600:
+    summary: Select an input's video only (X!&); not allowed from an input set to a digital audio format (E17)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "{input}&"
+    expect: { matches: '^In\s*\d+\s*RGB$' }
+    returns: ack
+  select_audio_input_in1600:
+    summary: Select an input's audio only (X!$); not allowed to an input set to a digital audio format (E17)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "{input}$"
+    expect: { matches: '^In\s*\d+\s*Aud$' }
+    returns: ack
+  get_input_in1600:
+    summary: Get the current video and audio input (!)
+    send: "!"
+    expect: { matches: '^(?:In\s*)?0*(\d+)(?:\s*All)?$' }
+    returns: value
+  get_video_input_in1600:
+    summary: Get the current video input (&)
+    send: "&"
+    expect: { matches: '^(?:In\s*)?0*(\d+)(?:\s*RGB)?$' }
+    returns: value
+  get_audio_input_in1600:
+    summary: Get the current audio input ($)
+    send: "$"
+    expect: { matches: '^(?:In\s*)?0*(\d+)(?:\s*Aud)?$' }
+    returns: value
+
+  # ── Loop out and names ──────────────────────────────────────────────────
+  set_loop_out_input:
+    summary: Tie the HDMI loop output to an input (Esc X!LOUT)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}LOUT"
+    expect: { matches: '^Lout\s*\d+$' }
+    returns: ack
+  get_loop_out_input:
+    summary: Get the input on the loop output (Esc LOUT)
+    send: "\x1bLOUT"
+    expect: { matches: '^(?:Lout\s*)?0*(\d+)$' }
+    returns: value
+  set_input_name:
+    summary: Name a video input, up to 32 characters; a single space restores the default (Esc IX!*name VNAM)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true }
+    send: "\x1bI{input}*{name}VNAM"
+    expect: { matches: '^VnamI' }
+    returns: ack
+  get_input_name:
+    summary: Get a video input's name (Esc IX!VNAM)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1bI{input}VNAM"
+    expect: { matches: '^(?:VnamI\s*\d+\*)?(.*)$' }
+    returns: value
+  set_output_name:
+    summary: Name a video output (1A, 1B, loop), up to 32 characters (Esc OX@*name VNAM)
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+      name: { type: string, max_length: 32, pattern: '^[^,*|]+$', required: true }
+    send: "\x1bO{output}*{name}VNAM"
+    expect: { matches: '^VnamO' }
+    returns: ack
+  get_output_name:
+    summary: Get a video output's name (Esc OX@VNAM)
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+    send: "\x1bO{output}VNAM"
+    expect: { matches: '^(?:VnamO\s*\d+\*)?(.*)$' }
+    returns: value
+  set_input_name_in1600:
+    summary: Name an input, up to 16 characters; a single space restores the default (Esc X!,name NI)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      name: { type: string, max_length: 16, pattern: '^[^,*|]+$', required: true }
+    send: "\x1b{input},{name}NI"
+    expect: { matches: '^Nmi' }
+    returns: ack
+  get_input_name_in1600:
+    summary: Get an input's name (Esc X!NI)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}NI"
+    expect: { matches: '^(?:Nmi\s*\d+,)?(.*)$' }
+    returns: value
+
+  # ── Input configuration ─────────────────────────────────────────────────
+  auto_image:
+    summary: Run Auto-Image on the current input, following its aspect ratio, filling the output, or keeping the input's aspect (1*0A / 1*1A / 1*2A)
+    params:
+      mode: { type: enum, values: ["0", "1", "2"], default: "0" }
+    send: "1*{mode}A"
+    expect: { matches: '^Img1\*[0-2]$' }
+    returns: ack
+  auto_image_in1600:
+    summary: Run Auto-Image on the current input, following the input's aspect ratio setting (A)
+    send: "A"
+    expect: { matches: '^Img0$' }
+    returns: ack
+  auto_image_fill_in1600:
+    summary: Run Auto-Image on the current input and fill the output (1*A)
+    send: "1*A"
+    expect: { matches: '^Img1$' }
+    returns: ack
+  auto_image_keep_aspect_in1600:
+    summary: Run Auto-Image on the current input keeping its aspect ratio (2*A)
+    send: "2*A"
+    expect: { matches: '^Img2$' }
+    returns: ack
+  set_auto_image:
+    summary: Turn automatic Auto-Image on or off for an input (X!*1A / X!*0A)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, required: true }
+    send: "{input}*{enabled:bool01}A"
+    expect: { matches: '^Img\s*\d+\*[01]$' }
+    returns: ack
+  get_auto_image:
+    summary: Get whether automatic Auto-Image is on for an input (X!A)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "{input}A"
+    expect: { matches: '^(?:Img\s*\d+\*)?([01])$' }
+    returns: value
+  set_input_hdcp_authorized:
+    summary: Allow or block HDCP-encrypted content on an input (Esc EX!*1HDCP / *0)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      allowed: { type: bool, required: true }
+    send: "\x1bE{input}*{allowed:bool01}HDCP"
+    expect: { matches: '^HdcpE\s*\d+\*[01]$' }
+    returns: ack
+  get_input_hdcp_authorized:
+    summary: Get whether HDCP is allowed on an input (Esc EX!HDCP)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1bE{input}HDCP"
+    expect: { matches: '^(?:HdcpE\s*\d+\*)?([01])$' }
+    returns: value
+  set_aspect_ratio:
+    summary: Fill the output with an input (1) or keep its native aspect ratio (2) (Esc X!*nASPR)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      mode: { type: int, min: 1, max: 2, required: true }
+    send: "\x1b{input}*{mode}ASPR"
+    expect: { matches: '^Aspr\s*\d+\s*\*\s*[12]$' }
+    returns: ack
+  get_aspect_ratio:
+    summary: Get an input's aspect ratio setting, 1 fill or 2 follow (Esc X!ASPR)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}ASPR"
+    expect: { matches: '^(?:Aspr\s*\d+\s*\*\s*)?([12])$' }
+    returns: value
+  set_film_mode:
+    summary: Turn 3:2, 2:2 and 24:1 film mode detection on (auto) or off for an input (Esc X!*1FILM / *0)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, required: true }
+    send: "\x1b{input}*{enabled:bool01}FILM"
+    expect: { matches: '^Film\s*\d+\s*\*\s*[01]$' }
+    returns: ack
+  get_film_mode:
+    summary: Get an input's film mode detection (Esc X!FILM)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}FILM"
+    expect: { matches: '^(?:Film\s*\d+\s*\*\s*)?([01])$' }
+    returns: value
+  set_auto_switch_mode:
+    summary: "Set auto-input switching (Esc nAUSW): 0 manual; IN1808 1 user priority, 2 last connected; IN1608 1 highest active input, 2 lowest active input"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "\x1b{mode}AUSW"
+    expect: { matches: '^Ausw[0-2]$' }
+    returns: ack
+  get_auto_switch_mode:
+    summary: Get the auto-input switch mode (Esc AUSW)
+    send: "\x1bAUSW"
+    expect: { matches: '^(?:Ausw)?([0-2])$' }
+    returns: value
+  set_auto_switch_timeout:
+    summary: Set the seconds without video before auto-input switching moves on, 0-500 (Esc TnAUSW)
+    params:
+      seconds: { type: int, min: 0, max: 500, required: true }
+    send: "\x1bT{seconds}AUSW"
+    expect: { matches: '^AuswT\s*\d+$' }
+    returns: ack
+  get_auto_switch_timeout:
+    summary: Get the auto-input switch timeout in seconds (Esc TAUSW)
+    send: "\x1bTAUSW"
+    expect: { matches: '^(?:AuswT\s*)?0*(\d+)$' }
+    returns: value
+
+  # ── Picture (IN1808 p.66-68; IN1608 p.54-55, p.60) ──────────────────────
+  set_freeze:
+    summary: Freeze or unfreeze the output (1*1F / 1*0F)
+    params:
+      frozen: { type: bool, required: true }
+    send: "1*{frozen:bool01}F"
+    expect: { matches: '^Frz1\*[01]$' }
+    returns: ack
+  get_freeze:
+    summary: Get whether the output is frozen (1F)
+    send: "1F"
+    expect: { matches: '^(?:Frz1\*)?([01])$' }
+    returns: value
+  set_freeze_in1600:
+    summary: Freeze or unfreeze the current input (1F / 0F)
+    params:
+      frozen: { type: bool, required: true }
+    send: "{frozen:bool01}F"
+    expect: { matches: '^Frz[01]$' }
+    returns: ack
+  get_freeze_in1600:
+    summary: Get whether the current input is frozen (F)
+    send: "F"
+    expect: { matches: '^(?:Frz)?([01])$' }
+    returns: value
+  set_contrast:
+    summary: Set an input's contrast, 0-127 (64 default) (Esc X!*nCONT)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{input}*{level}CONT"
+    expect: { matches: '^Cont\s*\d+\*\d+$' }
+    returns: ack
+  get_contrast:
+    summary: Get an input's contrast (Esc X!CONT)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}CONT"
+    expect: { matches: '^(?:Cont\s*\d+\*)?0*(\d+)$' }
+    returns: value
+  set_brightness:
+    summary: Set an input's brightness, 0-127 (64 default) (Esc X!*nBRIT)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{input}*{level}BRIT"
+    expect: { matches: '^Brit\s*\d+\*\d+$' }
+    returns: ack
+  get_brightness:
+    summary: Get an input's brightness (Esc X!BRIT)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}BRIT"
+    expect: { matches: '^(?:Brit\s*\d+\*)?0*(\d+)$' }
+    returns: value
+  set_detail:
+    summary: Set the detail (sharpness) of the current input, 0-127 (Esc 1*nHDET)
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b1*{level}HDET"
+    expect: { matches: '^Hdet1\*\d+$' }
+    returns: ack
+  get_detail:
+    summary: Get the detail of the current input (Esc 1HDET)
+    send: "\x1b1HDET"
+    expect: { matches: '^(?:Hdet1\*)?0*(\d+)$' }
+    returns: value
+  set_image_position:
+    summary: "Set the image's position and size at once: horizontal -4096..4096, vertical -2400..2400, width 10-8192, height 10-4800 (Esc 1,h*v*w*hXIMG)"
+    params:
+      horizontal: { type: int, min: -4096, max: 4096, required: true }
+      vertical: { type: int, min: -2400, max: 2400, required: true }
+      width: { type: int, min: 10, max: 8192, required: true }
+      height: { type: int, min: 10, max: 4800, required: true }
+    send: "\x1b1,{horizontal}*{vertical}*{width}*{height}XIMG"
+    expect: { matches: '^Ximg1,' }
+    returns: ack
+  get_image_position:
+    summary: Get the image's position and size as "h*v*width*height" (Esc 1XIMG)
+    send: "\x1b1XIMG"
+    expect: { matches: '^(?:Ximg1,)?([-+]?\d+\*[-+]?\d+\*\d+\*\d+)$' }
+    returns: value
+  set_contrast_current_input:
+    summary: Set the current input's contrast, 0-127 (Esc nCONT)
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{level}CONT"
+    expect: { matches: '^Cont\s*\d+\*\d+$' }
+    returns: ack
+  get_contrast_current_input:
+    summary: Get the current input's contrast (Esc CONT)
+    send: "\x1bCONT"
+    expect: { matches: '^(?:Cont\s*\d+\*)?0*(\d+)$' }
+    returns: value
+  set_brightness_current_input:
+    summary: Set the current input's brightness, 0-127 (Esc nBRIT)
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{level}BRIT"
+    expect: { matches: '^Brit\s*\d+\*\d+$' }
+    returns: ack
+  get_brightness_current_input:
+    summary: Get the current input's brightness (Esc BRIT)
+    send: "\x1bBRIT"
+    expect: { matches: '^(?:Brit\s*\d+\*)?0*(\d+)$' }
+    returns: value
+  set_detail_current_input:
+    summary: Set the current input's detail filter, 0-127 (Esc nHDET)
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{level}HDET"
+    expect: { matches: '^Hdet\s*\d+\s*\*\s*\d+$' }
+    returns: ack
+  get_detail_current_input:
+    summary: Get the current input's detail filter (Esc HDET)
+    send: "\x1bHDET"
+    expect: { matches: '^(?:Hdet\s*\d+\s*\*\s*)?0*(\d+)$' }
+    returns: value
+  set_color_current_input:
+    summary: Set the current input's color level, 0-127 (NTSC, PAL and SECAM inputs only) (Esc nCOLR)
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{level}COLR"
+    expect: { matches: '^Colr\s*\d+\*\d+$' }
+    returns: ack
+  get_color_current_input:
+    summary: Get the current input's color level (Esc COLR)
+    send: "\x1bCOLR"
+    expect: { matches: '^(?:Colr\s*\d+\*)?0*(\d+)$' }
+    returns: value
+  set_tint_current_input:
+    summary: Set the current input's tint, 0-127 (NTSC inputs only) (Esc nTINT)
+    params:
+      level: { type: int, min: 0, max: 127, required: true }
+    send: "\x1b{level}TINT"
+    expect: { matches: '^Tint\s*\d+\*\d+$' }
+    returns: ack
+  get_tint_current_input:
+    summary: Get the current input's tint (Esc TINT)
+    send: "\x1bTINT"
+    expect: { matches: '^(?:Tint\s*\d+\*)?0*(\d+)$' }
+    returns: value
+  set_image_position_in1600:
+    summary: "Set the image's position and size at once: horizontal -2048..2048, vertical -1200..1200, width 10-4096, height 10-2400 (Esc h*v*w*hXIMG)"
+    params:
+      horizontal: { type: int, min: -2048, max: 2048, required: true }
+      vertical: { type: int, min: -1200, max: 1200, required: true }
+      width: { type: int, min: 10, max: 4096, required: true }
+      height: { type: int, min: 10, max: 2400, required: true }
+    send: "\x1b{horizontal}*{vertical}*{width}*{height}XIMG"
+    expect: { matches: '^Ximg' }
+    returns: ack
+  get_image_position_in1600:
+    summary: Get the image's position and size as "h*v*width*height" (Esc XIMG)
+    send: "\x1bXIMG"
+    expect: { matches: '^(?:Ximg)?([-+]?\d+\*[-+]?\d+\*\d+\*\d+)$' }
+    returns: value
+
+  # ── Output (IN1808 p.69-71; IN1608 p.54, p.56) ──────────────────────────
+  set_video_mute:
+    summary: "Mute an output: 0 unmute, 1 video to black, 2 video and sync (X@*nB)"
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "{output}*{mode}B"
+    expect: { matches: '^Vmt\s*\d+\*[0-2]$' }
+    returns: ack
+  get_video_mute:
+    summary: Get an output's video mute, 0-2 (X@*B)
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+    send: "{output}*B"
+    expect: { matches: '^(?:Vmt\s*\d+\*)?([0-2])$' }
+    returns: value
+  set_video_mute_all:
+    summary: "Mute every output: 0 unmute, 1 video to black, 2 video and sync (nB)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "{mode}B"
+    expect: { matches: '^Vmt[0-2]$' }
+    returns: ack
+  get_video_mute_all:
+    summary: Get the outputs' video mute (B); one digit per output on IN1808, one summary digit on IN1608
+    send: "B"
+    expect: { matches: '^(?:Vmt)?([0-2](?:\s[0-2])*)$' }
+    returns: value
+  set_output_rate:
+    summary: Set the output resolution and rate by the guide's code (Esc 1*nRATE); see the IN1808 guide's table (p.57)
+    params:
+      rate: { type: int, min: 10, max: 210, required: true }
+    send: "\x1b1*{rate}RATE"
+    expect: { matches: '^Rate1\*\d+$' }
+    returns: ack
+  get_output_rate:
+    summary: Get the output rate code (Esc 1RATE)
+    send: "\x1b1RATE"
+    expect: { matches: '^(?:Rate1\*)?0*(\d+)$' }
+    returns: value
+  set_output_rate_in1600:
+    summary: Set the output resolution and rate by the guide's code, 3-8, 10-92, 201, 202 (Esc nRATE); see the IN1608 guide's table (p.49)
+    params:
+      rate: { type: int, min: 3, max: 202, required: true }
+    send: "\x1b{rate}RATE"
+    expect: { matches: '^Rate\s*\d+$' }
+    returns: ack
+  get_output_rate_in1600:
+    summary: Get the output rate code (Esc RATE)
+    send: "\x1bRATE"
+    expect: { matches: '^(?:Rate\s*)?0*(\d+)$' }
+    returns: value
+  set_hdmi_output_format:
+    summary: Set an HDMI output's format and colour space by the guide's code, 0 auto (Esc X@*nVTPO)
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+      format: { type: int, min: 0, max: 7, required: true }
+    send: "\x1b{output}*{format}VTPO"
+    expect: { matches: '^Vtpo\s*\d+\s*\*\s*\d$' }
+    returns: ack
+  get_hdmi_output_format:
+    summary: Get an HDMI output's format code (Esc X@VTPO)
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+    send: "\x1b{output}VTPO"
+    expect: { matches: '^(?:Vtpo\s*\d+\s*\*\s*)?(\d)$' }
+    returns: value
+  set_power_save:
+    summary: "Set the power save mode: 0 full power; 1 lowest (IN1608: low) power; 2 low power with TP functions (IN1808) (Esc nPSAV)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "\x1b{mode}PSAV"
+    expect: { matches: '^Psav[0-2]$' }
+    returns: ack
+  get_power_save:
+    summary: Get the power save mode (Esc PSAV)
+    send: "\x1bPSAV"
+    expect: { matches: '^(?:Psav)?([0-2])$' }
+    returns: value
+  set_osd_duration:
+    summary: Set how long the on-screen input bug or menu shows, in seconds (IN1608 0 never shows, 501 always) (Esc nMDUR)
+    params:
+      seconds: { type: int, min: 0, max: 501, required: true }
+    send: "\x1b{seconds}MDUR"
+    expect: { matches: '^Mdur\s*\d+$' }
+    returns: ack
+  get_osd_duration:
+    summary: Get the on-screen display duration (Esc MDUR)
+    send: "\x1bMDUR"
+    expect: { matches: '^(?:Mdur\s*)?0*(\d+)$' }
+    returns: value
+
+  # ── Presets (IN1808 p.74; IN1608 p.59) ──────────────────────────────────
+  recall_input_preset:
+    summary: Recall an input preset (picture settings) for the current input, 1-16 on IN1808, 1-128 on IN1608 (2*n.)
+    params:
+      preset: { type: int, min: 1, max: 128, required: true }
+    send: "2*{preset}."
+    expect: { matches: '^2Rpr\s*\d+$' }
+    returns: ack
+  save_input_preset:
+    summary: Save the current input's picture settings as an input preset (2*n,)
+    params:
+      preset: { type: int, min: 1, max: 128, required: true }
+    send: "2*{preset},"
+    expect: { matches: '^2Spr\s*\d+$' }
+    returns: ack
+  recall_user_preset:
+    summary: Recall a user preset (picture and audio settings), 1-16 (1*n.)
+    params:
+      preset: { type: int, min: 1, max: 16, required: true }
+    send: "1*{preset}."
+    expect: { matches: '^1Rpr\s*\d+$' }
+    returns: ack
+  save_user_preset:
+    summary: Save the current picture controls as a user preset, 1-16 (1*n,)
+    params:
+      preset: { type: int, min: 1, max: 16, required: true }
+    send: "1*{preset},"
+    expect: { matches: '^1Spr\s*\d+$' }
+    returns: ack
+  set_auto_memory:
+    summary: Turn Auto Memory (automatic per-signal input presets) on or off for an input (Esc X!*1AMEM / *0)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+      enabled: { type: bool, required: true }
+    send: "\x1b{input}*{enabled:bool01}AMEM"
+    expect: { matches: '^Amem\s*\d+\s*\*\s*[01]$' }
+    returns: ack
+  get_auto_memory:
+    summary: Get an input's Auto Memory setting (Esc X!AMEM)
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1b{input}AMEM"
+    expect: { matches: '^(?:Amem\s*\d+\s*\*\s*)?([01])$' }
+    returns: value
+
+  # ── Audio (IN1808 p.75, p.88-92; IN1608 p.57-58) ────────────────────────
+  set_audio_input_format:
+    summary: "Set an input's audio format: 0 none (muted), 1 analog, 2 LPCM-2Ch, 3 multichannel, 4 LPCM-2Ch auto, 5 multichannel auto (Esc IX!*nAFMT)"
+    params:
+      input: { type: int, min: 1, max: 9, required: true }
+      format: { type: int, min: 0, max: 5, required: true }
+    send: "\x1bI{input}*{format}AFMT"
+    expect: { matches: '^AfmtI\s*\d+\*[0-5]$' }
+    returns: ack
+  get_audio_input_format:
+    summary: Get an input's audio format (Esc IX!AFMT)
+    params:
+      input: { type: int, min: 1, max: 9, required: true }
+    send: "\x1bI{input}AFMT"
+    expect: { matches: '^(?:AfmtI\s*\d+\*)?([0-5])$' }
+    returns: value
+  set_group_level:
+    summary: Set a group master (volume, bass or treble) in tenths of a dB, such as -293 for -29.3 dB (Esc Dg*nGRPM); groups per model in the notes
+    params:
+      group: { type: int, min: 1, max: 10, required: true }
+      level: { type: int, min: -1000, max: 800, required: true }
+    send: "\x1bD{group}*{level}GRPM"
+    expect: { matches: '^GrpmD\s*\d+\*[-+]?\d+$' }
+    returns: ack
+  increase_group_level:
+    summary: Raise a group master by a step in tenths of a dB (Esc Dg*n+GRPM)
+    params:
+      group: { type: int, min: 1, max: 10, required: true }
+      step: { type: int, min: 1, max: 1800, required: true }
+    send: "\x1bD{group}*{step}+GRPM"
+    expect: { matches: '^GrpmD\s*\d+\*[-+]?\d+$' }
+    returns: ack
+  decrease_group_level:
+    summary: Lower a group master by a step in tenths of a dB (Esc Dg*n-GRPM)
+    params:
+      group: { type: int, min: 1, max: 10, required: true }
+      step: { type: int, min: 1, max: 1800, required: true }
+    send: "\x1bD{group}*{step}-GRPM"
+    expect: { matches: '^GrpmD\s*\d+\*[-+]?\d+$' }
+    returns: ack
+  get_group_level:
+    summary: Get a group master's value in tenths of a dB (Esc DgGRPM)
+    params:
+      group: { type: int, min: 1, max: 10, required: true }
+    send: "\x1bD{group}GRPM"
+    expect: { matches: '^(?:GrpmD\s*\d+\*)?([-+]?\d+)$' }
+    returns: value
+  set_group_mute:
+    summary: Mute or unmute every block in a mute group (Esc Dg*1GRPM / *0)
+    params:
+      group: { type: int, min: 1, max: 10, required: true }
+      muted: { type: bool, required: true }
+    send: "\x1bD{group}*{muted:bool01}GRPM"
+    expect: { matches: '^GrpmD\s*\d+\*[01]$' }
+    returns: ack
+  get_group_mute:
+    summary: Get a mute group's state (Esc DgGRPM)
+    params:
+      group: { type: int, min: 1, max: 10, required: true }
+    send: "\x1bD{group}GRPM"
+    expect: { matches: '^(?:GrpmD\s*\d+\*)?([01])$' }
+    returns: value
+  set_dsp_gain:
+    summary: Set the gain or attenuation of a DSP block by its object ID (OID), in tenths of a dB (Esc Goid*nAU); OIDs per model in the quirks
+    params:
+      oid: { type: int, min: 30000, max: 60011, required: true }
+      level: { type: int, min: -1000, max: 800, required: true }
+    send: "\x1bG{oid}*{level}AU"
+    expect: { matches: '^DsG\s*\d+\*[-+]?\d+$' }
+    returns: ack
+  get_dsp_gain:
+    summary: Get a DSP block's gain in tenths of a dB (Esc GoidAU)
+    params:
+      oid: { type: int, min: 30000, max: 60011, required: true }
+    send: "\x1bG{oid}AU"
+    expect: { matches: '^(?:DsG\s*\d+\*)?([-+]?\d+)$' }
+    returns: value
+  set_dsp_mute:
+    summary: Mute or unmute a DSP block by its object ID (Esc Moid*1AU / *0)
+    params:
+      oid: { type: int, min: 30000, max: 60011, required: true }
+      muted: { type: bool, required: true }
+    send: "\x1bM{oid}*{muted:bool01}AU"
+    expect: { matches: '^DsM\s*\d+\*[01]$' }
+    returns: ack
+  get_dsp_mute:
+    summary: Get a DSP block's mute (Esc MoidAU)
+    params:
+      oid: { type: int, min: 30000, max: 60011, required: true }
+    send: "\x1bM{oid}AU"
+    expect: { matches: '^(?:DsM\s*\d+\*)?([01])$' }
+    returns: value
+  set_phantom_power:
+    summary: Turn 48 V phantom power on or off on mic/line input 1 (OID 40000) or 2 (40001) (Esc Zoid*1AU / *0)
+    params:
+      oid: { type: enum, values: ["40000", "40001"], required: true }
+      enabled: { type: bool, required: true }
+    send: "\x1bZ{oid}*{enabled:bool01}AU"
+    expect: { matches: '^DsZ\s*\d+\*[01]$' }
+    returns: ack
+  set_volume_knob_group:
+    summary: Choose what the front panel volume knob controls, 1 program, 3 mic or 8 output volume (Esc 1*nKNOB)
+    params:
+      group: { type: enum, values: ["1", "3", "8"], required: true }
+    send: "\x1b1*{group}KNOB"
+    expect: { matches: '^Knob1\*\d+$' }
+    returns: ack
+  get_volume_knob_group:
+    summary: Get the volume knob's group (Esc 1KNOB)
+    send: "\x1b1KNOB"
+    expect: { matches: '^(?:Knob1\*)?(\d+)$' }
+    returns: value
+  play_audio_file:
+    summary: Play the audio file in slot 1-16; a lower priority slot than the one playing is refused (E22) (Esc slot*1PLAY)
+    params:
+      slot: { type: int, min: 1, max: 16, required: true }
+    send: "\x1b{slot}*1PLAY"
+    expect: { matches: '^Play\s*\d+\*1$' }
+    returns: ack
+  stop_audio_file:
+    summary: Stop the audio file in a slot (Esc slot*0PLAY)
+    params:
+      slot: { type: int, min: 1, max: 16, required: true }
+    send: "\x1b{slot}*0PLAY"
+    expect: { matches: '^Play\s*\d+\*0$' }
+    returns: ack
+  get_playing_audio_file:
+    summary: Get the slot playing, 0 when none (Esc PLAY)
+    send: "\x1bPLAY"
+    expect: { matches: '^(?:Play)?0*(\d+)(?:\*[01])?$' }
+    returns: value
+
+  # ── Advanced (IN1808 p.78-79; IN1608 p.60-62) ───────────────────────────
+  set_test_pattern:
+    summary: "Show a test pattern on the output: 0 off, 1 crop, 2 alternating pixels, 3 crosshatch, 4 color bars, 5 grayscale, 6 audio test (pink noise) (Esc 1*nTEST)"
+    params:
+      pattern: { type: int, min: 0, max: 6, required: true }
+    send: "\x1b1*{pattern}TEST"
+    expect: { matches: '^Test1\*\d+$' }
+    returns: ack
+  get_test_pattern:
+    summary: Get the test pattern (Esc 1TEST)
+    send: "\x1b1TEST"
+    expect: { matches: '^(?:Test1\*)?0*(\d+)$' }
+    returns: value
+  set_test_pattern_in1600:
+    summary: "Show a test pattern: 0 none, 1 crop, 2 alternating pixels, 3 color bars, 4 grayscale, 5 blue mode, 6 audio test (Esc nTEST)"
+    params:
+      pattern: { type: int, min: 0, max: 6, required: true }
+    send: "\x1b{pattern}TEST"
+    expect: { matches: '^Test\s*\d+$' }
+    returns: ack
+  get_test_pattern_in1600:
+    summary: Get the test pattern (Esc TEST)
+    send: "\x1bTEST"
+    expect: { matches: '^(?:Test\s*)?0*(\d+)$' }
+    returns: value
+  set_switch_effect:
+    summary: "Set the input switch effect: 0 cut through black, 1 fade through black, 2 seamless fade, 3 seamless cut (Esc O1*nSWEF)"
+    params:
+      effect: { type: int, min: 0, max: 3, required: true }
+    send: "\x1bO1*{effect}SWEF"
+    expect: { matches: '^SwefO1\*[0-3]$' }
+    returns: ack
+  get_switch_effect:
+    summary: Get the switch effect (Esc O1SWEF)
+    send: "\x1bO1SWEF"
+    expect: { matches: '^(?:SwefO1\*)?([0-3])$' }
+    returns: value
+  set_switch_effect_in1600:
+    summary: Set the switch effect, 0 cut or 1 fade through black (Esc nSWEF)
+    params:
+      effect: { type: int, min: 0, max: 1, required: true }
+    send: "\x1b{effect}SWEF"
+    expect: { matches: '^Swef[01]$' }
+    returns: ack
+  get_switch_effect_in1600:
+    summary: Get the switch effect (Esc SWEF)
+    send: "\x1bSWEF"
+    expect: { matches: '^(?:Swef)?([01])$' }
+    returns: value
+  get_signal_status:
+    summary: Get every input's video signal presence as "1*0*..." (Esc 0LS)
+    send: "\x1b0LS"
+    expect: { matches: '^I[Nn]00\s*([01](?:\*[01])*)$' }
+    returns: value
+  set_front_panel_lock:
+    summary: "Lock the front panel: 0 off, 1 complete, 2 switching and volume (IN1808 also logos), 3 switching and logos (IN1808), 4 volume only (IN1808) (nX)"
+    params:
+      mode: { type: int, min: 0, max: 4, required: true }
+    send: "{mode}X"
+    expect: { matches: '^Exe[0-4]$' }
+    returns: ack
+  get_front_panel_lock:
+    summary: Get the front panel lock mode (X)
+    send: "X"
+    expect: { matches: '^(?:Exe)?([0-4])$' }
+    returns: value
+  set_output_hdcp_mode:
+    summary: "Set an output's HDCP mode: 0 off, 1 follow input, 2 always encrypt (10 s of retries), 3 follow, 4 encrypt (continuous retries) (Esc SX@*nHDCP)"
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+      mode: { type: int, min: 0, max: 4, required: true }
+    send: "\x1bS{output}*{mode}HDCP"
+    expect: { matches: '^HdcpS\s*\d+\*[0-4]$' }
+    returns: ack
+  get_output_hdcp_mode:
+    summary: Get an output's HDCP mode (Esc SX@HDCP)
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+    send: "\x1bS{output}HDCP"
+    expect: { matches: '^(?:HdcpS\s*\d+\*)?([0-4])$' }
+    returns: value
+  set_output_hdcp_mode_in1600:
+    summary: "Set the HDMI outputs' HDCP mode: 0 encrypt when required, 1 always, 2 and 3 the same for DVI sinks that drop to green screen, 4 never (Esc SnHDCP)"
+    params:
+      mode: { type: int, min: 0, max: 4, required: true }
+    send: "\x1bS{mode}HDCP"
+    expect: { matches: '^HdcpS\s*[0-4]$' }
+    returns: ack
+  get_output_hdcp_mode_in1600:
+    summary: Get the HDCP mode (Esc SHDCP)
+    send: "\x1bSHDCP"
+    expect: { matches: '^(?:HdcpS\s*)?([0-4])$' }
+    returns: value
+  set_hdcp_notification:
+    summary: "Set what a non-HDCP display shows for HDCP content: 0 black, 1 green screen with message, 2 user image (Esc N1*nHDCP)"
+    params:
+      mode: { type: int, min: 0, max: 2, required: true }
+    send: "\x1bN1*{mode}HDCP"
+    expect: { matches: '^HdcpN1\*[0-2]$' }
+    returns: ack
+  get_hdcp_notification:
+    summary: Get the HDCP notification mode (Esc N1HDCP)
+    send: "\x1bN1HDCP"
+    expect: { matches: '^(?:HdcpN1\*)?([0-2])$' }
+    returns: value
+  set_hdcp_notification_in1600:
+    summary: Show a green screen (true) or mute to black (false) on a non-HDCP display for HDCP content (Esc N1HDCP / N0HDCP)
+    params:
+      enabled: { type: bool, required: true }
+    send: "\x1bN{enabled:bool01}HDCP"
+    expect: { matches: '^HdcpN[01]$' }
+    returns: ack
+  get_hdcp_notification_in1600:
+    summary: Get whether the HDCP notification is on (Esc NHDCP)
+    send: "\x1bNHDCP"
+    expect: { matches: '^(?:HdcpN)?([01])$' }
+    returns: value
+  get_input_hdcp_status:
+    summary: "Get an input's HDCP status (Esc IX!HDCP): IN1808 0 no source, 1 no HDCP, 2 HDCP; IN1608 0 no source, 1 HDCP, 2 no HDCP"
+    params:
+      input: { type: int, min: 1, max: 8, required: true }
+    send: "\x1bI{input}HDCP"
+    expect: { matches: '^(?:HdcpI\s*\d+\*)?([0-2])$' }
+    returns: value
+  get_output_hdcp_status:
+    summary: Get an output's HDCP status (Esc OX@HDCP), coded as for inputs
+    params:
+      output: { type: int, min: 1, max: 3, required: true }
+    send: "\x1bO{output}HDCP"
+    expect: { matches: '^(?:HdcpO\s*\d+\*)?([0-2])$' }
+    returns: value
+
+  # ── Information (IN1808 p.83-84; IN1608 p.63-64) ────────────────────────
+  get_input_info:
+    summary: Get an input's signal type, audio and video mute and frequencies, as the unit reports them (X!*I)
+    params:
+      input: { type: int, min: 1, max: 9, required: true }
+    send: "{input}*I"
+    expect: { matches: '^(?:Inf00\*)?(Vid.*)$' }
+    returns: value
+  get_info_in1600:
+    summary: Get the current video and audio inputs, signal type, standard, mute and frequencies, as the unit reports them (I)
+    send: "I"
+    expect: { matches: '^(Vid.*)$' }
+    returns: value
+  get_model_name:
+    summary: Get the model name (1I)
+    send: "1I"
+    expect: { matches: '^(?:Inf01\*)?(.+)$' }
+    returns: value
+  get_firmware:
+    summary: Get the firmware version (Q)
+    send: "Q"
+    expect: { matches: '^(?:Ver01\*)?(\d+\.\d+)$' }
+    returns: value
+  get_firmware_full:
+    summary: Get the firmware version with its build number (*Q)
+    send: "*Q"
+    expect: { matches: '^(?:Bld)?(\d+\.\d+\.\d+)$' }
+    returns: value
+  get_part_number:
+    summary: Get the part number, such as 60-1615-01 (N)
+    send: "N"
+    expect: { matches: '^(?:Pno)?(60-\d+-\d+)$' }
+    returns: value
+  get_temperature:
+    summary: Get the internal temperature in degrees Celsius (Esc 20STAT)
+    send: "\x1b20STAT"
+    expect: { matches: '^(?:20Stat\s*)?0*(\d+)$' }
+    returns: value
+  set_verbose_mode:
+    summary: "Set the verbose mode: 0 none, 1 verbose, 2 tagged replies, 3 both (Esc nCV); state needs 3, which is set on connecting"
+    params:
+      mode: { type: int, min: 0, max: 3, required: true }
+    send: "\x1b{mode}CV"
+    expect: { matches: '^Vrb[0-3]$' }
+    returns: ack
+  get_verbose_mode:
+    summary: Get the verbose mode (Esc CV)
+    send: "\x1bCV"
+    expect: { matches: '^(?:Vrb)?([0-3])$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      In verbose mode 3 the unit tags its replies and reports changes made from the front panel, PCS and other
+      connections in the same form as replies (IN1808 guide p.59, IN1608 guide p.42). A change report that
+      arrives while a command is waiting for its reply can be taken as that reply; the command's expect
+      pattern then fails it, or, when the shapes agree, accepts the wrong report. State is updated from both
+      either way. The core sets verbose mode 3 on connecting; set_verbose_mode with another value stops the
+      change reports and the tagged forms the state rules read.
+  - models: [all]
+    severity: info
+    text: >
+      Telnet connections close after 5 minutes without traffic (port timeout 30 x 10 s by default, IN1808
+      guide p.85); the core's liveness query (Q) keeps the session open. A password-protected unit sends
+      "Password:" after the copyright banner and repeats it after a wrong password; the factory password is
+      the unit's serial number, and a factory reset clears it (IN1808 guide p.53, IN1608 guide p.43).
+  - models: [all]
+    severity: warning
+    text: >
+      Simple commands (1*3!, 2B, 1X) need no terminator, Esc commands end with CR (IN1808 guide p.55); every
+      command here is sent with a CR after it, which the unit ignores after a simple command. Commands the
+      unit does not recognise are ignored without a reply (IN1808 guide p.55), so they time out.
+  - models: [in1808-series]
+    severity: info
+    text: >
+      Replies pad numbers with zeros (inputs to two digits, levels to three or four); the expect patterns and
+      state rules read them as numbers. The tagged forms printed in the guide (In X!*1 All, VnamIX!*name,
+      Inf00*...) are followed loosely: spaces and zero padding are optional in every pattern.
+  - models: [in1808-series]
+    severity: info
+    text: >
+      DSP object IDs (IN1808 guide p.88): line input gain 30000-30017 (two per input, DisplayPort 1 to aux),
+      mic/line inputs 40000-40003, file player 40004-40005, output attenuation 60000-60011 (HDMI, DTP2/XTP/HDBT,
+      DTP analog, line outputs 1-4, amplifier). Gains are in tenths of a dB within each block's range. DTP
+      inputs 7 and 8 take their embedded audio gain with H in place of G (p.92), which is not offered here.
+  - models: [in1608-series]
+    severity: info
+    text: >
+      DSP control numbers (IN1608 guide p.57): 40100 and 40101 mic 1 and 2 mix volume, 40000 and 40001 mic 1
+      and 2 mute, 60000 and 60002 outputs 1 and 2, 60004-60005 variable, 60006-60007 digital and 60008-60009
+      amplified outputs; levels -1000 to 0 in tenths of a dB. Audio breakaway is refused (E17) to or from an
+      input set to a digital audio format (p.50).
+  - models: [all]
+    severity: critical
+    text: >
+      recall_input_preset and recall_user_preset replace the picture (and on IN1608 user presets audio gain)
+      settings of the current input at once, on air. set_power_save 1 or 2 on IN1808 turns off twisted-pair
+      remote power and over-TP functions or the output video. set_video_mute_all and a set_front_panel_lock
+      mode of 1 take the whole output or the whole panel away from the room until they are undone.
+  - models: [all]
+    severity: info
+    text: >
+      Input names are up to 32 characters on IN1808 and 16 on IN1608 and may not contain a comma, * or |;
+      a single space restores the default name (IN1808 guide p.63, IN1608 guide p.51).
+  - models: [all]
+    severity: info
+    text: >
+      The scaler pushes "IN00 1*0*..." on every sync change, one digit per input (IN1808 guide p.53), and
+      HdcpI / HdcpO on HDCP changes; these keep inputs.*.signal and the HDCP state current. Reconfig and HplgO
+      carry no state. The IN1606/IN1608 guide documents the 0LS reply and its "In00" tagged form (p.62) but
+      not the unsolicited signal message.
+  - models: [all]
+    severity: info
+    text: >
+      Model-specific numbering: group masters are 1-10 on IN1808 and 1-8 on IN1608, with different meanings
+      (see each model's notes), and HDCP status 1 and 2 mean the opposite on the two families (IN1808 guide
+      p.79: 1 no HDCP, 2 HDCP; IN1608 guide p.61: 1 HDCP, 2 no HDCP). State keeps the numbers as sent.
+
+state:
+  device.model:                 { type: string, description: "Model from the copyright banner, such as IN1808 IPCP SA" }
+  device.firmware:              { type: string, description: "Firmware version from the copyright banner" }
+  device.part_number:           { type: string, description: "Part number from the copyright banner, such as 60-1615-02" }
+  device.login:                 { type: string, description: "Access level granted at login: Administrator or User" }
+  input:                      { type: int, description: "Input whose video and audio go to the output (In X! All), numbered from 1" }
+  video_input:                  { type: int, description: "Input whose video goes to the output, numbered from 1" }
+  audio_input:                  { type: int, description: "Input whose audio goes to the output, numbered from 1; 9 is the IN1808 aux input" }
+  loop_out_input:               { type: int, description: "Input on the IN1808 loop output" }
+  outputs.*.video_mute:         { type: int, description: "Video mute of an output: 0 unmuted, 1 video muted to black, 2 video and sync muted" }
+  outputs.*.name:               { type: string, description: "Output name (IN1808)" }
+  outputs.*.hdcp_status:        { type: int, description: "Output HDCP status as the unit codes it (see quirks)" }
+  video_mute_all:               { type: int, description: "Mute last set on every output at once (0-2)" }
+  inputs.*.name:                { type: string, description: "Input name" }
+  inputs.*.signal:              { type: bool, description: "Video signal present on the input" }
+  inputs.*.audio_format:        { type: int, description: "Audio input format 0-5 (see set_audio_input_format)" }
+  inputs.*.hdcp_status:         { type: int, description: "Input HDCP status as the unit codes it (see quirks)" }
+  inputs.*.hdcp_authorized:     { type: bool, description: "HDCP content allowed on the input" }
+  inputs.*.aspect_ratio:        { type: int, description: "1 fill, 2 follow" }
+  inputs.*.contrast:            { type: int, description: "Contrast 0-127" }
+  inputs.*.brightness:          { type: int, description: "Brightness 0-127" }
+  groups.*.value:               { type: int, description: "Group master value as sent: tenths of a dB for a volume, bass or treble group, 0 or 1 for a mute group" }
+  dsp.*.gain:                   { type: int, description: "Gain or attenuation of a DSP block, keyed by object ID, in tenths of a dB" }
+  dsp.*.mute:                   { type: bool, description: "Mute of a DSP block, keyed by object ID" }
+  freeze:                       { type: bool, description: "Output (IN1808) or current input (IN1608) frozen" }
+  front_panel_lock:             { type: int, description: "Front panel lock mode (0 off)" }
+  power_save:                   { type: int, description: "Power save mode (0 full power)" }
+  output_rate:                  { type: int, description: "Output rate code from the guide's table" }
+  test_pattern:                 { type: int, description: "Test pattern code (0 off)" }
+  switch_effect:                { type: int, description: "Switch effect code" }
+  auto_switch_mode:             { type: int, description: "Auto-input switch mode (0 manual)" }
+  verbose_mode:                 { type: int, description: "Verbose mode 0-3 (3 set on connecting)" }
+  audio_playback_slot:          { type: int, description: "Audio file slot last reported playing (IN1808)" }
+  audio_playing:                { type: bool, description: "The slot in audio_playback_slot is playing" }
+
+telemetry:
+  # Verbose mode 3 (set on connecting) makes the unit report every change, from any source, in the
+  # tagged form of a reply, and tag the replies to queries, so the same rules read both. Signal
+  # presence is read once on connecting; changes to it are pushed (IN1808 guide p.53).
+  poll:
+    send: ["\x1b0LS", "X", "\x1bPSAV"]
+  updates:
+    # The copyright banner sent on connecting (IN1808 guide p.52, IN1608 guide p.42).
+    - match: '^\(c\) Copyright \d{4}, Extron Electronics,? (.+?), V(\d+\.\d+), (60-\d+-\d+)$'
+      state: { device.model: "{1}", device.firmware: "{2}", device.part_number: "{3}" }
+    - match: '^Login (Administrator|User)$'
+      state: { device.login: "{1}" }
+    - match: '^In\s*0*(\d+)(?:\*1)?\s*All$'
+      state: { input: "{1}", video_input: "{1}", audio_input: "{1}" }
+    - match: '^In\s*0*(\d+)(?:\*1)?\s*(?:Vid|RGB)$'
+      state: { video_input: "{1}" }
+    - match: '^In\s*0*(\d+)(?:\*1)?\s*Aud$'
+      state: { audio_input: "{1}" }
+    - match: '^Lout\s*0*(\d+)$'
+      state: { loop_out_input: "{1}" }
+    - match: '^Vmt\s*0*([1-3])\*([0-2])$'
+      state: { "outputs.{1}.video_mute": "{2}" }
+    - match: '^Vmt([0-2])$'
+      state: { video_mute_all: "{1}" }
+    - match: '^VnamI\s*0*(\d+)\*(.*)$'
+      state: { "inputs.{1}.name": "{2}" }
+    - match: '^VnamO\s*0*(\d+)\*(.*)$'
+      state: { "outputs.{1}.name": "{2}" }
+    - match: '^Nmi\s*0*(\d+),(.*)$'
+      state: { "inputs.{1}.name": "{2}" }
+    - match: '^AfmtI\s*0*(\d+)\*([0-5])$'
+      state: { "inputs.{1}.audio_format": "{2}" }
+    - match: '^HdcpI\s*0*(\d+)\*([0-2])$'
+      state: { "inputs.{1}.hdcp_status": "{2}" }
+    - match: '^HdcpO\s*0*(\d+)\*([0-2])$'
+      state: { "outputs.{1}.hdcp_status": "{2}" }
+    - match: '^HdcpE\s*0*(\d+)\*([01])$'
+      state: { "inputs.{1}.hdcp_authorized": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^Aspr\s*0*(\d+)\s*\*\s*([12])$'
+      state: { "inputs.{1}.aspect_ratio": "{2}" }
+    - match: '^Cont\s*0*(\d+)\*0*(\d+)$'
+      state: { "inputs.{1}.contrast": "{2}" }
+    - match: '^Brit\s*0*(\d+)\*0*(\d+)$'
+      state: { "inputs.{1}.brightness": "{2}" }
+    - match: '^GrpmD\s*0*(\d+)\*([-+]?\d+)$'
+      state: { "groups.{1}.value": "{2}" }
+    - match: '^DsG\s*(\d+)\*([-+]?\d+)$'
+      state: { "dsp.{1}.gain": "{2}" }
+    - match: '^DsM\s*(\d+)\*([01])$'
+      state: { "dsp.{1}.mute": { value: "{2}", map: { "0": false, "1": true } } }
+    - match: '^Frz(?:1\*)?([01])$'
+      state: { freeze: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^Exe([0-4])$'
+      state: { front_panel_lock: "{1}" }
+    - match: '^Psav([0-2])$'
+      state: { power_save: "{1}" }
+    - match: '^Rate(?:1\*)?0*(\d+)$'
+      state: { output_rate: "{1}" }
+    - match: '^Test(?:1\*)?0*(\d+)$'
+      state: { test_pattern: "{1}" }
+    - match: '^Swef(?:O1\*)?([0-3])$'
+      state: { switch_effect: "{1}" }
+    - match: '^Ausw([0-2])$'
+      state: { auto_switch_mode: "{1}" }
+    - match: '^Vrb([0-3])$'
+      state: { verbose_mode: "{1}" }
+    - match: '^Play0*(\d+)\*([01])$'
+      state: { audio_playback_slot: "{1}", audio_playing: { value: "{2}", map: { "0": false, "1": true } } }
+    # Signal presence: "IN00 1*0*1..." pushed on a sync change, and the tagged 0LS reply. One rule per
+    # input position (up to 8).
+    - match: '^I[Nn]00\s*([01])(?:\*[01])*$'
+      state: { "inputs.1.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*[01]\*([01])(?:\*[01])*$'
+      state: { "inputs.2.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*(?:[01]\*){2}([01])(?:\*[01])*$'
+      state: { "inputs.3.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*(?:[01]\*){3}([01])(?:\*[01])*$'
+      state: { "inputs.4.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*(?:[01]\*){4}([01])(?:\*[01])*$'
+      state: { "inputs.5.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*(?:[01]\*){5}([01])(?:\*[01])*$'
+      state: { "inputs.6.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*(?:[01]\*){6}([01])(?:\*[01])*$'
+      state: { "inputs.7.signal": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: '^I[Nn]00\s*(?:[01]\*){7}([01])(?:\*[01])*$'
+      state: { "inputs.8.signal": { value: "{1}", map: { "0": false, "1": true } } }

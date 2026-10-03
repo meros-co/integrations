@@ -339,6 +339,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which commands MAGNUM implements beyond routing, interrogate, locks, salvos and names. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
 - [ ] Check whether name replies carry the number on current firmware. ([specs/evertz-quartz.yaml:473](specs/evertz-quartz.yaml#L473))
 - [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:448](specs/evertz-quartz.yaml#L448))
+## extron-matrix — Extron SIS matrix switchers
+
+- [ ] Confirm that a CR after a simple command (1*2!) is ignored. ([specs/extron-matrix.yaml:931](specs/extron-matrix.yaml#L931))
+- [ ] Record what a wrong password produces (the prompt again assumed) and whether the unit sends Telnet option bytes before the banner. ([specs/extron-matrix.yaml:941](specs/extron-matrix.yaml#L941))
+- [ ] Check how often a change report arrives while a command waits, and whether replies and reports can be told apart. ([specs/extron-matrix.yaml:916](specs/extron-matrix.yaml#L916))
+- [ ] Record the Esc VM mute reply on DXP and XTP II (with and without the "Mut00" prefix). ([specs/extron-matrix.yaml:955](specs/extron-matrix.yaml#L955))
+- [ ] On DXP HD 4K PLUS, check set_input_attenuation_db at 0 dB (1*0G). ([specs/extron-matrix.yaml:971](specs/extron-matrix.yaml#L971))
+- [ ] On SMX, confirm two-digit plane numbers in commands and the plane-first reply form. ([specs/extron-matrix.yaml:985](specs/extron-matrix.yaml#L985))
+- [ ] On XTP II, confirm the Exec form of executive-mode reports. ([specs/extron-matrix.yaml:978](specs/extron-matrix.yaml#L978))
+
+## extron-switcher — Extron IN-series scaling presentation switchers
+
+- [ ] Record the tagged reply forms in verbose mode 3 (In X!*1 All, VnamI, Inf00, GrpmD padding). ([specs/extron-switcher.yaml:1031](specs/extron-switcher.yaml#L1031))
+- [ ] Confirm that a CR after a simple command (1*3!, 2B, 1X) is ignored. ([specs/extron-switcher.yaml:1025](specs/extron-switcher.yaml#L1025))
+- [ ] Check how often a change report arrives while a command waits. ([specs/extron-switcher.yaml:1009](specs/extron-switcher.yaml#L1009))
+- [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([specs/extron-switcher.yaml:1063](specs/extron-switcher.yaml#L1063))
+- [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1070](specs/extron-switcher.yaml#L1070))
+- [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:1018](specs/extron-switcher.yaml#L1018))
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))
