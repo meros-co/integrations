@@ -269,7 +269,6 @@ struct Waiting {
 
 pub(crate) struct London {
     device: SocketAddr,
-    monitor: bool,
     standing: Vec<(Address, Subscription)>,
     reader: Reader,
     socket_open: bool,
@@ -291,7 +290,6 @@ impl London {
             .unwrap_or_default();
         London {
             device: SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)),
-            monitor: ctx.monitor,
             standing: if ctx.monitor { standing } else { Vec::new() },
             reader: Reader::default(),
             socket_open: false,

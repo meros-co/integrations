@@ -368,8 +368,6 @@ impl Target {
 struct Subscription {
     label: String,
     rate_ms: u64,
-    /// From the `subscriptions` setting rather than a command.
-    standing: bool,
 }
 
 // ── Requests ──────────────────────────────────────────────────────────────
@@ -621,7 +619,6 @@ impl Tesira {
                     .or_insert_with(|| Subscription {
                         label: String::new(),
                         rate_ms: rate,
-                        standing: true,
                     });
             }
         }
@@ -948,7 +945,6 @@ impl Tesira {
                     .or_insert_with(|| Subscription {
                         label: String::new(),
                         rate_ms: rate,
-                        standing: false,
                     });
                 let line = self.subscribe_line(&tg);
                 self.enqueue(
