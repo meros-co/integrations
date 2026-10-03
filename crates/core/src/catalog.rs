@@ -149,6 +149,12 @@ fn default_returns() -> String {
 pub struct ParamSpec {
     #[serde(rename = "type")]
     pub kind: ParamType,
+    /// A short name for a person: what a form or button shows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// What the value means, its unit and numbering, in a sentence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

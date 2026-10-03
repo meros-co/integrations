@@ -466,6 +466,26 @@ Values outside the declared range are rejected before transmission. The core
 does not clamp, because a clamped value masks a caller error and produces a
 different device state than the caller requested.
 
+Every parameter, and every setting, has a `label` and a `description` for the
+person choosing a value, served by the catalogue so a consumer can build its
+forms from it:
+
+```yaml
+params:
+  channel:
+    type: int
+    min: 1
+    max: 32
+    required: true
+    label: Channel
+    description: Input channel to change, numbered from 1 as on the console.
+```
+
+The label is a short noun phrase in sentence case, the way a form names the
+field. The description is one plain sentence on what the value means: its
+unit, how it is numbered, what its ends or values do. It shouldn't just
+restate the type and range.
+
 ### Templates
 
 Every string in `send`, `on_connect` and `probe` is a template. Substitution is

@@ -692,6 +692,8 @@ impl Telemetry {
 fn spec_of(kind: ParamType) -> ParamSpec {
     ParamSpec {
         kind,
+        label: None,
+        description: None,
         min: None,
         max: None,
         values: None,
