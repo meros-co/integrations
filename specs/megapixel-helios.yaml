@@ -1,0 +1,2914 @@
+spec: 1
+id: megapixel-helios
+name: Megapixel HELIOS LED processing platform (Public API)
+vendor: Megapixel
+category: display
+
+# HELIOS keeps its state as one JSON property tree with two roots, dev
+# (processor, display, groups, receivers) and sys (system). The REST interface
+# reads it with GET /api/v1/public, optionally narrowed to dotted property
+# paths in the query, and writes any part of it with PATCH /api/v1/public and
+# the part as the body; both answer with the part of the tree they touched. The
+# same tree comes over the JSON-RPC websocket, which also pushes every change.
+# Saved configurations (presets) and the still store have their own endpoints.
+
+source:
+  - title: HELIOS Processor - Public API, v24.07.0.22791 (2024-07-11)
+    author: Megapixel (H2VR HoldCo)
+    url: https://github.com/PepperDash/epi-megapixel-helios/blob/main/docs/mvr-processor-public-api.pdf
+    note: >
+      Manufacturer document. Megapixel offers it on request through a form on
+      its support site (HELIOS User Guide K.18); this copy is distributed in the
+      MIT-licensed PepperDash Essentials plugin repository. Used for: HTTP on
+      80 and HTTPS on 443 (2.1), 400 and 406 answers (2.1.3-2.1.4), GET and
+      PATCH of /api/v1/public with property paths in the query and the reply
+      shape, out-of-range values kept and unknown properties ignored (3.1),
+      preview sources (3.2), saved configurations list and apply by id and by
+      name, 404 for an unknown one (3.3), the still store list, show by id and
+      name, hide, 204 and 404 answers (3.4), the JSON-RPC websocket at
+      /api/v1/public/rpc/websocket with the state, set, update and ping
+      methods (4), basic and digest authentication with realm "M8 Processor"
+      (5), the data model tables for dev.display, dev.display.out.adjust,
+      dev.display.redundancy, dev.groups, dev.ingest, dev.receivers and sys
+      (6), alerts and severities (7), and the blackout, brightness, gamma, test
+      pattern and redundancy flip examples (8). Cited as Public API 24.07.
+  - title: Megapixel-Helios-Json-Public-Payload.json (a processor's GET /api/v1/public reply)
+    author: PepperDash Technology (captured from a HELIOS processor)
+    url: https://github.com/PepperDash/epi-megapixel-helios/blob/main/docs/Megapixel-Helios-Json-Public-Payload.json
+    note: >
+      MIT-licensed repository. A whole-tree reply from a processor on firmware
+      p24.08.25. Used for the property names the tables do not spell out
+      (gains r/g/b, out.adjust gain/gamma/lift/offset r/g/b, redundancy
+      desired, testPattern.mediaEnabled, inputs.<key>.valid/resolution/format/
+      freq/w/h/name, ports and portsIn, temps, genlock, info.version.firmware,
+      blackClipping, latencyLow), the input keys (hdmi1, hdmi2, sdi1-4 and the
+      stitched hdmi1X2, hdmi2X1, sdi1X2 ...), and the ranges the processor
+      itself reports under sys.fixtures.display (brightness 0-100, cct
+      1667-25000, cctDuv -0.03 to 0.03, gamma 1-4, blackClipping 0-0.5, the
+      gamut types and redundancy modes). Cited as payload sample.
+  - title: epi-megapixel-helios README (PepperDash Essentials plugin, MIT)
+    author: PepperDash Technology
+    url: https://github.com/PepperDash/epi-megapixel-helios
+    note: >
+      MIT licence (LICENSE.md). Read, not copied, as corroboration: minimum
+      firmware 24.11.0, HTTPS on 443 with the web application's user name and
+      password, and the redundancy notes (role is the long-term assignment;
+      only main or backup can be requested as state; active, standby and mixed
+      are reported states). Its input-hotplug calls use a private API and are
+      not used here.
+  - title: HELIOS Processing System User Guide, K.18 "HELIOS - API" and the port table
+    author: Megapixel
+    url: https://megapixelvr.com/downloads/HELIOS%20Processing%20System-User%20Guide.pdf
+    note: >
+      Manufacturer document. TCP 80 and 443 carry the web UI and Public API,
+      UDP 5568 sACN control; the API documentation is available on request
+      through the support site's form. Preview blocking answers 403.
+  - title: HELIOS Release Notes v26.07.0
+    author: Megapixel
+    url: https://megapixelvr.com/downloads/HELIOS_Release_Notes_v26.07.0.pdf
+    note: >
+      Manufacturer document. Lists API additions after 24.07 (processor reboot,
+      pixel error detection, dev.switches documented) whose request forms are
+      only in the on-request API document, so they are not included.
+
+transport:
+  type: http
+  port: 80
+  # HTTPS is on 443 (Public API 2.1); with scheme https the host opens the
+  # device on port 443. The processor's certificate is its own.
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  # Basic or digest, when authentication is turned on in the web application
+  # (Public API 5); a digest challenge is answered.
+  auth: basic
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/v1/public, raw_query: "sys.description" }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http }
+  username: { type: string, default: "" }
+  password: { type: string, secret: true, default: "" }
+
+models:
+  - id: helios
+    name: Megapixel HELIOS processor
+    supports: [get_state, get_properties, set_properties, get_alerts,
+               set_blackout, set_freeze, set_brightness, set_cct, set_cct_duv, set_gamma,
+               set_black_clipping, set_display_gains, set_display_window, set_display_size,
+               set_output_adjust_enabled, set_output_adjust_gain, set_output_adjust_gamma,
+               set_output_adjust_lift, set_output_adjust_offset, set_output_adjust_saturation,
+               set_redundancy_mode, set_redundancy_role, redundancy_flip,
+               select_input, set_test_pattern, set_test_pattern_enabled, set_test_pattern_motion,
+               set_group_blackout, set_group_name, set_group_gains, set_group_mask_enabled,
+               set_group_mask, set_group_test_pattern_enabled, set_group_test_pattern_color,
+               set_receiver_group, set_receiver_position, set_processor_name,
+               list_presets, list_presets_full, recall_preset, recall_preset_by_name,
+               list_stills, show_still, show_still_by_name, hide_still, list_preview_sources]
+    verification: none
+    notes: >
+      One processor model; what it can do depends on its input cards (HDMI
+      2.0, HDMI 2.1, 12G-SDI, ST 2110) and the tiles connected.
+
+commands:
+  # ── Reading the property tree (Public API 3.1.1) ─────────────────────────
+  get_state:
+    summary: "The whole property tree, dev and sys (GET /api/v1/public; large on a big wall)"
+    send: { method: GET, path: /api/v1/public }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_properties:
+    summary: "Read the properties at these dotted paths, joined with &, such as dev.display.brightness&dev.display.gamma"
+    params:
+      paths: { type: string, pattern: "^[A-Za-z0-9_.:()&-]{1,512}$", required: true }
+    send: { method: GET, path: /api/v1/public, raw_query: "{paths}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_properties:
+    summary: "PATCH any part of the property tree (Public API 3.1.2): a JSON object such as {\"dev\": {\"display\": {\"brightness\": 42}}}; the reply holds the resulting values"
+    params:
+      tree: { type: json, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: "{tree}", content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_alerts:
+    summary: "System-wide alerts, their count and the most severe level (Public API 7.1)"
+    send: { method: GET, path: /api/v1/public, raw_query: "sys.alerts&sys.alertsCount&sys.alertsSeverity" }
+    expect: { status: 200, json_path: "$.sys" }
+    returns: value
+
+  # ── Display (Public API 6.1.1, 8.2-8.4) ───────────────────────────────────
+  set_blackout:
+    summary: "Black out the display, or bring it back"
+    params:
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"blackout":{enabled}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_freeze:
+    summary: "Freeze the display, or release it"
+    params:
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"freeze":{enabled}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_brightness:
+    summary: "Display brightness, 0 to 100 percent"
+    params:
+      brightness: { type: float, min: 0, max: 100, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"brightness":{brightness:.2f}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cct:
+    summary: "Colour temperature, 1667 to 25000 K"
+    params:
+      kelvin: { type: int, min: 1667, max: 25000, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"cct":{kelvin}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cct_duv:
+    summary: "Colour temperature Duv, -0.03 to 0.03"
+    params:
+      duv: { type: float, min: -0.03, max: 0.03, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"cctDuv":{duv:.4f}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_gamma:
+    summary: "Display gamma, 1 to 4"
+    params:
+      gamma: { type: float, min: 1, max: 4, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"gamma":{gamma:.2f}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_black_clipping:
+    summary: "Black clipping, 0 to 0.5 (named in the processor's own data, not the API tables)"
+    params:
+      level: { type: float, min: 0, max: 0.5, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"blackClipping":{level:.3f}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_display_gains:
+    summary: "Display RGB gains, 1 is unity"
+    params:
+      r: { type: float, min: 0, required: true }
+      g: { type: float, min: 0, required: true }
+      b: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"gains":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_display_window:
+    summary: "Position and size of the output window on the input canvas, in pixels"
+    params:
+      x: { type: int, min: 0, required: true }
+      y: { type: int, min: 0, required: true }
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"x":{x},"y":{y},"width":{width},"height":{height}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_display_size:
+    summary: "Size of the output window, in pixels"
+    params:
+      width: { type: int, min: 1, required: true }
+      height: { type: int, min: 1, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"width":{width},"height":{height}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_adjust_enabled:
+    summary: "Turn output adjustments on or off (dev.display.out.adjust.enabled)"
+    params:
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"enabled":{enabled}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_adjust_gain:
+    summary: "Output adjustment RGB gain"
+    params:
+      r: { type: float, min: 0, required: true }
+      g: { type: float, min: 0, required: true }
+      b: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"gain":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_adjust_gamma:
+    summary: "Output adjustment RGB gamma"
+    params:
+      r: { type: float, min: 0, required: true }
+      g: { type: float, min: 0, required: true }
+      b: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"gamma":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_adjust_lift:
+    summary: "Output adjustment RGB lift, 0 is none"
+    params:
+      r: { type: float, required: true }
+      g: { type: float, required: true }
+      b: { type: float, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"lift":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_adjust_offset:
+    summary: "Output adjustment RGB offset, 0 is none"
+    params:
+      r: { type: float, required: true }
+      g: { type: float, required: true }
+      b: { type: float, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"offset":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f}}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_adjust_saturation:
+    summary: "Output adjustment saturation, 1 is unity"
+    params:
+      saturation: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"out":{"adjust":{"saturation":{saturation:.3f}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Redundancy (Public API 6.1.1.3, 8.6) ──────────────────────────────────
+  set_redundancy_mode:
+    summary: "Redundancy mode: none, failover or seamless (the processor's own list also has manual and single)"
+    params:
+      mode: { type: enum, values: [none, failover, seamless, manual, single], required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"redundancy":{"mode":"{mode}"}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_redundancy_role:
+    summary: "This processor's long-term redundancy role: main, backup or offline"
+    params:
+      role: { type: enum, values: [main, backup, offline], required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"redundancy":{"role":"{role}"}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  redundancy_flip:
+    summary: "Flip the display to the main or the backup processor (redundancy state)"
+    params:
+      to: { type: enum, values: [main, backup], required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"display":{"redundancy":{"state":"{to}"}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Processor (dev.ingest, Public API 6.1.3, 8.5) ─────────────────────────
+  select_input:
+    summary: "Select the input by its key, such as hdmi1, hdmi2, sdi1 to sdi4, or a stitched input such as hdmi2X1"
+    params:
+      input: { type: string, pattern: "^[A-Za-z0-9]{1,32}$", required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"input":{input:json}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_test_pattern:
+    summary: "Show a test pattern of this type, such as colorBars, red or grid (Public API 8.5.1)"
+    params:
+      type: { type: string, pattern: "^[A-Za-z0-9]{1,32}$", required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"testPattern":{"enabled":true,"type":{type:json}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_test_pattern_enabled:
+    summary: "Turn the test pattern on or off (Public API 8.5.2)"
+    params:
+      enabled: { type: bool, default: false }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"testPattern":{"enabled":{enabled}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_test_pattern_motion:
+    summary: "Turn test pattern motion on or off"
+    params:
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"ingest":{"testPattern":{"motion":{enabled}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Groups (dev.groups, Public API 6.1.2) ─────────────────────────────────
+  set_group_blackout:
+    summary: "Black out a group of tiles, or bring it back; groups are indexed from 0"
+    params:
+      group: { type: int, min: 0, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"blackout":{enabled}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_name:
+    summary: "Rename a group"
+    params:
+      group: { type: int, min: 0, required: true }
+      name: { type: string, max_length: 64, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"name":{name:json}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_gains:
+    summary: "A group's RGB and intensity gains"
+    params:
+      group: { type: int, min: 0, required: true }
+      r: { type: float, min: 0, required: true }
+      g: { type: float, min: 0, required: true }
+      b: { type: float, min: 0, required: true }
+      i: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"gains":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f},"i":{i:.3f}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_mask_enabled:
+    summary: "Turn a group's mask on or off"
+    params:
+      group: { type: int, min: 0, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"mask":{"enabled":{enabled}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_mask:
+    summary: "A group's mask edge offsets: left, top, bottom and right"
+    params:
+      group: { type: int, min: 0, required: true }
+      l: { type: float, min: 0, required: true }
+      t: { type: float, min: 0, required: true }
+      b: { type: float, min: 0, required: true }
+      r: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"mask":{"l":{l:.3f},"t":{t:.3f},"b":{b:.3f},"r":{r:.3f}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_test_pattern_enabled:
+    summary: "Turn a group's test pattern on or off"
+    params:
+      group: { type: int, min: 0, required: true }
+      enabled: { type: bool, default: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"testPattern":{"enabled":{enabled}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_test_pattern_color:
+    summary: "A group's test pattern colour, R, G, B and A"
+    params:
+      group: { type: int, min: 0, required: true }
+      r: { type: float, min: 0, required: true }
+      g: { type: float, min: 0, required: true }
+      b: { type: float, min: 0, required: true }
+      a: { type: float, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"groups":{"{group}":{"testPattern":{"r":{r:.3f},"g":{g:.3f},"b":{b:.3f},"a":{a:.3f}}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Receivers (dev.receivers, Public API 6.1.4) ───────────────────────────
+  set_receiver_group:
+    summary: "Put a receiver (tile), by MAC address, in a group; -1 for none"
+    params:
+      mac: { type: string, pattern: "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", required: true }
+      group: { type: int, min: -1, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"receivers":{"{mac}":{"groupId":{group}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_receiver_position:
+    summary: "Move a receiver (tile), by MAC address, on the processor's canvas"
+    params:
+      mac: { type: string, pattern: "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$", required: true }
+      x: { type: int, min: 0, required: true }
+      y: { type: int, min: 0, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"dev":{"receivers":{"{mac}":{"x":{x},"y":{y}}}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── System (sys, Public API 6.2) ──────────────────────────────────────────
+  set_processor_name:
+    summary: "The processor's name, as on its front panel and web application (sys.description)"
+    params:
+      name: { type: string, max_length: 64, required: true }
+    send: { method: PATCH, path: /api/v1/public, body: '{"sys":{"description":{name:json}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Saved configurations (Public API 3.3) ─────────────────────────────────
+  list_presets:
+    summary: "Saved configurations (presets): id, presetName and times, without their settings (HELIOS 23.12.1 and later)"
+    send: { method: GET, path: /api/v1/presets/list }
+    expect: { status: 200, json_path: "$.presets" }
+    returns: value
+
+  list_presets_full:
+    summary: "Saved configurations with their saved settings"
+    send: { method: GET, path: /api/v1/presets }
+    expect: { status: 200, json_path: "$.presets" }
+    returns: value
+
+  recall_preset:
+    summary: "Apply a saved configuration by id; answers with the applied state"
+    params:
+      id: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/api/v1/presets/{id}/apply" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_preset_by_name:
+    summary: "Apply the first saved configuration with this name"
+    params:
+      name: { type: string, max_length: 128, required: true }
+    send: { method: POST, path: /api/v1/presets/apply, body: '{"presetName":{name:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Still store (Public API 3.4) ──────────────────────────────────────────
+  list_stills:
+    summary: "Stills in the still store: id, name, internal file name and times"
+    send: { method: GET, path: /api/v1/media }
+    expect: { status: 200, json_path: "$.media" }
+    returns: value
+
+  show_still:
+    summary: "Show the still with this id on the display"
+    params:
+      id: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/api/v1/media/{id}/show" }
+    expect: { status: 204 }
+    returns: ack
+
+  show_still_by_name:
+    summary: "Show the first still with this name"
+    params:
+      name: { type: string, max_length: 255, required: true }
+    send: { method: POST, path: /api/v1/media/show, body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  hide_still:
+    summary: "Stop showing a still"
+    send: { method: POST, path: /api/v1/media/hide }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Preview (Public API 3.2) ──────────────────────────────────────────────
+  list_preview_sources:
+    summary: "The preview sources, such as preview, hdmi and sdi1; a JPEG of each is at /api/v1/preview/<source>"
+    send: { method: GET, path: /api/v1/preview }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+telemetry:
+  # HELIOS pushes every property change on its JSON-RPC websocket without a
+  # subscription (Public API section 4.4), as {"method":"update","params":
+  # {<changed part of the tree>}}. On opening it, the core asks for the whole
+  # tree with the state method; the result has the same shape under
+  # $.result. HTTP replies to the commands (GET and PATCH of /api/v1/public)
+  # carry the tree too. Nothing is polled. Receivers and switches are keyed by
+  # MAC address, which a JSON path cannot name in advance, so only their
+  # counts and alerts are kept; groups 0-7, inputs hdmi1-2 and sdi1-4, output
+  # ports 1-8 and input ports 1-4 are read by their keys.
+  websocket:
+    path: /api/v1/public/rpc/websocket
+    send:
+      - '{"jsonrpc":"2.0","id":1,"method":"state"}'
+  updates:
+    # HTTP replies (GET and PATCH)
+    - path: "^/api/v1/public(\\?.*)?$"
+      json:
+        v0: "$.dev.display.blackout"
+        v1: "$.dev.display.freeze"
+        v2: "$.dev.display.brightness"
+        v3: "$.dev.display.cct"
+        v4: "$.dev.display.cctDuv"
+        v5: "$.dev.display.gamma"
+        v6: "$.dev.display.blackClipping"
+        v7: "$.dev.display.gains.r"
+        v8: "$.dev.display.gains.g"
+        v9: "$.dev.display.gains.b"
+        v10: "$.dev.display.width"
+        v11: "$.dev.display.height"
+        v12: "$.dev.display.x"
+        v13: "$.dev.display.y"
+        v14: "$.dev.display.tilesCount"
+        v15: "$.dev.display.tilesInfo"
+        v16: "$.dev.display.latencyLow"
+        v17: "$.dev.display.gamut.type"
+        v18: "$.dev.display.gamut.input"
+        v19: "$.dev.display.out.adjust.enabled"
+        v20: "$.dev.display.out.adjust.gain.r"
+        v21: "$.dev.display.out.adjust.gain.g"
+        v22: "$.dev.display.out.adjust.gain.b"
+        v23: "$.dev.display.out.adjust.gamma.r"
+        v24: "$.dev.display.out.adjust.gamma.g"
+        v25: "$.dev.display.out.adjust.gamma.b"
+        v26: "$.dev.display.out.adjust.lift.r"
+        v27: "$.dev.display.out.adjust.lift.g"
+        v28: "$.dev.display.out.adjust.lift.b"
+        v29: "$.dev.display.out.adjust.offset.r"
+        v30: "$.dev.display.out.adjust.offset.g"
+        v31: "$.dev.display.out.adjust.offset.b"
+        v32: "$.dev.display.out.adjust.saturation"
+        v33: "$.dev.display.redundancy.info"
+        v34: "$.dev.display.redundancy.mode"
+        v35: "$.dev.display.redundancy.role"
+        v36: "$.dev.display.redundancy.state"
+        v37: "$.dev.display.redundancy.desired"
+        v38: "$.dev.ingest.input"
+        v39: "$.dev.ingest.testPattern.enabled"
+        v40: "$.dev.ingest.testPattern.type"
+        v41: "$.dev.ingest.testPattern.motion"
+        v42: "$.dev.ingest.testPattern.mediaEnabled"
+        v43: "$.dev.ingest.alertsCount"
+        v44: "$.dev.ingest.alertsSeverity"
+        v45: "$.dev.ingest.outputFreq"
+        v46: "$.dev.ingest.genlock.enabled"
+        v47: "$.dev.ingest.genlock.source"
+        v48: "$.dev.ingest.genlock.matched"
+        v49: "$.dev.ingest.info.serial"
+        v50: "$.dev.ingest.info.version.firmware"
+        v51: "$.dev.ingest.macAddress"
+        v52: "$.dev.ingest.temps.CPUTemp"
+        v53: "$.dev.ingest.temps.CaseTemp"
+        v54: "$.dev.ingest.inputs.hdmi1.name"
+        v55: "$.dev.ingest.inputs.hdmi1.valid"
+        v56: "$.dev.ingest.inputs.hdmi1.resolution"
+        v57: "$.dev.ingest.inputs.hdmi1.format"
+        v58: "$.dev.ingest.inputs.hdmi1.freq"
+        v59: "$.dev.ingest.inputs.hdmi1.w"
+        v60: "$.dev.ingest.inputs.hdmi1.h"
+        v61: "$.dev.ingest.inputs.hdmi2.name"
+        v62: "$.dev.ingest.inputs.hdmi2.valid"
+        v63: "$.dev.ingest.inputs.hdmi2.resolution"
+        v64: "$.dev.ingest.inputs.hdmi2.format"
+        v65: "$.dev.ingest.inputs.hdmi2.freq"
+        v66: "$.dev.ingest.inputs.hdmi2.w"
+        v67: "$.dev.ingest.inputs.hdmi2.h"
+        v68: "$.dev.ingest.inputs.sdi1.name"
+        v69: "$.dev.ingest.inputs.sdi1.valid"
+      state:
+        display.blackout: "{v0}"
+        display.freeze: "{v1}"
+        display.brightness: "{v2}"
+        display.cct: "{v3}"
+        display.cct_duv: "{v4}"
+        display.gamma: "{v5}"
+        display.black_clipping: "{v6}"
+        display.gains.r: "{v7}"
+        display.gains.g: "{v8}"
+        display.gains.b: "{v9}"
+        display.width: "{v10}"
+        display.height: "{v11}"
+        display.x: "{v12}"
+        display.y: "{v13}"
+        display.tiles_count: "{v14}"
+        display.tiles_info: "{v15}"
+        display.latency_low: "{v16}"
+        display.gamut.type: "{v17}"
+        display.gamut.input: "{v18}"
+        display.out.adjust.enabled: "{v19}"
+        display.out.adjust.gain.r: "{v20}"
+        display.out.adjust.gain.g: "{v21}"
+        display.out.adjust.gain.b: "{v22}"
+        display.out.adjust.gamma.r: "{v23}"
+        display.out.adjust.gamma.g: "{v24}"
+        display.out.adjust.gamma.b: "{v25}"
+        display.out.adjust.lift.r: "{v26}"
+        display.out.adjust.lift.g: "{v27}"
+        display.out.adjust.lift.b: "{v28}"
+        display.out.adjust.offset.r: "{v29}"
+        display.out.adjust.offset.g: "{v30}"
+        display.out.adjust.offset.b: "{v31}"
+        display.out.adjust.saturation: "{v32}"
+        display.redundancy.info: "{v33}"
+        display.redundancy.mode: "{v34}"
+        display.redundancy.role: "{v35}"
+        display.redundancy.state: "{v36}"
+        display.redundancy.desired: "{v37}"
+        ingest.input: "{v38}"
+        ingest.test_pattern.enabled: "{v39}"
+        ingest.test_pattern.type: "{v40}"
+        ingest.test_pattern.motion: "{v41}"
+        ingest.test_pattern.media_enabled: "{v42}"
+        ingest.alerts_count: "{v43}"
+        ingest.alerts_severity: "{v44}"
+        ingest.output_freq: "{v45}"
+        ingest.genlock.enabled: "{v46}"
+        ingest.genlock.source: "{v47}"
+        ingest.genlock.matched: "{v48}"
+        ingest.info.serial: "{v49}"
+        ingest.info.firmware: "{v50}"
+        ingest.mac_address: "{v51}"
+        ingest.temps.cpu: "{v52}"
+        ingest.temps.case: "{v53}"
+        ingest.inputs.hdmi1.name: "{v54}"
+        ingest.inputs.hdmi1.valid: "{v55}"
+        ingest.inputs.hdmi1.resolution: "{v56}"
+        ingest.inputs.hdmi1.format: "{v57}"
+        ingest.inputs.hdmi1.freq: "{v58}"
+        ingest.inputs.hdmi1.width: "{v59}"
+        ingest.inputs.hdmi1.height: "{v60}"
+        ingest.inputs.hdmi2.name: "{v61}"
+        ingest.inputs.hdmi2.valid: "{v62}"
+        ingest.inputs.hdmi2.resolution: "{v63}"
+        ingest.inputs.hdmi2.format: "{v64}"
+        ingest.inputs.hdmi2.freq: "{v65}"
+        ingest.inputs.hdmi2.width: "{v66}"
+        ingest.inputs.hdmi2.height: "{v67}"
+        ingest.inputs.sdi1.name: "{v68}"
+        ingest.inputs.sdi1.valid: "{v69}"
+    # HTTP replies (GET and PATCH)
+    - path: "^/api/v1/public(\\?.*)?$"
+      json:
+        v0: "$.dev.ingest.inputs.sdi1.resolution"
+        v1: "$.dev.ingest.inputs.sdi1.format"
+        v2: "$.dev.ingest.inputs.sdi1.freq"
+        v3: "$.dev.ingest.inputs.sdi1.w"
+        v4: "$.dev.ingest.inputs.sdi1.h"
+        v5: "$.dev.ingest.inputs.sdi2.name"
+        v6: "$.dev.ingest.inputs.sdi2.valid"
+        v7: "$.dev.ingest.inputs.sdi2.resolution"
+        v8: "$.dev.ingest.inputs.sdi2.format"
+        v9: "$.dev.ingest.inputs.sdi2.freq"
+        v10: "$.dev.ingest.inputs.sdi2.w"
+        v11: "$.dev.ingest.inputs.sdi2.h"
+        v12: "$.dev.ingest.inputs.sdi3.name"
+        v13: "$.dev.ingest.inputs.sdi3.valid"
+        v14: "$.dev.ingest.inputs.sdi3.resolution"
+        v15: "$.dev.ingest.inputs.sdi3.format"
+        v16: "$.dev.ingest.inputs.sdi3.freq"
+        v17: "$.dev.ingest.inputs.sdi3.w"
+        v18: "$.dev.ingest.inputs.sdi3.h"
+        v19: "$.dev.ingest.inputs.sdi4.name"
+        v20: "$.dev.ingest.inputs.sdi4.valid"
+        v21: "$.dev.ingest.inputs.sdi4.resolution"
+        v22: "$.dev.ingest.inputs.sdi4.format"
+        v23: "$.dev.ingest.inputs.sdi4.freq"
+        v24: "$.dev.ingest.inputs.sdi4.w"
+        v25: "$.dev.ingest.inputs.sdi4.h"
+        v26: "$.dev.ingest.ports.1.info"
+        v27: "$.dev.ingest.ports.1.speedMbps"
+        v28: "$.dev.ingest.ports.1.tilesCount"
+        v29: "$.dev.ingest.ports.1.alertsCount"
+        v30: "$.dev.ingest.ports.2.info"
+        v31: "$.dev.ingest.ports.2.speedMbps"
+        v32: "$.dev.ingest.ports.2.tilesCount"
+        v33: "$.dev.ingest.ports.2.alertsCount"
+        v34: "$.dev.ingest.ports.3.info"
+        v35: "$.dev.ingest.ports.3.speedMbps"
+        v36: "$.dev.ingest.ports.3.tilesCount"
+        v37: "$.dev.ingest.ports.3.alertsCount"
+        v38: "$.dev.ingest.ports.4.info"
+        v39: "$.dev.ingest.ports.4.speedMbps"
+        v40: "$.dev.ingest.ports.4.tilesCount"
+        v41: "$.dev.ingest.ports.4.alertsCount"
+        v42: "$.dev.ingest.ports.5.info"
+        v43: "$.dev.ingest.ports.5.speedMbps"
+        v44: "$.dev.ingest.ports.5.tilesCount"
+        v45: "$.dev.ingest.ports.5.alertsCount"
+        v46: "$.dev.ingest.ports.6.info"
+        v47: "$.dev.ingest.ports.6.speedMbps"
+        v48: "$.dev.ingest.ports.6.tilesCount"
+        v49: "$.dev.ingest.ports.6.alertsCount"
+        v50: "$.dev.ingest.ports.7.info"
+        v51: "$.dev.ingest.ports.7.speedMbps"
+        v52: "$.dev.ingest.ports.7.tilesCount"
+        v53: "$.dev.ingest.ports.7.alertsCount"
+        v54: "$.dev.ingest.ports.8.info"
+        v55: "$.dev.ingest.ports.8.speedMbps"
+        v56: "$.dev.ingest.ports.8.tilesCount"
+        v57: "$.dev.ingest.ports.8.alertsCount"
+        v58: "$.dev.ingest.portsIn.1.info"
+        v59: "$.dev.ingest.portsIn.1.valid"
+        v60: "$.dev.ingest.portsIn.2.info"
+        v61: "$.dev.ingest.portsIn.2.valid"
+        v62: "$.dev.ingest.portsIn.3.info"
+        v63: "$.dev.ingest.portsIn.3.valid"
+        v64: "$.dev.ingest.portsIn.4.info"
+        v65: "$.dev.ingest.portsIn.4.valid"
+        v66: "$.dev.groups.0.name"
+        v67: "$.dev.groups.0.blackout"
+        v68: "$.dev.groups.0.gains.r"
+        v69: "$.dev.groups.0.gains.g"
+      state:
+        ingest.inputs.sdi1.resolution: "{v0}"
+        ingest.inputs.sdi1.format: "{v1}"
+        ingest.inputs.sdi1.freq: "{v2}"
+        ingest.inputs.sdi1.width: "{v3}"
+        ingest.inputs.sdi1.height: "{v4}"
+        ingest.inputs.sdi2.name: "{v5}"
+        ingest.inputs.sdi2.valid: "{v6}"
+        ingest.inputs.sdi2.resolution: "{v7}"
+        ingest.inputs.sdi2.format: "{v8}"
+        ingest.inputs.sdi2.freq: "{v9}"
+        ingest.inputs.sdi2.width: "{v10}"
+        ingest.inputs.sdi2.height: "{v11}"
+        ingest.inputs.sdi3.name: "{v12}"
+        ingest.inputs.sdi3.valid: "{v13}"
+        ingest.inputs.sdi3.resolution: "{v14}"
+        ingest.inputs.sdi3.format: "{v15}"
+        ingest.inputs.sdi3.freq: "{v16}"
+        ingest.inputs.sdi3.width: "{v17}"
+        ingest.inputs.sdi3.height: "{v18}"
+        ingest.inputs.sdi4.name: "{v19}"
+        ingest.inputs.sdi4.valid: "{v20}"
+        ingest.inputs.sdi4.resolution: "{v21}"
+        ingest.inputs.sdi4.format: "{v22}"
+        ingest.inputs.sdi4.freq: "{v23}"
+        ingest.inputs.sdi4.width: "{v24}"
+        ingest.inputs.sdi4.height: "{v25}"
+        ingest.ports.1.info: "{v26}"
+        ingest.ports.1.speed: "{v27}"
+        ingest.ports.1.tiles_count: "{v28}"
+        ingest.ports.1.alerts_count: "{v29}"
+        ingest.ports.2.info: "{v30}"
+        ingest.ports.2.speed: "{v31}"
+        ingest.ports.2.tiles_count: "{v32}"
+        ingest.ports.2.alerts_count: "{v33}"
+        ingest.ports.3.info: "{v34}"
+        ingest.ports.3.speed: "{v35}"
+        ingest.ports.3.tiles_count: "{v36}"
+        ingest.ports.3.alerts_count: "{v37}"
+        ingest.ports.4.info: "{v38}"
+        ingest.ports.4.speed: "{v39}"
+        ingest.ports.4.tiles_count: "{v40}"
+        ingest.ports.4.alerts_count: "{v41}"
+        ingest.ports.5.info: "{v42}"
+        ingest.ports.5.speed: "{v43}"
+        ingest.ports.5.tiles_count: "{v44}"
+        ingest.ports.5.alerts_count: "{v45}"
+        ingest.ports.6.info: "{v46}"
+        ingest.ports.6.speed: "{v47}"
+        ingest.ports.6.tiles_count: "{v48}"
+        ingest.ports.6.alerts_count: "{v49}"
+        ingest.ports.7.info: "{v50}"
+        ingest.ports.7.speed: "{v51}"
+        ingest.ports.7.tiles_count: "{v52}"
+        ingest.ports.7.alerts_count: "{v53}"
+        ingest.ports.8.info: "{v54}"
+        ingest.ports.8.speed: "{v55}"
+        ingest.ports.8.tiles_count: "{v56}"
+        ingest.ports.8.alerts_count: "{v57}"
+        ingest.ports_in.1.info: "{v58}"
+        ingest.ports_in.1.valid: "{v59}"
+        ingest.ports_in.2.info: "{v60}"
+        ingest.ports_in.2.valid: "{v61}"
+        ingest.ports_in.3.info: "{v62}"
+        ingest.ports_in.3.valid: "{v63}"
+        ingest.ports_in.4.info: "{v64}"
+        ingest.ports_in.4.valid: "{v65}"
+        groups.0.name: "{v66}"
+        groups.0.blackout: "{v67}"
+        groups.0.gains.r: "{v68}"
+        groups.0.gains.g: "{v69}"
+    # HTTP replies (GET and PATCH)
+    - path: "^/api/v1/public(\\?.*)?$"
+      json:
+        v0: "$.dev.groups.0.gains.b"
+        v1: "$.dev.groups.0.gains.i"
+        v2: "$.dev.groups.0.mask.enabled"
+        v3: "$.dev.groups.0.mask.l"
+        v4: "$.dev.groups.0.mask.t"
+        v5: "$.dev.groups.0.mask.b"
+        v6: "$.dev.groups.0.mask.r"
+        v7: "$.dev.groups.0.testPattern.enabled"
+        v8: "$.dev.groups.0.testPattern.r"
+        v9: "$.dev.groups.0.testPattern.g"
+        v10: "$.dev.groups.0.testPattern.b"
+        v11: "$.dev.groups.0.testPattern.a"
+        v12: "$.dev.groups.1.name"
+        v13: "$.dev.groups.1.blackout"
+        v14: "$.dev.groups.1.gains.r"
+        v15: "$.dev.groups.1.gains.g"
+        v16: "$.dev.groups.1.gains.b"
+        v17: "$.dev.groups.1.gains.i"
+        v18: "$.dev.groups.1.mask.enabled"
+        v19: "$.dev.groups.1.mask.l"
+        v20: "$.dev.groups.1.mask.t"
+        v21: "$.dev.groups.1.mask.b"
+        v22: "$.dev.groups.1.mask.r"
+        v23: "$.dev.groups.1.testPattern.enabled"
+        v24: "$.dev.groups.1.testPattern.r"
+        v25: "$.dev.groups.1.testPattern.g"
+        v26: "$.dev.groups.1.testPattern.b"
+        v27: "$.dev.groups.1.testPattern.a"
+        v28: "$.dev.groups.2.name"
+        v29: "$.dev.groups.2.blackout"
+        v30: "$.dev.groups.2.gains.r"
+        v31: "$.dev.groups.2.gains.g"
+        v32: "$.dev.groups.2.gains.b"
+        v33: "$.dev.groups.2.gains.i"
+        v34: "$.dev.groups.2.mask.enabled"
+        v35: "$.dev.groups.2.mask.l"
+        v36: "$.dev.groups.2.mask.t"
+        v37: "$.dev.groups.2.mask.b"
+        v38: "$.dev.groups.2.mask.r"
+        v39: "$.dev.groups.2.testPattern.enabled"
+        v40: "$.dev.groups.2.testPattern.r"
+        v41: "$.dev.groups.2.testPattern.g"
+        v42: "$.dev.groups.2.testPattern.b"
+        v43: "$.dev.groups.2.testPattern.a"
+        v44: "$.dev.groups.3.name"
+        v45: "$.dev.groups.3.blackout"
+        v46: "$.dev.groups.3.gains.r"
+        v47: "$.dev.groups.3.gains.g"
+        v48: "$.dev.groups.3.gains.b"
+        v49: "$.dev.groups.3.gains.i"
+        v50: "$.dev.groups.3.mask.enabled"
+        v51: "$.dev.groups.3.mask.l"
+        v52: "$.dev.groups.3.mask.t"
+        v53: "$.dev.groups.3.mask.b"
+        v54: "$.dev.groups.3.mask.r"
+        v55: "$.dev.groups.3.testPattern.enabled"
+        v56: "$.dev.groups.3.testPattern.r"
+        v57: "$.dev.groups.3.testPattern.g"
+        v58: "$.dev.groups.3.testPattern.b"
+        v59: "$.dev.groups.3.testPattern.a"
+        v60: "$.dev.groups.4.name"
+        v61: "$.dev.groups.4.blackout"
+        v62: "$.dev.groups.4.gains.r"
+        v63: "$.dev.groups.4.gains.g"
+        v64: "$.dev.groups.4.gains.b"
+        v65: "$.dev.groups.4.gains.i"
+        v66: "$.dev.groups.4.mask.enabled"
+        v67: "$.dev.groups.4.mask.l"
+        v68: "$.dev.groups.4.mask.t"
+        v69: "$.dev.groups.4.mask.b"
+      state:
+        groups.0.gains.b: "{v0}"
+        groups.0.gains.i: "{v1}"
+        groups.0.mask.enabled: "{v2}"
+        groups.0.mask.l: "{v3}"
+        groups.0.mask.t: "{v4}"
+        groups.0.mask.b: "{v5}"
+        groups.0.mask.r: "{v6}"
+        groups.0.test_pattern.enabled: "{v7}"
+        groups.0.test_pattern.r: "{v8}"
+        groups.0.test_pattern.g: "{v9}"
+        groups.0.test_pattern.b: "{v10}"
+        groups.0.test_pattern.a: "{v11}"
+        groups.1.name: "{v12}"
+        groups.1.blackout: "{v13}"
+        groups.1.gains.r: "{v14}"
+        groups.1.gains.g: "{v15}"
+        groups.1.gains.b: "{v16}"
+        groups.1.gains.i: "{v17}"
+        groups.1.mask.enabled: "{v18}"
+        groups.1.mask.l: "{v19}"
+        groups.1.mask.t: "{v20}"
+        groups.1.mask.b: "{v21}"
+        groups.1.mask.r: "{v22}"
+        groups.1.test_pattern.enabled: "{v23}"
+        groups.1.test_pattern.r: "{v24}"
+        groups.1.test_pattern.g: "{v25}"
+        groups.1.test_pattern.b: "{v26}"
+        groups.1.test_pattern.a: "{v27}"
+        groups.2.name: "{v28}"
+        groups.2.blackout: "{v29}"
+        groups.2.gains.r: "{v30}"
+        groups.2.gains.g: "{v31}"
+        groups.2.gains.b: "{v32}"
+        groups.2.gains.i: "{v33}"
+        groups.2.mask.enabled: "{v34}"
+        groups.2.mask.l: "{v35}"
+        groups.2.mask.t: "{v36}"
+        groups.2.mask.b: "{v37}"
+        groups.2.mask.r: "{v38}"
+        groups.2.test_pattern.enabled: "{v39}"
+        groups.2.test_pattern.r: "{v40}"
+        groups.2.test_pattern.g: "{v41}"
+        groups.2.test_pattern.b: "{v42}"
+        groups.2.test_pattern.a: "{v43}"
+        groups.3.name: "{v44}"
+        groups.3.blackout: "{v45}"
+        groups.3.gains.r: "{v46}"
+        groups.3.gains.g: "{v47}"
+        groups.3.gains.b: "{v48}"
+        groups.3.gains.i: "{v49}"
+        groups.3.mask.enabled: "{v50}"
+        groups.3.mask.l: "{v51}"
+        groups.3.mask.t: "{v52}"
+        groups.3.mask.b: "{v53}"
+        groups.3.mask.r: "{v54}"
+        groups.3.test_pattern.enabled: "{v55}"
+        groups.3.test_pattern.r: "{v56}"
+        groups.3.test_pattern.g: "{v57}"
+        groups.3.test_pattern.b: "{v58}"
+        groups.3.test_pattern.a: "{v59}"
+        groups.4.name: "{v60}"
+        groups.4.blackout: "{v61}"
+        groups.4.gains.r: "{v62}"
+        groups.4.gains.g: "{v63}"
+        groups.4.gains.b: "{v64}"
+        groups.4.gains.i: "{v65}"
+        groups.4.mask.enabled: "{v66}"
+        groups.4.mask.l: "{v67}"
+        groups.4.mask.t: "{v68}"
+        groups.4.mask.b: "{v69}"
+    # HTTP replies (GET and PATCH)
+    - path: "^/api/v1/public(\\?.*)?$"
+      json:
+        v0: "$.dev.groups.4.mask.r"
+        v1: "$.dev.groups.4.testPattern.enabled"
+        v2: "$.dev.groups.4.testPattern.r"
+        v3: "$.dev.groups.4.testPattern.g"
+        v4: "$.dev.groups.4.testPattern.b"
+        v5: "$.dev.groups.4.testPattern.a"
+        v6: "$.dev.groups.5.name"
+        v7: "$.dev.groups.5.blackout"
+        v8: "$.dev.groups.5.gains.r"
+        v9: "$.dev.groups.5.gains.g"
+        v10: "$.dev.groups.5.gains.b"
+        v11: "$.dev.groups.5.gains.i"
+        v12: "$.dev.groups.5.mask.enabled"
+        v13: "$.dev.groups.5.mask.l"
+        v14: "$.dev.groups.5.mask.t"
+        v15: "$.dev.groups.5.mask.b"
+        v16: "$.dev.groups.5.mask.r"
+        v17: "$.dev.groups.5.testPattern.enabled"
+        v18: "$.dev.groups.5.testPattern.r"
+        v19: "$.dev.groups.5.testPattern.g"
+        v20: "$.dev.groups.5.testPattern.b"
+        v21: "$.dev.groups.5.testPattern.a"
+        v22: "$.dev.groups.6.name"
+        v23: "$.dev.groups.6.blackout"
+        v24: "$.dev.groups.6.gains.r"
+        v25: "$.dev.groups.6.gains.g"
+        v26: "$.dev.groups.6.gains.b"
+        v27: "$.dev.groups.6.gains.i"
+        v28: "$.dev.groups.6.mask.enabled"
+        v29: "$.dev.groups.6.mask.l"
+        v30: "$.dev.groups.6.mask.t"
+        v31: "$.dev.groups.6.mask.b"
+        v32: "$.dev.groups.6.mask.r"
+        v33: "$.dev.groups.6.testPattern.enabled"
+        v34: "$.dev.groups.6.testPattern.r"
+        v35: "$.dev.groups.6.testPattern.g"
+        v36: "$.dev.groups.6.testPattern.b"
+        v37: "$.dev.groups.6.testPattern.a"
+        v38: "$.dev.groups.7.name"
+        v39: "$.dev.groups.7.blackout"
+        v40: "$.dev.groups.7.gains.r"
+        v41: "$.dev.groups.7.gains.g"
+        v42: "$.dev.groups.7.gains.b"
+        v43: "$.dev.groups.7.gains.i"
+        v44: "$.dev.groups.7.mask.enabled"
+        v45: "$.dev.groups.7.mask.l"
+        v46: "$.dev.groups.7.mask.t"
+        v47: "$.dev.groups.7.mask.b"
+        v48: "$.dev.groups.7.mask.r"
+        v49: "$.dev.groups.7.testPattern.enabled"
+        v50: "$.dev.groups.7.testPattern.r"
+        v51: "$.dev.groups.7.testPattern.g"
+        v52: "$.dev.groups.7.testPattern.b"
+        v53: "$.dev.groups.7.testPattern.a"
+        v54: "$.sys.description"
+        v55: "$.sys.alertsCount"
+        v56: "$.sys.alertsSeverity"
+        v57: "$.sys.ipAddress"
+      state:
+        groups.4.mask.r: "{v0}"
+        groups.4.test_pattern.enabled: "{v1}"
+        groups.4.test_pattern.r: "{v2}"
+        groups.4.test_pattern.g: "{v3}"
+        groups.4.test_pattern.b: "{v4}"
+        groups.4.test_pattern.a: "{v5}"
+        groups.5.name: "{v6}"
+        groups.5.blackout: "{v7}"
+        groups.5.gains.r: "{v8}"
+        groups.5.gains.g: "{v9}"
+        groups.5.gains.b: "{v10}"
+        groups.5.gains.i: "{v11}"
+        groups.5.mask.enabled: "{v12}"
+        groups.5.mask.l: "{v13}"
+        groups.5.mask.t: "{v14}"
+        groups.5.mask.b: "{v15}"
+        groups.5.mask.r: "{v16}"
+        groups.5.test_pattern.enabled: "{v17}"
+        groups.5.test_pattern.r: "{v18}"
+        groups.5.test_pattern.g: "{v19}"
+        groups.5.test_pattern.b: "{v20}"
+        groups.5.test_pattern.a: "{v21}"
+        groups.6.name: "{v22}"
+        groups.6.blackout: "{v23}"
+        groups.6.gains.r: "{v24}"
+        groups.6.gains.g: "{v25}"
+        groups.6.gains.b: "{v26}"
+        groups.6.gains.i: "{v27}"
+        groups.6.mask.enabled: "{v28}"
+        groups.6.mask.l: "{v29}"
+        groups.6.mask.t: "{v30}"
+        groups.6.mask.b: "{v31}"
+        groups.6.mask.r: "{v32}"
+        groups.6.test_pattern.enabled: "{v33}"
+        groups.6.test_pattern.r: "{v34}"
+        groups.6.test_pattern.g: "{v35}"
+        groups.6.test_pattern.b: "{v36}"
+        groups.6.test_pattern.a: "{v37}"
+        groups.7.name: "{v38}"
+        groups.7.blackout: "{v39}"
+        groups.7.gains.r: "{v40}"
+        groups.7.gains.g: "{v41}"
+        groups.7.gains.b: "{v42}"
+        groups.7.gains.i: "{v43}"
+        groups.7.mask.enabled: "{v44}"
+        groups.7.mask.l: "{v45}"
+        groups.7.mask.t: "{v46}"
+        groups.7.mask.b: "{v47}"
+        groups.7.mask.r: "{v48}"
+        groups.7.test_pattern.enabled: "{v49}"
+        groups.7.test_pattern.r: "{v50}"
+        groups.7.test_pattern.g: "{v51}"
+        groups.7.test_pattern.b: "{v52}"
+        groups.7.test_pattern.a: "{v53}"
+        sys.description: "{v54}"
+        sys.alerts_count: "{v55}"
+        sys.alerts_severity: "{v56}"
+        sys.ip_address: "{v57}"
+    # websocket state result
+    - json_match: { "$.id": "^1$", "$.result": "^\\{" }
+      json:
+        v0: "$.result.dev.display.blackout"
+        v1: "$.result.dev.display.freeze"
+        v2: "$.result.dev.display.brightness"
+        v3: "$.result.dev.display.cct"
+        v4: "$.result.dev.display.cctDuv"
+        v5: "$.result.dev.display.gamma"
+        v6: "$.result.dev.display.blackClipping"
+        v7: "$.result.dev.display.gains.r"
+        v8: "$.result.dev.display.gains.g"
+        v9: "$.result.dev.display.gains.b"
+        v10: "$.result.dev.display.width"
+        v11: "$.result.dev.display.height"
+        v12: "$.result.dev.display.x"
+        v13: "$.result.dev.display.y"
+        v14: "$.result.dev.display.tilesCount"
+        v15: "$.result.dev.display.tilesInfo"
+        v16: "$.result.dev.display.latencyLow"
+        v17: "$.result.dev.display.gamut.type"
+        v18: "$.result.dev.display.gamut.input"
+        v19: "$.result.dev.display.out.adjust.enabled"
+        v20: "$.result.dev.display.out.adjust.gain.r"
+        v21: "$.result.dev.display.out.adjust.gain.g"
+        v22: "$.result.dev.display.out.adjust.gain.b"
+        v23: "$.result.dev.display.out.adjust.gamma.r"
+        v24: "$.result.dev.display.out.adjust.gamma.g"
+        v25: "$.result.dev.display.out.adjust.gamma.b"
+        v26: "$.result.dev.display.out.adjust.lift.r"
+        v27: "$.result.dev.display.out.adjust.lift.g"
+        v28: "$.result.dev.display.out.adjust.lift.b"
+        v29: "$.result.dev.display.out.adjust.offset.r"
+        v30: "$.result.dev.display.out.adjust.offset.g"
+        v31: "$.result.dev.display.out.adjust.offset.b"
+        v32: "$.result.dev.display.out.adjust.saturation"
+        v33: "$.result.dev.display.redundancy.info"
+        v34: "$.result.dev.display.redundancy.mode"
+        v35: "$.result.dev.display.redundancy.role"
+        v36: "$.result.dev.display.redundancy.state"
+        v37: "$.result.dev.display.redundancy.desired"
+        v38: "$.result.dev.ingest.input"
+        v39: "$.result.dev.ingest.testPattern.enabled"
+        v40: "$.result.dev.ingest.testPattern.type"
+        v41: "$.result.dev.ingest.testPattern.motion"
+        v42: "$.result.dev.ingest.testPattern.mediaEnabled"
+        v43: "$.result.dev.ingest.alertsCount"
+        v44: "$.result.dev.ingest.alertsSeverity"
+        v45: "$.result.dev.ingest.outputFreq"
+        v46: "$.result.dev.ingest.genlock.enabled"
+        v47: "$.result.dev.ingest.genlock.source"
+        v48: "$.result.dev.ingest.genlock.matched"
+        v49: "$.result.dev.ingest.info.serial"
+        v50: "$.result.dev.ingest.info.version.firmware"
+        v51: "$.result.dev.ingest.macAddress"
+        v52: "$.result.dev.ingest.temps.CPUTemp"
+        v53: "$.result.dev.ingest.temps.CaseTemp"
+        v54: "$.result.dev.ingest.inputs.hdmi1.name"
+        v55: "$.result.dev.ingest.inputs.hdmi1.valid"
+        v56: "$.result.dev.ingest.inputs.hdmi1.resolution"
+        v57: "$.result.dev.ingest.inputs.hdmi1.format"
+        v58: "$.result.dev.ingest.inputs.hdmi1.freq"
+        v59: "$.result.dev.ingest.inputs.hdmi1.w"
+        v60: "$.result.dev.ingest.inputs.hdmi1.h"
+        v61: "$.result.dev.ingest.inputs.hdmi2.name"
+        v62: "$.result.dev.ingest.inputs.hdmi2.valid"
+        v63: "$.result.dev.ingest.inputs.hdmi2.resolution"
+        v64: "$.result.dev.ingest.inputs.hdmi2.format"
+        v65: "$.result.dev.ingest.inputs.hdmi2.freq"
+        v66: "$.result.dev.ingest.inputs.hdmi2.w"
+        v67: "$.result.dev.ingest.inputs.hdmi2.h"
+        v68: "$.result.dev.ingest.inputs.sdi1.name"
+        v69: "$.result.dev.ingest.inputs.sdi1.valid"
+      state:
+        display.blackout: "{v0}"
+        display.freeze: "{v1}"
+        display.brightness: "{v2}"
+        display.cct: "{v3}"
+        display.cct_duv: "{v4}"
+        display.gamma: "{v5}"
+        display.black_clipping: "{v6}"
+        display.gains.r: "{v7}"
+        display.gains.g: "{v8}"
+        display.gains.b: "{v9}"
+        display.width: "{v10}"
+        display.height: "{v11}"
+        display.x: "{v12}"
+        display.y: "{v13}"
+        display.tiles_count: "{v14}"
+        display.tiles_info: "{v15}"
+        display.latency_low: "{v16}"
+        display.gamut.type: "{v17}"
+        display.gamut.input: "{v18}"
+        display.out.adjust.enabled: "{v19}"
+        display.out.adjust.gain.r: "{v20}"
+        display.out.adjust.gain.g: "{v21}"
+        display.out.adjust.gain.b: "{v22}"
+        display.out.adjust.gamma.r: "{v23}"
+        display.out.adjust.gamma.g: "{v24}"
+        display.out.adjust.gamma.b: "{v25}"
+        display.out.adjust.lift.r: "{v26}"
+        display.out.adjust.lift.g: "{v27}"
+        display.out.adjust.lift.b: "{v28}"
+        display.out.adjust.offset.r: "{v29}"
+        display.out.adjust.offset.g: "{v30}"
+        display.out.adjust.offset.b: "{v31}"
+        display.out.adjust.saturation: "{v32}"
+        display.redundancy.info: "{v33}"
+        display.redundancy.mode: "{v34}"
+        display.redundancy.role: "{v35}"
+        display.redundancy.state: "{v36}"
+        display.redundancy.desired: "{v37}"
+        ingest.input: "{v38}"
+        ingest.test_pattern.enabled: "{v39}"
+        ingest.test_pattern.type: "{v40}"
+        ingest.test_pattern.motion: "{v41}"
+        ingest.test_pattern.media_enabled: "{v42}"
+        ingest.alerts_count: "{v43}"
+        ingest.alerts_severity: "{v44}"
+        ingest.output_freq: "{v45}"
+        ingest.genlock.enabled: "{v46}"
+        ingest.genlock.source: "{v47}"
+        ingest.genlock.matched: "{v48}"
+        ingest.info.serial: "{v49}"
+        ingest.info.firmware: "{v50}"
+        ingest.mac_address: "{v51}"
+        ingest.temps.cpu: "{v52}"
+        ingest.temps.case: "{v53}"
+        ingest.inputs.hdmi1.name: "{v54}"
+        ingest.inputs.hdmi1.valid: "{v55}"
+        ingest.inputs.hdmi1.resolution: "{v56}"
+        ingest.inputs.hdmi1.format: "{v57}"
+        ingest.inputs.hdmi1.freq: "{v58}"
+        ingest.inputs.hdmi1.width: "{v59}"
+        ingest.inputs.hdmi1.height: "{v60}"
+        ingest.inputs.hdmi2.name: "{v61}"
+        ingest.inputs.hdmi2.valid: "{v62}"
+        ingest.inputs.hdmi2.resolution: "{v63}"
+        ingest.inputs.hdmi2.format: "{v64}"
+        ingest.inputs.hdmi2.freq: "{v65}"
+        ingest.inputs.hdmi2.width: "{v66}"
+        ingest.inputs.hdmi2.height: "{v67}"
+        ingest.inputs.sdi1.name: "{v68}"
+        ingest.inputs.sdi1.valid: "{v69}"
+    # websocket state result
+    - json_match: { "$.id": "^1$", "$.result": "^\\{" }
+      json:
+        v0: "$.result.dev.ingest.inputs.sdi1.resolution"
+        v1: "$.result.dev.ingest.inputs.sdi1.format"
+        v2: "$.result.dev.ingest.inputs.sdi1.freq"
+        v3: "$.result.dev.ingest.inputs.sdi1.w"
+        v4: "$.result.dev.ingest.inputs.sdi1.h"
+        v5: "$.result.dev.ingest.inputs.sdi2.name"
+        v6: "$.result.dev.ingest.inputs.sdi2.valid"
+        v7: "$.result.dev.ingest.inputs.sdi2.resolution"
+        v8: "$.result.dev.ingest.inputs.sdi2.format"
+        v9: "$.result.dev.ingest.inputs.sdi2.freq"
+        v10: "$.result.dev.ingest.inputs.sdi2.w"
+        v11: "$.result.dev.ingest.inputs.sdi2.h"
+        v12: "$.result.dev.ingest.inputs.sdi3.name"
+        v13: "$.result.dev.ingest.inputs.sdi3.valid"
+        v14: "$.result.dev.ingest.inputs.sdi3.resolution"
+        v15: "$.result.dev.ingest.inputs.sdi3.format"
+        v16: "$.result.dev.ingest.inputs.sdi3.freq"
+        v17: "$.result.dev.ingest.inputs.sdi3.w"
+        v18: "$.result.dev.ingest.inputs.sdi3.h"
+        v19: "$.result.dev.ingest.inputs.sdi4.name"
+        v20: "$.result.dev.ingest.inputs.sdi4.valid"
+        v21: "$.result.dev.ingest.inputs.sdi4.resolution"
+        v22: "$.result.dev.ingest.inputs.sdi4.format"
+        v23: "$.result.dev.ingest.inputs.sdi4.freq"
+        v24: "$.result.dev.ingest.inputs.sdi4.w"
+        v25: "$.result.dev.ingest.inputs.sdi4.h"
+        v26: "$.result.dev.ingest.ports.1.info"
+        v27: "$.result.dev.ingest.ports.1.speedMbps"
+        v28: "$.result.dev.ingest.ports.1.tilesCount"
+        v29: "$.result.dev.ingest.ports.1.alertsCount"
+        v30: "$.result.dev.ingest.ports.2.info"
+        v31: "$.result.dev.ingest.ports.2.speedMbps"
+        v32: "$.result.dev.ingest.ports.2.tilesCount"
+        v33: "$.result.dev.ingest.ports.2.alertsCount"
+        v34: "$.result.dev.ingest.ports.3.info"
+        v35: "$.result.dev.ingest.ports.3.speedMbps"
+        v36: "$.result.dev.ingest.ports.3.tilesCount"
+        v37: "$.result.dev.ingest.ports.3.alertsCount"
+        v38: "$.result.dev.ingest.ports.4.info"
+        v39: "$.result.dev.ingest.ports.4.speedMbps"
+        v40: "$.result.dev.ingest.ports.4.tilesCount"
+        v41: "$.result.dev.ingest.ports.4.alertsCount"
+        v42: "$.result.dev.ingest.ports.5.info"
+        v43: "$.result.dev.ingest.ports.5.speedMbps"
+        v44: "$.result.dev.ingest.ports.5.tilesCount"
+        v45: "$.result.dev.ingest.ports.5.alertsCount"
+        v46: "$.result.dev.ingest.ports.6.info"
+        v47: "$.result.dev.ingest.ports.6.speedMbps"
+        v48: "$.result.dev.ingest.ports.6.tilesCount"
+        v49: "$.result.dev.ingest.ports.6.alertsCount"
+        v50: "$.result.dev.ingest.ports.7.info"
+        v51: "$.result.dev.ingest.ports.7.speedMbps"
+        v52: "$.result.dev.ingest.ports.7.tilesCount"
+        v53: "$.result.dev.ingest.ports.7.alertsCount"
+        v54: "$.result.dev.ingest.ports.8.info"
+        v55: "$.result.dev.ingest.ports.8.speedMbps"
+        v56: "$.result.dev.ingest.ports.8.tilesCount"
+        v57: "$.result.dev.ingest.ports.8.alertsCount"
+        v58: "$.result.dev.ingest.portsIn.1.info"
+        v59: "$.result.dev.ingest.portsIn.1.valid"
+        v60: "$.result.dev.ingest.portsIn.2.info"
+        v61: "$.result.dev.ingest.portsIn.2.valid"
+        v62: "$.result.dev.ingest.portsIn.3.info"
+        v63: "$.result.dev.ingest.portsIn.3.valid"
+        v64: "$.result.dev.ingest.portsIn.4.info"
+        v65: "$.result.dev.ingest.portsIn.4.valid"
+        v66: "$.result.dev.groups.0.name"
+        v67: "$.result.dev.groups.0.blackout"
+        v68: "$.result.dev.groups.0.gains.r"
+        v69: "$.result.dev.groups.0.gains.g"
+      state:
+        ingest.inputs.sdi1.resolution: "{v0}"
+        ingest.inputs.sdi1.format: "{v1}"
+        ingest.inputs.sdi1.freq: "{v2}"
+        ingest.inputs.sdi1.width: "{v3}"
+        ingest.inputs.sdi1.height: "{v4}"
+        ingest.inputs.sdi2.name: "{v5}"
+        ingest.inputs.sdi2.valid: "{v6}"
+        ingest.inputs.sdi2.resolution: "{v7}"
+        ingest.inputs.sdi2.format: "{v8}"
+        ingest.inputs.sdi2.freq: "{v9}"
+        ingest.inputs.sdi2.width: "{v10}"
+        ingest.inputs.sdi2.height: "{v11}"
+        ingest.inputs.sdi3.name: "{v12}"
+        ingest.inputs.sdi3.valid: "{v13}"
+        ingest.inputs.sdi3.resolution: "{v14}"
+        ingest.inputs.sdi3.format: "{v15}"
+        ingest.inputs.sdi3.freq: "{v16}"
+        ingest.inputs.sdi3.width: "{v17}"
+        ingest.inputs.sdi3.height: "{v18}"
+        ingest.inputs.sdi4.name: "{v19}"
+        ingest.inputs.sdi4.valid: "{v20}"
+        ingest.inputs.sdi4.resolution: "{v21}"
+        ingest.inputs.sdi4.format: "{v22}"
+        ingest.inputs.sdi4.freq: "{v23}"
+        ingest.inputs.sdi4.width: "{v24}"
+        ingest.inputs.sdi4.height: "{v25}"
+        ingest.ports.1.info: "{v26}"
+        ingest.ports.1.speed: "{v27}"
+        ingest.ports.1.tiles_count: "{v28}"
+        ingest.ports.1.alerts_count: "{v29}"
+        ingest.ports.2.info: "{v30}"
+        ingest.ports.2.speed: "{v31}"
+        ingest.ports.2.tiles_count: "{v32}"
+        ingest.ports.2.alerts_count: "{v33}"
+        ingest.ports.3.info: "{v34}"
+        ingest.ports.3.speed: "{v35}"
+        ingest.ports.3.tiles_count: "{v36}"
+        ingest.ports.3.alerts_count: "{v37}"
+        ingest.ports.4.info: "{v38}"
+        ingest.ports.4.speed: "{v39}"
+        ingest.ports.4.tiles_count: "{v40}"
+        ingest.ports.4.alerts_count: "{v41}"
+        ingest.ports.5.info: "{v42}"
+        ingest.ports.5.speed: "{v43}"
+        ingest.ports.5.tiles_count: "{v44}"
+        ingest.ports.5.alerts_count: "{v45}"
+        ingest.ports.6.info: "{v46}"
+        ingest.ports.6.speed: "{v47}"
+        ingest.ports.6.tiles_count: "{v48}"
+        ingest.ports.6.alerts_count: "{v49}"
+        ingest.ports.7.info: "{v50}"
+        ingest.ports.7.speed: "{v51}"
+        ingest.ports.7.tiles_count: "{v52}"
+        ingest.ports.7.alerts_count: "{v53}"
+        ingest.ports.8.info: "{v54}"
+        ingest.ports.8.speed: "{v55}"
+        ingest.ports.8.tiles_count: "{v56}"
+        ingest.ports.8.alerts_count: "{v57}"
+        ingest.ports_in.1.info: "{v58}"
+        ingest.ports_in.1.valid: "{v59}"
+        ingest.ports_in.2.info: "{v60}"
+        ingest.ports_in.2.valid: "{v61}"
+        ingest.ports_in.3.info: "{v62}"
+        ingest.ports_in.3.valid: "{v63}"
+        ingest.ports_in.4.info: "{v64}"
+        ingest.ports_in.4.valid: "{v65}"
+        groups.0.name: "{v66}"
+        groups.0.blackout: "{v67}"
+        groups.0.gains.r: "{v68}"
+        groups.0.gains.g: "{v69}"
+    # websocket state result
+    - json_match: { "$.id": "^1$", "$.result": "^\\{" }
+      json:
+        v0: "$.result.dev.groups.0.gains.b"
+        v1: "$.result.dev.groups.0.gains.i"
+        v2: "$.result.dev.groups.0.mask.enabled"
+        v3: "$.result.dev.groups.0.mask.l"
+        v4: "$.result.dev.groups.0.mask.t"
+        v5: "$.result.dev.groups.0.mask.b"
+        v6: "$.result.dev.groups.0.mask.r"
+        v7: "$.result.dev.groups.0.testPattern.enabled"
+        v8: "$.result.dev.groups.0.testPattern.r"
+        v9: "$.result.dev.groups.0.testPattern.g"
+        v10: "$.result.dev.groups.0.testPattern.b"
+        v11: "$.result.dev.groups.0.testPattern.a"
+        v12: "$.result.dev.groups.1.name"
+        v13: "$.result.dev.groups.1.blackout"
+        v14: "$.result.dev.groups.1.gains.r"
+        v15: "$.result.dev.groups.1.gains.g"
+        v16: "$.result.dev.groups.1.gains.b"
+        v17: "$.result.dev.groups.1.gains.i"
+        v18: "$.result.dev.groups.1.mask.enabled"
+        v19: "$.result.dev.groups.1.mask.l"
+        v20: "$.result.dev.groups.1.mask.t"
+        v21: "$.result.dev.groups.1.mask.b"
+        v22: "$.result.dev.groups.1.mask.r"
+        v23: "$.result.dev.groups.1.testPattern.enabled"
+        v24: "$.result.dev.groups.1.testPattern.r"
+        v25: "$.result.dev.groups.1.testPattern.g"
+        v26: "$.result.dev.groups.1.testPattern.b"
+        v27: "$.result.dev.groups.1.testPattern.a"
+        v28: "$.result.dev.groups.2.name"
+        v29: "$.result.dev.groups.2.blackout"
+        v30: "$.result.dev.groups.2.gains.r"
+        v31: "$.result.dev.groups.2.gains.g"
+        v32: "$.result.dev.groups.2.gains.b"
+        v33: "$.result.dev.groups.2.gains.i"
+        v34: "$.result.dev.groups.2.mask.enabled"
+        v35: "$.result.dev.groups.2.mask.l"
+        v36: "$.result.dev.groups.2.mask.t"
+        v37: "$.result.dev.groups.2.mask.b"
+        v38: "$.result.dev.groups.2.mask.r"
+        v39: "$.result.dev.groups.2.testPattern.enabled"
+        v40: "$.result.dev.groups.2.testPattern.r"
+        v41: "$.result.dev.groups.2.testPattern.g"
+        v42: "$.result.dev.groups.2.testPattern.b"
+        v43: "$.result.dev.groups.2.testPattern.a"
+        v44: "$.result.dev.groups.3.name"
+        v45: "$.result.dev.groups.3.blackout"
+        v46: "$.result.dev.groups.3.gains.r"
+        v47: "$.result.dev.groups.3.gains.g"
+        v48: "$.result.dev.groups.3.gains.b"
+        v49: "$.result.dev.groups.3.gains.i"
+        v50: "$.result.dev.groups.3.mask.enabled"
+        v51: "$.result.dev.groups.3.mask.l"
+        v52: "$.result.dev.groups.3.mask.t"
+        v53: "$.result.dev.groups.3.mask.b"
+        v54: "$.result.dev.groups.3.mask.r"
+        v55: "$.result.dev.groups.3.testPattern.enabled"
+        v56: "$.result.dev.groups.3.testPattern.r"
+        v57: "$.result.dev.groups.3.testPattern.g"
+        v58: "$.result.dev.groups.3.testPattern.b"
+        v59: "$.result.dev.groups.3.testPattern.a"
+        v60: "$.result.dev.groups.4.name"
+        v61: "$.result.dev.groups.4.blackout"
+        v62: "$.result.dev.groups.4.gains.r"
+        v63: "$.result.dev.groups.4.gains.g"
+        v64: "$.result.dev.groups.4.gains.b"
+        v65: "$.result.dev.groups.4.gains.i"
+        v66: "$.result.dev.groups.4.mask.enabled"
+        v67: "$.result.dev.groups.4.mask.l"
+        v68: "$.result.dev.groups.4.mask.t"
+        v69: "$.result.dev.groups.4.mask.b"
+      state:
+        groups.0.gains.b: "{v0}"
+        groups.0.gains.i: "{v1}"
+        groups.0.mask.enabled: "{v2}"
+        groups.0.mask.l: "{v3}"
+        groups.0.mask.t: "{v4}"
+        groups.0.mask.b: "{v5}"
+        groups.0.mask.r: "{v6}"
+        groups.0.test_pattern.enabled: "{v7}"
+        groups.0.test_pattern.r: "{v8}"
+        groups.0.test_pattern.g: "{v9}"
+        groups.0.test_pattern.b: "{v10}"
+        groups.0.test_pattern.a: "{v11}"
+        groups.1.name: "{v12}"
+        groups.1.blackout: "{v13}"
+        groups.1.gains.r: "{v14}"
+        groups.1.gains.g: "{v15}"
+        groups.1.gains.b: "{v16}"
+        groups.1.gains.i: "{v17}"
+        groups.1.mask.enabled: "{v18}"
+        groups.1.mask.l: "{v19}"
+        groups.1.mask.t: "{v20}"
+        groups.1.mask.b: "{v21}"
+        groups.1.mask.r: "{v22}"
+        groups.1.test_pattern.enabled: "{v23}"
+        groups.1.test_pattern.r: "{v24}"
+        groups.1.test_pattern.g: "{v25}"
+        groups.1.test_pattern.b: "{v26}"
+        groups.1.test_pattern.a: "{v27}"
+        groups.2.name: "{v28}"
+        groups.2.blackout: "{v29}"
+        groups.2.gains.r: "{v30}"
+        groups.2.gains.g: "{v31}"
+        groups.2.gains.b: "{v32}"
+        groups.2.gains.i: "{v33}"
+        groups.2.mask.enabled: "{v34}"
+        groups.2.mask.l: "{v35}"
+        groups.2.mask.t: "{v36}"
+        groups.2.mask.b: "{v37}"
+        groups.2.mask.r: "{v38}"
+        groups.2.test_pattern.enabled: "{v39}"
+        groups.2.test_pattern.r: "{v40}"
+        groups.2.test_pattern.g: "{v41}"
+        groups.2.test_pattern.b: "{v42}"
+        groups.2.test_pattern.a: "{v43}"
+        groups.3.name: "{v44}"
+        groups.3.blackout: "{v45}"
+        groups.3.gains.r: "{v46}"
+        groups.3.gains.g: "{v47}"
+        groups.3.gains.b: "{v48}"
+        groups.3.gains.i: "{v49}"
+        groups.3.mask.enabled: "{v50}"
+        groups.3.mask.l: "{v51}"
+        groups.3.mask.t: "{v52}"
+        groups.3.mask.b: "{v53}"
+        groups.3.mask.r: "{v54}"
+        groups.3.test_pattern.enabled: "{v55}"
+        groups.3.test_pattern.r: "{v56}"
+        groups.3.test_pattern.g: "{v57}"
+        groups.3.test_pattern.b: "{v58}"
+        groups.3.test_pattern.a: "{v59}"
+        groups.4.name: "{v60}"
+        groups.4.blackout: "{v61}"
+        groups.4.gains.r: "{v62}"
+        groups.4.gains.g: "{v63}"
+        groups.4.gains.b: "{v64}"
+        groups.4.gains.i: "{v65}"
+        groups.4.mask.enabled: "{v66}"
+        groups.4.mask.l: "{v67}"
+        groups.4.mask.t: "{v68}"
+        groups.4.mask.b: "{v69}"
+    # websocket state result
+    - json_match: { "$.id": "^1$", "$.result": "^\\{" }
+      json:
+        v0: "$.result.dev.groups.4.mask.r"
+        v1: "$.result.dev.groups.4.testPattern.enabled"
+        v2: "$.result.dev.groups.4.testPattern.r"
+        v3: "$.result.dev.groups.4.testPattern.g"
+        v4: "$.result.dev.groups.4.testPattern.b"
+        v5: "$.result.dev.groups.4.testPattern.a"
+        v6: "$.result.dev.groups.5.name"
+        v7: "$.result.dev.groups.5.blackout"
+        v8: "$.result.dev.groups.5.gains.r"
+        v9: "$.result.dev.groups.5.gains.g"
+        v10: "$.result.dev.groups.5.gains.b"
+        v11: "$.result.dev.groups.5.gains.i"
+        v12: "$.result.dev.groups.5.mask.enabled"
+        v13: "$.result.dev.groups.5.mask.l"
+        v14: "$.result.dev.groups.5.mask.t"
+        v15: "$.result.dev.groups.5.mask.b"
+        v16: "$.result.dev.groups.5.mask.r"
+        v17: "$.result.dev.groups.5.testPattern.enabled"
+        v18: "$.result.dev.groups.5.testPattern.r"
+        v19: "$.result.dev.groups.5.testPattern.g"
+        v20: "$.result.dev.groups.5.testPattern.b"
+        v21: "$.result.dev.groups.5.testPattern.a"
+        v22: "$.result.dev.groups.6.name"
+        v23: "$.result.dev.groups.6.blackout"
+        v24: "$.result.dev.groups.6.gains.r"
+        v25: "$.result.dev.groups.6.gains.g"
+        v26: "$.result.dev.groups.6.gains.b"
+        v27: "$.result.dev.groups.6.gains.i"
+        v28: "$.result.dev.groups.6.mask.enabled"
+        v29: "$.result.dev.groups.6.mask.l"
+        v30: "$.result.dev.groups.6.mask.t"
+        v31: "$.result.dev.groups.6.mask.b"
+        v32: "$.result.dev.groups.6.mask.r"
+        v33: "$.result.dev.groups.6.testPattern.enabled"
+        v34: "$.result.dev.groups.6.testPattern.r"
+        v35: "$.result.dev.groups.6.testPattern.g"
+        v36: "$.result.dev.groups.6.testPattern.b"
+        v37: "$.result.dev.groups.6.testPattern.a"
+        v38: "$.result.dev.groups.7.name"
+        v39: "$.result.dev.groups.7.blackout"
+        v40: "$.result.dev.groups.7.gains.r"
+        v41: "$.result.dev.groups.7.gains.g"
+        v42: "$.result.dev.groups.7.gains.b"
+        v43: "$.result.dev.groups.7.gains.i"
+        v44: "$.result.dev.groups.7.mask.enabled"
+        v45: "$.result.dev.groups.7.mask.l"
+        v46: "$.result.dev.groups.7.mask.t"
+        v47: "$.result.dev.groups.7.mask.b"
+        v48: "$.result.dev.groups.7.mask.r"
+        v49: "$.result.dev.groups.7.testPattern.enabled"
+        v50: "$.result.dev.groups.7.testPattern.r"
+        v51: "$.result.dev.groups.7.testPattern.g"
+        v52: "$.result.dev.groups.7.testPattern.b"
+        v53: "$.result.dev.groups.7.testPattern.a"
+        v54: "$.result.sys.description"
+        v55: "$.result.sys.alertsCount"
+        v56: "$.result.sys.alertsSeverity"
+        v57: "$.result.sys.ipAddress"
+      state:
+        groups.4.mask.r: "{v0}"
+        groups.4.test_pattern.enabled: "{v1}"
+        groups.4.test_pattern.r: "{v2}"
+        groups.4.test_pattern.g: "{v3}"
+        groups.4.test_pattern.b: "{v4}"
+        groups.4.test_pattern.a: "{v5}"
+        groups.5.name: "{v6}"
+        groups.5.blackout: "{v7}"
+        groups.5.gains.r: "{v8}"
+        groups.5.gains.g: "{v9}"
+        groups.5.gains.b: "{v10}"
+        groups.5.gains.i: "{v11}"
+        groups.5.mask.enabled: "{v12}"
+        groups.5.mask.l: "{v13}"
+        groups.5.mask.t: "{v14}"
+        groups.5.mask.b: "{v15}"
+        groups.5.mask.r: "{v16}"
+        groups.5.test_pattern.enabled: "{v17}"
+        groups.5.test_pattern.r: "{v18}"
+        groups.5.test_pattern.g: "{v19}"
+        groups.5.test_pattern.b: "{v20}"
+        groups.5.test_pattern.a: "{v21}"
+        groups.6.name: "{v22}"
+        groups.6.blackout: "{v23}"
+        groups.6.gains.r: "{v24}"
+        groups.6.gains.g: "{v25}"
+        groups.6.gains.b: "{v26}"
+        groups.6.gains.i: "{v27}"
+        groups.6.mask.enabled: "{v28}"
+        groups.6.mask.l: "{v29}"
+        groups.6.mask.t: "{v30}"
+        groups.6.mask.b: "{v31}"
+        groups.6.mask.r: "{v32}"
+        groups.6.test_pattern.enabled: "{v33}"
+        groups.6.test_pattern.r: "{v34}"
+        groups.6.test_pattern.g: "{v35}"
+        groups.6.test_pattern.b: "{v36}"
+        groups.6.test_pattern.a: "{v37}"
+        groups.7.name: "{v38}"
+        groups.7.blackout: "{v39}"
+        groups.7.gains.r: "{v40}"
+        groups.7.gains.g: "{v41}"
+        groups.7.gains.b: "{v42}"
+        groups.7.gains.i: "{v43}"
+        groups.7.mask.enabled: "{v44}"
+        groups.7.mask.l: "{v45}"
+        groups.7.mask.t: "{v46}"
+        groups.7.mask.b: "{v47}"
+        groups.7.mask.r: "{v48}"
+        groups.7.test_pattern.enabled: "{v49}"
+        groups.7.test_pattern.r: "{v50}"
+        groups.7.test_pattern.g: "{v51}"
+        groups.7.test_pattern.b: "{v52}"
+        groups.7.test_pattern.a: "{v53}"
+        sys.description: "{v54}"
+        sys.alerts_count: "{v55}"
+        sys.alerts_severity: "{v56}"
+        sys.ip_address: "{v57}"
+    # websocket update notification
+    - json_match: { "$.method": "^update$" }
+      json:
+        v0: "$.params.dev.display.blackout"
+        v1: "$.params.dev.display.freeze"
+        v2: "$.params.dev.display.brightness"
+        v3: "$.params.dev.display.cct"
+        v4: "$.params.dev.display.cctDuv"
+        v5: "$.params.dev.display.gamma"
+        v6: "$.params.dev.display.blackClipping"
+        v7: "$.params.dev.display.gains.r"
+        v8: "$.params.dev.display.gains.g"
+        v9: "$.params.dev.display.gains.b"
+        v10: "$.params.dev.display.width"
+        v11: "$.params.dev.display.height"
+        v12: "$.params.dev.display.x"
+        v13: "$.params.dev.display.y"
+        v14: "$.params.dev.display.tilesCount"
+        v15: "$.params.dev.display.tilesInfo"
+        v16: "$.params.dev.display.latencyLow"
+        v17: "$.params.dev.display.gamut.type"
+        v18: "$.params.dev.display.gamut.input"
+        v19: "$.params.dev.display.out.adjust.enabled"
+        v20: "$.params.dev.display.out.adjust.gain.r"
+        v21: "$.params.dev.display.out.adjust.gain.g"
+        v22: "$.params.dev.display.out.adjust.gain.b"
+        v23: "$.params.dev.display.out.adjust.gamma.r"
+        v24: "$.params.dev.display.out.adjust.gamma.g"
+        v25: "$.params.dev.display.out.adjust.gamma.b"
+        v26: "$.params.dev.display.out.adjust.lift.r"
+        v27: "$.params.dev.display.out.adjust.lift.g"
+        v28: "$.params.dev.display.out.adjust.lift.b"
+        v29: "$.params.dev.display.out.adjust.offset.r"
+        v30: "$.params.dev.display.out.adjust.offset.g"
+        v31: "$.params.dev.display.out.adjust.offset.b"
+        v32: "$.params.dev.display.out.adjust.saturation"
+        v33: "$.params.dev.display.redundancy.info"
+        v34: "$.params.dev.display.redundancy.mode"
+        v35: "$.params.dev.display.redundancy.role"
+        v36: "$.params.dev.display.redundancy.state"
+        v37: "$.params.dev.display.redundancy.desired"
+        v38: "$.params.dev.ingest.input"
+        v39: "$.params.dev.ingest.testPattern.enabled"
+        v40: "$.params.dev.ingest.testPattern.type"
+        v41: "$.params.dev.ingest.testPattern.motion"
+        v42: "$.params.dev.ingest.testPattern.mediaEnabled"
+        v43: "$.params.dev.ingest.alertsCount"
+        v44: "$.params.dev.ingest.alertsSeverity"
+        v45: "$.params.dev.ingest.outputFreq"
+        v46: "$.params.dev.ingest.genlock.enabled"
+        v47: "$.params.dev.ingest.genlock.source"
+        v48: "$.params.dev.ingest.genlock.matched"
+        v49: "$.params.dev.ingest.info.serial"
+        v50: "$.params.dev.ingest.info.version.firmware"
+        v51: "$.params.dev.ingest.macAddress"
+        v52: "$.params.dev.ingest.temps.CPUTemp"
+        v53: "$.params.dev.ingest.temps.CaseTemp"
+        v54: "$.params.dev.ingest.inputs.hdmi1.name"
+        v55: "$.params.dev.ingest.inputs.hdmi1.valid"
+        v56: "$.params.dev.ingest.inputs.hdmi1.resolution"
+        v57: "$.params.dev.ingest.inputs.hdmi1.format"
+        v58: "$.params.dev.ingest.inputs.hdmi1.freq"
+        v59: "$.params.dev.ingest.inputs.hdmi1.w"
+        v60: "$.params.dev.ingest.inputs.hdmi1.h"
+        v61: "$.params.dev.ingest.inputs.hdmi2.name"
+        v62: "$.params.dev.ingest.inputs.hdmi2.valid"
+        v63: "$.params.dev.ingest.inputs.hdmi2.resolution"
+        v64: "$.params.dev.ingest.inputs.hdmi2.format"
+        v65: "$.params.dev.ingest.inputs.hdmi2.freq"
+        v66: "$.params.dev.ingest.inputs.hdmi2.w"
+        v67: "$.params.dev.ingest.inputs.hdmi2.h"
+        v68: "$.params.dev.ingest.inputs.sdi1.name"
+        v69: "$.params.dev.ingest.inputs.sdi1.valid"
+      state:
+        display.blackout: "{v0}"
+        display.freeze: "{v1}"
+        display.brightness: "{v2}"
+        display.cct: "{v3}"
+        display.cct_duv: "{v4}"
+        display.gamma: "{v5}"
+        display.black_clipping: "{v6}"
+        display.gains.r: "{v7}"
+        display.gains.g: "{v8}"
+        display.gains.b: "{v9}"
+        display.width: "{v10}"
+        display.height: "{v11}"
+        display.x: "{v12}"
+        display.y: "{v13}"
+        display.tiles_count: "{v14}"
+        display.tiles_info: "{v15}"
+        display.latency_low: "{v16}"
+        display.gamut.type: "{v17}"
+        display.gamut.input: "{v18}"
+        display.out.adjust.enabled: "{v19}"
+        display.out.adjust.gain.r: "{v20}"
+        display.out.adjust.gain.g: "{v21}"
+        display.out.adjust.gain.b: "{v22}"
+        display.out.adjust.gamma.r: "{v23}"
+        display.out.adjust.gamma.g: "{v24}"
+        display.out.adjust.gamma.b: "{v25}"
+        display.out.adjust.lift.r: "{v26}"
+        display.out.adjust.lift.g: "{v27}"
+        display.out.adjust.lift.b: "{v28}"
+        display.out.adjust.offset.r: "{v29}"
+        display.out.adjust.offset.g: "{v30}"
+        display.out.adjust.offset.b: "{v31}"
+        display.out.adjust.saturation: "{v32}"
+        display.redundancy.info: "{v33}"
+        display.redundancy.mode: "{v34}"
+        display.redundancy.role: "{v35}"
+        display.redundancy.state: "{v36}"
+        display.redundancy.desired: "{v37}"
+        ingest.input: "{v38}"
+        ingest.test_pattern.enabled: "{v39}"
+        ingest.test_pattern.type: "{v40}"
+        ingest.test_pattern.motion: "{v41}"
+        ingest.test_pattern.media_enabled: "{v42}"
+        ingest.alerts_count: "{v43}"
+        ingest.alerts_severity: "{v44}"
+        ingest.output_freq: "{v45}"
+        ingest.genlock.enabled: "{v46}"
+        ingest.genlock.source: "{v47}"
+        ingest.genlock.matched: "{v48}"
+        ingest.info.serial: "{v49}"
+        ingest.info.firmware: "{v50}"
+        ingest.mac_address: "{v51}"
+        ingest.temps.cpu: "{v52}"
+        ingest.temps.case: "{v53}"
+        ingest.inputs.hdmi1.name: "{v54}"
+        ingest.inputs.hdmi1.valid: "{v55}"
+        ingest.inputs.hdmi1.resolution: "{v56}"
+        ingest.inputs.hdmi1.format: "{v57}"
+        ingest.inputs.hdmi1.freq: "{v58}"
+        ingest.inputs.hdmi1.width: "{v59}"
+        ingest.inputs.hdmi1.height: "{v60}"
+        ingest.inputs.hdmi2.name: "{v61}"
+        ingest.inputs.hdmi2.valid: "{v62}"
+        ingest.inputs.hdmi2.resolution: "{v63}"
+        ingest.inputs.hdmi2.format: "{v64}"
+        ingest.inputs.hdmi2.freq: "{v65}"
+        ingest.inputs.hdmi2.width: "{v66}"
+        ingest.inputs.hdmi2.height: "{v67}"
+        ingest.inputs.sdi1.name: "{v68}"
+        ingest.inputs.sdi1.valid: "{v69}"
+    # websocket update notification
+    - json_match: { "$.method": "^update$" }
+      json:
+        v0: "$.params.dev.ingest.inputs.sdi1.resolution"
+        v1: "$.params.dev.ingest.inputs.sdi1.format"
+        v2: "$.params.dev.ingest.inputs.sdi1.freq"
+        v3: "$.params.dev.ingest.inputs.sdi1.w"
+        v4: "$.params.dev.ingest.inputs.sdi1.h"
+        v5: "$.params.dev.ingest.inputs.sdi2.name"
+        v6: "$.params.dev.ingest.inputs.sdi2.valid"
+        v7: "$.params.dev.ingest.inputs.sdi2.resolution"
+        v8: "$.params.dev.ingest.inputs.sdi2.format"
+        v9: "$.params.dev.ingest.inputs.sdi2.freq"
+        v10: "$.params.dev.ingest.inputs.sdi2.w"
+        v11: "$.params.dev.ingest.inputs.sdi2.h"
+        v12: "$.params.dev.ingest.inputs.sdi3.name"
+        v13: "$.params.dev.ingest.inputs.sdi3.valid"
+        v14: "$.params.dev.ingest.inputs.sdi3.resolution"
+        v15: "$.params.dev.ingest.inputs.sdi3.format"
+        v16: "$.params.dev.ingest.inputs.sdi3.freq"
+        v17: "$.params.dev.ingest.inputs.sdi3.w"
+        v18: "$.params.dev.ingest.inputs.sdi3.h"
+        v19: "$.params.dev.ingest.inputs.sdi4.name"
+        v20: "$.params.dev.ingest.inputs.sdi4.valid"
+        v21: "$.params.dev.ingest.inputs.sdi4.resolution"
+        v22: "$.params.dev.ingest.inputs.sdi4.format"
+        v23: "$.params.dev.ingest.inputs.sdi4.freq"
+        v24: "$.params.dev.ingest.inputs.sdi4.w"
+        v25: "$.params.dev.ingest.inputs.sdi4.h"
+        v26: "$.params.dev.ingest.ports.1.info"
+        v27: "$.params.dev.ingest.ports.1.speedMbps"
+        v28: "$.params.dev.ingest.ports.1.tilesCount"
+        v29: "$.params.dev.ingest.ports.1.alertsCount"
+        v30: "$.params.dev.ingest.ports.2.info"
+        v31: "$.params.dev.ingest.ports.2.speedMbps"
+        v32: "$.params.dev.ingest.ports.2.tilesCount"
+        v33: "$.params.dev.ingest.ports.2.alertsCount"
+        v34: "$.params.dev.ingest.ports.3.info"
+        v35: "$.params.dev.ingest.ports.3.speedMbps"
+        v36: "$.params.dev.ingest.ports.3.tilesCount"
+        v37: "$.params.dev.ingest.ports.3.alertsCount"
+        v38: "$.params.dev.ingest.ports.4.info"
+        v39: "$.params.dev.ingest.ports.4.speedMbps"
+        v40: "$.params.dev.ingest.ports.4.tilesCount"
+        v41: "$.params.dev.ingest.ports.4.alertsCount"
+        v42: "$.params.dev.ingest.ports.5.info"
+        v43: "$.params.dev.ingest.ports.5.speedMbps"
+        v44: "$.params.dev.ingest.ports.5.tilesCount"
+        v45: "$.params.dev.ingest.ports.5.alertsCount"
+        v46: "$.params.dev.ingest.ports.6.info"
+        v47: "$.params.dev.ingest.ports.6.speedMbps"
+        v48: "$.params.dev.ingest.ports.6.tilesCount"
+        v49: "$.params.dev.ingest.ports.6.alertsCount"
+        v50: "$.params.dev.ingest.ports.7.info"
+        v51: "$.params.dev.ingest.ports.7.speedMbps"
+        v52: "$.params.dev.ingest.ports.7.tilesCount"
+        v53: "$.params.dev.ingest.ports.7.alertsCount"
+        v54: "$.params.dev.ingest.ports.8.info"
+        v55: "$.params.dev.ingest.ports.8.speedMbps"
+        v56: "$.params.dev.ingest.ports.8.tilesCount"
+        v57: "$.params.dev.ingest.ports.8.alertsCount"
+        v58: "$.params.dev.ingest.portsIn.1.info"
+        v59: "$.params.dev.ingest.portsIn.1.valid"
+        v60: "$.params.dev.ingest.portsIn.2.info"
+        v61: "$.params.dev.ingest.portsIn.2.valid"
+        v62: "$.params.dev.ingest.portsIn.3.info"
+        v63: "$.params.dev.ingest.portsIn.3.valid"
+        v64: "$.params.dev.ingest.portsIn.4.info"
+        v65: "$.params.dev.ingest.portsIn.4.valid"
+        v66: "$.params.dev.groups.0.name"
+        v67: "$.params.dev.groups.0.blackout"
+        v68: "$.params.dev.groups.0.gains.r"
+        v69: "$.params.dev.groups.0.gains.g"
+      state:
+        ingest.inputs.sdi1.resolution: "{v0}"
+        ingest.inputs.sdi1.format: "{v1}"
+        ingest.inputs.sdi1.freq: "{v2}"
+        ingest.inputs.sdi1.width: "{v3}"
+        ingest.inputs.sdi1.height: "{v4}"
+        ingest.inputs.sdi2.name: "{v5}"
+        ingest.inputs.sdi2.valid: "{v6}"
+        ingest.inputs.sdi2.resolution: "{v7}"
+        ingest.inputs.sdi2.format: "{v8}"
+        ingest.inputs.sdi2.freq: "{v9}"
+        ingest.inputs.sdi2.width: "{v10}"
+        ingest.inputs.sdi2.height: "{v11}"
+        ingest.inputs.sdi3.name: "{v12}"
+        ingest.inputs.sdi3.valid: "{v13}"
+        ingest.inputs.sdi3.resolution: "{v14}"
+        ingest.inputs.sdi3.format: "{v15}"
+        ingest.inputs.sdi3.freq: "{v16}"
+        ingest.inputs.sdi3.width: "{v17}"
+        ingest.inputs.sdi3.height: "{v18}"
+        ingest.inputs.sdi4.name: "{v19}"
+        ingest.inputs.sdi4.valid: "{v20}"
+        ingest.inputs.sdi4.resolution: "{v21}"
+        ingest.inputs.sdi4.format: "{v22}"
+        ingest.inputs.sdi4.freq: "{v23}"
+        ingest.inputs.sdi4.width: "{v24}"
+        ingest.inputs.sdi4.height: "{v25}"
+        ingest.ports.1.info: "{v26}"
+        ingest.ports.1.speed: "{v27}"
+        ingest.ports.1.tiles_count: "{v28}"
+        ingest.ports.1.alerts_count: "{v29}"
+        ingest.ports.2.info: "{v30}"
+        ingest.ports.2.speed: "{v31}"
+        ingest.ports.2.tiles_count: "{v32}"
+        ingest.ports.2.alerts_count: "{v33}"
+        ingest.ports.3.info: "{v34}"
+        ingest.ports.3.speed: "{v35}"
+        ingest.ports.3.tiles_count: "{v36}"
+        ingest.ports.3.alerts_count: "{v37}"
+        ingest.ports.4.info: "{v38}"
+        ingest.ports.4.speed: "{v39}"
+        ingest.ports.4.tiles_count: "{v40}"
+        ingest.ports.4.alerts_count: "{v41}"
+        ingest.ports.5.info: "{v42}"
+        ingest.ports.5.speed: "{v43}"
+        ingest.ports.5.tiles_count: "{v44}"
+        ingest.ports.5.alerts_count: "{v45}"
+        ingest.ports.6.info: "{v46}"
+        ingest.ports.6.speed: "{v47}"
+        ingest.ports.6.tiles_count: "{v48}"
+        ingest.ports.6.alerts_count: "{v49}"
+        ingest.ports.7.info: "{v50}"
+        ingest.ports.7.speed: "{v51}"
+        ingest.ports.7.tiles_count: "{v52}"
+        ingest.ports.7.alerts_count: "{v53}"
+        ingest.ports.8.info: "{v54}"
+        ingest.ports.8.speed: "{v55}"
+        ingest.ports.8.tiles_count: "{v56}"
+        ingest.ports.8.alerts_count: "{v57}"
+        ingest.ports_in.1.info: "{v58}"
+        ingest.ports_in.1.valid: "{v59}"
+        ingest.ports_in.2.info: "{v60}"
+        ingest.ports_in.2.valid: "{v61}"
+        ingest.ports_in.3.info: "{v62}"
+        ingest.ports_in.3.valid: "{v63}"
+        ingest.ports_in.4.info: "{v64}"
+        ingest.ports_in.4.valid: "{v65}"
+        groups.0.name: "{v66}"
+        groups.0.blackout: "{v67}"
+        groups.0.gains.r: "{v68}"
+        groups.0.gains.g: "{v69}"
+    # websocket update notification
+    - json_match: { "$.method": "^update$" }
+      json:
+        v0: "$.params.dev.groups.0.gains.b"
+        v1: "$.params.dev.groups.0.gains.i"
+        v2: "$.params.dev.groups.0.mask.enabled"
+        v3: "$.params.dev.groups.0.mask.l"
+        v4: "$.params.dev.groups.0.mask.t"
+        v5: "$.params.dev.groups.0.mask.b"
+        v6: "$.params.dev.groups.0.mask.r"
+        v7: "$.params.dev.groups.0.testPattern.enabled"
+        v8: "$.params.dev.groups.0.testPattern.r"
+        v9: "$.params.dev.groups.0.testPattern.g"
+        v10: "$.params.dev.groups.0.testPattern.b"
+        v11: "$.params.dev.groups.0.testPattern.a"
+        v12: "$.params.dev.groups.1.name"
+        v13: "$.params.dev.groups.1.blackout"
+        v14: "$.params.dev.groups.1.gains.r"
+        v15: "$.params.dev.groups.1.gains.g"
+        v16: "$.params.dev.groups.1.gains.b"
+        v17: "$.params.dev.groups.1.gains.i"
+        v18: "$.params.dev.groups.1.mask.enabled"
+        v19: "$.params.dev.groups.1.mask.l"
+        v20: "$.params.dev.groups.1.mask.t"
+        v21: "$.params.dev.groups.1.mask.b"
+        v22: "$.params.dev.groups.1.mask.r"
+        v23: "$.params.dev.groups.1.testPattern.enabled"
+        v24: "$.params.dev.groups.1.testPattern.r"
+        v25: "$.params.dev.groups.1.testPattern.g"
+        v26: "$.params.dev.groups.1.testPattern.b"
+        v27: "$.params.dev.groups.1.testPattern.a"
+        v28: "$.params.dev.groups.2.name"
+        v29: "$.params.dev.groups.2.blackout"
+        v30: "$.params.dev.groups.2.gains.r"
+        v31: "$.params.dev.groups.2.gains.g"
+        v32: "$.params.dev.groups.2.gains.b"
+        v33: "$.params.dev.groups.2.gains.i"
+        v34: "$.params.dev.groups.2.mask.enabled"
+        v35: "$.params.dev.groups.2.mask.l"
+        v36: "$.params.dev.groups.2.mask.t"
+        v37: "$.params.dev.groups.2.mask.b"
+        v38: "$.params.dev.groups.2.mask.r"
+        v39: "$.params.dev.groups.2.testPattern.enabled"
+        v40: "$.params.dev.groups.2.testPattern.r"
+        v41: "$.params.dev.groups.2.testPattern.g"
+        v42: "$.params.dev.groups.2.testPattern.b"
+        v43: "$.params.dev.groups.2.testPattern.a"
+        v44: "$.params.dev.groups.3.name"
+        v45: "$.params.dev.groups.3.blackout"
+        v46: "$.params.dev.groups.3.gains.r"
+        v47: "$.params.dev.groups.3.gains.g"
+        v48: "$.params.dev.groups.3.gains.b"
+        v49: "$.params.dev.groups.3.gains.i"
+        v50: "$.params.dev.groups.3.mask.enabled"
+        v51: "$.params.dev.groups.3.mask.l"
+        v52: "$.params.dev.groups.3.mask.t"
+        v53: "$.params.dev.groups.3.mask.b"
+        v54: "$.params.dev.groups.3.mask.r"
+        v55: "$.params.dev.groups.3.testPattern.enabled"
+        v56: "$.params.dev.groups.3.testPattern.r"
+        v57: "$.params.dev.groups.3.testPattern.g"
+        v58: "$.params.dev.groups.3.testPattern.b"
+        v59: "$.params.dev.groups.3.testPattern.a"
+        v60: "$.params.dev.groups.4.name"
+        v61: "$.params.dev.groups.4.blackout"
+        v62: "$.params.dev.groups.4.gains.r"
+        v63: "$.params.dev.groups.4.gains.g"
+        v64: "$.params.dev.groups.4.gains.b"
+        v65: "$.params.dev.groups.4.gains.i"
+        v66: "$.params.dev.groups.4.mask.enabled"
+        v67: "$.params.dev.groups.4.mask.l"
+        v68: "$.params.dev.groups.4.mask.t"
+        v69: "$.params.dev.groups.4.mask.b"
+      state:
+        groups.0.gains.b: "{v0}"
+        groups.0.gains.i: "{v1}"
+        groups.0.mask.enabled: "{v2}"
+        groups.0.mask.l: "{v3}"
+        groups.0.mask.t: "{v4}"
+        groups.0.mask.b: "{v5}"
+        groups.0.mask.r: "{v6}"
+        groups.0.test_pattern.enabled: "{v7}"
+        groups.0.test_pattern.r: "{v8}"
+        groups.0.test_pattern.g: "{v9}"
+        groups.0.test_pattern.b: "{v10}"
+        groups.0.test_pattern.a: "{v11}"
+        groups.1.name: "{v12}"
+        groups.1.blackout: "{v13}"
+        groups.1.gains.r: "{v14}"
+        groups.1.gains.g: "{v15}"
+        groups.1.gains.b: "{v16}"
+        groups.1.gains.i: "{v17}"
+        groups.1.mask.enabled: "{v18}"
+        groups.1.mask.l: "{v19}"
+        groups.1.mask.t: "{v20}"
+        groups.1.mask.b: "{v21}"
+        groups.1.mask.r: "{v22}"
+        groups.1.test_pattern.enabled: "{v23}"
+        groups.1.test_pattern.r: "{v24}"
+        groups.1.test_pattern.g: "{v25}"
+        groups.1.test_pattern.b: "{v26}"
+        groups.1.test_pattern.a: "{v27}"
+        groups.2.name: "{v28}"
+        groups.2.blackout: "{v29}"
+        groups.2.gains.r: "{v30}"
+        groups.2.gains.g: "{v31}"
+        groups.2.gains.b: "{v32}"
+        groups.2.gains.i: "{v33}"
+        groups.2.mask.enabled: "{v34}"
+        groups.2.mask.l: "{v35}"
+        groups.2.mask.t: "{v36}"
+        groups.2.mask.b: "{v37}"
+        groups.2.mask.r: "{v38}"
+        groups.2.test_pattern.enabled: "{v39}"
+        groups.2.test_pattern.r: "{v40}"
+        groups.2.test_pattern.g: "{v41}"
+        groups.2.test_pattern.b: "{v42}"
+        groups.2.test_pattern.a: "{v43}"
+        groups.3.name: "{v44}"
+        groups.3.blackout: "{v45}"
+        groups.3.gains.r: "{v46}"
+        groups.3.gains.g: "{v47}"
+        groups.3.gains.b: "{v48}"
+        groups.3.gains.i: "{v49}"
+        groups.3.mask.enabled: "{v50}"
+        groups.3.mask.l: "{v51}"
+        groups.3.mask.t: "{v52}"
+        groups.3.mask.b: "{v53}"
+        groups.3.mask.r: "{v54}"
+        groups.3.test_pattern.enabled: "{v55}"
+        groups.3.test_pattern.r: "{v56}"
+        groups.3.test_pattern.g: "{v57}"
+        groups.3.test_pattern.b: "{v58}"
+        groups.3.test_pattern.a: "{v59}"
+        groups.4.name: "{v60}"
+        groups.4.blackout: "{v61}"
+        groups.4.gains.r: "{v62}"
+        groups.4.gains.g: "{v63}"
+        groups.4.gains.b: "{v64}"
+        groups.4.gains.i: "{v65}"
+        groups.4.mask.enabled: "{v66}"
+        groups.4.mask.l: "{v67}"
+        groups.4.mask.t: "{v68}"
+        groups.4.mask.b: "{v69}"
+    # websocket update notification
+    - json_match: { "$.method": "^update$" }
+      json:
+        v0: "$.params.dev.groups.4.mask.r"
+        v1: "$.params.dev.groups.4.testPattern.enabled"
+        v2: "$.params.dev.groups.4.testPattern.r"
+        v3: "$.params.dev.groups.4.testPattern.g"
+        v4: "$.params.dev.groups.4.testPattern.b"
+        v5: "$.params.dev.groups.4.testPattern.a"
+        v6: "$.params.dev.groups.5.name"
+        v7: "$.params.dev.groups.5.blackout"
+        v8: "$.params.dev.groups.5.gains.r"
+        v9: "$.params.dev.groups.5.gains.g"
+        v10: "$.params.dev.groups.5.gains.b"
+        v11: "$.params.dev.groups.5.gains.i"
+        v12: "$.params.dev.groups.5.mask.enabled"
+        v13: "$.params.dev.groups.5.mask.l"
+        v14: "$.params.dev.groups.5.mask.t"
+        v15: "$.params.dev.groups.5.mask.b"
+        v16: "$.params.dev.groups.5.mask.r"
+        v17: "$.params.dev.groups.5.testPattern.enabled"
+        v18: "$.params.dev.groups.5.testPattern.r"
+        v19: "$.params.dev.groups.5.testPattern.g"
+        v20: "$.params.dev.groups.5.testPattern.b"
+        v21: "$.params.dev.groups.5.testPattern.a"
+        v22: "$.params.dev.groups.6.name"
+        v23: "$.params.dev.groups.6.blackout"
+        v24: "$.params.dev.groups.6.gains.r"
+        v25: "$.params.dev.groups.6.gains.g"
+        v26: "$.params.dev.groups.6.gains.b"
+        v27: "$.params.dev.groups.6.gains.i"
+        v28: "$.params.dev.groups.6.mask.enabled"
+        v29: "$.params.dev.groups.6.mask.l"
+        v30: "$.params.dev.groups.6.mask.t"
+        v31: "$.params.dev.groups.6.mask.b"
+        v32: "$.params.dev.groups.6.mask.r"
+        v33: "$.params.dev.groups.6.testPattern.enabled"
+        v34: "$.params.dev.groups.6.testPattern.r"
+        v35: "$.params.dev.groups.6.testPattern.g"
+        v36: "$.params.dev.groups.6.testPattern.b"
+        v37: "$.params.dev.groups.6.testPattern.a"
+        v38: "$.params.dev.groups.7.name"
+        v39: "$.params.dev.groups.7.blackout"
+        v40: "$.params.dev.groups.7.gains.r"
+        v41: "$.params.dev.groups.7.gains.g"
+        v42: "$.params.dev.groups.7.gains.b"
+        v43: "$.params.dev.groups.7.gains.i"
+        v44: "$.params.dev.groups.7.mask.enabled"
+        v45: "$.params.dev.groups.7.mask.l"
+        v46: "$.params.dev.groups.7.mask.t"
+        v47: "$.params.dev.groups.7.mask.b"
+        v48: "$.params.dev.groups.7.mask.r"
+        v49: "$.params.dev.groups.7.testPattern.enabled"
+        v50: "$.params.dev.groups.7.testPattern.r"
+        v51: "$.params.dev.groups.7.testPattern.g"
+        v52: "$.params.dev.groups.7.testPattern.b"
+        v53: "$.params.dev.groups.7.testPattern.a"
+        v54: "$.params.sys.description"
+        v55: "$.params.sys.alertsCount"
+        v56: "$.params.sys.alertsSeverity"
+        v57: "$.params.sys.ipAddress"
+      state:
+        groups.4.mask.r: "{v0}"
+        groups.4.test_pattern.enabled: "{v1}"
+        groups.4.test_pattern.r: "{v2}"
+        groups.4.test_pattern.g: "{v3}"
+        groups.4.test_pattern.b: "{v4}"
+        groups.4.test_pattern.a: "{v5}"
+        groups.5.name: "{v6}"
+        groups.5.blackout: "{v7}"
+        groups.5.gains.r: "{v8}"
+        groups.5.gains.g: "{v9}"
+        groups.5.gains.b: "{v10}"
+        groups.5.gains.i: "{v11}"
+        groups.5.mask.enabled: "{v12}"
+        groups.5.mask.l: "{v13}"
+        groups.5.mask.t: "{v14}"
+        groups.5.mask.b: "{v15}"
+        groups.5.mask.r: "{v16}"
+        groups.5.test_pattern.enabled: "{v17}"
+        groups.5.test_pattern.r: "{v18}"
+        groups.5.test_pattern.g: "{v19}"
+        groups.5.test_pattern.b: "{v20}"
+        groups.5.test_pattern.a: "{v21}"
+        groups.6.name: "{v22}"
+        groups.6.blackout: "{v23}"
+        groups.6.gains.r: "{v24}"
+        groups.6.gains.g: "{v25}"
+        groups.6.gains.b: "{v26}"
+        groups.6.gains.i: "{v27}"
+        groups.6.mask.enabled: "{v28}"
+        groups.6.mask.l: "{v29}"
+        groups.6.mask.t: "{v30}"
+        groups.6.mask.b: "{v31}"
+        groups.6.mask.r: "{v32}"
+        groups.6.test_pattern.enabled: "{v33}"
+        groups.6.test_pattern.r: "{v34}"
+        groups.6.test_pattern.g: "{v35}"
+        groups.6.test_pattern.b: "{v36}"
+        groups.6.test_pattern.a: "{v37}"
+        groups.7.name: "{v38}"
+        groups.7.blackout: "{v39}"
+        groups.7.gains.r: "{v40}"
+        groups.7.gains.g: "{v41}"
+        groups.7.gains.b: "{v42}"
+        groups.7.gains.i: "{v43}"
+        groups.7.mask.enabled: "{v44}"
+        groups.7.mask.l: "{v45}"
+        groups.7.mask.t: "{v46}"
+        groups.7.mask.b: "{v47}"
+        groups.7.mask.r: "{v48}"
+        groups.7.test_pattern.enabled: "{v49}"
+        groups.7.test_pattern.r: "{v50}"
+        groups.7.test_pattern.g: "{v51}"
+        groups.7.test_pattern.b: "{v52}"
+        groups.7.test_pattern.a: "{v53}"
+        sys.description: "{v54}"
+        sys.alerts_count: "{v55}"
+        sys.alerts_severity: "{v56}"
+        sys.ip_address: "{v57}"
+    # The applied state a saved configuration returns (Public API 3.3.5)
+    - path: "^/api/v1/presets/(\\d+/)?apply$"
+      json:
+        v0: "$.dev.display.blackout"
+        v1: "$.dev.display.freeze"
+        v2: "$.dev.display.brightness"
+        v3: "$.dev.display.cct"
+        v4: "$.dev.display.cctDuv"
+        v5: "$.dev.display.gamma"
+        v6: "$.dev.display.blackClipping"
+        v7: "$.dev.display.gains.r"
+        v8: "$.dev.display.gains.g"
+        v9: "$.dev.display.gains.b"
+        v10: "$.dev.display.width"
+        v11: "$.dev.display.height"
+        v12: "$.dev.display.x"
+        v13: "$.dev.display.y"
+        v14: "$.dev.display.tilesCount"
+        v15: "$.dev.display.tilesInfo"
+        v16: "$.dev.display.latencyLow"
+        v17: "$.dev.display.gamut.type"
+        v18: "$.dev.display.gamut.input"
+        v19: "$.dev.display.out.adjust.enabled"
+        v20: "$.dev.display.out.adjust.gain.r"
+        v21: "$.dev.display.out.adjust.gain.g"
+        v22: "$.dev.display.out.adjust.gain.b"
+        v23: "$.dev.display.out.adjust.gamma.r"
+        v24: "$.dev.display.out.adjust.gamma.g"
+        v25: "$.dev.display.out.adjust.gamma.b"
+        v26: "$.dev.display.out.adjust.lift.r"
+        v27: "$.dev.display.out.adjust.lift.g"
+        v28: "$.dev.display.out.adjust.lift.b"
+        v29: "$.dev.display.out.adjust.offset.r"
+        v30: "$.dev.display.out.adjust.offset.g"
+        v31: "$.dev.display.out.adjust.offset.b"
+        v32: "$.dev.display.out.adjust.saturation"
+        v33: "$.dev.display.redundancy.info"
+        v34: "$.dev.display.redundancy.mode"
+        v35: "$.dev.display.redundancy.role"
+        v36: "$.dev.display.redundancy.state"
+        v37: "$.dev.display.redundancy.desired"
+        v38: "$.dev.ingest.input"
+        v39: "$.dev.ingest.testPattern.enabled"
+        v40: "$.dev.ingest.testPattern.type"
+        v41: "$.dev.ingest.testPattern.motion"
+        v42: "$.dev.ingest.testPattern.mediaEnabled"
+        v43: "$.dev.ingest.alertsCount"
+        v44: "$.dev.ingest.alertsSeverity"
+        v45: "$.dev.ingest.outputFreq"
+        v46: "$.dev.ingest.genlock.enabled"
+        v47: "$.dev.ingest.genlock.source"
+        v48: "$.dev.ingest.genlock.matched"
+        v49: "$.dev.ingest.info.serial"
+        v50: "$.dev.ingest.info.version.firmware"
+        v51: "$.dev.ingest.macAddress"
+        v52: "$.dev.ingest.temps.CPUTemp"
+        v53: "$.dev.ingest.temps.CaseTemp"
+        v54: "$.dev.ingest.inputs.hdmi1.name"
+        v55: "$.dev.ingest.inputs.hdmi1.valid"
+        v56: "$.dev.ingest.inputs.hdmi1.resolution"
+        v57: "$.dev.ingest.inputs.hdmi1.format"
+        v58: "$.dev.ingest.inputs.hdmi1.freq"
+        v59: "$.dev.ingest.inputs.hdmi1.w"
+        v60: "$.dev.ingest.inputs.hdmi1.h"
+        v61: "$.dev.ingest.inputs.hdmi2.name"
+        v62: "$.dev.ingest.inputs.hdmi2.valid"
+        v63: "$.dev.ingest.inputs.hdmi2.resolution"
+        v64: "$.dev.ingest.inputs.hdmi2.format"
+        v65: "$.dev.ingest.inputs.hdmi2.freq"
+        v66: "$.dev.ingest.inputs.hdmi2.w"
+        v67: "$.dev.ingest.inputs.hdmi2.h"
+        v68: "$.dev.ingest.inputs.sdi1.name"
+        v69: "$.dev.ingest.inputs.sdi1.valid"
+      state:
+        display.blackout: "{v0}"
+        display.freeze: "{v1}"
+        display.brightness: "{v2}"
+        display.cct: "{v3}"
+        display.cct_duv: "{v4}"
+        display.gamma: "{v5}"
+        display.black_clipping: "{v6}"
+        display.gains.r: "{v7}"
+        display.gains.g: "{v8}"
+        display.gains.b: "{v9}"
+        display.width: "{v10}"
+        display.height: "{v11}"
+        display.x: "{v12}"
+        display.y: "{v13}"
+        display.tiles_count: "{v14}"
+        display.tiles_info: "{v15}"
+        display.latency_low: "{v16}"
+        display.gamut.type: "{v17}"
+        display.gamut.input: "{v18}"
+        display.out.adjust.enabled: "{v19}"
+        display.out.adjust.gain.r: "{v20}"
+        display.out.adjust.gain.g: "{v21}"
+        display.out.adjust.gain.b: "{v22}"
+        display.out.adjust.gamma.r: "{v23}"
+        display.out.adjust.gamma.g: "{v24}"
+        display.out.adjust.gamma.b: "{v25}"
+        display.out.adjust.lift.r: "{v26}"
+        display.out.adjust.lift.g: "{v27}"
+        display.out.adjust.lift.b: "{v28}"
+        display.out.adjust.offset.r: "{v29}"
+        display.out.adjust.offset.g: "{v30}"
+        display.out.adjust.offset.b: "{v31}"
+        display.out.adjust.saturation: "{v32}"
+        display.redundancy.info: "{v33}"
+        display.redundancy.mode: "{v34}"
+        display.redundancy.role: "{v35}"
+        display.redundancy.state: "{v36}"
+        display.redundancy.desired: "{v37}"
+        ingest.input: "{v38}"
+        ingest.test_pattern.enabled: "{v39}"
+        ingest.test_pattern.type: "{v40}"
+        ingest.test_pattern.motion: "{v41}"
+        ingest.test_pattern.media_enabled: "{v42}"
+        ingest.alerts_count: "{v43}"
+        ingest.alerts_severity: "{v44}"
+        ingest.output_freq: "{v45}"
+        ingest.genlock.enabled: "{v46}"
+        ingest.genlock.source: "{v47}"
+        ingest.genlock.matched: "{v48}"
+        ingest.info.serial: "{v49}"
+        ingest.info.firmware: "{v50}"
+        ingest.mac_address: "{v51}"
+        ingest.temps.cpu: "{v52}"
+        ingest.temps.case: "{v53}"
+        ingest.inputs.hdmi1.name: "{v54}"
+        ingest.inputs.hdmi1.valid: "{v55}"
+        ingest.inputs.hdmi1.resolution: "{v56}"
+        ingest.inputs.hdmi1.format: "{v57}"
+        ingest.inputs.hdmi1.freq: "{v58}"
+        ingest.inputs.hdmi1.width: "{v59}"
+        ingest.inputs.hdmi1.height: "{v60}"
+        ingest.inputs.hdmi2.name: "{v61}"
+        ingest.inputs.hdmi2.valid: "{v62}"
+        ingest.inputs.hdmi2.resolution: "{v63}"
+        ingest.inputs.hdmi2.format: "{v64}"
+        ingest.inputs.hdmi2.freq: "{v65}"
+        ingest.inputs.hdmi2.width: "{v66}"
+        ingest.inputs.hdmi2.height: "{v67}"
+        ingest.inputs.sdi1.name: "{v68}"
+        ingest.inputs.sdi1.valid: "{v69}"
+    # The applied state a saved configuration returns (Public API 3.3.5)
+    - path: "^/api/v1/presets/(\\d+/)?apply$"
+      json:
+        v0: "$.dev.ingest.inputs.sdi1.resolution"
+        v1: "$.dev.ingest.inputs.sdi1.format"
+        v2: "$.dev.ingest.inputs.sdi1.freq"
+        v3: "$.dev.ingest.inputs.sdi1.w"
+        v4: "$.dev.ingest.inputs.sdi1.h"
+        v5: "$.dev.ingest.inputs.sdi2.name"
+        v6: "$.dev.ingest.inputs.sdi2.valid"
+        v7: "$.dev.ingest.inputs.sdi2.resolution"
+        v8: "$.dev.ingest.inputs.sdi2.format"
+        v9: "$.dev.ingest.inputs.sdi2.freq"
+        v10: "$.dev.ingest.inputs.sdi2.w"
+        v11: "$.dev.ingest.inputs.sdi2.h"
+        v12: "$.dev.ingest.inputs.sdi3.name"
+        v13: "$.dev.ingest.inputs.sdi3.valid"
+        v14: "$.dev.ingest.inputs.sdi3.resolution"
+        v15: "$.dev.ingest.inputs.sdi3.format"
+        v16: "$.dev.ingest.inputs.sdi3.freq"
+        v17: "$.dev.ingest.inputs.sdi3.w"
+        v18: "$.dev.ingest.inputs.sdi3.h"
+        v19: "$.dev.ingest.inputs.sdi4.name"
+        v20: "$.dev.ingest.inputs.sdi4.valid"
+        v21: "$.dev.ingest.inputs.sdi4.resolution"
+        v22: "$.dev.ingest.inputs.sdi4.format"
+        v23: "$.dev.ingest.inputs.sdi4.freq"
+        v24: "$.dev.ingest.inputs.sdi4.w"
+        v25: "$.dev.ingest.inputs.sdi4.h"
+        v26: "$.dev.ingest.ports.1.info"
+        v27: "$.dev.ingest.ports.1.speedMbps"
+        v28: "$.dev.ingest.ports.1.tilesCount"
+        v29: "$.dev.ingest.ports.1.alertsCount"
+        v30: "$.dev.ingest.ports.2.info"
+        v31: "$.dev.ingest.ports.2.speedMbps"
+        v32: "$.dev.ingest.ports.2.tilesCount"
+        v33: "$.dev.ingest.ports.2.alertsCount"
+        v34: "$.dev.ingest.ports.3.info"
+        v35: "$.dev.ingest.ports.3.speedMbps"
+        v36: "$.dev.ingest.ports.3.tilesCount"
+        v37: "$.dev.ingest.ports.3.alertsCount"
+        v38: "$.dev.ingest.ports.4.info"
+        v39: "$.dev.ingest.ports.4.speedMbps"
+        v40: "$.dev.ingest.ports.4.tilesCount"
+        v41: "$.dev.ingest.ports.4.alertsCount"
+        v42: "$.dev.ingest.ports.5.info"
+        v43: "$.dev.ingest.ports.5.speedMbps"
+        v44: "$.dev.ingest.ports.5.tilesCount"
+        v45: "$.dev.ingest.ports.5.alertsCount"
+        v46: "$.dev.ingest.ports.6.info"
+        v47: "$.dev.ingest.ports.6.speedMbps"
+        v48: "$.dev.ingest.ports.6.tilesCount"
+        v49: "$.dev.ingest.ports.6.alertsCount"
+        v50: "$.dev.ingest.ports.7.info"
+        v51: "$.dev.ingest.ports.7.speedMbps"
+        v52: "$.dev.ingest.ports.7.tilesCount"
+        v53: "$.dev.ingest.ports.7.alertsCount"
+        v54: "$.dev.ingest.ports.8.info"
+        v55: "$.dev.ingest.ports.8.speedMbps"
+        v56: "$.dev.ingest.ports.8.tilesCount"
+        v57: "$.dev.ingest.ports.8.alertsCount"
+        v58: "$.dev.ingest.portsIn.1.info"
+        v59: "$.dev.ingest.portsIn.1.valid"
+        v60: "$.dev.ingest.portsIn.2.info"
+        v61: "$.dev.ingest.portsIn.2.valid"
+        v62: "$.dev.ingest.portsIn.3.info"
+        v63: "$.dev.ingest.portsIn.3.valid"
+        v64: "$.dev.ingest.portsIn.4.info"
+        v65: "$.dev.ingest.portsIn.4.valid"
+        v66: "$.dev.groups.0.name"
+        v67: "$.dev.groups.0.blackout"
+        v68: "$.dev.groups.0.gains.r"
+        v69: "$.dev.groups.0.gains.g"
+      state:
+        ingest.inputs.sdi1.resolution: "{v0}"
+        ingest.inputs.sdi1.format: "{v1}"
+        ingest.inputs.sdi1.freq: "{v2}"
+        ingest.inputs.sdi1.width: "{v3}"
+        ingest.inputs.sdi1.height: "{v4}"
+        ingest.inputs.sdi2.name: "{v5}"
+        ingest.inputs.sdi2.valid: "{v6}"
+        ingest.inputs.sdi2.resolution: "{v7}"
+        ingest.inputs.sdi2.format: "{v8}"
+        ingest.inputs.sdi2.freq: "{v9}"
+        ingest.inputs.sdi2.width: "{v10}"
+        ingest.inputs.sdi2.height: "{v11}"
+        ingest.inputs.sdi3.name: "{v12}"
+        ingest.inputs.sdi3.valid: "{v13}"
+        ingest.inputs.sdi3.resolution: "{v14}"
+        ingest.inputs.sdi3.format: "{v15}"
+        ingest.inputs.sdi3.freq: "{v16}"
+        ingest.inputs.sdi3.width: "{v17}"
+        ingest.inputs.sdi3.height: "{v18}"
+        ingest.inputs.sdi4.name: "{v19}"
+        ingest.inputs.sdi4.valid: "{v20}"
+        ingest.inputs.sdi4.resolution: "{v21}"
+        ingest.inputs.sdi4.format: "{v22}"
+        ingest.inputs.sdi4.freq: "{v23}"
+        ingest.inputs.sdi4.width: "{v24}"
+        ingest.inputs.sdi4.height: "{v25}"
+        ingest.ports.1.info: "{v26}"
+        ingest.ports.1.speed: "{v27}"
+        ingest.ports.1.tiles_count: "{v28}"
+        ingest.ports.1.alerts_count: "{v29}"
+        ingest.ports.2.info: "{v30}"
+        ingest.ports.2.speed: "{v31}"
+        ingest.ports.2.tiles_count: "{v32}"
+        ingest.ports.2.alerts_count: "{v33}"
+        ingest.ports.3.info: "{v34}"
+        ingest.ports.3.speed: "{v35}"
+        ingest.ports.3.tiles_count: "{v36}"
+        ingest.ports.3.alerts_count: "{v37}"
+        ingest.ports.4.info: "{v38}"
+        ingest.ports.4.speed: "{v39}"
+        ingest.ports.4.tiles_count: "{v40}"
+        ingest.ports.4.alerts_count: "{v41}"
+        ingest.ports.5.info: "{v42}"
+        ingest.ports.5.speed: "{v43}"
+        ingest.ports.5.tiles_count: "{v44}"
+        ingest.ports.5.alerts_count: "{v45}"
+        ingest.ports.6.info: "{v46}"
+        ingest.ports.6.speed: "{v47}"
+        ingest.ports.6.tiles_count: "{v48}"
+        ingest.ports.6.alerts_count: "{v49}"
+        ingest.ports.7.info: "{v50}"
+        ingest.ports.7.speed: "{v51}"
+        ingest.ports.7.tiles_count: "{v52}"
+        ingest.ports.7.alerts_count: "{v53}"
+        ingest.ports.8.info: "{v54}"
+        ingest.ports.8.speed: "{v55}"
+        ingest.ports.8.tiles_count: "{v56}"
+        ingest.ports.8.alerts_count: "{v57}"
+        ingest.ports_in.1.info: "{v58}"
+        ingest.ports_in.1.valid: "{v59}"
+        ingest.ports_in.2.info: "{v60}"
+        ingest.ports_in.2.valid: "{v61}"
+        ingest.ports_in.3.info: "{v62}"
+        ingest.ports_in.3.valid: "{v63}"
+        ingest.ports_in.4.info: "{v64}"
+        ingest.ports_in.4.valid: "{v65}"
+        groups.0.name: "{v66}"
+        groups.0.blackout: "{v67}"
+        groups.0.gains.r: "{v68}"
+        groups.0.gains.g: "{v69}"
+    # The applied state a saved configuration returns (Public API 3.3.5)
+    - path: "^/api/v1/presets/(\\d+/)?apply$"
+      json:
+        v0: "$.dev.groups.0.gains.b"
+        v1: "$.dev.groups.0.gains.i"
+        v2: "$.dev.groups.0.mask.enabled"
+        v3: "$.dev.groups.0.mask.l"
+        v4: "$.dev.groups.0.mask.t"
+        v5: "$.dev.groups.0.mask.b"
+        v6: "$.dev.groups.0.mask.r"
+        v7: "$.dev.groups.0.testPattern.enabled"
+        v8: "$.dev.groups.0.testPattern.r"
+        v9: "$.dev.groups.0.testPattern.g"
+        v10: "$.dev.groups.0.testPattern.b"
+        v11: "$.dev.groups.0.testPattern.a"
+        v12: "$.dev.groups.1.name"
+        v13: "$.dev.groups.1.blackout"
+        v14: "$.dev.groups.1.gains.r"
+        v15: "$.dev.groups.1.gains.g"
+        v16: "$.dev.groups.1.gains.b"
+        v17: "$.dev.groups.1.gains.i"
+        v18: "$.dev.groups.1.mask.enabled"
+        v19: "$.dev.groups.1.mask.l"
+        v20: "$.dev.groups.1.mask.t"
+        v21: "$.dev.groups.1.mask.b"
+        v22: "$.dev.groups.1.mask.r"
+        v23: "$.dev.groups.1.testPattern.enabled"
+        v24: "$.dev.groups.1.testPattern.r"
+        v25: "$.dev.groups.1.testPattern.g"
+        v26: "$.dev.groups.1.testPattern.b"
+        v27: "$.dev.groups.1.testPattern.a"
+        v28: "$.dev.groups.2.name"
+        v29: "$.dev.groups.2.blackout"
+        v30: "$.dev.groups.2.gains.r"
+        v31: "$.dev.groups.2.gains.g"
+        v32: "$.dev.groups.2.gains.b"
+        v33: "$.dev.groups.2.gains.i"
+        v34: "$.dev.groups.2.mask.enabled"
+        v35: "$.dev.groups.2.mask.l"
+        v36: "$.dev.groups.2.mask.t"
+        v37: "$.dev.groups.2.mask.b"
+        v38: "$.dev.groups.2.mask.r"
+        v39: "$.dev.groups.2.testPattern.enabled"
+        v40: "$.dev.groups.2.testPattern.r"
+        v41: "$.dev.groups.2.testPattern.g"
+        v42: "$.dev.groups.2.testPattern.b"
+        v43: "$.dev.groups.2.testPattern.a"
+        v44: "$.dev.groups.3.name"
+        v45: "$.dev.groups.3.blackout"
+        v46: "$.dev.groups.3.gains.r"
+        v47: "$.dev.groups.3.gains.g"
+        v48: "$.dev.groups.3.gains.b"
+        v49: "$.dev.groups.3.gains.i"
+        v50: "$.dev.groups.3.mask.enabled"
+        v51: "$.dev.groups.3.mask.l"
+        v52: "$.dev.groups.3.mask.t"
+        v53: "$.dev.groups.3.mask.b"
+        v54: "$.dev.groups.3.mask.r"
+        v55: "$.dev.groups.3.testPattern.enabled"
+        v56: "$.dev.groups.3.testPattern.r"
+        v57: "$.dev.groups.3.testPattern.g"
+        v58: "$.dev.groups.3.testPattern.b"
+        v59: "$.dev.groups.3.testPattern.a"
+        v60: "$.dev.groups.4.name"
+        v61: "$.dev.groups.4.blackout"
+        v62: "$.dev.groups.4.gains.r"
+        v63: "$.dev.groups.4.gains.g"
+        v64: "$.dev.groups.4.gains.b"
+        v65: "$.dev.groups.4.gains.i"
+        v66: "$.dev.groups.4.mask.enabled"
+        v67: "$.dev.groups.4.mask.l"
+        v68: "$.dev.groups.4.mask.t"
+        v69: "$.dev.groups.4.mask.b"
+      state:
+        groups.0.gains.b: "{v0}"
+        groups.0.gains.i: "{v1}"
+        groups.0.mask.enabled: "{v2}"
+        groups.0.mask.l: "{v3}"
+        groups.0.mask.t: "{v4}"
+        groups.0.mask.b: "{v5}"
+        groups.0.mask.r: "{v6}"
+        groups.0.test_pattern.enabled: "{v7}"
+        groups.0.test_pattern.r: "{v8}"
+        groups.0.test_pattern.g: "{v9}"
+        groups.0.test_pattern.b: "{v10}"
+        groups.0.test_pattern.a: "{v11}"
+        groups.1.name: "{v12}"
+        groups.1.blackout: "{v13}"
+        groups.1.gains.r: "{v14}"
+        groups.1.gains.g: "{v15}"
+        groups.1.gains.b: "{v16}"
+        groups.1.gains.i: "{v17}"
+        groups.1.mask.enabled: "{v18}"
+        groups.1.mask.l: "{v19}"
+        groups.1.mask.t: "{v20}"
+        groups.1.mask.b: "{v21}"
+        groups.1.mask.r: "{v22}"
+        groups.1.test_pattern.enabled: "{v23}"
+        groups.1.test_pattern.r: "{v24}"
+        groups.1.test_pattern.g: "{v25}"
+        groups.1.test_pattern.b: "{v26}"
+        groups.1.test_pattern.a: "{v27}"
+        groups.2.name: "{v28}"
+        groups.2.blackout: "{v29}"
+        groups.2.gains.r: "{v30}"
+        groups.2.gains.g: "{v31}"
+        groups.2.gains.b: "{v32}"
+        groups.2.gains.i: "{v33}"
+        groups.2.mask.enabled: "{v34}"
+        groups.2.mask.l: "{v35}"
+        groups.2.mask.t: "{v36}"
+        groups.2.mask.b: "{v37}"
+        groups.2.mask.r: "{v38}"
+        groups.2.test_pattern.enabled: "{v39}"
+        groups.2.test_pattern.r: "{v40}"
+        groups.2.test_pattern.g: "{v41}"
+        groups.2.test_pattern.b: "{v42}"
+        groups.2.test_pattern.a: "{v43}"
+        groups.3.name: "{v44}"
+        groups.3.blackout: "{v45}"
+        groups.3.gains.r: "{v46}"
+        groups.3.gains.g: "{v47}"
+        groups.3.gains.b: "{v48}"
+        groups.3.gains.i: "{v49}"
+        groups.3.mask.enabled: "{v50}"
+        groups.3.mask.l: "{v51}"
+        groups.3.mask.t: "{v52}"
+        groups.3.mask.b: "{v53}"
+        groups.3.mask.r: "{v54}"
+        groups.3.test_pattern.enabled: "{v55}"
+        groups.3.test_pattern.r: "{v56}"
+        groups.3.test_pattern.g: "{v57}"
+        groups.3.test_pattern.b: "{v58}"
+        groups.3.test_pattern.a: "{v59}"
+        groups.4.name: "{v60}"
+        groups.4.blackout: "{v61}"
+        groups.4.gains.r: "{v62}"
+        groups.4.gains.g: "{v63}"
+        groups.4.gains.b: "{v64}"
+        groups.4.gains.i: "{v65}"
+        groups.4.mask.enabled: "{v66}"
+        groups.4.mask.l: "{v67}"
+        groups.4.mask.t: "{v68}"
+        groups.4.mask.b: "{v69}"
+    # The applied state a saved configuration returns (Public API 3.3.5)
+    - path: "^/api/v1/presets/(\\d+/)?apply$"
+      json:
+        v0: "$.dev.groups.4.mask.r"
+        v1: "$.dev.groups.4.testPattern.enabled"
+        v2: "$.dev.groups.4.testPattern.r"
+        v3: "$.dev.groups.4.testPattern.g"
+        v4: "$.dev.groups.4.testPattern.b"
+        v5: "$.dev.groups.4.testPattern.a"
+        v6: "$.dev.groups.5.name"
+        v7: "$.dev.groups.5.blackout"
+        v8: "$.dev.groups.5.gains.r"
+        v9: "$.dev.groups.5.gains.g"
+        v10: "$.dev.groups.5.gains.b"
+        v11: "$.dev.groups.5.gains.i"
+        v12: "$.dev.groups.5.mask.enabled"
+        v13: "$.dev.groups.5.mask.l"
+        v14: "$.dev.groups.5.mask.t"
+        v15: "$.dev.groups.5.mask.b"
+        v16: "$.dev.groups.5.mask.r"
+        v17: "$.dev.groups.5.testPattern.enabled"
+        v18: "$.dev.groups.5.testPattern.r"
+        v19: "$.dev.groups.5.testPattern.g"
+        v20: "$.dev.groups.5.testPattern.b"
+        v21: "$.dev.groups.5.testPattern.a"
+        v22: "$.dev.groups.6.name"
+        v23: "$.dev.groups.6.blackout"
+        v24: "$.dev.groups.6.gains.r"
+        v25: "$.dev.groups.6.gains.g"
+        v26: "$.dev.groups.6.gains.b"
+        v27: "$.dev.groups.6.gains.i"
+        v28: "$.dev.groups.6.mask.enabled"
+        v29: "$.dev.groups.6.mask.l"
+        v30: "$.dev.groups.6.mask.t"
+        v31: "$.dev.groups.6.mask.b"
+        v32: "$.dev.groups.6.mask.r"
+        v33: "$.dev.groups.6.testPattern.enabled"
+        v34: "$.dev.groups.6.testPattern.r"
+        v35: "$.dev.groups.6.testPattern.g"
+        v36: "$.dev.groups.6.testPattern.b"
+        v37: "$.dev.groups.6.testPattern.a"
+        v38: "$.dev.groups.7.name"
+        v39: "$.dev.groups.7.blackout"
+        v40: "$.dev.groups.7.gains.r"
+        v41: "$.dev.groups.7.gains.g"
+        v42: "$.dev.groups.7.gains.b"
+        v43: "$.dev.groups.7.gains.i"
+        v44: "$.dev.groups.7.mask.enabled"
+        v45: "$.dev.groups.7.mask.l"
+        v46: "$.dev.groups.7.mask.t"
+        v47: "$.dev.groups.7.mask.b"
+        v48: "$.dev.groups.7.mask.r"
+        v49: "$.dev.groups.7.testPattern.enabled"
+        v50: "$.dev.groups.7.testPattern.r"
+        v51: "$.dev.groups.7.testPattern.g"
+        v52: "$.dev.groups.7.testPattern.b"
+        v53: "$.dev.groups.7.testPattern.a"
+        v54: "$.sys.description"
+        v55: "$.sys.alertsCount"
+        v56: "$.sys.alertsSeverity"
+        v57: "$.sys.ipAddress"
+      state:
+        groups.4.mask.r: "{v0}"
+        groups.4.test_pattern.enabled: "{v1}"
+        groups.4.test_pattern.r: "{v2}"
+        groups.4.test_pattern.g: "{v3}"
+        groups.4.test_pattern.b: "{v4}"
+        groups.4.test_pattern.a: "{v5}"
+        groups.5.name: "{v6}"
+        groups.5.blackout: "{v7}"
+        groups.5.gains.r: "{v8}"
+        groups.5.gains.g: "{v9}"
+        groups.5.gains.b: "{v10}"
+        groups.5.gains.i: "{v11}"
+        groups.5.mask.enabled: "{v12}"
+        groups.5.mask.l: "{v13}"
+        groups.5.mask.t: "{v14}"
+        groups.5.mask.b: "{v15}"
+        groups.5.mask.r: "{v16}"
+        groups.5.test_pattern.enabled: "{v17}"
+        groups.5.test_pattern.r: "{v18}"
+        groups.5.test_pattern.g: "{v19}"
+        groups.5.test_pattern.b: "{v20}"
+        groups.5.test_pattern.a: "{v21}"
+        groups.6.name: "{v22}"
+        groups.6.blackout: "{v23}"
+        groups.6.gains.r: "{v24}"
+        groups.6.gains.g: "{v25}"
+        groups.6.gains.b: "{v26}"
+        groups.6.gains.i: "{v27}"
+        groups.6.mask.enabled: "{v28}"
+        groups.6.mask.l: "{v29}"
+        groups.6.mask.t: "{v30}"
+        groups.6.mask.b: "{v31}"
+        groups.6.mask.r: "{v32}"
+        groups.6.test_pattern.enabled: "{v33}"
+        groups.6.test_pattern.r: "{v34}"
+        groups.6.test_pattern.g: "{v35}"
+        groups.6.test_pattern.b: "{v36}"
+        groups.6.test_pattern.a: "{v37}"
+        groups.7.name: "{v38}"
+        groups.7.blackout: "{v39}"
+        groups.7.gains.r: "{v40}"
+        groups.7.gains.g: "{v41}"
+        groups.7.gains.b: "{v42}"
+        groups.7.gains.i: "{v43}"
+        groups.7.mask.enabled: "{v44}"
+        groups.7.mask.l: "{v45}"
+        groups.7.mask.t: "{v46}"
+        groups.7.mask.b: "{v47}"
+        groups.7.mask.r: "{v48}"
+        groups.7.test_pattern.enabled: "{v49}"
+        groups.7.test_pattern.r: "{v50}"
+        groups.7.test_pattern.g: "{v51}"
+        groups.7.test_pattern.b: "{v52}"
+        groups.7.test_pattern.a: "{v53}"
+        sys.description: "{v54}"
+        sys.alerts_count: "{v55}"
+        sys.alerts_severity: "{v56}"
+        sys.ip_address: "{v57}"
+
+state:
+  display.blackout: { type: bool, description: "The display is blacked out" }
+  display.freeze: { type: bool, description: "The display is frozen" }
+  display.brightness: { type: float, unit: percent, description: "Display brightness" }
+  display.cct: { type: float, unit: K, description: "Colour temperature" }
+  display.cct_duv: { type: float, description: "Colour temperature Duv (distance from the Planckian locus)" }
+  display.gamma: { type: float, description: "Display gamma" }
+  display.black_clipping: { type: float, description: "Black clipping (data model sample; 0 to 0.5 by sys.fixtures)" }
+  display.gains.r: { type: float, description: "Display R gain, 1 is unity" }
+  display.gains.g: { type: float, description: "Display G gain, 1 is unity" }
+  display.gains.b: { type: float, description: "Display B gain, 1 is unity" }
+  display.width: { type: int, unit: px, description: "Output window width" }
+  display.height: { type: int, unit: px, description: "Output window height" }
+  display.x: { type: int, unit: px, description: "Output window x position" }
+  display.y: { type: int, unit: px, description: "Output window y position" }
+  display.tiles_count: { type: int, description: "Number of tiles in the display" }
+  display.tiles_info: { type: string, description: "Tiles in the display, as the processor words it (such as '84 VenXR08')" }
+  display.latency_low: { type: bool, description: "Low latency mode (data model sample)" }
+  display.gamut.type: { type: string, description: "Display gamut type, such as auto, rec709, rec2020, dcip3, custom (sys.fixtures)" }
+  display.gamut.input: { type: string, description: "Input gamut the display is converting from (data model sample)" }
+  display.out.adjust.enabled: { type: bool, description: "Output adjustments on" }
+  display.out.adjust.gain.r: { type: float, description: "Output adjustment gain, R" }
+  display.out.adjust.gain.g: { type: float, description: "Output adjustment gain, G" }
+  display.out.adjust.gain.b: { type: float, description: "Output adjustment gain, B" }
+  display.out.adjust.gamma.r: { type: float, description: "Output adjustment gamma, R" }
+  display.out.adjust.gamma.g: { type: float, description: "Output adjustment gamma, G" }
+  display.out.adjust.gamma.b: { type: float, description: "Output adjustment gamma, B" }
+  display.out.adjust.lift.r: { type: float, description: "Output adjustment lift, R" }
+  display.out.adjust.lift.g: { type: float, description: "Output adjustment lift, G" }
+  display.out.adjust.lift.b: { type: float, description: "Output adjustment lift, B" }
+  display.out.adjust.offset.r: { type: float, description: "Output adjustment offset, R" }
+  display.out.adjust.offset.g: { type: float, description: "Output adjustment offset, G" }
+  display.out.adjust.offset.b: { type: float, description: "Output adjustment offset, B" }
+  display.out.adjust.saturation: { type: float, description: "Output adjustment saturation, 1 is unity" }
+  display.redundancy.info: { type: string, description: "Overall redundancy state, as the processor words it (such as 'Fail over - Main (Active)')" }
+  display.redundancy.mode: { type: string, description: "Redundancy mode: none, failover, seamless (sys.fixtures also lists manual and single)" }
+  display.redundancy.role: { type: string, description: "Redundancy role: main, backup or offline" }
+  display.redundancy.state: { type: string, description: "Redundancy state: active, standby or mixed" }
+  display.redundancy.desired: { type: string, description: "Requested redundancy flip, main or backup (data model sample)" }
+  ingest.input: { type: string, description: "Selected input, by its key (such as hdmi1, sdi1, hdmi2X1)" }
+  ingest.test_pattern.enabled: { type: bool, description: "Test pattern on" }
+  ingest.test_pattern.type: { type: string, description: "Test pattern type, such as colorBars, red or grid" }
+  ingest.test_pattern.motion: { type: bool, description: "Test pattern motion on" }
+  ingest.test_pattern.media_enabled: { type: bool, description: "A still from the still store is shown (data model sample)" }
+  ingest.alerts_count: { type: int, description: "Number of processor alerts" }
+  ingest.alerts_severity: { type: int, description: "Most severe processor alert, as a syslog level (2 critical, 3 error, 4 warning, 5 notice); -1 when there are none" }
+  ingest.output_freq: { type: float, unit: Hz, description: "Output frame rate (data model sample)" }
+  ingest.genlock.enabled: { type: bool, description: "Genlock on (data model sample)" }
+  ingest.genlock.source: { type: string, description: "Genlock source (data model sample)" }
+  ingest.genlock.matched: { type: bool, description: "Locked to the genlock source (data model sample)" }
+  ingest.info.serial: { type: string, description: "Processor serial number" }
+  ingest.info.firmware: { type: string, description: "Processor firmware version" }
+  ingest.mac_address: { type: string, description: "Processor MAC address (data model sample)" }
+  ingest.temps.cpu: { type: float, unit: degC, description: "Processor CPU temperature (data model sample)" }
+  ingest.temps.case: { type: float, unit: degC, description: "Processor case temperature (data model sample)" }
+  ingest.inputs.*.name: { type: string, description: "Input display name, keyed by the input's key" }
+  ingest.inputs.*.valid: { type: bool, description: "The input has a valid signal, keyed by the input's key" }
+  ingest.inputs.*.resolution: { type: string, description: "Input format as the processor words it (such as '3840x2160p60.00', 'No input'), keyed by the input's key" }
+  ingest.inputs.*.format: { type: string, description: "Input colour format (such as 'YCbCr 4:4:4 rec709 limited 8bpc'), keyed by the input's key" }
+  ingest.inputs.*.freq: { type: float, unit: Hz, description: "Input frame rate, keyed by the input's key" }
+  ingest.inputs.*.width: { type: int, unit: px, description: "Input width, keyed by the input's key" }
+  ingest.inputs.*.height: { type: int, unit: px, description: "Input height, keyed by the input's key" }
+  ingest.ports.*.info: { type: string, description: "Output port link, as the processor words it (such as '10GbE', 'No link'), keyed by port number" }
+  ingest.ports.*.speed: { type: int, unit: Mbit/s, description: "Output port link speed, keyed by port number" }
+  ingest.ports.*.tiles_count: { type: int, description: "Tiles on the output port, keyed by port number" }
+  ingest.ports.*.alerts_count: { type: int, description: "Alerts on the output port, keyed by port number" }
+  ingest.ports_in.*.info: { type: string, description: "Input port link, as the processor words it (such as '12G SDI', 'No link'), keyed by port number" }
+  ingest.ports_in.*.valid: { type: bool, description: "The input port has a valid signal, keyed by port number" }
+  groups.*.name: { type: string, description: "Group name, keyed by the group's index from 0" }
+  groups.*.blackout: { type: bool, description: "Group blacked out, keyed by the group's index from 0" }
+  groups.*.gains.r: { type: float, description: "Group R gain, keyed by the group's index from 0" }
+  groups.*.gains.g: { type: float, description: "Group G gain, keyed by the group's index from 0" }
+  groups.*.gains.b: { type: float, description: "Group B gain, keyed by the group's index from 0" }
+  groups.*.gains.i: { type: float, description: "Group intensity gain, keyed by the group's index from 0" }
+  groups.*.mask.enabled: { type: bool, description: "Group mask on, keyed by the group's index from 0" }
+  groups.*.mask.l: { type: float, description: "Group mask left edge offset, keyed by the group's index from 0" }
+  groups.*.mask.t: { type: float, description: "Group mask top edge offset, keyed by the group's index from 0" }
+  groups.*.mask.b: { type: float, description: "Group mask bottom edge offset, keyed by the group's index from 0" }
+  groups.*.mask.r: { type: float, description: "Group mask right edge offset, keyed by the group's index from 0" }
+  groups.*.test_pattern.enabled: { type: bool, description: "Group test pattern on, keyed by the group's index from 0" }
+  groups.*.test_pattern.r: { type: float, description: "Group test pattern colour, R, keyed by the group's index from 0" }
+  groups.*.test_pattern.g: { type: float, description: "Group test pattern colour, G, keyed by the group's index from 0" }
+  groups.*.test_pattern.b: { type: float, description: "Group test pattern colour, B, keyed by the group's index from 0" }
+  groups.*.test_pattern.a: { type: float, description: "Group test pattern colour, A, keyed by the group's index from 0" }
+  sys.description: { type: string, description: "Processor name, as on its front panel and web application" }
+  sys.alerts_count: { type: int, description: "Number of system-wide alerts" }
+  sys.alerts_severity: { type: int, description: "Most severe system alert, as a syslog level (2 critical, 3 error, 4 warning, 5 notice); -1 when there are none" }
+  sys.ip_address: { type: string, description: "Processor IP address" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A PATCH with a value out of range leaves the property as it was, and an
+      unknown property is ignored; both answer 200 with the property's actual
+      value, or with nothing for an unknown one (Public API 3.1.4). A command
+      here therefore succeeds whether or not the value was taken; the state,
+      updated from the reply, shows what the processor holds. The ranges here
+      are the processor's own (sys.fixtures in the payload sample) where it
+      reports one, and otherwise only a lower bound.
+
+  - models: [all]
+    severity: info
+    text: >
+      Requests with a body need Content-Type application/json, or HELIOS
+      answers 406; a malformed request answers 400 (Public API 2.1.3-2.1.4).
+
+  - models: [all]
+    severity: info
+    text: >
+      Authentication, when turned on in the web application, applies to the
+      whole API including the websocket, by basic or digest access (realm "M8
+      Processor"); use HTTPS (port 443, scheme https) where the network is not
+      trusted (Public API 5). The username and password settings are the web
+      application's.
+
+  - models: [all]
+    severity: info
+    text: >
+      Property changes are pushed on the JSON-RPC websocket to every connected
+      client without subscribing (Public API 4.4); a notification can carry one
+      property or many at once. The JSON-RPC interface cannot read a single
+      property: the state method returns the whole tree.
+
+  - models: [all]
+    severity: info
+    text: >
+      Groups are keyed by index from 0, sequential but with gaps where groups
+      were removed; a receiver's groupId refers to them, -1 for none.
+      Receivers are keyed by MAC address. Telemetry reads groups 0 to 7 and
+      the inputs, ports and input ports by their keys; any other group is
+      updated only by get_properties or get_state.
+
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset and recall_preset_by_name apply a saved configuration to
+      the live display at once (brightness, colour temperature, gamma, test
+      pattern, blackout, whatever it saved); there is no undo. An unknown id
+      answers 404. By name, the first configuration with that name is used.
+
+  - models: [all]
+    severity: critical
+    text: >
+      set_blackout, set_freeze, set_test_pattern, select_input, show_still and
+      the group blackout and test pattern commands change the live display
+      immediately.
+
+  - models: [all]
+    severity: critical
+    text: >
+      redundancy_flip moves the display to the main or backup processor. Only
+      main and backup can be requested; the state then reads active, standby
+      or mixed, never the value sent (Public API 8.6). With redundancy mode
+      failover the processor also flips by itself on loss of video.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_receiver_position and set_receiver_group change the tile map that
+      the processor's mapping uses; a wrong position shows the wrong part of
+      the picture on that tile.
+
+  - models: [all]
+    severity: info
+    text: >
+      The test pattern types are not listed in the API document; colorBars,
+      red and grid are named in it, and the web application shows the rest.
+      Input keys (hdmi1, hdmi2, sdi1 to sdi4, and stitched inputs such as
+      hdmi2X1 and sdi1X2) depend on the installed input cards; dev.ingest.inputs
+      in get_state lists them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not included: uploading a still (multipart/form-data, which the format
+      does not send), the MJPEG and JPEG previews (binary, at
+      /api/v1/preview/<source>), sACN control of group gains (UDP 5568), and
+      the processor reboot and pixel error detection that release notes after
+      24.07 add to the API, whose request forms are only in the on-request
+      API document.
