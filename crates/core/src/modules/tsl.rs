@@ -309,11 +309,46 @@ impl Deframer {
     }
 }
 
+/// Splits a TCP stream of V3.1 packets: a header byte (0x80 + address)
+/// followed by 17 bytes below 0x80. A byte of 0x80 or more inside a packet
+/// starts a new one, which recovers from a truncated packet.
+#[derive(Default)]
+struct V3Stream {
+    packet: Vec<u8>,
+}
+
+impl V3Stream {
+    fn feed(&mut self, data: &[u8]) -> Vec<Vec<u8>> {
+        let mut out = Vec::new();
+        for &b in data {
+            if b >= 0x80 {
+                self.packet = vec![b];
+            } else if !self.packet.is_empty() {
+                self.packet.push(b);
+                if self.packet.len() == 18 {
+                    out.push(std::mem::take(&mut self.packet));
+                }
+            }
+        }
+        out
+    }
+}
+
+/// How the listener receives.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Receive {
+    Udp,
+    /// V5.0 over TCP: the switcher connects to us.
+    V5Tcp,
+    /// V3.1 over TCP (Ross Carbonite): the switcher connects to us.
+    V3Tcp,
+}
+
 pub(crate) struct Listener {
     port: u16,
-    /// V5.0 over TCP: the switcher connects to us.
-    tcp: bool,
+    receive: Receive,
     deframer: Deframer,
+    v3: V3Stream,
     /// Displays seen per screen, for V5.0 broadcasts.
     known: BTreeMap<u16, BTreeSet<u16>>,
 }
@@ -322,8 +357,13 @@ impl Listener {
     pub(crate) fn new(port: u16, model: &str) -> Listener {
         Listener {
             port,
-            tcp: model == "tsl-umd-5-tcp",
+            receive: match model {
+                "tsl-umd-5-tcp" => Receive::V5Tcp,
+                "tsl-umd-3-tcp" => Receive::V3Tcp,
+                _ => Receive::Udp,
+            },
             deframer: Deframer::default(),
+            v3: V3Stream::default(),
             known: BTreeMap::new(),
         }
     }
@@ -389,7 +429,7 @@ impl Listener {
 
 impl Module for Listener {
     fn start(&mut self, cx: &mut Cx) {
-        if self.tcp {
+        if self.receive != Receive::Udp {
             cx.tcp_listen(SOCKET, self.port);
             cx.connection(Connection::Disconnected {
                 reason: "waiting for the switcher to connect".into(),
@@ -404,10 +444,15 @@ impl Module for Listener {
         match input {
             TcpInput::Connected => {
                 self.deframer = Deframer::default();
+                self.v3 = V3Stream::default();
                 cx.connection(Connection::Connected);
             }
             TcpInput::Data(data) => {
-                for packet in self.deframer.feed(&data) {
+                let packets = match self.receive {
+                    Receive::V3Tcp => self.v3.feed(&data),
+                    _ => self.deframer.feed(&data),
+                };
+                for packet in packets {
                     self.receive(cx, &packet);
                 }
             }
@@ -853,5 +898,46 @@ mod tests {
         }));
         // One-way: no reply, so no round trip.
         assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+    }
+
+    #[test]
+    fn v3_1_packets_over_tcp_are_split_from_the_stream() {
+        let mut l = Listener::new(5727, "tsl-umd-3-tcp");
+        let mut cx = Cx::new(0);
+        l.start(&mut cx);
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::TcpListen { port: 5727, .. })));
+        let mut cx = Cx::new(1);
+        l.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let mut first = vec![0x80 + 3, 0x02];
+        first.extend_from_slice(b"CAM 3           ");
+        let mut second = vec![0x80 + 4, 0x01];
+        second.extend_from_slice(b"CAM 4           ");
+        // A truncated packet, then the two, split across reads.
+        let mut stream = vec![0x80 + 9, 0x01, b'X'];
+        stream.extend(&first);
+        stream.extend(&second[..5]);
+        l.tcp(&mut cx, SOCKET, TcpInput::Data(stream));
+        l.tcp(&mut cx, SOCKET, TcpInput::Data(second[5..].to_vec()));
+        let states: Vec<Value> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::State(p) => Some(p),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(states.len(), 2);
+        assert_eq!(states[0]["screens"]["0"]["displays"]["3"]["text"], "CAM 3");
+        assert_eq!(
+            states[0]["screens"]["0"]["displays"]["3"]["lamps"]["2"],
+            true
+        );
+        assert_eq!(
+            states[1]["screens"]["0"]["displays"]["4"]["lamps"]["1"],
+            true
+        );
     }
 }

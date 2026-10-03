@@ -21,6 +21,16 @@ source:
       UTF-16LE), SCREEN, then display messages of INDEX, CONTROL (RH, text and
       LH tally, brightness, bit 15 control data) and LENGTH-prefixed text; UDP
       packets up to 2048 bytes; 0xFFFF broadcast.
+  - title: Ross Carbonite, TSL UMD Protocol Setup
+    author: Ross Video
+    url: https://help.rossvideo.com/carbonite-device/Topics/Devices/UMD/TSL.html
+    note: >
+      Manufacturer document. The switcher sends TSL UMD V3.1 (SubType
+      TSLUMD_1.0) over TCP or UDP to a port the operator sets; tally 1 is
+      preview and tally 2 program, 3 and 4 always off; 16 characters;
+      ShowUMDId, ShowBusName, Center and 1SecUpdate options; addresses for
+      inputs, ME backgrounds and keys, auxes, media stores, MiniMEs and the
+      program, preview and clean buses.
   - title: Tally TSL receivers (tally/TSLUMD3.cpp, TSLUMD4.cpp, TSLUMD5.cpp)
     note: Meros. A UDP listener on an operator-chosen port; TSL has no standard port.
 
@@ -31,6 +41,10 @@ models:
     verification: none
   - id: tsl-umd-5-tcp
     name: TSL UMD V5.0 over TCP (the switcher connects to the core)
+    supports: []
+    verification: none
+  - id: tsl-umd-3-tcp
+    name: TSL UMD V3.1 over TCP (the switcher connects to the core), as Ross Carbonite sends it
     supports: []
     verification: none
 
@@ -69,10 +83,22 @@ quirks:
       already known on that screen. V5.0 control data and screen control
       messages are undefined in V5.0 and are ignored.
 
-  - models: [tsl-umd-5-tcp]
+  - models: [tsl-umd-5-tcp, tsl-umd-3-tcp]
     severity: info
     text: >
       Over TCP the switcher connects to the core, on the port given when the
       device is opened, from the device's address; connections from other
       addresses are closed. The device reports connected while the switcher's
       connection is open, and a newer connection replaces an older one.
+
+  - models: [tsl-umd-3-tcp, tsl-umd]
+    severity: info
+    text: >
+      Ross Carbonite reports tally and source names only this way: RossTalk,
+      which carries its commands (the rosstalk integration), sends no state.
+      On the switcher, MENU > SYSTEM > NEXT > NEXT > Device Config, Add, Type
+      SerialTally, SubType TSLUMD_1.0, then the core's address, this port and
+      TCP or UDP. Tally 1 (lamps.1) is preview and tally 2 (lamps.2) program.
+      ShowUMDId puts the source's UMD id at the start of the text and
+      ShowBusName adds the bus name; 1SecUpdate sends one address per second
+      instead of all of them every minute.

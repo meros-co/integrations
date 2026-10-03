@@ -6,6 +6,8 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
+#[cfg(feature = "aes70")]
+mod aes70;
 #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
 #[cfg(any(
@@ -164,6 +166,12 @@ pub(crate) fn construct(
             let dialect = analogway::Dialect::for_spec(&spec.id).expect("an AWJ spec");
             Ok(Box::new(analogway::AnalogWay::new(dialect, context)))
         }
+        // OCP.1 has no assigned port, so the host must give the device's.
+        #[cfg(feature = "aes70")]
+        "aes70" => match context.port {
+            Some(port) => Ok(Box::new(aes70::Aes70::new(context, port))),
+            None => Err("AES70 (OCP.1) has no standard port: give the device's OCP.1 port".into()),
+        },
         #[cfg(feature = "emberplus")]
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
         #[cfg(feature = "pjlink")]
