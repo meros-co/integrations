@@ -280,6 +280,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## bss-london — BSS Soundweb London
+
+- [ ] Confirm that nothing (no ACK or NAK byte) is sent back over TCP, and whether the device expects an ACK from the controller over Ethernet before it stops resending a subscription's message (the FAQ describes 1-second resends on serial). ([specs/bss-london.yaml:168](specs/bss-london.yaml#L168))
+- [ ] Check that subscribing again to a subscribed state variable makes the device send the current value again (the read and the liveness check rely on it). ([specs/bss-london.yaml:103](specs/bss-london.yaml#L103))
+- [ ] Check the SUBSCRIBE rate field's unit (ms, 50 ms steps) and what 0 means for a meter. ([specs/bss-london.yaml:120](specs/bss-london.yaml#L120))
+- [ ] Check that venue and parameter preset recall bodies carry the 32-bit preset ID with no node address. ([specs/bss-london.yaml:147](specs/bss-london.yaml#L147))
+- [ ] Check the SET STRING length field (string bytes plus the terminator) and the answer to a subscribed string SV. ([specs/bss-london.yaml:94](specs/bss-london.yaml#L94))
+- [ ] Confirm which current London models (BLU-806, BLU-806DA and later) speak the same protocol unchanged. ([specs/bss-london.yaml:55](specs/bss-london.yaml#L55))
+
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
 - [ ] Check the blackout sense: whether /dbo 0 turns blackout on (manual) or off (Companion). ([specs/chamsys-magicq.yaml:1104](specs/chamsys-magicq.yaml#L1104))

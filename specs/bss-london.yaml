@@ -1,0 +1,206 @@
+spec: 1
+id: bss-london
+name: BSS Soundweb London (London Direct Inject)
+vendor: BSS Audio
+category: mixer
+implementation: native
+reason: >
+  Binary messages: STX, a body, an XOR checksum and ETX, with five reserved
+  bytes escaped in the body and the checksum, and big-endian 16/8/24/16-bit
+  addresses with 32-bit data. Nothing is acknowledged over Ethernet, so a read
+  is a subscription whose first value answers it and which is then cancelled,
+  and subscriptions, made per connection, must be made again after each
+  reconnection.
+
+source:
+  - title: "Soundweb London Interface Kit, Revision 2.7 (April 2013)"
+    author: BSS Audio (Harman)
+    url: "https://bssaudio.com/en-US/site_elements/soundweb-london-di-kit"
+    note: >
+      Manufacturer document (Third Party Control Interface Kit). Ethernet: TCP
+      port 1023 (p.6); special bytes STX 0x02, ETX 0x03, ACK 0x06, NAK 0x15,
+      Escape 0x1B and their substitutions, applied after the checksum (p.6);
+      command bytes 0x88-0x91 (p.7); message and body formats, node,
+      virtual device (0x03 for audio processing objects), object, state
+      variable, data and percentage fields (p.7-8); ACK/NAK used only on
+      serial, not over Ethernet (p.9); send and receive pseudo code (p.10);
+      message types SET, SUBSCRIBE (current value first, then changes or a
+      meter's period in 50 ms steps), UNSUBSCRIBE, SET%, SUBSCRIBE%,
+      UNSUBSCRIBE%, BUMP% (p.12); venue and parameter preset recall,
+      broadcast, by preset ID (p.13); Appendix A scaling laws (percentage x
+      65536, discrete, scalar x 10000, the gain fader law, delay x 96 per ms,
+      frequency and speed log10 x 1000000, percent x 100); Appendix B meter
+      state variables; Appendix C FAQ; Appendix D fixed object IDs; Appendix E
+      hybrid string dialing; Appendix F SET STRING (0x91); Appendix G fixed
+      state variable IDs.
+  - title: "Soundweb London Third Party Control (application guide)"
+    author: BSS Audio (Harman)
+    url: "https://bssaudio.com/en-US/site_elements/soundweb-london-third-party-control-application-guide"
+    note: >
+      Manufacturer guide: devices listen on TCP 1023 and accept several
+      connections, always listening without being enabled for third-party
+      control.
+
+settings:
+  # State variables kept current while the device is open, subscribed to on
+  # every connection: entries separated by ";", "," or line breaks, each
+  # node/virtual_device/object/state_variable (decimal or 0x hex, as London
+  # Architect shows the HiQnet address 0xNNNNVVOOOOOO), then optionally
+  # @<rate ms> for a meter, % to receive percentages, and :<encoding>
+  # (scalar, gain_db, delay_ms, frequency_or_speed, percent_value) to decode
+  # the value. For example: 0x010F/3/0x000100/0:gain_db; 0x010F/3/0x000100/1
+  subscriptions: { type: string, default: "", max_length: 8192 }
+
+models:
+  - id: blu
+    name: "BSS Soundweb London BLU devices (BLU-80, BLU-800, BLU-32, BLU-320, BLU-16, BLU-160, BLU-120, BLU-100, BLU-101, BLU-102, BLU-103 and later London models)"
+    supports: &all
+      [set_sv, set_sv_percent, bump_sv_percent, set_string_sv, get_sv, get_sv_percent, subscribe,
+       subscribe_percent, unsubscribe, unsubscribe_percent, recall_venue_preset, recall_parameter_preset]
+    verification: none
+    notes: >
+      Any Soundweb London device on the network can be reached through the one
+      connected to, by its HiQnet node address.
+
+commands:
+  set_sv:
+    summary: "SET (0x88): set a state variable; value is encoded per encoding (raw sends the 32-bit integer as is: discrete controls, mutes 0/1)"
+    params:
+      node: &node { type: int, min: 0, max: 65535, required: true }
+      virtual_device: &vd { type: int, min: 0, max: 255, default: 3 }
+      object: &object { type: int, min: 0, max: 16777215, required: true }
+      state_variable: &sv { type: int, min: 0, max: 65535, required: true }
+      value: { type: float, min: -2147483648, max: 2147483647, required: true }
+      encoding: &encoding { type: enum, values: [raw, scalar, gain_db, delay_ms, frequency_or_speed, percent_value], default: raw }
+    returns: none
+  set_sv_percent:
+    summary: "SET% (0x8D): set a state variable as a percentage of its control's travel, 0-100"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+      percent: { type: float, min: 0, max: 100, required: true }
+    returns: none
+  bump_sv_percent:
+    summary: "BUMP% (0x90): move a state variable up or down by a signed percentage"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+      percent: { type: float, min: -100, max: 100, required: true }
+    returns: none
+  set_string_sv:
+    summary: "SET STRING (0x91): set a string state variable, up to 32 characters (a VoIP number, a label)"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+      text: { type: string, max_length: 32, required: true }
+    returns: none
+  get_sv:
+    summary: "Read a state variable: subscribe, return the first value (decoded per encoding), then unsubscribe unless subscribed"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+      encoding: *encoding
+    returns: value
+  get_sv_percent:
+    summary: "Read a state variable as a percentage, the same way"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+    returns: value
+  subscribe:
+    summary: "SUBSCRIBE (0x89): keep a state variable in state for this session; returns its current value. rate_ms sets a meter's period (50 ms steps)"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+      rate_ms: &rate { type: int, min: 0, max: 3600000, default: 0 }
+      encoding: *encoding
+    returns: value
+  subscribe_percent:
+    summary: "SUBSCRIBE% (0x8E): keep a state variable in state as a percentage; returns its current percentage"
+    params:
+      node: *node
+      virtual_device: *vd
+      object: *object
+      state_variable: *sv
+      rate_ms: *rate
+    returns: value
+  unsubscribe:
+    summary: "UNSUBSCRIBE (0x8A): stop a subscription"
+    params: { node: *node, virtual_device: *vd, object: *object, state_variable: *sv }
+    returns: none
+  unsubscribe_percent:
+    summary: "UNSUBSCRIBE% (0x8F): stop a percentage subscription"
+    params: { node: *node, virtual_device: *vd, object: *object, state_variable: *sv }
+    returns: none
+  recall_venue_preset:
+    summary: "Venue preset recall (0x8B), broadcast to every unit, by the preset ID London Architect shows in square brackets"
+    params:
+      preset: &preset { type: int, min: 0, max: 4294967295, required: true }
+    returns: none
+  recall_parameter_preset:
+    summary: "Parameter preset recall (0x8C), broadcast to every unit, by preset ID"
+    params:
+      preset: *preset
+    returns: none
+
+state:
+  nodes.*.*.*.*.raw: { type: int, description: "A state variable's 32-bit data as the device sent it, keyed by node, virtual device, object and state variable (decimal)" }
+  nodes.*.*.*.*.value: { type: float, description: "The same, decoded with the encoding its subscription or read named (dB, ms, Hz, a scalar or a percent value)" }
+  nodes.*.*.*.*.percent: { type: float, description: "A state variable as a percentage of its control's travel, from a percentage subscription" }
+  nodes.*.*.*.*.text: { type: string, description: "A string state variable's text (SET STRING)" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Over Ethernet the device acknowledges nothing, so sets and preset
+      recalls are reported unverified. Subscribing to a state variable makes
+      the device send its current value: reads and the liveness check use
+      that.
+  - models: [all]
+    severity: info
+    text: >
+      Addresses are those of the London Architect design: the HiQnet address
+      0xNNNNVVOOOOOO of an object gives node, virtual device (3 for audio
+      processing objects) and object; state variable IDs are per object type
+      (a gain object: gain 0, mute 1, polarity 2; Appendix G lists fixed IDs).
+  - models: [all]
+    severity: info
+    text: >
+      Encodings (Appendix A): gain_db uses the fader law (linear from +10 to
+      -10 dB, logarithmic down to -100 dB); delay_ms is samples at 96 kHz;
+      frequency_or_speed is log10 x 1000000; scalar is x 10000 (thresholds,
+      boost/cut, pan); percent_value is x 100 for controls whose own unit is a
+      percentage. Discrete controls (mutes, selectors, card gain steps) are
+      raw.
+  - models: [all]
+    severity: info
+    text: >
+      Subscriptions belong to the connection and are made again on every
+      reconnection; the session cancels them when it closes. With at least one
+      subscription, one is renewed after 10 s of silence and the connection is
+      dropped if the device does not answer within 5 s. With none, only the
+      TCP connection shows the device is there.
+  - models: [all]
+    severity: warning
+    text: >
+      A meter subscription sends its value every period (50 ms steps): give a
+      rate, or the value is sent on every change.
+  - models: [all]
+    severity: critical
+    text: >
+      recall_venue_preset and recall_parameter_preset are broadcast to every
+      unit that responds to the preset, change everything it holds at once,
+      and cannot be undone except by recalling another preset.
