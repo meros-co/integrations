@@ -39,6 +39,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "analogway-picturall",
         ],
     ),
+    ("vendor-anomes", &["millumin"]),
+    ("vendor-avstumpfl", &["avstumpfl-pixera"]),
     ("vendor-barco", &["barco-eventmaster"]),
     (
         "vendor-behringer",
@@ -56,6 +58,11 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
+    (
+        "vendor-dataton",
+        &["dataton-watchout6", "dataton-watchout7"],
+    ),
+    ("vendor-disguise", &["disguise"]),
     ("vendor-etc", &["etc-eos"]),
     ("vendor-figure53", &["qlab"]),
     (
@@ -67,6 +74,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "http-snapshot",
         ],
     ),
+    ("vendor-greenhippo", &["greenhippo-hippotizer"]),
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-kramer", &["kramer-p3000"]),
     ("vendor-lawo", &["emberplus"]),

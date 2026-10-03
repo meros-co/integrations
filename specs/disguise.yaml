@@ -1,0 +1,621 @@
+spec: 1
+id: disguise
+name: disguise Designer (Session and Service APIs)
+vendor: disguise
+category: playback
+
+# Written over disguise's HTTP APIs, which disguise documents with complete
+# Swagger documents: the Session API (/api/session, served by Designer while a
+# project runs, sent to the Director) for transports and status, and the
+# Service API (/api/service, served by d3service with or without a project)
+# for systems and projects. Every reply is {"status": {"code", "message",
+# "details"}, "result"}, and a request that fails in part still answers HTTP
+# 200 with a non-zero status.code, so every command checks status.code.
+# Transports and tracks are named by a Locator; this spec sends the name, which
+# Designer resolves to the first resource of that name.
+#
+# The playhead is pushed over the Live Update websocket on the same port, which
+# carries values only by subscription id. The subscription here asks for one
+# property, a dictionary of the transport's playback values, so each update
+# carries its own field names. Transport settings and machine health are read
+# over REST every 10 seconds, sparingly, as disguise asks.
+#
+# OSC and MSC are not used: both need an event transport and a device created
+# inside the project, with operator-chosen addresses, and drive one transport
+# each; the REST API covers the same controls without that setup.
+
+source:
+  - title: d3 API, Session API (Swagger 2.0 document session.swagger.json, info.version 2.0.0, basePath /api/session)
+    author: disguise
+    url: https://developer.disguise.one/specs/session.swagger.json
+    note: >
+      Manufacturer document, retrieved 2026-10-02, linked from
+      https://developer.disguise.one/api/openapi/ and rendered at
+      https://developer.disguise.one/api/session/transport/. Transport paths
+      play, playsection, playloopsection, stop, returntostart,
+      gotonextsection, gotoprevsection, gotonexttrack, gotoprevtrack,
+      gotosection, gototrack, gotonote, gototag, gototime, gotoframe,
+      gototimecode, engaged, volume and brightness with their request bodies
+      (the transports array, TransportLocator {uid, name}, playmode NotSet,
+      Play, PlaySection, Loop, Stop; TagType TC, MIDI, CUE); GET
+      activetransport, transports (transports and multitransports at the top
+      level), tracks, setlists and annotations; status health, notifications,
+      project, session and setguimode; failover settings, failovermachine and
+      restoremachine. No securityDefinitions.
+  - title: d3 API, Service API (Swagger 2.0 document service.swagger.json, info.version 2.0.0, basePath /api/service)
+    author: disguise
+    url: https://developer.disguise.one/specs/service.swagger.json
+    note: >
+      Manufacturer document, retrieved 2026-10-02. system detectsystems, osinfo,
+      networkadapters, gpuoutputs and projects; project startlocalproject
+      {projectPath, soloMode, allowUpgrade}, quitlocalproject,
+      forcequitlocalproject and restartlocalproject.
+  - title: disguise Developer Portal, "Error Handling", "Locator", "Working with Sessions", "Monitoring Machine Health"
+    author: disguise
+    url: https://developer.disguise.one/api/error-handling/
+    note: >
+      Manufacturer documents, retrieved 2026-10-02. The response envelope, status.code
+      0 on success, HTTP 200 on partial failure; a Locator needs uid or name, uid
+      wins when both are given and a name finds the first match; commands go to
+      the Director; frequent REST polling is discouraged in favour of Live
+      Update.
+  - title: disguise Developer Portal, "Live Update API"
+    author: disguise
+    url: https://developer.disguise.one/api/session/liveupdate/
+    note: >
+      Manufacturer document, retrieved 2026-10-02. ws://<director>:<port>/api/session/liveupdate;
+      {"subscribe": {"object", "properties", "configuration": {"updateFrequencyMs"}}};
+      properties are Python expressions evaluated with object bound;
+      {"valuesChanged": [{"id", "value", ...}]} on subscribing and on each
+      change; dictionaries serialise as JSON objects.
+  - title: disguise User Guide, "APIs Overview" (last updated 2026-08-11)
+    author: disguise
+    url: https://help.disguise.one/designer/apis/api-overview
+    note: >
+      Manufacturer document. TCP port 80 by default, set in d3Manager > Machine
+      Settings > Advanced Network Configuration > API http port, 0 disabling the
+      API; Session and Service APIs from r23.2; uid as a decimal or hex string.
+  - title: companion-module-disguise-session (Light Art Studios GmbH, MIT licence)
+    author: Light Art Studios GmbH
+    url: https://github.com/Light-Art-Studios-GmbH/companion-module-disguise-session
+    note: >
+      Corroboration only, licence checked; its notes say it was verified against
+      Designer r34.0.3. Used for the Live Update transport object
+      transportmanager:<name> (spaces as underscores) and its properties
+      player.playing, player.tRender, player.playMode, player.track, engaged,
+      volume and brightness, which disguise's pages do not list; for gototime
+      taking seconds and gototimecode HH:MM:SS:FF; and for status.code 4000 on a
+      rejected play mode. No code taken.
+
+transport:
+  type: http
+  port: 80
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/service/system/osinfo }
+
+settings:
+  # The transport manager whose playhead Live Update reports, as Designer names
+  # it with spaces written as underscores.
+  live_transport: { type: string, pattern: "^[A-Za-z0-9_]+$", default: default }
+  # How often, at most, Live Update sends a changed value, in milliseconds.
+  live_update_ms: { type: int, min: 40, max: 10000, default: 250 }
+
+models:
+  - id: designer
+    name: disguise Designer r23.2 and later (Director, Actor or solo; vx, gx, rx and EX servers and Designer software)
+    supports: [play, play_section, loop_section, stop, return_to_start, next_section, previous_section,
+               next_track, previous_track, go_to_section, go_to_track, go_to_note, go_to_tag, go_to_time,
+               go_to_frame, go_to_timecode, set_engaged, set_volume, set_brightness,
+               get_active_transport, get_transports, get_tracks, get_setlists, get_annotations,
+               get_health, get_notifications, get_project, get_session, set_gui_mode,
+               get_failover_settings, failover_machine, restore_machine,
+               detect_systems, get_os_info, get_network_adapters, get_gpu_outputs, get_projects,
+               start_project, quit_project, restart_project, force_quit_project]
+    verification: none
+
+commands:
+  # ── Transport: play modes ────────────────────────────────────────────────
+  play:
+    summary: Play a transport (POST /api/session/transport/play)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+    send: { method: POST, path: /api/session/transport/play, body: '{"transports":[{"name":{transport:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  play_section:
+    summary: Play a transport to the end of the current section (playsection)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+    send: { method: POST, path: /api/session/transport/playsection, body: '{"transports":[{"name":{transport:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  loop_section:
+    summary: Loop the current section of a transport (playloopsection)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+    send: { method: POST, path: /api/session/transport/playloopsection, body: '{"transports":[{"name":{transport:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  stop:
+    summary: Stop a transport (stop)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+    send: { method: POST, path: /api/session/transport/stop, body: '{"transports":[{"name":{transport:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  return_to_start:
+    summary: Return a transport to its start (returntostart)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+    send: { method: POST, path: /api/session/transport/returntostart, body: '{"transports":[{"name":{transport:json}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Transport: jumps ─────────────────────────────────────────────────────
+  # playmode NotSet leaves the play mode as it is after the jump.
+  next_section:
+    summary: Jump a transport to the next section (gotonextsection)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotonextsection, body: '{"transports":[{"transport":{"name":{transport:json}},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  previous_section:
+    summary: Jump a transport to the previous section (gotoprevsection)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotoprevsection, body: '{"transports":[{"transport":{"name":{transport:json}},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  next_track:
+    summary: Jump a transport to the start of the next track in its set list (gotonexttrack)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotonexttrack, body: '{"transports":[{"transport":{"name":{transport:json}},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  previous_track:
+    summary: Jump a transport to the start of the previous track in its set list (gotoprevtrack)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotoprevtrack, body: '{"transports":[{"transport":{"name":{transport:json}},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_section:
+    summary: Jump a transport to a section of the current track by its index, from 0 (gotosection)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      section:   { type: int, min: 0, required: true }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotosection, body: '{"transports":[{"transport":{"name":{transport:json}},"section":"{section}","playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_track:
+    summary: Jump a transport to a track, by the track's name (gototrack)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      track:     { type: string, max_length: 256, required: true }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gototrack, body: '{"transports":[{"transport":{"name":{transport:json}},"track":{"name":{track:json}},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_note:
+    summary: Jump a transport to the note with this text on the current track (gotonote)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      note:      { type: string, max_length: 1024, required: true }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotonote, body: '{"transports":[{"transport":{"name":{transport:json}},"note":{note:json},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_tag:
+    summary: >
+      Jump a transport to a tag: a CUE tag such as 1.2.5, a MIDI tag or a TC
+      tag (gototag). allow_global also searches the other tracks of the set list.
+    params:
+      transport:    { type: string, max_length: 256, default: default }
+      type:         { type: enum, values: [CUE, MIDI, TC], default: CUE }
+      value:        { type: string, max_length: 64, required: true }
+      allow_global: { type: bool, default: false }
+      playmode:     { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gototag, body: '{"transports":[{"transport":{"name":{transport:json}},"type":"{type}","value":{value:json},"allowGlobalJump":{allow_global},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_time:
+    summary: Jump a transport to a time on the current track, in seconds (gototime)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      time:      { type: float, min: 0.0, required: true }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gototime, body: '{"transports":[{"transport":{"name":{transport:json}},"time":{time:.3f},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_frame:
+    summary: Jump a transport to a frame on the current track (gotoframe)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      frame:     { type: int, min: 0, required: true }
+      playmode:  { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gotoframe, body: '{"transports":[{"transport":{"name":{transport:json}},"frame":"{frame}","playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  go_to_timecode:
+    summary: Jump a transport to a timecode, HH:MM:SS:FF (gototimecode); ignore_tags jumps without looking for a TC tag
+    params:
+      transport:   { type: string, max_length: 256, default: default }
+      timecode:    { type: string, pattern: "^[0-9]{2}:[0-5][0-9]:[0-5][0-9]:[0-9]{2}$", required: true }
+      ignore_tags: { type: bool, default: false }
+      playmode:    { type: enum, values: [NotSet, Play, PlaySection, Loop, Stop], default: NotSet }
+    send: { method: POST, path: /api/session/transport/gototimecode, body: '{"transports":[{"transport":{"name":{transport:json}},"timecode":"{timecode}","ignoreTags":{ignore_tags},"playmode":"{playmode}"}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Transport: settings ──────────────────────────────────────────────────
+  set_engaged:
+    summary: Engage or disengage a transport (engaged); a disengaged transport ignores every control source
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      engaged:   { type: bool, default: true }
+    send: { method: POST, path: /api/session/transport/engaged, body: '{"transports":[{"transport":{"name":{transport:json}},"engaged":{engaged}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  set_volume:
+    summary: Set a transport's volume, 0.0 to 1.0 (volume)
+    params:
+      transport: { type: string, max_length: 256, default: default }
+      volume:    { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: POST, path: /api/session/transport/volume, body: '{"transports":[{"transport":{"name":{transport:json}},"volume":{volume:.3f}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  set_brightness:
+    summary: Set a transport's brightness, 0.0 to 1.0 (brightness)
+    params:
+      transport:  { type: string, max_length: 256, default: default }
+      brightness: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { method: POST, path: /api/session/transport/brightness, body: '{"transports":[{"transport":{"name":{transport:json}},"brightness":{brightness:.3f}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Transport: queries ───────────────────────────────────────────────────
+  get_active_transport:
+    summary: The transport selected in Designer's state bar, or a multitransport's members (activetransport)
+    send: { method: GET, path: /api/session/transport/activetransport }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_transports:
+    summary: Every transport and multitransport with its engaged state, volume, brightness, play mode, current track and set list (transports)
+    send: { method: GET, path: /api/session/transport/transports }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_tracks:
+    summary: Every track in the project, with its length and crossfade (tracks)
+    send: { method: GET, path: /api/session/transport/tracks }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_setlists:
+    summary: Every set list with its tracks (setlists)
+    send: { method: GET, path: /api/session/transport/setlists }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_annotations:
+    summary: A track's notes, tags and sections, by the track's name (annotations)
+    params:
+      track: { type: string, max_length: 256, required: true }
+    send: { method: GET, path: /api/session/transport/annotations, query: { name: "{track}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  # ── Session status ───────────────────────────────────────────────────────
+  get_health:
+    summary: Each machine's average FPS, dropped and missed video frames and status states (status/health)
+    send: { method: GET, path: /api/session/status/health }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_notifications:
+    summary: Each machine's notifications (status/notifications)
+    send: { method: GET, path: /api/session/status/notifications }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_project:
+    summary: The running project's path and the Designer version (status/project)
+    send: { method: GET, path: /api/session/status/project }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_session:
+    summary: The session's Director, actors and understudies, and whether it runs solo (status/session)
+    send: { method: GET, path: /api/session/status/session }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  set_gui_mode:
+    summary: Set when a machine shows Designer's interface (status/setguimode)
+    params:
+      machine: { type: string, max_length: 256, required: true }
+      mode:    { type: enum, values: [OffWhenActor, AlwaysOn, AlwaysOff], required: true }
+    send: { method: POST, path: /api/session/status/setguimode, body: '{"machine":{"name":{machine:json}},"mode":"{mode}"}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Failover ─────────────────────────────────────────────────────────────
+  get_failover_settings:
+    summary: The failover timeout and the normal and current presets (failover/settings)
+    send: { method: GET, path: /api/session/failover/settings }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  failover_machine:
+    summary: Fail a machine over to its understudy, by the machine's name (failover/failovermachine)
+    params:
+      machine: { type: string, max_length: 256, required: true }
+    send: { method: POST, path: /api/session/failover/failovermachine, body: '{"machine":{"name":{machine:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  restore_machine:
+    summary: Restore a failed-over machine, by its name (failover/restoremachine)
+    params:
+      machine: { type: string, max_length: 256, required: true }
+    send: { method: POST, path: /api/session/failover/restoremachine, body: '{"machine":{"name":{machine:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  # ── Service API: systems and projects ────────────────────────────────────
+  detect_systems:
+    summary: The disguise systems on the network, with type, version, running project and which services run (system/detectsystems)
+    send: { method: GET, path: /api/service/system/detectsystems }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_os_info:
+    summary: Windows and OS image versions (system/osinfo)
+    send: { method: GET, path: /api/service/system/osinfo }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_network_adapters:
+    summary: Network adapters with their addresses (system/networkadapters)
+    send: { method: GET, path: /api/service/system/networkadapters }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_gpu_outputs:
+    summary: GPU outputs with resolution, refresh rate, genlock state and colour format (system/gpuoutputs)
+    send: { method: GET, path: /api/service/system/gpuoutputs }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_projects:
+    summary: The projects on each machine and the last one run (system/projects)
+    send: { method: GET, path: /api/service/system/projects }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  start_project:
+    summary: Start a project on this machine (project/startlocalproject); see quirks before allow_upgrade
+    params:
+      path:          { type: string, max_length: 1024, required: true }
+      solo:          { type: bool, default: false }
+      allow_upgrade: { type: bool, default: false }
+    send: { method: POST, path: /api/service/project/startlocalproject, body: '{"projectPath":{path:json},"soloMode":{solo},"allowUpgrade":{allow_upgrade}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  quit_project:
+    summary: Quit the project running on this machine (project/quitlocalproject)
+    send: { method: POST, path: /api/service/project/quitlocalproject }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  restart_project:
+    summary: Restart the project running on this machine (project/restartlocalproject)
+    send: { method: POST, path: /api/service/project/restartlocalproject }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  force_quit_project:
+    summary: End the Designer process on this machine without saving (project/forcequitlocalproject)
+    send: { method: POST, path: /api/service/project/forcequitlocalproject }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+telemetry:
+  poll:
+    every_ms: 10000
+    send:
+      - { method: GET, path: /api/session/transport/transports }
+      - { method: GET, path: /api/session/status/health }
+      - { method: GET, path: /api/session/status/project }
+  websocket:
+    path: /api/session/liveupdate
+    send:
+      - >-
+        {"subscribe":{"object":"transportmanager:{settings.live_transport}","properties":["{'playing': object.player.playing, 'time': object.player.tRender, 'mode': str(object.player.playMode.state), 'track': str(object.player.track.description), 'engaged': object.engaged, 'volume': object.volume, 'brightness': object.brightness}"],"configuration":{"updateFrequencyMs":{settings.live_update_ms}}}}
+  updates:
+    - path: "^/api/session/transport/transports$"
+      json_each: "$.transports"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        engaged: "$.engaged"
+        volume: "$.volume"
+        brightness: "$.brightness"
+        playmode: "$.playmode"
+        track: "$.currentTrack.name"
+        timecode: "$.receivingTimecode"
+        setlist: "$.setList.name"
+      state:
+        transports.{uid}.name: "{name}"
+        transports.{uid}.engaged: "{engaged}"
+        transports.{uid}.volume: "{volume}"
+        transports.{uid}.brightness: "{brightness}"
+        transports.{uid}.playmode: "{playmode}"
+        transports.{uid}.current_track: "{track}"
+        transports.{uid}.receiving_timecode: "{timecode}"
+        transports.{uid}.setlist: "{setlist}"
+    - path: "^/api/session/status/health$"
+      json_each: "$.result"
+      json:
+        machine: "$.machine.name"
+        hostname: "$.machine.hostname"
+        fps: "$.status.averageFPS"
+        dropped: "$.status.videoDroppedFrames"
+        missed: "$.status.videoMissedFrames"
+      state:
+        machines.{machine}.hostname: "{hostname}"
+        machines.{machine}.average_fps: "{fps}"
+        machines.{machine}.video_dropped_frames: "{dropped}"
+        machines.{machine}.video_missed_frames: "{missed}"
+    - path: "^/api/session/status/project$"
+      json:
+        path: "$.result.projectPath"
+        major: "$.result.version.major"
+        minor: "$.result.version.minor"
+        hotfix: "$.result.version.hotfix"
+        revision: "$.result.version.revision"
+      state:
+        project.path: "{path}"
+        project.version: "{major}.{minor}.{hotfix}.{revision}"
+    # Live Update: the one subscribed property is a dictionary of the
+    # transport's playback values.
+    - json_match: { "$.valuesChanged": "^\\[" }
+      json_each: "$.valuesChanged"
+      json:
+        playing: "$.value.playing"
+        time: "$.value.time"
+        mode: "$.value.mode"
+        track: "$.value.track"
+        engaged: "$.value.engaged"
+        volume: "$.value.volume"
+        brightness: "$.value.brightness"
+      state:
+        live.playing: "{playing}"
+        live.time: "{time}"
+        live.play_mode: "{mode}"
+        live.track: "{track}"
+        live.engaged: "{engaged}"
+        live.volume: "{volume}"
+        live.brightness: "{brightness}"
+    - json_match: { "$.error": "^(.+)$" }
+      state: { live.error: "{1}" }
+
+state:
+  transports.*.name:               { type: string, description: "Transport name, keyed by the transport's uid" }
+  transports.*.engaged:            { type: bool, description: "The transport is engaged (responds to control)" }
+  transports.*.volume:             { type: float, description: "Transport volume, 0.0 to 1.0" }
+  transports.*.brightness:         { type: float, description: "Transport brightness, 0.0 to 1.0" }
+  transports.*.playmode:           { type: string, description: "Play mode: Play, PlaySection, Loop, Stop or NotSet" }
+  transports.*.current_track:      { type: string, description: "Name of the transport's current track" }
+  transports.*.receiving_timecode: { type: bool, description: "The transport is receiving timecode" }
+  transports.*.setlist:            { type: string, description: "Name of the transport's set list" }
+  machines.*.hostname:             { type: string, description: "Machine host name, keyed by machine name" }
+  machines.*.average_fps:          { type: float, unit: fps, description: "Machine's average frame rate" }
+  machines.*.video_dropped_frames: { type: float, description: "Dropped video frames reported by the machine" }
+  machines.*.video_missed_frames:  { type: float, description: "Missed video frames reported by the machine" }
+  project.path:                    { type: string, description: "Path of the running project" }
+  project.version:                 { type: string, description: "Designer version, major.minor.hotfix.revision" }
+  live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
+  live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
+  live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
+  live.track:                      { type: string, description: "Name of the Live Update transport's current track" }
+  live.engaged:                    { type: bool, description: "The Live Update transport is engaged" }
+  live.volume:                     { type: float, description: "Volume of the Live Update transport, 0.0 to 1.0" }
+  live.brightness:                 { type: float, description: "Brightness of the Live Update transport, 0.0 to 1.0" }
+  live.error:                      { type: string, description: "The last error Live Update reported, such as a subscription it could not make" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Send every request to the Director of a multi-machine session. The Session
+      API (transports, status, failover) answers only while Designer runs a
+      project; the Service API (systems, projects) answers whenever d3service
+      runs. The API port is set in d3Manager, and 0 turns the API off. There is no
+      authentication and no HTTPS: anyone who reaches the port has full control.
+  - models: [all]
+    severity: warning
+    text: >
+      A request that fails, in whole or in part, can still answer HTTP 200 with a
+      non-zero status.code and its reasons in status.details, which every command
+      here checks. The status codes are not listed by disguise; 4000 has been seen
+      for a play mode a jump does not take (such as LoopSection).
+  - models: [all]
+    severity: info
+    text: >
+      Transports, tracks and machines are named here by name. Designer resolves a
+      name to the first resource with it, and which comes first is not defined, so
+      give every transport, track and machine a unique name. get_transports and the
+      transports state give each transport's uid.
+  - models: [all]
+    severity: info
+    text: >
+      Some disguise examples write playMode with lower-case values (playsection)
+      and an /api/v2 path; this spec follows the Swagger document: playmode, the
+      values NotSet, Play, PlaySection, Loop and Stop, and /api/session. gototime
+      takes seconds and gototimecode HH:MM:SS:FF, as Designer r34 has been seen to
+      take them; the document gives no units. Volume and brightness outside 0 to 1
+      are ignored by the Director.
+  - models: [all]
+    severity: warning
+    text: >
+      set_engaged false disengages a transport: it then ignores every control
+      source, including timecode, OSC and this API's other commands, until engaged
+      again.
+  - models: [all]
+    severity: critical
+    text: >
+      failover_machine and restore_machine change which machine outputs, at once.
+      After a failover the understudy has to be restarted before it can act as
+      understudy again.
+  - models: [all]
+    severity: critical
+    text: >
+      quit_project and restart_project stop the show output; force_quit_project
+      ends the Designer process and loses unsaved changes. start_project with
+      allow_upgrade upgrades a project saved by an older Designer, after which that
+      version can no longer open it.
+  - models: [all]
+    severity: info
+    text: >
+      Live Update sends values by subscription id only. The subscription here asks
+      for one property, a Python dictionary of the transport's playback values
+      (player.playing, player.tRender, player.playMode, player.track, engaged,
+      volume, brightness), so each update names its own fields. Those properties
+      come from a third-party module tested on r34, not from disguise's pages, and
+      a multitransport has no transport manager to subscribe to. Designer can
+      accept the connection during start-up and not answer the websocket upgrade.
+  - models: [all]
+    severity: info
+    text: >
+      REST has no push and disguise discourages frequent polling, so transports,
+      machine health and the project are read every 10 seconds; the playhead of
+      the transport named by live_transport comes over Live Update. The Python
+      execution endpoints are not included: they run arbitrary code in Designer.

@@ -1,0 +1,725 @@
+spec: 1
+id: millumin
+name: Millumin (OSC API)
+vendor: Anomes
+category: playback
+
+# Millumin's OSC API, over UDP to its OSC input (port 5000 by default). The
+# /millumin prefix is optional on what Millumin receives and is left out here;
+# an int argument is an index (from 1) and a string argument a name, so the
+# index and name forms of a command are separate commands. Millumin never
+# answers the sender: its feedback goes to the OSC senders (servers) with
+# "send feedback" set in its device panel, so it is received on a fixed local
+# port, the feedback_port setting. Millumin sends no feedback for a change made
+# through the OSC API itself, so feedback reports what the operator or the
+# show changed, and every command reports unverified.
+
+source:
+  - title: Millumin dev-kit wiki, "OSC documentation" (Millumin V5)
+    author: Anomes
+    url: https://github.com/anome/millumin-dev-kit/wiki/OSC-documentation
+    note: >
+      Manufacturer document, the page Millumin's own "OSC Documentation" button
+      opens; last edited 2026-06-23, retrieved 2026-10-02. Read as
+      documentation only (the dev-kit repository's code has no licence and was
+      not read). The optional /millumin prefix, case-insensitive addresses,
+      int for index and string for name; element addressing /layer:<name>,
+      /light:<name>, /index:<n>, /selectedLayer; /action/launchColumn,
+      launchOrStopColumn, stopColumn, launchNextColumn, launchPreviousColumn,
+      selectBoard, play, pause, playOrPause, goToTime (seconds, negative from
+      the end, or HH:MM:SS.mmm), goToTimelineSegment, selectLayer,
+      selectLight, brush, enter/exitFullscreen, display/hideTestCard,
+      enable/disableWorkspace, openProject, saveProject, quit; /masterVideo,
+      /masterAudio, /masterDMX; /ping; layer opacity (0-1), position/xy, x and
+      y (pixels), rotation (degrees), scale (1 = 100%), effect<N>/<param>, the
+      /+ and /- relative forms and the /? query; media time,
+      normalizedTime, speed and text; startMedia (no argument, a column
+      index, a media name or a column name), pauseMedia, startOrPauseMedia,
+      stopMedia; /selectedLayer/import and importAndStart; the Feedback
+      section: board/launchedColumn and stoppedColumn (index, name),
+      layer:<name>/mediaStarted (index, name, duration), mediaPaused and
+      mediaStopped, property changes, light intensity, selectedLayer media
+      time, each sent by layer name and by index.
+  - title: Millumin dev-kit wiki, "OSC documentation (V4)" and "(V3)" (archives)
+    author: Anomes
+    url: https://github.com/anome/millumin-dev-kit/wiki/OSC-documentation-(V3)
+    note: >
+      Manufacturer documents. Version differences: launchPrevColumn before V4;
+      playAll, pauseAll, playTimeline, pauseTimeline and playOrPauseTimeline
+      before the 4.18 unified transport messages.
+  - title: Millumin Help, "Devices" (OSC), "Control Your Show Remotely", "Setup a Backup Machine", "Change Log"
+    author: Anomes
+    url: https://help.millumin.com/docs/connect/devices/#osc
+    note: >
+      Manufacturer documents, retrieved 2026-10-02. OSC input port 5000; OSC
+      senders with "send feedback"; Bonjour completion of the sender's machine;
+      4.16 masters over OSC, 4.18 play/pause for dashboard and timeline alike,
+      5.14 goToTime with HH:MM:SS.MMM.
+  - title: Millumin forum, "OSC feedback" (staff answer, September 2023)
+    author: Anomes
+    url: https://forum.millumin.com/discussion/2059/osc-feedback
+    note: >
+      Manufacturer staff statement: a change made through the OSC API sends no
+      feedback.
+  - title: companion-module-anomes-millumin (Bitfocus Companion module, MIT licence)
+    author: Bitfocus / Anomes
+    url: https://github.com/bitfocus/companion-module-anomes-millumin
+    note: >
+      Corroboration only, licence checked: commands sent to port 5000 with the
+      type tags above, feedback received on 8000, and per-layer media time
+      feedback /millumin/layer:<name>/media/time (elapsed, duration). No code
+      taken.
+
+transport:
+  type: osc-udp
+  port: 5000
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  # The port of the OSC sender (server) set up in Millumin's device panel,
+  # with send feedback on, pointing at this host. Empty for no feedback.
+  feedback_port: { type: int, min: 1, max: 65535, default: 8000 }
+
+models:
+  - id: millumin-5
+    name: Millumin 5
+    supports: [launch_column, launch_column_named, launch_or_stop_column, launch_or_stop_column_named,
+                   stop_column, next_column, previous_column, select_board, select_board_named,
+                   play, pause, play_or_pause, go_to_time, go_to_timecode, go_to_timeline_segment,
+                   select_layer, select_layer_named, select_light, select_light_named,
+                   set_master_video, set_master_audio, set_master_dmx, brush,
+                   enter_fullscreen, exit_fullscreen, show_test_card, hide_test_card,
+                   enable_workspace, disable_workspace, open_project, save_project, save_project_as,
+                   quit, ping, set_layer_opacity, set_layer_position, set_layer_x, set_layer_y,
+                   set_layer_rotation, set_layer_scale, set_layer_effect, select_layer_by_name,
+                   set_light_intensity, set_property, adjust_property, query_property,
+                   start_media, start_media_column, start_media_named, pause_media,
+                   start_or_pause_media, stop_media, set_media_time, set_media_normalized_time,
+                   set_media_speed, set_media_text, import_media, import_media_column,
+                   clear_layer_media, clear_column_media, import_and_start]
+    verification: none
+  - id: millumin-4
+    name: Millumin 4.18 and later 4.x
+    supports: [launch_column, launch_column_named, launch_or_stop_column, launch_or_stop_column_named,
+               stop_column, next_column, previous_column, select_board, select_board_named,
+               play, pause, play_or_pause, go_to_time, go_to_timeline_segment,
+               select_layer, select_layer_named, select_light, select_light_named,
+               set_master_video, set_master_audio, set_master_dmx, brush,
+               enter_fullscreen, exit_fullscreen, show_test_card, hide_test_card,
+               enable_workspace, disable_workspace, open_project, save_project, save_project_as,
+               quit, ping, set_layer_opacity, set_layer_position, set_layer_x, set_layer_y,
+               set_layer_rotation, set_layer_scale, set_layer_effect, select_layer_by_name,
+               set_light_intensity, set_property, adjust_property, query_property,
+               start_media, start_media_column, start_media_named, pause_media,
+               start_or_pause_media, stop_media, set_media_time, set_media_normalized_time,
+               set_media_speed, set_media_text, import_media, import_media_column,
+               clear_layer_media, clear_column_media]
+    verification: none
+    notes: >
+      No goToTime with a timecode string (5.14) and no importAndStart (V5).
+      Before 4.18, transport used the Millumin 3 messages (play_all and so on,
+      the millumin-3 model).
+  - id: millumin-3
+    name: Millumin 3, and 4 before 4.18
+    supports: [launch_column, launch_column_named, launch_or_stop_column, launch_or_stop_column_named,
+               stop_column, next_column, previous_column_legacy, select_board, select_board_named,
+               play_all, pause_all, play_timeline, pause_timeline, play_or_pause_timeline,
+               go_to_timeline_segment, select_layer, select_layer_named, select_light, select_light_named,
+               brush, enter_fullscreen, exit_fullscreen, show_test_card, hide_test_card,
+               enable_workspace, disable_workspace, open_project, save_project, save_project_as,
+               quit, ping, set_layer_opacity, set_layer_position, set_layer_x, set_layer_y,
+               set_layer_rotation, set_layer_scale, set_layer_effect, select_layer_by_name,
+               set_light_intensity, set_property, adjust_property, query_property,
+               start_media, start_media_column, start_media_named, pause_media,
+               start_or_pause_media, stop_media, set_media_time, set_media_normalized_time,
+               set_media_speed, import_media, import_media_column, clear_layer_media,
+               clear_column_media]
+    verification: none
+    notes: >
+      launchPrevColumn for the previous column, and separate dashboard (playAll,
+      pauseAll) and timeline (playTimeline, ...) transport. No masters (4.16) and
+      no media text (V4). Millumin 4 between 4.16 and 4.18 also takes the masters.
+
+commands:
+  # ── Columns and boards ───────────────────────────────────────────────────
+  launch_column:
+    summary: Launch a column of the current board, by index from 1 (/action/launchColumn int)
+    params:
+      column: { type: int, min: 1, required: true }
+    send: { address: /action/launchColumn, args: [ { value: "{column}", type: int } ] }
+    returns: none
+
+  launch_column_named:
+    summary: Launch a column, by name (/action/launchColumn string)
+    params:
+      column: { type: string, max_length: 256, required: true }
+    send: { address: /action/launchColumn, args: [ { value: "{column}", type: string } ] }
+    returns: none
+
+  launch_or_stop_column:
+    summary: Launch a column, or stop it when it is playing, by index (/action/launchOrStopColumn int)
+    params:
+      column: { type: int, min: 1, required: true }
+    send: { address: /action/launchOrStopColumn, args: [ { value: "{column}", type: int } ] }
+    returns: none
+
+  launch_or_stop_column_named:
+    summary: Launch a column, or stop it when it is playing, by name (/action/launchOrStopColumn string)
+    params:
+      column: { type: string, max_length: 256, required: true }
+    send: { address: /action/launchOrStopColumn, args: [ { value: "{column}", type: string } ] }
+    returns: none
+
+  stop_column:
+    summary: Stop the playing column (/action/stopColumn)
+    send: { address: /action/stopColumn }
+    returns: none
+
+  next_column:
+    summary: Launch the next column (/action/launchNextColumn)
+    send: { address: /action/launchNextColumn }
+    returns: none
+
+  previous_column:
+    summary: Launch the previous column (/action/launchPreviousColumn, Millumin 4 and later)
+    send: { address: /action/launchPreviousColumn }
+    returns: none
+
+  previous_column_legacy:
+    summary: Launch the previous column (/action/launchPrevColumn, Millumin 3 and earlier)
+    send: { address: /action/launchPrevColumn }
+    returns: none
+
+  select_board:
+    summary: Switch to a board, by index from 1 (/action/selectBoard int)
+    params:
+      board: { type: int, min: 1, required: true }
+    send: { address: /action/selectBoard, args: [ { value: "{board}", type: int } ] }
+    returns: none
+
+  select_board_named:
+    summary: Switch to a board, by name (/action/selectBoard string)
+    params:
+      board: { type: string, max_length: 256, required: true }
+    send: { address: /action/selectBoard, args: [ { value: "{board}", type: string } ] }
+    returns: none
+
+  # ── Transport (dashboard media, or the timeline being edited) ────────────
+  play:
+    summary: Play the dashboard's media, or the timeline being edited (/action/play, 4.18 and later)
+    send: { address: /action/play }
+    returns: none
+
+  pause:
+    summary: Pause the dashboard's media, or the timeline being edited (/action/pause)
+    send: { address: /action/pause }
+    returns: none
+
+  play_or_pause:
+    summary: Toggle play and pause (/action/playOrPause)
+    send: { address: /action/playOrPause }
+    returns: none
+
+  go_to_time:
+    summary: Go to a time in seconds; a negative time counts from the end (/action/goToTime float)
+    params:
+      seconds: { type: float, required: true }
+    send: { address: /action/goToTime, args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  go_to_timecode:
+    summary: Go to a time given as HH:MM:SS.mmm (/action/goToTime string, 5.14 and later)
+    params:
+      time: { type: string, pattern: "^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,3})?$", required: true }
+    send: { address: /action/goToTime, args: [ { value: "{time}", type: string } ] }
+    returns: none
+
+  go_to_timeline_segment:
+    summary: Go to a timeline segment, by name (/action/goToTimelineSegment)
+    params:
+      segment: { type: string, max_length: 256, required: true }
+    send: { address: /action/goToTimelineSegment, args: [ { value: "{segment}", type: string } ] }
+    returns: none
+
+  play_all:
+    summary: Play every dashboard media (/action/playAll, Millumin 3)
+    send: { address: /action/playAll }
+    returns: none
+
+  pause_all:
+    summary: Pause every dashboard media (/action/pauseAll, Millumin 3)
+    send: { address: /action/pauseAll }
+    returns: none
+
+  play_timeline:
+    summary: Play the timeline being edited (/action/playTimeline, Millumin 3)
+    send: { address: /action/playTimeline }
+    returns: none
+
+  pause_timeline:
+    summary: Pause the timeline being edited (/action/pauseTimeline, Millumin 3)
+    send: { address: /action/pauseTimeline }
+    returns: none
+
+  play_or_pause_timeline:
+    summary: Toggle the timeline being edited (/action/playOrPauseTimeline, Millumin 3)
+    send: { address: /action/playOrPauseTimeline }
+    returns: none
+
+  # ── Selection, masters and the workspace ─────────────────────────────────
+  select_layer:
+    summary: Select a layer, by index (/action/selectLayer int)
+    params:
+      layer: { type: int, min: 1, required: true }
+    send: { address: /action/selectLayer, args: [ { value: "{layer}", type: int } ] }
+    returns: none
+
+  select_layer_named:
+    summary: Select a layer, by name (/action/selectLayer string)
+    params:
+      layer: { type: string, max_length: 256, required: true }
+    send: { address: /action/selectLayer, args: [ { value: "{layer}", type: string } ] }
+    returns: none
+
+  select_light:
+    summary: Select a light, by index (/action/selectLight int)
+    params:
+      light: { type: int, min: 1, required: true }
+    send: { address: /action/selectLight, args: [ { value: "{light}", type: int } ] }
+    returns: none
+
+  select_light_named:
+    summary: Select a light, by name (/action/selectLight string)
+    params:
+      light: { type: string, max_length: 256, required: true }
+    send: { address: /action/selectLight, args: [ { value: "{light}", type: string } ] }
+    returns: none
+
+  set_master_video:
+    summary: Set the video master, 0.0 to 1.0 (/masterVideo, 4.16 and later)
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { address: /masterVideo, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  set_master_audio:
+    summary: Set the audio master, 0.0 to 1.0 (/masterAudio)
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { address: /masterAudio, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  set_master_dmx:
+    summary: Set the DMX master, 0.0 to 1.0 (/masterDMX)
+    params:
+      level: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { address: /masterDMX, args: [ { value: "{level}", type: float } ] }
+    returns: none
+
+  brush:
+    summary: Paint with the brush at a normalised position, 0.0 to 1.0, with a pressure (/action/brush)
+    params:
+      x:        { type: float, min: 0.0, max: 1.0, required: true }
+      y:        { type: float, min: 0.0, max: 1.0, required: true }
+      pressure: { type: float, min: 0.0, max: 1.0, default: 1.0 }
+    send: { address: /action/brush, args: [ { value: "{x}", type: float }, { value: "{y}", type: float }, { value: "{pressure}", type: float } ] }
+    returns: none
+
+  enter_fullscreen:
+    summary: Enter full screen output (/action/enterFullscreen)
+    send: { address: /action/enterFullscreen }
+    returns: none
+
+  exit_fullscreen:
+    summary: Leave full screen output (/action/exitFullscreen)
+    send: { address: /action/exitFullscreen }
+    returns: none
+
+  show_test_card:
+    summary: Show the test card on the outputs (/action/displayTestCard)
+    send: { address: /action/displayTestCard }
+    returns: none
+
+  hide_test_card:
+    summary: Hide the test card (/action/hideTestCard)
+    send: { address: /action/hideTestCard }
+    returns: none
+
+  enable_workspace:
+    summary: Enable the workspace (/action/enableWorkspace)
+    send: { address: /action/enableWorkspace }
+    returns: none
+
+  disable_workspace:
+    summary: Disable the workspace (/action/disableWorkspace)
+    send: { address: /action/disableWorkspace }
+    returns: none
+
+  # ── Project ──────────────────────────────────────────────────────────────
+  open_project:
+    summary: Open a project, by the absolute path of its .millumin file (/action/openProject); see quirks
+    params:
+      path: { type: string, pattern: "^/", max_length: 1024, required: true }
+    send: { address: /action/openProject, args: [ { value: "{path}", type: string } ] }
+    returns: none
+
+  save_project:
+    summary: Save the project to its file (/action/saveProject)
+    send: { address: /action/saveProject }
+    returns: none
+
+  save_project_as:
+    summary: Save the project to another file, by absolute path (/action/saveProject string)
+    params:
+      path: { type: string, pattern: "^/", max_length: 1024, required: true }
+    send: { address: /action/saveProject, args: [ { value: "{path}", type: string } ] }
+    returns: none
+
+  quit:
+    summary: Quit Millumin (/action/quit); see quirks
+    send: { address: /action/quit }
+    returns: none
+
+  ping:
+    summary: Ask Millumin to send the state of every layer to its feedback senders (/ping)
+    send: { address: /ping }
+    returns: none
+
+  # ── Layers and lights ────────────────────────────────────────────────────
+  set_layer_opacity:
+    summary: Set a layer's opacity, 0.0 to 1.0, by layer name (/layer:<name>/opacity)
+    params:
+      layer:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      opacity: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { address: "/layer:{layer}/opacity", args: [ { value: "{opacity}", type: float } ] }
+    returns: none
+
+  set_layer_position:
+    summary: Move a layer to a position in pixels (/layer:<name>/position/xy)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      x:     { type: float, required: true }
+      y:     { type: float, required: true }
+    send: { address: "/layer:{layer}/position/xy", args: [ { value: "{x}", type: float }, { value: "{y}", type: float } ] }
+    returns: none
+
+  set_layer_x:
+    summary: Set a layer's horizontal position in pixels (/layer:<name>/position/x)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      x:     { type: float, required: true }
+    send: { address: "/layer:{layer}/position/x", args: [ { value: "{x}", type: float } ] }
+    returns: none
+
+  set_layer_y:
+    summary: Set a layer's vertical position in pixels (/layer:<name>/position/y)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      y:     { type: float, required: true }
+    send: { address: "/layer:{layer}/position/y", args: [ { value: "{y}", type: float } ] }
+    returns: none
+
+  set_layer_rotation:
+    summary: Set a layer's rotation in degrees (/layer:<name>/rotation)
+    params:
+      layer:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      degrees: { type: float, required: true }
+    send: { address: "/layer:{layer}/rotation", args: [ { value: "{degrees}", type: float } ] }
+    returns: none
+
+  set_layer_scale:
+    summary: Set a layer's scale, 1.0 for 100% (/layer:<name>/scale)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      scale: { type: float, min: 0.0, required: true }
+    send: { address: "/layer:{layer}/scale", args: [ { value: "{scale}", type: float } ] }
+    returns: none
+
+  set_layer_effect:
+    summary: Set a parameter of a layer's effect, the effect numbered from 1 and the parameter named as in Millumin (/layer:<name>/effect<N>/<param>)
+    params:
+      layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      effect: { type: int, min: 1, required: true }
+      param:  { type: string, pattern: "^[^/]+$", max_length: 128, required: true }
+      value:  { type: float, required: true }
+    send: { address: "/layer:{layer}/effect{effect}/{param}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  select_layer_by_name:
+    summary: Select (true) or deselect (false) a layer, by name (/layer:<name>/selected)
+    params:
+      layer:    { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      selected: { type: bool, default: true }
+    send: { address: "/layer:{layer}/selected", args: [ { value: "{selected:bool01}", type: int } ] }
+    returns: none
+
+  set_light_intensity:
+    summary: Set a light's intensity, by light name (/light:<name>/intensity); see quirks for the scale
+    params:
+      light:     { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      intensity: { type: float, min: 0.0, required: true }
+    send: { address: "/light:{light}/intensity", args: [ { value: "{intensity}", type: float } ] }
+    returns: none
+
+  set_property:
+    summary: >
+      Set any property of any element: target is layer:<name>, light:<name>,
+      index:<n>, selectedLayer, selectedLight or a media name, and property a
+      path such as mapping/topLeft/x or media/speed (/<target>/<property>)
+    params:
+      target:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      property: { type: string, pattern: "^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$", max_length: 128, required: true }
+      value:    { type: float, required: true }
+    send: { address: "/{target}/{property}", args: [ { value: "{value}", type: float } ] }
+    returns: none
+
+  adjust_property:
+    summary: Add to (+) or subtract from (-) any property of any element (/<target>/<property>/+ or /-)
+    params:
+      target:    { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      property:  { type: string, pattern: "^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$", max_length: 128, required: true }
+      direction: { type: enum, values: ["+", "-"], default: "+" }
+      amount:    { type: float, min: 0.0, required: true }
+    send: { address: "/{target}/{property}/{direction}", args: [ { value: "{amount}", type: float } ] }
+    returns: none
+
+  query_property:
+    summary: Ask Millumin to send a property's value to its feedback senders (/<target>/<property>/?)
+    params:
+      target:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      property: { type: string, pattern: "^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$", max_length: 128, required: true }
+    send: { address: "/{target}/{property}/?" }
+    returns: none
+
+  # ── Media on a layer ─────────────────────────────────────────────────────
+  start_media:
+    summary: Restart a layer's current media (/layer:<name>/startMedia)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+    send: { address: "/layer:{layer}/startMedia" }
+    returns: none
+
+  start_media_column:
+    summary: Start the media of a column, by index, on a layer (/layer:<name>/startMedia int)
+    params:
+      layer:  { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      column: { type: int, min: 1, required: true }
+    send: { address: "/layer:{layer}/startMedia", args: [ { value: "{column}", type: int } ] }
+    returns: none
+
+  start_media_named:
+    summary: Start a media on a layer, by the media's name (or in Millumin 5 a column's name) (/layer:<name>/startMedia string)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      media: { type: string, max_length: 256, required: true }
+    send: { address: "/layer:{layer}/startMedia", args: [ { value: "{media}", type: string } ] }
+    returns: none
+
+  pause_media:
+    summary: Pause a layer's media (/layer:<name>/pauseMedia)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+    send: { address: "/layer:{layer}/pauseMedia" }
+    returns: none
+
+  start_or_pause_media:
+    summary: Toggle a layer's media between playing and paused (/layer:<name>/startOrPauseMedia)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+    send: { address: "/layer:{layer}/startOrPauseMedia" }
+    returns: none
+
+  stop_media:
+    summary: Stop a layer's media (/layer:<name>/stopMedia)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+    send: { address: "/layer:{layer}/stopMedia" }
+    returns: none
+
+  set_media_time:
+    summary: Move a layer's media to a time in seconds (/layer:<name>/media/time)
+    params:
+      layer:   { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      seconds: { type: float, min: 0.0, required: true }
+    send: { address: "/layer:{layer}/media/time", args: [ { value: "{seconds}", type: float } ] }
+    returns: none
+
+  set_media_normalized_time:
+    summary: Move a layer's media to a fraction of its duration, 0.0 to 1.0 (/layer:<name>/media/normalizedTime)
+    params:
+      layer:    { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      position: { type: float, min: 0.0, max: 1.0, required: true }
+    send: { address: "/layer:{layer}/media/normalizedTime", args: [ { value: "{position}", type: float } ] }
+    returns: none
+
+  set_media_speed:
+    summary: Set a layer's media speed, 1.0 for normal speed (/layer:<name>/media/speed)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      speed: { type: float, required: true }
+    send: { address: "/layer:{layer}/media/speed", args: [ { value: "{speed}", type: float } ] }
+    returns: none
+
+  set_media_text:
+    summary: Set the text of a layer's text media (/layer:<name>/media/text, Millumin 4 and later)
+    params:
+      layer: { type: string, pattern: "^[^/]+$", max_length: 256, required: true }
+      text:  { type: string, max_length: 4096, required: true }
+    send: { address: "/layer:{layer}/media/text", args: [ { value: "{text}", type: string } ] }
+    returns: none
+
+  import_media:
+    summary: Import a file, or every file of a folder, onto the selected layer (/selectedLayer/import)
+    params:
+      path: { type: string, pattern: "^/", max_length: 1024, required: true }
+    send: { address: /selectedLayer/import, args: [ { value: "{path}", type: string } ] }
+    returns: none
+
+  import_media_column:
+    summary: Import a file onto the selected layer in a column (/selectedLayer/import with a column)
+    params:
+      path:   { type: string, pattern: "^/", max_length: 1024, required: true }
+      column: { type: int, min: 1, required: true }
+    send: { address: /selectedLayer/import, args: [ { value: "{path}", type: string }, { value: "{column}", type: int } ] }
+    returns: none
+
+  clear_layer_media:
+    summary: Remove every media from the selected layer (/selectedLayer/import with an empty path); see quirks
+    send: { address: /selectedLayer/import, args: [ { value: "", type: string } ] }
+    returns: none
+
+  clear_column_media:
+    summary: Remove the selected layer's media in a column (/selectedLayer/import with an empty path and a column); see quirks
+    params:
+      column: { type: int, min: 1, required: true }
+    send: { address: /selectedLayer/import, args: [ { value: "", type: string }, { value: "{column}", type: int } ] }
+    returns: none
+
+  import_and_start:
+    summary: Import a file onto the selected layer in a column and start it (/selectedLayer/importAndStart, Millumin 5)
+    params:
+      path:   { type: string, pattern: "^/", max_length: 1024, required: true }
+      column: { type: int, min: 1, required: true }
+    send: { address: /selectedLayer/importAndStart, args: [ { value: "{path}", type: string }, { value: "{column}", type: int } ] }
+    returns: none
+
+telemetry:
+  # Feedback arrives on feedback_port from the OSC senders set up in
+  # Millumin. Each layer event is sent twice, by layer name and by index; the
+  # rules read the named form. The /millumin/info duplicates are not read.
+  updates:
+    - address: "^/millumin/board/launchedColumn$"
+      state:
+        board.column: "{arg0}"
+        board.column_name: "{arg1}"
+        board.column_playing: "true"
+    - address: "^/millumin/board/stoppedColumn$"
+      state:
+        board.column: "{arg0}"
+        board.column_name: "{arg1}"
+        board.column_playing: "false"
+    - address: "^/millumin/layer:([^/]+)/mediaStarted$"
+      state:
+        layers.{1}.media_index: "{arg0}"
+        layers.{1}.media: "{arg1}"
+        layers.{1}.duration_s: "{arg2}"
+        layers.{1}.media_state: started
+    - address: "^/millumin/layer:([^/]+)/mediaPaused$"
+      state:
+        layers.{1}.media_index: "{arg0}"
+        layers.{1}.media: "{arg1}"
+        layers.{1}.media_state: paused
+    - address: "^/millumin/layer:([^/]+)/mediaStopped$"
+      state:
+        layers.{1}.media_index: "{arg0}"
+        layers.{1}.media: "{arg1}"
+        layers.{1}.media_state: stopped
+    - address: "^/millumin/layer:([^/]+)/media/time$"
+      state:
+        layers.{1}.time_s: "{arg0}"
+        layers.{1}.duration_s: "{arg1}"
+    - address: "^/millumin/layer:([^/]+)/opacity$"
+      state: { "layers.{1}.opacity": "{arg0}" }
+    - address: "^/millumin/layer:([^/]+)/rotation$"
+      state: { "layers.{1}.rotation": "{arg0}" }
+    - address: "^/millumin/layer:([^/]+)/scale$"
+      state: { "layers.{1}.scale": "{arg0}" }
+    - address: "^/millumin/layer:([^/]+)/(?:position/)?xy$"
+      state:
+        layers.{1}.x: "{arg0}"
+        layers.{1}.y: "{arg1}"
+    - address: "^/millumin/light:([^/]+)/intensity$"
+      state: { "lights.{1}.intensity": "{arg0}" }
+    - address: "^/millumin/selectedLayer/media/time$"
+      state:
+        selected_layer.time_s: "{arg0}"
+        selected_layer.duration_s: "{arg1}"
+
+state:
+  board.column:            { type: int, description: "Index of the column last launched or stopped, from 1" }
+  board.column_name:       { type: string, description: "Name of that column, when it has one" }
+  board.column_playing:    { type: bool, description: "The column was launched (true) or stopped (false)" }
+  layers.*.media_index:    { type: int, description: "Index of the layer's current media, keyed by layer name" }
+  layers.*.media:          { type: string, description: "Name of the layer's current media" }
+  layers.*.media_state:    { type: string, description: "started, paused or stopped, from the last media event" }
+  layers.*.duration_s:     { type: float, unit: s, description: "Duration of the layer's media" }
+  layers.*.time_s:         { type: float, unit: s, description: "Playhead of the layer's media" }
+  layers.*.opacity:        { type: float, description: "Layer opacity, 0.0 to 1.0" }
+  layers.*.rotation:       { type: float, unit: deg, description: "Layer rotation" }
+  layers.*.scale:          { type: float, description: "Layer scale, 1.0 for 100%" }
+  layers.*.x:              { type: float, unit: px, description: "Layer horizontal position" }
+  layers.*.y:              { type: float, unit: px, description: "Layer vertical position" }
+  lights.*.intensity:      { type: float, description: "Light intensity as Millumin reports it (0.5 for 50%), keyed by light name" }
+  selected_layer.time_s:   { type: float, unit: s, description: "Playhead of the selected layer's media" }
+  selected_layer.duration_s: { type: float, unit: s, description: "Duration of the selected layer's media" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Millumin sends feedback only to the OSC senders (servers) set up in its
+      device panel (CMD+K, OSC) with "send feedback" checked; with Millumin 4 the
+      panel's API feedback box must be checked too. Point one at this host and the
+      feedback_port setting (default 8000 here). Nothing can set that up over OSC.
+      On macOS 15 and later Millumin also needs the Local Network permission.
+  - models: [all]
+    severity: info
+    text: >
+      A change made through the OSC API sends no feedback (Millumin staff,
+      September 2023), so the state reports changes made in Millumin or by its
+      show, and every command here reports unverified. A column launched over OSC
+      still reports the media it starts. query_property and ping ask for feedback;
+      their answers also go to the configured senders.
+  - models: [all]
+    severity: info
+    text: >
+      An int argument is an index and a string argument a name: sending a number
+      as a string addresses an element of that name. Element names are written
+      into addresses as they are, so a name containing a slash cannot be used.
+  - models: [all]
+    severity: info
+    text: >
+      play, pause, play_or_pause and go_to_time act on the dashboard's media, or
+      on the timeline being edited; which one is not documented further.
+      stop_column takes no column: it stops the playing one.
+  - models: [all]
+    severity: info
+    text: >
+      Light intensity is shown in the documentation's input example on a 0-255
+      scale (127 for 50%) but reported in feedback as 0.5 for 50%; the master
+      levels are taken to be 0.0 to 1.0 from the documentation's examples.
+  - models: [all]
+    severity: critical
+    text: >
+      quit closes Millumin, and nothing can start it again over OSC.
+      open_project replaces the open show. save_project_as overwrites the file at
+      that path. clear_layer_media and clear_column_media remove media from the
+      selected layer.
+  - models: [all]
+    severity: info
+    text: >
+      Millumin's input port is 5000 in its documentation and earlier interfaces;
+      a Millumin 5 screenshot shows 8000, so check the listener's port in the
+      device panel. Millumin also answers OSCQuery, which is not documented
+      further.

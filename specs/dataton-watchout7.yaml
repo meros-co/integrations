@@ -1,0 +1,365 @@
+spec: 1
+id: dataton-watchout7
+name: Dataton WATCHOUT 7 (HTTP REST API)
+vendor: Dataton
+category: playback
+
+# WATCHOUT 7's external control API on port 3019 of the node running the
+# Director (served by the Operative, enabled per node with the "WATCHOUT 7
+# protocol" switch). Timelines and cues are addressed by their numeric ids,
+# which survive renaming (Producer: Copy ID). Inputs are show variables
+# addressed by their Key. Playback changes, countdowns and show revisions are
+# pushed on the server-sent event stream /v2/sse. WATCHOUT 7's WATCHOUT 6
+# compatibility layer is the dataton-watchout6 integration's watchout7-compat
+# model.
+
+source:
+  - title: WATCHOUT User Guide, "HTTP REST API" (generated July 2026, WATCHOUT 7.8.2)
+    author: Dataton
+    url: https://docs.dataton.com/guide/watchout/external-control/http-rest-api.html
+    note: >
+      Manufacturer document, retrieved 2026-10-02. Port 3019; no
+      authentication; GET and POST only; GET /info, /v0/state, /v0/show,
+      /v0/timelines, /v0/cues/{timeline_id}, /v0/inputs,
+      /v0/cue-group-state/by-id and by-name; POST /v0/play (PlaybackStateChange
+      {timelineId, state run|pause|stop, timelineTime}), /v0/play|pause|stop/{timeline_id},
+      /v0/jump-to-time/{timeline_id}?time=<ms>&state=play|pause (default pause),
+      /v0/jump-to-cue/{timeline_id}/{cue_id}?state=, /v0/show (show JSON),
+      /v0/showfile, /v0/inputs ([{key, value, duration}]), /v0/input/{key}?value=&duration=,
+      cue-group-state by id and by name (a map, {} resetting every set, or
+      one group and variant in the path), /v0/hittest ({cues: ["tl/cue"], x,
+      y} answered {hit_cues}; 400 for a conditional cue), /v0/msc; event
+      streams /v0, /v1 and /v2 sse and ndjson, v2 with PlaybackState as diffs
+      and TimelineCountdowns (Pre, Last10, Last5, Reached); node shutdown,
+      reboot and services/restart on port 3017; the full schema served by the
+      node at /api-docs/openapi.json.
+  - title: WATCHOUT User Guide, "External Control Overview", "MIDI Show Control", "Firewall Configuration" (July 2026, 7.8.2)
+    author: Dataton
+    url: https://docs.dataton.com/guide/watchout/external-control/external-control-overview.html
+    note: >
+      Manufacturer documents. Protocol switches per node in Node Info >
+      Protocols; external input addresses a variable by its Key; default input
+      interpolation 50 ms; MSC GO, STOP, GO OFF and RESET over /v0/msc, an
+      unknown cue answered 400 "MSC Cue not found".
+  - title: WATCHOUT release notes 7.2 to 7.8.4
+    author: Dataton
+    url: https://www.dataton.com/watchout/release-notes
+    note: >
+      Manufacturer document. /v0/hittest and the v2 event stream with
+      countdowns from 7.8.
+  - title: companion-module-dataton-watchout-json (Bitfocus Companion module, MIT licence, tested on WATCHOUT 7.5.1)
+    author: Bitfocus
+    url: https://github.com/bitfocus/companion-module-dataton-watchout-json
+    note: >
+      Corroboration only, licence checked. The event stream's data as JSON
+      {"kind", "value"} with kinds playbackState (value.timelines as
+      {id, playbackStatus}, merged by id), timelineCountdowns ({timelineId,
+      cueId, delta, status}) and showRevision, which Dataton's page names but
+      does not show. No code taken.
+
+transport:
+  type: http
+  port: 3019
+  scheme: http
+  auth: none
+  timeout_ms: 5000
+  probe: { method: GET, path: /info }
+
+models:
+  - id: watchout7
+    name: WATCHOUT 7.8 and later (Director node)
+    supports: [get_info, get_state, get_show, get_timelines, get_cues, get_inputs,
+               play_timeline, pause_timeline, stop_timeline, set_timeline_state, set_timeline_state_at,
+               jump_to_time, jump_to_cue, set_input, set_inputs, get_cue_sets_by_id,
+               get_cue_sets_by_name, set_cue_set_by_id, set_cue_set_by_name, set_cue_sets_by_id,
+               set_cue_sets_by_name, reset_cue_sets, hit_test, send_msc, load_show]
+    verification: none
+  - id: watchout7-early
+    name: WATCHOUT 7 before 7.8
+    supports: [get_info, get_state, get_show, get_timelines, get_cues, get_inputs,
+               play_timeline, pause_timeline, stop_timeline, set_timeline_state, set_timeline_state_at,
+               jump_to_time, jump_to_cue, set_input, set_inputs, get_cue_sets_by_id,
+               get_cue_sets_by_name, set_cue_set_by_id, set_cue_set_by_name, set_cue_sets_by_id,
+               set_cue_sets_by_name, reset_cue_sets, send_msc, load_show]
+    verification: none
+    notes: >
+      No /v0/hittest and no v2 event stream (both 7.8), so playback state is not
+      pushed: read it with get_state.
+
+commands:
+  # ── Reading ──────────────────────────────────────────────────────────────
+  get_info:
+    summary: Build and version information (GET /info)
+    send: { method: GET, path: /info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_state:
+    summary: The playback state of every timeline (GET /v0/state)
+    send: { method: GET, path: /v0/state }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_show:
+    summary: The whole current show, with its timelines and cues by id (GET /v0/show)
+    send: { method: GET, path: /v0/show }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_timelines:
+    summary: The timelines with their ids and names (GET /v0/timelines)
+    send: { method: GET, path: /v0/timelines }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_cues:
+    summary: A timeline's cues with their ids and names (GET /v0/cues/{timeline_id})
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/v0/cues/{timeline}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_inputs:
+    summary: Every input variable with its key and range (GET /v0/inputs)
+    send: { method: GET, path: /v0/inputs }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Playback ─────────────────────────────────────────────────────────────
+  play_timeline:
+    summary: Play a timeline, by id (POST /v0/play/{timeline_id})
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/v0/play/{timeline}" }
+    expect: { status: 200 }
+    returns: ack
+
+  pause_timeline:
+    summary: Pause a timeline (POST /v0/pause/{timeline_id})
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/v0/pause/{timeline}" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_timeline:
+    summary: Stop a timeline and return it to its start (POST /v0/stop/{timeline_id})
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/v0/stop/{timeline}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timeline_state:
+    summary: Run, pause or stop a timeline (POST /v0/play with a PlaybackStateChange)
+    params:
+      timeline: { type: int, min: 0, required: true }
+      state:    { type: enum, values: [run, pause, stop], required: true }
+    send: { method: POST, path: /v0/play, body: '{"timelineId":{timeline},"state":"{state}"}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timeline_state_at:
+    summary: Run, pause or stop a timeline at a time in ms (POST /v0/play with timelineTime)
+    params:
+      timeline: { type: int, min: 0, required: true }
+      state:    { type: enum, values: [run, pause, stop], required: true }
+      time_ms:  { type: int, min: 0, required: true }
+    send: { method: POST, path: /v0/play, body: '{"timelineId":{timeline},"state":"{state}","timelineTime":{time_ms}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  jump_to_time:
+    summary: Move a timeline to a time in ms, then play or pause it (POST /v0/jump-to-time/{timeline_id})
+    params:
+      timeline: { type: int, min: 0, required: true }
+      time_ms:  { type: int, min: 0, required: true }
+      state:    { type: enum, values: [play, pause], default: pause }
+    send: { method: POST, path: "/v0/jump-to-time/{timeline}", query: { time: "{time_ms}", state: "{state}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  jump_to_cue:
+    summary: Move a timeline to the start of a cue, by ids, then play or pause it (POST /v0/jump-to-cue/{timeline_id}/{cue_id})
+    params:
+      timeline: { type: int, min: 0, required: true }
+      cue:      { type: int, min: 0, required: true }
+      state:    { type: enum, values: [play, pause], default: pause }
+    send: { method: POST, path: "/v0/jump-to-cue/{timeline}/{cue}", query: { state: "{state}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Inputs ───────────────────────────────────────────────────────────────
+  set_input:
+    summary: Set an input variable, by key, over a transition in ms (POST /v0/input/{key})
+    params:
+      key:         { type: string, max_length: 256, required: true }
+      value:       { type: float, required: true }
+      duration_ms: { type: int, min: 0, default: 50 }
+    send: { method: POST, path: "/v0/input/{key}", query: { value: "{value:.4f}", duration: "{duration_ms}" } }
+    expect: { status: 200 }
+    returns: ack
+
+  set_inputs:
+    summary: >
+      Set several input variables at once (POST /v0/inputs): a JSON array of
+      {"key": <key>, "value": <number>, "duration": <ms, optional>}, as the
+      document's input schema gives it
+    params:
+      inputs: { type: json, required: true }
+    send: { method: POST, path: /v0/inputs, body: "{inputs}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Cue sets (cue-group state) ───────────────────────────────────────────
+  get_cue_sets_by_id:
+    summary: The active variant of every cue set, by ids (GET /v0/cue-group-state/by-id)
+    send: { method: GET, path: /v0/cue-group-state/by-id }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_cue_sets_by_name:
+    summary: The active variant of every cue set, by names, such as {"Language":"English"} (GET /v0/cue-group-state/by-name)
+    send: { method: GET, path: /v0/cue-group-state/by-name }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_cue_set_by_id:
+    summary: Select a cue set's variant, by ids (POST /v0/cue-group-state/by-id/{group_id}/{variant_id})
+    params:
+      group:   { type: int, min: 0, required: true }
+      variant: { type: int, min: 0, required: true }
+    send: { method: POST, path: "/v0/cue-group-state/by-id/{group}/{variant}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_set_by_name:
+    summary: Select a cue set's variant, by names (POST /v0/cue-group-state/by-name/{group_name}/{variant_name})
+    params:
+      group:   { type: string, max_length: 256, required: true }
+      variant: { type: string, max_length: 256, required: true }
+    send: { method: POST, path: "/v0/cue-group-state/by-name/{group}/{variant}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_sets_by_id:
+    summary: Select variants of several cue sets, a JSON map of group id to variant id (POST /v0/cue-group-state/by-id)
+    params:
+      selection: { type: json, required: true }
+    send: { method: POST, path: /v0/cue-group-state/by-id, body: "{selection}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_sets_by_name:
+    summary: Select variants of several cue sets, a JSON map of set name to variant name (POST /v0/cue-group-state/by-name)
+    params:
+      selection: { type: json, required: true }
+    send: { method: POST, path: /v0/cue-group-state/by-name, body: "{selection}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  reset_cue_sets:
+    summary: Return every cue set to its default variant (POST /v0/cue-group-state/by-name with {})
+    send: { method: POST, path: /v0/cue-group-state/by-name, body: "{}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Other ────────────────────────────────────────────────────────────────
+  hit_test:
+    summary: >
+      Which of the given cues ("timeline_id/cue_id", a JSON array of strings) are
+      hit at a stage position (POST /v0/hittest); answers {"hit_cues": [...]}
+    params:
+      cues: { type: json, required: true }
+      x:    { type: float, required: true }
+      y:    { type: float, required: true }
+    send: { method: POST, path: /v0/hittest, body: '{"cues":{cues},"x":{x:.2f},"y":{y:.2f}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.hit_cues" }
+    returns: value
+
+  send_msc:
+    summary: >
+      MIDI Show Control commands (POST /v0/msc): a JSON array such as
+      [{"command": {"go": {}}}], as the node's MSC schema gives it
+    params:
+      commands: { type: json, required: true }
+    send: { method: POST, path: /v0/msc, body: "{commands}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  load_show:
+    summary: Replace the running show with a show in WATCHOUT's show JSON (POST /v0/show); see quirks
+    params:
+      show: { type: json, required: true }
+    send: { method: POST, path: /v0/show, body: "{show}", content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # Version 2 of the event stream sends playback changes as differences per
+  # timeline, countdowns to cues and the show revision.
+  sse:
+    path: /v2/sse
+  updates:
+    - json_match: { "$.data.kind": "^playbackState$" }
+      json_each: "$.data.value.timelines"
+      json: { id: "$.id", status: "$.playbackStatus" }
+      state:
+        timelines.{id}.status: "{status}"
+    - json_match: { "$.data.kind": "^playbackState$" }
+      json: { clock: "$.data.value.clockTime" }
+      state: { clock_time_ms: "{clock}" }
+    - json_match: { "$.data.kind": "^timelineCountdowns$" }
+      json_each: "$.data.value"
+      json: { timeline: "$.timelineId", cue: "$.cueId", delta: "$.delta", status: "$.status" }
+      state:
+        countdowns.{timeline}.cue: "{cue}"
+        countdowns.{timeline}.delta_ms: "{delta}"
+        countdowns.{timeline}.status: "{status}"
+    - json_match: { "$.data.kind": "^showRevision$" }
+      json: { revision: "$.data.value" }
+      state: { show.revision: "{revision}" }
+
+state:
+  timelines.*.status:     { type: string, description: "Playback status of a timeline, keyed by timeline id: run, pause or stop" }
+  clock_time_ms:          { type: int, unit: ms, description: "WATCHOUT's clock time of the last playback state, in ms since the Unix epoch" }
+  countdowns.*.cue:       { type: int, description: "Id of the cue a timeline is counting down to, keyed by timeline id" }
+  countdowns.*.delta_ms:  { type: int, unit: ms, description: "Time to (negative after) the cue" }
+  countdowns.*.status:    { type: string, description: "Countdown status: Pre, Last10, Last5 or Reached" }
+  show.revision:          { type: string, description: "Revision of the show, which changes whenever the show is edited or replaced" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no authentication: anyone who reaches port 3019 controls the
+      show. It answers only while the node's "WATCHOUT 7 protocol" switch (Node
+      Info > Protocols) is on, on the node running the Director.
+  - models: [all]
+    severity: critical
+    text: >
+      load_show replaces the running show at once. reset_cue_sets returns every cue
+      set to its default variant, and stop_timeline returns a timeline to its start.
+  - models: [all]
+    severity: info
+    text: >
+      Dataton documents only HTTP 400 (a hit test on a conditionally rendered cue,
+      an MSC cue that does not exist). Success is taken to be HTTP 200 and the
+      response bodies of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs
+      are returned as sent: their schema is served only by the node, at
+      /api-docs/openapi.json.
+  - models: [all]
+    severity: info
+    text: >
+      The shape of the event stream's messages comes from Bitfocus's Companion
+      module, not Dataton's page: JSON {"kind", "value"} without event names, with
+      v2 playback states as differences by timeline id. A timeline removed from the
+      show stays in the timelines state until the device is opened again.
+  - models: [all]
+    severity: info
+    text: >
+      Uploading a .watch file (POST /v0/showfile, binary), and node shutdown,
+      reboot and service restart (port 3017 of each node) are not included: the
+      first needs a binary request body and the others a second port. Media
+      presets appear in the show and the event stream, but no endpoint selects one.
