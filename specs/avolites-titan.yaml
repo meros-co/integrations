@@ -1,0 +1,1476 @@
+spec: 1
+id: avolites-titan
+name: Avolites Titan (WebAPI)
+vendor: Avolites
+category: lighting
+
+source:
+  - title: Avolites Titan V19.2 API Documentation, Introduction
+    author: Avolites Ltd
+    url: https://api.avolites.com/19.2/
+    note: >
+      Retrieved 2026-10-02 (the newest of the versions listed at https://api.avolites.com/, 10.0
+      to 19.2). HTTP port 4430, paths starting /titan/, JSON replies; get requests
+      (/titan/get/System/SoftwareVersion, /titan/get/Show/ShowName), set requests as a POST body;
+      scripts as GET with typed query parameters; the Titan-specific types Level, Level Delta,
+      TitanId and User Number; "If you send an invalid request, the console will return an error
+      message ... For a successful request the console will return the result, or if there is no
+      result it will return a blank page"; handle requests /titan/handles, /titan/handles/<group>
+      and /titan/handles/<group>/<page> (pages from 0, group names case sensitive) returning JSON
+      handle records (handleLocation group, index and page, properties, titanId, type, Active,
+      Legend); the Playbacks and Titan providers.
+  - title: Avolites Titan V19.2 API Documentation, API reference (script/2, get/2 and set/2 forms)
+    author: Avolites Ltd
+    url: https://api.avolites.com/19.2/api/index.html
+    note: >
+      Retrieved 2026-10-02. One page per member, each with its macro syntax, HTTP form and
+      examples, for example Playbacks.FirePlaybackAtLevel.html:
+      /titan/script/2/Playbacks/FirePlaybackAtLevel?handle_userNumber=6&level_level=1&alwaysRefire=true,
+      with handle_location=playback_2_1 and handle_titanId=1895 as the other handle forms and
+      level_leveldelta=0.5 as the relative form; AcwTimeSpan parameters given in seconds
+      (fadeTime=5); properties read at /titan/get/2/<Provider>/<Property> and written by POST to
+      /titan/set/2/<Provider>/<Property>. Pages used: Playbacks (FirePlaybackAtLevel,
+      SetPlaybackLevel, KillPlayback, KillAllPlaybacks, ReleasePlayback, ReleaseAllPlaybacks,
+      ReleaseAllPlaybacksByPriority, FlashPlayback, ClearFlashPlayback, FlashTimedPlayback,
+      ClearFlashTimedPlayback, SwopPlayback, ClearSwopPlayback, ToggleLatchPlayback,
+      ToggleBlindPlayback, ClearAllBlindPlaybacks, Preload, SetManualCrossfadeLevel, TapTempo,
+      SetEffectSpeedMultiplier, SetCueLegend), CueLists (Play, PlayWithTime, GoBack, Resume, Pause,
+      FlashAndGo, SetNextCue, AdvanceNextStep, DecrementNextStep, ResetNextStep, NextStep, Review,
+      SnapBack, CutNextCueToLive, PauseChase, PlayChase, LiveCueNumber, NextCueNumber), Chases
+      (Play, Pause, GoBack, SetNextCue, NextStep, SetXFade), Masters (BlackOutDesk,
+      SetGrandMasterFaderLevel, DeadBlackOut, Flash, ClearFlash, Latch, Take, ResetMaster,
+      ResetAllMasters, TapTempo, IsDeskBlackedOut, GrandMasterOutputLevel), UserMacros
+      (RecallMacro, RecallMacroById), Palette (ApplyPalette, ApplyTimedPalette, ApplyQuickPalette,
+      ApplyTimedPaletteNumeric, ApplyPaletteToPlayback, SetFadeTime), Group (RecallGroup,
+      RecallGroupNumeric, Flash, Swop), Programmer (Editor.ClearAll, Editor.Fixtures.Release,
+      LocateSelectedFixtures, SetDimmerLevel "The level as a percentage", SetControlValueByName,
+      ToggleHighlight, FlashOn, FlashOut, ClearFlash, Highlight, Editor.Selection.SelectFixture,
+      Clear, PatternNext, PatternPrevious, InvertPattern, SetBlind, TryCue, BlindActive), Fixtures
+      (FlashFixture, ClearFlashFixture, SwopFixture, ClearSwopFixture), Timelines (PlayTimeline,
+      PauseTimeline, PlayPauseTimeline, StopTimeline, ResetTimeline, ReleaseTimeline,
+      ToggleLatchTimeline, SkipTimeline, FlashTimeline, ReleaseAllTimelines), Timecode
+      (SetEnabled, Play, Pause, Restart, Enabled), Dmx.FreezeDmx, Handles (SetGroupPage,
+      CurrentWorldName), System (ToggleMode, SoftwareVersion, DeskMode), Show.ShowName,
+      Titan (DmxOutputEnabled, DeviceInfo), Command.CommandLineText. The script/2 form is
+      documented from V14.0; V10.0 to V12.0 document only the older typed-parameter form.
+  - title: Bitfocus Companion module companion-module-avolites-titan (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-avolites-titan
+    note: >
+      Community code, read for corroboration only (MIT at the top level). For Titan 14.0 onwards;
+      "does NOT work with the Titan One, T1 and Editor Keys", the WebAPI being enabled "with T2
+      dongles and beyond (T3, desks...)". Sends script/2 requests as above, the grand master as
+      SetGrandMasterFaderLevel?oldValue=&value=<0-100>, tap tempo with an empty panelTimeStamp;
+      polls /titan/handles and get/2 System/SoftwareVersion, Masters/IsDeskBlackedOut,
+      Programmer/BlindActive and Programmer/Editor/Fixtures/Highlight every 5 s, and reads
+      handle records with lower-case legend, titanId, type, userNumber (hashCode, userNumbers)
+      and icon.
+
+# HTTP on port 4430, no authentication. Every request is a GET to /titan/script/2/...,
+# /titan/get/2/... or /titan/handles...; Titan answers 200 with the result, an empty page when
+# there is none, or an error message. State is polled: Titan pushes nothing over the WebAPI.
+transport:
+  type: http
+  port: 4430
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /titan/get/2/System/SoftwareVersion }
+
+models:
+  - id: diamond-9
+    name: Avolites Diamond 9
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+  - id: sapphire-touch
+    name: Avolites Sapphire Touch
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+  - id: arena
+    name: Avolites Arena
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+  - id: tiger-touch
+    name: Avolites Tiger Touch II and Tiger Touch Pro
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+  - id: quartz
+    name: Avolites Quartz
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+  - id: titan-mobile
+    name: Avolites Titan Mobile
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+  - id: titan-pc
+    name: Titan on a PC (Titan Go, Titan PC with a T2, T3 or Titan Net Processor)
+    supports: [
+      fire_playback, fire_playback_delta, set_playback_level, adjust_playback_level, kill_playback,
+      kill_all_playbacks, release_playback, release_all_playbacks,
+      release_all_playbacks_by_priority, flash_playback, clear_flash_playback,
+      flash_timed_playback, clear_flash_timed_playback, swop_playback, clear_swop_playback,
+      toggle_latch_playback, toggle_blind_playback, clear_all_blind_playbacks, preload_playback,
+      set_manual_crossfade_level, tap_tempo, set_effect_speed_multiplier, set_cue_legend,
+      cuelist_go, cuelist_go_with_time, cuelist_go_back, cuelist_resume, cuelist_pause,
+      cuelist_flash_and_go, cuelist_set_next_cue, cuelist_advance_next_step,
+      cuelist_decrement_next_step, cuelist_reset_next_step, cuelist_next_step, cuelist_review,
+      cuelist_snap_back, cuelist_cut_next_cue_to_live, pause_connected_chase, play_connected_chase,
+      chase_go, chase_pause, chase_go_back, chase_set_next_cue, chase_next_step,
+      chase_set_crossfade, set_desk_blackout, set_grand_master, dead_blackout, master_flash,
+      master_clear_flash, master_latch, master_take, reset_master, reset_all_masters,
+      master_tap_tempo, recall_macro, recall_macro_by_id, apply_palette, apply_timed_palette,
+      apply_quick_palette, apply_palette_number, apply_palette_to_playback, set_palette_fade_time,
+      recall_group, recall_group_number, group_flash, group_swop, clear_programmer,
+      release_programmer, locate_selected_fixtures, set_selected_dimmer, set_selected_attribute,
+      toggle_highlight, flash_selected_on, flash_selected_out, clear_selected_flash,
+      select_fixture, clear_selection, pattern_next, pattern_previous, invert_pattern, set_blind,
+      try_cue, flash_fixture, clear_flash_fixture, swop_fixture, clear_swop_fixture, timeline_play,
+      timeline_pause, timeline_play_pause, timeline_stop, timeline_reset, timeline_release,
+      timeline_toggle_latch, timeline_skip, timeline_flash, release_all_timelines,
+      set_timecode_enabled, timecode_play, timecode_pause, timecode_restart, set_dmx_frozen,
+      set_group_page, toggle_desk_mode, get_software_version, get_show_name, get_desk_mode,
+      get_desk_blackout, get_grand_master_output, get_blind_active, get_highlight,
+      get_dmx_output_enabled, get_timecode_enabled, get_live_cue_number, get_next_cue_number,
+      get_command_line, get_current_world, get_device_info, get_property, get_handles,
+      get_group_handles, get_page_handles
+    ]
+    verification: none
+
+commands:
+  fire_playback:
+    summary: "Fire a playback at a level 0-1 (FirePlaybackAtLevel: forces the level and loads it if not loaded; always_refire kills it first)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+      always_refire: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Playbacks/FirePlaybackAtLevel, raw_query: "handle_{by}={handle}&level_level={level:.3f}&alwaysRefire={always_refire}" }
+    expect: { status: 200 }
+    returns: ack
+
+  fire_playback_delta:
+    summary: "Fire a playback, adding a level change of -1 to 1 to its current level (FirePlaybackAtLevel with level_leveldelta)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      delta: { type: float, min: -1, max: 1, required: true }
+      always_refire: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Playbacks/FirePlaybackAtLevel, raw_query: "handle_{by}={handle}&level_leveldelta={delta:.3f}&alwaysRefire={always_refire}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_playback_level:
+    summary: "Set the level 0-1 of a playback (SetPlaybackLevel)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/SetPlaybackLevel, raw_query: "srcHandle_{by}={handle}&level_level={level:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  adjust_playback_level:
+    summary: "Change the level of a playback by -1 to 1 (SetPlaybackLevel with level_leveldelta)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      delta: { type: float, min: -1, max: 1, required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/SetPlaybackLevel, raw_query: "srcHandle_{by}={handle}&level_leveldelta={delta:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  kill_playback:
+    summary: "Kill a playback (KillPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/KillPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  kill_all_playbacks:
+    summary: "Kill all playbacks (KillAllPlaybacks)"
+    send: { method: GET, path: /titan/script/2/Playbacks/KillAllPlaybacks }
+    expect: { status: 200 }
+    returns: ack
+
+  release_playback:
+    summary: "Release a playback over fade_time seconds, or its master release time (ReleasePlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      fade_time: { type: float, min: 0, max: 3600, required: true }
+      use_master_release_time: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Playbacks/ReleasePlayback, raw_query: "handle_{by}={handle}&fadeTime={fade_time:.2f}&useMasterReleaseTime={use_master_release_time}" }
+    expect: { status: 200 }
+    returns: ack
+
+  release_all_playbacks:
+    summary: "Release all playbacks over fade_time seconds (ReleaseAllPlaybacks)"
+    params:
+      fade_time: { type: float, min: 0, max: 3600, required: true }
+      use_master_release_time: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Playbacks/ReleaseAllPlaybacks, raw_query: "fadeTime={fade_time:.2f}&useMasterReleaseTime={use_master_release_time}" }
+    expect: { status: 200 }
+    returns: ack
+
+  release_all_playbacks_by_priority:
+    summary: "Release all playbacks, by priority unless all_playbacks (ReleaseAllPlaybacksByPriority)"
+    params:
+      fade_time: { type: float, min: 0, max: 3600, required: true }
+      use_master_release_time: { type: bool, default: false }
+      all_playbacks: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Playbacks/ReleaseAllPlaybacksByPriority, raw_query: "fadeTime={fade_time:.2f}&useMasterReleaseTime={use_master_release_time}&allPlaybacks={all_playbacks}" }
+    expect: { status: 200 }
+    returns: ack
+
+  flash_playback:
+    summary: "Flash a playback to its flash level, if flash is enabled (FlashPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/FlashPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_flash_playback:
+    summary: "Clear a playback's flash (ClearFlashPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/ClearFlashPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  flash_timed_playback:
+    summary: "Flash a playback using its in and out times (FlashTimedPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/FlashTimedPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_flash_timed_playback:
+    summary: "Clear a timed flash (ClearFlashTimedPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/ClearFlashTimedPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  swop_playback:
+    summary: "Swop a playback (SwopPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/SwopPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_swop_playback:
+    summary: "Clear a playback's swop (ClearSwopPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/ClearSwopPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_latch_playback:
+    summary: "Toggle a playback between flashed and cleared; a cue list plays its next cue (ToggleLatchPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/ToggleLatchPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_blind_playback:
+    summary: "Toggle a playback's blind mode (ToggleBlindPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/ToggleBlindPlayback, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_all_blind_playbacks:
+    summary: "Take all playbacks out of blind (ClearAllBlindPlaybacks)"
+    send: { method: GET, path: /titan/script/2/Playbacks/ClearAllBlindPlaybacks }
+    expect: { status: 200 }
+    returns: ack
+
+  preload_playback:
+    summary: "Preload a playback: load everything but intensity, fading over time seconds (Preload)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      time: { type: float, min: 0, max: 3600, required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/Preload, raw_query: "handle_{by}={handle}&time={time:.2f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_manual_crossfade_level:
+    summary: "Set a playback's manual crossfade level 0-1 (SetManualCrossfadeLevel)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      level: { type: float, min: 0, max: 1, required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/SetManualCrossfadeLevel, raw_query: "handle_{by}={handle}&level_level={level:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  tap_tempo:
+    summary: "Tap the tempo of a playback; two taps set the step interval (TapTempo, with an empty panelTimeStamp)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/TapTempo, raw_query: "handle_{by}={handle}&panelTimeStamp=" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_effect_speed_multiplier:
+    summary: "Set a playback's effect speed multiplier (SetEffectSpeedMultiplier)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      multiplier: { type: float, min: 0, max: 100, required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/SetEffectSpeedMultiplier, raw_query: "handle_{by}={handle}&level={multiplier:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cue_legend:
+    summary: "Set the legend of a cue of a playback (SetCueLegend)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      cue: { type: float, min: 0, max: 99999, required: true }
+      legend: { type: string, max_length: 64, required: true }
+    send: { method: GET, path: /titan/script/2/Playbacks/SetCueLegend, raw_query: "handle_{by}={handle}&cueNumber={cue:.3f}&newLegend={legend:url}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_go:
+    summary: "Go on a cue list: play its next cue (CueLists.Play)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/Play, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_go_with_time:
+    summary: "Go on a cue list, overriding the fade time with time seconds (PlayWithTime)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      time: { type: float, min: 0, max: 3600, required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/PlayWithTime, raw_query: "handle_{by}={handle}&time={time:.2f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_go_back:
+    summary: "Go back: fire the cue before the live one (CueLists.GoBack)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/GoBack, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_resume:
+    summary: "Resume a paused cue list, with time seconds as the override time (CueLists.Resume)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      time: { type: float, min: 0, max: 3600, required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/Resume, raw_query: "handle_{by}={handle}&time={time:.2f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_pause:
+    summary: "Pause a cue list; if go_back_if_paused and it is already paused, go back (CueLists.Pause)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      go_back_if_paused: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/CueLists/Pause, raw_query: "handle_{by}={handle}&goBackIfPaused={go_back_if_paused}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_flash_and_go:
+    summary: "Flash a cue list (flash true), or clear the flash and go to the next cue (flash false) (FlashAndGo)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      flash: { type: bool, required: true }
+      with_times: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/CueLists/FlashAndGo, raw_query: "handle_{by}={handle}&flash={flash}&withTimes={with_times}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_set_next_cue:
+    summary: "Set the next cue (step number) of a cue list (CueLists.SetNextCue)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      cue: { type: float, min: 0, max: 99999, required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/SetNextCue, raw_query: "handle_{by}={handle}&stepNumber={cue:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_advance_next_step:
+    summary: "Move a cue list's next cue on by one (AdvanceNextStep)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/AdvanceNextStep, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_decrement_next_step:
+    summary: "Move a cue list's next cue back by one (DecrementNextStep)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/DecrementNextStep, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_reset_next_step:
+    summary: "Reset a cue list's next cue to the one after the live cue (ResetNextStep)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/ResetNextStep, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_next_step:
+    summary: "Play the next cue of a cue list or chase (CueLists.NextStep)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/NextStep, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_review:
+    summary: "Review: snap to the previous cue and run the live cue again (Review)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/Review, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_snap_back:
+    summary: "Snap back to the cue before the live one, without fades (SnapBack)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/SnapBack, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  cuelist_cut_next_cue_to_live:
+    summary: "Run the next cue without fade times (CutNextCueToLive)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/CueLists/CutNextCueToLive, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  pause_connected_chase:
+    summary: "Pause the connected running chase (CueLists.PauseChase)"
+    send: { method: GET, path: /titan/script/2/CueLists/PauseChase }
+    expect: { status: 200 }
+    returns: ack
+
+  play_connected_chase:
+    summary: "Continue the connected paused chase (CueLists.PlayChase)"
+    send: { method: GET, path: /titan/script/2/CueLists/PlayChase }
+    expect: { status: 200 }
+    returns: ack
+
+  chase_go:
+    summary: "Play a chase (Chases.Play)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Chases/Play, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  chase_pause:
+    summary: "Pause a chase; if go_back_if_paused and it is already paused, go back (Chases.Pause)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      go_back_if_paused: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Chases/Pause, raw_query: "handle_{by}={handle}&goBackIfPaused={go_back_if_paused}" }
+    expect: { status: 200 }
+    returns: ack
+
+  chase_go_back:
+    summary: "Fire the step before the live one on a chase (Chases.GoBack)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Chases/GoBack, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  chase_set_next_cue:
+    summary: "Set the next step of a chase (Chases.SetNextCue)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      step: { type: float, min: 0, max: 99999, required: true }
+    send: { method: GET, path: /titan/script/2/Chases/SetNextCue, raw_query: "handle_{by}={handle}&stepNumber={step:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  chase_next_step:
+    summary: "Play the next step of a chase (Chases.NextStep)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Chases/NextStep, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  chase_set_crossfade:
+    summary: "Set a chase's crossfade, 0-1 (SetXFade)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      crossfade: { type: float, min: 0, max: 1, required: true }
+    send: { method: GET, path: /titan/script/2/Chases/SetXFade, raw_query: "handle_{by}={handle}&crossfade={crossfade:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_desk_blackout:
+    summary: "Black out the desk (all intensity outputs to 0) or restore it (BlackOutDesk)"
+    params:
+      blackout: { type: bool, required: true }
+    send: { method: GET, path: /titan/script/2/Masters/BlackOutDesk, raw_query: "deskBlackOutState={blackout}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_grand_master:
+    summary: "Set the grand master fader, 0-100 (SetGrandMasterFaderLevel, with an empty oldValue)"
+    params:
+      level: { type: float, min: 0, max: 100, required: true }
+    send: { method: GET, path: /titan/script/2/Masters/SetGrandMasterFaderLevel, raw_query: "oldValue=&value={level:.1f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  dead_blackout:
+    summary: "Flash a master to zero (DeadBlackOut)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/DeadBlackOut, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  master_flash:
+    summary: "Flash a master to full (Masters.Flash)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/Flash, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  master_clear_flash:
+    summary: "Clear a master's flash and return it to its fader level (Masters.ClearFlash)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/ClearFlash, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  master_latch:
+    summary: "Toggle a master on and off (Masters.Latch)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/Latch, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  master_take:
+    summary: "Take on a master (Masters.Take)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/Take, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  reset_master:
+    summary: "Reset a master's levels to their defaults (ResetMaster)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/ResetMaster, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  reset_all_masters:
+    summary: "Reset every assigned master (ResetAllMasters)"
+    send: { method: GET, path: /titan/script/2/Masters/ResetAllMasters }
+    expect: { status: 200 }
+    returns: ack
+
+  master_tap_tempo:
+    summary: "Tap the tempo of a speed master (Masters.TapTempo, with an empty panelTimeStamp)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Masters/TapTempo, raw_query: "handle_{by}={handle}&panelTimeStamp=" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_macro:
+    summary: "Run the macro on a handle (RecallMacro)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/UserMacros/RecallMacro, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_macro_by_id:
+    summary: "Run a macro by its macro id (RecallMacroById)"
+    params:
+      macro_id: { type: string, pattern: '^[A-Za-z0-9_.-]{1,128}$', required: true }
+    send: { method: GET, path: /titan/script/2/UserMacros/RecallMacroById, raw_query: "macroId={macro_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  apply_palette:
+    summary: "Recall the palette on a handle, with or without its times (ApplyPalette)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      use_palette_times: { type: bool, default: true }
+    send: { method: GET, path: /titan/script/2/Palette/ApplyPalette, raw_query: "handle_{by}={handle}&usePaletteTimes={use_palette_times}" }
+    expect: { status: 200 }
+    returns: ack
+
+  apply_timed_palette:
+    summary: "Recall the palette on a handle using times (ApplyTimedPalette)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Palette/ApplyTimedPalette, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  apply_quick_palette:
+    summary: "Fire the quick palette on a handle (ApplyQuickPalette)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      use_palette_times: { type: bool, default: true }
+    send: { method: GET, path: /titan/script/2/Palette/ApplyQuickPalette, raw_query: "handle_{by}={handle}&usePaletteTimes={use_palette_times}" }
+    expect: { status: 200 }
+    returns: ack
+
+  apply_palette_number:
+    summary: "Recall a palette by user number with the current times (ApplyTimedPaletteNumeric)"
+    params:
+      user_number: { type: float, min: 0, max: 999999, required: true }
+    send: { method: GET, path: /titan/script/2/Palette/ApplyTimedPaletteNumeric, raw_query: "userNumber={user_number:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  apply_palette_to_playback:
+    summary: "Apply a palette to the fixtures in a playback (ApplyPaletteToPlayback)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      playback_by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      playback: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      use_palette_times: { type: bool, default: true }
+    send: { method: GET, path: /titan/script/2/Palette/ApplyPaletteToPlayback, raw_query: "handle_{by}={handle}&playbackHandle_{playback_by}={playback}&usePaletteTimes={use_palette_times}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_palette_fade_time:
+    summary: "Set the fade time for the next palette, in seconds (Palette.SetFadeTime)"
+    params:
+      time: { type: float, min: 0, max: 3600, required: true }
+    send: { method: GET, path: /titan/script/2/Palette/SetFadeTime, raw_query: "value={time:.2f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_group:
+    summary: "Recall the group on a handle (RecallGroup)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Group/RecallGroup, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  recall_group_number:
+    summary: "Recall a group by user number (RecallGroupNumeric)"
+    params:
+      user_number: { type: float, min: 0, max: 999999, required: true }
+    send: { method: GET, path: /titan/script/2/Group/RecallGroupNumeric, raw_query: "userId={user_number:.3f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  group_flash:
+    summary: "Flash (true) or release the flash of (false) a group handle (Group.Flash)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      enabled: { type: bool, required: true }
+    send: { method: GET, path: /titan/script/2/Group/Flash, raw_query: "handle_{by}={handle}&enable={enabled}" }
+    expect: { status: 200 }
+    returns: ack
+
+  group_swop:
+    summary: "Swop (true) or release the swop of (false) a group handle (Group.Swop)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      enabled: { type: bool, required: true }
+    send: { method: GET, path: /titan/script/2/Group/Swop, raw_query: "handle_{by}={handle}&enable={enabled}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_programmer:
+    summary: "Clear the programmer of all fixtures and attributes and clear the selection, ignoring the user clear settings (Programmer.Editor.ClearAll)"
+    params:
+      presets: { type: bool, default: false }
+      all_programmers: { type: bool, default: false }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/ClearAll, raw_query: "presets={presets}&allProgrammers={all_programmers}" }
+    expect: { status: 200 }
+    returns: ack
+
+  release_programmer:
+    summary: "Release the programmer over fade_time seconds (Programmer.Editor.Fixtures.Release)"
+    params:
+      fade_time: { type: float, min: 0, max: 3600, required: true }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/Release, raw_query: "fadeTime={fade_time:.2f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  locate_selected_fixtures:
+    summary: "Locate the selected fixtures; all_attributes locates every attribute (LocateSelectedFixtures)"
+    params:
+      all_attributes: { type: bool, default: true }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/LocateSelectedFixtures, raw_query: "allAttributes={all_attributes}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_selected_dimmer:
+    summary: "Set the dimmer of the selected fixtures, in percent (SetDimmerLevel)"
+    params:
+      level: { type: float, min: 0, max: 100, required: true }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/SetDimmerLevel, raw_query: "level={level:.1f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_selected_attribute:
+    summary: "Set an attribute of the selected fixtures by control and function name to a scaled value (SetControlValueByName)"
+    params:
+      control: { type: string, max_length: 64, required: true }
+      function: { type: string, max_length: 64, required: true }
+      value: { type: float, min: -100000, max: 100000, required: true }
+      programmer: { type: bool, default: true }
+      create_restore_point: { type: bool, default: true }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/SetControlValueByName, raw_query: "controlName={control:url}&functionName={function:url}&value={value:.3f}&programmer={programmer}&createRestorePoint={create_restore_point}" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_highlight:
+    summary: "Toggle the highlight fixture option (ToggleHighlight)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/ToggleHighlight }
+    expect: { status: 200 }
+    returns: ack
+
+  flash_selected_on:
+    summary: "Flash the selected fixtures to full (FlashOn)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/FlashOn }
+    expect: { status: 200 }
+    returns: ack
+
+  flash_selected_out:
+    summary: "Flash the selected fixtures to zero (FlashOut)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/FlashOut }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_selected_flash:
+    summary: "Clear the flash of the selected fixtures (Programmer.Editor.Fixtures.ClearFlash)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Fixtures/ClearFlash }
+    expect: { status: 200 }
+    returns: ack
+
+  select_fixture:
+    summary: "Select a fixture by handle (SelectFixture)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Selection/SelectFixture, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_selection:
+    summary: "Clear the fixture selection (Programmer.Editor.Selection.Clear)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Selection/Clear }
+    expect: { status: 200 }
+    returns: ack
+
+  pattern_next:
+    summary: "Move the selection pattern one place right (PatternNext)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Selection/PatternNext }
+    expect: { status: 200 }
+    returns: ack
+
+  pattern_previous:
+    summary: "Move the selection pattern one place left (PatternPrevious)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Selection/PatternPrevious }
+    expect: { status: 200 }
+    returns: ack
+
+  invert_pattern:
+    summary: "Invert the active selection pattern (InvertPattern)"
+    send: { method: GET, path: /titan/script/2/Programmer/Editor/Selection/InvertPattern }
+    expect: { status: 200 }
+    returns: ack
+
+  set_blind:
+    summary: "Turn blind mode on or off; set_changes_live applies blind changes live over fade_time seconds with a fixture overlap of 0-100 % (Programmer.SetBlind)"
+    params:
+      enabled: { type: bool, required: true }
+      set_changes_live: { type: bool, default: false }
+      fade_time: { type: float, min: 0, max: 3600, default: 0 }
+      fixture_overlap: { type: float, min: 0, max: 100, default: 100 }
+    send: { method: GET, path: /titan/script/2/Programmer/SetBlind, raw_query: "enabled={enabled}&setChangesLive={set_changes_live}&fadeTime={fade_time:.2f}&fixtureOverlap={fixture_overlap:.1f}" }
+    expect: { status: 200 }
+    returns: ack
+
+  try_cue:
+    summary: "Release and re-fire the programmer with its times, to preview a cue (TryCue)"
+    send: { method: GET, path: /titan/script/2/Programmer/TryCue }
+    expect: { status: 200 }
+    returns: ack
+
+  flash_fixture:
+    summary: "Flash a fixture to its flash level (FlashFixture)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Fixtures/FlashFixture, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_flash_fixture:
+    summary: "Clear a fixture's flash (ClearFlashFixture)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Fixtures/ClearFlashFixture, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  swop_fixture:
+    summary: "Swop a fixture (SwopFixture)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Fixtures/SwopFixture, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_swop_fixture:
+    summary: "Clear a fixture's swop (ClearSwopFixture)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Fixtures/ClearSwopFixture, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_play:
+    summary: "Play a timeline (Timelines.PlayTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/PlayTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_pause:
+    summary: "Pause a timeline (Timelines.PauseTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/PauseTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_play_pause:
+    summary: "Play a timeline, or pause it if playing (Timelines.PlayPauseTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/PlayPauseTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_stop:
+    summary: "Stop a timeline (Timelines.StopTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/StopTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_reset:
+    summary: "Reset a timeline (Timelines.ResetTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/ResetTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_release:
+    summary: "Release a timeline (Timelines.ReleaseTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/ReleaseTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_toggle_latch:
+    summary: "Latch or unlatch a timeline (level 1 or 0) (Timelines.ToggleLatchTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/ToggleLatchTimeline, raw_query: "handle_{by}={handle}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_skip:
+    summary: "Skip forwards (true) or backwards (false) on a timeline (SkipTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      forwards: { type: bool, default: true }
+    send: { method: GET, path: /titan/script/2/Timelines/SkipTimeline, raw_query: "handle_{by}={handle}&forwards={forwards}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_flash:
+    summary: "Flash (true) or unflash (false) a timeline (FlashTimeline)"
+    params:
+      by: { type: enum, values: [userNumber, titanId, location], default: userNumber }
+      handle: { type: string, pattern: '^([0-9]{1,6}(\.[0-9]{1,3})?|[A-Za-z][A-Za-z0-9]{0,31}_[0-9]{1,4}_[0-9]{1,4})$', required: true }
+      flash: { type: bool, required: true }
+    send: { method: GET, path: /titan/script/2/Timelines/FlashTimeline, raw_query: "handle_{by}={handle}&flashState={flash}" }
+    expect: { status: 200 }
+    returns: ack
+
+  release_all_timelines:
+    summary: "Release all timelines (ReleaseAllTimelines)"
+    send: { method: GET, path: /titan/script/2/Timelines/ReleaseAllTimelines }
+    expect: { status: 200 }
+    returns: ack
+
+  set_timecode_enabled:
+    summary: "Enable or disable the timers (timecode) in Titan (Timecode.SetEnabled)"
+    params:
+      enabled: { type: bool, required: true }
+    send: { method: GET, path: /titan/script/2/Timecode/SetEnabled, raw_query: "enabled={enabled}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timecode_play:
+    summary: "Play a timecode source by id (Timecode.Play)"
+    params:
+      timecode: { type: int, min: 0, max: 1000000, required: true }
+    send: { method: GET, path: /titan/script/2/Timecode/Play, raw_query: "timecodeId={timecode}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timecode_pause:
+    summary: "Pause a timecode source by id (Timecode.Pause)"
+    params:
+      timecode: { type: int, min: 0, max: 1000000, required: true }
+    send: { method: GET, path: /titan/script/2/Timecode/Pause, raw_query: "timecodeId={timecode}" }
+    expect: { status: 200 }
+    returns: ack
+
+  timecode_restart:
+    summary: "Restart a timecode source by id (Timecode.Restart)"
+    params:
+      timecode: { type: int, min: 0, max: 1000000, required: true }
+    send: { method: GET, path: /titan/script/2/Timecode/Restart, raw_query: "timecodeId={timecode}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_dmx_frozen:
+    summary: "Freeze (true) or unfreeze (false) the DMX output (FreezeDmx)"
+    params:
+      frozen: { type: bool, required: true }
+    send: { method: GET, path: /titan/script/2/Dmx/FreezeDmx, raw_query: "freeze={frozen}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_group_page:
+    summary: "Set the current page of a handle group, such as the playback page (Handles.SetGroupPage; pages from 0)"
+    params:
+      group: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,31}$', required: true }
+      page: { type: int, min: 0, max: 9999, required: true }
+    send: { method: GET, path: /titan/script/2/Handles/SetGroupPage, raw_query: "groupName={group}&page={page}" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_desk_mode:
+    summary: "Toggle the desk between run and program mode (System.ToggleMode)"
+    send: { method: GET, path: /titan/script/2/System/ToggleMode }
+    expect: { status: 200 }
+    returns: ack
+
+  get_software_version:
+    summary: "The Titan software version (System.SoftwareVersion)"
+    send: { method: GET, path: /titan/get/2/System/SoftwareVersion }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_show_name:
+    summary: "The show name (Show.ShowName)"
+    send: { method: GET, path: /titan/get/2/Show/ShowName }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_desk_mode:
+    summary: "The desk's run mode (System.DeskMode)"
+    send: { method: GET, path: /titan/get/2/System/DeskMode }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_desk_blackout:
+    summary: "Whether the desk is blacked out (Masters.IsDeskBlackedOut)"
+    send: { method: GET, path: /titan/get/2/Masters/IsDeskBlackedOut }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_grand_master_output:
+    summary: "The grand master's actual intensity output level (Masters.GrandMasterOutputLevel)"
+    send: { method: GET, path: /titan/get/2/Masters/GrandMasterOutputLevel }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_blind_active:
+    summary: "Whether blind mode is active (Programmer.BlindActive)"
+    send: { method: GET, path: /titan/get/2/Programmer/BlindActive }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_highlight:
+    summary: "Whether fixture highlight is on (Programmer.Editor.Fixtures.Highlight)"
+    send: { method: GET, path: /titan/get/2/Programmer/Editor/Fixtures/Highlight }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_dmx_output_enabled:
+    summary: "Whether DMX output is enabled (Titan.DmxOutputEnabled)"
+    send: { method: GET, path: /titan/get/2/Titan/DmxOutputEnabled }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_timecode_enabled:
+    summary: "Whether the timers (timecode) are enabled (Timecode.Enabled)"
+    send: { method: GET, path: /titan/get/2/Timecode/Enabled }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_live_cue_number:
+    summary: "The live cue number of the connected cue list (CueLists.LiveCueNumber)"
+    send: { method: GET, path: /titan/get/2/CueLists/LiveCueNumber }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_next_cue_number:
+    summary: "The next cue number of the connected cue list (CueLists.NextCueNumber)"
+    send: { method: GET, path: /titan/get/2/CueLists/NextCueNumber }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_command_line:
+    summary: "The command line text being typed or edited (Command.CommandLineText)"
+    send: { method: GET, path: /titan/get/2/Command/CommandLineText }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_current_world:
+    summary: "The current handle world's name (Handles.CurrentWorldName)"
+    send: { method: GET, path: /titan/get/2/Handles/CurrentWorldName }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_device_info:
+    summary: "The status of every connection to the console, as JSON (Titan.DeviceInfo)"
+    send: { method: GET, path: /titan/get/2/Titan/DeviceInfo }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_property:
+    summary: "Read any property by provider and property name (/titan/get/2/<provider>/<property>), e.g. Masters and IsDeskBlackedOut"
+    params:
+      provider: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,63}$', required: true }
+      property: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,63}$', required: true }
+    send: { method: GET, path: "/titan/get/2/{provider}/{property}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_handles:
+    summary: "Every programmed handle on the console, as Titan's JSON handle records (/titan/handles); can be large"
+    send: { method: GET, path: /titan/handles }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_group_handles:
+    summary: "The handles of one group on all its pages (/titan/handles/<group>), e.g. Fixtures or Colours; group names are case sensitive"
+    params:
+      group: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,31}$', required: true }
+    send: { method: GET, path: "/titan/handles/{group}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_page_handles:
+    summary: "The handles on one page of a group (/titan/handles/<group>/<page>, pages from 0)"
+    params:
+      group: { type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,31}$', required: true }
+      page:  { type: int, min: 0, max: 9999, required: true }
+    send: { method: GET, path: "/titan/handles/{group}/{page}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The WebAPI needs Titan V14 or later for the script/2 form used here, and is enabled on
+      consoles and on Titan PC with a T2, T3 or Titan Net Processor; Titan One, T1 and Editor
+      keys do not answer (per the community Companion module; Avolites' pages do not state the
+      licensing).
+
+  - models: [all]
+    severity: warning
+    text: >
+      A command is acknowledged by any 200 reply. Avolites says an invalid request returns "an
+      error message" without saying whether its status is 200, so a refused request may still
+      report ack; a malformed request and an unknown handle are not told apart from success.
+
+  - models: [all]
+    severity: info
+    text: >
+      Handles are addressed by user number (default), Titan id or location (by: location, handle
+      such as playback_2_1, the documentation's example), sent as handle_userNumber,
+      handle_titanId or handle_location (srcHandle_* for SetPlaybackLevel, playbackHandle_* for
+      the second handle of apply_palette_to_playback). User numbers are those shown on the
+      console's handles and can be changed by the operator.
+
+  - models: [all]
+    severity: info
+    text: >
+      Titan pushes nothing over the WebAPI. /titan/handles and four properties (software version,
+      desk blackout, blind and highlight) are polled every 5 s, the interval the community
+      Companion module uses, so playback active state lags by up to 5 s plus the console's reply
+      time. On a show with many handles the handles reply is large.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Handle record field names differ between sources: Avolites' introduction shows Active and
+      Legend, the community Companion module reads legend (lower case), userNumber and icon. Both
+      spellings of the legend and of active are read; handles are keyed by titanId. The user
+      number is read from userNumber.hashCode, a field Avolites does not document.
+
+  - models: [all]
+    severity: info
+    text: >
+      Levels are fractions 0-1 (level_level; 0.5 = 50 %) and level changes -1 to 1
+      (level_leveldelta); times are seconds, sent with two decimals (fadeTime=5.00) where the
+      documentation's examples use whole seconds. The grand master value is sent as 0-100, as the
+      community Companion module does; Avolites gives no range. The selected-fixtures dimmer is a
+      percentage ("The level as a percentage"). Bounds the documentation leaves open are chosen
+      here: times 0-3600 s, cue and step numbers 0-99999, the effect speed multiplier 0-100.
+
+  - models: [all]
+    severity: info
+    text: >
+      tap_tempo and master_tap_tempo send an empty panelTimeStamp, and set_grand_master an empty
+      oldValue, as the community Companion module does; the documentation types them TimeSpan and
+      Nullable<Single> without an example value.
+
+  - models: [all]
+    severity: critical
+    text: >
+      kill_all_playbacks, release_all_playbacks, set_desk_blackout, set_dmx_frozen,
+      clear_programmer and release_all_timelines act on the whole show at once and cannot be
+      undone from here; toggle_desk_mode switches the console between run and program mode.
+
+  - models: [all]
+    severity: info
+    text: >
+      Methods whose parameters use types the documentation gives no wire example for
+      (AcwRecordMask, AcwShapeType, AcwHSI, MenuEventTypes, AcwTimecodeSource, TimecodeTime and
+      some Int32 index arguments typed {titanId}) are not offered: the programmer clear with a
+      mask, effect clearing, HSI colour, handle key and fader events, timecode source selection,
+      playing a timeline from a time, and fader-group levels by index. Recording (StoreCue and
+      the Palette and Group store methods) is left out because recording on a live console cannot
+      be undone.
+
+state:
+  "handles.*.legend": { type: string, description: "Handle legend, by Titan id, from /titan/handles (legend or Legend)" }
+  "handles.*.active": { type: bool, description: "Whether the handle is active (a playback running), by Titan id, from /titan/handles (Active or active)" }
+  "handles.*.type": { type: string, description: "Handle type (playbackHandle, paletteHandle, fixtureHandle, ...), by Titan id" }
+  "handles.*.group": { type: string, description: "Handle group name (handleLocation.group), by Titan id" }
+  "handles.*.page": { type: int, description: "Handle page, from 0 (handleLocation.page), by Titan id" }
+  "handles.*.index": { type: int, description: "Handle index on its page, from 0 (handleLocation.index), by Titan id" }
+  "handles.*.user_number": { type: string, description: "Handle user number as Titan reports it (userNumber.hashCode; undocumented), by Titan id" }
+  system.software_version: { type: string, description: "Titan software version, from System.SoftwareVersion" }
+  masters.desk_blackout: { type: bool, description: "Desk blacked out, from Masters.IsDeskBlackedOut" }
+  programmer.blind: { type: bool, description: "Programmer blind mode active, from Programmer.BlindActive" }
+  programmer.highlight: { type: bool, description: "Fixture highlight on, from Programmer.Editor.Fixtures.Highlight" }
+
+telemetry:
+  poll:
+    send:
+      - { method: GET, path: /titan/get/2/System/SoftwareVersion }
+      - { method: GET, path: /titan/get/2/Masters/IsDeskBlackedOut }
+      - { method: GET, path: /titan/get/2/Programmer/BlindActive }
+      - { method: GET, path: /titan/get/2/Programmer/Editor/Fixtures/Highlight }
+      - { method: GET, path: /titan/handles }
+    every_ms: 5000
+  updates:
+    - path: "^/titan/get/2/System/SoftwareVersion$"
+      json: { version: "$" }
+      state: { system.software_version: "{version}" }
+    - path: "^/titan/get/2/Masters/IsDeskBlackedOut$"
+      json: { value: "$" }
+      state: { masters.desk_blackout: "{value}" }
+    - path: "^/titan/get/2/Programmer/BlindActive$"
+      json: { value: "$" }
+      state: { programmer.blind: "{value}" }
+    - path: "^/titan/get/2/Programmer/Editor/Fixtures/Highlight$"
+      json: { value: "$" }
+      state: { programmer.highlight: "{value}" }
+    - path: "^/titan/handles$"
+      json_each: "$"
+      json:
+        id: "$.titanId"
+        legend: "$.legend"
+        active: "$.active"
+        type: "$.type"
+        group: "$.handleLocation.group"
+        page: "$.handleLocation.page"
+        index: "$.handleLocation.index"
+        user_number: "$.userNumber.hashCode"
+      state:
+        "handles.{id}.legend": "{legend}"
+        "handles.{id}.active": "{active}"
+        "handles.{id}.type": "{type}"
+        "handles.{id}.group": "{group}"
+        "handles.{id}.page": "{page}"
+        "handles.{id}.index": "{index}"
+        "handles.{id}.user_number": "{user_number}"
+    - path: "^/titan/handles$"
+      json_each: "$"
+      json: { id: "$.titanId", legend: "$.Legend", active: "$.Active" }
+      state:
+        "handles.{id}.legend": "{legend}"
+        "handles.{id}.active": "{active}"

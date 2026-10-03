@@ -1,0 +1,596 @@
+spec: 1
+id: highend-hog4
+name: High End Systems Hog 4 family and Hog OS consoles
+vendor: High End Systems
+category: lighting
+
+source:
+  - title: Hog Lighting Control System User Manual 5.2.1, Section 22 Open Sound Control
+    author: High End Systems (ETC)
+    url: https://www.etcconnect.com/WebDocs/Controls/Hog_5x/Content/22_OSC/OSCInputMapping.htm
+    note: >
+      Manual version 5.2.1 (built 2026-09-01, retrieved 2026-10-02). 22.1 (OSCIntro.htm): OSC
+      input on every console of the family including Hog PC. 22.2 and 22.3 (OSCConfigIN.htm,
+      OSCConfigOUT.htm): Setup, Network, console Settings, Open Sound Control pane: OSC In with an
+      input port; OSC Out with an output port, the IP address to send to and the protocol. 22.4
+      OSC Input Mappings: playback paths /hog/playback/go|halt|resume|release/<type> where the
+      path number is the object type (0 list, 1 scene, 2 macro) and the argument the object
+      number, "Hog can process arguments sent as a float or integer", goto as list#.cue#
+      ("/hog/playback/go/0 15.2"); 22.4.2 button paths with 0 = up, 1 = down (masters
+      /hog/hardware/choose|go|pause|goback|flash/<master>, playback, programmer and number pad
+      keys, h# function keys, u# keys); 22.4.3 wheel paths (ewheelbutton/#, iwheelup, iwheeldown,
+      posmode 0 off 1 on, trackball "x,y values", encoderwheel/# -20 to 20, ratewheel, iwheel);
+      22.4.4 fader paths (/hog/hardware/fader/0 GM and faders 1 thru 90, 0 to 255); 22.4.5 system
+      commands /hog/command consoleledrefresh, consolefaderrefresh, refreshall. 22.5 OSC Output
+      Mappings (OSCOutputMapping.htm): no playback output; status paths /hog/status/led/<button>,
+      /hog/status/led/<button>colour, /hog/status/commandline, /hog/status/encoderwheel#/label and
+      value, /hog/status/h#/line1 and line2, /hog/status/chatline1-3. 22.6 (OSCNetwork.htm): wired
+      networks recommended; UDP OSC is not error checked.
+  - title: Hog 4 Lighting Control System User Manual 3.15.0, Section 22 Open Sound Control
+    author: High End Systems
+    url: https://www.etcconnect.com/webdocs/Controls/HOG/HTML/en/sect-osc_mappings.htm
+    note: >
+      Hog 4 OS manual version 3.15.0 (chap-osc.htm, sect-osc_intro.htm, sect-connecting_osc.htm,
+      sect-connecting_osc_output.htm, sect-osc_mappings.htm, sect-osc_wifi.htm). The same playback
+      table without resume for scenes; 22.4.2 OSC MIDI note mappings /hog/midi/on|off/<channel>/<note>
+      with the velocity as data ("if velocity = 0, then message is treated as note off"); a
+      shorter key table (masters, wheel buttons, pig, period, arrows, @, -, +, /, backspace, h#,
+      main play/pause/back, center choose, skip forward/back, 0-9); trackball, GM fader, encoder,
+      rate and i-wheel paths; the status outputs without the LED colour.
+  - title: ETC support articles, How To Setup Touch OSC and Hog 4; How To Setup iHog OSC and Hog 4
+    author: Electronic Theatre Controls
+    url: https://support.etcconnect.com/HES/Consoles/Hog_4/Networking/How_To_Setup_Touch_OSC_and_Hog_4
+    note: >
+      Retrieved 2026-10-02. OSC In and OSC Out enabled in the console's Open Sound Control tab with
+      different ports, "Recommended to use input port: 7001" and "output port: 7002", the output
+      IP address being the controller's; Hog 4 PC needs a wing, widget, Nano Hog or unlocked
+      ETCnomad key for encoders to work from TouchOSC. The port defaults below follow these.
+  - title: ETC support, All Hog Software Versions
+    author: Electronic Theatre Controls
+    url: https://support.etcconnect.com/HES/Consoles/Hog_4/Software_and_Programming/All_Hog_Software_Versions
+    note: >
+      Retrieved 2026-10-02: Hog OS releases 3.x, 4.0-4.3 and 5.0-5.2 and the manual for each; the
+      Hog OS 5 manual's technical specifications list Stage Hog, Flex Hog, Gig Hog, Hog 4, Hog
+      4-18, Full Boar 4, HPU, HPU+, Road Hog 4, Road Hog 4-21, HedgeHog 4 (4N, 4S, 4X, 2020 4X),
+      Nano Hog 4 and Hog PC.
+  - title: Bitfocus Companion module companion-module-highend-hog4 (community, MIT)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-highend-hog4
+    note: >
+      Community code, read for corroboration only (MIT at the top level). It sends the object
+      number in the address (/hog/playback/go/0/<n>) with a float 1 or 0, where the manual's
+      tables send it as the argument; this spec follows the manual. It also sends
+      /hog/hardware/fader/<master> with 0-255 for any master, and keys (full, enter, rate) that
+      the manual does not list and this spec leaves out.
+
+# OSC 1.0 over UDP to the console's OSC In port. Hog acknowledges nothing, so every command
+# reports unverified. Status output goes to the IP address, port and protocol set under OSC Out,
+# not back to the sender: set OSC Out to UDP, this host's address and feedback_port, and the core
+# receives there (a fixed local port shared by every console sending to it, each datagram routed
+# by its source address). With feedback_port empty nothing is read back.
+transport:
+  type: osc-udp
+  port: 7001
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 7002 }
+
+models:
+  - id: hog-4
+    name: Hog 4
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: hog-4-18
+    name: Hog 4-18
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: full-boar-4
+    name: Full Boar 4
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: road-hog-4
+    name: Road Hog 4
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: road-hog-4-21
+    name: Road Hog 4-21
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: hedgehog-4
+    name: HedgeHog 4 (4, 4N, 4S, 4X and the 2020 4X)
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: rack-hog-4
+    name: Rack Hog 4
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+    notes: >
+      Not in the Hog OS 5.2.1 technical specifications; runs Hog 4 OS like the other Hog 4 family consoles.
+  - id: nano-hog-4
+    name: Nano Hog 4 (with Hog 4 PC / Hog PC)
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+    notes: >
+      A USB control surface for Hog PC: OSC goes to the PC running Hog PC.
+  - id: hpu
+    name: Hog Processing Unit (HPU and HPU+)
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+    notes: >
+      A rack processor with no control surface of its own.
+  - id: hog-pc
+    name: Hog 4 PC / Hog PC
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: stage-hog
+    name: Stage Hog (Hog OS 5)
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: flex-hog
+    name: Flex Hog (Hog OS 5)
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+  - id: gig-hog
+    name: Gig Hog (Hog OS 5)
+    supports: [
+      go_list, halt_list, resume_list, release_list, go_scene, halt_scene, resume_scene,
+      release_scene, go_macro, halt_macro, release_macro, goto_cue, master_key, master_key_press,
+      set_fader, set_grand_master, key, key_press, function_key, function_key_press, user_key,
+      user_key_press, encoder_button, set_pos_mode, move_trackball, turn_encoder, turn_rate_wheel,
+      turn_intensity_wheel, midi_note_on, midi_note_off, refresh_leds, refresh_faders, refresh_all
+    ]
+    verification: none
+
+commands:
+  go_list:
+    summary: "Go cuelist by number (/hog/playback/go/0, the number as the argument)"
+    params:
+      list: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/go/0, args: [ { value: "{list}", type: int } ] }
+    returns: none
+
+  halt_list:
+    summary: "Halt cuelist by number (/hog/playback/halt/0, the number as the argument)"
+    params:
+      list: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/halt/0, args: [ { value: "{list}", type: int } ] }
+    returns: none
+
+  resume_list:
+    summary: "Resume a halted cuelist by number (/hog/playback/resume/0, the number as the argument)"
+    params:
+      list: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/resume/0, args: [ { value: "{list}", type: int } ] }
+    returns: none
+
+  release_list:
+    summary: "Release cuelist by number (/hog/playback/release/0, the number as the argument)"
+    params:
+      list: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/release/0, args: [ { value: "{list}", type: int } ] }
+    returns: none
+
+  go_scene:
+    summary: "Go scene by number (/hog/playback/go/1, the number as the argument)"
+    params:
+      scene: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/go/1, args: [ { value: "{scene}", type: int } ] }
+    returns: none
+
+  halt_scene:
+    summary: "Halt scene by number (/hog/playback/halt/1, the number as the argument)"
+    params:
+      scene: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/halt/1, args: [ { value: "{scene}", type: int } ] }
+    returns: none
+
+  resume_scene:
+    summary: "Resume a halted scene (Hog OS 5 table) by number (/hog/playback/resume/1, the number as the argument)"
+    params:
+      scene: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/resume/1, args: [ { value: "{scene}", type: int } ] }
+    returns: none
+
+  release_scene:
+    summary: "Release scene by number (/hog/playback/release/1, the number as the argument)"
+    params:
+      scene: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/release/1, args: [ { value: "{scene}", type: int } ] }
+    returns: none
+
+  go_macro:
+    summary: "Go macro by number (/hog/playback/go/2, the number as the argument)"
+    params:
+      macro: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/go/2, args: [ { value: "{macro}", type: int } ] }
+    returns: none
+
+  halt_macro:
+    summary: "Halt macro by number (/hog/playback/halt/2, the number as the argument)"
+    params:
+      macro: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/halt/2, args: [ { value: "{macro}", type: int } ] }
+    returns: none
+
+  release_macro:
+    summary: "Release macro by number (/hog/playback/release/2, the number as the argument)"
+    params:
+      macro: { type: int, min: 1, max: 99999, required: true }
+    send: { address: /hog/playback/release/2, args: [ { value: "{macro}", type: int } ] }
+    returns: none
+
+  goto_cue:
+    summary: "Go to a cue in a cuelist (/hog/playback/go/0 with the float <list>.<cue>, e.g. 15.2 for list 15 cue 2; see quirks for the cue numbers this form can carry)"
+    params:
+      list: { type: int, min: 1, max: 99999, required: true }
+      cue:  { type: string, pattern: '^[0-9]{0,3}[1-9]$', required: true }
+    send: { address: /hog/playback/go/0, args: [ { value: "{list}.{cue}", type: float } ] }
+    returns: none
+
+  master_key:
+    summary: "Press (true, 1) or release (false, 0) a master's Choose, Go, Pause, Back (goback) or Flash key (/hog/hardware/<key>/<master>)"
+    params:
+      key:     { type: enum, values: [choose, go, pause, goback, flash], required: true }
+      master:  { type: int, min: 1, max: 90, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/hog/hardware/{key}/{master}", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  master_key_press:
+    summary: "Press and release a master's Choose, Go, Pause, Back (goback) or Flash key (1 then 0 on /hog/hardware/<key>/<master>)"
+    params:
+      key:    { type: enum, values: [choose, go, pause, goback, flash], required: true }
+      master: { type: int, min: 1, max: 90, required: true }
+    send:
+      - { address: "/hog/hardware/{key}/{master}", args: [ { value: "1", type: int } ] }
+      - { address: "/hog/hardware/{key}/{master}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  set_fader:
+    summary: "Set master fader 1-90 to 0-255 (/hog/hardware/fader/<master>)"
+    params:
+      master: { type: int, min: 1, max: 90, required: true }
+      level:  { type: int, min: 0, max: 255, required: true }
+    send: { address: "/hog/hardware/fader/{master}", args: [ { value: "{level}", type: int } ] }
+    returns: none
+
+  set_grand_master:
+    summary: "Set the grand master fader to 0-255 (/hog/hardware/fader/0)"
+    params:
+      level: { type: int, min: 0, max: 255, required: true }
+    send: { address: /hog/hardware/fader/0, args: [ { value: "{level}", type: int } ] }
+    returns: none
+
+  key:
+    summary: "Press (true, 1) or release (false, 0) a front panel key (/hog/hardware/<key>); keys from the Hog OS 5.2.1 table"
+    params:
+      key:     { type: enum, values: [maingo, mainhalt, mainback, mainchoose, skipfwd, skipback, restart, assert, release, gm, dbo, nextpage, backpage, pig, period, up, down, left, right, at, minus, plus, slash, backspace, thru, intensity, position, colour, beam, effect, time, group, fixture, live, scene, cue, plot, batch, master, macro, list, page, delete, move, copy, update, merge, record, setup, goto, set, fan, open, next, back, all, clear, blind, highlight, func, zero, one, two, three, four, five, six, seven, eight, nine, iwheelup, iwheeldown], required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/hog/hardware/{key}", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  key_press:
+    summary: "Press and release a front panel key (1 then 0 on /hog/hardware/<key>)"
+    params:
+      key: { type: enum, values: [maingo, mainhalt, mainback, mainchoose, skipfwd, skipback, restart, assert, release, gm, dbo, nextpage, backpage, pig, period, up, down, left, right, at, minus, plus, slash, backspace, thru, intensity, position, colour, beam, effect, time, group, fixture, live, scene, cue, plot, batch, master, macro, list, page, delete, move, copy, update, merge, record, setup, goto, set, fan, open, next, back, all, clear, blind, highlight, func, zero, one, two, three, four, five, six, seven, eight, nine, iwheelup, iwheeldown], required: true }
+    send:
+      - { address: "/hog/hardware/{key}", args: [ { value: "1", type: int } ] }
+      - { address: "/hog/hardware/{key}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  function_key:
+    summary: "Press (true) or release (false) function key H<n> (/hog/hardware/h<n>)"
+    params:
+      number:  { type: int, min: 1, max: 20, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/hog/hardware/h{number}", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  function_key_press:
+    summary: "Press and release function key H<n> (1 then 0 on /hog/hardware/h<n>)"
+    params:
+      number: { type: int, min: 1, max: 20, required: true }
+    send:
+      - { address: "/hog/hardware/h{number}", args: [ { value: "1", type: int } ] }
+      - { address: "/hog/hardware/h{number}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  user_key:
+    summary: "Press (true) or release (false) U key<n> (/hog/hardware/u<n>)"
+    params:
+      number:  { type: int, min: 1, max: 20, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/hog/hardware/u{number}", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  user_key_press:
+    summary: "Press and release U key<n> (1 then 0 on /hog/hardware/u<n>)"
+    params:
+      number: { type: int, min: 1, max: 20, required: true }
+    send:
+      - { address: "/hog/hardware/u{number}", args: [ { value: "1", type: int } ] }
+      - { address: "/hog/hardware/u{number}", args: [ { value: "0", type: int } ] }
+    returns: none
+
+  encoder_button:
+    summary: "Press (true) or release (false) the button of encoder wheel <n> (/hog/hardware/ewheelbutton/<n>)"
+    params:
+      wheel:   { type: int, min: 1, max: 6, required: true }
+      pressed: { type: bool, required: true }
+    send: { address: "/hog/hardware/ewheelbutton/{wheel}", args: [ { value: "{pressed:bool01}", type: int } ] }
+    returns: none
+
+  set_pos_mode:
+    summary: "Trackball POS mode on (1) or off (0) (/hog/hardware/posmode)"
+    params:
+      enabled: { type: bool, required: true }
+    send: { address: /hog/hardware/posmode, args: [ { value: "{enabled:bool01}", type: int } ] }
+    returns: none
+
+  move_trackball:
+    summary: "Move the trackball by x and y (/hog/hardware/trackball with two values; see quirks for the range)"
+    params:
+      x: { type: int, min: -20, max: 20, required: true }
+      y: { type: int, min: -20, max: 20, required: true }
+    send: { address: /hog/hardware/trackball, args: [ { value: "{x}", type: int }, { value: "{y}", type: int } ] }
+    returns: none
+
+  turn_encoder:
+    summary: "Turn encoder wheel <n> by -20 to 20 (/hog/hardware/encoderwheel/<n>)"
+    params:
+      wheel: { type: int, min: 1, max: 6, required: true }
+      delta: { type: int, min: -20, max: 20, required: true }
+    send: { address: "/hog/hardware/encoderwheel/{wheel}", args: [ { value: "{delta}", type: int } ] }
+    returns: none
+
+  turn_rate_wheel:
+    summary: "Turn the rate wheel by -20 to 20 (/hog/hardware/ratewheel)"
+    params:
+      delta: { type: int, min: -20, max: 20, required: true }
+    send: { address: /hog/hardware/ratewheel, args: [ { value: "{delta}", type: int } ] }
+    returns: none
+
+  turn_intensity_wheel:
+    summary: "Turn the intensity wheel (i-Wheel) by -20 to 20 (/hog/hardware/iwheel)"
+    params:
+      delta: { type: int, min: -20, max: 20, required: true }
+    send: { address: /hog/hardware/iwheel, args: [ { value: "{delta}", type: int } ] }
+    returns: none
+
+  midi_note_on:
+    summary: "MIDI note on for the console's MIDI note triggers (/hog/midi/on/<channel>/<note>, velocity as the argument; a velocity of 0 is note off)"
+    params:
+      channel:  { type: int, min: 1, max: 16, required: true }
+      note:     { type: int, min: 0, max: 127, required: true }
+      velocity: { type: int, min: 0, max: 127, default: 127 }
+    send: { address: "/hog/midi/on/{channel}/{note}", args: [ { value: "{velocity}", type: int } ] }
+    returns: none
+
+  midi_note_off:
+    summary: "MIDI note off for the console's MIDI note triggers (/hog/midi/off/<channel>/<note>, velocity as the argument; a velocity of 0 is note off)"
+    params:
+      channel:  { type: int, min: 1, max: 16, required: true }
+      note:     { type: int, min: 0, max: 127, required: true }
+      velocity: { type: int, min: 0, max: 127, default: 0 }
+    send: { address: "/hog/midi/off/{channel}/{note}", args: [ { value: "{velocity}", type: int } ] }
+    returns: none
+
+  refresh_leds:
+    summary: "Ask the console to send every button LED status to its OSC output (/hog/command, string consoleledrefresh)"
+    send: { address: /hog/command, args: [ { value: consoleledrefresh, type: string } ] }
+    returns: none
+
+  refresh_faders:
+    summary: "Ask the console to send every fader level status to its OSC output (/hog/command, string consolefaderrefresh)"
+    send: { address: /hog/command, args: [ { value: consolefaderrefresh, type: string } ] }
+    returns: none
+
+  refresh_all:
+    summary: "Ask the console to send every supported status to its OSC output (/hog/command, string refreshall)"
+    send: { address: /hog/command, args: [ { value: refreshall, type: string } ] }
+    returns: none
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Hog acknowledges nothing over OSC, so every command reports unverified, and OSC over UDP is
+      not error checked ("Hog OS cannot verify that OSC messages ... will be received
+      properly"). High End recommends a wired network for OSC; the status output is the only way
+      to see what the console did.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Status output goes to the IP address, port and protocol set under OSC Out, not back to the
+      sender. Set OSC Out to UDP, this host's address and feedback_port (default 7002, ETC's
+      recommended output port); the OSC In port (default 7001, ETC's recommendation) must differ.
+      The console has no OSC playback output ("Hog OS does not output playback activity via
+      OSC"): cuelist, scene and fader state cannot be read, only LEDs, the command line, encoder
+      and H-key labels and the chat lines.
+
+  - models: [all]
+    severity: info
+    text: >
+      /hog/command refreshall is sent on connecting and every 60 s, so the status state is filled
+      in and recovered after a console restart; each send makes the console output all of its
+      supported statuses. consoleledrefresh and consolefaderrefresh are available as commands. The
+      manual does not document an address for fader level status, so faders are not read.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The manual documents the status addresses but not their argument types. LED status is
+      stored as a number (the TouchOSC templates drive LEDs with 0 and 1); the LED colour, the
+      command line, encoder labels and values, H-key labels and chat lines as text. The LED colour
+      address is written "<button>colour" in the table and "clearcolor" in its example, so both
+      spellings are read; an LED colour message also matches the plain LED address, so a
+      numeric colour value would appear as an extra LED named <button>colour.
+
+  - models: [all]
+    severity: info
+    text: >
+      The manual's playback table sends the object number as the argument of
+      /hog/playback/<action>/<type>, where <type> is 0 for lists, 1 for scenes and 2 for macros.
+      The community Companion module puts the number in the address instead
+      (/hog/playback/go/0/15); this spec follows the manual. Numbers are sent as int, which the
+      manual says Hog accepts as well as float.
+
+  - models: [all]
+    severity: warning
+    text: >
+      goto_cue sends one float, <list>.<cue>, as the manual's example "/hog/playback/go/0 15.2"
+      does, so a cue number is the decimal part: cue 2 and cue 20 would both be 15.2, and point
+      cues (2.5) cannot be expressed. The cue is therefore limited to whole numbers that do not
+      end in 0. A 32-bit float carries 15.2 as 15.19999981, which the console is assumed to round.
+
+  - models: [all]
+    severity: info
+    text: >
+      Ranges the manual does not state are bounded here: list, scene and macro numbers 1-99999;
+      H keys and U keys 1-20 (the manual writes h# and u#; examples h9 and u2); encoder wheels
+      1-6; trackball x and y -20 to 20 (the manual gives "x,y values" and the example 10,10,
+      sent here as two ints). Numbers a console does not have are ignored or mis-handled by the
+      console, not refused by the core. Masters 1-90 follow "Faders 1 thru 90"; models have
+      fewer physical masters but virtual masters are addressable.
+
+  - models: [all]
+    severity: info
+    text: >
+      The key list is the Hog OS 5.2.1 table. Hog 4 OS 3.x documents only the masters, wheel
+      buttons, Pig, Period, arrows, @, minus, plus, slash, Backspace, H keys, main Go, Halt and
+      Back, Center Choose, Skip Forward and Back and the number pad; other keys, U keys, resume
+      for scenes and the LED colour output may not exist on older software. Keys such as Enter
+      and Full are in neither table and are not offered.
+
+  - models: [all]
+    severity: info
+    text: >
+      Key commands send int 1 for down and 0 for up; key_press, master_key_press and the *_press
+      commands send both, in order, in two datagrams. A key left down by a lost release datagram
+      stays down until released.
+
+  - models: [hog-pc, nano-hog-4]
+    severity: warning
+    text: >
+      Encoders do not work over OSC on a Hog PC system without hardware attached (a Nano Hog,
+      Hoglet, wing or unlocked ETCnomad key), per ETC's TouchOSC setup article.
+
+  - models: [hpu]
+    severity: info
+    text: >
+      The HPU and HPU+ have no control surface; their front panel keys, encoders and faders over OSC
+      are assumed to act as on any console running Hog OS, which ETC does not state.
+
+state:
+  status.command_line: { type: string, description: "The console's command line, from /hog/status/commandline" }
+  leds.*.value: { type: float, description: "Front panel LED status by button name (the OSC key word, e.g. clear), from /hog/status/led/<button>; argument type undocumented" }
+  leds.*.colour: { type: string, description: "Front panel LED backlight colour by button name, from /hog/status/led/<button>colour (Hog OS 5); format undocumented, stored as sent" }
+  encoder_wheels.*.label: { type: string, description: "Encoder wheel label, numbered from 1, from /hog/status/encoderwheel<n>/label" }
+  encoder_wheels.*.value: { type: string, description: "Encoder wheel value as displayed, from /hog/status/encoderwheel<n>/value" }
+  function_keys.*.line1: { type: string, description: "H key label, first line, from /hog/status/h<n>/line1" }
+  function_keys.*.line2: { type: string, description: "H key label, second line, from /hog/status/h<n>/line2" }
+  chat.line1: { type: string, description: "Most recent chat message, from /hog/status/chatline1" }
+  chat.line2: { type: string, description: "Second most recent chat message, from /hog/status/chatline2" }
+  chat.line3: { type: string, description: "Third most recent chat message, from /hog/status/chatline3" }
+
+telemetry:
+  subscribe:
+    send:
+      - { address: /hog/command, args: [ { value: refreshall, type: string } ] }
+    every_ms: 60000
+  updates:
+    - address: '^/hog/status/commandline$'
+      state: { status.command_line: "{arg0}" }
+    - address: '^/hog/status/led/([a-z0-9]+?)colou?r$'
+      state: { "leds.{1}.colour": "{arg0}" }
+    - address: '^/hog/status/led/([a-z0-9]+)$'
+      state: { "leds.{1}.value": "{arg0}" }
+    - address: '^/hog/status/encoderwheel([0-9]+)/label$'
+      state: { "encoder_wheels.{1}.label": "{arg0}" }
+    - address: '^/hog/status/encoderwheel([0-9]+)/value$'
+      state: { "encoder_wheels.{1}.value": "{arg0}" }
+    - address: '^/hog/status/h([0-9]+)/line1$'
+      state: { "function_keys.{1}.line1": "{arg0}" }
+    - address: '^/hog/status/h([0-9]+)/line2$'
+      state: { "function_keys.{1}.line2": "{arg0}" }
+    - address: '^/hog/status/chatline1$'
+      state: { chat.line1: "{arg0}" }
+    - address: '^/hog/status/chatline2$'
+      state: { chat.line2: "{arg0}" }
+    - address: '^/hog/status/chatline3$'
+      state: { chat.line3: "{arg0}" }
