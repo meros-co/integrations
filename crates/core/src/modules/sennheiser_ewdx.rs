@@ -4,6 +4,11 @@
 //! RFDeck exercised on real EW-DX receivers (OpenAPI 1.7): /api/channel/{id},
 //! its signalQualityIndicator, level and warnings, /api/rf/channels/{id} and
 //! /api/transmitters/{id}/battery. Only mute is writable: see the spec's quirks.
+//!
+//! Opened for commands only, it opens no subscription stream (so takes none of
+//! the device's subscription sessions) and reads nothing on connecting: the
+//! version request that finds the device, repeated whenever it has been quiet
+//! for 3 s, is the liveness check.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -48,18 +53,22 @@ enum Purpose {
 enum Phase {
     Idle,
     Probing,
-    Streaming,
+    /// The device answered: streaming, or for commands only, ready.
+    Ready,
 }
 
 pub(crate) struct Ewdx {
     base: String,
     authorization: String,
     channels: u32,
+    /// Stream and read state; false for commands only.
+    monitor: bool,
     phase: Phase,
     connected: bool,
     session: Option<String>,
     next_request: RequestId,
-    requests: HashMap<RequestId, Purpose>,
+    /// Requests in flight: why each was made and when it went.
+    requests: HashMap<RequestId, (Purpose, Millis)>,
     last_activity: Millis,
     liveness_in_flight: bool,
     strikes: u32,
@@ -79,7 +88,9 @@ impl Ewdx {
             .and_then(Value::as_str)
             .unwrap_or("");
         let port = ctx.port.unwrap_or(443);
-        Ewdx::for_device(ctx.host, port, password, ctx.channels.unwrap_or(2))
+        let mut d = Ewdx::for_device(ctx.host, port, password, ctx.channels.unwrap_or(2));
+        d.monitor = ctx.monitor;
+        d
     }
 
     fn for_device(host: IpAddr, port: u16, password: &str, channels: u32) -> Ewdx {
@@ -93,6 +104,7 @@ impl Ewdx {
             base: format!("https://{host}:{port}"),
             authorization: format!("Basic {credentials}"),
             channels,
+            monitor: true,
             phase: Phase::Idle,
             connected: false,
             session: None,
@@ -130,7 +142,7 @@ impl Ewdx {
     fn send(&mut self, cx: &mut Cx, purpose: Purpose, request: HttpRequest) {
         let id = self.next_request;
         self.next_request += 1;
-        self.requests.insert(id, purpose);
+        self.requests.insert(id, (purpose, cx.now()));
         cx.http(id, request);
     }
 
@@ -141,7 +153,9 @@ impl Ewdx {
     }
 
     fn stop_everything(&mut self, cx: &mut Cx) {
-        cx.sse_close(STREAM);
+        if self.monitor {
+            cx.sse_close(STREAM);
+        }
         cx.cancel_timer(LIVENESS);
         cx.cancel_timer(RETRY);
         self.phase = Phase::Idle;
@@ -392,7 +406,7 @@ impl Module for Ewdx {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
-        let Some(purpose) = self.requests.remove(&id) else {
+        let Some((purpose, sent)) = self.requests.remove(&id) else {
             return;
         };
         if self.refused.is_some() {
@@ -401,6 +415,10 @@ impl Module for Ewdx {
                 cx.complete(command, Err(CommandError::Auth { message }));
             }
             return;
+        }
+        // Every request is answered directly; a transport failure is no answer.
+        if result.is_ok() {
+            cx.round_trip(cx.now().saturating_sub(sent));
         }
         let status = result.as_ref().ok().map(|r| r.status);
         if let Some(reason) = refusal(status) {
@@ -428,8 +446,17 @@ impl Module for Ewdx {
                 match (status, &body) {
                     // A JSON body is what separates an SSCv2 device from any
                     // other HTTPS server at the address.
+                    (Some(s), Some(Value::Object(_))) if is_success(s) && !self.monitor => {
+                        // Commands only: no stream, no reads. The liveness
+                        // check keeps asking the version while it is quiet.
+                        self.phase = Phase::Ready;
+                        self.heard(cx);
+                        self.connected = true;
+                        cx.connection(Connection::Connected);
+                        cx.set_timer(LIVENESS, LIVENESS_CHECK_EVERY);
+                    }
                     (Some(s), Some(Value::Object(_))) if is_success(s) => {
-                        self.phase = Phase::Streaming;
+                        self.phase = Phase::Ready;
                         self.last_activity = cx.now();
                         let request = self.request(
                             "GET",
@@ -558,7 +585,7 @@ impl Module for Ewdx {
         match key {
             RETRY if self.refused.is_none() => self.probe(cx),
             LIVENESS => {
-                if self.phase != Phase::Streaming {
+                if self.phase != Phase::Ready {
                     return;
                 }
                 let quiet = cx.now().saturating_sub(self.last_activity);
@@ -575,7 +602,9 @@ impl Module for Ewdx {
     }
 
     fn stop(&mut self, cx: &mut Cx) {
-        cx.sse_close(STREAM);
+        if self.monitor {
+            cx.sse_close(STREAM);
+        }
     }
 }
 
@@ -932,6 +961,74 @@ mod tests {
             let dropped = a.contains(&Action::SseClose { stream: STREAM });
             assert_eq!(dropped, failures == 2);
         }
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_opens_no_stream() {
+        let mut d = device();
+        d.monitor = false;
+        let mut cx = Cx::new(0);
+        d.start(&mut cx);
+        let probe = requests(&cx.take())[0].0;
+        let mut cx = Cx::new(10);
+        d.http_response(&mut cx, probe, ok(json!({"protocol": "2.0"})));
+        let a = cx.take();
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        // No stream, no subscription, no identity or state read.
+        assert!(!a.iter().any(|x| matches!(x, Action::SseOpen { .. })));
+        assert!(requests(&a).is_empty());
+
+        // Quiet for 3 s: the version is asked as the liveness check.
+        let mut cx = Cx::new(10 + QUIET_AFTER);
+        d.timer(&mut cx, LIVENESS);
+        let (check, req) = requests(&cx.take()).remove(0);
+        assert!(req.url.ends_with("/api/ssc/version"));
+        let mut cx = Cx::new(10 + QUIET_AFTER + 8);
+        d.http_response(&mut cx, check, ok(json!({"protocol": "2.0"})));
+        let a = cx.take();
+        assert!(a.contains(&Action::Alive));
+        assert!(a.contains(&Action::RoundTrip(8)));
+
+        // Commands work.
+        let mut cx = Cx::new(5_000);
+        d.command(
+            &mut cx,
+            4,
+            "mute",
+            &params(json!({"channel": 1, "muted": true})),
+        );
+        let (put, req) = requests(&cx.take()).remove(0);
+        assert_eq!(req.url, "https://10.0.0.5:443/api/channel/0");
+        let mut cx = Cx::new(5_030);
+        d.http_response(&mut cx, put, status(200));
+        let a = cx.take();
+        assert_eq!(completed(&a), [(4, Ok(Outcome::Ack))]);
+        assert!(a.contains(&Action::RoundTrip(30)));
+
+        // Losing it closes no stream, since none was opened.
+        let mut cx = Cx::new(9_000);
+        d.lost(&mut cx, "gone".into());
+        assert!(!cx.take().contains(&Action::SseClose { stream: STREAM }));
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut d = device();
+        let mut cx = Cx::new(100);
+        d.start(&mut cx);
+        let probe = requests(&cx.take())[0].0;
+        let mut cx = Cx::new(140);
+        d.http_response(&mut cx, probe, ok(json!({"protocol": "2.0"})));
+        assert!(cx.take().contains(&Action::RoundTrip(40)));
+
+        // A request that fails in transport was not answered.
+        let (mut d, _) = streaming();
+        let mut cx = Cx::new(50);
+        d.command(&mut cx, 1, "mute", &params(json!({"channel": 1})));
+        let (id, _) = requests(&cx.take())[0].clone();
+        let mut cx = Cx::new(2_000);
+        d.http_response(&mut cx, id, Err("timed out".into()));
+        assert!(!cx.take().iter().any(|x| matches!(x, Action::RoundTrip(_))));
     }
 
     #[test]

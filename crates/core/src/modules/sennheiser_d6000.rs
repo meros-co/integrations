@@ -5,6 +5,10 @@
 //! channel tree), renewed at a third of their lifetime, with a silence timeout
 //! underneath because a lapsed subscription is otherwise indistinguishable from
 //! an idle receiver.
+//!
+//! Opened for commands only, it subscribes to nothing and reads no identity.
+//! A receiver sends nothing unsubscribed, so its name is asked at the renewal
+//! cadence instead, as the liveness check.
 
 use std::net::SocketAddr;
 
@@ -56,12 +60,18 @@ struct Pending {
     xid: u64,
     path: Vec<String>,
     expect: Expect,
+    sent_at: Millis,
     deadline: Millis,
 }
 
 pub(crate) struct D6000 {
     device: SocketAddr,
     channels: u32,
+    /// Subscribe and read identity; false for commands only.
+    monitor: bool,
+    /// The unanswered liveness query of a commands-only device: its xid and
+    /// when it went.
+    liveness: Option<(u64, Millis)>,
     connected: bool,
     open: bool,
     next_xid: u64,
@@ -71,13 +81,17 @@ pub(crate) struct D6000 {
 impl D6000 {
     pub(crate) fn new(ctx: OpenContext) -> D6000 {
         let port = ctx.port.unwrap_or(45);
-        D6000::for_device(SocketAddr::new(ctx.host, port), ctx.channels.unwrap_or(2))
+        let mut d = D6000::for_device(SocketAddr::new(ctx.host, port), ctx.channels.unwrap_or(2));
+        d.monitor = ctx.monitor;
+        d
     }
 
     fn for_device(device: SocketAddr, channels: u32) -> D6000 {
         D6000 {
             device,
             channels,
+            monitor: true,
+            liveness: None,
             connected: false,
             open: false,
             next_xid: 1,
@@ -111,7 +125,17 @@ impl D6000 {
         cx.set_timer(RECONNECT, RECONNECT_AFTER);
     }
 
-    fn subscribe(&self, cx: &mut Cx) {
+    /// Both subscriptions, and identity until connected. Opened for commands
+    /// only, the liveness query instead: an unsubscribed receiver sends
+    /// nothing, so without it a lost device could not be told from an idle one.
+    fn subscribe(&mut self, cx: &mut Cx) {
+        if !self.monitor {
+            let xid = self.next_xid;
+            self.next_xid += 1;
+            self.send(cx, &json!({"osc": {"xid": xid}, "device": {"name": null}}));
+            self.liveness = Some((xid, cx.now()));
+            return;
+        }
         for message in subscription_messages(self.channels) {
             self.send(cx, &message);
         }
@@ -147,6 +171,7 @@ impl D6000 {
             xid,
             path: path.iter().map(|s| s.to_string()).collect(),
             expect,
+            sent_at: cx.now(),
             deadline: cx.now() + REPLY_WAIT,
         });
         self.arm_reply_timer(cx);
@@ -173,6 +198,7 @@ impl D6000 {
                 match index {
                     Some(i) => {
                         let p = self.pending.remove(i);
+                        cx.round_trip(cx.now().saturating_sub(p.sent_at));
                         cx.complete(
                             p.id,
                             Err(CommandError::DeviceError {
@@ -193,6 +219,16 @@ impl D6000 {
 
     fn resolve_replies(&mut self, cx: &mut Cx, message: &Value) {
         let xid = message.pointer("/osc/xid").and_then(Value::as_u64);
+        if let Some((probe, sent)) = self.liveness {
+            let answers = match xid {
+                Some(x) => x == probe,
+                None => message.pointer("/device/name").is_some(),
+            };
+            if answers {
+                self.liveness = None;
+                cx.round_trip(cx.now().saturating_sub(sent));
+            }
+        }
         let mut i = 0;
         while i < self.pending.len() {
             let p = &self.pending[i];
@@ -229,6 +265,7 @@ impl D6000 {
             match reply {
                 Some(Reply::Done(result)) => {
                     let p = self.pending.remove(i);
+                    cx.round_trip(cx.now().saturating_sub(p.sent_at));
                     cx.complete(p.id, result);
                 }
                 Some(Reply::Wait) | None => i += 1,
@@ -847,6 +884,91 @@ mod tests {
         }));
         // Not connected again yet, so identity is asked again.
         assert_eq!(sent(&a).len(), 3);
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_subscribes_to_nothing() {
+        let mut d = D6000::for_device(device(), 2);
+        d.monitor = false;
+        let mut cx = Cx::new(0);
+        d.start(&mut cx);
+        // No subscription and no identity read: only the liveness query.
+        assert_eq!(
+            sent(&cx.take()),
+            [json!({"osc": {"xid": 1}, "device": {"name": null}})]
+        );
+        let a = feed(
+            &mut d,
+            15,
+            json!({"osc": {"xid": 1}, "device": {"name": "EM 6000"}}),
+        );
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(a.contains(&Action::RoundTrip(15)));
+        assert_eq!(patch(&a)["device"]["name"], "EM 6000");
+
+        // Renewal asks again; nothing is subscribed.
+        let mut cx = Cx::new(RENEW_EVERY);
+        d.timer(&mut cx, RENEW);
+        assert_eq!(
+            sent(&cx.take()),
+            [json!({"osc": {"xid": 2}, "device": {"name": null}})]
+        );
+
+        // Commands work.
+        let mut cx = Cx::new(7_000);
+        d.command(
+            &mut cx,
+            4,
+            "mute",
+            &params(json!({"channel": 1, "muted": true})),
+        );
+        assert_eq!(
+            sent(&cx.take()),
+            [json!({"osc": {"xid": 3}, "rx1": {"audio_mute": true}})]
+        );
+        let a = feed(
+            &mut d,
+            7_020,
+            json!({"osc": {"xid": 3}, "rx1": {"audio_mute": true}}),
+        );
+        assert_eq!(completed(&a), [(4, Ok(Outcome::Ack))]);
+        assert!(a.contains(&Action::RoundTrip(20)));
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut d = connected();
+        // Subscription notifications are pushed, not answers.
+        let a = feed(&mut d, 5, json!({"rx1": {"name": "Vox"}}));
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+
+        let mut cx = Cx::new(10);
+        d.command(
+            &mut cx,
+            9,
+            "set_af_out",
+            &params(json!({"channel": 1, "level_db": 6})),
+        );
+        let a = feed(
+            &mut d,
+            42,
+            json!({"osc": {"xid": 1}, "audio": {"out1": {"level_db": 6}}}),
+        );
+        assert!(a.contains(&Action::RoundTrip(32)));
+
+        let mut cx = Cx::new(100);
+        d.command(
+            &mut cx,
+            10,
+            "mute",
+            &params(json!({"channel": 1, "muted": true})),
+        );
+        let a = feed(
+            &mut d,
+            107,
+            json!({"osc": {"xid": 2, "error": [{"rx1": {"audio_mute": [406, {"desc": "no"}]}}]}}),
+        );
+        assert!(a.contains(&Action::RoundTrip(7)));
     }
 
     #[test]

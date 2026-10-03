@@ -5,6 +5,10 @@
 //! every 8 s, declare the device gone after 15 s of silence, and back off an
 //! address that never answers. Readings that differ from RFDeck were reviewed
 //! with it in RFDeck `docs/INTEGRATIONS_CORE_REVIEW.md`.
+//!
+//! Opened for commands only, it sends no Push and reads nothing on connecting.
+//! Without Push a receiver sends nothing unasked, so it is asked its name at
+//! the renewal cadence instead, as the liveness check.
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -24,6 +28,9 @@ const SOCKET: Key = "mcp";
 /// mode 3 (configuration attributes on change, cyclic attributes on warning
 /// change). The cycle time has a 100 ms resolution (TI 1254 p.12).
 const SUBSCRIBE: &str = "Push 60 500 3";
+/// The liveness check of a device opened for commands only: one short reply,
+/// and no subscription.
+const LIVENESS_QUERY: &str = "Name";
 
 /// Renew well inside the 60 s subscription: some firmware drops it early while
 /// in RF-Mute (RFDeck, observed on hardware).
@@ -68,12 +75,17 @@ struct Pending {
     id: CommandId,
     sent: String,
     expect: Expect,
+    sent_at: Millis,
     deadline: Millis,
 }
 
 pub(crate) struct Mcp {
     device: SocketAddr,
     kind: Kind,
+    /// Subscribe and read on connecting; false for commands only.
+    monitor: bool,
+    /// When the last unanswered Push (or, unmonitored, liveness query) went.
+    keep_alive_sent: Option<Millis>,
     connected: bool,
     disconnect_reported: bool,
     unanswered_cycles: u32,
@@ -88,13 +100,17 @@ impl Mcp {
         } else {
             Kind::Receiver
         };
-        Mcp::for_host(ctx.host, kind)
+        let mut mcp = Mcp::for_host(ctx.host, kind);
+        mcp.monitor = ctx.monitor;
+        mcp
     }
 
     fn for_host(host: IpAddr, kind: Kind) -> Mcp {
         Mcp {
             device: SocketAddr::new(host, PORT),
             kind,
+            monitor: true,
+            keep_alive_sent: None,
             connected: false,
             disconnect_reported: false,
             unanswered_cycles: 0,
@@ -107,8 +123,27 @@ impl Mcp {
         cx.udp_send(SOCKET, self.device, format!("{instruction}\r"));
     }
 
-    fn subscribe(&self, cx: &mut Cx) {
-        self.send(cx, SUBSCRIBE);
+    /// What keeps the device talking: Push when monitoring, otherwise the
+    /// liveness query, since without Push a receiver says nothing unasked.
+    fn keep_alive(&mut self, cx: &mut Cx) {
+        let instruction = if self.monitor {
+            SUBSCRIBE
+        } else {
+            LIVENESS_QUERY
+        };
+        self.send(cx, instruction);
+        self.keep_alive_sent = Some(cx.now());
+    }
+
+    /// The device's answer to the keep-alive: Push is echoed, the liveness
+    /// query answered with the name.
+    fn answers_keep_alive(&self, line: &str) -> bool {
+        let keyword = line.split_whitespace().next();
+        if self.monitor {
+            keyword == Some("Push")
+        } else {
+            keyword == Some(LIVENESS_QUERY)
+        }
     }
 
     fn arm_reply_timer(&self, cx: &mut Cx) {
@@ -124,6 +159,7 @@ impl Mcp {
             id,
             sent: instruction,
             expect,
+            sent_at: cx.now(),
             deadline: cx.now() + REPLY_WAIT,
         });
         self.arm_reply_timer(cx);
@@ -145,7 +181,7 @@ impl Mcp {
 
         self.unanswered_cycles += 1;
         if self.unanswered_cycles <= ATTEMPTS_BEFORE_BACKOFF {
-            self.subscribe(cx);
+            self.keep_alive(cx);
             cx.set_timer(SILENCE, SILENCE_TIMEOUT);
             return;
         }
@@ -199,6 +235,7 @@ impl Mcp {
         match index {
             Some(i) => {
                 let p = self.pending.remove(i);
+                cx.round_trip(cx.now().saturating_sub(p.sent_at));
                 cx.complete(
                     p.id,
                     Err(CommandError::DeviceError {
@@ -218,6 +255,7 @@ impl Mcp {
             return;
         };
         let p = self.pending.remove(index);
+        cx.round_trip(cx.now().saturating_sub(p.sent_at));
         let result = match p.expect {
             Expect::Echo(_) => Ok(Outcome::Ack),
             Expect::FirmwareRevision => Ok(Outcome::Value {
@@ -446,9 +484,11 @@ impl Module for Mcp {
     fn start(&mut self, cx: &mut Cx) {
         cx.connection(Connection::Connecting);
         cx.udp_open(SOCKET, Bind::Shared(PORT));
-        self.subscribe(cx);
-        self.send(cx, "Name");
-        self.send(cx, "Frequency");
+        self.keep_alive(cx);
+        if self.monitor {
+            self.send(cx, "Name");
+            self.send(cx, "Frequency");
+        }
         cx.set_timer(RESUB, RESUBSCRIBE_EVERY);
         cx.set_timer(SILENCE, SILENCE_TIMEOUT);
     }
@@ -508,6 +548,11 @@ impl Module for Mcp {
             if self.complete_error(cx, line) {
                 continue;
             }
+            if self.answers_keep_alive(line) {
+                if let Some(sent) = self.keep_alive_sent.take() {
+                    cx.round_trip(cx.now().saturating_sub(sent));
+                }
+            }
             replies.push(*line);
             self.parse_line(line, &mut channel, &mut device, &mut tx);
         }
@@ -540,13 +585,15 @@ impl Module for Mcp {
     fn timer(&mut self, cx: &mut Cx, key: Key) {
         match key {
             RESUB => {
-                self.subscribe(cx);
+                self.keep_alive(cx);
                 cx.set_timer(RESUB, RESUBSCRIBE_EVERY);
             }
             SILENCE => self.go_offline(cx),
             SLOW_PROBE => {
-                self.subscribe(cx);
-                self.send(cx, "Name");
+                self.keep_alive(cx);
+                if self.monitor {
+                    self.send(cx, "Name");
+                }
                 cx.set_timer(SLOW_PROBE, SLOW_PROBE_EVERY);
             }
             REPLY => {
@@ -916,6 +963,62 @@ mod tests {
             }));
             now += 100;
         }
+    }
+
+    #[test]
+    fn opened_for_commands_only_it_asks_only_for_its_name() {
+        let mut m = receiver();
+        m.monitor = false;
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        // No Push, no Frequency read: the name query is the liveness check.
+        assert_eq!(sent(&cx.take()), ["Name\r"]);
+
+        let a = feed(&mut m, 30, "Name Vocal 1\r");
+        assert!(a.contains(&Action::Connection(Connection::Connected)));
+        assert!(a.contains(&Action::RoundTrip(30)));
+        assert_eq!(state(&a)["channels"]["1"]["name"], "Vocal 1");
+
+        // Renewal, silence and slow probing all ask the name, never Push.
+        let mut cx = Cx::new(RESUBSCRIBE_EVERY);
+        m.timer(&mut cx, RESUB);
+        assert_eq!(sent(&cx.take()), ["Name\r"]);
+        let mut cx = Cx::new(20_000);
+        m.timer(&mut cx, SILENCE);
+        assert_eq!(sent(&cx.take()), ["Name\r"]);
+        let mut cx = Cx::new(60_000);
+        m.timer(&mut cx, SLOW_PROBE);
+        assert_eq!(sent(&cx.take()), ["Name\r"]);
+
+        // Commands work as ever, and what the device sends unasked is kept.
+        let mut cx = Cx::new(61_000);
+        m.command(&mut cx, 1, "mute", &params(json!({"muted": true})));
+        assert_eq!(sent(&cx.take()), ["Mute 1\r"]);
+        let a = feed(&mut m, 61_040, "Mute 1\r");
+        assert_eq!(completed(&a), [(1, Ok(Outcome::Ack))]);
+        assert_eq!(state(&a)["channels"]["1"]["mute"], true);
+    }
+
+    #[test]
+    fn the_time_to_each_reply_is_reported() {
+        let mut m = receiver();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        // The Push echo answers the subscription.
+        let a = feed(&mut m, 25, "Push 60 500 3\r");
+        assert!(a.contains(&Action::RoundTrip(25)));
+        // Cyclic attributes are pushed, not answers: nothing is measured.
+        let a = feed(&mut m, 500, "Msg OK\r");
+        assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
+
+        let mut cx = Cx::new(1_000);
+        m.command(&mut cx, 2, "set_af_out", &params(json!({"level_db": 6})));
+        let a = feed(&mut m, 1_012, "AfOut 6\r");
+        assert!(a.contains(&Action::RoundTrip(12)));
+        let mut cx = Cx::new(2_000);
+        m.command(&mut cx, 3, "set_af_out", &params(json!({"level_db": 5})));
+        let a = feed(&mut m, 2_009, "1020: Value out of range [ AfOut 5 ]\r");
+        assert!(a.contains(&Action::RoundTrip(9)));
     }
 
     #[test]
