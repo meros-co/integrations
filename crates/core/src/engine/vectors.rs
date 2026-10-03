@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use super::SpecEngine;
 use crate::catalog::{validate, Catalog};
-use crate::module::{Action, Cx, HttpResponse, Module, OpenContext, TcpInput, WsInput};
+use crate::module::{Action, Cx, HttpResponse, Module, OpenContext, SseInput, TcpInput, WsInput};
 
 const HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10));
 
@@ -230,6 +230,20 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             _ => "push",
         };
         engine.ws(&mut cx, socket, WsInput::Text(text.to_string()));
+    } else if let Some(e) = v.get("inbound_sse") {
+        // An event on `telemetry.sse`: its name (`message` when absent) and data.
+        let event = crate::sse::SseEvent {
+            event: e
+                .get("event")
+                .and_then(Value::as_str)
+                .unwrap_or("message")
+                .to_string(),
+            data: e["data"]
+                .as_str()
+                .ok_or("inbound_sse needs data")?
+                .to_string(),
+        };
+        engine.sse(&mut cx, super::EVENTS, SseInput::Event(event));
     } else if let Some(r) = v.get("inbound_http") {
         // The reply to a request for this path, as the engine offers it.
         let path = r["path"].as_str().ok_or("inbound_http needs a path")?;
@@ -291,9 +305,15 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
 fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let text = std::fs::read_to_string(path).unwrap();
     let v: Value = serde_yaml::from_str(&text).map_err(|e| format!("parse: {e}"))?;
-    if ["inbound", "inbound_hex", "inbound_http", "inbound_ws"]
-        .iter()
-        .any(|k| v.get(k).is_some())
+    if [
+        "inbound",
+        "inbound_hex",
+        "inbound_http",
+        "inbound_ws",
+        "inbound_sse",
+    ]
+    .iter()
+    .any(|k| v.get(k).is_some())
     {
         return run_telemetry(&v, catalog);
     }
@@ -384,8 +404,16 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 7] = [
-        "200 ok", "~01@ok", "ACK;", "ACK", "ack,ok", "OK ok", "\u{6}",
+    const SUCCESS: [&str; 9] = [
+        "200 ok",
+        "~01@ok",
+        "ACK;",
+        "ACK",
+        "ack,ok",
+        "OK ok",
+        "\u{6}",
+        "[m]",
+        r#"{"jsonrpc":"2.0","id":1}"#,
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
@@ -398,15 +426,20 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             .unwrap_or(SUCCESS[0]),
         _ => SUCCESS[0],
     };
-    // A block transport's reply ends at a blank line.
-    let end = match &engine.transport {
+    // A block transport's reply ends at a blank line; a delimited one is
+    // wrapped in its delimiters (PIXERA's separator-only 0xPX).
+    let success = match &engine.transport {
         super::Transport::LineTcp {
             reply: super::ReplyFraming::Block,
             ..
-        } => "\r\n\r\n",
-        _ => "\r\n",
-    };
-    let success = format!("{line}{end}").into_bytes();
+        } => format!("{line}\r\n\r\n"),
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::Delimited { open, close },
+            ..
+        } => format!("{open}{line}{close}"),
+        _ => format!("{line}\r\n"),
+    }
+    .into_bytes();
     let success = success.as_slice();
     let internal = |e: &SpecEngine| e.current.as_ref().is_some_and(|f| f.id.is_none());
     let mut guard = 0;
@@ -579,9 +612,15 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
     let mut covered = std::collections::BTreeSet::new();
     for f in vector_files() {
         let v: Value = serde_yaml::from_str(&std::fs::read_to_string(&f).unwrap()).unwrap();
-        if ["inbound", "inbound_hex", "inbound_http", "inbound_ws"]
-            .iter()
-            .any(|k| v.get(k).is_some())
+        if [
+            "inbound",
+            "inbound_hex",
+            "inbound_http",
+            "inbound_ws",
+            "inbound_sse",
+        ]
+        .iter()
+        .any(|k| v.get(k).is_some())
         {
             covered.insert(v["spec"].as_str().unwrap().to_string());
         }
