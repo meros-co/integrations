@@ -116,6 +116,27 @@ transport:
   reply_match: "^[12][0-9][0-9] "
 ```
 
+Some devices answer with the same message they push when a value changes
+(Shure's `< REP 01 AUDIO_MUTE ON >`), so `reply_match` alone cannot tell the
+answer from a change pushed meanwhile. A command then names text its reply
+holds, as a template:
+
+```yaml
+commands:
+  get_mute:
+    params: { channel: { type: int, min: 0, max: 28, required: true } }
+    send: "GET {channel:02d} AUDIO_MUTE"
+    expect:
+      reply_contains: "REP {channel:02d} AUDIO_MUTE "
+      matches: "AUDIO_MUTE (ON|OFF)"
+    returns: value
+```
+
+The reply is the first message holding the rendered text; other messages
+are not the reply, and still go to the telemetry rules. As with `reply_json`
+(§2, `ws`), a command whose reply never comes times out without the stream
+being reset, since a late reply names what it answers.
+
 ### `line-udp`
 
 Text messages over UDP, one message per datagram (ChamSys MagicQ's remote
@@ -587,6 +608,7 @@ expect:
   address: /ch/01/config/name       # OSC only: the reply's address
   arg: 0                    # OSC only: argument returned as the value
   reply_json: { "$.id": "{id}" }    # ws only: what identifies the reply (§2)
+  reply_contains: "REP {channel:02d} AUDIO_MUTE "  # line transports: text the reply holds (§2)
   convert: x32_fader        # the returned value, converted from the wire (§4)
 ```
 
