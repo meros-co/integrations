@@ -329,6 +329,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm macro text arrives on /eos/out/get/macro/<n>/text/list/... ([specs/etc-eos.yaml:4807](specs/etc-eos.yaml#L4807))
 - [ ] Confirm the console uses the default /eos cue OSC strings, or note the configured ones. ([specs/etc-eos.yaml:4801](specs/etc-eos.yaml#L4801))
 
+## evertz-quartz — Evertz Quartz protocol routers
+
+- [ ] Confirm the control port of each product (23 assumed per AN65; EQT, EMR and 7700R use 3737-3740, the 7700R also 2000). ([specs/evertz-quartz.yaml:97](specs/evertz-quartz.yaml#L97))
+- [ ] Check that a route (.S) is answered only by a .U update, and that .E comes only for commands the router cannot parse. ([specs/evertz-quartz.yaml:414](specs/evertz-quartz.yaml#L414))
+- [ ] Check what an interrogate of a missing destination returns on EQX and MAGNUM (AN65 says nothing). ([specs/evertz-quartz.yaml:436](specs/evertz-quartz.yaml#L436))
+- [ ] Check that numbers without leading zeros are accepted, and that replies use three digits. ([specs/evertz-quartz.yaml:457](specs/evertz-quartz.yaml#L457))
+- [ ] Check whether lock and name changes made elsewhere are pushed as .BA or .RA. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
+- [ ] Check which commands MAGNUM implements beyond routing, interrogate, locks, salvos and names. ([specs/evertz-quartz.yaml:484](specs/evertz-quartz.yaml#L484))
+- [ ] Check whether name replies carry the number on current firmware. ([specs/evertz-quartz.yaml:473](specs/evertz-quartz.yaml#L473))
+- [ ] Record the tieline source encoding (source in the lower 12 bits, level above) on a system with tielines. ([specs/evertz-quartz.yaml:448](specs/evertz-quartz.yaml#L448))
 ## grandma2 — MA Lighting grandMA2
 
 - [ ] Record exactly what the console sends over telnet after a failed Login, since a failed login cannot be detected now and every later command is silently discarded. ([specs/grandma2.yaml:1164](specs/grandma2.yaml#L1164))

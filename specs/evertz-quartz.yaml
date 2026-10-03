@@ -1,0 +1,611 @@
+spec: 1
+id: evertz-quartz
+name: Evertz Quartz protocol routers (EQX, EXR, Xenon, MAGNUM, Q-series)
+vendor: Evertz
+category: router
+
+# The Quartz routing switcher remote control protocol (Evertz Application Note
+# 65, "RCP-T01"). Page numbers below are AN65's printed page numbers.
+#
+# Evertz's router manuals call it "an open ASCII based router protocol" but do
+# not reproduce it: they refer to AN65 and say to ask Evertz service for it.
+# The note itself is read through a public third-party mirror of the Evertz
+# document. Covered: crosspoint set (single and block), interrogate and list,
+# system destination locks, system salvos, the queue (dynamic salvo) commands,
+# reading destination, source and level names, and the connection test and
+# protocol version. Left out: writing names (two replies per command, see the
+# quirks), the 10-character extended names (their reply form is not given),
+# configuration EPROM read/write (.? and .!, embedded control systems only),
+# engineering commands that reset the controller, halt vertical-interval
+# switching, change Q-Link panel status or the controller's IP settings (.#12,
+# .#23, .#34, .#40-.#45, .&), and the video status display pages (.VP).
+source:
+  - title: "Application Note 65: Quartz Routing Switcher Remote Control Protocol (RCP-T01), Revision 1.4"
+    author: Evertz Microsystems Ltd. (Quartz Electronics)
+    url: https://www.manualslib.com/manual/3326474/Evertz-Quartz-D9.html
+    note: >
+      Manufacturer document, read through a third-party mirror (ManualsLib
+      lists it as "Quartz D9 Application Note"); Evertz distributes AN65 through
+      Evertz service on request and does not host it publicly. Serial settings
+      and DIP switches p.2-3; Ethernet interface, stream sockets on the telnet
+      port 23, and connections dropped on a configuration download p.4-5;
+      commands in upper-case ASCII ending in CR, numbering from 1, levels
+      V,A,B..G (8-level) and V,A..O (16-level), Set Xpt (.S) answered by .U or
+      .E p.6; Multiple Set Xpt (.M, from RCP-T01 V1.17) p.7; System Destination
+      Lock (.BL/.BU/.BI answered .BA{dest},{status}) and Fire System Salvo (.F,
+      salvo 1-32) p.8; Interrogate (.I answered .A{level}{dest},{srce}, tieline
+      source encoding) and List Routes (.L, up to 8 routes) p.9; Read Name
+      Table (.RD/.RS/.RL answered .RA[D/S/L], with or without the number) p.10;
+      Write Name Table (.RA update, then acknowledge) p.11; Queue (salvo)
+      commands .QC/.QR/.QS/.QF/.QD and .QL (SC-1000 V2.36+, EQX from January
+      2010) p.13-14; engineering commands .#00 and .#01 p.15; responses .A,
+      .E, .P and .U, levels in order V,A,B.. p.17; response summary, including
+      no reply to an interrogate of an invalid level or destination p.18;
+      changes by panels reported as .U p.19; examples p.20.
+  - title: EQT Series Routers System Manual, Revision 1.9.1
+    author: Evertz Microsystems Ltd.
+    url: https://evertz.com/resources/manuals/?id=553
+    note: >
+      Manufacturer manual. Quartz (-1) protocol on the serial port and over
+      Ethernet; protocol details "contact Evertz service"; Ethernet control
+      ports 3737-3740 (section 6.1.4); port 4000 is the configuration menu and
+      cannot control the router.
+  - title: 7700R Series 7700R16x16/7700R8x8 Modular Router User Manual, Revision 1.67
+    author: Evertz Microsystems Ltd.
+    url: https://evertz.com/resources/manuals/?id=295
+    note: >
+      Manufacturer manual. Quartz (-1) protocol over Ethernet with port 2000 as
+      the default control port and four more (3737-3740) addable (section 5.5).
+  - title: EMR-32x32-3G / EMR 12G/3G/HD Router User Manual, Revision 1.3
+    author: Evertz Microsystems Ltd.
+    url: https://evertz.com/resources/manuals/?id=707
+    note: >
+      Manufacturer manual. Describes Quartz as an open ASCII router protocol
+      with unsolicited route updates, and the Quartz protocol application
+      document as available from Evertz service (section 4.2.2); control ports
+      3737-3740, each usable by several clients at once (section 6.1.2).
+  - title: 7800TR-32x24 Modular Tally Router, Revision 1.2
+    author: Evertz Microsystems Ltd.
+    url: https://evertz.com/resources/manuals/?id=446
+    note: >
+      Manufacturer manual. Corroborates the .U, .I and .A message forms with
+      zero-padded three-digit numbers (".UV017,002", ".IV005" answered
+      ".AV005,00X"), MAGNUM's use of the Quartz protocol, and AN65 as the
+      protocol reference (section 5.1). The tally router itself is not modelled.
+  - title: Quartz Pre-Installation Guide (2009)
+    author: Evertz Microsystems Ltd.
+    url: https://evertz.com/resources/manuals/?id=642
+    note: >
+      Manufacturer guide for Quartz (Q-series) routers: TCP/IP set through the
+      Quartz (-1) protocol, default addresses of the main and backup
+      processors.
+  - title: companion-module-evertz-quartz (Bitfocus Companion module)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-evertz-quartz
+    note: >
+      Community source (MIT licence), used as corroboration only, not copied:
+      default port 23, MAGNUM systems accepting 26 levels (V and A-Z without V),
+      lock status 0 / 1-254 / 255, list replies of up to 8 routes, and MAGNUM
+      salvo numbers taken from MAGNUM's preset list.
+
+transport:
+  type: line-tcp
+  # AN65 p.4: Quartz controllers accept stream-socket connections on the
+  # telnet port, 23. Many Evertz products are set to other ports (EQT, EMR and
+  # 7700R: 3737-3740, the 7700R also 2000); the operator sets the port the
+  # router or MAGNUM is configured with.
+  port: 23
+  framing: terminated
+  terminator: cr
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Replies are .A (acknowledge, interrogate and list answers), .BA (lock
+  # status), .RA (names) and .QL / .QC0 (queue). .U (route update) and .P
+  # (power up) are pushed whenever a route changes or the controller restarts,
+  # so they are never a command's reply. .E (error) is not taken as a reply
+  # either: it also answers fire-and-forget routes, and would otherwise be
+  # read as the answer to whatever query is in flight. See the quirks.
+  reply_match: "^\\.(A|BA|RA|QL|QC)"
+  # Test connection (AN65 p.15): ".#01" answered ".A".
+  probe: ".#01"
+
+models:
+  - id: eqx
+    name: Evertz EQX router
+    supports:
+      - ping
+      - get_protocol_version
+      - route
+      - route_block
+      - interrogate
+      - list_routes
+      - lock_destination
+      - unlock_destination
+      - get_lock
+      - fire_salvo
+      - get_destination_name
+      - get_source_name
+      - get_level_name
+      - salvo_select
+      - salvo_deselect
+      - salvo_clear
+      - salvo_add
+      - salvo_fire
+      - salvo_fire_at
+      - salvo_destroy
+      - salvo_count
+    verification: none
+    notes: >
+      The queue (dynamic salvo) commands exist on EQX routers from January 2010
+      (AN65 p.13). Up to 16 levels on the router's own controller.
+  - id: magnum
+    name: Routers controlled through Evertz MAGNUM (Quartz server)
+    supports:
+      - ping
+      - route
+      - interrogate
+      - list_routes
+      - lock_destination
+      - unlock_destination
+      - get_lock
+      - fire_salvo
+      - get_destination_name
+      - get_source_name
+      - get_level_name
+    verification: none
+    notes: >
+      MAGNUM presents its routers to Quartz clients with up to 26 levels (V and
+      A-Z without V). Salvo numbers are MAGNUM's preset numbers. AN65 predates
+      MAGNUM and does not say which of its other commands MAGNUM implements, so
+      the block, queue and engineering commands are not listed here.
+  - id: sc1000
+    name: Quartz SC-1000 controlled systems (Q-series, Q256, Topaz)
+    supports:
+      - ping
+      - get_protocol_version
+      - route
+      - route_block
+      - interrogate
+      - list_routes
+      - lock_destination
+      - unlock_destination
+      - get_lock
+      - fire_salvo
+      - get_destination_name
+      - get_source_name
+      - get_level_name
+      - salvo_select
+      - salvo_deselect
+      - salvo_clear
+      - salvo_add
+      - salvo_fire
+      - salvo_fire_at
+      - salvo_destroy
+      - salvo_count
+    verification: none
+    notes: >
+      The queue commands need SC-1000 firmware V2.36 or later (AN65 p.13).
+  - id: quartz-1
+    name: Other Evertz routers with the Quartz (-1) protocol (Xenon, EXR, EQT, EMR, 7700R)
+    supports:
+      - ping
+      - get_protocol_version
+      - route
+      - interrogate
+      - list_routes
+      - lock_destination
+      - unlock_destination
+      - get_lock
+      - fire_salvo
+      - get_destination_name
+      - get_source_name
+      - get_level_name
+    verification: none
+    notes: >
+      Routers whose manuals name the Quartz (-1) protocol and refer to AN65.
+      The block set and queue commands are documented only for SC-1000 and EQX
+      controllers and are not listed here.
+
+# Levels, in AN65's order (p.6, p.17): V, A..G on 8-level systems, V, A..O on
+# 16-level systems; MAGNUM accepts the rest of the alphabet as well.
+commands:
+  # ── Connection (engineering commands, p.15) ─────────────────────────────
+  ping:
+    summary: Test the connection (.#01), answered with an acknowledge
+    send: ".#01"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  get_protocol_version:
+    summary: Get the Q-Link protocol version and the controller's address (.#00), as "version,address"
+    send: ".#00"
+    expect: { matches: '^\.A(.+)$' }
+    returns: value
+
+  # ── Routing (p.6-9) ─────────────────────────────────────────────────────
+  route:
+    summary: >
+      Route a source to a destination on one or more levels (.S), given as
+      level letters in the router's order (V, VA, VABC). The router
+      confirms with a .U route update, which updates the state; no other reply
+      exists, so the command itself is unverified
+    params:
+      levels:      { type: string, pattern: '^[A-Z]{1,26}$', required: true }
+      destination: { type: int, min: 1, required: true }
+      source:      { type: int, min: 1, required: true }
+    send: ".S{levels}{destination},{source}"
+    returns: none
+
+  route_block:
+    summary: >
+      Route a block of up to 16 consecutive destinations to consecutive sources
+      on the given levels (.M), e.g. destinations 1-5 to sources 10-14
+    params:
+      levels:            { type: string, pattern: '^[A-Z]{1,26}$', required: true }
+      first_destination: { type: int, min: 1, required: true }
+      last_destination:  { type: int, min: 1, required: true }
+      first_source:      { type: int, min: 1, required: true }
+      last_source:       { type: int, min: 1, required: true }
+    send: ".M{levels}{first_destination}-{last_destination},{first_source}-{last_source}"
+    expect: { matches: '^\.A' }
+    returns: ack
+
+  interrogate:
+    summary: Get the source routed to a destination on one level (.I)
+    params:
+      level:       { type: enum, values: [V, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, W, X, Y, Z], required: true }
+      destination: { type: int, min: 1, required: true }
+    send: ".I{level}{destination}"
+    expect: { matches: '^\.A[A-Z]\d+,(\d+)$' }
+    returns: value
+
+  list_routes:
+    summary: >
+      List the routes of up to 8 destinations on one level from the given
+      destination on (.L), as the router's level/destination/source groups
+      ("V005,002V006,009..."); the state is updated from them
+    params:
+      level:       { type: enum, values: [V, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, W, X, Y, Z], required: true }
+      destination: { type: int, min: 1, required: true }
+    send: ".L{level}{destination},-"
+    expect: { matches: '^\.A(.*)$' }
+    returns: value
+
+  # ── System destination locks (p.8) ──────────────────────────────────────
+  lock_destination:
+    summary: >
+      Lock a destination against changes from control panels (.BL); returns the
+      lock status: 0 unlocked, 1-254 protected by the panel at Q-Link address
+      n-1, 255 locked
+    params:
+      destination: { type: int, min: 1, required: true }
+    send: ".BL{destination}"
+    expect: { matches: '^\.BA\d+,(\d+)$' }
+    returns: value
+
+  unlock_destination:
+    summary: Unlock a destination (.BU); returns the lock status as lock_destination
+    params:
+      destination: { type: int, min: 1, required: true }
+    send: ".BU{destination}"
+    expect: { matches: '^\.BA\d+,(\d+)$' }
+    returns: value
+
+  get_lock:
+    summary: "Get a destination's lock status (.BI): 0 unlocked, 1-254 protected by the panel at Q-Link address n-1, 255 locked"
+    params:
+      destination: { type: int, min: 1, required: true }
+    send: ".BI{destination}"
+    expect: { matches: '^\.BA\d+,(\d+)$' }
+    returns: value
+
+  # ── System salvos (p.8) ─────────────────────────────────────────────────
+  fire_salvo:
+    summary: >
+      Fire a system salvo (.F), a set of crosspoints stored in the router's
+      configuration (or a MAGNUM preset); its routes are reported as .U updates
+    params:
+      salvo: { type: int, min: 1, max: 32, required: true }
+    send: ".F{salvo}"
+    returns: none
+
+  # ── Names (p.10) ────────────────────────────────────────────────────────
+  get_destination_name:
+    summary: Get a destination's name (mnemonic, 8 characters) (.RD)
+    params:
+      destination: { type: int, min: 1, required: true }
+    send: ".RD{destination}"
+    expect: { matches: '^\.RAD(?:\d+,)?(.*?)\s*$' }
+    returns: value
+
+  get_source_name:
+    summary: Get a source's name (mnemonic, 8 characters) (.RS)
+    params:
+      source: { type: int, min: 1, required: true }
+    send: ".RS{source}"
+    expect: { matches: '^\.RAS(?:\d+,)?(.*?)\s*$' }
+    returns: value
+
+  get_level_name:
+    summary: Get a level's name (mnemonic, 8 characters) (.RL)
+    params:
+      level: { type: enum, values: [V, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, W, X, Y, Z], required: true }
+    send: ".RL{level}"
+    expect: { matches: '^\.RAL(?:[A-Z],)?(.*?)\s*$' }
+    returns: value
+
+  # ── Queue (dynamic salvo) commands (p.13-14) ────────────────────────────
+  salvo_select:
+    summary: >
+      Select salvo n for loading, creating it if it does not exist (.QC); the
+      router answers .QC0 when it cannot. Salvos are the same set as the
+      configured system salvos; use 10 or higher to keep clear of them
+    params:
+      salvo: { type: int, min: 1, max: 32, required: true }
+    send: ".QC{salvo}"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_deselect:
+    summary: Deselect the selected salvo (.QC0)
+    send: ".QC0"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_clear:
+    summary: Empty a salvo (.QR)
+    params:
+      salvo: { type: int, min: 1, max: 32, required: true }
+    send: ".QR{salvo}"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_add:
+    summary: Add a crosspoint to the selected salvo (.QS), without routing it; up to 2048 per salvo
+    params:
+      levels:      { type: string, pattern: '^[A-Z]{1,26}$', required: true }
+      destination: { type: int, min: 1, required: true }
+      source:      { type: int, min: 1, required: true }
+    send: ".QS{levels}{destination},{source}"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_fire:
+    summary: Fire a salvo now (.QF); its routes are reported as .U updates
+    params:
+      salvo: { type: int, min: 1, max: 32, required: true }
+    send: ".QF{salvo}"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_fire_at:
+    summary: >
+      Fire a salvo at a time of the router's system timecode (T1), as
+      hh:mm:ss:ff (.QF n T1:...); a frame number the system's rate lacks
+      stops it firing
+    params:
+      salvo:    { type: int, min: 1, max: 32, required: true }
+      timecode: { type: string, pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]:[0-5][0-9]$', required: true }
+    send: ".QF{salvo}T1:{timecode}"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_destroy:
+    summary: Destroy a salvo (.QD)
+    params:
+      salvo: { type: int, min: 1, max: 32, required: true }
+    send: ".QD{salvo}"
+    expect: { matches: '^\.A$' }
+    returns: ack
+
+  salvo_count:
+    summary: Get the number of crosspoints in a salvo (.QL)
+    params:
+      salvo: { type: int, min: 1, max: 32, required: true }
+    send: ".QL{salvo}"
+    expect: { matches: '^\.QL\d+,(\d+)$' }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      A route (.S) has no reply of its own: the router answers with a .U route
+      update when the route is made, or .E when it cannot parse the command
+      (AN65 p.6, p.18). A .U has the same form as the update pushed for a route
+      made by a panel or another controller, which can arrive at any moment,
+      including straight after a route (p.19), so a .U is never taken as a
+      command's reply. route and fire_salvo are therefore sent without waiting
+      and reported unverified; the state shows the route once the update
+      arrives.
+
+  - models: [all]
+    severity: warning
+    text: >
+      .E (error) carries nothing to say which command it answers. Since a route
+      can be answered by .E at any time, .E is not taken as a reply: a query the
+      router answers with .E instead goes unanswered, fails with a timeout, and
+      the connection is reopened, so that its late reply cannot be read as the
+      answer to the next command. A level letter the router does not have (Z on
+      an 8-level system) is answered .E (p.20).
+
+  - models: [all]
+    severity: warning
+    text: >
+      An interrogate (.I) of a level or destination the router does not have is
+      not answered at all (p.18), so it times out and the connection is
+      reopened. Router sizes are not part of the protocol and no maximum is
+      enforced here; ask only for destinations the router has. For this reason
+      the integration does not interrogate every destination on connecting:
+      routing state fills from the pushed .U updates and from the replies to
+      interrogate and list_routes, which the consumer can issue for the
+      destinations it knows the router has.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A source routed over a tieline is reported (in .A and in the SC-1000's
+      legacy .U form) with the source's control level in the bits above the
+      lower 12: the source is the value's lower 12 bits (1-4095) and the level
+      the next 5 (p.9, p.17). ".UV001,8194" is source 2 on level 2. The state
+      holds the value as sent.
+
+  - models: [all]
+    severity: info
+    text: >
+      Numbers are decimal from 1, sent here without leading zeros; the router
+      answers with three digits (".UV003,001"), which the state reads as the
+      number. Commands and replies are upper case and end with CR (p.6).
+      Updates list a multi-level route in level order, V, A, B, C... (p.17).
+
+  - models: [all]
+    severity: info
+    text: >
+      The controller drops every TCP connection when a new configuration is
+      downloaded to it (p.5); the core reconnects. A redundant system takes
+      connections only on its active controller. .P is sent when the matrix
+      powers up or resets (p.17), after which routes may differ from the state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Writing names (.WD, .WS, .WL) is not offered: the router answers each
+      with a .RA name update and then a separate acknowledge (p.11), and the
+      line transport takes one reply per message, so the second would be taken
+      as the next command's reply. The 10-character extended names (.RE) are
+      not offered either, because AN65 does not give their reply form. Name
+      replies come with or without the number depending on firmware (p.10);
+      only replies carrying the number update the state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Whether a lock or name change made by a panel or another controller is
+      pushed (as .BA or .RA) is not documented. Lock and name state is updated
+      from replies to this client's own lock and name commands, and from any
+      such message the router does push.
+
+  - models: [eqx, sc1000]
+    severity: info
+    text: >
+      route_block (.M) sets up to 16 routes in one message, under 256 bytes
+      (p.7): destinations first_destination..last_destination to sources
+      first_source..last_source in order, so both ranges need the same length.
+      The router checks the ranges, not this integration. It is answered with an
+      acknowledge, and each route made with a .U update.
+
+  - models: [eqx, sc1000]
+    severity: critical
+    text: >
+      Queue salvos (.Q) are the same set as the system salvos created in the
+      router's configuration (p.13): salvo_clear, salvo_add and salvo_destroy on
+      a configured salvo change or remove it until the configuration is
+      downloaded again. AN65 suggests building dynamic salvos from number 10.
+      salvo_select is answered .QC0 when the salvo cannot be selected.
+
+state:
+  levels.*.destinations.*.source: { type: int, description: "Source routed to the destination on the level, keyed by level letter (V, A, B...) and destination number from 1. A tieline route carries the source's level above the lower 12 bits" }
+  levels.*.name:                  { type: string, description: "Level name (mnemonic), keyed by level letter" }
+  destinations.*.name:            { type: string, description: "Destination name (mnemonic), keyed by destination number from 1" }
+  destinations.*.lock_status:     { type: int, description: "System destination lock: 0 unlocked, 1-254 protected lock by the panel at Q-Link address n-1, 255 unprotected lock" }
+  destinations.*.locked:          { type: bool, description: "The destination is locked (lock status other than 0)" }
+  sources.*.name:                 { type: string, description: "Source name (mnemonic), keyed by source number from 1" }
+  salvos.*.items:                 { type: int, description: "Number of crosspoints in the salvo (.QL)" }
+
+telemetry:
+  # The router pushes ".U{levels}{dest},{srce}" for every route made, by this
+  # client, a panel or another controller (AN65 p.17, p.19), so routing state
+  # is kept current without polling. The replies to interrogate (.I) and
+  # list_routes (.L) carry the same level/destination/source groups and fill
+  # the state for destinations asked about. Nothing is polled: the router's
+  # size is not in the protocol, and an interrogate of a destination it lacks
+  # is never answered (see the quirks).
+  updates:
+    # .U: one rule per position in the level list, so ".UVAB001,002" sets
+    # levels V, A and B. MAGNUM systems have up to 26 levels.
+    - match: '^\.U([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{1}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{2}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{3}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{4}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{5}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{6}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{7}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{8}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{9}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{10}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{11}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{12}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{13}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{14}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{15}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{16}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{17}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{18}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{19}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{20}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{21}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{22}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{23}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{24}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.U[A-Z]{25}([A-Z])[A-Z]*(\d+),(\d+)$'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    # .A: an interrogate reply is one group, a list reply up to 8.
+    - match: '^\.A([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){1}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){2}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){3}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){4}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){5}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){6}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    - match: '^\.A(?:[A-Z]\d+,\d+){7}([A-Z])(\d+),(\d+)'
+      state: { "levels.{1}.destinations.{2}.source": "{3}" }
+    # .BA{dest},{status}: the answer to every lock command (p.8).
+    - match: '^\.BA(\d+),(\d+)$'
+      state: { "destinations.{1}.lock_status": "{2}" }
+    - match: '^\.BA(\d+),0*(0)$'
+      state: { "destinations.{1}.locked": { value: "{2}", map: { "0": false } } }
+    - match: '^\.BA(\d+),0*[1-9]\d*$'
+      state: { "destinations.{1}.locked": "true" }
+    # .RA[D/S/L]{number},{name}: name replies carrying the number (p.10).
+    - match: '^\.RAD(\d+),(.*?)\s*$'
+      state: { "destinations.{1}.name": "{2}" }
+    - match: '^\.RAS(\d+),(.*?)\s*$'
+      state: { "sources.{1}.name": "{2}" }
+    - match: '^\.RAL([A-Z]),(.*?)\s*$'
+      state: { "levels.{1}.name": "{2}" }
+    - match: '^\.QL(\d+),(\d+)$'
+      state: { "salvos.{1}.items": "{2}" }

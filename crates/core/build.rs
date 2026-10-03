@@ -59,6 +59,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-etc", &["etc-eos"]),
+    ("vendor-evertz", &["evertz-quartz"]),
     ("vendor-figure53", &["qlab"]),
     (
         "vendor-generic",
