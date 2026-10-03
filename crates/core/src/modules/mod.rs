@@ -84,6 +84,8 @@ mod sony_camera_http;
 mod sony_camera_props;
 #[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
+#[cfg(feature = "probel-swp08")]
+mod swp08;
 #[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 mod tsl;
 #[cfg(feature = "visca")]
@@ -174,6 +176,8 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "emberplus")]
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
+        #[cfg(feature = "probel-swp08")]
+        "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
         "pjlink" => Ok(Box::new(pjlink::PjLink::new(context)?)),
         #[cfg(feature = "generic-osc")]

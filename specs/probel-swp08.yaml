@@ -1,0 +1,508 @@
+spec: 1
+id: probel-swp08
+name: Probel / Grass Valley SW-P-08 routers and router controllers (General Remote Control Protocol)
+vendor: Probel / Snell / Grass Valley (SW-P-08, also implemented by Calrec, Evertz, Ross, Lawo, EVS and others)
+category: router
+implementation: native
+reason: >
+  SW-P-08 is binary: each message is framed DLE STX ... DLE ETX with a byte count and an 8-bit two's
+  complement checksum, every 10h inside a frame is doubled, and every frame in either direction must be
+  acknowledged with DLE ACK (or refused with DLE NAK) within a second, the controller re-sending up to five
+  times otherwise. A command's data reply follows the ACK and is matched by its own command byte and address,
+  while CONNECTED and PROTECT messages are broadcast at any time. Numbers above 1023 or matrices and levels
+  above 15 need the extended command set, chosen per message from the values, and tally dumps, name tables and
+  salvo groups arrive in several messages or have to be walked index by index.
+
+source:
+  - title: "General Remote Control Communication Protocol, Part I - General Commands, SW-P-08 Issue 30 (8 May 2013)"
+    author: "Snell Limited (D. Yeomans, M. Butler, B. Pearce)"
+    note: >
+      The primary source, a publicly circulated copy of Snell's document; it carries a confidentiality notice,
+      so nothing here is quoted from it and only wire layouts are restated. Data link framing, checksum, DLE
+      doubling, 128-byte data limit (§2.2.1); ACK/NAK, 1 s, five re-sends, ACK within 10 ms (§2.2.2); crosspoint
+      interrogate and connect with the matrix/level byte and the multiplier byte (DIV 128, bad-source bit,
+      monitoring rows 896-1023) (§3.1.2, §3.1.3); maintenance: hard reset, soft reset, clear protects (§3.1.4);
+      dual controller status request (§3.1.5); protect interrogate, connect, disconnect, device name, tally dump
+      request (§3.1.6-§3.1.10); crosspoint tally dump request (§3.1.11); master protect connect (§3.1.14);
+      source, destination association, UMD label and source association name requests, name lengths 4/8/12
+      (16 for UMD labels) (§3.1.18-§3.1.25); update name (§3.1.26); tie-line connect and interrogate
+      (§3.1.27, §3.1.28); connect-on-go, go and group salvo interrogate (§3.1.29-§3.1.31); tally, connected,
+      dual controller status, protect tally, connected, disconnected, device name and tally dump replies, tally
+      dumps (byte, up to 191; word, 64 per message), names updated (§3.2.2-§3.2.14); name and label responses
+      (§3.2.19-§3.2.22); tie-line tally (§3.2.23); salvo acknowledgements and tally (§3.2.24-§3.2.26); the
+      extended command set and when a controller uses it (§3.3-§3.5); implementation request and status,
+      invalid message (§4); per-controller command table and numbering notes (§8); worked examples (§9);
+      SW-P-08 over IP: raw messages on a TCP server whose port is configured on the controller, all of the
+      serial protocol including acknowledgements, up to 16 clients, dual controllers on two addresses (§11).
+  - title: "Router Control Protocols, SW-P-88 Issue 1 (20 March 2001), Annex D-6 to a European Parliament tender"
+    author: "Pro-Bel Limited"
+    url: "https://www.europarl.europa.eu/tenders/2012/20120822/11.annex_d-6_switcher_protocol_en.pdf"
+    note: >
+      Published by the European Parliament as a tender annex. Its General Remote Control Protocol part (§5-§9)
+      is the earlier issue of the same text: framing and checksum (§6.2.1), transmission protocol (§6.2.2),
+      interrogate, connect, tally dump and group salvo commands and replies (§7), and the worked examples
+      (§9.1-§9.3: interrogate 10 02 01 11 00 01 04 E9 10 03, tally reply 10 02 03 11 01 01 19 05 CC 10 03 for
+      source 153, connect 10 02 02 11 00 02 00 05 E6 10 03, connected 10 02 04 11 00 02 00 05 E4 10 03), which
+      the module's tests reproduce. Agrees with Issue 30 wherever both cover a command.
+  - title: "Grass Valley MV-8 Series User Manual, Appendix C Protocols, SW-P-08 General Remote Protocol, Supported SW-P-08 Commands (p.227-228)"
+    author: "Grass Valley"
+    url: "https://www.manualslib.com/manual/2010067/Grass-Valley-Mv-8-Series.html?page=227"
+    note: >
+      Manufacturer-documented list of the SW-P-08 commands an MV-8 multiviewer's router accepts and sends,
+      including the extended set; the source of the grassvalley-mv8 model's supports list.
+  - title: "RouteMaster guide, Router specific: SW-P-08"
+    author: "Rascular"
+    url: "https://routemaster-guide.rascular.com/router-specific/sw-p-08/"
+    note: >
+      Corroboration from a third-party controller vendor: SW-P-08 over IP often uses TCP port 2008 but the port
+      is not fixed; name lengths 4, 8, 12, 16 and 32 in some controllers; CONNECTED broadcast to every client.
+  - title: "companion-module-generic-swp08 (README, HELP.md)"
+    author: "Bitfocus and contributors (MIT licence)"
+    url: "https://github.com/bitfocus/companion-module-generic-swp08"
+    note: >
+      Corroboration only (MIT; no code used): routers without the extended set are limited to 16 levels and
+      1024 sources and destinations; supported-commands check through the implementation request; names may
+      not be supported by every router; a 1 s ACK timeout.
+  - title: "go-acp, internal/probel-sw08p/CLAUDE.md"
+    author: "BY-SYSTEMS SRL (MIT licence)"
+    url: "https://github.com/by-openclaw/go-acp/tree/main/internal/probel-sw08p"
+    note: >
+      Corroboration only (MIT; no code used): default port 2008; DLE ACK is framing-level and does not show the
+      command was applied; some peers NAK commands they do not implement; EVS Neuron sends no tally to a
+      general interrogate when the routed source is above 1023 but answers the extended one; Lawo VSM pushes
+      names unasked on connecting.
+
+settings:
+  # The matrix and how many of its levels (1..levels) are read on connecting: tally dump, protects and
+  # names. Commands may address any matrix and level.
+  matrix: { type: int, min: 1, max: 256, default: 1 }
+  levels: { type: int, min: 1, max: 256, default: 1 }
+  # auto: the general (normal) commands, and the extended ones when a number is above 1023 or a matrix or
+  # level above 16, as Issue 30 §3.3 has the controller choose. extended: always the extended commands where
+  # one exists (routers that answer only those, see quirks). general: never the extended commands.
+  command_set: { type: enum, values: [auto, general, extended], default: auto }
+  # Characters per name asked for in name requests: 4, 8 or 12 (§3.1.18).
+  name_length: { type: enum, values: ["4", "8", "12"], default: "8" }
+  # Read source and destination names on connecting and when the controller says names changed.
+  read_names: { type: bool, default: true }
+  # Read the protect table on connecting.
+  read_protects: { type: bool, default: true }
+  # The device number this client protects destinations as (§3.1.7).
+  protect_device: { type: int, min: 0, max: 1023, default: 0 }
+
+models:
+  - id: generic
+    name: "SW-P-08 router or controller (any maker), over TCP"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, master_protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_source_association_names, get_source_association_name, get_umd_labels, get_umd_label, update_name,
+      salvo_add, salvo_fire, salvo_clear, get_salvo, connect_tie_line, get_tie_line, get_controller_status,
+      get_implementation, clear_protects, reset, refresh]
+    verification: none
+    notes: >
+      For third-party implementations (Calrec Hydra2, Evertz, Ross, Lawo VSM, EVS Cerebrum and Neuron, Grass
+      Valley and others), which implement different subsets. A command the router does not implement is
+      usually acknowledged and then not answered (a timeout) or refused with NAK; get_implementation asks the
+      router which commands it has, where it implements that.
+  - id: grassvalley-mv8
+    name: "Grass Valley MV-8 Series multiviewer router"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, master_protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_source_association_names, get_source_association_name, update_name, salvo_add, salvo_fire,
+      salvo_clear, get_salvo, connect_tie_line, get_tie_line, get_implementation, refresh]
+    verification: none
+    notes: >
+      Supported commands from the MV-8 manual (p.227-228): 1, 2, 10, 12, 14, 17, 19, 21, 29, 97, 99, 100-103,
+      111, 112, 114, 115, 117, 120, 121, 124 and the extended 129, 130, 138, 140, 142, 147, 149, 228-231, 248,
+      252. No UMD labels, maintenance or dual controller status.
+  - id: probel-aurora
+    name: "Pro-Bel Aurora / System 3 (6006/6001) controller"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, master_protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_source_association_names, get_source_association_name, get_umd_labels, get_umd_label, update_name,
+      salvo_add, salvo_fire, salvo_clear, get_salvo, connect_tie_line, get_tie_line, get_controller_status,
+      refresh]
+    verification: none
+    notes: >
+      Issue 30 §8 column 05, with the extended set. Dual controller status needs Aurora firmware 1.10 or later
+      and update_name 1.11 or later (§8 notes). Sends NAMES UPDATED.
+  - id: snell-centra
+    name: "Snell Centra / Nucleus2 controller (2330, 246x)"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, master_protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_source_association_names, get_source_association_name, update_name, get_controller_status, refresh]
+    verification: none
+    notes: >
+      Issue 30 §8 column 07, with the extended set (no UMD labels or salvos). SW-P-08 over IP and dual
+      controllers on two addresses are described for these controllers (§11).
+  - id: snell-nucleus
+    name: "Snell Nucleus controller (2450)"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, master_protect, unprotect, get_protect, get_protect_dump,
+      get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_source_association_names, get_source_association_name, connect_tie_line, get_tie_line, refresh]
+    verification: none
+    notes: >
+      Issue 30 §8 column 06, with the extended crosspoint, protect and name commands. No protect device names,
+      UMD labels, salvos or update name.
+  - id: probel-freeway
+    name: "Pro-Bel Freeway / Axis / Halo / Sirius / Nebula controller"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      salvo_add, salvo_fire, salvo_clear, get_salvo, connect_tie_line, get_tie_line, get_controller_status,
+      get_implementation, clear_protects, reset, refresh]
+    verification: none
+    notes: >
+      Issue 30 §8 column 04: the general set only (up to 16 levels and 1024 sources and destinations), matrix
+      number always 0. Group salvos only on Nebula 2442/3 with firmware 1.05 or later and 2444/5 with 3.03 or
+      later (§8 notes). Its tally dump comes in the byte form only.
+  - id: probel-system3-6000
+    name: "Pro-Bel System 3 (6000 variants) controller"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_umd_labels, get_umd_label, salvo_add, salvo_fire, salvo_clear, get_salvo, connect_tie_line,
+      get_tie_line, refresh]
+    verification: none
+    notes: Issue 30 §8 column 03; the general set only.
+  - id: probel-system3-8400
+    name: "Pro-Bel System 3 (8400 variants) controller"
+    supports:
+      [connect, interrogate, get_tally_dump, protect, unprotect, get_protect, get_protect_dump,
+      get_protect_device_name, get_source_names, get_source_name, get_destination_names, get_destination_name,
+      get_umd_labels, get_umd_label, connect_tie_line, get_tie_line, refresh]
+    verification: none
+    notes: Issue 30 §8 column 02; the general set only.
+  - id: probel-system2
+    name: "Pro-Bel System 2 controller"
+    supports: [connect, interrogate, get_tally_dump, refresh]
+    verification: none
+    notes: >
+      Issue 30 §8 column 01: crosspoints and tally dumps only. Its matrix number on the wire is always 1 and
+      levels start from 1 (§8 notes), so on this model matrix and level numbers are sent as given rather than
+      less one.
+
+commands:
+  connect:
+    summary: "Route a source to a destination on one matrix and level (CROSSPOINT CONNECT 02, or extended 130); succeeds when the controller reports the route made (CONNECTED 04 / 132)"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+      source: { type: int, min: 1, max: 65536, required: true }
+    returns: ack
+  interrogate:
+    summary: "Read which source is routed to a destination (CROSSPOINT INTERROGATE 01 / extended 129, answered by TALLY 03 / 131); returns the source number"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+    returns: value
+  get_tally_dump:
+    summary: "Ask for the whole routing table of a matrix and level (CROSSPOINT TALLY DUMP REQUEST 21 / extended 149); the dump messages that follow update state"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+    returns: ack
+  protect:
+    summary: "Protect a destination as this client's device (setting protect_device) (PROTECT CONNECT 12 / extended 140); succeeds when PROTECT CONNECTED reports it protected by that device"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+    returns: ack
+  master_protect:
+    summary: "Protect a destination as this client's device, taking over any protect a panel holds, as a master panel can (MASTER PROTECT CONNECT 29)"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+    returns: ack
+  unprotect:
+    summary: "Remove this client's protect from a destination (PROTECT DIS-CONNECT 14 / extended 142); succeeds when PROTECT DIS-CONNECTED reports it unprotected"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+    returns: ack
+  get_protect:
+    summary: "Read a destination's protect (PROTECT INTERROGATE 10 / extended 138); returns {state, device}, state none, panel, panel_override or remote"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+    returns: value
+  get_protect_dump:
+    summary: "Ask for the protect table of a matrix and level (PROTECT TALLY DUMP REQUEST 19 / extended 147); the dump messages that follow update state"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+    returns: ack
+  get_protect_device_name:
+    summary: "Read the name of the device (panel) a protect belongs to (PROTECT DEVICE NAME REQUEST 17, answered by 18 with 8 characters)"
+    params:
+      device: { type: int, min: 0, max: 1023, required: true }
+    returns: value
+  get_source_names:
+    summary: "Ask for every source name of a matrix and level at the name_length setting (ALL SOURCE NAMES REQUEST 100 / extended 228); the responses update state"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+    returns: ack
+  get_source_name:
+    summary: "Read one source's name (SINGLE SOURCE NAME REQUEST 101 / extended 229)"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      source: { type: int, min: 1, max: 65536, required: true }
+    returns: value
+  get_destination_names:
+    summary: "Ask for every destination (destination association) name of a matrix (ALL DESTINATIONS ASSOCIATION NAMES REQUEST 102 / extended 230); the responses update state"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+    returns: ack
+  get_destination_name:
+    summary: "Read one destination (destination association) name (SINGLE DESTINATION ASSOCIATION NAMES REQUEST 103 / extended 231)"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+    returns: value
+  get_source_association_names:
+    summary: "Ask for every source association name of a matrix (ALL SOURCE ASSOCIATION NAMES REQUEST 114); the responses update state"
+    params:
+      matrix: { type: int, min: 1, max: 16, default: 1 }
+    returns: ack
+  get_source_association_name:
+    summary: "Read one source association name (SINGLE SOURCE ASSOCIATION NAME REQUEST 115)"
+    params:
+      matrix: { type: int, min: 1, max: 16, default: 1 }
+      source_association: { type: int, min: 1, max: 65536, required: true }
+    returns: value
+  get_umd_labels:
+    summary: "Ask for every alternative UMD label of a matrix's sources (ALL UMD LABELS REQUEST 104 / extended 232); the responses update state"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      length: { type: enum, values: ["4", "8", "12", "16"], default: "8" }
+    returns: ack
+  get_umd_label:
+    summary: "Read one source's alternative UMD label (SINGLE UMD LABEL REQUEST 105 / extended 233)"
+    params:
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      source: { type: int, min: 1, max: 65536, required: true }
+      length: { type: enum, values: ["4", "8", "12", "16"], default: "8" }
+    returns: value
+  update_name:
+    summary: "Change a name in the controller's database (UPDATE NAME REQUEST 117), padded with spaces to the given length; the controller sends no reply"
+    params:
+      kind: { type: enum, values: [source, source_association, destination_association, umd_label], required: true }
+      matrix: { type: int, min: 1, max: 20, default: 1 }
+      level: { type: int, min: 1, max: 16, default: 1 }
+      number: { type: int, min: 1, max: 65536, required: true }
+      length: { type: enum, values: ["4", "8", "12", "16"], default: "8" }
+      name: { type: string, max_length: 16, pattern: "^[ -~]*$", required: true }
+    returns: none
+  salvo_add:
+    summary: "Store a route in a group salvo to be made on salvo_fire (CROSSPOINT CONNECT ON GO GROUP SALVO 120 / extended 248, acknowledged by 122 / 250)"
+    params:
+      salvo: { type: int, min: 1, max: 128, required: true }
+      matrix: { type: int, min: 1, max: 256, default: 1 }
+      level: { type: int, min: 1, max: 256, default: 1 }
+      destination: { type: int, min: 1, max: 65536, required: true }
+      source: { type: int, min: 1, max: 65536, required: true }
+    returns: ack
+  salvo_fire:
+    summary: "Make every route stored in a group salvo (CROSSPOINT GO GROUP SALVO 121 with 00); fails when the salvo holds nothing (GO DONE 123 status 02)"
+    params:
+      salvo: { type: int, min: 1, max: 128, required: true }
+    returns: ack
+  salvo_clear:
+    summary: "Discard the routes stored in a group salvo without making them (CROSSPOINT GO GROUP SALVO 121 with 01)"
+    params:
+      salvo: { type: int, min: 1, max: 128, required: true }
+    returns: ack
+  get_salvo:
+    summary: "Read every route stored in a group salvo, index by index (CROSSPOINT GROUP SALVO INTERROGATE 124 / extended 252); returns [{matrix, level, destination, source}]"
+    params:
+      salvo: { type: int, min: 1, max: 128, required: true }
+    returns: value
+  connect_tie_line:
+    summary: "Make a multi-stage route from a source association to a destination association on the levels given as bitmaps, bit 0 = level 1 (CROSSPOINT TIE-LINE CONNECT 111); the controller sends no reply"
+    params:
+      destination_matrix: { type: int, min: 1, max: 20, default: 1 }
+      destination_association: { type: int, min: 1, max: 65536, required: true }
+      destination_levels: { type: int, min: 1, max: 65535, required: true }
+      source_matrix: { type: int, min: 1, max: 20, default: 1 }
+      source_association: { type: int, min: 1, max: 65536, required: true }
+      source_levels: { type: int, min: 1, max: 65535, required: true }
+    returns: none
+  get_tie_line:
+    summary: "Read the sources routed to every level of a destination association (CROSSPOINT TIE-LINE INTERROGATE 112, answered by 113); returns [{matrix, level, source}]"
+    params:
+      matrix: { type: int, min: 1, max: 20, default: 1 }
+      destination_association: { type: int, min: 1, max: 65536, required: true }
+    returns: value
+  get_controller_status:
+    summary: "Read which card of a dual controller is active and whether the idle one is healthy (DUAL CONTROLLER STATUS REQUEST 08, answered by 09); returns {active_card, active, idle_ok}"
+    returns: value
+  get_implementation:
+    summary: "Ask the controller which commands it implements (IMPLEMENTATION REQUEST 97, answered by 98); returns {received, transmitted}, lists of command numbers"
+    returns: value
+  clear_protects:
+    summary: "Clear every protect on a level, on every level of a matrix, or everywhere, whoever set it (MAINTENANCE 07, clear protects)"
+    params:
+      scope: { type: enum, values: [level, matrix, all], default: level }
+      matrix: { type: int, min: 1, max: 20, default: 1 }
+      level: { type: int, min: 1, max: 16, default: 1 }
+    returns: ack
+  reset:
+    summary: "Restart the controller: soft (software restart) or hard (as at power-on) (MAINTENANCE 07)"
+    params:
+      kind: { type: enum, values: [soft, hard], required: true }
+    returns: ack
+  refresh:
+    summary: "Read the routing, protects and names of the configured matrix and levels again"
+    returns: ack
+
+state:
+  matrices.*.levels.*.destinations.*.source: { type: int, description: "Source routed to the destination, numbered from 1; keyed by matrix, level and destination, each numbered from 1" }
+  matrices.*.levels.*.destinations.*.source_bad: { type: bool, description: "The controller flags the routed source as bad (TDM and HD digital video routers, multiplier bit 3); only in general-form tallies" }
+  matrices.*.levels.*.destinations.*.protect: { type: string, description: "none, panel (protected by a controller panel), panel_override (cannot be altered remotely) or remote (protected by a remote device such as this one)" }
+  matrices.*.levels.*.destinations.*.protect_device: { type: int, description: "Device number that holds the protect" }
+  matrices.*.levels.*.sources.*.name: { type: string, description: "Source name, trailing spaces removed" }
+  matrices.*.destinations.*.name: { type: string, description: "Destination association name of the matrix, trailing spaces removed" }
+  matrices.*.source_associations.*.name: { type: string, description: "Source association name of the matrix" }
+  matrices.*.umd_labels.*: { type: string, description: "Alternative UMD label of a source of the matrix" }
+  protect_devices.*.name: { type: string, description: "Name of a protecting device (panel), keyed by device number" }
+  controller.active_card: { type: string, description: "Dual controllers: master or slave, whichever is active" }
+  controller.active: { type: bool, description: "This controller (the one connected to) is active; false when it is the idle one (Issue 30 §11.5)" }
+  controller.idle_ok: { type: bool, description: "The idle controller of a dual pair is present and healthy" }
+  implementation.received: { type: array, description: "Command numbers the controller accepts, from IMPLEMENTATION STATUS" }
+  implementation.transmitted: { type: array, description: "Command numbers the controller sends, from IMPLEMENTATION STATUS" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      Numbers are 1-based here and 0-based on the wire: destination, source, matrix, level, association and
+      salvo 1 are wire 0 (Issue 30 §9 "always indexed from 0"), except on the probel-system2 model, whose
+      matrix and level are sent as given (§8 notes). Which wire matrix and level a router answers to is set in
+      its controller; an off-by-one in configuration routes the wrong level.
+  - models: [all]
+    severity: warning
+    text: >
+      DLE ACK only means the message was framed correctly, not that it was acted on (§9). connect succeeds
+      only when the controller reports the route made with CONNECTED; a connect to a protected destination,
+      or one the controller cannot make, is acknowledged and then not answered, and fails with a timeout after
+      3 s. A CONNECTED for the same destination from another client in that time is taken as the answer.
+      Take routing state only from TALLY, CONNECTED and tally dumps.
+  - models: [all]
+    severity: info
+    text: >
+      The core acknowledges every frame the controller sends with DLE ACK at once (the controller re-sends up
+      to five times after 1 s otherwise, §2.2.2, and asks for the ACK within 10 ms) and refuses a frame with a
+      bad checksum or byte count with DLE NAK. A message of its own refused with NAK, or not acknowledged
+      within 1 s, is sent again, up to five times (§2.2.2); then a command fails, and five unacknowledged
+      sends drop the connection and reconnect with backoff (1 s doubling to 30 s).
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by what the controller pushes: CONNECTED (04 / 132) on every route by any client
+      or panel, and PROTECT CONNECTED / DIS-CONNECTED (13, 15 / 141, 143) on every protect change, broadcast to
+      every port (§3.2.3, §3.2.6, §3.2.7). On connecting the core reads, for the configured matrix and each of
+      its levels 1..levels: the tally dump, the protect dump (read_protects) and the source names, and the
+      matrix's destination names (read_names); and asks for the implementation once where the model has it.
+      NAMES UPDATED (30, Aurora) reads the names again. Opened for commands only, none of this is read, and a
+      DUAL CONTROLLER STATUS REQUEST (08) every 10 s is the only message sent unasked: its DLE ACK is the
+      liveness check, which a controller gives even when it does not implement the command (§2.2.2).
+  - models: [all]
+    severity: warning
+    text: >
+      The general commands carry 4-bit matrix and level numbers and 10-bit destination and source numbers
+      (§3.1.2), so routers with more than 16 matrices or levels, or more than 1024 sources or destinations,
+      need the extended commands (§3.3). With command_set auto the extended form is used only for such
+      numbers, as the controller itself chooses; replies are read in either form. Models without the extended
+      set (System 2, System 3, Freeway) refuse those numbers before sending. Some routers answer only one form
+      (an EVS Neuron sends no tally to a general interrogate for a source above 1023, per go-acp); set
+      command_set extended for them, or general for a router that NAKs the extended commands.
+  - models: [all]
+    severity: info
+    text: >
+      Destinations 896-1023 of the general form are output monitoring rows on HD series routers (§3.1.2). The
+      bad-source flag is only in general-form tallies. A byte-form tally dump (22) covers numbers up to 191 and
+      a word-form dump (23 / 151) carries up to 64 tallies per message; the controller sends as many messages
+      as the table needs (§3.2.10, §3.2.11, §3.5.7), and they are applied as they arrive.
+  - models: [all]
+    severity: info
+    text: >
+      SW-P-08 over IP has no standard port: it is configured on the controller (§11.4). The core uses 2008, a
+      common choice (RouteMaster, go-acp), unless the device is opened with another port. Snell 2330/2463
+      controllers accept up to 16 TCP clients (§11.2); other controllers set their own limits.
+  - models: [all]
+    severity: warning
+    text: >
+      Dual controllers over IP have an address each, and only the active one acts on commands (§11.5). Open the
+      device at each address: controller.active shows which is active, from DUAL CONTROLLER STATUS RESPONSE (09),
+      which the active controller also sends unasked when it changes. After a changeover the newly active
+      controller's state should be read again (refresh).
+  - models: [all]
+    severity: warning
+    text: >
+      Protects belong to a device number: protect and unprotect use the protect_device setting (0 by default),
+      so two clients with the same number share protects. A destination protected by a panel cannot be
+      unprotected remotely; panel_override cannot be altered remotely at all (§3.2.5). protect and unprotect
+      fail with a device error when PROTECT CONNECTED / DIS-CONNECTED reports a state other than the one asked
+      for. Issue 30 does not say how device numbers are allocated between panels and remote devices; choose
+      one the controller's configuration leaves free.
+  - models: [all]
+    severity: critical
+    text: >
+      master_protect takes a destination's protect away from whichever panel holds it, as a master panel can
+      (§3.1.14); the panel operator loses control of that destination without warning. clear_protects removes
+      every protect on its scope whoever set it, the "master" protect override (§3.1.4.3).
+  - models: [all]
+    severity: critical
+    text: >
+      reset restarts the router controller (§3.1.4.1, §3.1.4.2): a hard reset is as if power had just been
+      applied, a soft reset re-initialises the software. Routing panels and control stop working until it is
+      back, and crosspoints may change if the controller restores them from its database.
+  - models: [all]
+    severity: critical
+    text: >
+      salvo_fire makes every route stored in the salvo group at once, including routes stored by other clients
+      in the same group (the group is held by the controller, §3.1.29). Read it first with get_salvo. Issue 30
+      says no CONNECTED messages follow a salvo (§3.1.30); routing state is then read again with a tally dump
+      of the configured levels. Group salvos exist only on XD and Eclipse routers (§3.1.29).
+  - models: [all]
+    severity: critical
+    text: >
+      update_name changes the controller's database. On an Aurora the next connection of the system
+      configuration editor finds a database mismatch, and remote changes are lost unless the database is
+      uploaded from the controller before editing (§3.1.26). The controller sends no reply, so the command is
+      unverified; read the name back to check it. Names longer than the length are refused; shorter ones are
+      padded with spaces.
+  - models: [all]
+    severity: info
+    text: >
+      Names arrive in several messages of up to 32 four-character, 16 eight-character or 10 twelve-character
+      names (§3.2.19), with no message marking the end. get_*_names returns once the request is acknowledged;
+      the names reach state as they arrive. Not every router implements names (Companion's notes), and Lawo VSM
+      can push names unasked on connecting (go-acp); either way they are applied.
+  - models: [probel-aurora]
+    severity: info
+    text: >
+      NAMES UPDATED (30) is sent 5 s after the last name change and after a database load (§3.2.14). When the
+      device is monitored and read_names is on, the core then asks for the names of the configured matrix again.
+  - models: [all]
+    severity: warning
+    text: >
+      Issue 30's tables have evident slips that the module resolves as follows; see VERIFICATION.md. The
+      protect tally dump request (19) lists bytes 1, 3 and 4 only; it is sent as the matrix/level byte then
+      the first destination as two bytes (0). The source association names response (116) gives the
+      8-character name offsets as for 4 characters; names are read at the requested length. The tie-line
+      connect (111) table labels bytes 7 and 8 as a count and name characters; they are sent as the source
+      association number, as the notes beside them say.
