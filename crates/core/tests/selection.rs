@@ -173,7 +173,14 @@ fn a_vendor_group_selects_its_integrations() {
     let shure = Core::with_options(options).unwrap();
     assert_eq!(
         shure.catalog().devices.keys().collect::<Vec<_>>(),
-        ["shure-wireless"]
+        [
+            "shure-ani",
+            "shure-imx-room",
+            "shure-mxa",
+            "shure-mxn5",
+            "shure-p300",
+            "shure-wireless"
+        ]
     );
     let every = Core::with_options(CoreOptions::new().devices(["all"])).unwrap();
     assert_eq!(

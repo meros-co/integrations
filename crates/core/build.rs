@@ -47,6 +47,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         "vendor-behringer",
         &["behringer-wing", "behringer-x32", "behringer-xair"],
     ),
+    ("vendor-biamp", &["biamp-tesira"]),
     ("vendor-birddog", &["birddog"]),
     (
         "vendor-blackmagic",
@@ -59,6 +60,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-canon", &["canon-ptz"]),
+    ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-churchapps", &["freeshow"]),
     ("vendor-digico", &["digico-sd"]),
@@ -90,7 +92,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-ptzoptics", &["ptzoptics"]),
-    ("vendor-qsc", &["qsys"]),
+    ("vendor-qsc", &["qsys", "qsys-ecp"]),
     (
         "vendor-renewedvision",
         &["propresenter", "renewedvision-pvp"],
@@ -121,9 +123,23 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-ew-g3-g4",
         ],
     ),
-    ("vendor-shure", &["shure-wireless"]),
+    (
+        "vendor-shure",
+        &[
+            "shure-ani",
+            "shure-imx-room",
+            "shure-mxa",
+            "shure-mxn5",
+            "shure-p300",
+            "shure-wireless",
+        ],
+    ),
     ("vendor-sony", &["sony-camera", "visca"]),
     ("vendor-studiocoast", &["vmix"]),
+    (
+        "vendor-symetrix",
+        &["symetrix-composer", "symetrix-jupiter"],
+    ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
     (
         "vendor-yamaha",

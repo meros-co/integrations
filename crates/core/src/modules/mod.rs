@@ -42,6 +42,8 @@ mod allenheath_sq;
 mod analogway;
 #[cfg(feature = "blackmagic-atem")]
 mod atem;
+#[cfg(feature = "bss-london")]
+mod bss_london;
 #[cfg(feature = "emberplus")]
 mod emberplus;
 #[cfg(feature = "generic-http")]
@@ -86,6 +88,8 @@ mod sony_camera_http;
 mod sony_camera_props;
 #[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
+#[cfg(feature = "biamp-tesira")]
+mod tesira;
 #[cfg(any(feature = "tsl-umd-display", feature = "tsl-umd-listener"))]
 mod tsl;
 #[cfg(feature = "visca")]
@@ -142,6 +146,10 @@ pub(crate) fn construct(
         "obsidian-onyx" => Ok(Box::new(onyx::Onyx::new(context))),
         #[cfg(feature = "shure-wireless")]
         "shure-wireless" => Ok(Box::new(shure::Shure::new(context))),
+        #[cfg(feature = "biamp-tesira")]
+        "biamp-tesira" => Ok(Box::new(tesira::Tesira::new(context))),
+        #[cfg(feature = "bss-london")]
+        "bss-london" => Ok(Box::new(bss_london::London::new(context))),
         #[cfg(feature = "sony-camera")]
         "sony-camera" => Ok(Box::new(sony_camera::SonyCamera::new(context)?)),
         // TSL defines no port, so the host must give one.

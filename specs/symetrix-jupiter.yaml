@@ -1,0 +1,247 @@
+spec: 1
+id: symetrix-jupiter
+name: Symetrix Jupiter 4, 8 and 12 (Jupiter control protocol)
+vendor: Symetrix
+category: mixer
+
+# Written from Symetrix's Jupiter control protocol document. Jupiter speaks a
+# relative of the Composer protocol over UDP only, with controller numbers
+# pre-assigned by each Jupiter app (shown in the Jupiter software's Custom
+# Preset Parameter Browser), presets 1-50 and pushes that go to the address
+# of the last command received.
+source:
+  - title: "Control Protocol: Jupiter 4, Jupiter 8, Jupiter 12"
+    author: Symetrix, Inc.
+    url: "https://d3b79pswu7f4ma.cloudfront.net/pdf-download/Jupiter-Control-Protocol.pdf"
+    note: >
+      Manufacturer document (also published as
+      https://www.symetrix.co/knowledge/protocol-jupiter-4-jupiter-8-jupiter-12/ and
+      https://www.symetrixinc.com/wp-content/uploads/2023/05/Symetrix_PROTOCOL_Jupiter_cp2.pdf).
+      Ethernet control over UDP port 48630, commands end in CR, responses to
+      the sender's address and port, which is kept across power cycles and
+      also receives pushed data; quiet mode on and echo off by default.
+      Parameter notes (faders -72 to +12 dB linear, buttons 0/65535 with some
+      negative-logic exceptions in the appendix, selectors, meters); CS, CC,
+      GS, GS2, GSB, GSB2; GPR D answered PrstD=nnnn, presets 1-50; LP; FU;
+      push: at power-up push is on globally but every controller is disabled,
+      PU, PUE, PUD, GPU, PUR, PUC, PUI, PUT; SQ, EH; controller numbers from
+      the Custom Preset Parameter Browser.
+
+transport:
+  type: line-udp
+  port: 48630
+  terminator: cr
+  encoding: ascii
+  reply: to-source
+  # Pushed values and GSB2 lines are "#nnnnn=vvvvv"; answers are anything
+  # else.
+  reply_match: "^[^#]"
+  probe: "GPR D"
+
+conversions:
+  # "Volume dB = -72 + 84*(CONTROLLER POSITION/65535)".
+  symetrix_fader:
+    points: [[0, -72.0], [65535, 12.0]]
+
+models:
+  - id: jupiter-4
+    name: "Symetrix Jupiter 4"
+    supports: &all
+      [set_controller, increment_controller, decrement_controller, get_controller,
+       read_controller_block, set_fader_db, get_fader_db, button_on, button_off, load_preset,
+       get_preset, flash_unit, set_push_global, push_enable, push_enable_range, push_disable,
+       push_disable_range, push_refresh, push_refresh_range, push_clear, set_push_interval,
+       set_push_threshold]
+    verification: none
+  - id: jupiter-8
+    name: "Symetrix Jupiter 8"
+    supports: *all
+    verification: none
+  - id: jupiter-12
+    name: "Symetrix Jupiter 12"
+    supports: *all
+    verification: none
+
+commands:
+  set_controller:
+    summary: "CS: move a controller to an absolute position, 0-65535"
+    params:
+      controller: &controller { type: int, min: 1, max: 10000, required: true }
+      position: &position { type: int, min: 0, max: 65535, required: true }
+    send: "CS {controller} {position}"
+    expect: &ack { matches: "^ACK\\s*$" }
+    returns: ack
+  increment_controller:
+    summary: "CC <n> 1 <amount>: raise a controller's position, limited to 65535"
+    params: { controller: *controller, amount: &amount { type: int, min: 0, max: 65535, required: true } }
+    send: "CC {controller} 1 {amount}"
+    expect: *ack
+    returns: ack
+  decrement_controller:
+    summary: "CC <n> 0 <amount>: lower a controller's position, limited to 0"
+    params: { controller: *controller, amount: *amount }
+    send: "CC {controller} 0 {amount}"
+    expect: *ack
+    returns: ack
+  get_controller:
+    summary: "GS: a controller's position (0-65535)"
+    params: { controller: *controller }
+    send: "GS {controller}"
+    expect: { matches: "^\\s*(\\d+)\\s*$" }
+    returns: value
+  read_controller_block:
+    summary: "GSB2: read up to 256 consecutive controllers into controllers.<n>.value (answered as #nnnnn=vvvvv lines)"
+    params:
+      controller: *controller
+      count: { type: int, min: 1, max: 256, required: true }
+    send: "GSB2 {controller} {count}"
+    returns: none
+  set_fader_db:
+    summary: "CS with a level in dB for a -72 to +12 dB volume fader"
+    params:
+      controller: *controller
+      level_db: { type: float, min: -72, max: 12, required: true }
+    send: "CS {controller} {level_db:to.symetrix_fader:.0f}"
+    expect: *ack
+    returns: ack
+  get_fader_db:
+    summary: "GS: a -72 to +12 dB volume fader's level in dB"
+    params: { controller: *controller }
+    send: "GS {controller}"
+    expect: { matches: "^\\s*(\\d+)\\s*$", convert: symetrix_fader }
+    returns: value
+  button_on:
+    summary: "CS <n> 65535: press a button (some Jupiter buttons are negative logic: see the app's appendix)"
+    params: { controller: *controller }
+    send: "CS {controller} 65535"
+    expect: *ack
+    returns: ack
+  button_off:
+    summary: "CS <n> 0: release a button"
+    params: { controller: *controller }
+    send: "CS {controller} 0"
+    expect: *ack
+    returns: ack
+  load_preset:
+    summary: "LP: load a preset, 1-50"
+    params:
+      preset: { type: int, min: 1, max: 50, required: true }
+    send: "LP {preset}"
+    expect: *ack
+    returns: ack
+  get_preset:
+    summary: "GPR D: the last preset loaded, 0 when none has been (answered PrstD=nnnn)"
+    send: "GPR D"
+    expect: { matches: "PrstD=0*(\\d+)" }
+    returns: value
+  flash_unit:
+    summary: "FU: flash the front-panel LEDs"
+    send: "FU"
+    expect: *ack
+    returns: ack
+  set_push_global:
+    summary: "PU 1 / PU 0: turn pushing on or off for the whole unit"
+    params:
+      enabled: { type: bool, default: true }
+    send: "PU {enabled:bool01}"
+    expect: *ack
+    returns: ack
+  push_enable:
+    summary: "PUE: enable push for every controller"
+    send: "PUE"
+    expect: *ack
+    returns: ack
+  push_enable_range:
+    summary: "PUE <low> <high>: enable push for a range of controllers"
+    params: { low: *controller, high: *controller }
+    send: "PUE {low} {high}"
+    expect: *ack
+    returns: ack
+  push_disable:
+    summary: "PUD: disable push for every controller"
+    send: "PUD"
+    expect: *ack
+    returns: ack
+  push_disable_range:
+    summary: "PUD <low> <high>: disable push for a range of controllers"
+    params: { low: *controller, high: *controller }
+    send: "PUD {low} {high}"
+    expect: *ack
+    returns: ack
+  push_refresh:
+    summary: "PUR: push every push-enabled controller now"
+    send: "PUR"
+    expect: *ack
+    returns: ack
+  push_refresh_range:
+    summary: "PUR <low> <high>: push a range of controllers now"
+    params: { low: *controller, high: *controller }
+    send: "PUR {low} {high}"
+    expect: *ack
+    returns: ack
+  push_clear:
+    summary: "PUC: forget changes not yet pushed"
+    send: "PUC"
+    expect: *ack
+    returns: ack
+  set_push_interval:
+    summary: "PUI: the minimum time between pushes, 20-30000 ms (100 at power-up)"
+    params:
+      interval_ms: { type: int, min: 20, max: 30000, required: true }
+    send: "PUI {interval_ms}"
+    expect: *ack
+    returns: ack
+  set_push_threshold:
+    summary: "PUT: how far a value must move before it is pushed again, for parameters and meters"
+    params:
+      parameter_threshold: { type: int, min: 0, max: 65535, required: true }
+      meter_threshold: { type: int, min: 0, max: 65535, required: true }
+    send: "PUT {parameter_threshold} {meter_threshold}"
+    expect: *ack
+    returns: ack
+
+state:
+  controllers.*.value:
+    type: int
+    description: "A controller's position, 0-65535, keyed by controller number, from push data and GSB2 block reads; -1 for a controller that does not exist"
+
+telemetry:
+  # At power-up every controller is disabled for push: enable them all and
+  # ask for every value. Pushes go to the last sender's address, which these
+  # datagrams make this session.
+  subscribe:
+    send: ["PU 1", "PUE", "PUR"]
+  updates:
+    - match: '^#(\d+)=(-?\d+)\s*$'
+      state: { "controllers.{1}.value": "{2}" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Jupiter is controlled over UDP only, and sends its answers and pushed
+      data to the address and port of the last command it received. Two
+      control systems on one Jupiter take the pushes from each other: the
+      last to send a command receives them.
+  - models: [all]
+    severity: info
+    text: >
+      Controller numbers are fixed by each Jupiter app; read them in the
+      Jupiter software's Custom Preset Parameter Browser. Some buttons use
+      negative logic (0 turns them on), as the app's appendix notes.
+  - models: [all]
+    severity: info
+    text: >
+      Push settings are the unit's. The session enables push for every
+      controller (PUE) because Jupiter starts with every controller disabled.
+  - models: [all]
+    severity: info
+    text: >
+      read_controller_block's answer has the same form as push data, so it is
+      sent without waiting for an answer and its lines go straight to state.
+      UDP gives no delivery guarantee: a lost datagram is a timeout.
+  - models: [all]
+    severity: critical
+    text: >
+      load_preset changes every parameter the preset holds, on a live system,
+      and cannot be undone except by loading another preset.

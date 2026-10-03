@@ -298,6 +298,12 @@ fn answer_internal(engine: &mut SpecEngine, cx: &mut Cx, success: &[u8]) {
             engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &reply);
         }
         Some(super::Await::Ws(_)) => engine.ws(cx, "device", WsInput::Text("{}".into())),
+        // One reply line per datagram.
+        _ if matches!(engine.transport, super::Transport::LineUdp { .. }) => {
+            let line = String::from_utf8_lossy(success);
+            let line = line.trim_end().as_bytes().to_vec();
+            engine.datagram(cx, "device", SocketAddr::new(HOST, 1), &line);
+        }
         _ => engine.tcp(cx, "device", TcpInput::Data(success.to_vec())),
     }
 }
@@ -404,7 +410,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     // command: the first of these that the transport takes as a reply (its
     // reply_match, where it has one). OSC queries are answered on their own
     // address.
-    const SUCCESS: [&str; 9] = [
+    const SUCCESS: [&str; 10] = [
         "200 ok",
         "~01@ok",
         "ACK;",
@@ -414,29 +420,45 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         "\u{6}",
         "[m]",
         r#"{"jsonrpc":"2.0","id":1}"#,
+        "REP ok",
     ];
     let line = match &engine.transport {
         super::Transport::LineTcp {
             reply_match: Some(re),
             ..
-        } => SUCCESS
-            .iter()
-            .find(|s| re.is_match(s))
-            .copied()
-            .unwrap_or(SUCCESS[0]),
+        }
+        | super::Transport::LineUdp {
+            reply_match: Some(re),
+            ..
+        } => {
+            // A delimited reply is matched with its markers.
+            let wrap = |s: &str| match &engine.transport {
+                super::Transport::LineTcp {
+                    reply: super::ReplyFraming::Delimited { open, close },
+                    ..
+                } => format!("{open}{s}{close}"),
+                _ => s.to_string(),
+            };
+            SUCCESS
+                .iter()
+                .find(|s| re.is_match(&wrap(s)))
+                .copied()
+                .unwrap_or(SUCCESS[0])
+        }
         _ => SUCCESS[0],
     };
     // A block transport's reply ends at a blank line; a delimited one is
-    // wrapped in its delimiters (PIXERA's separator-only 0xPX).
+    // wrapped in its markers (Shure's `< ... >`, PIXERA's separator-only
+    // 0xPX).
     let success = match &engine.transport {
-        super::Transport::LineTcp {
-            reply: super::ReplyFraming::Block,
-            ..
-        } => format!("{line}\r\n\r\n"),
         super::Transport::LineTcp {
             reply: super::ReplyFraming::Delimited { open, close },
             ..
         } => format!("{open}{line}{close}"),
+        super::Transport::LineTcp {
+            reply: super::ReplyFraming::Block,
+            ..
+        } => format!("{line}\r\n\r\n"),
         _ => format!("{line}\r\n"),
     }
     .into_bytes();

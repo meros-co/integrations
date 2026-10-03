@@ -269,6 +269,11 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
                     errors.append(f"commands.{name}: reply_json key '{path_}' is not a JSON path")
                 errors += check_template("text", template, params, settings,
                                          f"commands.{name}.expect.reply_json")
+        if "reply_contains" in expect_:
+            if transport_type not in ("line-tcp", "line-udp"):
+                errors.append(f"commands.{name}: expect.reply_contains needs a line transport")
+            errors += check_template("text", expect_["reply_contains"], params, settings,
+                                     f"commands.{name}.expect.reply_contains")
         if "convert" in expect_:
             if expect_["convert"] not in conversions:
                 errors.append(f"commands.{name}: expect.convert names undeclared conversion '{expect_['convert']}'")

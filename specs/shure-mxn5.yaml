@@ -1,0 +1,566 @@
+spec: 1
+id: shure-mxn5
+name: "Shure MXN5-C networked ceiling loudspeaker"
+vendor: Shure
+category: mixer
+
+# Written from Shure's MXN5-C command strings. Channels: 01-02 Dante inputs,
+# 03 summed input, 04 Dante output; 00 is all.
+source:
+  - title: "MXN5-C Command Strings, Version 1.5 (2024-E)"
+    author: Shure Incorporated
+    url: "https://pubs.shure.com/command-strings/MXN5-C/en-US"
+    note: >
+      Manufacturer document, also as a PDF at
+      https://pubs2-api.prod.shureweb.eu/documents/public/download/7644.pdf . TCP 2202; channel
+      table p.3; GET ALL and GET x ALL (MXN5-C-V1 only); device information; CHAN_NAME and NA names;
+      FLASH; clip indicator; METER_RATE with 4-channel SAMPLE; AUDIO_GAIN_HI_RES with inc/dec;
+      DEVICE_AUDIO_MUTE; AUDIO_MUTE; PRESET and PRESET_NAME; DEFAULT_SETTINGS; LIMITER_ENGAGED;
+      ENCRYPTION; REBOOT; PEQ (block 03); DELAY (1-160 ms on 03); BYPASS_DSP; signal generator type,
+      frequency (125-20000 Hz), gain (0-1310) and start/stop.
+
+transport:
+  type: line-tcp
+  port: 2202
+  framing: delimited
+  open: "< "
+  close: " >"
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  # Answers and change reports are both REP; SAMPLE (metering) never answers.
+  # Commands name the parameter their REP carries (expect.reply_contains), so
+  # a change pushed meanwhile is never taken for an answer.
+  reply_match: "^< REP "
+  error_match: "^< REP ERR"
+  probe: "GET MODEL"
+
+conversions:
+  # AUDIO_GAIN_HI_RES and similar: tenths of a dB offset by 1100 (0-1400 = -110.0 to +30.0 dB)
+  shure_gain:
+    points: [[0, -110.0], [1400, 30.0]]
+
+models:
+  - id: mxn5-c
+    name: "Shure MXN5-C networked ceiling loudspeaker"
+    supports:
+      - get_model
+      - get_serial_number
+      - get_firmware
+      - get_device_id
+      - get_ip_address
+      - get_subnet
+      - get_gateway
+      - get_na_device_name
+      - get_mac_address
+      - get_encryption
+      - get_preset
+      - recall_preset
+      - get_preset_name
+      - flash
+      - reboot
+      - restore_defaults
+      - get_all
+      - get_parameter
+      - set_parameter
+      - get_device_parameter
+      - set_device_parameter
+      - get_name
+      - get_mute
+      - set_mute
+      - toggle_mute
+      - get_gain
+      - set_gain
+      - increase_gain
+      - decrease_gain
+      - get_device_mute
+      - set_device_mute
+      - toggle_device_mute
+      - get_clip_indicator
+      - get_limiter_engaged
+      - get_meter_rate
+      - set_meter_rate
+      - get_delay
+      - set_delay
+      - get_bypass_dsp
+      - set_bypass_dsp
+      - toggle_bypass_dsp
+      - get_signal_generator_type
+      - set_signal_generator_type
+      - get_signal_generator_frequency
+      - set_signal_generator_frequency
+      - get_signal_generator_gain
+      - set_signal_generator_gain
+      - set_signal_generator
+      - get_peq_filter
+      - set_peq_filter
+    verification: none
+
+commands:
+  get_model:
+    summary: "Read the model (MODEL)"
+    send: "GET MODEL"
+    expect: { reply_contains: " MODEL ", matches: " MODEL \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_serial_number:
+    summary: "Read the serial number (SERIAL_NUM)"
+    send: "GET SERIAL_NUM"
+    expect: { reply_contains: " SERIAL_NUM ", matches: " SERIAL_NUM \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_firmware:
+    summary: "Read the firmware version (FW_VER)"
+    send: "GET FW_VER"
+    expect: { reply_contains: " FW_VER ", matches: " FW_VER \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_device_id:
+    summary: "Read the device ID (name) (DEVICE_ID)"
+    send: "GET DEVICE_ID"
+    expect: { reply_contains: " DEVICE_ID ", matches: " DEVICE_ID \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_ip_address:
+    summary: "Read the primary audio network IP address (IP_ADDR_NET_AUDIO_PRIMARY)"
+    send: "GET IP_ADDR_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_ADDR_NET_AUDIO_PRIMARY ", matches: " IP_ADDR_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_subnet:
+    summary: "Read the primary audio network subnet mask (IP_SUBNET_NET_AUDIO_PRIMARY)"
+    send: "GET IP_SUBNET_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_SUBNET_NET_AUDIO_PRIMARY ", matches: " IP_SUBNET_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_gateway:
+    summary: "Read the primary audio network gateway (IP_GATEWAY_NET_AUDIO_PRIMARY)"
+    send: "GET IP_GATEWAY_NET_AUDIO_PRIMARY"
+    expect: { reply_contains: " IP_GATEWAY_NET_AUDIO_PRIMARY ", matches: " IP_GATEWAY_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_na_device_name:
+    summary: "Read the Dante device name (NA_DEVICE_NAME)"
+    send: "GET NA_DEVICE_NAME"
+    expect: { reply_contains: " NA_DEVICE_NAME ", matches: " NA_DEVICE_NAME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_mac_address:
+    summary: "Read the control MAC address (CONTROL_MAC_ADDR)"
+    send: "GET CONTROL_MAC_ADDR"
+    expect: { reply_contains: " CONTROL_MAC_ADDR ", matches: " CONTROL_MAC_ADDR \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_encryption:
+    summary: "Read audio encryption (ENCRYPTION)"
+    send: "GET ENCRYPTION"
+    expect: { reply_contains: " ENCRYPTION ", matches: " ENCRYPTION \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_preset:
+    summary: "The preset last recalled (PRESET), 1-10"
+    send: "GET PRESET"
+    expect: { reply_contains: " PRESET ", matches: " PRESET \\{?(.*?) *\\}? *>$" }
+    returns: value
+  recall_preset:
+    summary: "Recall a preset (SET PRESET), 1-10"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "SET PRESET {preset:02d}"
+    expect: { reply_contains: " PRESET ", contains: " PRESET " }
+    returns: ack
+  get_preset_name:
+    summary: "A preset's name (PRESET_NAME); {empty} for an empty preset"
+    params:
+      preset: { type: int, min: 1, max: 10, required: true }
+    send: "GET PRESET_NAME {preset:02d}"
+    expect: { reply_contains: " PRESET_NAME ", matches: " PRESET_NAME \\d+ (.*?) *>$" }
+    returns: value
+  flash:
+    summary: "Flash the device's lights to identify it (FLASH); it stops by itself after about 30 s"
+    params:
+      enabled: { type: bool, default: true }
+    send: "SET FLASH {enabled:on_off}"
+    expect: { reply_contains: " FLASH ", contains: " FLASH " }
+    returns: ack
+  reboot:
+    summary: "Reboot the device (SET REBOOT); not acknowledged"
+    send: "SET REBOOT"
+    returns: none
+  restore_defaults:
+    summary: "Restore default settings (SET DEFAULT_SETTINGS)"
+    send: "SET DEFAULT_SETTINGS"
+    expect: { reply_contains: "DEFAULT_SETTINGS", contains: "DEFAULT_SETTINGS" }
+    returns: ack
+  get_all:
+    summary: "Ask for every parameter of a channel (0: the device and all channels); the answers update state"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} ALL"
+    returns: none
+  get_parameter:
+    summary: "Read any documented channel parameter by name (GET <channel> <PARAM>), returning its value text"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+    send: "GET {channel:02d} {parameter}"
+    expect: { reply_contains: " {parameter} ", matches: "^< REP (?:\\d+ )?[A-Z][A-Z0-9_]* \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_parameter:
+    summary: "Set any documented channel parameter by name (SET <channel> <PARAM> <value>), the value in the document's form"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+      value: { type: string, pattern: "^[^<>]+$", max_length: 64, required: true }
+    send: "SET {channel:02d} {parameter} {value}"
+    expect: { reply_contains: " {parameter} ", not_contains: "REP ERR" }
+    returns: ack
+  get_device_parameter:
+    summary: "Read any documented device parameter by name (GET <PARAM>)"
+    params:
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+    send: "GET {parameter}"
+    expect: { reply_contains: " {parameter} ", matches: "^< REP (?:\\d+ )?[A-Z][A-Z0-9_]* \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_parameter:
+    summary: "Set any documented device parameter by name (SET <PARAM> <value>)"
+    params:
+      parameter: { type: string, pattern: "^[A-Z][A-Z0-9_]*$", max_length: 40, required: true }
+      value: { type: string, pattern: "^[^<>]+$", max_length: 128, required: true }
+    send: "SET {parameter} {value}"
+    expect: { reply_contains: " {parameter} ", not_contains: "REP ERR" }
+    returns: ack
+  get_name:
+    summary: "Read a channel's name (CHAN_NAME)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} CHAN_NAME"
+    expect: { reply_contains: " CHAN_NAME ", matches: " CHAN_NAME \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_mute:
+    summary: "Read a channel's mute (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_MUTE"
+    expect: { reply_contains: " AUDIO_MUTE ", matches: " AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_mute:
+    summary: "Turn a channel's mute on or off (AUDIO_MUTE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      muted: { type: bool, default: true }
+    send: "SET {channel:02d} AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle a channel's mute (AUDIO_MUTE TOGGLE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "SET {channel:02d} AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " AUDIO_MUTE ", contains: " AUDIO_MUTE " }
+    returns: ack
+  get_gain:
+    summary: "Read a channel's digital gain (AUDIO_GAIN_HI_RES)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_GAIN_HI_RES"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", matches: " AUDIO_GAIN_HI_RES \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_gain:
+    summary: "Set a channel's digital gain (AUDIO_GAIN_HI_RES), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 300, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  increase_gain:
+    summary: "Increase a channel's digital gain by a step (AUDIO_GAIN_HI_RES inc)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES inc {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  decrease_gain:
+    summary: "Decrease a channel's digital gain by a step (AUDIO_GAIN_HI_RES dec)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      step: { type: int, min: 1, max: 1400, required: true }
+    send: "SET {channel:02d} AUDIO_GAIN_HI_RES dec {step}"
+    expect: { reply_contains: " AUDIO_GAIN_HI_RES ", contains: " AUDIO_GAIN_HI_RES " }
+    returns: ack
+  get_device_mute:
+    summary: "Read the device mute (DEVICE_AUDIO_MUTE)"
+    send: "GET DEVICE_AUDIO_MUTE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", matches: " DEVICE_AUDIO_MUTE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_device_mute:
+    summary: "Turn the device mute on or off (DEVICE_AUDIO_MUTE)"
+    params:
+      muted: { type: bool, default: true }
+    send: "SET DEVICE_AUDIO_MUTE {muted:on_off}"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  toggle_device_mute:
+    summary: "Toggle the device mute (DEVICE_AUDIO_MUTE TOGGLE)"
+    send: "SET DEVICE_AUDIO_MUTE TOGGLE"
+    expect: { reply_contains: " DEVICE_AUDIO_MUTE ", contains: " DEVICE_AUDIO_MUTE " }
+    returns: ack
+  get_clip_indicator:
+    summary: "Read a channel's clip indicator (AUDIO_OUT_CLIP_INDICATOR)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} AUDIO_OUT_CLIP_INDICATOR"
+    expect: { reply_contains: " AUDIO_OUT_CLIP_INDICATOR ", matches: " AUDIO_OUT_CLIP_INDICATOR \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_limiter_engaged:
+    summary: "Read the limiter engaged (LIMITER_ENGAGED)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} LIMITER_ENGAGED"
+    expect: { reply_contains: " LIMITER_ENGAGED ", matches: " LIMITER_ENGAGED \\{?(.*?) *\\}? *>$" }
+    returns: value
+  get_meter_rate:
+    summary: "Read the metering interval, ms (0: off; 1-99 refused) (METER_RATE)"
+    send: "GET METER_RATE"
+    expect: { reply_contains: " METER_RATE ", matches: " METER_RATE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_meter_rate:
+    summary: "Set the metering interval, ms (0: off; 1-99 refused) (METER_RATE), ms"
+    params:
+      rate_ms: { type: int, min: 0, max: 99999, required: true }
+    send: "SET METER_RATE {rate_ms:05d}"
+    expect: { reply_contains: " METER_RATE ", contains: " METER_RATE " }
+    returns: ack
+  get_delay:
+    summary: "Read the delay, ms (channel 03; 0 off) (DELAY)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} DELAY"
+    expect: { reply_contains: " DELAY ", matches: " DELAY \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_delay:
+    summary: "Set the delay, ms (channel 03; 0 off) (DELAY), ms"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: int, min: 0, max: 160, required: true }
+    send: "SET {channel:02d} DELAY {value:04d}"
+    expect: { reply_contains: " DELAY ", contains: " DELAY " }
+    returns: ack
+  get_bypass_dsp:
+    summary: "Read bypass of the EQ, delay and limiter (BYPASS_DSP)"
+    send: "GET BYPASS_DSP"
+    expect: { reply_contains: " BYPASS_DSP ", matches: " BYPASS_DSP \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_bypass_dsp:
+    summary: "Turn bypass of the EQ, delay and limiter on or off (BYPASS_DSP)"
+    params:
+      enabled: { type: bool, default: true }
+    send: "SET BYPASS_DSP {enabled:on_off}"
+    expect: { reply_contains: " BYPASS_DSP ", contains: " BYPASS_DSP " }
+    returns: ack
+  toggle_bypass_dsp:
+    summary: "Toggle bypass of the EQ, delay and limiter (BYPASS_DSP TOGGLE)"
+    send: "SET BYPASS_DSP TOGGLE"
+    expect: { reply_contains: " BYPASS_DSP ", contains: " BYPASS_DSP " }
+    returns: ack
+  get_signal_generator_type:
+    summary: "Read the signal generator type (channel 03) (SIG_GEN_TYPE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} SIG_GEN_TYPE"
+    expect: { reply_contains: " SIG_GEN_TYPE ", matches: " SIG_GEN_TYPE \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_signal_generator_type:
+    summary: "Set the signal generator type (channel 03) (SIG_GEN_TYPE)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      value: { type: enum, values: ["PINK", "WHITE", "TONE", "SWEEP"], required: true }
+    send: "SET {channel:02d} SIG_GEN_TYPE {value}"
+    expect: { reply_contains: " SIG_GEN_TYPE ", contains: " SIG_GEN_TYPE " }
+    returns: ack
+  get_signal_generator_frequency:
+    summary: "Read the signal generator tone frequency, Hz (SIG_GEN_FREQ)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} SIG_GEN_FREQ"
+    expect: { reply_contains: " SIG_GEN_FREQ ", matches: " SIG_GEN_FREQ \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_signal_generator_frequency:
+    summary: "Set the signal generator tone frequency, Hz (SIG_GEN_FREQ), Hz"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      frequency_hz: { type: int, min: 125, max: 20000, required: true }
+    send: "SET {channel:02d} SIG_GEN_FREQ {frequency_hz}"
+    expect: { reply_contains: " SIG_GEN_FREQ ", contains: " SIG_GEN_FREQ " }
+    returns: ack
+  get_signal_generator_gain:
+    summary: "Read the signal generator gain, tenths of a dB (-1100 to 210) (SIG_GEN_GAIN)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+    send: "GET {channel:02d} SIG_GEN_GAIN"
+    expect: { reply_contains: " SIG_GEN_GAIN ", matches: " SIG_GEN_GAIN \\{?(.*?) *\\}? *>$" }
+    returns: value
+  set_signal_generator_gain:
+    summary: "Set the signal generator gain, tenths of a dB (-1100 to 210) (SIG_GEN_GAIN), dB"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      gain_tenth_db: { type: int, min: -1100, max: 210, required: true }
+    send: "SET {channel:02d} SIG_GEN_GAIN {gain_tenth_db:+1100:04d}"
+    expect: { reply_contains: " SIG_GEN_GAIN ", contains: " SIG_GEN_GAIN " }
+    returns: ack
+  set_signal_generator:
+    summary: "Start, stop or toggle the signal generator (SIG_GEN)"
+    params:
+      channel: { type: int, min: 0, max: 99, required: true }
+      state: { type: enum, values: [START, STOP, TOGGLE], required: true }
+    send: "SET {channel:02d} SIG_GEN {state}"
+    expect: { reply_contains: " SIG_GEN ", contains: " SIG_GEN " }
+    returns: ack
+  get_peq_filter:
+    summary: "Whether a PEQ filter is enabled (PEQ <block> <filter>)"
+    params:
+      block: { type: int, min: 0, max: 99, required: true }
+      filter: { type: int, min: 0, max: 16, required: true }
+    send: "GET {block:02d} PEQ {filter:02d}"
+    expect: { reply_contains: " PEQ ", matches: " PEQ \\d+ (ON|OFF) *>$" }
+    returns: value
+  set_peq_filter:
+    summary: "Enable, disable or toggle a PEQ filter (0: every block or filter)"
+    params:
+      block: { type: int, min: 0, max: 99, required: true }
+      filter: { type: int, min: 0, max: 16, required: true }
+      state: { type: enum, values: ["ON", "OFF", "TOGGLE"], required: true }
+    send: "SET {block:02d} PEQ {filter:02d} {state}"
+    expect: { reply_contains: " PEQ ", contains: " PEQ " }
+    returns: ack
+
+state:
+  device.model: { type: string, description: "the model" }
+  device.serial_number: { type: string, description: "the serial number" }
+  device.firmware: { type: string, description: "the firmware version" }
+  device.device_id: { type: string, description: "the device ID (name)" }
+  device.ip_address: { type: string, description: "the primary audio network IP address" }
+  device.subnet: { type: string, description: "the primary audio network subnet mask" }
+  device.gateway: { type: string, description: "the primary audio network gateway" }
+  device.na_device_name: { type: string, description: "the Dante device name" }
+  device.mac_address: { type: string, description: "the control MAC address" }
+  device.encryption: { type: bool, description: "audio encryption (on/true)" }
+  device.preset: { type: int, description: "The preset last recalled, 1-10" }
+  channels.*.name: { type: string, description: "a channel's name" }
+  channels.*.mute: { type: bool, description: "a channel's mute (on/true)" }
+  channels.*.gain: { type: float, unit: "dB", description: "A channel's digital gain, -110.0 to +30.0 dB (wire 0-1400 in tenths offset by 1100); set_gain takes tenths of a dB, -1100 to 300" }
+  device.device_mute: { type: bool, description: "the device mute (on/true)" }
+  channels.*.clip_indicator: { type: bool, description: "a channel's clip indicator (on/true)" }
+  channels.*.limiter_engaged: { type: bool, description: "the limiter engaged (on/true)" }
+  device.meter_rate: { type: int, unit: "ms", description: "the metering interval, ms (0: off; 1-99 refused)" }
+  channels.*.delay: { type: int, unit: "ms", description: "the delay, ms (channel 03; 0 off)" }
+  device.bypass_dsp: { type: bool, description: "bypass of the EQ, delay and limiter (on/true)" }
+  channels.*.signal_generator_type: { type: string, description: "the signal generator type (channel 03)" }
+  channels.*.signal_generator_frequency: { type: int, unit: "Hz", description: "the signal generator tone frequency, Hz" }
+  channels.*.signal_generator_gain: { type: float, unit: "dB", description: "the signal generator gain, tenths of a dB (-1100 to 210)" }
+  peq.*.*.enabled: { type: bool, description: "A PEQ filter's enable, keyed by block then filter" }
+
+telemetry:
+  # Every parameter is reported once on connecting; after that the device
+  # sends a REP whenever a value changes, so nothing is polled.
+  poll:
+    send: ["GET 00 ALL"]
+  updates:
+    - match: "^< REP MODEL \\{?(.*?) *\\}? >$"
+      state: { "device.model": "{1}" }
+    - match: "^< REP SERIAL_NUM \\{?(.*?) *\\}? >$"
+      state: { "device.serial_number": "{1}" }
+    - match: "^< REP FW_VER \\{?(.*?) *\\}? >$"
+      state: { "device.firmware": "{1}" }
+    - match: "^< REP DEVICE_ID \\{?(.*?) *\\}? >$"
+      state: { "device.device_id": "{1}" }
+    - match: "^< REP IP_ADDR_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.ip_address": "{1}" }
+    - match: "^< REP IP_SUBNET_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.subnet": "{1}" }
+    - match: "^< REP IP_GATEWAY_NET_AUDIO_PRIMARY \\{?(.*?) *\\}? >$"
+      state: { "device.gateway": "{1}" }
+    - match: "^< REP NA_DEVICE_NAME \\{?(.*?) *\\}? >$"
+      state: { "device.na_device_name": "{1}" }
+    - match: "^< REP CONTROL_MAC_ADDR \\{?(.*?) *\\}? >$"
+      state: { "device.mac_address": "{1}" }
+    - match: "^< REP ENCRYPTION (ON|OFF|On|Off) >$"
+      state: { "device.encryption": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP PRESET (\\d+) >$"
+      state: { "device.preset": "{1}" }
+    - match: "^< REP (\\d+) CHAN_NAME \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.name": "{2}" }
+    - match: "^< REP (\\d+) AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.mute": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_GAIN_HI_RES (\\d+) >$"
+      state: { "channels.{1}.gain": "{2:from.shure_gain}" }
+    - match: "^< REP DEVICE_AUDIO_MUTE (ON|OFF|On|Off) >$"
+      state: { "device.device_mute": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) AUDIO_OUT_CLIP_INDICATOR (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.clip_indicator": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) LIMITER_ENGAGED (ON|OFF|On|Off) >$"
+      state: { "channels.{1}.limiter_engaged": { value: "{2}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP METER_RATE (-?\\d+) >$"
+      state: { "device.meter_rate": "{1}" }
+    - match: "^< REP (\\d+) DELAY (-?\\d+) >$"
+      state: { "channels.{1}.delay": "{2}" }
+    - match: "^< REP BYPASS_DSP (ON|OFF|On|Off) >$"
+      state: { "device.bypass_dsp": { value: "{1}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+    - match: "^< REP (\\d+) SIG_GEN_TYPE \\{?(.*?) *\\}? >$"
+      state: { "channels.{1}.signal_generator_type": "{2}" }
+    - match: "^< REP (\\d+) SIG_GEN_FREQ (-?\\d+) >$"
+      state: { "channels.{1}.signal_generator_frequency": "{2}" }
+    - match: "^< REP (\\d+) SIG_GEN_GAIN (\\d+) >$"
+      state: { "channels.{1}.signal_generator_gain": "{2:from.shure_gain}" }
+    - match: "^< REP (\\d+) PEQ (\\d+) (ON|OFF) >$"
+      state: { "peq.{1}.{2}.enabled": { value: "{3}", map: { "ON": true, "OFF": false, "On": true, "Off": false, "on": true, "off": false } } }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Commands are matched to their REP by the parameter name, not by the channel: a change to the
+      same parameter on another channel arriving in the same moment could be taken for the answer.
+      An error answer is < REP ERR >, which names nothing; it fails the command waiting.
+  - models: [all]
+    severity: info
+    text: >
+      Text values (names, model, serial number, addresses) are padded with spaces to a fixed width,
+      sometimes in braces; the spaces and braces are removed. Channel 0 (or 00) means every channel,
+      answered with one REP per channel.
+  - models: [all]
+    severity: info
+    text: >
+      Gains are sent and reported in tenths of a dB offset by 1100 (0000-1400 = -110.0 to +30.0 dB);
+      set commands take tenths of a dB (-1100 to 300), and state holds dB. Increase and decrease
+      steps are in tenths of a dB.
+  - models: [all]
+    severity: info
+    text: >
+      Metering (METER_RATE and its siblings) sends SAMPLE messages at the chosen interval until set
+      to 0; it is never started here, and SAMPLE values (000-060 = -60 to 0 dBFS) are not kept in
+      state. Values 1-99 ms are refused by the device.
+  - models: [all]
+    severity: info
+    text: >
+      On connecting the session sends one GET ALL; the device answers with a REP for every
+      parameter, and thereafter reports every change unasked, so state stays current without
+      polling. Opened for commands only, the GET ALL is not sent.
+  - models: [all]
+    severity: info
+    text: >
+      get_parameter, set_parameter, get_device_parameter and set_device_parameter reach any
+      parameter the command-string document lists, with the value in the document's form, for those
+      not given a command of their own.
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset replaces the device's whole configuration with the preset's, live, and cannot be
+      undone except by recalling another preset.
+  - models: [all]
+    severity: critical
+    text: >
+      restore_defaults erases the device's configuration (presets aside) and cannot be undone;
+      reboot restarts the device, interrupting its audio, and is not acknowledged.
+  - models: [all]
+    severity: info
+    text: >
+      GET x ALL works only on MXN5-C-V1 units; on others the connect-time read is answered with an
+      error and state fills as values change.
+  - models: [all]
+    severity: warning
+    text: >
+      The signal generator plays pink or white noise, a tone or a sweep through the loudspeaker; set
+      its gain before starting it.

@@ -65,6 +65,9 @@ enum Transport {
         ascii: bool,
         replies: bool,
         reply_match: Option<Regex>,
+        /// An error answer, which names nothing it answers: taken as the
+        /// reply of a command waiting with `expect.reply_contains`.
+        error_match: Option<Regex>,
     },
     /// Text messages, one per datagram (ChamSys, XPression over UDP).
     LineUdp {
@@ -73,6 +76,8 @@ enum Transport {
         ascii: bool,
         replies: bool,
         listen: Option<u16>,
+        /// As for line-tcp: a datagram not matching it is never a reply.
+        reply_match: Option<Regex>,
     },
     OscUdp {
         port: u16,
@@ -193,8 +198,9 @@ impl OscReply {
 /// What reply the command in flight is waiting for.
 #[derive(Debug)]
 enum Await {
-    /// The next reply message on a text stream.
-    Text,
+    /// The next reply message on a text stream, or with
+    /// `expect.reply_contains` the first one holding that rendered text.
+    Text(Option<String>),
     /// An OSC message on this address; `None` for a probe, where any will do.
     Osc(Option<OscReply>),
     Http(RequestId),
@@ -207,7 +213,10 @@ impl Await {
     /// A reply that names what it answers: a late one cannot be taken for
     /// the answer to a later message, so a timeout need not reset a stream.
     fn addressed(&self) -> bool {
-        matches!(self, Await::Osc(Some(_)) | Await::Ws(Some(_)))
+        matches!(
+            self,
+            Await::Osc(Some(_)) | Await::Ws(Some(_)) | Await::Text(Some(_))
+        )
     }
 }
 
@@ -218,6 +227,8 @@ struct InFlight {
     messages: VecDeque<(Outgoing, Option<OscReply>)>,
     /// Over a websocket: what identifies the reply (`expect.reply_json`).
     ws_reply: Option<Vec<(String, String)>>,
+    /// On a line transport: text the reply holds (`expect.reply_contains`).
+    text_reply: Option<String>,
     expect: Map<String, Value>,
     returns: String,
     awaiting: Option<Await>,
@@ -455,6 +466,10 @@ impl SpecEngine {
                     ascii: str_field(&t, "encoding") != Some("utf-8"),
                     replies: str_field(&t, "reply") != Some("none"),
                     reply_match,
+                    error_match: match str_field(&t, "error_match") {
+                        Some(p) => Some(Regex::new(p).map_err(|e| format!("error_match: {e}"))?),
+                        None => None,
+                    },
                 }
             }
             "line-udp" => Transport::LineUdp {
@@ -469,6 +484,10 @@ impl SpecEngine {
                 ascii: str_field(&t, "encoding") != Some("utf-8"),
                 replies: str_field(&t, "reply") == Some("to-source"),
                 listen: listen_port(t.get("listen_port"), &ctx.settings)?,
+                reply_match: match str_field(&t, "reply_match") {
+                    Some(p) => Some(Regex::new(p).map_err(|e| format!("reply_match: {e}"))?),
+                    None => None,
+                },
             },
             "osc-udp" => Transport::OscUdp {
                 port,
@@ -870,6 +889,10 @@ impl SpecEngine {
             }
             None => None,
         };
+        let text_reply = match expect.get("reply_contains").and_then(Value::as_str) {
+            Some(template) => Some(render(template, &values, no_escape)?),
+            None => None,
+        };
         let mut messages = VecDeque::new();
         for item in &items {
             // OSC probes are bare addresses in the spec.
@@ -884,6 +907,7 @@ impl SpecEngine {
             id: job.id,
             messages,
             ws_reply,
+            text_reply,
             expect,
             returns,
             awaiting: None,
@@ -956,7 +980,9 @@ impl SpecEngine {
                         _ => cx.tcp_send(SOCKET, bytes),
                     }
                     match &self.transport {
-                        Transport::LineTcp { .. } | Transport::LineUdp { .. } => Await::Text,
+                        Transport::LineTcp { .. } | Transport::LineUdp { .. } => {
+                            Await::Text(flight.text_reply.clone())
+                        }
                         _ => Await::Osc(address),
                     }
                 }
@@ -1376,11 +1402,21 @@ impl SpecEngine {
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
         self.apply_message(cx, &message);
-        let waiting = matches!(
-            self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
-            Some(Await::Text)
-        );
+        let waiting = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
+            Some(Await::Text(None)) => true,
+            // `expect.reply_contains`: a message that does not hold the text
+            // answers something else, or nothing.
+            Some(Await::Text(Some(text))) => {
+                message.contains(text.as_str())
+                    || matches!(&self.transport, Transport::LineTcp { error_match: Some(re), .. } if re.is_match(&message))
+            }
+            _ => false,
+        };
         if let Transport::LineTcp {
+            reply_match: Some(re),
+            ..
+        }
+        | Transport::LineUdp {
             reply_match: Some(re),
             ..
         } = &self.transport
@@ -3158,5 +3194,69 @@ mod tests {
         assert!(cx
             .take()
             .contains(&Action::State(json!({"slide": {"index": 4}}))));
+    }
+
+    #[test]
+    fn a_line_reply_can_be_matched_by_the_text_it_holds() {
+        let mut spec = Catalog::source_tree()
+            .device("kramer-p3000")
+            .unwrap()
+            .clone();
+        let command = spec.commands.get_mut("get_route_video").unwrap();
+        command.expect = Some(json!({
+            "reply_contains": "ROUTE 1,{output},",
+            "matches": r"ROUTE 1,\d+,(\d+)",
+        }));
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                port: None,
+                model: "p3000-generic".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b"~01@ OK\r\n".to_vec()));
+        cx.take();
+
+        let mut params = Params::new();
+        params.insert("output".into(), json!(2));
+        let mut cx = Cx::new(10);
+        e.command(&mut cx, 1, "get_route_video", &params);
+        assert_eq!(tcp_sent(&cx.take()), vec!["#ROUTE? 1,2\r".to_string()]);
+
+        // A change pushed for another output is not the reply.
+        let mut cx = Cx::new(11);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"~01@ROUTE 1,5,3\r\n".to_vec()),
+        );
+        assert!(completed(&cx.take()).is_empty());
+        let mut cx = Cx::new(12);
+        e.tcp(
+            &mut cx,
+            SOCKET,
+            TcpInput::Data(b"~01@ROUTE 1,2,7\r\n".to_vec()),
+        );
+        assert_eq!(
+            completed(&cx.take()),
+            vec![(1, Ok(Outcome::Value { value: json!("7") }))]
+        );
+
+        // Unanswered, it times out without resetting the stream: a late
+        // reply names what it answers.
+        let mut cx = Cx::new(20);
+        e.command(&mut cx, 2, "get_route_video", &params);
+        e.timer(&mut cx, REPLY);
+        let a = cx.take();
+        assert_eq!(completed(&a), vec![(2, Err(CommandError::Timeout))]);
+        assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
     }
 }

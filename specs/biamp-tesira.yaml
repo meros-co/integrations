@@ -1,0 +1,522 @@
+spec: 1
+id: biamp-tesira
+name: Biamp Tesira (Tesira Text Protocol)
+vendor: Biamp
+category: mixer
+implementation: native
+reason: >
+  The Telnet server negotiates session options as the connection opens and
+  goes no further until each one is answered, so the session must refuse
+  every option it is offered (at any point in the session) and drop the
+  Telnet bytes from the text. A protected system asks for a user name and
+  password before the welcome banner, which an unprotected one does not.
+  Answers (+OK, +OK "value":..., -ERR ...) never say what they answer, so a
+  get's value can only become state by remembering what was asked; and
+  subscriptions, the only push, belong to the session and must be made again,
+  with the same labels, after every reconnection.
+
+# Written from Biamp's Tesira Text Protocol manual and the Cornerstone
+# knowledge-base articles below. TTP over SSH (port 22) is not offered: the
+# core opens SSH only as port-forwarding tunnels, and Tesira's SSH server is
+# an interactive console. RS-232 is out of scope.
+source:
+  - title: "Tesira Text Protocol, Version 4.2 (2 Dec 2021)"
+    author: Biamp Systems
+    url: "https://downloads.biamp.com/assets/docs/default-source/control/tesira_text_protocol_v4-2_jan22.pdf"
+    note: >
+      Manufacturer manual. TTP overview (case-sensitive commands, a line feed
+      after each, +OK / -ERR) p.1; syntax Instance_Tag Command Attribute
+      [Index] [Value] and services Instance_Tag Service [Index] [Value] p.2-3;
+      instance tags (quoted when they contain spaces; / and & illegal; SESSION
+      get aliases) p.3-5; commands get/set/increment/decrement/toggle/
+      subscribe/unsubscribe p.5; services, index and value forms p.6-7;
+      DEVICE and SESSION special addresses p.7; TTP security (login prompt,
+      default/default, observer and controller levels) p.8-9; responses,
+      verbose and non-verbose, -ERR examples, -CANNOT_DELIVER,
+      -GENERAL_FAILURE, -ERR WRONG_STATE p.10-12; subscriptions (custom
+      label, minimum interval in ms, lost on reboot or configuration change,
+      publishToken responses, the first value before +OK, unsubscribe with the
+      same index and label) p.13-16; Telnet (32 sessions per server, port 23,
+      negotiation required, refuse every option, welcome banner, CR NUL line
+      ends, negotiation possible mid-session, example negotiation) p.19-23;
+      SSH p.24; DEVICE services (reboot, deleteConfigData, rebootERD,
+      recallPreset, recallPresetShowFailures, recallPresetByName, savePreset,
+      savePresetByName, startAudio, stopAudio, startPartitionAudio,
+      stopPartitionAudio) p.28-29; DEVICE attributes (serialNumber, version,
+      hostname, networkStatus, ipConfig, telnetDisabled, sshDisabled, ...)
+      p.30-35; SESSION attributes (aliases, verbose) p.36-37; block attribute
+      tables: Audio Input p.38-39, Standard Mixer p.141-142, Matrix Mixer
+      p.143-144, Room Combiner p.146-147, Router p.170, Source Selector
+      p.171-172, Level p.175-176, Invert p.177, Mute p.178, Preset Button
+      p.179, Command String p.180-181, Dialer services and attributes
+      p.183-185, Logic State, Flip Flop and Logic Meter p.195-198.
+  - title: "Tesira Text Protocol (Cornerstone knowledge base)"
+    author: Biamp Systems
+    url: "https://support.biamp.com/Tesira/Control/Tesira_Text_Protocol"
+    note: >
+      Manufacturer article. Sessions (subscriptions belong to the session that
+      made them), command formatting, +OK and -ERR examples, subscription
+      responses in verbose mode, and example sessions in which the first
+      publication and the subscribe's +OK appear on one line.
+  - title: "Telnet session negotiation in Tesira (Cornerstone knowledge base)"
+    author: Biamp Systems
+    url: "https://support.biamp.com/Tesira/Control/Telnet_session_negotiation_in_Tesira"
+    note: >
+      Manufacturer article. Port 23; 32 Telnet and 64-80 SSH sessions per
+      system; wait for the welcome message; if the client does not answer the
+      option negotiation the session does not go ahead; WILL is answered
+      DON'T and DO is answered WON'T with the option byte returned; the
+      banner is preceded and followed by CR LF; lines may end CR NUL;
+      negotiation may happen at any point; an example in which the server
+      asks DO terminal type, terminal speed, X display location and others.
+  - title: "Tesira DSP blocks that support subscriptions (Cornerstone knowledge base)"
+    author: Biamp Systems
+    url: "https://support.biamp.com/Tesira/Control/Tesira_Text_Protocol/Tesira_DSP_blocks_that_support_subscriptions"
+    note: Manufacturer article; the blocks and attributes that can be subscribed to.
+  - title: "Tesira TTP Fault Responses (Cornerstone knowledge base)"
+    author: Biamp Systems
+    url: "https://support.biamp.com/Tesira/Control/Tesira_TTP_Fault_Responses"
+    note: Manufacturer article; -ERR texts and their causes.
+  - title: "Tesira security best practices and Tesira network ports and protocols (Cornerstone knowledge base)"
+    author: Biamp Systems
+    url: "https://support.biamp.com/Tesira/Control/Tesira_security_best_practices"
+    note: >
+      Manufacturer articles (with Tesira_network_ports_and_protocols). Telnet
+      and SSH are disabled by default and enabled in Device Maintenance >
+      Network Settings; with system security on, TTP needs a user with at
+      least Controller level.
+  - title: "TTP Security (Tesira help, v5.3 and earlier)"
+    author: Biamp Systems
+    url: "https://tesira-help.biamp.com/System_Control/Tesira_Text_Protocol/TTP_Security.htm"
+    note: Manufacturer help page; the same login rules as the manual.
+  - title: "Bitfocus Companion module biamp-tesira (MIT)"
+    url: "https://github.com/bitfocus/companion-module-biamp-tesira"
+    note: >
+      Read as corroboration only, no code copied: its help text describes
+      answering a login prompt when one appears (user name, then password,
+      default/default on unprotected systems), waiting for the welcome
+      banner, and subscribing again after a reconnection.
+
+settings:
+  # Sent only when the Tesira asks for them (a protected system). An
+  # unprotected system accepts default/default.
+  username: { type: string, default: default, max_length: 64 }
+  password: { type: string, secret: true, default: default, max_length: 64 }
+  # Block attributes kept current while the device is open, subscribed to on
+  # every connection: entries separated by ";" or line breaks, each
+  # "<instance tag> <attribute> [index ...] [@<minimum interval ms>]", a tag
+  # with spaces in double quotes. For example:
+  #   Level1 level 1; Level1 mute 1; "Room Mics" mutes; AudioMeter1 level 1 @250
+  subscriptions: { type: string, default: "", max_length: 8192 }
+
+models:
+  - id: tesira-server
+    name: "Biamp Tesira SERVER and SERVER-IO"
+    supports: &all
+      [get, set, increment, decrement, toggle, subscribe, unsubscribe, service, raw, get_aliases,
+       get_level, set_level, increment_level, decrement_level, get_mute, set_mute, toggle_mute,
+       select_source, get_source, route, get_route, set_crosspoint, set_crosspoint_level,
+       set_logic_state, set_wall, recall_preset, recall_preset_show_failures, recall_preset_by_name,
+       save_preset, save_preset_by_name, start_audio, stop_audio, start_partition_audio,
+       stop_partition_audio, reboot, dial, send_dtmf, end_call, answer_call, redial, hold_call,
+       resume_call, off_hook, on_hook, flash_hook]
+    verification: none
+  - id: tesiraforte
+    name: "Biamp TesiraFORTÉ (AI, AVB, CI, DAN, VI, VT, VT4)"
+    supports: *all
+    verification: none
+  - id: tesiraforte-x
+    name: "Biamp TesiraFORTÉ X 400, 800 and 1600"
+    supports: *all
+    verification: none
+  - id: tesira-amp
+    name: "Biamp Tesira amplifiers (server-class AMP models with a control port)"
+    supports: *all
+    verification: none
+    notes: >
+      The manual names Tesira amplifiers among the devices whose Telnet can be
+      enabled; which amplifier models host a TTP server is not listed.
+
+commands:
+  # ── Any block attribute ────────────────────────────────────────────────
+  get:
+    summary: "Read a block attribute: <tag> get <attribute> [index]. Returns the value (number, true/false, string, list or object) and stores it at blocks.<tag>.<attribute>[.<index>...]"
+    params:
+      tag: &tag { type: string, required: true, max_length: 128, pattern: "^[^\"/&]+$" }
+      attribute: &attribute { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$" }
+      index: &index { type: string, default: "", max_length: 64, pattern: "^[A-Za-z0-9_:. -]*$" }
+    returns: value
+  set:
+    summary: "Set a block attribute: <tag> set <attribute> [index] <value>, the value in TTP form (a number, true/false, a \"quoted string\", or a list/object as the attribute table gives it)"
+    params:
+      tag: *tag
+      attribute: *attribute
+      index: *index
+      value: { type: string, required: true, max_length: 1024 }
+    returns: ack
+  increment:
+    summary: "Raise a numeric block attribute by an amount: <tag> increment <attribute> [index] <amount>"
+    params:
+      tag: *tag
+      attribute: *attribute
+      index: *index
+      amount: { type: float, required: true, min: -1000000, max: 1000000 }
+    returns: ack
+  decrement:
+    summary: "Lower a numeric block attribute by an amount: <tag> decrement <attribute> [index] <amount>"
+    params:
+      tag: *tag
+      attribute: *attribute
+      index: *index
+      amount: { type: float, required: true, min: -1000000, max: 1000000 }
+    returns: ack
+  toggle:
+    summary: "Toggle a two-state block attribute: <tag> toggle <attribute> [index]"
+    params:
+      tag: *tag
+      attribute: *attribute
+      index: *index
+    returns: ack
+  subscribe:
+    summary: "Subscribe to a block attribute for this session; its value and every change land at blocks.<tag>.<attribute>[.<index>...]. Made again after each reconnection until unsubscribed. rate_ms is the minimum interval between updates, ms (0 sends none)"
+    params:
+      tag: *tag
+      attribute: *attribute
+      index: *index
+      rate_ms: { type: int, min: 0, max: 3600000, default: 0 }
+    returns: ack
+  unsubscribe:
+    summary: "Cancel a subscription made in this session (by the subscribe command or the subscriptions setting)"
+    params:
+      tag: *tag
+      attribute: *attribute
+      index: *index
+    returns: ack
+  service:
+    summary: "Run a block's service code: <tag> <service> [arguments], e.g. a Dialer's speedDial or a DTMF Decode's clear. Arguments are sent as written"
+    params:
+      tag: *tag
+      service: { type: string, required: true, max_length: 64, pattern: "^[A-Za-z][A-Za-z0-9_]*$" }
+      arguments: { type: string, default: "", max_length: 1024 }
+    returns: value
+  raw:
+    summary: "Send one TTP line as written and return what its +OK carries; for anything the other commands do not cover. Avoid subscribe here: its publications cannot be placed in state"
+    params:
+      command: { type: string, required: true, max_length: 2048 }
+    returns: value
+  get_aliases:
+    summary: "SESSION get aliases: the instance tags of the running design"
+    returns: value
+
+  # ── Level, Mute, Audio Input/Output and similar blocks ──────────────────
+  get_level:
+    summary: "Read a channel's level (attribute level), dB"
+    params:
+      tag: *tag
+      channel: &channel { type: int, min: 0, max: 256, required: true }
+    returns: value
+  set_level:
+    summary: "Set a channel's level in dB, within the block's minLevel to maxLevel (Level blocks: -100 to +12 dB). Channel 0 addresses a ganged block"
+    params:
+      tag: *tag
+      channel: *channel
+      level_db: { type: float, min: -100, max: 12, required: true }
+    returns: ack
+  increment_level:
+    summary: "Raise a channel's level by a step in dB"
+    params:
+      tag: *tag
+      channel: *channel
+      step_db: &step { type: float, min: 0, max: 112, required: true }
+    returns: ack
+  decrement_level:
+    summary: "Lower a channel's level by a step in dB"
+    params:
+      tag: *tag
+      channel: *channel
+      step_db: *step
+    returns: ack
+  get_mute:
+    summary: "Read a channel's mute (attribute mute)"
+    params:
+      tag: *tag
+      channel: *channel
+    returns: value
+  set_mute:
+    summary: "Mute or unmute a channel (attribute mute)"
+    params:
+      tag: *tag
+      channel: *channel
+      muted: { type: bool, default: true }
+    returns: ack
+  toggle_mute:
+    summary: "Toggle a channel's mute"
+    params:
+      tag: *tag
+      channel: *channel
+    returns: ack
+
+  # ── Routing and mixing ─────────────────────────────────────────────────
+  select_source:
+    summary: "Source Selector: select a source (sourceSelection), 0 for none"
+    params:
+      tag: *tag
+      source: { type: int, min: 0, max: 64, required: true }
+    returns: ack
+  get_source:
+    summary: "Source Selector: the selected source (sourceSelection), 0 for none"
+    params:
+      tag: *tag
+    returns: value
+  route:
+    summary: "Router: route an input to an output (input <output> <input>), input 0 for none"
+    params:
+      tag: *tag
+      output: { type: int, min: 1, max: 256, required: true }
+      input: { type: int, min: 0, max: 256, required: true }
+    returns: ack
+  get_route:
+    summary: "Router: the input routed to an output, 0 for none"
+    params:
+      tag: *tag
+      output: { type: int, min: 1, max: 256, required: true }
+    returns: value
+  set_crosspoint:
+    summary: "Turn a mixer crosspoint on or off: crosspointLevelState on a Matrix Mixer, crosspoint on a Standard Mixer"
+    params:
+      tag: *tag
+      input: &mixin { type: int, min: 1, max: 256, required: true }
+      output: &mixout { type: int, min: 1, max: 256, required: true }
+      enabled: { type: bool, default: true }
+      mixer: { type: enum, values: [matrix, standard], default: matrix }
+    returns: ack
+  set_crosspoint_level:
+    summary: "Matrix Mixer: set a crosspoint's level (crosspointLevel), -100 to 0 dB"
+    params:
+      tag: *tag
+      input: *mixin
+      output: *mixout
+      level_db: { type: float, min: -100, max: 0, required: true }
+    returns: ack
+  set_logic_state:
+    summary: "Logic State or Flip Flop block: set a channel's state"
+    params:
+      tag: *tag
+      channel: { type: int, min: 1, max: 256, required: true }
+      state: { type: bool, required: true }
+    returns: ack
+  set_wall:
+    summary: "Room Combiner: open or close a wall (wallState)"
+    params:
+      tag: *tag
+      wall: { type: int, min: 1, max: 256, required: true }
+      closed: { type: bool, required: true }
+    returns: ack
+
+  # ── DEVICE services ────────────────────────────────────────────────────
+  recall_preset:
+    summary: "DEVICE recallPreset <id>: recall a preset of the design by its ID (preset IDs start at 1001 in Tesira software)"
+    params:
+      preset: &preset { type: int, min: 1, max: 2147483647, required: true }
+    returns: ack
+  recall_preset_show_failures:
+    summary: "DEVICE recallPresetShowFailures <id>: recall a preset and return the devices that failed to recall it"
+    params:
+      preset: *preset
+    returns: value
+  recall_preset_by_name:
+    summary: "DEVICE recallPresetByName \"<name>\": recall a preset by its name"
+    params:
+      name: &presetname { type: string, required: true, max_length: 128 }
+    returns: ack
+  save_preset:
+    summary: "DEVICE savePreset <id>: store the current state in a preset, replacing what it held"
+    params:
+      preset: *preset
+    returns: ack
+  save_preset_by_name:
+    summary: "DEVICE savePresetByName \"<name>\": store the current state in the named preset"
+    params:
+      name: *presetname
+    returns: ack
+  start_audio:
+    summary: "DEVICE startAudio: start system audio"
+    returns: ack
+  stop_audio:
+    summary: "DEVICE stopAudio: stop system audio (every partition goes silent)"
+    returns: ack
+  start_partition_audio:
+    summary: "DEVICE startPartitionAudio <partition>: start audio in one partition"
+    params:
+      partition: &partition { type: int, min: 0, max: 255, required: true }
+    returns: ack
+  stop_partition_audio:
+    summary: "DEVICE stopPartitionAudio <partition>: stop audio in one partition"
+    params:
+      partition: *partition
+    returns: ack
+  reboot:
+    summary: "DEVICE reboot: restart the device this session is connected to"
+    returns: ack
+
+  # ── Dialer block (TI and VoIP lines) ───────────────────────────────────
+  dial:
+    summary: "Dialer: dial a number on a line and call appearance (commas insert one-second pauses)"
+    params:
+      tag: *tag
+      line: &line { type: int, min: 1, max: 2, required: true }
+      call_appearance: &ca { type: int, min: 1, max: 6, default: 1 }
+      number: { type: string, required: true, max_length: 64, pattern: "^[0-9*#,+A-Za-z@._:-]+$" }
+    returns: ack
+  send_dtmf:
+    summary: "Dialer: send DTMF digits on a line that is off hook"
+    params:
+      tag: *tag
+      line: *line
+      digits: { type: string, required: true, max_length: 64, pattern: "^[0-9*#]+$" }
+    returns: ack
+  end_call:
+    summary: "Dialer: end the call on a line and call appearance"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  answer_call:
+    summary: "Dialer: answer the incoming call on a line and call appearance"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  redial:
+    summary: "Dialer: redial the last number on a line and call appearance"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  hold_call:
+    summary: "Dialer: hold the call (VoIP lines only)"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  resume_call:
+    summary: "Dialer: resume a held call (VoIP lines only)"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  off_hook:
+    summary: "Dialer: take the line off hook"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  on_hook:
+    summary: "Dialer: put the line on hook"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+  flash_hook:
+    summary: "Dialer: hook flash on a line and call appearance"
+    params: { tag: *tag, line: *line, call_appearance: *ca }
+    returns: ack
+
+state:
+  blocks.*.*:
+    type: float
+    description: "A block attribute read with no index, keyed by instance tag then attribute (levels, mutes, numChannels, sourceSelection, ...). A number, true/false, a string, a list (levels) or an object, as the attribute table gives it: a consumer must accept all of them"
+  blocks.*.*.*:
+    type: float
+    description: "A block attribute with one index (level 1, mute 2, state 1, input 3, wallState 1), keyed by instance tag, attribute, then index. Levels are in dB; mutes, states and crosspoint states are true/false"
+  blocks.*.*.*.*:
+    type: float
+    description: "A block attribute with two indexes (crosspointLevelState 1 2, crosspointLevel 1 2), keyed by instance tag, attribute, input, then output"
+  device.serial_number: { type: string, description: "DEVICE serialNumber of the unit connected to" }
+  device.firmware: { type: string, description: "DEVICE version: the firmware version" }
+  device.hostname: { type: string, description: "DEVICE hostname" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Telnet (and SSH) are disabled by default on Tesira and must be enabled
+      in Tesira software (Device Maintenance > Network Settings) and the
+      configuration sent. With Telnet off the connection is refused or closed;
+      a connection that never shows the welcome banner within 15 s is
+      dropped and retried with "is Telnet enabled on the Tesira?".
+  - models: [all]
+    severity: info
+    text: >
+      The module refuses every Telnet option the server offers, whenever it
+      offers one, as Biamp recommends for a raw connection, and drops Telnet
+      bytes from the text. It sends nothing else until the welcome banner.
+  - models: [all]
+    severity: warning
+    text: >
+      Login: the user name and password are sent only when the server asks
+      for them before the banner, recognised by a waiting prompt ending in
+      "login:", "username:", "user name:", "user:" or "password:". The exact
+      prompt texts are not documented. Being asked again, or a line with
+      "incorrect", "denied", "failed" or "invalid" after the credentials, is
+      taken as a refusal: terminal, nothing is sent again until the device is
+      reopened, since repeated failures can lock an account. On a protected
+      system the default user is only an observer: sets fail, gets work.
+  - models: [all]
+    severity: info
+    text: >
+      Instance tags are case sensitive, as are attribute names and DEVICE and
+      SESSION. A tag containing anything other than letters, digits, "_", "."
+      and "-" is sent in double quotes; tags cannot contain a double quote
+      here. In a ganged Level or Mute block the channel is 0; in an un-ganged
+      one it is the channel number, and 0 is refused (-ERR INVALID_PARAMETER).
+  - models: [all]
+    severity: info
+    text: >
+      Answers are taken in order, one command at a time, because they do not
+      say what they answer. A command not answered within 5 s fails, and the
+      session is closed and opened again (subscriptions are then made again),
+      since a late answer would otherwise be taken for the next command's.
+  - models: [all]
+    severity: info
+    text: >
+      State: what a get returns and what a subscription publishes is stored
+      at blocks.<tag>.<attribute>[.<index>...]. After a set, increment,
+      decrement or toggle is acknowledged, the module reads the attribute
+      back (unless it is subscribed, or the device is open for commands only)
+      so state follows the change. Changes made elsewhere (Tesira software, a
+      panel, presets, another controller) reach state only through
+      subscriptions: list the attributes to keep current in the subscriptions
+      setting, or subscribe with the subscribe command.
+  - models: [all]
+    severity: warning
+    text: >
+      Subscriptions belong to the Telnet session and are lost when it closes,
+      when the Tesira reboots or when a configuration is sent to it. The
+      module makes every subscription again after reconnecting, with the
+      label it first chose (meros1, meros2, ...), but cannot notice a
+      configuration change on a session that stays open; reopen the device
+      after sending a new configuration. Each Tesira serves at most 32 Telnet
+      sessions.
+  - models: [all]
+    severity: info
+    text: >
+      Meters (Peak or RMS Meter, Signal Present, gain reduction) change all
+      the time: subscribe to them with a minimum interval (@250 in the
+      subscriptions setting, rate_ms on the command) or the session is flooded.
+  - models: [all]
+    severity: info
+    text: >
+      The module turns on verbose answers (SESSION set verbose true) at the
+      start of every session, since it parses the "key":value form; a raw
+      command must not turn them off.
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset, recall_preset_show_failures and recall_preset_by_name
+      change every block the preset holds at once, on a live system, and
+      cannot be undone except by recalling another preset.
+  - models: [all]
+    severity: critical
+    text: >
+      save_preset and save_preset_by_name replace what the preset held, with
+      no confirmation and no way back.
+  - models: [all]
+    severity: critical
+    text: >
+      stop_audio and stop_partition_audio silence the system or the partition
+      until audio is started again; reboot restarts the unit, dropping its
+      audio and every session's subscriptions.
+  - models: [all]
+    severity: info
+    text: >
+      Preset IDs are those Tesira software assigns (from 1001); preset names
+      are matched by the Tesira. A command addressed to a block on another
+      server of the same system is forwarded by the Tesira; -CANNOT_DELIVER
+      means it could not reach it.
