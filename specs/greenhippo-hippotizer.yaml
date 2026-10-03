@@ -1,0 +1,687 @@
+spec: 1
+id: greenhippo-hippotizer
+name: Green Hippo Hippotizer (REST API)
+vendor: Green Hippo
+category: playback
+
+# Written over the HippoAPI REST component, the only Hippotizer interface with
+# a fixed, documented command set. Hippotizer's OSC input and TCP Listener are
+# Multicontroller inputs whose addresses are whatever the show's text mappings
+# say, with no documented default port and no OSC feedback, so there is no
+# fixed OSC address space to describe here; the generic-osc integration reaches
+# a mapped OSC input. Every REST operation is a GET with its arguments in the
+# path, including those that change the show (Swagger document v1.2). Pushed
+# changes come only from the Web Callbacks websocket on port 40513, which
+# reports media, preset and system changes; timelines, levels and pins are not
+# pushed and are read over REST.
+
+source:
+  - title: Hippotizer API (Swagger 2.0 document, info.version 1.2)
+    author: Green Hippo (tvONE)
+    url: https://api.tvone.com/products/green-hippo/hippotizer-media-servers/REST_Hippotizer_current.json?v=1.2.0
+    note: >
+      Manufacturer document, retrieved 2026-10-02, rendered at
+      https://api.tvone.com/products/green-hippo/hippotizer-media-servers/rest_api.html.
+      Every command here is an operation in it: tags Timelines, Presets, Mix
+      Control, Layer Control, Media and Pin Control, and GET /info. Parameter
+      types and ranges (levels 0-100, bank and slot 0-255, media map index
+      1-65535, preset types layer, mix, viewport, notch and touchengine), the
+      declared status codes and their texts, and the response models
+      ServerInfo, MixInfo, TimelineInfoModel, PresetCollectionInfo,
+      PresetBankInfo, MediaMapModel, MediaInformationModel and PinInformation
+      with their field names.
+  - title: Hippotizer V4 manual 4.9.4, topic "REST API"
+    author: Green Hippo
+    url: https://www.manula.com/manuals/green-hippo/hippotizer-v4/4.9.4/en/topic/hippoapi
+    note: >
+      Manufacturer document. The API is served at http://<host>:40512 by a REST
+      API component added to the show, and links the Swagger document above as
+      the complete reference.
+  - title: Hippotizer V4 manual 4.8.1 and 4.9.4, topic "Web Callbacks"
+    author: Green Hippo
+    url: https://www.manula.com/manuals/green-hippo/hippotizer-v4/4.8.1/en/topic/web-callbacks
+    note: >
+      Manufacturer document. ws://<host>:40513; the client sends one JSON array
+      of {"subscribe":{"category":...}} objects for MEDIA, PRESETS and SYSTEM;
+      events are {"category","event","data"}: MEDIAMAP_CHANGED,
+      MEDIAFILES_ADDED (array of {mediaID}), MEDIAFILE_DELETED and
+      MEDIAFILE_CHANGED (mediaID), PRESET_ADDED and PRESET_CHANGED ({presetid,
+      bank, slot, type}), PRESET_DELETED (presetid), PRESETS_RESET,
+      CONFIG_CHANGED and SYSTEM_STATUS_CHANGED (status text).
+  - title: Hippotizer V4 manual 4.9.4, topics "OSC", "Multicontroller", "Pin Mappings", "TCP Listener", "Release Notes"
+    author: Green Hippo
+    url: https://www.manula.com/manuals/green-hippo/hippotizer-v4/4.9.4/en/topic/osc
+    note: >
+      Manufacturer document. OSC and TCP inputs are Multicontroller controllers
+      with operator-chosen ports and text mappings (why they are not specced);
+      release notes 4.9.1-4.9.4 list REST additions (media encoding settings,
+      strata folder commands, user name and colour) that the public Swagger
+      document v1.2 does not describe, so they are not here.
+  - title: companion-module-greenhippo-hippotizer-rest (Bitfocus Companion module, MIT licence)
+    author: Bitfocus / Green Hippo
+    url: https://github.com/bitfocus/companion-module-greenhippo-hippotizer-rest
+    note: >
+      Corroboration only, licence checked. Port 40512, Hippotizer 4.7.1 or later,
+      mix and layer numbered from 1, and a single preset number of bank * 256 +
+      slot; used for the quirks below, not for any wire format.
+
+transport:
+  type: http
+  port: 40512
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe: { method: GET, path: /info }
+
+models:
+  - id: hippotizer-v4
+    name: Hippotizer V4, V4+ and MX media servers, and Zookeeper with the REST API component (4.7.1 and later)
+    supports: [get_info, get_timelines, play_timeline, stop_timeline, reset_timeline, mute_timeline,
+               unmute_timeline, timeline_next_cue, timeline_previous_cue, timeline_go_cue,
+               play_all_timelines, stop_all_timelines, reset_all_timelines, mute_all_timelines,
+               unmute_all_timelines, all_timelines_next_cue, all_timelines_previous_cue,
+               all_timelines_go_cue, get_presets, delete_preset, get_mix_level, set_mix_level,
+               load_mix_preset, load_mix_preset_bank_slot, load_mix_preset_id, get_layer_level,
+               set_layer_level, load_layer_media, load_layer_media_index, play_layer_media_oneshot,
+               play_layer_media_oneshot_index, load_layer_preset, load_layer_preset_bank_slot,
+               load_layer_preset_id, get_media, get_media_info, get_media_info_index, get_media_map,
+               delete_media, delete_media_map_entry, add_media_map_entry, sync_media, get_pin_value,
+               set_pin_value, reset_pin, get_pin_info, fade_pin_value]
+    verification: none
+
+commands:
+  # ── Server ───────────────────────────────────────────────────────────────
+  get_info:
+    summary: Server information (GetServerInfo) with names, HippoNet IP, product, software version, engine and media manager status, and the mixes
+    send: { method: GET, path: /info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Timelines ────────────────────────────────────────────────────────────
+  get_timelines:
+    summary: Every timeline with its id, name, start and end time and its commands (GetTimelines, TimelineCollection)
+    send: { method: GET, path: /timelines }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  play_timeline:
+    summary: Play a timeline (PlayTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/play" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_timeline:
+    summary: Stop a timeline (StopTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/stop" }
+    expect: { status: 200 }
+    returns: ack
+
+  reset_timeline:
+    summary: Reset (rewind) a timeline to its start (ResetTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/reset" }
+    expect: { status: 200 }
+    returns: ack
+
+  mute_timeline:
+    summary: Mute a timeline, so its commands no longer drive the show (MuteTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/mute" }
+    expect: { status: 200 }
+    returns: ack
+
+  unmute_timeline:
+    summary: Unmute a timeline (UnMuteTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/unmute" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_next_cue:
+    summary: Jump a timeline to its next cue (GoNextCueTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/gonextcue" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_previous_cue:
+    summary: Jump a timeline to its previous cue (GoPreviousCueTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/timelines/{timeline}/gopreviouscue" }
+    expect: { status: 200 }
+    returns: ack
+
+  timeline_go_cue:
+    summary: Jump a timeline to a cue number, such as 4 or 4.5 (GoCueTimeline)
+    params:
+      timeline: { type: int, min: 0, required: true }
+      cue:      { type: string, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+    send: { method: GET, path: "/timelines/{timeline}/gocue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  play_all_timelines:
+    summary: Play every timeline at once (PlayAllTimelines)
+    send: { method: GET, path: /timelines/all/play }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_all_timelines:
+    summary: Stop every timeline at once (StopAllTimelines)
+    send: { method: GET, path: /timelines/all/stop }
+    expect: { status: 200 }
+    returns: ack
+
+  reset_all_timelines:
+    summary: Reset every timeline at once (ResetAllTimelines)
+    send: { method: GET, path: /timelines/all/reset }
+    expect: { status: 200 }
+    returns: ack
+
+  mute_all_timelines:
+    summary: Mute every timeline (MuteAllTimelines)
+    send: { method: GET, path: /timelines/all/mute }
+    expect: { status: 200 }
+    returns: ack
+
+  unmute_all_timelines:
+    summary: Unmute every timeline (UnMuteAllTimelines)
+    send: { method: GET, path: /timelines/all/unmute }
+    expect: { status: 200 }
+    returns: ack
+
+  all_timelines_next_cue:
+    summary: Jump every timeline to its next cue (GoNextCueAllTimelines)
+    send: { method: GET, path: /timelines/all/gonextcue }
+    expect: { status: 200 }
+    returns: ack
+
+  all_timelines_previous_cue:
+    summary: Jump every timeline to its previous cue (GoPreviousCueAllTimelines)
+    send: { method: GET, path: /timelines/all/gopreviouscue }
+    expect: { status: 200 }
+    returns: ack
+
+  all_timelines_go_cue:
+    summary: Jump every timeline to a cue number (GoCueAllTimelines)
+    params:
+      cue: { type: string, pattern: "^[0-9]+(\\.[0-9]+)?$", required: true }
+    send: { method: GET, path: "/timelines/all/gocue/{cue}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Presets ──────────────────────────────────────────────────────────────
+  get_presets:
+    summary: A preset collection with its banks and presets (GetPresetCollection, PresetCollectionInfo)
+    params:
+      type: { type: enum, values: [layer, mix, viewport, notch, touchengine], required: true }
+    send: { method: GET, path: "/presets/{type}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_preset:
+    summary: Delete a preset by its id (DeletePreset); see quirks
+    params:
+      preset_id: { type: string, max_length: 128, required: true }
+    send: { method: GET, path: "/presets/delete/{preset_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Mixes ────────────────────────────────────────────────────────────────
+  get_mix_level:
+    summary: A mix's level, 0 to 100 (Mix Control GetLevel)
+    params:
+      mix: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/mix/{mix}/level" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_mix_level:
+    summary: Set a mix's level, 0 to 100 (Mix Control SetLevel)
+    params:
+      mix:   { type: int, min: 1, required: true }
+      level: { type: int, min: 0, max: 100, required: true }
+    send: { method: GET, path: "/mix/{mix}/level/{level}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_mix_preset:
+    summary: Load a mix preset by its single preset number (Mix Control LoadPreset); see quirks for the numbering
+    params:
+      mix:    { type: int, min: 1, required: true }
+      preset: { type: int, min: 0, max: 65535, required: true }
+    send: { method: GET, path: "/mix/{mix}/preset/{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_mix_preset_bank_slot:
+    summary: Load a mix preset by bank and slot, each 0 to 255 (LoadPresetBankSlot)
+    params:
+      mix:  { type: int, min: 1, required: true }
+      bank: { type: int, min: 0, max: 255, required: true }
+      slot: { type: int, min: 0, max: 255, required: true }
+    send: { method: GET, path: "/mix/{mix}/preset/{bank}/{slot}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_mix_preset_id:
+    summary: Load a mix preset by its unique id (LoadPresetPresetID)
+    params:
+      mix:       { type: int, min: 1, required: true }
+      preset_id: { type: string, max_length: 128, pattern: "[^0-9]", required: true }
+    send: { method: GET, path: "/mix/{mix}/preset/{preset_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Layers ───────────────────────────────────────────────────────────────
+  get_layer_level:
+    summary: A layer's level, 0 to 100 (Layer Control GetLevel)
+    params:
+      mix:   { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/level" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_layer_level:
+    summary: Set a layer's level, 0 to 100 (Layer Control SetLevel)
+    params:
+      mix:   { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true }
+      level: { type: int, min: 0, max: 100, required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/level/{level}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_layer_media:
+    summary: Load a media file onto a layer by its media id (LoadMedia)
+    params:
+      mix:      { type: int, min: 1, required: true }
+      layer:    { type: int, min: 1, required: true }
+      media_id: { type: string, max_length: 256, pattern: "[^0-9]", required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/media/{media_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_layer_media_index:
+    summary: Load the media in a media map slot onto a layer (LoadMediaFromIndex)
+    params:
+      mix:   { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true }
+      index: { type: int, min: 1, max: 65535, required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/media/{index}" }
+    expect: { status: 200 }
+    returns: ack
+
+  play_layer_media_oneshot:
+    summary: Load a media file onto a layer, fade the layer up, play the media once and fade the layer out (LoadMediaOneShot)
+    params:
+      mix:      { type: int, min: 1, required: true }
+      layer:    { type: int, min: 1, required: true }
+      media_id: { type: string, max_length: 256, pattern: "[^0-9]", required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/mediaoneshot/{media_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  play_layer_media_oneshot_index:
+    summary: As play_layer_media_oneshot, for the media in a media map slot (LoadMediaOneShotFromIndex)
+    params:
+      mix:   { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true }
+      index: { type: int, min: 1, max: 65535, required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/mediaoneshot/{index}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_layer_preset:
+    summary: Load a layer preset by its single preset number (Layer Control LoadPreset); see quirks for the numbering
+    params:
+      mix:    { type: int, min: 1, required: true }
+      layer:  { type: int, min: 1, required: true }
+      preset: { type: int, min: 0, max: 65535, required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/preset/{preset}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_layer_preset_bank_slot:
+    summary: Load a layer preset by bank and slot, each 0 to 255 (LoadPresetBankSlot)
+    params:
+      mix:   { type: int, min: 1, required: true }
+      layer: { type: int, min: 1, required: true }
+      bank:  { type: int, min: 0, max: 255, required: true }
+      slot:  { type: int, min: 0, max: 255, required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/preset/{bank}/{slot}" }
+    expect: { status: 200 }
+    returns: ack
+
+  load_layer_preset_id:
+    summary: Load a layer preset by its unique id (LoadPresetPresetID)
+    params:
+      mix:       { type: int, min: 1, required: true }
+      layer:     { type: int, min: 1, required: true }
+      preset_id: { type: string, max_length: 128, pattern: "[^0-9]", required: true }
+    send: { method: GET, path: "/mix/{mix}/layer/{layer}/preset/{preset_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Media ────────────────────────────────────────────────────────────────
+  get_media:
+    summary: Every media file on the server, with its id, name and folder (GetAllMedia, MediaDatabaseInformationModel)
+    send: { method: GET, path: /media }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_media_info:
+    summary: A media file's details by media id (GetMedia, MediaInformationModel)
+    params:
+      media_id: { type: string, max_length: 256, pattern: "[^0-9]", required: true }
+    send: { method: GET, path: "/media/{media_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_media_info_index:
+    summary: The details of the media in a media map slot (GetMediaFromIndex)
+    params:
+      index: { type: int, min: 1, max: 65535, required: true }
+    send: { method: GET, path: "/media/{index}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_media_map:
+    summary: The media map, slot by slot (GetMap, MediaMapModel)
+    send: { method: GET, path: /media/map }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_media:
+    summary: Delete a media file from the server and from every media map slot (DeleteMedia); see quirks
+    params:
+      media_id: { type: string, max_length: 256, required: true }
+    send: { method: DELETE, path: "/media/delete/{media_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_media_map_entry:
+    summary: Empty a media map slot; the file stays on the server (DeleteMapEntry)
+    params:
+      index: { type: int, min: 1, max: 65535, required: true }
+    send: { method: DELETE, path: "/media/deletemapentry/{index}" }
+    expect: { status: 200 }
+    returns: ack
+
+  add_media_map_entry:
+    summary: Put a media file already on the server into a media map slot (AddMapEntry)
+    params:
+      index:    { type: int, min: 1, max: 65535, required: true }
+      media_id: { type: string, max_length: 256, required: true }
+    send: { method: PUT, path: "/media/addmapentry/{index}/{media_id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  sync_media:
+    summary: Synchronise this server's media to other servers on the network, as its Media Manager settings say (SyncToAll)
+    send: { method: GET, path: /media/sync }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Pins ─────────────────────────────────────────────────────────────────
+  get_pin_value:
+    summary: >
+      The value of any pin, by its path with underscores between the parts, such
+      as Engine_Mix1_Layer1_Mixer_Level (Pin Control GetValue)
+    params:
+      pin: { type: string, max_length: 512, required: true }
+    send: { method: GET, path: "/pin/getvalue/{pin}" }
+    expect: { status: 200 }
+    returns: text
+
+  set_pin_value:
+    summary: Set any pin to a value, given as text (Pin Control SetValue)
+    params:
+      pin:   { type: string, max_length: 512, required: true }
+      value: { type: string, max_length: 1024, required: true }
+    send: { method: GET, path: "/pin/setvalue/{pin}/{value}" }
+    expect: { status: 200 }
+    returns: ack
+
+  reset_pin:
+    summary: Set a pin back to its default value (Pin Control Reset)
+    params:
+      pin: { type: string, max_length: 512, required: true }
+    send: { method: GET, path: "/pin/reset/{pin}" }
+    expect: { status: 200 }
+    returns: ack
+
+  get_pin_info:
+    summary: A pin's name, data type, direction and details (Pin Control GetInfo, PinInformation)
+    params:
+      pin: { type: string, max_length: 512, required: true }
+    send: { method: GET, path: "/pin/getinfo/{pin}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  fade_pin_value:
+    summary: Fade a float pin to a value over a time in milliseconds (Pin Control FadeValue)
+    params:
+      pin:     { type: string, max_length: 512, required: true }
+      value:   { type: float, required: true }
+      time_ms: { type: int, min: 0, required: true }
+    send: { method: GET, path: "/pin/fadevalue/{pin}/{value:.4f}/{time_ms}" }
+    expect: { status: 200 }
+    returns: ack
+
+telemetry:
+  # Server information and the media map are read every 10 seconds: nothing
+  # pushes engine status, the mixes or map contents in full. Levels follow
+  # the replies to get_mix_level and get_layer_level, and media and preset
+  # changes arrive on the Web Callbacks websocket.
+  poll:
+    every_ms: 10000
+    send:
+      - { method: GET, path: /info }
+      - { method: GET, path: /media/map }
+  websocket:
+    path: /
+    port: 40513
+    send:
+      - '[{"subscribe":{"category":"MEDIA"}},{"subscribe":{"category":"PRESETS"}},{"subscribe":{"category":"SYSTEM"}}]'
+  updates:
+    - path: "^/info$"
+      json:
+        computer: "$.computerName"
+        host: "$.hostName"
+        ip: "$.iP"
+        product: "$.product"
+        family: "$.productFamily"
+        version: "$.softwareVersion"
+        revision: "$.softwareRevision"
+        engine: "$.engineStatus"
+        media_manager: "$.mediaManagerStatus"
+        owner: "$.registeredOwner"
+      state:
+        server.computer_name: "{computer}"
+        server.host_name: "{host}"
+        server.ip: "{ip}"
+        server.product: "{product}"
+        server.product_family: "{family}"
+        server.software_version: "{version}"
+        server.software_revision: "{revision}"
+        server.engine_status: "{engine}"
+        server.media_manager_status: "{media_manager}"
+        server.registered_owner: "{owner}"
+    - path: "^/info$"
+      json_each: "$.mixes"
+      json:
+        index: "$.index"
+        name: "$.name"
+        type: "$.mixType"
+        layers: "$.layerCount"
+        has_layers: "$.hasLayers"
+        fxc: "$.fXCName"
+      state:
+        mixes.{index}.name: "{name}"
+        mixes.{index}.type: "{type}"
+        mixes.{index}.layer_count: "{layers}"
+        mixes.{index}.has_layers: "{has_layers}"
+        mixes.{index}.fxc_name: "{fxc}"
+    - path: "^/media/map$"
+      json_each: "$.entries"
+      json: { index: "$.index", media: "$.mediaID", name: "$.name" }
+      state:
+        media_map.{index}.media_id: "{media}"
+        media_map.{index}.name: "{name}"
+    - path: "^/mix/(\\d+)/level$"
+      json: { level: "$" }
+      state: { "mixes.{1}.level": "{level}" }
+    - path: "^/mix/(\\d+)/layer/(\\d+)/level$"
+      json: { level: "$" }
+      state: { "mixes.{1}.layers.{2}.level": "{level}" }
+    - path: "^/presets/(layer|mix|viewport|notch|touchengine)$"
+      json_each: "$.banks"
+      json: { index: "$.index", name: "$.name", has_presets: "$.hasPresets" }
+      state:
+        preset_banks.{1}.{index}.name: "{name}"
+        preset_banks.{1}.{index}.has_presets: "{has_presets}"
+    # Web Callbacks events.
+    - json_match: { "$.category": "^(MEDIA|PRESETS|SYSTEM)$", "$.event": "^([A-Z_]+)$" }
+      state:
+        last_event.category: "{1}"
+        last_event.event: "{2}"
+    - json_match: { "$.category": "^SYSTEM$", "$.event": "^SYSTEM_STATUS_CHANGED$" }
+      json: { status: "$.data" }
+      state: { server.output_status: "{status}" }
+    - json_match: { "$.category": "^PRESETS$", "$.event": "^PRESET_(ADDED|CHANGED)$" }
+      json: { id: "$.data.presetid", bank: "$.data.bank", slot: "$.data.slot", type: "$.data.type" }
+      state:
+        presets.{id}.bank: "{bank}"
+        presets.{id}.slot: "{slot}"
+        presets.{id}.type: "{type}"
+        presets.{id}.deleted: "false"
+    - json_match: { "$.category": "^PRESETS$", "$.event": "^PRESET_DELETED$" }
+      json: { id: "$.data" }
+      state:
+        presets.{id}.deleted: "true"
+    - json_match: { "$.category": "^MEDIA$", "$.event": "^MEDIAFILE_DELETED$" }
+      json: { id: "$.data" }
+      state:
+        media.{id}.deleted: "true"
+    - json_match: { "$.category": "^MEDIA$", "$.event": "^MEDIAFILES_ADDED$" }
+      json_each: "$.data"
+      json: { id: "$.mediaID" }
+      state:
+        media.{id}.deleted: "false"
+
+state:
+  server.computer_name:        { type: string, description: "Name of the computer Hippotizer runs on" }
+  server.host_name:            { type: string, description: "User-friendly name of the Hippotizer engine host" }
+  server.ip:                   { type: string, description: "The server's HippoNet IP address" }
+  server.product:              { type: string, description: "The model of product" }
+  server.product_family:       { type: string, description: "The product family" }
+  server.software_version:     { type: string, description: "Software version, major.minor.maintenance" }
+  server.software_revision:    { type: string, description: "Software revision" }
+  server.engine_status:        { type: string, description: "Status of the video playback engine, as Hippotizer words it" }
+  server.media_manager_status: { type: string, description: "Status of the media management component" }
+  server.registered_owner:     { type: string, description: "Registered owner of the server, when registered" }
+  server.output_status:        { type: string, description: "Output system state from the last SYSTEM_STATUS_CHANGED event, such as Configuring" }
+  mixes.*.name:                { type: string, description: "Mix name, keyed by mix index" }
+  mixes.*.type:                { type: string, description: "Mix type: XFade, NonXfade or Special" }
+  mixes.*.layer_count:         { type: int, description: "Number of layers in the mix" }
+  mixes.*.has_layers:          { type: bool, description: "The mix has layers that can play media" }
+  mixes.*.fxc_name:            { type: string, description: "FXC file configuring the mix" }
+  mixes.*.level:               { type: int, description: "Mix level, 0 to 100, as last read or set" }
+  mixes.*.layers.*.level:      { type: int, description: "Layer level, 0 to 100, as last read or set, keyed by mix and layer index" }
+  media_map.*.media_id:        { type: string, description: "Media id in a media map slot, keyed by slot index (1-65535)" }
+  media_map.*.name:            { type: string, description: "Name of the media in a media map slot" }
+  media.*.deleted:             { type: bool, description: "Media file deleted (true) or added (false), keyed by media id, from Web Callbacks events" }
+  presets.*.bank:              { type: int, description: "Bank of a preset added or changed, keyed by preset id" }
+  presets.*.slot:              { type: int, description: "Slot of a preset added or changed" }
+  presets.*.type:              { type: string, description: "Preset type: layer, mix, viewport, notch or touchengine" }
+  presets.*.deleted:           { type: bool, description: "Preset deleted (true), or added or changed (false)" }
+  preset_banks.*.*.name:       { type: string, description: "Preset bank name, keyed by preset type and bank index, from get_presets" }
+  preset_banks.*.*.has_presets: { type: bool, description: "The bank holds presets" }
+  last_event.category:         { type: string, description: "Category of the last Web Callbacks event: MEDIA, PRESETS or SYSTEM" }
+  last_event.event:            { type: string, description: "Name of the last Web Callbacks event, such as MEDIAMAP_CHANGED or CONFIG_CHANGED" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The REST API is a component that has to be added to the active show; it is
+      not served otherwise. Adding or stopping a component changes the pin tree on
+      every Hippotizer on the network, so do it before the show, not during it.
+  - models: [all]
+    severity: warning
+    text: >
+      Every operation, including those that delete media or presets and those that
+      change the output, is an HTTP GET (the delete and map operations also accept
+      DELETE and PUT, which this spec uses). Anything that fetches these URLs, such
+      as a browser prefetch or a link crawler on the API's own help pages, carries
+      them out.
+  - models: [all]
+    severity: critical
+    text: >
+      load_mix_preset, load_layer_preset and their bank/slot and id forms change
+      the live output at once with the preset's stored fade; there is no undo. The
+      fade can be set first through the layer's Presets pins (UsePresetSettings,
+      FadeTime in ms, FadeType 0 Cut, 1 Crossfade, 2 Fade Through Black, 3 Fade Up
+      First, 4 Snap Start, 5 Snap End) with set_pin_value.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_media removes the file from the server and from every media map slot,
+      and delete_preset removes the preset; neither can be undone remotely.
+      sync_media copies media to other servers, as this server's Media Manager
+      settings say.
+  - models: [all]
+    severity: warning
+    text: >
+      set_pin_value and reset_pin reach every pin in the pin tree, including system
+      ones. Pin paths are the Zookeeper paths with underscores in place of slashes;
+      how a pin name that itself contains an underscore is written is not
+      documented, and no REST operation lists the pins.
+  - models: [all]
+    severity: info
+    text: >
+      The single preset number of load_mix_preset and load_layer_preset is not
+      defined in Green Hippo's document; Green Hippo's Companion module sends bank *
+      256 + slot. The bank/slot and id forms are documented and preferred. The
+      document also does not say whether mix, layer and timeline indexes start at 0
+      or 1; mixes and layers are taken from 1, as the Companion module and the mix
+      index in /info do, and timelines by the iD that get_timelines reports.
+  - models: [all]
+    severity: info
+    text: >
+      Paths with a media id and with a media map index share one shape
+      (/media/{id} and /media/{index}), as do preset numbers and preset ids. The
+      server tells them apart by whether the segment is a number, so the id
+      parameters here must contain a character that is not a digit.
+  - models: [all]
+    severity: info
+    text: >
+      Timeline play state and position are not reported by any REST operation or
+      Web Callbacks event, and a cue jump does not set the play state on its own
+      (Green Hippo's Companion module follows it with play or stop). The JSON
+      wrapper of the timeline collection is not described in the document, so
+      timelines are not kept in state; get_timelines returns them as sent.
+  - models: [all]
+    severity: info
+    text: >
+      Web Callbacks report only media, preset and system events. Levels and pin
+      values are not pushed: the level state follows the replies to the level
+      commands, and is not kept current when the level is changed elsewhere unless
+      get_mix_level or get_layer_level is called again.
+  - models: [all]
+    severity: info
+    text: >
+      The manual's example of the presets-reset event reads PRESES_RESET, which
+      looks like a typo for PRESETS_RESET; last_event.event records whichever the
+      server sends.

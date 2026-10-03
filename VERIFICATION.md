@@ -154,6 +154,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm unquoted set values are accepted. ([specs/analogway-picturall.yaml:246](specs/analogway-picturall.yaml#L246))
 - [ ] Check what media_end_action values mean and which playback commands besides go exist. ([specs/analogway-picturall.yaml:251](specs/analogway-picturall.yaml#L251))
 
+## avstumpfl-pixera — AV Stumpfl PIXERA
+
+- [ ] Confirm that replies and pushed monEvent messages on a JSON/TCP (dl) access point end with 0xPX, and what setMonitoringHasDelimiter changes (26.1 lists it without a description). ([specs/avstumpfl-pixera.yaml:690](specs/avstumpfl-pixera.yaml#L690))
+- [ ] Check how a PIXERA before 26.1 answers setMonitoringHasDelimiter (an error reply is assumed) and that monitoring still works there. ([specs/avstumpfl-pixera.yaml:691](specs/avstumpfl-pixera.yaml#L691))
+- [ ] Confirm that setMonitoringEventMode all pushes timelineTransport, timelinePositions and timelineCountdowns with the same entry shapes as pollMonitoring, with id -1, and how often positions arrive. ([specs/avstumpfl-pixera.yaml:682](specs/avstumpfl-pixera.yaml#L682))
+- [ ] Check that a reply carries the request's id (1) as "id":1, so that pushed messages (id -1) are not taken as replies. ([specs/avstumpfl-pixera.yaml:94](specs/avstumpfl-pixera.yaml#L94))
+- [ ] Check the error object PIXERA sends for an unknown method, wrong parameter names, an unknown timeline or cue name, and an invalid handle. ([specs/avstumpfl-pixera.yaml:139](specs/avstumpfl-pixera.yaml#L139))
+- [ ] Check what a name or path containing the text 0xPX does to framing. ([specs/avstumpfl-pixera.yaml:668](specs/avstumpfl-pixera.yaml#L668))
+- [ ] Confirm the default API port (1400 assumed from AV Stumpfl's examples; none is documented) and whether a disabled API (25.2 default) refuses the connection or answers -32602. ([specs/avstumpfl-pixera.yaml:660](specs/avstumpfl-pixera.yaml#L660))
+- [ ] Check whether handles stay valid after reloading the project or restarting PIXERA. ([specs/avstumpfl-pixera.yaml:685](specs/avstumpfl-pixera.yaml#L685))
+- [ ] Confirm the Compound time methods take "name" in 26.1 and "timelineName" before it, and which revision changed it. ([specs/avstumpfl-pixera.yaml:69](specs/avstumpfl-pixera.yaml#L69))
+- [ ] Check whether load_project discards unsaved changes silently. ([specs/avstumpfl-pixera.yaml:696](specs/avstumpfl-pixera.yaml#L696))
+- [ ] Check the format of getCurrentHMSFOfTimeline (hh:mm:ss:ff assumed) and what getCurrentCountdownOfTimeline returns when no cue is ahead. ([specs/avstumpfl-pixera.yaml:305](specs/avstumpfl-pixera.yaml#L305))
+
 ## barco-eventmaster — Barco Event Master
 
 - [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1257](specs/barco-eventmaster.yaml#L1257))
@@ -305,6 +319,28 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether QuickQ DIN accepts remote control. ([specs/chamsys-magicq-udp.yaml:852](specs/chamsys-magicq-udp.yaml#L852))
 - [ ] On MQ40 and MQ40N, confirm the remote protocol works. ([specs/chamsys-magicq-udp.yaml:830](specs/chamsys-magicq-udp.yaml#L830))
 
+## dataton-watchout6 — Dataton WATCHOUT 6
+
+- [ ] Confirm that every ID-tagged command ([m]) gets a tagged reply on WATCHOUT 6 (production and display) as the guide says, including an empty [m] for a successful action; WATCHOUT 7 documents the empty tag, the 6.x guide does not. ([specs/dataton-watchout6.yaml:489](specs/dataton-watchout6.yaml#L489))
+- [ ] Check the reply to authenticate 1 on a production computer and a display cluster, and which Error 8 sub-codes a refused login gives (1, 4, 5 and 6 are taken as refusals). ([specs/dataton-watchout6.yaml:81](specs/dataton-watchout6.yaml#L81))
+- [ ] Confirm the field order of the general Status push after getStatus 1 (taken from Bitfocus's Companion module) and how often it is sent. ([specs/dataton-watchout6.yaml:533](specs/dataton-watchout6.yaml#L533))
+- [ ] Check that the timeline Status line for a timeline in a folder has a space before :mItemList, as the knowledge base article shows. ([specs/dataton-watchout6.yaml:537](specs/dataton-watchout6.yaml#L537))
+- [ ] Check the exact keyword of the information message (Information is assumed from the guide's heading). ([specs/dataton-watchout6.yaml:445](specs/dataton-watchout6.yaml#L445))
+- [ ] Check the syntax and reply of powerDown on a WATCHOUT 6 display cluster; only WATCHOUT 7's compatibility page gives it. ([specs/dataton-watchout6.yaml:507](specs/dataton-watchout6.yaml#L507))
+- [ ] Check whether getAuxTimelines, getControlCues and getInputs exist on WATCHOUT 6 (documented only for WATCHOUT 7's compatibility layer), and their JSON. ([specs/dataton-watchout6.yaml:544](specs/dataton-watchout6.yaml#L544))
+- [ ] Check how load_display reports progress and completion: the command takes the first tagged reply, which may be a Busy line. ([specs/dataton-watchout6.yaml:501](specs/dataton-watchout6.yaml#L501))
+- [ ] On WATCHOUT 7, check the show name in the getStatus reply (the show file's name, or its id as an older page says). ([specs/dataton-watchout6.yaml:542](specs/dataton-watchout6.yaml#L542))
+- [ ] Confirm that spontaneous messages go only to the most recently connected controller. ([specs/dataton-watchout6.yaml:493](specs/dataton-watchout6.yaml#L493))
+
+## dataton-watchout7 — Dataton WATCHOUT 7
+
+- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:347](specs/dataton-watchout7.yaml#L347))
+- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:355](specs/dataton-watchout7.yaml#L355))
+- [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:154](specs/dataton-watchout7.yaml#L154))
+- [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:33](specs/dataton-watchout7.yaml#L33))
+- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:322](specs/dataton-watchout7.yaml#L322))
+- [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:237](specs/dataton-watchout7.yaml#L237))
+
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
@@ -316,6 +352,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:776](specs/digico-sd.yaml#L776))
 - [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:832](specs/digico-sd.yaml#L832))
 - [ ] Check the addresses left out (Channel_Input/main/alt_in, CGs_level, CGs_mute, Matrix_Inputs sends, Multis) and what they do. ([specs/digico-sd.yaml:2722](specs/digico-sd.yaml#L2722))
+
+## disguise — disguise Designer
+
+- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:608](specs/disguise.yaml#L608))
+- [ ] Check that a Locator with only a name (no uid key) is accepted by every transport and failover command. ([specs/disguise.yaml:573](specs/disguise.yaml#L573))
+- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:582](specs/disguise.yaml#L582))
+- [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:568](specs/disguise.yaml#L568))
+- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:584](specs/disguise.yaml#L584))
+- [ ] Check which Designer release added each endpoint used here; the Swagger documents carry no version markers. ([specs/disguise.yaml:107](specs/disguise.yaml#L107))
+- [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:540](specs/disguise.yaml#L540))
 
 ## emberplus — Ember+
 
@@ -377,6 +423,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the fader_fade fade argument (two integers) and any upper bound on fade time. ([specs/grandma3.yaml:1807](specs/grandma3.yaml#L1807))
 - [ ] Check the upper bounds of cue and pool numbers (four digits, 9999, 99999 assumed). ([specs/grandma3.yaml:1831](specs/grandma3.yaml#L1831))
 
+## greenhippo-hippotizer — Green Hippo Hippotizer
+
+- [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:656](specs/greenhippo-hippotizer.yaml#L656))
+- [ ] Check the single preset number of load_mix_preset and load_layer_preset (bank * 256 + slot per the Companion module). ([specs/greenhippo-hippotizer.yaml:654](specs/greenhippo-hippotizer.yaml#L654))
+- [ ] Check the body of a level reply (a bare integer is assumed) and of the action endpoints. ([specs/greenhippo-hippotizer.yaml:240](specs/greenhippo-hippotizer.yaml#L240))
+- [ ] Capture the JSON wrapper of GET /timelines, which the Swagger document leaves empty. ([specs/greenhippo-hippotizer.yaml:672](specs/greenhippo-hippotizer.yaml#L672))
+- [ ] Check that the Web Callbacks websocket on 40513 accepts the subscription array sent on opening, with the path /, and whether it acknowledges it. ([specs/greenhippo-hippotizer.yaml:492](specs/greenhippo-hippotizer.yaml#L492))
+- [ ] Check whether the presets-reset event is PRESETS_RESET or PRESES_RESET (the manual's example). ([specs/greenhippo-hippotizer.yaml:685](specs/greenhippo-hippotizer.yaml#L685))
+- [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:626](specs/greenhippo-hippotizer.yaml#L626))
+- [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:649](specs/greenhippo-hippotizer.yaml#L649))
+- [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:663](specs/greenhippo-hippotizer.yaml#L663))
+- [ ] Capture the 4.9.x REST additions (media encoding settings, strata folder, user name and colour) from the API help served at port 40512. ([specs/greenhippo-hippotizer.yaml:57](specs/greenhippo-hippotizer.yaml#L57))
+
 ## h2r-graphics — H2R Graphics
 
 - [ ] Record the HTTP status of a successful request (200 assumed) and of an error reply from v3.4 onward. ([specs/h2r-graphics.yaml:352](specs/h2r-graphics.yaml#L352))
@@ -393,6 +452,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:1176](specs/kramer-p3000.yaml#L1176))
 - [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:1187](specs/kramer-p3000.yaml#L1187))
 - [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:1162](specs/kramer-p3000.yaml#L1162))
+
+## millumin — Millumin
+
+- [ ] Confirm the default OSC input port of Millumin 5 (5000 in the documentation; a V5 screenshot shows 8000). ([specs/millumin.yaml:722](specs/millumin.yaml#L722))
+- [ ] Check that changes made through the OSC API send no feedback, and which side effects (a column's media starting) still do. ([specs/millumin.yaml:689](specs/millumin.yaml#L689))
+- [ ] Check where /? and /ping answers go (the configured senders are assumed) and what /ping sends. ([specs/millumin.yaml:692](specs/millumin.yaml#L692))
+- [ ] Check the light intensity scale on input (0-255 in the documentation's example) and feedback (0 to 1), and the master levels' range. ([specs/millumin.yaml:709](specs/millumin.yaml#L709))
+- [ ] Check the rate of /millumin/layer:<name>/media/time feedback and whether it is sent for every layer. ([specs/millumin.yaml:638](specs/millumin.yaml#L638))
+- [ ] Check whether Millumin 5 still has a global API feedback switch beside each sender's send feedback. ([specs/millumin.yaml:682](specs/millumin.yaml#L682))
+- [ ] Check which of the dashboard and the edited timeline play, pause and go_to_time act on. ([specs/millumin.yaml:703](specs/millumin.yaml#L703))
+- [ ] Check that stop_column takes no column in Millumin 5. ([specs/millumin.yaml:705](specs/millumin.yaml#L705))
+- [ ] Check that floats are accepted where the documentation shows whole numbers (positions, rotation, media time). ([specs/millumin.yaml:398](specs/millumin.yaml#L398))
 
 ## newtek-tricaster — NewTek TriCaster
 

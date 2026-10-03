@@ -1,0 +1,546 @@
+spec: 1
+id: dataton-watchout6
+name: Dataton WATCHOUT 6 control protocol (production and display)
+vendor: Dataton
+category: playback
+
+# WATCHOUT's text control protocol: one command per line on TCP, to the
+# production computer (WATCHMAKER, port 3040) or to a display computer, which
+# then conducts the display cluster (WATCHPOINT, port 3039). WATCHOUT 7 keeps
+# the protocol on both ports as its WATCHOUT 6 compatibility layer.
+#
+# A successful command is normally answered with nothing, so every command
+# here carries the protocol's command ID tag, [m]: WATCHOUT then always sends
+# at least one reply with the same tag (an empty [m], a Ready or Reply line,
+# or an Error), which is what each command waits for. Untagged lines are the
+# spontaneous feedback (Ready, Busy, Error, Warning, Information, Quit) and
+# the Status lines of the status subscription, which go to the telemetry
+# rules only.
+
+source:
+  - title: "Dataton WATCHOUT User's Guide 6.6, Appendix C: Control Protocol (pp.175-187); Preferences, Control tab (pp.51-52)"
+    author: Dataton
+    url: https://cdn.dataton.com/Files-PDF-etc/userguides/Dataton_WATCHOUT_Users_Guide_6.6.pdf
+    note: >
+      Manufacturer document (PDF of 2021-10-22; the 6.1 guide of 2016 is the same
+      in substance). Ports 3040 (production, TCP or UDP when enabled in the
+      Control tab) and 3039 (display cluster, TCP); authenticate 1 before any
+      display command but ping; CR, LF or CRLF line ends, UTF-8, quoted strings
+      with backslash escapes; times in milliseconds or "HH:MM:SS.FFF"; commands
+      ping, authenticate, load (production and display forms), online, run,
+      halt, kill, gotoTime, gotoControlCue, enableLayerCond, standBy, getStatus
+      (and its Reply fields), reset, setInput, setInputs, setLogoString,
+      timecodeMode and hitTest; feedback Ready, Busy, Error (kinds 1-8,
+      authentication sub-codes 1-7), Warning, Information, Reply and Quit;
+      command ID tags ([23]ping answered [23]Ready ...), p.187.
+  - title: WATCHOUT User Guide, "WATCHOUT 6 Protocol" (generated July 2026, WATCHOUT 7.8.2)
+    author: Dataton
+    url: https://docs.dataton.com/guide/watchout/external-control/watchout-6-protocol.html
+    note: >
+      Manufacturer document, retrieved 2026-10-02, describing the WATCHOUT 6
+      protocol as WATCHOUT 7's compatibility layer implements it. getStatus
+      modes 0 (unsubscribe), 1 (subscribe) and 2 (once), with a timeline path
+      TaskList:mItemList:mItems:TimelineTask \"<name>\"; Status lines and the
+      timeline Status line (state 0 stopped, 1 paused, 2 running, position,
+      world clock); getInputs, getAuxTimelines and getControlCues answered with
+      Reply and JSON; an ID-tagged command with an empty result answered by its
+      tag alone; the subscription's first tagged reply an empty acknowledgement
+      and later pushes untagged; commands without a timeline name acting on a
+      timeline named "Main Timeline"; which commands are implemented and which
+      answer Error 7 not implemented; a 4096-byte frame limit; UDP running
+      commands without replies.
+  - title: Dataton Knowledge Base, "getStatus using Folders" (updated 2020-01-13, WATCHOUT 6.4 and later)
+    author: Dataton
+    url: https://knowledge.dataton.com/knowledge/get-status
+    note: >
+      Manufacturer document. getStatus 1 with a timeline path, and the path of
+      a timeline in a folder (TaskFolder \"<folder>\" :mItemList:mItems:...).
+  - title: companion-module-dataton-watchout (Bitfocus Companion module, MIT licence)
+    author: Bitfocus
+    url: https://github.com/bitfocus/companion-module-dataton-watchout
+    note: >
+      Corroboration only, licence checked. The field order of the general Status
+      line (the getStatus Reply fields after an empty path string), which
+      Dataton's pages show only in part. No code taken.
+
+transport:
+  type: line-tcp
+  port: 3040
+  framing: terminated
+  terminator: crlf
+  encoding: utf-8
+  timeout_ms: 3000
+  # Tagged lines are replies to this connection's commands; untagged lines are
+  # spontaneous feedback and status pushes.
+  reply_match: "^\\[m\\]"
+  probe: "[m]ping"
+
+on_connect:
+  # Required by a display cluster before any command but ping; accepted and
+  # not needed by the production computer and by WATCHOUT 7.
+  # Refused: authentication errors 1 (no authority), 4 (challenge failed), 5
+  # (invalid level) and 6 (level not allowed on this port). Once WATCHOUT has
+  # answered Ready (or, in WATCHOUT 7, the bare tag), later authority errors
+  # are failures of single commands, not a refused login.
+  - send: "[m]authenticate 1"
+    await_reply: true
+    refused: "^\\[m\\]Error 8 [1456]\\b"
+    accepted: "^\\[m\\](Ready\\b|\\s*$)"
+
+models:
+  - id: production
+    name: WATCHOUT 6 production computer (WATCHMAKER, TCP 3040), and WATCHOUT 5
+    supports: [ping, get_status, run, halt, run_timeline, halt_timeline, kill_timeline,
+                           goto_time, goto_time_timecode, goto_time_timeline, goto_control_cue,
+                           goto_control_cue_timeline, reset, set_input, adjust_input, set_inputs_2,
+                           enable_layer_conditions, standby, hit_test, online, load_production,
+                           subscribe_timeline, unsubscribe_timeline, get_aux_timelines,
+                           get_control_cues, get_control_cues_timeline, get_inputs]
+    verification: none
+  - id: display
+    name: WATCHOUT 6 display cluster (WATCHPOINT conductor, TCP 3039)
+    supports: [ping, get_status, run, halt, run_timeline, halt_timeline, kill_timeline,
+               goto_time, goto_time_timecode, goto_time_timeline, goto_control_cue,
+               goto_control_cue_timeline, reset, set_input, adjust_input, set_inputs_2,
+               enable_layer_conditions, standby, hit_test, load_display, set_logo_string,
+               timecode_mode, power_down, subscribe_timeline, unsubscribe_timeline,
+               get_aux_timelines, get_control_cues, get_control_cues_timeline, get_inputs]
+    verification: none
+    notes: >
+      Open on port 3039. Quit the production software (or take it offline) first:
+      a display cluster controlled by both answers commands with an authority error.
+  - id: watchout7-compat
+    name: WATCHOUT 7 WATCHOUT 6 compatibility layer (Operative, TCP 3040 or 3039)
+    supports: [ping, get_status, run, halt, run_timeline, halt_timeline, kill_timeline,
+               goto_time, goto_time_timecode, goto_time_timeline, goto_control_cue,
+               goto_control_cue_timeline, reset, set_input, adjust_input, set_inputs_2,
+               online, load_production, subscribe_timeline, unsubscribe_timeline,
+               get_aux_timelines, get_control_cues, get_control_cues_timeline, get_inputs]
+    verification: none
+    notes: >
+      Enabled per node with the "WATCHOUT 6 protocol" switch. standBy, hitTest,
+      enableLayerCond, setLogoString, timecodeMode and powerDown answer Error 7 (not
+      implemented) and are left out. Commands without a timeline name act on the
+      timeline named "Main Timeline".
+
+commands:
+  ping:
+    summary: Ask for a Ready reply with the program's version, name and OS (ping)
+    send: "[m]ping"
+    expect: { matches: "^\\[m\\]Ready (.*)$" }
+    returns: value
+
+  get_status:
+    summary: >
+      The show and main timeline status (getStatus): show name, busy, cluster
+      health, display open, show active, programmer online, then while a show is
+      active the position in ms, playing, rate, standby and world time
+    send: "[m]getStatus"
+    expect: { matches: "^\\[m\\]Reply (.*)$" }
+    returns: value
+
+  # ── Timelines ────────────────────────────────────────────────────────────
+  run:
+    summary: Run the main timeline (run)
+    send: "[m]run"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  halt:
+    summary: Pause the main timeline (halt)
+    send: "[m]halt"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  run_timeline:
+    summary: Run an auxiliary timeline, by name (run "<timeline>")
+    params:
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]run "{timeline}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  halt_timeline:
+    summary: Pause an auxiliary timeline, by name (halt "<timeline>")
+    params:
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]halt "{timeline}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  kill_timeline:
+    summary: Stop and deactivate an auxiliary timeline, by name (kill "<timeline>")
+    params:
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]kill "{timeline}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  goto_time:
+    summary: Move the main timeline to a time in milliseconds, keeping its run or pause state (gotoTime)
+    params:
+      time_ms: { type: int, min: 0, required: true }
+    send: "[m]gotoTime {time_ms}"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  goto_time_timecode:
+    summary: Move the main timeline to a time given as HH:MM:SS.FFF (gotoTime "HH:MM:SS.FFF")
+    params:
+      time: { type: string, pattern: "^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}$", required: true }
+    send: '[m]gotoTime "{time}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  goto_time_timeline:
+    summary: Move an auxiliary timeline to a time in milliseconds (gotoTime <ms> "<timeline>")
+    params:
+      time_ms:  { type: int, min: 0, required: true }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]gotoTime {time_ms} "{timeline}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  goto_control_cue:
+    summary: >
+      Move the main timeline to a named control cue, searching forward then
+      backward, or backward only (gotoControlCue); the run or pause state is kept
+    params:
+      cue:          { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      reverse_only: { type: bool, default: false }
+    send: '[m]gotoControlCue "{cue}" {reverse_only}'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  goto_control_cue_timeline:
+    summary: Move an auxiliary timeline to a named control cue (gotoControlCue "<cue>" <reverse> "<timeline>")
+    params:
+      cue:          { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      reverse_only: { type: bool, default: false }
+      timeline:     { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]gotoControlCue "{cue}" {reverse_only} "{timeline}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  reset:
+    summary: Reset and stop all timelines (reset)
+    send: "[m]reset"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  # ── Inputs and conditions ────────────────────────────────────────────────
+  set_input:
+    summary: Set a generic input to a value, usually 0.0 to 1.0, over a transition in ms (setInput)
+    params:
+      input:         { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      value:         { type: float, min: 0.0, required: true }
+      transition_ms: { type: int, min: 0, default: 0 }
+    send: '[m]setInput "{input}" {value:.4f} {transition_ms}'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  adjust_input:
+    summary: Change a generic input by a signed amount, such as +0.1 or -0.25, over a transition in ms (setInput with +/-)
+    params:
+      input:         { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      delta:         { type: string, pattern: "^[+-][0-9]+(\\.[0-9]+)?$", required: true }
+      transition_ms: { type: int, min: 0, default: 0 }
+    send: '[m]setInput "{input}" {delta} {transition_ms}'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  set_inputs_2:
+    summary: Set two generic inputs on the same frame, over one transition in ms (setInputs)
+    params:
+      transition_ms: { type: int, min: 0, default: 0 }
+      input1:        { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      value1:        { type: float, min: 0.0, required: true }
+      input2:        { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      value2:        { type: float, min: 0.0, required: true }
+    send: '[m]setInputs {transition_ms} "{input1}" {value1:.4f} "{input2}" {value2:.4f}'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  enable_layer_conditions:
+    summary: Set the enabled layer conditions as a bit mask, condition 1 = 1, condition 2 = 2, condition 3 = 4 and so on (enableLayerCond)
+    params:
+      conditions: { type: int, min: 0, max: 4294967295, required: true }
+    send: "[m]enableLayerCond {conditions}"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  standby:
+    summary: Enter or leave standby over a fade in ms; standby blanks picture and sound, or plays the show's standby layers (standBy)
+    params:
+      enter:   { type: bool, default: true }
+      fade_ms: { type: int, min: 0, default: 0 }
+    send: "[m]standBy {enter} {fade_ms}"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  hit_test:
+    summary: >
+      The front-most visible interactive media cue at a stage position (hitTest):
+      true or false, then the interaction name and the hit position
+    params:
+      x: { type: int, required: true }
+      y: { type: int, required: true }
+    send: "[m]hitTest {x} {y}"
+    expect: { matches: "^\\[m\\]Reply (.*)$" }
+    returns: value
+
+  # ── Show ─────────────────────────────────────────────────────────────────
+  online:
+    summary: Take the production computer online or offline (online)
+    params:
+      online: { type: bool, default: true }
+    send: "[m]online {online}"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  load_production:
+    summary: >
+      Open a show file on the production computer by its full path, with the
+      layer conditions to enable and whether to go online afterwards (load); see quirks
+    params:
+      path:       { type: string, pattern: "^[^\"]+$", max_length: 1024, required: true }
+      conditions: { type: int, min: 0, max: 4294967295, default: 0 }
+      go_online:  { type: bool, default: true }
+    send: '[m]load "{path}" {conditions} {go_online}'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  load_display:
+    summary: >
+      Load a show, by name, from the display computer's Shows folder, managing the
+      cluster as its conductor (load); the last reply is Ready once loaded; see quirks
+    params:
+      show:           { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+      manage_cluster: { type: bool, default: true }
+      as_conductor:   { type: bool, default: true }
+      conditions:     { type: int, min: 0, max: 4294967295, default: 0 }
+    send: '[m]load "{show}" {manage_cluster} {as_conductor} {conditions}'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  set_logo_string:
+    summary: Show a text beside the WATCHOUT logo on the displays (setLogoString)
+    params:
+      text: { type: string, pattern: "^[^\"\\\\]*$", max_length: 256, required: true }
+    send: '[m]setLogoString "{text}"'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  timecode_mode:
+    summary: >
+      Set the display cluster's timecode input (timecodeMode): 0 off, 1 auto-detect,
+      2 EBU 25, 3 SMPTE 29.97 non-drop, 4 SMPTE 29.97 drop, 5 SMPTE 30, 6 24 fps,
+      with an offset in ms
+    params:
+      mode:      { type: int, min: 0, max: 6, required: true }
+      offset_ms: { type: int, default: 0 }
+    send: "[m]timecodeMode {mode} {offset_ms}"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  power_down:
+    summary: Quit the display software, shut Windows down and turn the display computers off (powerDown); see quirks
+    send: "[m]powerDown"
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  # ── Status subscriptions and queries ─────────────────────────────────────
+  subscribe_timeline:
+    summary: Have WATCHOUT push an auxiliary timeline's state and position as it changes (getStatus 1 with the timeline's path)
+    params:
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]getStatus 1 "TaskList:mItemList:mItems:TimelineTask \"{timeline}\""'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  unsubscribe_timeline:
+    summary: Stop pushes for an auxiliary timeline (getStatus 0 with the timeline's path)
+    params:
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]getStatus 0 "TaskList:mItemList:mItems:TimelineTask \"{timeline}\""'
+    expect: { not_contains: "Error" }
+    returns: ack
+
+  get_aux_timelines:
+    summary: The auxiliary timelines, with folders, as JSON (getAuxTimelines tree)
+    send: "[m]getAuxTimelines tree"
+    expect: { matches: "^\\[m\\]Reply (.*)$" }
+    returns: value
+
+  get_control_cues:
+    summary: >
+      The main timeline's control cues as JSON (getControlCues), filtered by a bit
+      mask: 1 no-op cues, 2 cues targeting another timeline, 4 unnamed cues
+    params:
+      filter: { type: int, min: 0, max: 7, default: 0 }
+    send: "[m]getControlCues {filter}"
+    expect: { matches: "^\\[m\\]Reply (.*)$" }
+    returns: value
+
+  get_control_cues_timeline:
+    summary: An auxiliary timeline's control cues as JSON (getControlCues <filter> "<timeline>")
+    params:
+      filter:   { type: int, min: 0, max: 7, default: 0 }
+      timeline: { type: string, pattern: "^[^\"\\\\]+$", max_length: 256, required: true }
+    send: '[m]getControlCues {filter} "{timeline}"'
+    expect: { matches: "^\\[m\\]Reply (.*)$" }
+    returns: value
+
+  get_inputs:
+    summary: Every generic input with its value, as JSON (getInputs)
+    send: "[m]getInputs"
+    expect: { matches: "^\\[m\\]Reply (.*)$" }
+    returns: value
+
+telemetry:
+  # The general status subscription pushes Status lines as the show changes;
+  # getStatus is also read every 10 seconds, as a check on the subscription.
+  subscribe:
+    send: ["[m]getStatus 1"]
+  poll:
+    every_ms: 10000
+    send: ["[m]getStatus"]
+  updates:
+    # getStatus Reply and the general Status push carry the same fields; the
+    # last five are present only while a show is active.
+    - match: '^(?:\[m\])?(?:Reply|Status "") "((?:[^"\\]|\\.)*)" (true|false) ([0-3]) (true|false) (true|false) (true|false)(?: (\d+) (true|false) ([0-9.]+)(?: (true|false))?(?: (\d+))?)?\s*$'
+      state:
+        show.name: "{1}"
+        status.busy: "{2}"
+        status.cluster_health: { value: "{3}", map: { "0": ok, "1": suboptimal, "2": problems, "3": dead } }
+        status.display_open: "{4}"
+        status.show_active: "{5}"
+        status.programmer_online: "{6}"
+        main.position_ms: "{7}"
+        main.playing: "{8}"
+        main.rate: "{9}"
+        status.standby: "{10}"
+        status.world_time_ms: "{11}"
+    - match: '^(?:\[m\])?Status "TaskList:mItemList:mItems:(?:TaskFolder \\"(?:[^"\\]|\\.)*\\" :mItemList:mItems:)?TimelineTask \\"((?:[^"\\]|\\.)*)\\"" ([0-2]) (\d+)'
+      state:
+        timelines.{1}.state: { value: "{2}", map: { "0": stopped, "1": paused, "2": running } }
+        timelines.{1}.position_ms: "{3}"
+    - match: '^(?:\[m\])?Ready "([^"]*)" "([^"]*)" "([^"]*)" (true|false)'
+      state:
+        system.version: "{1}"
+        system.program: "{2}"
+        system.os: "{3}"
+        system.license_ok: "{4}"
+    - match: '^(?:\[m\])?Busy "([^"]*)" "([^"]*)" (\d+)'
+      state:
+        busy.activity: "{1}"
+        busy.subject: "{2}"
+        busy.percent: "{3}"
+    - match: '^(?:\[m\])?Error ([1-8]) (.*)$'
+      state:
+        last_error.kind: { value: "{1}", map: { "1": os, "2": quicktime, "3": rendering, "4": network, "5": file_server, "6": syntax, "7": runtime, "8": authentication } }
+        last_error.text: "{2}"
+    - match: '^(?:\[m\])?Warning "((?:[^"\\]|\\.)*)"'
+      state: { last_warning: "{1}" }
+    - match: '^(?:\[m\])?Information "((?:[^"\\]|\\.)*)"'
+      state: { last_information: "{1}" }
+    - match: '^Quit\s*$'
+      state: { system.quitting: "true" }
+
+state:
+  show.name:                { type: string, description: "Name of the loaded show, empty when none" }
+  status.busy:              { type: bool, description: "The conductor or a display computer is busy" }
+  status.cluster_health:    { type: string, description: "Cluster health: ok, suboptimal, problems or dead" }
+  status.display_open:      { type: bool, description: "The display is open (full screen)" }
+  status.show_active:       { type: bool, description: "The show is active (ready to run)" }
+  status.programmer_online: { type: bool, description: "The production computer (programmer) is online" }
+  status.standby:           { type: bool, description: "The show is in standby" }
+  status.world_time_ms:     { type: int, unit: ms, description: "WATCHOUT's world time" }
+  main.position_ms:         { type: int, unit: ms, description: "Position of the main timeline" }
+  main.playing:             { type: bool, description: "The main timeline is running (false: paused)" }
+  main.rate:                { type: float, description: "Rate of the main timeline, nominally 1" }
+  timelines.*.state:        { type: string, description: "State of a subscribed auxiliary timeline, keyed by name: stopped, paused or running" }
+  timelines.*.position_ms:  { type: int, unit: ms, description: "Position of a subscribed auxiliary timeline" }
+  system.version:           { type: string, description: "Software version from the last Ready" }
+  system.program:           { type: string, description: "Program name from the last Ready: WATCHMAKER or WATCHPOINT" }
+  system.os:                { type: string, description: "Operating system from the last Ready" }
+  system.license_ok:        { type: bool, description: "The licence is valid, from the last Ready" }
+  system.quitting:          { type: bool, description: "WATCHOUT announced it is about to quit" }
+  busy.activity:            { type: string, description: "Activity of the last Busy message, such as Transferring" }
+  busy.subject:             { type: string, description: "Subject of the last Busy message, such as a media file" }
+  busy.percent:             { type: int, unit: "%", description: "Progress of the last Busy message, 0 to 100" }
+  last_error.kind:          { type: string, description: "Kind of the last Error: os, quicktime, rendering, network, file_server, syntax, runtime or authentication" }
+  last_error.text:          { type: string, description: "Code or description and excuse of the last Error, as WATCHOUT sent them" }
+  last_warning:             { type: string, description: "Text of the last Warning" }
+  last_information:         { type: string, description: "Text of the last Information message" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Control has to be enabled: on the production computer in Preferences >
+      Control (TCP and UDP), in WATCHOUT 7 with the node's "WATCHOUT 6 protocol"
+      switch. There is no password; authenticate 1, sent on connecting, is
+      required by a display cluster and accepted by the others. UDP control runs
+      commands without any reply, so this spec uses TCP only.
+  - models: [all]
+    severity: info
+    text: >
+      WATCHOUT acknowledges a successful command with nothing. Every command here
+      carries the ID tag [m], so WATCHOUT answers it with a reply carrying the same
+      tag, and an Error carrying it when the command fails. Spontaneous messages
+      (Ready after a busy period, Busy, Error, Warning, Information, Quit) and the
+      status pushes are untagged; they go to the most recently connected or
+      authenticated controller, so with several controllers only the last receives
+      them.
+  - models: [all]
+    severity: critical
+    text: >
+      load_production and load_display replace the running show. On a production
+      computer, a show whose own Control settings do not enable TCP control closes
+      this connection once loaded. A display cluster sends Busy lines while
+      loading and a final Ready; this command takes the first tagged reply, so wait
+      for status.show_active before running.
+  - models: [display]
+    severity: critical
+    text: >
+      power_down shuts down every display computer of the cluster; nothing can
+      turn them on again over this protocol. Its syntax comes from WATCHOUT 7's
+      description of the WATCHOUT 6 protocol; the 6.x guides document only the
+      equivalent menu command.
+  - models: [all]
+    severity: warning
+    text: >
+      reset stops every timeline, and kill_timeline stops and deactivates an
+      auxiliary timeline; standby true blanks the output, or plays the show's
+      standby layers.
+  - models: [all]
+    severity: info
+    text: >
+      set_input takes an absolute value; a value written with + or - is relative,
+      so a negative absolute value cannot be sent (adjust_input sends a relative
+      change). setInputs takes any number of inputs; set_inputs_2 sends two, and
+      set_input sends one.
+  - models: [all]
+    severity: info
+    text: >
+      Names are always sent in double quotes, since an unquoted name ends at the
+      first space; names containing a double quote or backslash are refused here
+      rather than escaped. Command names are case sensitive.
+  - models: [all]
+    severity: info
+    text: >
+      The order of the general Status push's fields is taken from Bitfocus's
+      Companion module (the getStatus Reply fields after an empty path); Dataton
+      shows the line only in part. subscribe_timeline covers a timeline at the top
+      level; the state rules also read a timeline in a folder (WATCHOUT 6.4 and
+      later), whose path has a space before :mItemList.
+  - models: [watchout7-compat]
+    severity: info
+    text: >
+      In WATCHOUT 7, getStatus hard-codes busy false, health 0, display open and
+      programmer online true, rate 1 or 0 and standby false; the show name is the
+      show file's name (an older page says its id). authenticate, online and the
+      load conditions are accepted and ignored. getAuxTimelines, getControlCues
+      and getInputs are documented only for WATCHOUT 7's compatibility layer; the
+      6.x guides do not list them.

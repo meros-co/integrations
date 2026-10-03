@@ -897,6 +897,9 @@ Each event goes to the `json_match` rules as `{"event": <name>, "data":
 <data>}`, with `data` parsed where it is JSON (the event name is `message`
 when the stream gives none), and its data to the text rules.
 
+A telemetry vector for an event stream gives `inbound_sse: { event, data }`,
+one event as the stream would deliver it (`event` defaults to `message`).
+
 ## Native modules
 
 Protocols requiring session state, sequencing or logic that depends on what the
