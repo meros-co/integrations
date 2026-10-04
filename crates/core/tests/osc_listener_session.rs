@@ -58,12 +58,16 @@ fn slip(packet: &[u8]) -> Vec<u8> {
     out
 }
 
+/// A port free for both UDP and TCP on every address, since tests run in
+/// parallel and the listener binds 0.0.0.0.
 fn free_port() -> u16 {
-    std::net::TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
+    loop {
+        let udp = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+        let port = udp.local_addr().unwrap().port();
+        if std::net::TcpListener::bind(("0.0.0.0", port)).is_ok() {
+            return port;
+        }
+    }
 }
 
 fn open(core: &Core, port: u16, settings: Value) -> DeviceId {
