@@ -27,11 +27,16 @@ export interface DiscoverRequest {
   action: 'listen' | 'scan' | 'stop';
   /**
    * Discovery protocols: 'mcp' (Sennheiser G3/G4), 'ssdp' (Sony cameras),
-   * 'pjlink' (PJLink projectors). Empty means every protocol that finds a
-   * device in this core's catalogue; naming one that finds none is an error.
+   * 'pjlink' (PJLink projectors), 'mdns' (Blackmagic ATEM, Videohub,
+   * HyperDeck, SmartView and MultiView). Empty means every protocol that
+   * finds a device in this core's catalogue; naming one that finds none is
+   * an error.
    */
   protocols?: string[];
-  /** Addresses where devices were last seen; a scan also sweeps their /24s. */
+  /**
+   * Addresses where devices were last seen. An MCP scan also sweeps their
+   * /24s; SSDP, PJLink and mDNS scans also ask each by unicast.
+   */
   hints?: string[];
 }
 

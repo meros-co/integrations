@@ -31,6 +31,12 @@
 //! | GET  /v1/devices/{device}/streams/{stream}.mjpg |                    | MJPEG, until closed        |
 //! | GET  /v1/devices/{device}/streams/{stream}.jpg  | ?wait_ms=5000      | the newest JPEG            |
 //!
+//! `/v1/discover` takes `protocols` among `mcp` (Sennheiser G3/G4), `ssdp`
+//! (Sony cameras), `pjlink` (PJLink projectors) and `mdns` (Blackmagic ATEM,
+//! Videohub, HyperDeck, SmartView and MultiView); none means every protocol
+//! that finds a device in the service's catalogue. `hints` are addresses
+//! where devices were last seen.
+//!
 //! Every request needs `Authorization: Bearer <token>`. The token is read from
 //! the token file, which is created with a random token if absent. The service
 //! listens on loopback unless told otherwise.
