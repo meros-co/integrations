@@ -626,6 +626,10 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         for path in paths:
             if not is_declared(path, prefix=path in deletions):
                 errors.append(f"{where}: '{path}' is not declared in 'state'")
+        replace = rule.get("replace") or []
+        for path in [replace] if isinstance(replace, str) else replace:
+            if not is_declared(path, prefix=True):
+                errors.append(f"{where}: replace '{path}' is not declared in 'state'")
     return errors
 
 

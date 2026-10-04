@@ -1145,6 +1145,34 @@ name something else. Within one message a removal wins over a value the same
 message assigns under it. A telemetry vector for a removal gives
 `state_before`, the state the message arrives on.
 
+#### Lists
+
+A device that reports a list whole each time (a file list, a service's
+items) declares the subtree each such message replaces with `replace`:
+whenever the rule's message arrives (its path, header or selectors match,
+even with no element at all), the subtree is removed first, in a patch of
+its own, and the values the message gives are applied after it, so a list
+that shrinks or empties leaves nothing behind. In a `header` + `each_line`
+rule, `{index}` is the line's place among the lines that match, from 0, for
+lists of plain lines (Ultimatte's FILE LIST):
+
+```yaml
+    - header: ^FILE LIST:$
+      each_line: ^([^:]+)$
+      replace: files
+      state: { "files.{index}": "{1}" }
+    - path: "^/api/v2/service/items$"
+      json_each: "$"
+      json: { id: "$.id", title: "$.title" }
+      replace: service.items
+      state: { "service.items.{id}.title": "{title}" }
+```
+
+`replace` is a path or a list of them, templates over the captures before
+`json_each` (the path's, the selectors'), each declared or leading to
+declared paths. Consumers see the removal and the new list as two `state`
+events in a row.
+
 Over HTTP, `poll` requests and command requests alike have their replies
 offered to `path` rules, which match the request's path and query:
 

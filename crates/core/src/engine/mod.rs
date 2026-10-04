@@ -2386,7 +2386,15 @@ impl SpecEngine {
     /// (only while monitored).
     fn offer(&mut self, cx: &mut Cx, message: &telemetry::Inbound) {
         let mut triggered = Vec::new();
-        if let Some(patch) = self.telemetry.apply_into(message, &mut triggered) {
+        let mut cleared = Value::Object(Map::new());
+        let patch = self
+            .telemetry
+            .apply_into(message, &mut triggered, &mut cleared);
+        // What the message replaces leaves state first.
+        if cleared.as_object().is_some_and(|c| !c.is_empty()) {
+            cx.state(cleared);
+        }
+        if let Some(patch) = patch {
             cx.state(patch);
         }
         if !triggered.is_empty() && self.monitor && self.refused.is_none() {

@@ -89,7 +89,15 @@ telemetry(UL, "control", inbound="CONTROL:\nMatte Density: 0\nRed Density: 0\nMa
 telemetry(UL, "current-file", inbound="CURRENT FILE:\nName: Ultimatte Defaults\nStatus: Clean\n\n",
           expect_state={"file": {"current": "Ultimatte Defaults", "status": "Clean"}})
 telemetry(UL, "image-list", inbound="IMAGE LIST:\nCapacity: 6736052224\nAvailable: 6722727936\nImage 1\nImage 2\n\n",
-          expect_state={"media": {"capacity": 6736052224, "available": 6722727936}})
+          expect_state={"media": {"capacity": 6736052224, "available": 6722727936,
+                                  "images": {"0": "Image 1", "1": "Image 2"}}})
+telemetry(UL, "file-list", inbound="FILE LIST:\nGreen Set\nBlue Set\n\n",
+          state_before={"files": {"0": "Old", "1": "Green Set", "2": "Blue Set"}},
+          expect_state={"files": {"0": "Green Set", "1": "Blue Set"}})
+telemetry(UL, "gpi-list", inbound="GPI LIST:\nID: 1\nIndex: 0\nGreen Set\nBlue Set\n\n",
+          expect_state={"gpi": {"list_id": 1, "index": 0, "events": {"0": "Green Set", "1": "Blue Set"}}})
+telemetry(UL, "video-formats", inbound="VIDEO FORMATS:\n1080p59.94\n2160p25\n\n",
+          expect_state={"video_formats": {"0": "1080p59.94", "1": "2160p25"}})
 telemetry(UL, "frame-buffer", inbound="FRAME BUFFER:\nBackground 1:\nBackground Mix: 0\nLayer Transition Duration: 500\n\n",
           expect_state={"frame_buffer": {"background_1": "", "background_mix": 0, "layer_transition_ms": 500}})
 telemetry(UL, "camera-control", inbound="CAMERA CONTROL:\nCCU Camera Id: 1\nCEC Camera Id: 0\nCamera Control Mode: idle\n\n",

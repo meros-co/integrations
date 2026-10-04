@@ -433,6 +433,8 @@ telemetry:
 
     - path: "^/api/v2/service/items$"
       json_each: "$"
+      # The whole service: an item no longer listed leaves state.
+      replace: service.items
       json: { id: "$.id", title: "$.title", plugin: "$.plugin", selected: "$.selected", valid: "$.is_valid", notes: "$.notes" }
       state:
         service.items.{id}.title: "{title}"
@@ -478,8 +480,8 @@ quirks:
       the live state each time it changes, as JSON in binary frames. The websocket only counts
       changes to the live item and the service, so each message it sends has the live item and
       the service list read again (one of each waits at a time), and both are read every minute
-      as well. When nothing is live, live-item answers {} and live_item leaves the state. Items
-      removed from the service stay in the state with their last values.
+      as well. When nothing is live, live-item answers {} and live_item leaves the state; each
+      service list read replaces the last, so items removed from the service leave the state.
 
   - models: [all]
     severity: info

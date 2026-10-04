@@ -344,12 +344,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-ultimatte — Blackmagic Ultimatte 12
 
-- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1297](specs/blackmagic-ultimatte.yaml#L1297))
-- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1307](specs/blackmagic-ultimatte.yaml#L1307))
-- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1329](specs/blackmagic-ultimatte.yaml#L1329))
-- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
-- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1339](specs/blackmagic-ultimatte.yaml#L1339))
-- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1322](specs/blackmagic-ultimatte.yaml#L1322))
+- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1320](specs/blackmagic-ultimatte.yaml#L1320))
+- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
+- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1352](specs/blackmagic-ultimatte.yaml#L1352))
+- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1353](specs/blackmagic-ultimatte.yaml#L1353))
+- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1362](specs/blackmagic-ultimatte.yaml#L1362))
+- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1345](specs/blackmagic-ultimatte.yaml#L1345))
+
+- [ ] Confirm that a VIDEO FORMATS, FILE LIST or GPI LIST block always carries the whole list (an update replaces the list kept), that list lines never hold a colon, and whether an IMAGE LIST update can carry Capacity or Available alone. ([specs/blackmagic-ultimatte.yaml:957](specs/blackmagic-ultimatte.yaml#L957))
+- [ ] Record the GPI LIST block's event lines (the file of each event, in event order, assumed). ([specs/blackmagic-ultimatte.yaml:961](specs/blackmagic-ultimatte.yaml#L961))
 
 ## blackmagic-videohub — Blackmagic Videohub
 

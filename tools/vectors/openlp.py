@@ -93,6 +93,8 @@ telemetry(OL, "service-items", inbound_http={"path": "/api/v2/service/items", "b
      "title": "Amazing Grace"},
     {"ccli_number": "", "id": "9d0e1b", "is_valid": False, "notes": "Play from 0:30", "plugin": "media",
      "selected": False, "title": "Intro video"}])},
+    # An item no longer in the service leaves state.
+    state_before={"service": {"items": {"0aa0aa": {"title": "Removed song"}}}},
     expect_state={"service": {"items": {
         "6c1f2a": {"title": "Amazing Grace", "plugin": "songs", "live": True, "valid": True, "notes": ""},
         "9d0e1b": {"title": "Intro video", "plugin": "media", "live": False, "valid": False,

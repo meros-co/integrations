@@ -241,6 +241,10 @@ struct Rule {
     /// `then_send`: requests queued when the rule matches, templates over
     /// its captures and the settings (a re-read the push only announces).
     then_send: Vec<Value>,
+    /// `replace`: state subtrees (templates over the captures before
+    /// `json_each`) the rule's values replace: removed whenever the rule's
+    /// message arrives, before its values are applied.
+    replace: Vec<String>,
 }
 
 /// A `then_send` item a matching rule queued, with the captures it is
@@ -558,10 +562,25 @@ impl Telemetry {
                 matcher,
                 assign: assigns,
                 then_send: items(rule.get("then_send")),
+                replace: items(rule.get("replace"))
+                    .iter()
+                    .map(|v| {
+                        v.as_str()
+                            .map(str::to_string)
+                            .ok_or("telemetry: replace lists state paths".to_string())
+                    })
+                    .collect::<Result<_, _>>()?,
             });
         }
         // Every path a rule writes must be declared, so its type is known.
         for rule in &t.rules {
+            for path in &rule.replace {
+                if !t.declares(&placeholder_to_star(path)) {
+                    return Err(format!(
+                        "telemetry: replace '{path}' is not declared in the spec's state"
+                    ));
+                }
+            }
             let paths: Vec<&Assign> = match &rule.matcher {
                 Matcher::Fields { fields, .. } => fields.values().collect(),
                 _ => rule.assign.iter().collect(),
@@ -618,15 +637,30 @@ impl Telemetry {
     /// The state patch this message produces, if any rule matches.
     #[cfg(test)]
     pub(crate) fn apply(&self, message: &Inbound) -> Option<Value> {
-        self.apply_into(message, &mut Vec::new())
+        let mut cleared = Value::Object(Map::new());
+        let patch = self.apply_into(message, &mut Vec::new(), &mut cleared);
+        match (cleared.as_object().is_some_and(|c| !c.is_empty()), patch) {
+            (false, patch) => patch,
+            // The two patches in order, as one, for a test to compare.
+            (true, patch) => {
+                let mut both = cleared;
+                if let Some(p) = patch {
+                    crate::session::merge_patch(&mut both, &p);
+                }
+                Some(both)
+            }
+        }
     }
 
     /// As `apply`, adding to `triggers` the `then_send` items of every rule
-    /// that matched, once per match, with its captures.
+    /// that matched, once per match, with its captures, and to `cleared` the
+    /// `replace` subtrees of the rules whose message this is: a patch of
+    /// removals to apply before the one returned.
     pub(crate) fn apply_into(
         &self,
         message: &Inbound,
         triggers: &mut Vec<Triggered>,
+        cleared: &mut Value,
     ) -> Option<Value> {
         // A reply is text to the text rules; its request is for request_match.
         let (message, request) = match message {
@@ -652,6 +686,7 @@ impl Telemetry {
                             values.push(((n + offset).to_string(), v));
                         }
                     }
+                    self.clear(rule, &values, cleared);
                     any |= self.matched(rule, &values, &mut patch, triggers);
                 }
                 (Matcher::Lines { header, line }, Inbound::Text(text)) => {
@@ -659,9 +694,15 @@ impl Telemetry {
                     if !lines.next().is_some_and(|h| header.is_match(h.trim_end())) {
                         continue;
                     }
+                    self.clear(rule, &[], cleared);
+                    // `{index}`: the line's place among those matching, from 0.
+                    let mut index = 0;
                     for l in lines {
                         if let Some(caps) = line.captures(l.trim_end()) {
-                            any |= self.matched(rule, &captures(&caps), &mut patch, triggers);
+                            let mut values = captures(&caps);
+                            values.push(("index".to_string(), Value::from(index)));
+                            index += 1;
+                            any |= self.matched(rule, &values, &mut patch, triggers);
                         }
                     }
                 }
@@ -671,6 +712,7 @@ impl Telemetry {
                         continue;
                     }
                     self.trigger(rule, &[], triggers);
+                    self.clear(rule, &[], cleared);
                     for l in lines {
                         let Some((name, value)) = l.split_once(':') else {
                             continue;
@@ -722,6 +764,7 @@ impl Telemetry {
                     if !select(&doc, reply_select, &mut base) {
                         continue;
                     }
+                    self.clear(rule, &base, cleared);
                     for values in each_values(&doc, each.as_deref(), json, &base) {
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
@@ -738,6 +781,7 @@ impl Telemetry {
                         continue;
                     };
                     let base = captures(&caps);
+                    self.clear(rule, &base, cleared);
                     for node in doc
                         .descendants()
                         .filter(|n| n.has_tag_name(element.as_str()))
@@ -761,6 +805,7 @@ impl Telemetry {
                     if !select(doc, selectors, &mut base) {
                         continue;
                     }
+                    self.clear(rule, &base, cleared);
                     for values in each_values(doc, each.as_deref(), json, &base) {
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
@@ -820,6 +865,34 @@ impl Telemetry {
     ) -> bool {
         self.trigger(rule, values, triggers);
         self.assign_all(&rule.assign, values, patch)
+    }
+
+    /// `replace`: the subtrees the rule's values replace, removed first.
+    fn clear(&self, rule: &Rule, values: &[(String, Value)], cleared: &mut Value) {
+        if rule.replace.is_empty() {
+            return;
+        }
+        let (params, specs) = capture_params(values);
+        let ctx = Values {
+            params: &params,
+            param_specs: &specs,
+            settings: &Params::new(),
+            setting_specs: &BTreeMap::new(),
+            conversions: &self.conversions,
+            maps: &Default::default(),
+        };
+        for template in &rule.replace {
+            let Ok(path) = render(template, &ctx, |s| s.to_string()) else {
+                continue;
+            };
+            if path.split('.').any(str::is_empty)
+                || path.split('.').count() != template.split('.').count()
+                || !self.declares(&path)
+            {
+                continue;
+            }
+            set_path(cleared, &path, Value::Null);
+        }
     }
 
     fn trigger(&self, rule: &Rule, values: &[(String, Value)], triggers: &mut Vec<Triggered>) {
@@ -1377,7 +1450,11 @@ mod tests {
         .unwrap();
         let answer = |text, request| {
             let mut triggers = Vec::new();
-            let patch = t.apply_into(&Inbound::Answer { text, request }, &mut triggers);
+            let patch = t.apply_into(
+                &Inbound::Answer { text, request },
+                &mut triggers,
+                &mut json!({}),
+            );
             (patch, triggers)
         };
         let (patch, triggers) = answer("1", "AMP2.MuteC ?");
@@ -1393,6 +1470,47 @@ mod tests {
         // Without its request, a bare value is nothing.
         assert_eq!(t.apply(&Inbound::Text("1")), None);
         assert_eq!(answer("1", "Subnet.Status ?").0, None);
+    }
+
+    #[test]
+    fn a_list_replaces_the_last_one() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"header": "^FILE LIST:$", "each_line": "^([^:]+)$", "replace": "files",
+                 "state": {"files.{index}": "{1}"}},
+                {"path": "^/service/items$", "json_each": "$", "json": {"id": "$.id", "title": "$.title"},
+                 "replace": ["service.items"], "state": {"service.items.{id}.title": "{title}"}},
+            ]})),
+            &state(json!({
+                "files.*": {"type": "string", "description": "x"},
+                "service.items.*.title": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let apply = |m: &Inbound| {
+            let mut cleared = json!({});
+            let patch = t.apply_into(m, &mut Vec::new(), &mut cleared);
+            (cleared, patch)
+        };
+        let (cleared, patch) = apply(&Inbound::Text("FILE LIST:\nCount: 2\nA.ult\nB.ult\n"));
+        assert_eq!(cleared, json!({"files": null}));
+        assert_eq!(patch, Some(json!({"files": {"0": "A.ult", "1": "B.ult"}})));
+        // An empty list clears what was there.
+        let (cleared, patch) = apply(&Inbound::Http {
+            path: "/service/items",
+            headers: &[],
+            body: b"[]",
+            request: None,
+        });
+        assert_eq!(cleared, json!({"service": {"items": null}}));
+        assert_eq!(patch, None);
+        // As the session applies them: the removal, then the new list.
+        let mut s = json!({"files": {"0": "Old.ult", "1": "B.ult", "2": "C.ult"}});
+        let (cleared, patch) = apply(&Inbound::Text("FILE LIST:\nB.ult\n"));
+        crate::session::merge_patch(&mut s, &cleared);
+        crate::session::merge_patch(&mut s, &patch.unwrap());
+        assert_eq!(s, json!({"files": {"0": "B.ult"}}));
     }
 
     #[test]
