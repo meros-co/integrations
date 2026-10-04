@@ -1,0 +1,1290 @@
+spec: 1
+id: boinx-mimolive
+name: Boinx mimoLive (HTTP API)
+vendor: Boinx Software
+category: switcher
+
+# mimoLive's HTTP API (JSON:API) on port 8989, under /api/v1, when it is
+# enabled in mimoLive's Remote Control preferences. Commands are HTTP
+# requests; mimoLive pushes every added, changed and removed document, layer,
+# variant, source, output destination and layer set on its websocket
+# (/api/v1/socket), which keeps the state current. A slow poll of the
+# document list, with each kind of object sideloaded, fills the state on
+# connecting and catches anything missed while the websocket was reopening.
+# Every object is addressed by the IDs mimoLive gives it, which it stores in
+# the document, so they stay valid for as long as the document is used.
+
+source:
+  - title: mimoLive User Manual, Remote Control & Automation > HTTP API (overview)
+    author: Boinx Software
+    url: https://mimolive.com/user-manual/remote-control-automation/http-api/
+    note: >
+      Manufacturer document, last updated 2024-10-08, retrieved 2026-10-04. The server on port
+      8989 when enabled, the /api/v1 prefix, JSON:API, IDs persisted in the document; from 3.1 the
+      password as its SHA-256 in hex, in the X-MimoLive-Password-SHA256 header or the pwSHA256
+      query parameter, shown and copyable in the Remote Controls preference pane; the error
+      object {"errors": [{status, title, description}]}.
+  - title: mimoLive User Manual, HTTP API > Endpoints
+    author: Boinx Software
+    url: https://mimolive.com/user-manual/remote-control-automation/http-api/endpoints/
+    note: >
+      Manufacturer document, last updated 2026-08-19. Every endpoint here: documents and their
+      setLive, setOff and toggleLive; creating, querying, modifying (name, volume from 5.6,
+      input-values) and deleting layers; layer setLive, setOff, toggleLive, signals,
+      cycleThroughVariants (5.6), cycleThroughVariantsBackwards, setLiveFirstVariant,
+      setLiveLastVariant and input media control with its thirteen commands; variants and their
+      actions; sources (gain clipped to 0-2, channel-map, video and audio device by id or name or
+      none, mimoCall attributes from 6.18), source media control, signals and actions (6.18);
+      filters; output destinations with their ten type identifiers, JSON:API PATCH of title,
+      starts-with-show, stops-with-show and settings, setLive and setOff answering 409 when they
+      cannot; layer sets (5.0) with create, PATCH, delete and recall; data stores; Zoom join (a
+      Zoom account name required from 6.19, 400 without), leave, end, participants and the
+      meeting action commands.
+  - title: mimoLive User Manual, HTTP API > Data Types
+    author: Boinx Software
+    url: https://mimolive.com/user-manual/remote-control-automation/http-api/data-types/
+    note: >
+      Manufacturer document, last updated 2026-08-19. The documents, layers, variants, sources,
+      filters, output-destinations and layer-sets objects, their attributes and relationships; the
+      LiveState values off, live, preview, shutdown and startup, and the TallyState values off,
+      in-use, effect, preview and program; recording settings and filename placeholders.
+  - title: mimoLive API Reference (mimoLive-API.md)
+    author: Boinx Software
+    url: https://github.com/boinx/mimoLive-API-Reference
+    note: >
+      Manufacturer document under the MIT licence, last pushed 2026-07-10. The websocket at
+      /api/v1/socket with {"event": "ping"} every 5 seconds or a timeout at 15, and added, removed
+      and changed events by resource type; the built-in outputs record, stream, playout and
+      fullscreen started and stopped with documents/(DocumentID)/outputs/(OutputID)/setLive and
+      setOff (any other verb toggles); programOutputMasterVolume; Content-Type
+      application/vnd.api+json for writes; POST answering 201 and DELETE 204; the type catalogs
+      (/layertypes, /sourcetypes, /outputdestinationtypes); /comments/new; /accounts (6.19);
+      Zoom participant source assignment by zoom-userid and zoom-userselectiontype (0, 2, 6);
+      the include query that sideloads a document's layers and sources.
+  - title: mlController (Boinx's mimoLive controller app, MIT licence)
+    author: Boinx Software
+    url: https://github.com/boinx/mlController
+    note: >
+      Manufacturer code, read for corroboration only (Services/MimoLiveWebSocket.swift): the
+      websocket URL, the ping message every 5 seconds against the 15-second timeout, and that
+      pong and ping messages are not state.
+  - title: companion-module-boinx-mimolive (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-boinx-mimolive
+    note: >
+      Read for corroboration only (src/api.js, src/actions.js). Its websocket handler shows the
+      event message shape: {event, type, id, data} where data is the whole object, with
+      data.attributes and data.relationships (document, layer, active-variant) as the HTTP API
+      returns them; it sets a layer's volume with a plain PUT body {"volume": x}.
+
+# The API key (the password's SHA-256 in hex, which the Remote Controls
+# preference pane shows and copies) goes in mimoLive's own header on every
+# request and on the websocket's opening request; empty sends none.
+transport:
+  type: http
+  port: 8989
+  scheme: http
+  auth: header
+  auth_header: X-MimoLive-Password-SHA256
+  timeout_ms: 5000
+  probe: { method: GET, path: /api/v1/documents }
+
+settings:
+  token: { type: string, secret: true, max_length: 64, pattern: "^([0-9A-Fa-f]{64})?$",
+    label: API key,
+    description: "The API key from mimoLive's Remote Controls preferences, the SHA-256 of the remote control password in hex; leave empty when no password is set." }
+
+ports:
+  - { port: 8989, protocol: http, role: control }
+  - { port: 8989, protocol: ws, role: push }
+
+models:
+  - id: mimolive
+    name: mimoLive 6 (HTTP API enabled)
+    supports: [list_documents, get_document, start_show, stop_show, toggle_show, set_program_volume,
+               start_output, stop_output, list_layers, get_layer, layer_live, layer_off, layer_toggle,
+               layer_next_variant, layer_previous_variant, layer_live_first_variant,
+               layer_live_last_variant, set_layer_volume, set_layer_name, set_layer_text,
+               set_layer_number, set_layer_flag, set_layer_inputs, trigger_layer_signal,
+               layer_media_control, add_layer, add_layer_at, delete_layer, list_variants, get_variant,
+               variant_live, variant_off, variant_toggle, set_variant_name, set_variant_text,
+               set_variant_inputs, trigger_variant_signal, list_sources, get_source, set_source_gain,
+               set_source_name, set_source_inputs, set_source_video_device, set_source_audio_device,
+               set_source_channel_map, source_media_control, trigger_source_signal, source_action,
+               add_source, delete_source, list_filters, set_filter_inputs, trigger_filter_signal,
+               list_output_destinations, get_output_destination, output_destination_live,
+               output_destination_off, set_output_destination_title,
+               set_output_destination_starts_with_show, set_output_destination_stops_with_show,
+               set_recording_location, set_recording_filename, set_streaming_target,
+               add_output_destination, delete_output_destination, list_layer_sets, recall_layer_set,
+               set_layer_set_name, set_layer_set_layers, add_layer_set, delete_layer_set,
+               get_datastore, put_datastore, delete_datastore, list_devices, get_device, list_accounts,
+               list_layer_types, list_source_types, list_output_destination_types, inject_comment,
+               zoom_join, zoom_join_with_passcode, zoom_leave, zoom_end, zoom_participants,
+               zoom_meeting_action, zoom_participant_action, zoom_assign_participant,
+               zoom_unassign_source, zoom_assign_active_speaker, zoom_assign_screen_share]
+    verification: none
+
+commands:
+  # ── Documents and the show ────────────────────────────────────────────────
+  list_documents:
+    summary: "The open documents with their live state (GET /documents)"
+    send: { method: GET, path: /api/v1/documents }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_document:
+    summary: "One document, with its layers, sources and output destinations sideloaded (GET /documents/(DocumentID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: GET, path: "/api/v1/documents/{document}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  start_show:
+    summary: "Start the show: the document goes live and triggers its start events, such as outputs set to start with the show (setLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: POST, path: "/api/v1/documents/{document}/setLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_show:
+    summary: "Stop the show, with the outputs set to stop with it (setOff)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: POST, path: "/api/v1/documents/{document}/setOff" }
+    expect: { status: 200 }
+    returns: ack
+
+  toggle_show:
+    summary: "Start the show if it is off, stop it if it is live (toggleLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: POST, path: "/api/v1/documents/{document}/toggleLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_program_volume:
+    summary: "Set the program output master volume (PUT /documents/(DocumentID), programOutputMasterVolume)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      volume: { type: float, min: 0.0, max: 1.0, required: true, label: Volume, description: "Program output master volume from 0.0 (silent) to 1.0 (full)." }
+    send: { method: PUT, path: "/api/v1/documents/{document}", body: "{\"programOutputMasterVolume\":{volume:.3f}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  start_output:
+    summary: "Start one of the document's built-in outputs (outputs/(OutputID)/setLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: enum, values: [record, stream, playout, fullscreen], required: true, label: Output, description: "The document's built-in output: record (file recording), stream, playout or fullscreen." }
+    send: { method: POST, path: "/api/v1/documents/{document}/outputs/{output}/setLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  stop_output:
+    summary: "Stop one of the document's built-in outputs (outputs/(OutputID)/setOff)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: enum, values: [record, stream, playout, fullscreen], required: true, label: Output, description: "The document's built-in output: record (file recording), stream, playout or fullscreen." }
+    send: { method: POST, path: "/api/v1/documents/{document}/outputs/{output}/setOff" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Layers ────────────────────────────────────────────────────────────────
+  list_layers:
+    summary: "The document's layers, top of the stack first (GET /documents/(DocumentID)/layers)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: GET, path: "/api/v1/documents/{document}/layers" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_layer:
+    summary: "One layer with its variants sideloaded (GET .../layers/(LayerID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: GET, path: "/api/v1/documents/{document}/layers/{layer}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  layer_live:
+    summary: "Switch a layer live with its last selected variant (setLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/setLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_off:
+    summary: "Switch a layer off, with its outgoing transition (setOff)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/setOff" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_toggle:
+    summary: "Toggle a layer between live and off (toggleLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/toggleLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_next_variant:
+    summary: "Select the next variant to go live next, without changing what is on air (cycleThroughVariants, mimoLive 5.6 and later)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/cycleThroughVariants" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_previous_variant:
+    summary: "Select the previous variant to go live next, without changing what is on air (cycleThroughVariantsBackwards)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/cycleThroughVariantsBackwards" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_live_first_variant:
+    summary: "Activate the layer's first variant and switch the layer live (setLiveFirstVariant)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/setLiveFirstVariant" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_live_last_variant:
+    summary: "Activate the layer's last variant and switch the layer live (setLiveLastVariant)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/setLiveLastVariant" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_volume:
+    summary: "Set a layer's volume (PUT .../layers/(LayerID), volume; mimoLive 5.6 and later)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      volume: { type: float, min: 0.0, max: 1.0, required: true, label: Volume, description: "Layer volume from 0.0 (silent) to 1.0 (full); ignored by a layer with no volume control." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}", body: "{\"volume\":{volume:.3f}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_name:
+    summary: "Rename a layer (PUT .../layers/(LayerID), name)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}", body: "{\"name\":{name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_text:
+    summary: "Set one text input of a layer's live, or else active, variant (PUT .../layers/(LayerID), input-values)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      input_key: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Input key", description: "The key of the input in the object's input-values, such as tvGroup_Content__Subtitle." }
+      text: { type: string, max_length: 4096, required: true, label: Text, description: "The text to put in the input." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}", body: "{\"input-values\":{{input_key:json}:{text:json}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_number:
+    summary: "Set one number input of a layer's live, or else active, variant (PUT .../layers/(LayerID), input-values)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      input_key: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Input key", description: "The key of the input in the object's input-values, such as tvGroup_Content__Subtitle." }
+      value: { type: float, required: true, label: Value, description: "The number to put in the input, within the input's own value-min and value-max." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}", body: "{\"input-values\":{{input_key:json}:{value:.4f}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_flag:
+    summary: "Set one on/off input of a layer's live, or else active, variant (PUT .../layers/(LayerID), input-values)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      input_key: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Input key", description: "The key of the input in the object's input-values, such as tvGroup_Content__Subtitle." }
+      value: { type: bool, required: true, label: Value, description: "On or off for the input." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}", body: "{\"input-values\":{{input_key:json}:{value}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_inputs:
+    summary: "Set several inputs of a layer's live, or else active, variant at once (PUT .../layers/(LayerID), input-values object)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      values: { type: json, required: true, label: "Input values", description: "A JSON object of input keys and their new values, as the object's input-values reports them; keys left out are unchanged." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}", body: "{\"input-values\":{values}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_layer_signal:
+    summary: "Trigger a signal input (a button) on the layer's live, or else active, variant (signals/(SignalID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      signal: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Signal ID", description: "The signal input's key, one of the input-values keys ending in _TypeSignal." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/signals/{signal}" }
+    expect: { status: 200 }
+    returns: ack
+
+  layer_media_control:
+    summary: "Send a media command to the media bound to one of a layer's inputs (inputs/(SourceInputKey)/mediacontrol/(Command))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      input_key: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Input key", description: "The key of the input in the object's input-values, such as tvGroup_Content__Subtitle." }
+      media_command: { type: enum, values: [play, pause, stop, reverse, rewind, fastforward, skiptostart, skiptoend, skipback, skipahead, record, shuffle, repeat], required: true, label: "Media command", description: "What to do to the media: play, pause, stop (back to the start), reverse, rewind, fastforward, skiptostart, skiptoend, skipback and skipahead (10 seconds), record, shuffle or repeat." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/inputs/{input_key}/mediacontrol/{media_command}" }
+    expect: { status: 200 }
+    returns: ack
+
+  add_layer:
+    summary: "Create a layer from a layer template, named, on top of the stack (POST /documents/(DocumentID)/layers)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer_type: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer type", description: "The layer template's identifier, such as com.boinx.mimoLive.layer.lowerthird; the layer type list gives every one." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers", body: "{\"layer-identifier\":{layer_type:json},\"name\":{name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 201 }
+    returns: ack
+
+  add_layer_at:
+    summary: "Create a layer from a layer template, named, at a position in the stack (POST /documents/(DocumentID)/layers)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer_type: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer type", description: "The layer template's identifier, such as com.boinx.mimoLive.layer.lowerthird; the layer type list gives every one." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+      index: { type: int, min: 0, max: 9999, required: true, label: "Stack position", description: "Position in the layer stack, 0 for the top, as the layers' index attribute counts." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers", body: "{\"layer-identifier\":{layer_type:json},\"index\":{index},\"name\":{name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 201 }
+    returns: ack
+
+  delete_layer:
+    summary: "Remove a layer from the document (DELETE .../layers/(LayerID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: DELETE, path: "/api/v1/documents/{document}/layers/{layer}" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Layer variants ────────────────────────────────────────────────────────
+  list_variants:
+    summary: "A layer's variants (GET .../layers/(LayerID)/variants)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+    send: { method: GET, path: "/api/v1/documents/{document}/layers/{layer}/variants" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_variant:
+    summary: "One layer variant (GET .../variants/(VariantID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+    send: { method: GET, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  variant_live:
+    summary: "Make a variant active and switch its layer live (variants/(VariantID)/setLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}/setLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  variant_off:
+    summary: "Deactivate a variant, which switches its layer off (variants/(VariantID)/setOff)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}/setOff" }
+    expect: { status: 200 }
+    returns: ack
+
+  variant_toggle:
+    summary: "Toggle a variant between live and off (variants/(VariantID)/toggleLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}/toggleLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_variant_name:
+    summary: "Rename a variant (PUT .../variants/(VariantID), name)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}", body: "{\"name\":{name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_variant_text:
+    summary: "Set one text input of a variant (PUT .../variants/(VariantID), input-values)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+      input_key: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Input key", description: "The key of the input in the object's input-values, such as tvGroup_Content__Subtitle." }
+      text: { type: string, max_length: 4096, required: true, label: Text, description: "The text to put in the input." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}", body: "{\"input-values\":{{input_key:json}:{text:json}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_variant_inputs:
+    summary: "Set several inputs of a variant at once (PUT .../variants/(VariantID), input-values object)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+      values: { type: json, required: true, label: "Input values", description: "A JSON object of input keys and their new values, as the object's input-values reports them; keys left out are unchanged." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}", body: "{\"input-values\":{values}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_variant_signal:
+    summary: "Trigger a signal input (a button) on a variant (variants/(VariantID)/signals/(SignalID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer ID", description: "The layer's ID (a UUID), from the layer list or its Copy API Endpoint menu." }
+      variant: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Variant ID", description: "The layer variant's ID (a UUID), from the layer's variant list." }
+      signal: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Signal ID", description: "The signal input's key, one of the input-values keys ending in _TypeSignal." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layers/{layer}/variants/{variant}/signals/{signal}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Sources and filters ───────────────────────────────────────────────────
+  list_sources:
+    summary: "The document's sources with their tally state (GET /documents/(DocumentID)/sources)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: GET, path: "/api/v1/documents/{document}/sources" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_source:
+    summary: "One source with its filters sideloaded (GET .../sources/(SourceID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+    send: { method: GET, path: "/api/v1/documents/{document}/sources/{source}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_source_gain:
+    summary: "Set a source's audio gain (PUT .../sources/(SourceID), gain; mimoLive 5.2 and later)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      gain: { type: float, min: 0.0, max: 2.0, required: true, label: Gain, description: "Audio gain from 0.0 (silent) through 1.0 (unchanged) to 2.0 (about double); ignored by a source with no audio." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"gain\":{gain:.3f}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_name:
+    summary: "Rename a source (PUT .../sources/(SourceID), name)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"name\":{name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_inputs:
+    summary: "Set inputs of a composition source (PUT .../sources/(SourceID), input-values object)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      values: { type: json, required: true, label: "Input values", description: "A JSON object of input keys and their new values, as the object's input-values reports them; keys left out are unchanged." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"input-values\":{values}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_video_device:
+    summary: "Choose a camera or device source's video device by its name, or none to detach it (PUT, video-device-name)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      device_name: { type: string, max_length: 256, required: true, label: "Device name", description: "The device's display name as the device list gives it, or none to detach the device." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"video-device-name\":{device_name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_audio_device:
+    summary: "Choose a camera or device source's audio device by its name, or none to detach it (PUT, audio-device-name)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      device_name: { type: string, max_length: 256, required: true, label: "Device name", description: "The device's display name as the device list gives it, or none to detach the device." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"audio-device-name\":{device_name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_channel_map:
+    summary: "Choose which device input channels feed a source's left and right channels (PUT, channel-map)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      left: { type: int, min: 0, max: 1023, required: true, label: "Left channel", description: "Zero-based device input channel for the left channel (2 is the third)." }
+      right: { type: int, min: 0, max: 1023, required: true, label: "Right channel", description: "Zero-based device input channel for the right channel." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"channel-map\":[{left},{right}]}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  source_media_control:
+    summary: "Send a media command to a media-capable source such as a media file or playlist (sources/(SourceID)/mediacontrol/(Command))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      media_command: { type: enum, values: [play, pause, stop, reverse, rewind, fastforward, skiptostart, skiptoend, skipback, skipahead, record, shuffle, repeat], required: true, label: "Media command", description: "What to do to the media: play, pause, stop (back to the start), reverse, rewind, fastforward, skiptostart, skiptoend, skipback and skipahead (10 seconds), record, shuffle or repeat." }
+    send: { method: POST, path: "/api/v1/documents/{document}/sources/{source}/mediacontrol/{media_command}" }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_source_signal:
+    summary: "Trigger a signal input on a composition source (sources/(SourceID)/signals/(SignalID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      signal: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Signal ID", description: "The signal input's key, one of the input-values keys ending in _TypeSignal." }
+    send: { method: POST, path: "/api/v1/documents/{document}/sources/{source}/signals/{signal}" }
+    expect: { status: 200 }
+    returns: ack
+
+  source_action:
+    summary: "Run a named action of a source, one of its available-actions such as reconnect or openwebbrowser (sources/(SourceID)/actions/(ActionName), mimoLive 6.18 and later)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      action: { type: string, max_length: 64, pattern: "^[A-Za-z0-9_-]+$", required: true, label: Action, description: "The action's name, from the source's available-actions attribute." }
+    send: { method: GET, path: "/api/v1/documents/{document}/sources/{source}/actions/{action}" }
+    expect: { status: 200 }
+    returns: ack
+
+  add_source:
+    summary: "Create a named source of a source type (POST /documents/(DocumentID)/sources)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source_type: { type: string, max_length: 256, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source type", description: "The source type's identifier, such as com.boinx.mimoLive.sources.deviceVideoSource; the source type list gives every one." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: POST, path: "/api/v1/documents/{document}/sources", body: "{\"source-type\":{source_type:json},\"name\":{name:json}}", content_type: application/vnd.api+json }
+    expect: { status: 201 }
+    returns: ack
+
+  delete_source:
+    summary: "Remove a source from the document (DELETE .../sources/(SourceID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+    send: { method: DELETE, path: "/api/v1/documents/{document}/sources/{source}" }
+    expect: { status: 204 }
+    returns: ack
+
+  list_filters:
+    summary: "A source's filters (GET .../sources/(SourceID)/filters)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+    send: { method: GET, path: "/api/v1/documents/{document}/sources/{source}/filters" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_filter_inputs:
+    summary: "Set inputs of a filter (PUT .../filters/(FilterID), input-values object)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      filter: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Filter ID", description: "The filter's ID, from the source's filter list." }
+      values: { type: json, required: true, label: "Input values", description: "A JSON object of input keys and their new values, as the object's input-values reports them; keys left out are unchanged." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/sources/{source}/filters/{filter}", body: "{\"input-values\":{values}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  trigger_filter_signal:
+    summary: "Trigger a signal input on a filter (filters/(FilterID)/signals/(SignalID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      filter: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Filter ID", description: "The filter's ID, from the source's filter list." }
+      signal: { type: string, max_length: 256, pattern: "^[A-Za-z0-9_]+$", required: true, label: "Signal ID", description: "The signal input's key, one of the input-values keys ending in _TypeSignal." }
+    send: { method: POST, path: "/api/v1/documents/{document}/sources/{source}/filters/{filter}/signals/{signal}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Output destinations ───────────────────────────────────────────────────
+  list_output_destinations:
+    summary: "The document's output destinations (recording, streaming, NDI and others) with their live state"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: GET, path: "/api/v1/documents/{document}/output-destinations" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_output_destination:
+    summary: "One output destination (GET .../output-destinations/(OutputDestinationID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+    send: { method: GET, path: "/api/v1/documents/{document}/output-destinations/{output}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  output_destination_live:
+    summary: "Start an output destination: start recording, streaming or playout (setLive)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+    send: { method: POST, path: "/api/v1/documents/{document}/output-destinations/{output}/setLive" }
+    expect: { status: 200 }
+    returns: ack
+
+  output_destination_off:
+    summary: "Stop an output destination: stop recording, streaming or playout (setOff)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+    send: { method: POST, path: "/api/v1/documents/{document}/output-destinations/{output}/setOff" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_destination_title:
+    summary: "Rename an output destination (PATCH, title)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+      title: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/output-destinations/{output}", body: "{\"data\":{\"type\":\"output-destinations\",\"id\":{output:json},\"attributes\":{\"title\":{title:json}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_destination_starts_with_show:
+    summary: "Whether an output destination starts when the show starts (PATCH, starts-with-show)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+      enabled: { type: bool, required: true, label: "With the show", description: "On ties the output destination to the show; off leaves it to be started and stopped on its own." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/output-destinations/{output}", body: "{\"data\":{\"type\":\"output-destinations\",\"id\":{output:json},\"attributes\":{\"starts-with-show\":{enabled}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_output_destination_stops_with_show:
+    summary: "Whether an output destination stops when the show stops (PATCH, stops-with-show)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+      enabled: { type: bool, required: true, label: "With the show", description: "On ties the output destination to the show; off leaves it to be started and stopped on its own." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/output-destinations/{output}", body: "{\"data\":{\"type\":\"output-destinations\",\"id\":{output:json},\"attributes\":{\"stops-with-show\":{enabled}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_recording_location:
+    summary: "Set a file recording's folder (PATCH, settings.location)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+      location: { type: string, max_length: 1024, required: true, label: Folder, description: "Folder on the mimoLive computer the recording goes to, such as ~/Movies." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/output-destinations/{output}", body: "{\"data\":{\"type\":\"output-destinations\",\"id\":{output:json},\"attributes\":{\"settings\":{\"location\":{location:json}}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_recording_filename:
+    summary: "Set a file recording's file name pattern (PATCH, settings.filename)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+      filename: { type: string, max_length: 512, required: true, label: "File name", description: "File name, with placeholders such as %show, %year, %month, %day, %hour, %minute, %second and %extension." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/output-destinations/{output}", body: "{\"data\":{\"type\":\"output-destinations\",\"id\":{output:json},\"attributes\":{\"settings\":{\"filename\":{filename:json}}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_streaming_target:
+    summary: "Set a live streaming destination's RTMP URL and stream key (PATCH, settings.rtmpurl and streamingkey; mimoLive 5.5 and later)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+      rtmp_url: { type: string, max_length: 1024, pattern: "^rtmps?://", required: true, label: "RTMP URL", description: "The streaming server's RTMP or RTMPS URL." }
+      stream_key: { type: string, max_length: 512, required: true, label: "Stream key", description: "The stream key the streaming service gave." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/output-destinations/{output}", body: "{\"data\":{\"type\":\"output-destinations\",\"id\":{output:json},\"attributes\":{\"settings\":{\"rtmpurl\":{rtmp_url:json},\"streamingkey\":{stream_key:json}}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  add_output_destination:
+    summary: "Create an output destination of a type, unconfigured (POST /documents/(DocumentID)/output-destinations)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output_type: { type: enum, required: true, label: "Output destination type", values: [com.boinx.mimoLive.outputDestination.liveStreaming, com.boinx.mimoLive.outputDestination.fileRecording, com.boinx.mimoLive.outputDestination.blackmagicDesign, com.boinx.mimoLive.outputDestination.ndi, com.boinx.mimoLive.outputDestination.fullscreen, com.boinx.mimoLive.outputDestination.virtualCamera, com.boinx.mimoLive.outputDestination.mimoCall, com.boinx.mimoLive.outputDestination.audioMonitor, com.boinx.mimoLive.outputDestination.imageSequence, com.boinx.mimoLive.outputDestination.fileUploader], description: "The kind of output destination: live streaming, file recording, Blackmagic playout, NDI, fullscreen, virtual camera, mimoCall, audio monitor, image writer or file uploader." }
+    send: { method: POST, path: "/api/v1/documents/{document}/output-destinations", body: "{\"output-destination-type\":{output_type:json}}", content_type: application/vnd.api+json }
+    expect: { status: 201 }
+    returns: ack
+
+  delete_output_destination:
+    summary: "Remove an output destination (DELETE .../output-destinations/(OutputDestinationID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      output: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Output destination ID", description: "The output destination's ID (a UUID), from the output destination list." }
+    send: { method: DELETE, path: "/api/v1/documents/{document}/output-destinations/{output}" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Layer sets ────────────────────────────────────────────────────────────
+  list_layer_sets:
+    summary: "The document's layer sets and which one matches the layer stack (GET /documents/(DocumentID)/layer-sets)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+    send: { method: GET, path: "/api/v1/documents/{document}/layer-sets" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  recall_layer_set:
+    summary: "Recall a layer set: every layer in it goes to the live state the set records (recall)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer_set: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer set ID", description: "The layer set's ID (a UUID), from the layer set list." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layer-sets/{layer_set}/recall" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_set_name:
+    summary: "Rename a layer set (PATCH, name)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer_set: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer set ID", description: "The layer set's ID (a UUID), from the layer set list." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/layer-sets/{layer_set}", body: "{\"data\":{\"attributes\":{\"name\":{name:json}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_layer_set_layers:
+    summary: "Replace a layer set's layer actions (PATCH, layers: an array of {layer-id, action live|off|force-off, variant})"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer_set: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer set ID", description: "The layer set's ID (a UUID), from the layer set list." }
+      layers: { type: json, required: true, label: "Layer actions", description: "JSON array of {\"layer-id\", \"action\", \"variant\"} entries, action live, off or force-off, variant edit-variant or a variant ID, replacing the set's list." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/layer-sets/{layer_set}", body: "{\"data\":{\"attributes\":{\"layers\":{layers}}}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  add_layer_set:
+    summary: "Create an empty named layer set (POST /documents/(DocumentID)/layer-sets)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The new name, as mimoLive shows it." }
+    send: { method: POST, path: "/api/v1/documents/{document}/layer-sets", body: "{\"data\":{\"attributes\":{\"name\":{name:json}}}}", content_type: application/vnd.api+json }
+    expect: { status: 201 }
+    returns: ack
+
+  delete_layer_set:
+    summary: "Remove a layer set (DELETE .../layer-sets/(LayerSetID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      layer_set: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Layer set ID", description: "The layer set's ID (a UUID), from the layer set list." }
+    send: { method: DELETE, path: "/api/v1/documents/{document}/layer-sets/{layer_set}" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Data stores ───────────────────────────────────────────────────────────
+  get_datastore:
+    summary: "Read a data store kept in the document (GET .../datastores/(StoreID), mimoLive 6.8 and later)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      store: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Store ID", description: "A name of your choosing for the data store; mimoLive cannot list them." }
+    send: { method: GET, path: "/api/v1/documents/{document}/datastores/{store}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  put_datastore:
+    summary: "Create or replace a data store with a JSON value (PUT .../datastores/(StoreID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      store: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Store ID", description: "A name of your choosing for the data store; mimoLive cannot list them." }
+      data: { type: json, required: true, label: Data, description: "The JSON value to keep in the store, returned exactly as given." }
+    send: { method: PUT, path: "/api/v1/documents/{document}/datastores/{store}", body: "{data}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_datastore:
+    summary: "Delete a data store (DELETE .../datastores/(StoreID))"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      store: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Store ID", description: "A name of your choosing for the data store; mimoLive cannot list them." }
+    send: { method: DELETE, path: "/api/v1/documents/{document}/datastores/{store}" }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Devices, accounts, types and comments ─────────────────────────────────
+  list_devices:
+    summary: "The video and audio devices on the mimoLive computer, with their connection and tally state (GET /devices)"
+    send: { method: GET, path: /api/v1/devices }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_device:
+    summary: "One device, with an audio device's input channel names (GET /devices/(DeviceID))"
+    params:
+      device: { type: string, max_length: 256, required: true, label: "Device ID", description: "The video or audio device's ID, from the device list." }
+    send: { method: GET, path: "/api/v1/devices/{device}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_accounts:
+    summary: "The web service accounts logged in to mimoLive (GET /accounts, mimoLive 6.19 and later)"
+    send: { method: GET, path: /api/v1/accounts }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_layer_types:
+    summary: "Every layer type, whose ids add_layer takes (GET /layertypes)"
+    send: { method: GET, path: /api/v1/layertypes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_source_types:
+    summary: "Every source type, whose ids add_source takes (GET /sourcetypes)"
+    send: { method: GET, path: /api/v1/sourcetypes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_output_destination_types:
+    summary: "Every output destination type (GET /outputdestinationtypes)"
+    send: { method: GET, path: /api/v1/outputdestinationtypes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  inject_comment:
+    summary: "Add a comment to mimoLive's live comments, as if it came from a social platform (comments/new)"
+    params:
+      username: { type: string, max_length: 256, required: true, label: Author, description: "The name shown as the comment's author." }
+      comment: { type: string, max_length: 4096, required: true, label: Comment, description: "The comment text." }
+      platform: { type: enum, values: [facebook, twitter, youtube, twitch], required: true, label: Platform, description: "The service whose icon the comment carries." }
+    send: { method: POST, path: /api/v1/comments/new, query: {"username": "{username}", "comment": "{comment}", "platform": "{platform}"} }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Zoom ──────────────────────────────────────────────────────────────────
+  zoom_join:
+    summary: "Join a Zoom meeting with a logged-in Zoom account (zoom/join)"
+    params:
+      meeting: { type: string, max_length: 64, pattern: "^[A-Za-z0-9-]+$", required: true, label: "Meeting ID", description: "The Zoom meeting number, or Demo-Meeting-ID for mimoLive's demo meeting." }
+      account: { type: string, max_length: 256, required: true, label: "Zoom account", description: "The name of a Zoom account logged in to mimoLive, as the account list gives it." }
+    send: { method: GET, path: /api/v1/zoom/join, query: {"meetingid": "{meeting}", "zoomaccountname": "{account}"} }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  zoom_join_with_passcode:
+    summary: "Join a Zoom meeting with a passcode and display name, sending the program out as video (zoom/join)"
+    params:
+      meeting: { type: string, max_length: 64, pattern: "^[A-Za-z0-9-]+$", required: true, label: "Meeting ID", description: "The Zoom meeting number, or Demo-Meeting-ID for mimoLive's demo meeting." }
+      account: { type: string, max_length: 256, required: true, label: "Zoom account", description: "The name of a Zoom account logged in to mimoLive, as the account list gives it." }
+      passcode: { type: string, max_length: 64, required: true, label: Passcode, description: "The meeting's passcode." }
+      display_name: { type: string, max_length: 128, required: true, label: "Display name", description: "The name mimoLive appears under in the meeting." }
+    send: { method: GET, path: /api/v1/zoom/join, query: {"meetingid": "{meeting}", "zoomaccountname": "{account}", "passcode": "{passcode}", "displayname": "{display_name}", "virtualcamera": "true"} }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  zoom_leave:
+    summary: "Leave the Zoom meeting (zoom/leave)"
+    send: { method: GET, path: /api/v1/zoom/leave }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_end:
+    summary: "End the Zoom meeting for everyone, as its host (zoom/end)"
+    send: { method: GET, path: /api/v1/zoom/end }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_participants:
+    summary: "The meeting's participants with their video, audio, talking and hand state (zoom/participants)"
+    send: { method: GET, path: /api/v1/zoom/participants }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  zoom_meeting_action:
+    summary: "Run a meeting-wide Zoom action; most need mimoLive to be host or co-host (zoom/meetingaction)"
+    params:
+      action: { type: enum, values: [requestRecordingPermission, enableUnmuteBySelf, disableUnmuteBySelf, muteAll, unmuteAll, lockMeeting, unlockMeeting, lowerAllHands, shareFitWindowMode, pauseShare, resumeShare, joinVoip, leaveVoip, allowParticipantsToChat, disallowParticipantsToChat, allowParticipantsToShare, disallowParticipantsToShare, allowParticipantsToStartVideo, disallowParticipantsToStartVideo, allowParticipantsToShareWhiteBoard, disallowParticipantsToShareWhiteBoard, enableAutoAllowLocalRecordingRequest, disableAutoAllowLocalRecordingRequest, allowParticipantsToRename, disallowParticipantsToRename, showParticipantProfilePictures, hideParticipantProfilePictures], required: true, label: Action, description: "The meeting action, such as muteAll, lockMeeting or lowerAllHands." }
+    send: { method: GET, path: /api/v1/zoom/meetingaction, query: {"command": "{action}"} }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_participant_action:
+    summary: "Mute or unmute one participant's audio or video (zoom/meetingaction with userid)"
+    params:
+      action: { type: enum, values: [muteVideo, unmuteVideo, muteAudio, unmuteAudio], required: true, label: Action, description: "muteVideo, unmuteVideo, muteAudio or unmuteAudio." }
+      user: { type: int, min: 0, max: 4294967295, required: true, label: "Participant ID", description: "The participant's numeric user ID, from the participant list." }
+    send: { method: GET, path: /api/v1/zoom/meetingaction, query: {"command": "{action}", "userid": "{user}"} }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_assign_participant:
+    summary: "Show one Zoom participant in a Zoom participant source (PATCH, zoom-userid)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+      user: { type: int, min: 0, max: 4294967295, required: true, label: "Participant ID", description: "The participant's numeric user ID, from the participant list." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"zoom-userid\":{user}}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_unassign_source:
+    summary: "Show nothing in a Zoom participant source (PATCH, zoom-userselectiontype 0)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"zoom-userselectiontype\":0}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_assign_active_speaker:
+    summary: "Show the active speaker in a Zoom participant source (PATCH, zoom-userselectiontype 2)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"zoom-userselectiontype\":2}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+  zoom_assign_screen_share:
+    summary: "Show the screen share in a Zoom participant source (PATCH, zoom-userselectiontype 6)"
+    params:
+      document: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Document ID", description: "The document's ID, from the document list or the document's Copy API Endpoint menu in mimoLive." }
+      source: { type: string, max_length: 128, pattern: "^[A-Za-z0-9._-]+$", required: true, label: "Source ID", description: "The source's ID, which mimoLive writes as the document ID, a dash and a UUID." }
+    send: { method: PATCH, path: "/api/v1/documents/{document}/sources/{source}", body: "{\"zoom-userselectiontype\":6}", content_type: application/vnd.api+json }
+    expect: { status: 200 }
+    returns: ack
+
+# State is keyed by mimoLive's own JSON:API type names and IDs, so every
+# reply and every websocket event updates it the same way whatever endpoint it
+# came from: documents.<id>, layers.<id>, variants.<id>, sources.<id>,
+# output-destinations.<id> and layer-sets.<id>.
+state:
+  documents.*.name: { type: string, description: "Document name, the .tvshow file's name" }
+  documents.*.live_state: { type: string, description: "Show state: off (not running) or live (running)" }
+  documents.*.duration: { type: int, unit: s, description: "While the show is live, how long it has been running" }
+  documents.*.show_start: { type: int, description: "While the show is live, the timestamp at which it went live" }
+  documents.*.program_volume: { type: float, description: "Program output master volume, 0.0 to 1.0" }
+  documents.*.show_title: { type: string, description: "Show title from the show metadata" }
+  documents.*.width: { type: int, unit: px, description: "Document video width" }
+  documents.*.height: { type: int, unit: px, description: "Document video height" }
+  documents.*.framerate: { type: float, unit: fps, description: "Document frame rate" }
+  documents.*.removed: { type: bool, description: "True once mimoLive reports the document closed" }
+  documents.*.outputs.*.live_state: { type: string, description: "A built-in output's state (record, stream, playout, fullscreen): off or live" }
+  layers.*.name: { type: string, description: "Layer name as shown in the layer stack" }
+  layers.*.live_state: { type: string, description: "off, live, preview, or shutdown while an outgoing transition runs" }
+  layers.*.index: { type: int, description: "Position in the layer stack, 0 at the top" }
+  layers.*.volume: { type: float, description: "Layer volume, 0.0 to 1.0, for a layer with a volume control" }
+  layers.*.composition_id: { type: string, description: "The layer type's composition identifier" }
+  layers.*.document: { type: string, description: "ID of the document the layer is in" }
+  layers.*.active_variant: { type: string, description: "ID of the variant selected to go live" }
+  layers.*.live_variant: { type: string, description: "ID of the variant on air, while the layer is live; not cleared when it goes off" }
+  layers.*.removed: { type: bool, description: "True once mimoLive reports the layer removed" }
+  variants.*.name: { type: string, description: "Variant name" }
+  variants.*.live_state: { type: string, description: "live when its layer is live with this variant, otherwise off" }
+  variants.*.layer: { type: string, description: "ID of the layer the variant belongs to" }
+  variants.*.removed: { type: bool, description: "True once mimoLive reports the variant removed" }
+  sources.*.name: { type: string, description: "Source name" }
+  sources.*.tally_state: { type: string, description: "Highest use of the source: off, in-use, effect, preview or program" }
+  sources.*.gain: { type: float, description: "Audio gain, 0.0 (silent), 1.0 (unchanged) to 2.0, for a source with audio" }
+  sources.*.video: { type: bool, description: "Whether the source supplies video" }
+  sources.*.audio: { type: bool, description: "Whether the source supplies audio" }
+  sources.*.video_connected: { type: bool, description: "Whether the source's video hardware is connected (mimoLive 5.5 and later)" }
+  sources.*.audio_connected: { type: bool, description: "Whether the source's audio hardware is connected (mimoLive 5.5 and later)" }
+  sources.*.summary: { type: string, description: "Summary text as mimoLive shows it" }
+  sources.*.source_type: { type: string, description: "Source type identifier" }
+  sources.*.document: { type: string, description: "ID of the document the source is in" }
+  sources.*.removed: { type: bool, description: "True once mimoLive reports the source removed" }
+  output-destinations.*.title: { type: string, description: "Output destination name" }
+  output-destinations.*.kind: { type: string, description: "Kind, as mimoLive names it: File Recording, Live Streaming, NDI®, Fullscreen and others" }
+  output-destinations.*.live_state: { type: string, description: "off (not configured), preview (ready), startup, live (recording or streaming) or shutdown" }
+  output-destinations.*.ready: { type: bool, description: "Whether it is configured well enough to go live" }
+  output-destinations.*.starts_with_show: { type: bool, description: "Whether it starts when the show starts" }
+  output-destinations.*.stops_with_show: { type: bool, description: "Whether it stops when the show stops" }
+  output-destinations.*.summary: { type: string, description: "Summary of its most important settings" }
+  output-destinations.*.document: { type: string, description: "ID of the document it belongs to" }
+  output-destinations.*.removed: { type: bool, description: "True once mimoLive reports it removed" }
+  layer-sets.*.name: { type: string, description: "Layer set name" }
+  layer-sets.*.active: { type: bool, description: "Whether the layer stack matches the layer set" }
+  layer-sets.*.document: { type: string, description: "ID of the document it belongs to" }
+  layer-sets.*.removed: { type: bool, description: "True once mimoLive reports it removed" }
+
+telemetry:
+  # mimoLive pushes each change on its websocket; it closes a client that
+  # sends nothing for 15 seconds, so the ping goes every 5.
+  websocket:
+    path: /api/v1/socket
+    send: '{"event":"ping"}'
+    every_ms: 5000
+  # Everything, once on connecting and then every minute as a safety net:
+  # the document list with each kind of object sideloaded, one kind per
+  # request so a version that refuses one include still answers the others.
+  poll:
+    send:
+      - { method: GET, path: /api/v1/documents, query: { include: layers } }
+      - { method: GET, path: /api/v1/documents, query: { include: sources } }
+      - { method: GET, path: /api/v1/documents, query: { include: output-destinations } }
+      - { method: GET, path: /api/v1/documents, query: { include: layer-sets } }
+    every_ms: 60000
+  updates:
+    # A list reply: each object in data.
+    - path: "^/api/v1/"
+      json_each: "$.data"
+      json: &object
+        type: "$.type"
+        id: "$.id"
+        name: "$.attributes.name"
+        live: "$.attributes.live-state"
+        duration: "$.attributes.duration"
+        show_start: "$.attributes.show-start"
+        program_volume: "$.attributes.programOutputMasterVolume"
+        title: "$.attributes.metadata.title"
+        width: "$.attributes.metadata.width"
+        height: "$.attributes.metadata.height"
+        framerate: "$.attributes.metadata.framerate"
+        index: "$.attributes.index"
+        volume: "$.attributes.volume"
+        composition: "$.attributes.composition-id"
+        tally: "$.attributes.tally-state"
+        gain: "$.attributes.gain"
+        video: "$.attributes.video"
+        audio: "$.attributes.audio"
+        video_connected: "$.attributes.video-device-connected"
+        audio_connected: "$.attributes.audio-device-connected"
+        summary: "$.attributes.summary"
+        source_type: "$.attributes.source-type"
+        output_title: "$.attributes.title"
+        kind: "$.attributes.type"
+        ready: "$.attributes.ready-to-go-live"
+        starts: "$.attributes.starts-with-show"
+        stops: "$.attributes.stops-with-show"
+        active: "$.attributes.active"
+        document: "$.relationships.document.data.id"
+        active_variant: "$.relationships.active-variant.data.id"
+        live_variant: "$.relationships.live-variant.data.id"
+        layer: "$.relationships.layer.data.id"
+      state: &assign
+        "{type}.{id}.name": "{name}"
+        "{type}.{id}.live_state": "{live}"
+        "{type}.{id}.duration": "{duration}"
+        "{type}.{id}.show_start": "{show_start}"
+        "{type}.{id}.program_volume": "{program_volume}"
+        "{type}.{id}.show_title": "{title}"
+        "{type}.{id}.width": "{width}"
+        "{type}.{id}.height": "{height}"
+        "{type}.{id}.framerate": "{framerate}"
+        "{type}.{id}.index": "{index}"
+        "{type}.{id}.volume": "{volume}"
+        "{type}.{id}.composition_id": "{composition}"
+        "{type}.{id}.tally_state": "{tally}"
+        "{type}.{id}.gain": "{gain}"
+        "{type}.{id}.video": "{video}"
+        "{type}.{id}.audio": "{audio}"
+        "{type}.{id}.video_connected": "{video_connected}"
+        "{type}.{id}.audio_connected": "{audio_connected}"
+        "{type}.{id}.summary": "{summary}"
+        "{type}.{id}.source_type": "{source_type}"
+        "{type}.{id}.title": "{output_title}"
+        "{type}.{id}.kind": "{kind}"
+        "{type}.{id}.ready": "{ready}"
+        "{type}.{id}.starts_with_show": "{starts}"
+        "{type}.{id}.stops_with_show": "{stops}"
+        "{type}.{id}.active": "{active}"
+        "{type}.{id}.document": "{document}"
+        "{type}.{id}.active_variant": "{active_variant}"
+        "{type}.{id}.live_variant": "{live_variant}"
+        "{type}.{id}.layer": "{layer}"
+        "{type}.{id}.removed": "false"
+
+    # The objects sideloaded in included (the poll's layers, sources, output
+    # destinations and layer sets).
+    - path: "^/api/v1/"
+      json_each: "$.included"
+      json: *object
+      state: *assign
+
+    # A reply with one object in data: a GET of one object, and the updated
+    # object setLive, setOff, PUT and PATCH answer with.
+    - path: "^/api/v1/"
+      json: &single
+        type: "$.data.type"
+        id: "$.data.id"
+        name: "$.data.attributes.name"
+        live: "$.data.attributes.live-state"
+        duration: "$.data.attributes.duration"
+        show_start: "$.data.attributes.show-start"
+        program_volume: "$.data.attributes.programOutputMasterVolume"
+        title: "$.data.attributes.metadata.title"
+        width: "$.data.attributes.metadata.width"
+        height: "$.data.attributes.metadata.height"
+        framerate: "$.data.attributes.metadata.framerate"
+        index: "$.data.attributes.index"
+        volume: "$.data.attributes.volume"
+        composition: "$.data.attributes.composition-id"
+        tally: "$.data.attributes.tally-state"
+        gain: "$.data.attributes.gain"
+        video: "$.data.attributes.video"
+        audio: "$.data.attributes.audio"
+        video_connected: "$.data.attributes.video-device-connected"
+        audio_connected: "$.data.attributes.audio-device-connected"
+        summary: "$.data.attributes.summary"
+        source_type: "$.data.attributes.source-type"
+        output_title: "$.data.attributes.title"
+        kind: "$.data.attributes.type"
+        ready: "$.data.attributes.ready-to-go-live"
+        starts: "$.data.attributes.starts-with-show"
+        stops: "$.data.attributes.stops-with-show"
+        active: "$.data.attributes.active"
+        document: "$.data.relationships.document.data.id"
+        active_variant: "$.data.relationships.active-variant.data.id"
+        live_variant: "$.data.relationships.live-variant.data.id"
+        layer: "$.data.relationships.layer.data.id"
+      state: *assign
+
+    # A document's built-in outputs, in the document object.
+    - path: "^/api/v1/documents/([^/?]+)"
+      json_each: "$.data.attributes.outputs"
+      json: { output: "$.id", live: "$.live-state" }
+      state: { "documents.{1}.outputs.{output}.live_state": "{live}" }
+
+    # Pushed: an object added or changed, the whole object in data.
+    - json_match: { "$.event": "^(added|changed)$" }
+      json: *single
+      state: *assign
+    - json_match: { "$.event": "^(added|changed)$", "$.type": "^documents$", "$.id": "^(.+)$" }
+      json_each: "$.data.attributes.outputs"
+      json: { output: "$.id", live: "$.live-state" }
+      state: { "documents.{2}.outputs.{output}.live_state": "{live}" }
+    # Pushed: an object removed. Its last state stays, marked removed.
+    - json_match: { "$.event": "^removed$", "$.type": "^(documents|layers|variants|sources|output-destinations|layer-sets)$", "$.id": "^(.+)$" }
+      json: {}
+      state: { "{1}.{2}.removed": "true" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      The HTTP API is off until "Allow Remote Control Access" is turned on in mimoLive's Remote
+      Control preferences, and it serves the local network. Without a remote control password
+      anyone who can reach port 8989 controls the show. With one, the token setting holds the API
+      key the preference pane shows (the password's SHA-256 in hex), sent in the
+      X-MimoLive-Password-SHA256 header; a wrong key answers 401, which stops the device until it
+      is opened again with the right key. The older X-MimoLive-Password header, which sends the
+      password itself, is not used.
+
+  - models: [all]
+    severity: critical
+    text: >
+      start_show, stop_show and toggle_show start or stop the show, and with it every output
+      destination set to start or stop with the show: a recording or a live stream starts or ends,
+      which cannot be undone on air. stop_show can leave the document in shutdown while it runs
+      its end-of-show events.
+
+  - models: [all]
+    severity: critical
+    text: >
+      output_destination_live and start_output start recording, streaming or playout, and
+      output_destination_off and stop_output stop it; a stopped recording or stream cannot be
+      resumed into the same file or broadcast. setLive answers 409 when the destination is not
+      configured or the licence does not allow it to go live, and setOff 409 when it may not stop.
+      start_output and stop_output send only setLive and setOff, because the built-in output
+      endpoint toggles on any other verb, so a mistyped verb could start a recording.
+
+  - models: [all]
+    severity: critical
+    text: >
+      recall_layer_set switches every layer in the set to the state the set records at once, on
+      air. layer_live, layer_off, layer_toggle, variant_live, variant_off, variant_toggle,
+      layer_live_first_variant and layer_live_last_variant change the program output immediately;
+      layer_next_variant and layer_previous_variant only choose what goes live next.
+
+  - models: [all]
+    severity: critical
+    text: >
+      delete_layer, delete_source, delete_output_destination, delete_layer_set and
+      delete_datastore remove the object from the document with no undo through the API; a layer
+      or source in use on air disappears from the output. mimoLive refuses to delete a required
+      demo layer. zoom_end ends the Zoom meeting for every participant when mimoLive is host.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Writes are sent with Content-Type application/vnd.api+json, as Boinx's API reference says
+      they need; the user manual's curl examples send application/json. Layer, variant, source and
+      document changes are sent as plain JSON objects holding only the changed fields, as the
+      manual shows for layers, variants and sources; output destination and layer set changes in
+      the JSON:API form {"data": {"attributes": {...}}}, as the manual shows for them. The shape
+      for the document's programOutputMasterVolume is not shown in either document and follows
+      the layer form.
+
+  - models: [all]
+    severity: warning
+    text: >
+      add_layer and add_layer_at send the layer template as layer-identifier with name and index,
+      as the user manual's example does. Boinx's API reference instead shows {"data":
+      {"attributes": {"composition-id": ...}}}; the two documents disagree.
+
+  - models: [all]
+    severity: info
+    text: >
+      Input values written to a layer (set_layer_text, set_layer_number, set_layer_flag,
+      set_layer_inputs) go to its live variant, or to its active variant while the layer is off,
+      and some take effect only after another render cycle. Input keys are the layer's own
+      (tvGroup_Content__Subtitle and the like), listed with their types and ranges in the layer's
+      input-descriptions; signal IDs are the input-values keys ending in _TypeSignal.
+
+  - models: [all]
+    severity: info
+    text: >
+      State is kept current by the websocket mimoLive pushes added, changed and removed objects
+      on, each carrying the whole object; the core sends {"event":"ping"} every 5 seconds, since
+      mimoLive closes a quiet client after 15. The document list with each kind of object
+      sideloaded is read on connecting and every minute. State is keyed by mimoLive's own type
+      names and IDs (layers.<id>.live_state, output-destinations.<id>.live_state); a removed
+      object keeps its last state with removed true. A layer's live_variant is not cleared when
+      the layer goes off, so its live_state is the one to read. Layer variants enter the state
+      from websocket events and get_layer replies, not from the poll, which cannot sideload them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Each document has two kinds of output: the four built-in outputs (record, stream, playout,
+      fullscreen) in the document object, started with start_output, and the output destinations
+      (output_destination_live), which carry the recording and streaming settings. The RTMP URL and
+      stream key read back obfuscated; set_streaming_target writes them in full.
+
+  - models: [all]
+    severity: info
+    text: >
+      Zoom commands need mimoLive's Zoom integration: from mimoLive 6.19 zoom_join needs the name
+      of a Zoom account logged in to mimoLive (list_accounts gives them) and answers 400 without
+      one; every meeting action answers 409 when no meeting is joined, and meeting-wide actions
+      need mimoLive to be host or co-host. There is no way to read the meeting-wide settings back.

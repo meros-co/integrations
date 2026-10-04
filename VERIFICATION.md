@@ -322,6 +322,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## boinx-mimolive — Boinx mimoLive
+
+- [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:1240](specs/boinx-mimolive.yaml#L1240))
+- [ ] Check the body shape PUT /documents/(DocumentID) takes for programOutputMasterVolume (a plain object assumed, as for layers). ([specs/boinx-mimolive.yaml:168](specs/boinx-mimolive.yaml#L168))
+- [ ] Check which body POST /documents/(DocumentID)/layers takes: the manual's layer-identifier, name and index, or the reference's data.attributes.composition-id. ([specs/boinx-mimolive.yaml:1251](specs/boinx-mimolive.yaml#L1251))
+- [ ] Confirm that GET /documents?include=layers (and sources, output-destinations, layer-sets) sideloads every document's objects in included, as the poll reads them. ([specs/boinx-mimolive.yaml:1052](specs/boinx-mimolive.yaml#L1052))
+- [ ] Record the websocket's added, changed and removed messages: that data is the whole object as the HTTP API returns it, and that a removed message carries type and id at the top level. ([specs/boinx-mimolive.yaml:1187](specs/boinx-mimolive.yaml#L1187))
+- [ ] Confirm that the websocket closes a client that sends nothing for 15 seconds and that {"event":"ping"} every 5 seconds keeps it open. ([specs/boinx-mimolive.yaml:1044](specs/boinx-mimolive.yaml#L1044))
+- [ ] With a remote control password set, confirm that the X-MimoLive-Password-SHA256 header is accepted on the websocket's opening request, and that a wrong key answers 401 on HTTP. ([specs/boinx-mimolive.yaml:88](specs/boinx-mimolive.yaml#L88))
+- [ ] Check that output destination PATCH bodies are accepted with type and id, and layer set PATCH bodies without them. ([specs/boinx-mimolive.yaml:680](specs/boinx-mimolive.yaml#L680))
+- [ ] Check that layer set PATCH and POST bodies take the JSON:API data.attributes form shown in the manual. ([specs/boinx-mimolive.yaml:777](specs/boinx-mimolive.yaml#L777))
+- [ ] Check that a number input accepts four decimals and that set_layer_flag's JSON true and false are taken for a bool input. ([specs/boinx-mimolive.yaml:307](specs/boinx-mimolive.yaml#L307))
+- [ ] Confirm the built-in outputs record, stream, playout and fullscreen in the document's outputs attribute, and their live-state values. ([specs/boinx-mimolive.yaml:177](specs/boinx-mimolive.yaml#L177))
+- [ ] Check that comments/new takes its parameters in the query of a POST. ([specs/boinx-mimolive.yaml:883](specs/boinx-mimolive.yaml#L883))
+- [ ] Check what a layer's live-variant relationship holds while the layer is off (null assumed, which leaves live_variant as it was). ([specs/boinx-mimolive.yaml:1009](specs/boinx-mimolive.yaml#L1009))
+
 ## brompton-tessera — Brompton Tessera
 
 - [ ] Confirm that GET /api/ answers the whole tree under an "api" key, with groups, input ports, cable loops and frame remapping frames keyed "1", "2", ... (ports and frames numbered from 1), as the poll reads it. ([specs/brompton-tessera.yaml:3315](specs/brompton-tessera.yaml#L3315))
