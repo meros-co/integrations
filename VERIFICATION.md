@@ -942,6 +942,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:223](specs/shure-wireless.yaml#L223))
 - [ ] Opened for commands only, confirm a receiver that is not metering answers `GET DEVICE_ID` (`GET DEVICE_NAME` on the PSM1000) promptly enough for the 5 s liveness check. ([crates/core/src/modules/shure.rs:48](crates/core/src/modules/shure.rs#L48))
 
+## softouch-easyworship — Softouch EasyWorship
+
+- [ ] Confirm the whole exchange against EasyWorship 7.3 or later: the pairing request and its paired and notPaired answers, a heartbeat after each message, and status messages. ([specs/softouch-easyworship.yaml:130](specs/softouch-easyworship.yaml#L130))
+- [ ] Check whether EasyWorship sends paired on the same connection once the pairing request is approved, or only on the next request (sent again every 15 seconds). ([crates/core/src/modules/easyworship.rs:39](crates/core/src/modules/easyworship.rs#L39))
+- [ ] Check whether the pairing request is accepted with any uid text (meros-<name> by default), and whether repeating it while EasyWorship is asking shows a second request. ([specs/softouch-easyworship.yaml:39](specs/softouch-easyworship.yaml#L39))
+- [ ] Record whether the advertised port stays the same across EasyWorship restarts. ([specs/softouch-easyworship.yaml:44](specs/softouch-easyworship.yaml#L44))
+- [ ] Check what a status sent with only the logo, black and clear flags (before EasyWorship's first status) does. ([specs/softouch-easyworship.yaml:101](specs/softouch-easyworship.yaml#L101))
+- [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
+- [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
+
 ## sony-camera — Sony cameras
 
 - [ ] Check user base look numbering on each body: whether properties.D0C7 lists the plain number 1-16 or the user-LUT form (0x0100 plus the number), and that select, delete and PPLUT commands hit the intended look. ([specs/sony-camera.yaml:2515](specs/sony-camera.yaml#L2515))

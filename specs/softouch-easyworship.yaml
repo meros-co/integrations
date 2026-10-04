@@ -1,0 +1,174 @@
+spec: 1
+id: softouch-easyworship
+name: Softouch EasyWorship (remote protocol)
+vendor: Softouch Development
+category: playback
+implementation: native
+reason: >
+  A session: the controller asks to pair with a stable identity and waits for the operator to approve
+  it on the EasyWorship computer, every message EasyWorship sends carries a revision that must be sent
+  back in a heartbeat after it and in every command, and the logo, black and clear commands must send
+  back EasyWorship's whole last status with one flag changed. Each depends on what EasyWorship last
+  sent, which the spec format cannot carry.
+
+source:
+  - title: companion-module-softouch-easyworship (Bitfocus Companion module, MIT licence), version 2.1.2
+    author: Bitfocus AS and contributors
+    url: https://github.com/bitfocus/companion-module-softouch-easyworship
+    note: >
+      Community implementation, the only public description of the protocol (Softouch publishes
+      none); MIT at the top level, retrieved 2026-10-04. Read src/index.js, src/actions.js,
+      src/config.js, src/variables.js and companion/HELP.md, and described here in its own words:
+      EasyWorship 7.3 and later advertises the remote over Bonjour as _ezwremote._tcp with its host
+      and port; JSON objects over TCP, each ended by CRLF, sent as Latin-1; the pairing request
+      {"action": "connect", "uid", "device_name", "device_type": 8, "requestrev": "0"} answered
+      "paired" or "notPaired" (approve on the EasyWorship computer; the same uid pairs again
+      without asking); every incoming message's requestrev kept and a heartbeat {"action":
+      "heartbeat", "requestrev"} sent after each one but notPaired, and every 30 seconds while
+      paired; status messages with logo, black and clear and rectype, pres_rowid, slide_rowid,
+      pres_no, slide_no, schedulerev, liverev, imagehash and permissions; the actions nextSlide,
+      prevSlide, nextSchedule, prevSchedule, nextBuild, prevBuild, gotoStartPresentation,
+      gotoStartSlide, Play, Pause, Toggle, "gotoSlide N" and "gotoSchedule N" each with the
+      requestrev; logo, black and clear changed by sending the whole status back, logo and black
+      excluding each other; no reply to commands and no play state reported.
+
+settings:
+  device_name: { type: string, max_length: 64, pattern: "^[A-Za-z0-9 _-]{1,64}$", default: Meros,
+    label: Controller name,
+    description: "The name EasyWorship shows for this controller when asking to pair it." }
+  client_id: { type: string, max_length: 128, default: "",
+    label: Controller ID,
+    description: "The identity EasyWorship remembers a paired controller by; leave empty to use meros- and the controller name, and keep it unchanged so EasyWorship does not ask again." }
+
+ports:
+  - { port: null, protocol: tcp, role: control, note: "no fixed port: EasyWorship advertises its remote port over Bonjour (_ezwremote._tcp); give that port when opening the device" }
+
+models:
+  - id: easyworship
+    name: EasyWorship 7.3 and later (EasyWorship Remote enabled)
+    supports: [next_slide, previous_slide, go_to_slide, next_schedule_item, previous_schedule_item,
+               go_to_schedule_item, next_build, previous_build, presentation_start, slide_start,
+               play, pause, toggle_play, set_logo, toggle_logo, set_black, toggle_black, set_clear,
+               toggle_clear]
+    verification: none
+
+commands:
+  next_slide:
+    summary: Go to the next slide of the live item (nextSlide)
+    returns: none
+  previous_slide:
+    summary: Go to the previous slide of the live item (prevSlide)
+    returns: none
+  go_to_slide:
+    summary: Go to a slide of the live item by its number (gotoSlide N)
+    params:
+      slide: { type: int, min: 1, max: 100000, required: true, label: Slide,
+        description: "The slide's number in the live item, from 1." }
+    returns: none
+  next_schedule_item:
+    summary: Go to the next item in the schedule (nextSchedule)
+    returns: none
+  previous_schedule_item:
+    summary: Go to the previous item in the schedule (prevSchedule)
+    returns: none
+  go_to_schedule_item:
+    summary: Go to a schedule item by its number (gotoSchedule N)
+    params:
+      item: { type: int, min: 1, max: 100000, required: true, label: Schedule item,
+        description: "The item's number in the schedule, from 1." }
+    returns: none
+  next_build:
+    summary: Go to the slide's next build, an animation step within the slide (nextBuild)
+    returns: none
+  previous_build:
+    summary: Go to the slide's previous build (prevBuild)
+    returns: none
+  presentation_start:
+    summary: Go to the first slide of the live item (gotoStartPresentation)
+    returns: none
+  slide_start:
+    summary: Go to the start of the current slide (gotoStartSlide)
+    returns: none
+  play:
+    summary: Play the live item's media (Play)
+    returns: none
+  pause:
+    summary: Pause the live item's media (Pause)
+    returns: none
+  toggle_play:
+    summary: Play or pause the live item's media (Toggle)
+    returns: none
+  set_logo:
+    summary: Show or hide the logo; showing it turns black off (status with logo)
+    params:
+      enabled: { type: bool, required: true, label: Logo,
+        description: "On shows the logo over the output, off hides it." }
+    returns: none
+  toggle_logo:
+    summary: Show the logo if it is hidden, hide it if shown
+    returns: none
+  set_black:
+    summary: Turn black on or off; turning it on hides the logo (status with black)
+    params:
+      enabled: { type: bool, required: true, label: Black,
+        description: "On blacks the output, off shows it again." }
+    returns: none
+  toggle_black:
+    summary: Turn black on if it is off, off if on
+    returns: none
+  set_clear:
+    summary: Turn clear on or off, independent of logo and black (status with clear)
+    params:
+      enabled: { type: bool, required: true, label: Clear,
+        description: "On clears the live text from the output, off brings it back." }
+    returns: none
+  toggle_clear:
+    summary: Turn clear on if it is off, off if on
+    returns: none
+
+state:
+  paired: { type: bool, description: "Whether EasyWorship has paired this controller; commands need it" }
+  display.logo: { type: bool, description: "The logo is shown" }
+  display.black: { type: bool, description: "The output is black" }
+  display.clear: { type: bool, description: "The live text is cleared" }
+  live.presentation: { type: int, description: "Number of the live presentation (schedule item), as EasyWorship sends pres_no" }
+  live.slide: { type: int, description: "Number of the live slide, as EasyWorship sends slide_no" }
+  live.record_type: { type: int, description: "Kind of the live item, as EasyWorship sends rectype (its values are not described)" }
+  live.presentation_id: { type: int, description: "EasyWorship's database row of the live presentation" }
+  live.slide_id: { type: int, description: "EasyWorship's database row of the live slide" }
+  schedule_revision: { type: string, description: "Changes when the schedule changes" }
+  live_revision: { type: string, description: "Changes when the live item changes" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Softouch does not publish this protocol. It is the one the EasyWorship Remote app uses, as the
+      MIT-licensed Bitfocus Companion module implements it, and an EasyWorship update can change it.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Pairing: on connecting the core asks EasyWorship to pair, and EasyWorship shows a request to
+      approve on its computer. Until it is approved the device reports unauthorized, commands fail
+      with an authentication error and the request is sent again every 15 seconds. EasyWorship
+      remembers the controller by its ID (the client_id setting, or meros- and the controller
+      name), so keep that unchanged; changing it asks for approval again.
+
+  - models: [all]
+    severity: warning
+    text: >
+      EasyWorship has no fixed port: it advertises its remote service over Bonjour
+      (_ezwremote._tcp), which the core does not browse. Find the port with a Bonjour browser
+      (dns-sd -B _ezwremote._tcp, then dns-sd -L) and give it when opening the device; it can
+      change when EasyWorship restarts.
+
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is acknowledged, so commands are reported unverified; EasyWorship's next status
+      shows the logo, black and clear result. set_logo, set_black and set_clear send EasyWorship's
+      whole last status back with the flag changed, as EasyWorship takes it; before the first
+      status they send only the flags. Media play state is not reported. The meaning of rectype
+      and of the presentation and slide numbers (whether they count from 0 or 1) is not
+      described.

@@ -150,6 +150,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "shure-wireless",
         ],
     ),
+    ("vendor-softouch", &["softouch-easyworship"]),
     ("vendor-sony", &["sony-camera", "visca"]),
     ("vendor-studiocoast", &["vmix"]),
     (

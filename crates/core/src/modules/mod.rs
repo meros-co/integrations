@@ -44,6 +44,8 @@ mod analogway;
 mod atem;
 #[cfg(feature = "bss-london")]
 mod bss_london;
+#[cfg(feature = "softouch-easyworship")]
+mod easyworship;
 #[cfg(feature = "emberplus")]
 mod emberplus;
 #[cfg(feature = "generic-http")]
@@ -198,6 +200,13 @@ pub(crate) fn construct(
         },
         #[cfg(feature = "emberplus")]
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
+        // EasyWorship advertises its port over Bonjour, so the host must give it.
+        #[cfg(feature = "softouch-easyworship")]
+        "softouch-easyworship" => match context.port {
+            Some(port) => Ok(Box::new(easyworship::EasyWorship::new(&context, port))),
+            None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour                          (_ezwremote._tcp)"
+                .into()),
+        },
         #[cfg(feature = "probel-swp08")]
         "probel-swp08" => Ok(Box::new(swp08::Swp08::new(spec, context)?)),
         #[cfg(feature = "pjlink")]
