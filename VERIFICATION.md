@@ -257,6 +257,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the API needs no authentication on the firmware in use. ([specs/birddog.yaml:3143](specs/birddog.yaml#L3143))
 - [ ] On X5 Ultra and X4 Ultra, check the firmware version and which 2.1 endpoints it lacks. ([specs/birddog.yaml:3271](specs/birddog.yaml#L3271))
 
+## birddog-converters — BirdDog converters and decoders
+
+- [ ] Which converter firmware first serves API 2.0, and whether Studio and Mini units on older firmware answer /about with API 1.0's {"Version":"1.0"}. ([specs/birddog-converters.yaml:1091](specs/birddog-converters.yaml#L1091))
+- [ ] Check /about's Format value on each converter (Studio, Mini, Flex Encode, Flex Decode, WP Encode, WP Decode, 4KHDMI/SDI, QUAD, PLAY) and what Flex 4K BACKPACK and Pod report. ([specs/birddog-converters.yaml:1098](specs/birddog-converters.yaml#L1098))
+- [ ] Confirm POST /connectTo with only {"sourceName": ...} switches the decoder on every converter, and whether ChNum in the query selects the channel on QUAD and dual-channel 4K HDMI/SDI. ([specs/birddog-converters.yaml:1081](specs/birddog-converters.yaml#L1081))
+- [ ] Check which keys /decodestatus returns (the document's example and parameter table differ), and its reply in encode mode. ([specs/birddog-converters.yaml:1074](specs/birddog-converters.yaml#L1074))
+- [ ] Check the odd DEVICE SUPPORT cells: /encodeTransport on Flex Decode and QUAD, decode NDIAudio on Wallplate Output and 4K HDMI/SDI, StreamName and NDIGroup on Wallplate Input. ([specs/birddog-converters.yaml:1071](specs/birddog-converters.yaml#L1071))
+- [ ] Check whether single-key POST bodies with ChNum are accepted on /encodesetup and /decodesetup, or the whole object must be sent. ([specs/birddog-converters.yaml:1082](specs/birddog-converters.yaml#L1082))
+- [ ] Check /operationmode's values on 4K QUAD with the 2x2 mode. ([specs/birddog-converters.yaml:1106](specs/birddog-converters.yaml#L1106))
+
 ## blackmagic-atem — Blackmagic ATEM
 
 - [ ] Check how many simultaneous connections the switcher accepts and how long a dropped connection holds its place. ([specs/blackmagic-atem.yaml:1150](specs/blackmagic-atem.yaml#L1150))
@@ -310,6 +320,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether a unit can report more than two network interfaces. ([specs/blackmagic-streaming.yaml:657](specs/blackmagic-streaming.yaml#L657))
 - [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:715](specs/blackmagic-streaming.yaml#L715))
 - [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:706](specs/blackmagic-streaming.yaml#L706))
+
+## blackmagic-teranex — Blackmagic Teranex
+
+- [ ] Check which output format text set_output_video_mode needs: 1080i5994 (the Command Syntax example) or 1080i59.94 (the table and the Companion module). ([specs/blackmagic-teranex.yaml:1691](specs/blackmagic-teranex.yaml#L1691))
+- [ ] Confirm the AUDIO and NETWORK CONFIG block headers, which are inferred from the section titles. ([specs/blackmagic-teranex.yaml:1704](specs/blackmagic-teranex.yaml#L1704))
+- [ ] Check whether the refusal is NACK (as documented) or NAK, and that ACK is followed by a blank line on Teranex AV and Express. ([specs/blackmagic-teranex.yaml:1684](specs/blackmagic-teranex.yaml#L1684))
+- [ ] Check whether on/off settings are accepted as true/false (sent here) and how they are reported (true/false or ON/OFF). ([specs/blackmagic-teranex.yaml:1711](specs/blackmagic-teranex.yaml#L1711))
+- [ ] Check the ranges the unit accepts for genlock line and pixel offsets, Variable Aspect Ratio and camera align values, and that whole numbers are accepted where it reports decimals. ([specs/blackmagic-teranex.yaml:1718](specs/blackmagic-teranex.yaml#L1718))
+
+## blackmagic-ultimatte — Blackmagic Ultimatte 12
+
+- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1297](specs/blackmagic-ultimatte.yaml#L1297))
+- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1307](specs/blackmagic-ultimatte.yaml#L1307))
+- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1329](specs/blackmagic-ultimatte.yaml#L1329))
+- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
+- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1339](specs/blackmagic-ultimatte.yaml#L1339))
+- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1322](specs/blackmagic-ultimatte.yaml#L1322))
 
 ## blackmagic-videohub — Blackmagic Videohub
 
@@ -625,6 +652,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2615](specs/lightware-lw3.yaml#L2615))
 - [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2564](specs/lightware-lw3.yaml#L2564))
 
+## magewell-proconvert — Magewell Pro Convert
+
+- [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
+- [ ] Confirm the session cookie arrives in Set-Cookie on login for the encoders, the NDI decoders and the IP decoders, and that status 37 is returned when it has expired. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
+- [ ] Check the IP decoders' default credentials (Admin / Admin assumed). ([specs/magewell-proconvert.yaml:549](specs/magewell-proconvert.yaml#L549))
+- [ ] Check whether Pro Convert for NDI to HDMI 4K runs Decoder API V1.3 or v1.1, and that the methods used here behave the same on both. ([specs/magewell-proconvert.yaml:172](specs/magewell-proconvert.yaml#L172))
+- [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:538](specs/magewell-proconvert.yaml#L538))
+
 ## megapixel-helios — Megapixel HELIOS
 
 - [ ] Confirm that the JSON-RPC websocket answers {"jsonrpc":"2.0","id":1,"method":"state"} with the whole tree under result, then pushes updates without a subscription, and that it takes the web application's credentials when authentication is on. ([specs/megapixel-helios.yaml:520](specs/megapixel-helios.yaml#L520))
@@ -700,6 +735,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether playback page actions need a release (0) after the key down. ([specs/obsidian-onyx-osc.yaml:1050](specs/obsidian-onyx-osc.yaml#L1050))
 - [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
 - [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
+
+## omt — Open Media Transport (OMT) source
+
+- [ ] Confirm a source accepts a metadata-only receiver and sends its OMTInfo, connection metadata and tally on accepting it, before any subscription. ([specs/omt.yaml:121](specs/omt.yaml#L121))
+- [ ] Confirm tally from a metadata-only receiver is combined into the source's tally, and is dropped when that connection closes. ([specs/omt.yaml:112](specs/omt.yaml#L112))
+- [ ] Confirm metadata without a terminating NUL is accepted by senders other than libomtnet (the protocol document says the length includes a NUL). ([specs/omt.yaml:131](specs/omt.yaml#L131))
+- [ ] On a PTZ source announcing OMTPTZ Protocol VISCA, confirm inband commands reach the camera and the reply carries the same Sequence. ([specs/omt.yaml:140](specs/omt.yaml#L140))
+
+## omt-discovery — Open Media Transport (OMT) Discovery Server
+
+- [ ] Check whether a newly connected client receives the current registrations, or only later changes (the server sends them before the subscription can arrive). ([specs/omt-discovery.yaml:56](specs/omt-discovery.yaml#L56))
 
 ## openlp — OpenLP
 
@@ -998,6 +1044,31 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))
 - [ ] On a Carbonite, confirm tally 1 is preview and tally 2 program on the TSL feed, and what ShowUMDId and ShowBusName add to the text. ([specs/tsl-umd-listener.yaml:94](specs/tsl-umd-listener.yaml#L94))
+
+## turtleav-amp150 — Turtle AV 150W Dante amplifier
+
+- [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute: on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:165](specs/turtleav-amp150.yaml#L165))
+
+## turtleav-avoip-control — Turtle AV DARWIN and CHAZY controllers
+
+- [ ] Check the line ending (CR LF sent), whether Telnet on port 23 negotiates options, prints a banner or asks for a login, and whether it echoes commands. ([specs/turtleav-avoip-control.yaml:588](specs/turtleav-avoip-control.yaml#L588))
+- [ ] Check CHAZY Control Pro's acknowledgement texts: whether they start with [SUCCESS] and [ERROR]. ([specs/turtleav-avoip-control.yaml:598](specs/turtleav-avoip-control.yaml#L598))
+- [ ] Check whether the status blocks between = lines end in a way a client can find, so state could be read rather than kept from replies. ([specs/turtleav-avoip-control.yaml:579](specs/turtleav-avoip-control.yaml#L579))
+
+## turtleav-bt-wallplate — Turtle AV Dante Bluetooth wall plate
+
+- [ ] Check the line ending, which port carries the commands (8000 or 23), and the get bt mute reply text. ([specs/turtleav-bt-wallplate.yaml:156](specs/turtleav-bt-wallplate.yaml#L156))
+
+## turtleav-dante — Turtle AV Dante bridges, Downtown and 30W amplifier
+
+- [ ] Check the line ending (CR LF sent), that port 8000 is a raw socket with the same commands as Telnet 23, and that no login is asked. ([specs/turtleav-dante.yaml:429](specs/turtleav-dante.yaml#L429))
+- [ ] Check the real channel ranges and get type strings of Mineola 4x4, 8x8 and 16x16 (their manuals copy the 2x2's). ([specs/turtleav-dante.yaml:436](specs/turtleav-dante.yaml#L436))
+- [ ] Check the reply to an error, and Downtown's auto event report format. ([specs/turtleav-dante.yaml:444](specs/turtleav-dante.yaml#L444))
+
+## turtleav-matrix — Turtle AV 4K60 video wall, matrix and multiviewer
+
+- [ ] Check which port carries the s/r commands (23 or 8000), whether a CR LF after ! is accepted, and the replies' line ending. ([specs/turtleav-matrix.yaml:353](specs/turtleav-matrix.yaml#L353))
+- [ ] Check that r output 0 in source! reads every output, and the 4x4's error replies. ([specs/turtleav-matrix.yaml:361](specs/turtleav-matrix.yaml#L361))
 
 ## tvone-coriomaster — tvONE CORIOmaster
 

@@ -48,7 +48,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["behringer-wing", "behringer-x32", "behringer-xair"],
     ),
     ("vendor-biamp", &["biamp-tesira"]),
-    ("vendor-birddog", &["birddog"]),
+    ("vendor-birddog", &["birddog", "birddog-converters"]),
     (
         "vendor-blackmagic",
         &[
@@ -58,6 +58,8 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "blackmagic-multiview",
             "blackmagic-smartview",
             "blackmagic-streaming",
+            "blackmagic-teranex",
+            "blackmagic-ultimatte",
             "blackmagic-videohub",
         ],
     ),
@@ -96,6 +98,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lawo", &["emberplus"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
+    ("vendor-magewell", &["magewell-proconvert"]),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-newtek", &["newtek-tricaster"]),
     (
@@ -105,6 +108,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-obs", &["obs-studio"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
     ("vendor-openlp", &["openlp"]),
+    ("vendor-omt", &["omt", "omt-discovery"]),
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-planningcenter", &["planningcenter-services"]),
@@ -160,6 +164,16 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
+    (
+        "vendor-turtleav",
+        &[
+            "turtleav-amp150",
+            "turtleav-avoip-control",
+            "turtleav-bt-wallplate",
+            "turtleav-dante",
+            "turtleav-matrix",
+        ],
+    ),
     ("vendor-tvone", &["tvone-coriomaster"]),
     (
         "vendor-yamaha",

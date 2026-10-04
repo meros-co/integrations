@@ -1,0 +1,157 @@
+spec: 1
+id: turtleav-bt-wallplate
+name: Turtle AV Dante Bluetooth wall plate
+vendor: Turtle AV
+category: other
+
+source:
+  - title: Dante Bluetooth Wall Plate user manual (US), §7 (pp. 14-21)
+    author: Turtle AV
+    url: https://turtleav.com/download/179/user-guide/28755/bluetooth-wallplate-us-user-guide.pdf
+    note: >
+      Manufacturer-documented, free download. The EU manual (28750) has the same table.
+      Telnet port 23 in the header and TCP/IP port 8000 in get ipconfig; Bluetooth name,
+      pairing, volume (Bluetooth volume: 50), mute, audio bridging, connection, transport
+      and metadata commands; input gain and mute (Bluetooth input left gain: 10dB); EQ and
+      network commands.
+
+transport:
+  type: line-tcp
+  port: 8000
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+
+ports:
+  - {port: 8000, protocol: tcp, role: control, note: 'TCP/IP control port, changeable; Telnet on 23 carries the same commands'}
+
+models:
+  - id: bt-wallplate
+    name: Turtle AV Dante Bluetooth Wall Plate (US and EU)
+    supports:
+      [set_bt_volume, set_bt_mute, set_bt_pairing, clear_bt_pairing, bt_transport,
+       set_input_gain, set_input_mute, get_bt_connection, reboot]
+    verification: none
+    notes: >
+      Bluetooth audio to Dante; it reports its type as WPD20BUS.
+
+commands:
+  set_bt_volume:
+    summary: Set the Bluetooth volume, 0-100
+    params:
+      volume: {type: int, min: 0, max: 100, required: true, label: Volume, description: Bluetooth audio volume from 0 to 100.}
+    send: set bt vol {volume}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_bt_mute:
+    summary: Mute or unmute the Bluetooth audio
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: set bt mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_bt_pairing:
+    summary: Make the wall plate discoverable for pairing, or stop
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: set bt discoverable/pairing {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  clear_bt_pairing:
+    summary: Forget a paired device, or all
+    params:
+      device: {type: int, min: 0, max: 2, required: true, label: Device, description: Paired device 1 or 2; 0 forgets both.}
+    send: set bt paired clear {device}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  bt_transport:
+    summary: Media transport on the connected phone or laptop
+    params:
+      action: {type: enum, values: [play/pause, forward, backward], required: true, label: Action, description: 'Play or pause, next track, or previous track.'}
+    send: set bt {action}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_input_gain:
+    summary: Set a Bluetooth channel's gain, -12 to +12 dB
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+      gain: {type: float, min: -12.0, max: 12.0, required: true, label: Gain, description: 'Gain in dB, -12.0 to +12.0.'}
+    send: set input {input} gain {gain:.1f}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  set_input_mute:
+    summary: Mute or unmute a Bluetooth channel
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 Bluetooth left, 2 Bluetooth right; 0 both.'}
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: set input {input} mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  get_bt_connection:
+    summary: Which paired devices are connected
+    send: get bt connection
+    expect: {matches: (.+)}
+    returns: value
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+  reboot:
+    summary: Reboot the wall plate
+    send: set reboot
+    expect: {not_contains: rror}
+    returns: ack
+    # Dante Bluetooth Wall Plate user manual (US; EU identical), §7
+
+telemetry:
+  poll:
+    every_ms: 5000
+    send:
+    - get bt vol
+    - get bt mute
+  updates:
+    - match: '^Bluetooth volume: ?(\d+)$'
+      state:
+        bt.volume: '{1}'
+    - match: '^Bluetooth mute: ?(on|off)$'
+      state:
+        bt.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^Bluetooth input (left|right) gain: (-?[0-9.]+) ?dB$'
+      state:
+        inputs.{1}.gain: '{2}'
+    - match: '^Bluetooth input (left|right) mute: (on|off)$'
+      state:
+        inputs.{1}.mute: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: '^Connected device(\d): (Connected|Disconnected)$'
+      state:
+        bt.devices.{1}.connected: {value: '{2}', map: {Connected: true, Disconnected: false}}
+
+state:
+  bt.volume:               {type: int, description: 'Bluetooth volume, 0-100'}
+  bt.mute:                 {type: bool, description: Bluetooth audio muted}
+  bt.devices.*.connected:  {type: bool, description: Paired device 1 or 2 connected}
+  inputs.*.gain:           {type: float, description: 'Channel gain in dB, keyed left or right'}
+  inputs.*.mute:           {type: bool, description: 'Channel muted, keyed left or right'}
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Nothing is pushed: the Bluetooth volume and mute are polled every 5 seconds; other
+      values update from command replies. The documents state no line ending (CR LF is
+      sent) and no login. The mute reply's exact text is not shown in the document
+      (Bluetooth mute: on is assumed).

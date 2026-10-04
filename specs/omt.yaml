@@ -1,0 +1,153 @@
+spec: 1
+id: omt
+name: Open Media Transport (OMT) source
+vendor: Open Media Transport
+category: other
+implementation: native
+reason: >
+  Binary framing: every message is a 16-byte little-endian header (version,
+  frame type, timestamp, metadata length, data length) followed by its data,
+  and control travels as XML metadata frames inside that framing. Tally
+  commands are fixed strings that are not well-formed XML, and a VISCA reply
+  is matched to its command by the sequence number inside the XML.
+
+source:
+  - title: "Open Media Transport (OMT) Protocol 1.0 (PROTOCOL.md, libomtnet)"
+    author: Open Media Transport Contributors
+    url: "https://github.com/openmediatransport/libomtnet/blob/master/PROTOCOL.md"
+    note: >
+      The protocol's own document (MIT licence). TCP framing with the 16-byte
+      little-endian header and frame types metadata 1, video 2, audio 4;
+      metadata as UTF-8 XML; the special metadata commands: OMTSubscribe for
+      video, audio and metadata (a sender sends nothing until subscribed),
+      OMTSettings Preview and Quality, the four OMTTally strings with their
+      preserved "Program==" typo, the sender combining every receiver's tally
+      and sending the combined tally to all receivers and to each new one;
+      OMTInfo sender information; DNS-SD service type _omt._tcp with names
+      HOSTNAME (Source Name); the discovery server's OMTAddress register and
+      deregister XML.
+  - title: "Open Media Transport (OMT) Metadata Specification Document 1.0"
+    author: Open Media Transport Contributors
+    url: "https://github.com/openmediatransport/Metadata"
+    note: >
+      MIT licence. OMTWeb (a sender's web management URL), OMTPTZ with
+      Protocol VISCAoverIP and a visca:// URL (PTZ over separate VISCA over
+      IP), OMTPTZ with Protocol VISCA carrying VISCA over IP messages inband as
+      hexadecimal Command (controller to camera) and Reply (camera to
+      controller) with the original Sequence number, AncillaryData, and
+      OMTGroup wrapping several elements, which parsers must accept as well as
+      single elements.
+  - title: "libomtnet reference implementation (OMTSend.cs, OMTChannel.cs, OMTMetadata.cs, OMTRedirect.cs, OMTConstants.cs)"
+    author: Open Media Transport Contributors
+    url: "https://github.com/openmediatransport/libomtnet"
+    note: >
+      MIT licence, read for behaviour the protocol document leaves out. A
+      sender sends its OMTInfo, its connection metadata (such as OMTWeb and
+      OMTPTZ), the current combined tally and any redirect to each new
+      connection as it is accepted, before any subscription; later metadata,
+      including combined tally changes, reaches only connections subscribed
+      to metadata. The sender compares control strings exactly against the
+      whole frame data, and itself sends metadata without a terminating NUL.
+      OMTRedirect NewAddress tells receivers to connect elsewhere (a virtual
+      source). The suggested quality counts only video receivers. Senders take
+      the first free TCP port from 6400 (up to 6600).
+
+ports:
+  - { port: 6400, protocol: tcp, role: control, note: "the first sender on a host listens on 6400, later ones on the next free port up to 6600; the port is advertised by DNS-SD (_omt._tcp) and the discovery server" }
+
+models:
+  - id: sender
+    name: "Any Open Media Transport sender (OMT source)"
+    supports: [set_tally, ptz_visca, send_metadata]
+    verification: none
+    notes: >
+      An OMT source: software such as vMix or the OBS OMT plugin, or hardware
+      such as the omtcapture Raspberry Pi encoder. The core connects as a
+      metadata-only receiver: it takes no video or audio.
+
+commands:
+  set_tally:
+    summary: "Send this receiver's tally to the source; the source combines it with every other receiver's"
+    params:
+      preview: { type: bool, default: false,
+        label: Preview,
+        description: "On reports the source as on preview from this receiver." }
+      program: { type: bool, default: false,
+        label: Program,
+        description: "On reports the source as on program from this receiver." }
+    returns: none
+
+  ptz_visca:
+    summary: "Send a VISCA command to a PTZ source inband (OMTPTZ Protocol VISCA) and return its reply"
+    params:
+      command: { type: string, pattern: "^(?:[0-9A-Fa-f]{2}){3,32}$",
+        label: VISCA command,
+        description: "The VISCA command as hexadecimal bytes, e.g. 8101040700FF (zoom stop); the sequence number is added by the core." }
+    returns: value
+
+  send_metadata:
+    summary: "Send one XML metadata frame to the source, such as an AncillaryData or OMTGroup element"
+    params:
+      xml: { type: string, max_length: 65000,
+        required: true,
+        label: XML,
+        description: "One UTF-8 XML element the source understands, sent as a metadata frame unchanged." }
+    returns: none
+
+state:
+  info.product_name:   { type: string, description: "Sender's product name (OMTInfo ProductName)" }
+  info.manufacturer:   { type: string, description: "Sender's manufacturer (OMTInfo Manufacturer)" }
+  info.version:        { type: string, description: "Sender's version (OMTInfo Version)" }
+  tally.preview:       { type: bool, description: "The source is on preview at some receiver: the combined tally the source sends" }
+  tally.program:       { type: bool, description: "The source is on program at some receiver: the combined tally the source sends" }
+  web.url:             { type: string, description: "The sender's web management address (OMTWeb URL)" }
+  ptz.protocol:        { type: string, description: "PTZ protocol the source offers: VISCAoverIP (separate UDP) or VISCA (inband); empty when none was announced" }
+  ptz.url:             { type: string, description: "VISCA over IP address for Protocol VISCAoverIP, e.g. visca://192.168.1.20:52381" }
+  redirect.address:    { type: string, description: "Address the source redirects receivers to (OMTRedirect NewAddress); empty when it does not redirect" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Tally from this receiver counts only while the core is connected: the
+      source drops a receiver's tally when its connection closes, so the core
+      sends the last tally it was given again after every reconnection. The
+      tally in state is the combined tally the source sends to subscribed
+      receivers, which includes other receivers' tally.
+
+  - models: [all]
+    severity: info
+    text: >
+      Opened for commands only, the core does not subscribe to metadata. The
+      source still sends its information, connection metadata and current
+      tally when the connection is accepted, so that state is kept, but later
+      tally changes and redirects are not received. OMT has no request a
+      source must answer, so the TCP connection alone tells the source is
+      there.
+
+  - models: [all]
+    severity: info
+    text: >
+      Metadata is sent without a terminating NUL, as the reference
+      implementation sends it: it compares control strings against the whole
+      frame data, so a NUL would make a tally command unrecognised. The
+      protocol document says the data length includes a NUL; received
+      metadata is accepted with or without one.
+
+  - models: [all]
+    severity: warning
+    text: >
+      ptz_visca reaches the camera only when the source handles inband VISCA:
+      such a source announces OMTPTZ Protocol VISCA in its connection
+      metadata (ptz.protocol). A source that announces VISCAoverIP takes
+      VISCA over UDP at ptz.url instead (the visca integration), and a source
+      that announces nothing does not answer, so the command times out after
+      2 seconds. Replies are matched to commands by the sequence number the
+      core puts in each; a reply may also be wrapped in an OMTGroup.
+
+  - models: [all]
+    severity: info
+    text: >
+      An OMTRedirect from the source asks receivers to connect to another
+      address instead (a virtual source switched remotely); the core reports
+      it as redirect.address and stays connected to the source it was given.

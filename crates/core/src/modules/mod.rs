@@ -56,6 +56,8 @@ mod generic_osc;
 mod generic_tcp_udp;
 #[cfg(feature = "http-snapshot")]
 mod http_snapshot;
+#[cfg(feature = "magewell-proconvert")]
+mod magewell;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
 #[cfg(feature = "novastar-h")]
@@ -64,6 +66,8 @@ mod novastar_h;
 mod novastar_h_commands;
 #[cfg(feature = "obs-studio")]
 mod obs;
+#[cfg(any(feature = "omt", feature = "omt-discovery"))]
+mod omt;
 #[cfg(feature = "obsidian-onyx")]
 mod onyx;
 #[cfg(feature = "panasonic-ptz")]
@@ -156,6 +160,12 @@ pub(crate) fn construct(
         "novastar-h" => Ok(Box::new(novastar_h::NovastarH::new(context))),
         #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
+        #[cfg(feature = "magewell-proconvert")]
+        "magewell-proconvert" => Ok(Box::new(magewell::ProConvert::new(context))),
+        #[cfg(feature = "omt")]
+        "omt" => Ok(Box::new(omt::Sender::new(context))),
+        #[cfg(feature = "omt-discovery")]
+        "omt-discovery" => Ok(Box::new(omt::Discovery::new(context))),
         #[cfg(feature = "obsidian-onyx")]
         "obsidian-onyx" => Ok(Box::new(onyx::Onyx::new(context))),
         #[cfg(feature = "shure-wireless")]
