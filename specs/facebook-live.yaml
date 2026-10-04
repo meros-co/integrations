@@ -11,7 +11,11 @@ category: other
 # long-lived one and reads the Page's access token, which has no expiry, and
 # passes that Page access token as the token setting. Facebook has no refresh
 # grant for it, so the core sends it as a plain bearer token until Facebook
-# refuses it. The core never runs a sign-in and persists nothing.
+# refuses it. The core never runs a sign-in and persists nothing. The
+# consumer gets the Page token through the core too, without calling the
+# Graph API itself: it opens facebook-account with the user's token, runs
+# list_pages (or list_page_names and get_page_token), lets the operator pick
+# a Page, closes facebook-account and opens this integration with that Page.
 
 source:
   - title: Live Video API, Guides, Go Live (streaming)
@@ -158,7 +162,7 @@ transport:
 settings:
   token: { type: string, secret: true, max_length: 4096, required: true,
            label: Page access token,
-           description: "The Page access token read with a long-lived user token from the consumer's own Meta app, which does not expire; Facebook has no way to refresh it, so a refused one needs a new login." }
+           description: "The Page access token read with a long-lived user token from the consumer's own Meta app (facebook-account's list_pages or get_page_token), which does not expire; Facebook has no way to refresh it, so a refused one needs a new login." }
   page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
              label: Page ID,
              description: "The numeric id of the Facebook Page the live videos belong to, the Page the token was issued for." }
@@ -481,10 +485,15 @@ quirks:
       publish_video for a person's own timeline, which this integration does
       not use), runs Facebook Login, exchanges the user token for a
       long-lived one on its own server (the exchange needs the app secret),
-      and reads the Page access token from GET /{user-id}/accounts. That
+      and reads the Page access token with the facebook-account integration
+      (list_pages, or list_page_names and get_page_token: GET
+      /{user-id}/accounts), so it never calls the Graph API itself. That
       Page token has no expiry date, and Facebook has no refresh grant: the
       core sends it as a plain Bearer token. It ends when the user changes
-      their password, removes the app or loses their role on the Page.
+      their password, removes the app or loses their role on the Page. A
+      Page token read with a short-lived user token (no server exchange) is
+      valid for 1 hour only, and this integration then stops with
+      unauthorized within the hour.
 
   - models: [all]
     severity: warning

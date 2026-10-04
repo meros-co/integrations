@@ -42,6 +42,8 @@ mod digest;
 mod discovery;
 mod engine;
 pub mod events;
+#[cfg(test)]
+mod facebook_account_session_tests;
 mod files;
 mod http;
 pub mod json;
@@ -59,6 +61,8 @@ pub mod module;
 mod modules;
 #[cfg(test)]
 mod oauth_session_tests;
+#[cfg(test)]
+mod oauth_validate_session_tests;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
 mod session;

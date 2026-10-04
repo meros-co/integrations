@@ -353,6 +353,10 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     if "oauth2" in methods:
         if not isinstance(transport.get("oauth"), dict):
             errors.append("auth: oauth2 needs an oauth block with token_url")
+        validate = (transport.get("oauth") or {}).get("validate") or {}
+        every = validate.get("every_s", 3600)
+        if isinstance(every, int) and every < 60:
+            errors.append("transport.oauth.validate.every_s is at least 60: a token is not checked more than once a minute")
         for name, kind, secret in [("client_id", "string", False), ("client_secret", "string", True),
                                    ("refresh_token", "string", True), ("access_token", "string", True),
                                    ("expires_at", "int", False), ("token_url", "string", False)]:

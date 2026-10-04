@@ -80,7 +80,19 @@ refreshes the access token before it expires and reports each new token in a
 (the user revoked access) the device reports `unauthorized` until the consumer
 signs the user in again and passes the new tokens with `update_settings`. A
 product that cannot ship its client secret points the `token_url` setting at
-its own token proxy.
+its own token proxy. Where a service requires the token to be checked on a
+schedule (Twitch: on start and hourly), the core does that too.
+
+A consumer never calls a platform's API itself, sign-in aside. Facebook Live
+acts for a Page with that Page's access token, which the core also gets: the
+consumer signs the operator in (Facebook Login, its own Meta app), opens
+`facebook-account` with the user token, runs `list_pages` (or
+`list_page_names`, then `get_page_token` for the Page picked), shows a Page
+picker, closes `facebook-account`, and opens `facebook-live` with the chosen
+Page's id and token. Page tokens come back only as command values, never in
+state or logs. A Page token lasts only an hour unless the user token was
+first exchanged for a long-lived one, which takes the app secret and so the
+product's own server (`specs/facebook-account.yaml` quirks).
 
 **Events** come from one queue, the same JSON in every package (SPEC.md,
 Events). A listener such as `osc-listener`, which hears OSC from any control

@@ -344,6 +344,37 @@ device go again without reopening it. The token endpoint's answer is never
 offered to the telemetry rules, and no token or secret is ever written to a
 log event.
 
+A service that requires the application to check its token on a schedule
+names its validation endpoint in `oauth.validate`. Twitch requires a
+validation when the application starts and every hour after:
+
+```yaml
+  oauth:
+    token_url: https://id.twitch.tv/oauth2/token
+    validate: { url: https://id.twitch.tv/oauth2/validate, every_s: 3600, scheme: OAuth }
+```
+
+The core sends a GET there with `Authorization: <scheme> <access token>`
+(`scheme` defaults to `Bearer`) and no other header of the device: once the
+device opens (after the first refresh, when there is no access token yet),
+after every refresh and every `update_settings`, then every `every_s` (default
+3600) while the device is open. It is a requirement of the service, not
+telemetry: it happens whether or not the device is monitored. The URL is on
+any host, and is checked as `token_url` is (`https`, or `http` only to this
+machine). Only the answer's status is read; its body (the token's client,
+user and scopes) is never offered to the rules, kept in state or logged.
+
+| Answer | What the core does |
+|---|---|
+| 2xx | Validated again after `every_s`. |
+| 401, with a refresh token | The token is refreshed once and the new one validated at once. A 401 for the new token too, or a refresh the token endpoint refuses, is the terminal `unauthorized`. |
+| 401, without a refresh token | The terminal `unauthorized` at once: the token was revoked and nothing can renew it. |
+| Anything else, or no answer | Logged, and tried again with backoff (1 s doubling to 60 s). The connection is not changed: the API itself may be working. |
+
+An API request refused with 401 while a refresh is already in flight waits
+for that refresh and is sent once more with the new token, as when it starts
+one itself.
+
 Where the operator chooses HTTP or HTTPS on the device, `scheme` names a
 setting instead: `scheme: { setting: scheme }` with `scheme: { type: enum,
 values: [http, https], default: http }`. Devices that serve HTTPS with a

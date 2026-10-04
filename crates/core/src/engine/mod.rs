@@ -31,7 +31,7 @@ use crate::module::{
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
-use oauth::{OAuth, Refreshed};
+use oauth::{OAuth, Refreshed, Validated};
 use template::{
     no_escape, percent_encode, render, sole_converted, sole_value, Conversions, Values,
 };
@@ -56,6 +56,8 @@ const POLL: Key = "telemetry-poll";
 const PROMPT: Key = "login-prompt";
 /// A token refresh that failed, tried again.
 const OAUTH_RETRY: Key = "oauth-retry";
+/// `oauth.validate`: the access token checked again.
+const OAUTH_VALIDATE: Key = "oauth-validate";
 
 const DEFAULT_TIMEOUT: Millis = 2_000;
 /// A device silent this long, with nothing in flight, is probed.
@@ -1365,6 +1367,11 @@ impl SpecEngine {
                 self.ctx.settings = self.settings.clone();
                 cx.credentials(tokens);
                 cx.log(Level::Info, "OAuth access token refreshed");
+                // A new token is validated at once, where the service wants it.
+                if let Some(oauth) = self.oauth.as_mut() {
+                    oauth.validate_waits = false;
+                }
+                self.validate_token(cx);
                 self.resend(cx);
                 if self.current.is_none()
                     && self.queue.is_empty()
@@ -1377,6 +1384,12 @@ impl SpecEngine {
             Refreshed::Refused(reason) => self.refuse(cx, reason),
             Refreshed::Failed(reason) => {
                 let wait = oauth.retry_at.saturating_sub(cx.now());
+                if std::mem::take(&mut oauth.validate_waits) {
+                    // Not refreshed, so not refused yet either: validated
+                    // again once the refresh may be tried again.
+                    oauth.validate_refreshed = false;
+                    cx.set_timer(OAUTH_VALIDATE, wait.max(1));
+                }
                 let message = format!("the access token could not be refreshed: {reason}");
                 cx.log(
                     Level::Warning,
@@ -1433,8 +1446,8 @@ impl SpecEngine {
     /// has not been sent with a refreshed one already. False when the
     /// refusal stands.
     fn retry_after_refresh(&mut self, cx: &mut Cx) -> bool {
-        let refreshable = self.oauth.as_ref().is_some_and(|o| o.refreshing.is_none())
-            && OAuth::can_refresh(&self.settings);
+        // A refresh already in flight (one validation asked for) serves too.
+        let refreshable = self.oauth.is_some() && OAuth::can_refresh(&self.settings);
         let Some(flight) = self.current.as_mut() else {
             return false;
         };
@@ -1447,6 +1460,80 @@ impl SpecEngine {
         cx.cancel_timer(REPLY);
         self.start_refresh(cx);
         true
+    }
+
+    /// `oauth.validate`: check the access token at the service's validation
+    /// endpoint now, or once the refresh due or in flight is done. Nothing
+    /// without `oauth.validate`, after a refusal, or while one is in flight.
+    fn validate_token(&mut self, cx: &mut Cx) {
+        let unix = cx.unix_millis();
+        let Some(oauth) = self.oauth.as_mut() else {
+            return;
+        };
+        let Some(every) = oauth.validate.as_ref().map(|v| v.every) else {
+            return;
+        };
+        if self.refused.is_some() || oauth.validating.is_some() {
+            return;
+        }
+        cx.cancel_timer(OAUTH_VALIDATE);
+        if oauth.refreshing.is_some() || oauth.needs_refresh(&self.settings, unix) {
+            // The new token is validated when the refresh ends; a refresh
+            // backing off is started by its own retry.
+            oauth.validate_waits = true;
+            if oauth.refreshing.is_none() && cx.now() >= oauth.retry_at {
+                self.start_refresh(cx);
+            }
+            return;
+        }
+        match oauth.validate_request(&self.settings, self.timeout) {
+            Some(request) => {
+                let id = self.next_request;
+                self.next_request += 1;
+                oauth.validating = Some(id);
+                cx.http(id, request);
+            }
+            // No token to validate yet: the next one is, when it comes.
+            None => cx.set_timer(OAUTH_VALIDATE, every),
+        }
+    }
+
+    /// The validation endpoint answered, or could not be reached. A 401
+    /// refreshes the token and validates the new one, when there is a
+    /// refresh token; otherwise, or when the new token is refused too, the
+    /// refusal is terminal. Anything else is tried again with backoff.
+    fn validated(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
+        let can_refresh = OAuth::can_refresh(&self.settings);
+        let Some(oauth) = self.oauth.as_mut() else {
+            return;
+        };
+        let every = oauth.validate.as_ref().map_or(0, |v| v.every);
+        match oauth.validated(result) {
+            Validated::Valid => cx.set_timer(OAUTH_VALIDATE, every),
+            Validated::Invalid if can_refresh && !oauth.validate_refreshed => {
+                oauth.validate_refreshed = true;
+                oauth.validate_waits = true;
+                cx.log(
+                    Level::Info,
+                    "the access token failed validation (HTTP 401): refreshing it",
+                );
+                self.start_refresh(cx);
+            }
+            Validated::Invalid => self.refuse(
+                cx,
+                "the service's token validation refused the access token (HTTP 401)".into(),
+            ),
+            Validated::Failed(reason, wait) => {
+                cx.log(
+                    Level::Warning,
+                    format!(
+                        "the access token could not be validated: {reason}; trying again in {} s",
+                        wait.div_ceil(1000)
+                    ),
+                );
+                cx.set_timer(OAUTH_VALIDATE, wait);
+            }
+        }
     }
 
     /// A push websocket or event stream refused its token: refresh it and
@@ -2263,6 +2350,7 @@ impl Module for SpecEngine {
         self.connect(cx);
         self.open_push(cx);
         self.open_events(cx);
+        self.validate_token(cx);
     }
 
     fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
@@ -2373,6 +2461,17 @@ impl Module for SpecEngine {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        if self
+            .oauth
+            .as_ref()
+            .is_some_and(|o| o.validating == Some(id))
+        {
+            // The validation endpoint's answer: never offered to the rules.
+            if self.refused.is_none() {
+                self.validated(cx, result);
+            }
+            return;
+        }
         if self
             .oauth
             .as_ref()
@@ -2523,6 +2622,7 @@ impl Module for SpecEngine {
                 }
             }
             EVENTS_RECONNECT => self.open_events(cx),
+            OAUTH_VALIDATE => self.validate_token(cx),
             OAUTH_RETRY => {
                 let due = self
                     .oauth
@@ -2607,8 +2707,11 @@ impl Module for SpecEngine {
             self.connect(cx);
             self.open_push(cx);
             self.open_events(cx);
+            self.validate_token(cx);
             return SettingsUpdate::Applied;
         }
+        // New settings may carry a new token: it is validated now.
+        self.validate_token(cx);
         // A request waiting on a refresh goes with the new tokens, refreshed
         // first if they need it.
         if self.current.as_ref().is_some_and(|f| f.retry.is_some()) {

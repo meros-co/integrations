@@ -1,0 +1,299 @@
+spec: 1
+id: facebook-account
+name: Facebook account (Meta Graph API, a user's Pages and Page access tokens)
+vendor: Meta
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host graph.facebook.com on port 443 with the user access token
+# of the operator who signed in, and lists the Facebook Pages they manage with
+# each Page's access token, so a consumer never calls the Graph API itself.
+# The flow: the consumer runs Facebook Login (its own Meta app) and gets a
+# user access token; it opens facebook-account with that token, runs
+# list_pages (or list_page_names and then get_page_token for the Page picked),
+# shows the operator a Page picker, closes facebook-account, and opens
+# facebook-live with the chosen Page's id as page_id and its access token as
+# token. Page access tokens are returned as command values only: never kept
+# in state or written to a log. The core never runs a sign-in and persists
+# nothing.
+
+source:
+  - title: Graph API reference, User accounts edge
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/user/accounts/
+    note: >
+      Manufacturer document, retrieved 2026-10-04. GET /{user-id}/accounts
+      lists the Facebook Pages a person owns or can perform tasks on, as Page
+      nodes with the user's tasks on each; paged. Error 283 names the Page
+      permissions a call is missing.
+  - title: Pages API, Get started (Get a Page access token)
+    author: Meta
+    url: https://developers.facebook.com/docs/pages-api/getting-started
+    note: >
+      Manufacturer document, retrieved 2026-10-04. GET /{user-id}/accounts
+      with a user access token answers, for each Page, its name, id, a
+      Page access token and the tasks the user can perform (such as
+      CREATE_CONTENT, MODERATE, ANALYZE, ADVERTISE); it needs
+      pages_show_list among the Page permissions.
+  - title: Graph API reference, Page (access_token field)
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/page/
+    note: >
+      Manufacturer document, retrieved 2026-10-04. A Page's access_token
+      field is returned only to a user with a role on the Page other than
+      Live Contributor, and only after two-factor authentication where the
+      business requires it.
+  - title: Graph API reference, User permissions edge
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/user/permissions/
+    note: >
+      Manufacturer document, retrieved 2026-10-04. GET /{user-id}/permissions
+      with the user's token lists each permission with status granted,
+      declined or expired.
+  - title: Facebook Login, Long-lived access tokens
+    author: Meta
+    url: https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived
+    note: >
+      Manufacturer document, retrieved 2026-10-04. A short-lived user token
+      is exchanged for a long-lived one (about 60 days) with GET
+      /oauth/access_token, grant_type fb_exchange_token, the app id and the
+      app secret, a call Meta says to make from a server, never a client. A
+      Page token read with a long-lived user token has no expiry date and
+      ends only under certain conditions.
+  - title: Facebook Login, Access tokens, and Business SDK, Get a Page Access Token
+    author: Meta
+    url: https://developers.facebook.com/docs/facebook-login/guides/access-tokens
+    note: >
+      Manufacturer documents, retrieved 2026-10-04. Short-lived user tokens
+      from a web login last about one to two hours; Page access tokens read
+      with a short-lived user token are valid for 1 hour
+      (https://developers.facebook.com/documentation/business-sdk/common-scenarios/token-switch).
+      Page access tokens are unique to each Page, admin and app.
+  - title: Graph API, Paginated results
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/results
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Cursor-based paging: an
+      edge answers data with paging.cursors.before and after and paging.next
+      while there is more; after and limit page forward.
+  - title: Graph API, Handling errors
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/guides/error-handling
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Code 190 is an invalid or
+      expired access token (subcodes 458 app removed, 460 password changed,
+      463 expired, 467 invalid) and 102 an invalid session; 10 and 200 to
+      299 are permissions; 4, 17, 32 and 613 rate limits.
+  - title: Graph API, Rate limiting (Platform rate limits)
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/overview/rate-limiting
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Calls made with user
+      tokens count against the app's Platform rate limit, 200 calls an hour
+      times the app's daily users, pooled across them; error 4 (app) or 17
+      (user) when exceeded.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The token setting (the user access token) as Bearer. Facebook has no
+  # refresh grant for it.
+  auth: bearer
+  # As for facebook-live: an invalid or expired token is HTTP 400 with error
+  # code 190 (or 102); a 401, or a 190 or 102 under any error status, is the
+  # refusal.
+  refusal_status: [401]
+  refusal_json: { "$.error.code": "^(190|102)$" }
+  timeout_ms: 10000
+  # The signed-in user's id and name: one cheap call, nothing secret.
+  probe: { method: GET, path: "/{settings.api_version}/me", query: { fields: "id,name" } }
+
+settings:
+  token: { type: string, secret: true, max_length: 4096, required: true,
+           label: User access token,
+           description: "The access token of the Facebook user who signed in with the consumer's own Meta app; Page tokens read with a long-lived one never expire, with a short-lived one they last 1 hour." }
+  api_version: { type: string, pattern: "^v[0-9]{1,3}\\.[0-9]$", default: "v26.0",
+                 label: Graph API version,
+                 description: "The Graph API version every request names, such as v26.0; use the same as facebook-live, and move to a newer one before Meta retires it." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at graph.facebook.com, opened by that host name" }
+
+models:
+  - id: graph-api
+    name: Meta Graph API, a Facebook user's Pages
+    supports: [get_me, get_permissions, list_pages, list_pages_after, list_page_names,
+               list_page_names_after, get_page_token]
+    verification: none
+    notes: >
+      Acts as the user who signed in. Lists only the Pages that user has a
+      role on; Page access tokens need the Page permissions in the quirks.
+
+commands:
+  get_me:
+    summary: The signed-in user's id and name (GET /me)
+    send: { method: GET, path: "/{settings.api_version}/me", query: { fields: "id,name" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_permissions:
+    summary: The permissions the user granted the app at sign-in, each granted, declined or expired, to check for pages_show_list and the Page permissions (GET /me/permissions)
+    send: { method: GET, path: "/{settings.api_version}/me/permissions" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_pages:
+    summary: The Pages the user manages, each with id, name, category, the user's tasks and the Page access token, a secret returned here only; the answer's paging.cursors.after pages on (GET /me/accounts)
+    params:
+      limit: { type: int, min: 1, max: 100, default: 25,
+               label: Pages,
+               description: "How many Pages to return in this page of results." }
+    send: { method: GET, path: "/{settings.api_version}/me/accounts",
+            query: { fields: "id,name,category,tasks,access_token", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_pages_after:
+    summary: The next Pages after a cursor from list_pages, with their Page access tokens (GET /me/accounts with after)
+    params:
+      after: { type: string, pattern: "^[A-Za-z0-9+/_=-]+$", max_length: 1024, required: true,
+               label: After cursor,
+               description: "paging.cursors.after from the previous answer; there are no more Pages when that answer had no paging.next." }
+      limit: { type: int, min: 1, max: 100, default: 25,
+               label: Pages,
+               description: "How many Pages to return in this page of results." }
+    send: { method: GET, path: "/{settings.api_version}/me/accounts",
+            query: { fields: "id,name,category,tasks,access_token", limit: "{limit}", after: "{after}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_page_names:
+    summary: The Pages the user manages, with id, name, category and the user's tasks but no tokens, for a picker followed by get_page_token (GET /me/accounts)
+    params:
+      limit: { type: int, min: 1, max: 100, default: 25,
+               label: Pages,
+               description: "How many Pages to return in this page of results." }
+    send: { method: GET, path: "/{settings.api_version}/me/accounts",
+            query: { fields: "id,name,category,tasks", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_page_names_after:
+    summary: The next Pages after a cursor from list_page_names, without tokens (GET /me/accounts with after)
+    params:
+      after: { type: string, pattern: "^[A-Za-z0-9+/_=-]+$", max_length: 1024, required: true,
+               label: After cursor,
+               description: "paging.cursors.after from the previous answer; there are no more Pages when that answer had no paging.next." }
+      limit: { type: int, min: 1, max: 100, default: 25,
+               label: Pages,
+               description: "How many Pages to return in this page of results." }
+    send: { method: GET, path: "/{settings.api_version}/me/accounts",
+            query: { fields: "id,name,category,tasks", limit: "{limit}", after: "{after}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_page_token:
+    summary: One Page's id, name and access token, for the token setting of facebook-live; a secret returned here only (GET /{page-id} access_token)
+    params:
+      page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                 label: Page ID,
+                 description: "The numeric id of a Page the user has a role on, from list_page_names." }
+    send: { method: GET, path: "/{settings.api_version}/{page_id}", query: { fields: "id,name,access_token" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host graph.facebook.com and
+      port 443; it is reached over HTTPS and the certificate is checked
+      against that name. It acts as the user whose access token is the token
+      setting, and exists to turn that sign-in into a Page for facebook-live:
+      open it with the user token, run list_pages (or list_page_names, then
+      get_page_token for the Page the operator picks), close it, and open
+      facebook-live with that Page's id as page_id and its access token as
+      token. Open it for commands only (monitor off): there is nothing to
+      poll.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The consumer owns the credential and the Meta app. It runs Facebook
+      Login itself, asking for pages_show_list (to list the Pages) and the
+      Page permissions facebook-live uses (pages_read_engagement,
+      pages_manage_posts, and pages_read_user_content for comments), which
+      need App Review for Advanced Access, and passes the user access token
+      as the token setting. Facebook has no refresh grant: a refused token
+      needs a new login. A user who declined a permission at sign-in gets an
+      empty or partial Page list, or Pages without access tokens;
+      get_permissions shows what was granted.
+
+  - models: [all]
+    severity: critical
+    text: >
+      How long a Page token lasts depends on the user token it was read
+      with. Read with a short-lived user token (the about 1 to 2 hours a web
+      login gives), a Page token is valid for 1 hour, so facebook-live stops
+      with unauthorized within the hour, likely mid-broadcast. Read with a
+      long-lived user token (about 60 days), it has no expiry date and ends
+      only when the user changes their password, removes the app or loses
+      their role on the Page. Getting a long-lived user token takes the app
+      secret (GET /oauth/access_token with grant_type fb_exchange_token),
+      and Meta requires that call to be made from a server, never from a
+      client: it is not offered here, since the core runs on the operator's
+      machine. A product with a server exchanges the token there and opens
+      this integration with the long-lived one; a product without one gets
+      Page tokens that last an hour, and must sign the operator in again for
+      each broadcast. The SDKs for native mobile apps give long-lived user
+      tokens directly.
+
+  - models: [all]
+    severity: warning
+    text: >
+      list_pages, list_pages_after and get_page_token return Page access
+      tokens, secrets anyone could manage the Page with. They are returned as
+      the command's value only: no telemetry rule reads those answers, so
+      they are never kept in state or logged, and the idle probe asks only
+      for the user's id and name. Hand the chosen token straight to
+      facebook-live's token setting and persist it as a secret; list_page_names
+      gives the picker without any token. The access_token field is returned
+      only for Pages where the user has a role other than Live Contributor
+      (and has passed two-factor authentication where the business requires
+      it); a Page without one can't be streamed to by this user.
+
+  - models: [all]
+    severity: info
+    text: >
+      Pages come 25 to an answer by default (limit, at most 100), as data
+      with paging; when the answer has paging.next there are more, and
+      list_pages_after (or list_page_names_after) with
+      paging.cursors.after gives the next ones. Each Page carries the
+      user's tasks on it (such as CREATE_CONTENT, MODERATE, ANALYZE,
+      ADVERTISE, MANAGE); going live is expected to need CREATE_CONTENT.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Calls with a user token count against the app's Platform rate limit,
+      200 calls an hour times the app's daily users, pooled across them. The
+      idle probe (GET /me) runs every 10 seconds while nothing else is sent,
+      360 calls an hour: open this integration only for the Page picker and
+      close it once the Page is chosen. A refused token is told apart as for
+      facebook-live: HTTP 401, or error code 190 or 102 under any error
+      status, is the terminal unauthorized.
+
+state:
+  user.id:   { type: string, description: "The signed-in user's app-scoped id (GET /me id)" }
+  user.name: { type: string, description: "The signed-in user's name (GET /me name)" }
+
+telemetry:
+  # Nothing is polled. The probe and get_me give the user's id and name; no
+  # rule reads the Page answers, which carry access tokens.
+  updates:
+    - path: '^/v[0-9]+\.[0-9]+/me\?fields=id%2Cname$'
+      json: { id: "$.id", name: "$.name" }
+      state:
+        user.id: "{id}"
+        user.name: "{name}"
