@@ -316,10 +316,26 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
             errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")
-    if transport.get("auth") == "bearer" and "token" not in settings:
+    auth = transport.get("auth")
+    methods = set() if isinstance(auth, dict) else {auth}
+    if isinstance(auth, dict):
+        # The operator's choice: an enum setting whose values are methods.
+        if transport_type != "http":
+            errors.append("transport.auth: {setting: name} is for the http transport")
+        decl = settings.get(auth.get("setting"))
+        if decl is None:
+            errors.append(f"transport.auth names unknown setting '{auth.get('setting')}'")
+            methods = set()
+        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer"}:
+            errors.append("transport.auth's setting must be an enum of none, basic, digest and bearer")
+            methods = set()
+        else:
+            methods = set(decl.get("values", []))
+    if "bearer" in methods and "token" not in settings:
         errors.append("auth: bearer needs a 'token' setting")
-    if transport.get("auth") in ("basic", "digest") and not {"username", "password"} <= settings.keys():
-        errors.append(f"auth: {transport.get('auth')} needs 'username' and 'password' settings")
+    for method in sorted(methods & {"basic", "digest"}):
+        if not {"username", "password"} <= settings.keys():
+            errors.append(f"auth: {method} needs 'username' and 'password' settings")
 
     listen = (doc.get("transport") or {}).get("listen_port")
     if isinstance(listen, dict) and listen.get("setting") not in settings:

@@ -2051,6 +2051,7 @@ mod tests {
     fn module(settings: Value) -> EmberPlus {
         EmberPlus::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 40)),
+            host_name: None,
             port: None,
             model: "provider".into(),
             channels: None,
@@ -3054,6 +3055,7 @@ mod tests {
     fn commands_only(settings: Value) -> EmberPlus {
         EmberPlus::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 40)),
+            host_name: None,
             port: None,
             model: "provider".into(),
             channels: None,

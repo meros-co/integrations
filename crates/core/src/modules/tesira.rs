@@ -1333,6 +1333,7 @@ mod tests {
     fn tesira(settings: Value, monitor: bool) -> Tesira {
         Tesira::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 40)),
+            host_name: None,
             port: None,
             model: "tesiraforte".into(),
             channels: None,

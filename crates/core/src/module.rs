@@ -640,6 +640,11 @@ pub trait Module: Send + 'static {
 #[derive(Debug, Clone)]
 pub struct OpenContext {
     pub host: std::net::IpAddr,
+    /// The host name the device was opened with, when it was a name rather
+    /// than an address. HTTP, websocket and event-stream URLs carry it, so
+    /// TLS checks the certificate against it and `Host` names it: a cloud
+    /// API (`api.planningcenteronline.com`) serves neither by address.
+    pub host_name: Option<String>,
     /// Overrides the protocol's default port.
     pub port: Option<u16>,
     pub model: String,

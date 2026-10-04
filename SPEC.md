@@ -239,11 +239,21 @@ terminal: pending and later commands fail with `auth`, the connection reports
 again. A credential is never retried on a schedule, because repeated failed
 logins can lock a device out.
 
+A service taking more than one kind of credential names a setting instead,
+as for `scheme` below: `auth: { setting: auth }` with `auth: { type: enum,
+values: [basic, bearer] }`. Planning Center takes a personal access token as
+Basic and an OAuth token as Bearer.
+
 Where the operator chooses HTTP or HTTPS on the device, `scheme` names a
 setting instead: `scheme: { setting: scheme }` with `scheme: { type: enum,
 values: [http, https], default: http }`. Devices that serve HTTPS with a
 self-signed certificate declare `accept_invalid_certs: true`: the connection is
 encrypted, but the device's identity is not checked.
+
+A device opened by host name rather than address keeps the name in its HTTP,
+websocket and event-stream URLs, so the certificate is checked against the
+name and `Host` carries it. A cloud API is opened that way: Planning Center's
+`api.planningcenteronline.com` or YouTube's `www.googleapis.com` on port 443.
 
 ### `ws`
 
@@ -762,7 +772,8 @@ inbound: "VIDEO OUTPUT ROUTING:\n0 5\n1 0\n\n"      # inbound_hex for OSC
 expect_state: { outputs: { "1": { input: 6 }, "2": { input: 1 } } }
 ```
 
-Every spec with a `telemetry` section has at least one.
+Every spec with a `telemetry` section has at least one. A spec whose
+telemetry needs a required setting gives `settings`, as a command vector does.
 
 ## 8. Telemetry
 

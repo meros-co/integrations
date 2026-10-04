@@ -941,6 +941,7 @@ mod tests {
         let spec = catalog.device("resolume").unwrap().clone();
         let ctx = OpenContext {
             host: "192.0.2.10".parse().unwrap(),
+            host_name: None,
             port: None,
             model: "arena".into(),
             channels: None,

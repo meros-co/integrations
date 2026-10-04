@@ -711,6 +711,7 @@ mod tests {
     fn opened_for_commands_only_it_sends_nothing_on_connecting() {
         let mut m = NovastarCcp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
             port: None,
             model: "mx40-pro".into(),
             channels: None,

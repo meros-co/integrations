@@ -376,6 +376,7 @@ mod tests {
     fn context(monitor: bool) -> OpenContext {
         OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 168, 10, 228)),
+            host_name: None,
             port: None,
             model: "h5".into(),
             channels: None,

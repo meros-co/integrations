@@ -495,6 +495,7 @@ mod tests {
         let spec = catalog.device(spec_id).unwrap().clone();
         let ctx = OpenContext {
             host: "192.0.2.10".parse().unwrap(),
+            host_name: None,
             port: None,
             model: model.into(),
             channels: None,

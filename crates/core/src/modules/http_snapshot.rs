@@ -264,6 +264,7 @@ mod tests {
         s.entry("path").or_insert(json!("/snapshot.jpg"));
         HttpSnapshot::new(OpenContext {
             host: "10.0.0.5".parse().unwrap(),
+            host_name: None,
             port: None,
             model: "generic".into(),
             channels: None,
@@ -349,6 +350,7 @@ mod tests {
     fn opened_for_commands_only_it_checks_as_ever_and_times_fetches() {
         let mut m = HttpSnapshot::new(OpenContext {
             host: "10.0.0.5".parse().unwrap(),
+            host_name: None,
             port: None,
             model: "generic".into(),
             channels: None,
