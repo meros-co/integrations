@@ -83,6 +83,19 @@ impl NativeCore {
         })
     }
 
+    /// `{"ok": true}` or `{"error": {...}}`.
+    fn update_settings(&self, py: Python<'_>, device: u64, settings: &str) -> String {
+        let settings = match parse(settings) {
+            Ok(s) => s,
+            Err(e) => return e,
+        };
+        py.detach(|| {
+            self.core
+                .block_on(api::update_settings(&self.core, device, &settings))
+                .to_string()
+        })
+    }
+
     fn snapshot(&self, device: u64) -> String {
         api::snapshot(&self.core, device).to_string()
     }

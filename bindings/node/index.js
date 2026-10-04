@@ -65,8 +65,9 @@ class Stream extends EventEmitter {
 
 /**
  * Emits 'event' for every core event, and also the event under its own name:
- * 'connection', 'state', 'alive', 'log', 'closed', 'message', 'dropped',
- * 'discovered', 'discovery'.
+ * 'connection', 'state', 'alive', 'log', 'closed', 'message', 'credentials',
+ * 'dropped', 'discovered', 'discovery'. A 'credentials' event carries OAuth
+ * tokens the core refreshed, which the caller must persist.
  */
 class Core extends EventEmitter {
   #native;
@@ -116,6 +117,18 @@ class Core extends EventEmitter {
     const result = await this.#native.execute(device, command, params);
     if (result.error) throw new IntegrationsError(result.error);
     return result.ok;
+  }
+
+  /**
+   * Change an open device's settings without closing it: `settings` are
+   * merged into its current ones (null puts one back to its default) and the
+   * whole set is validated against the spec first. Resolves once applied, or
+   * rejects with an IntegrationsError ('invalid_settings', 'closed') and
+   * nothing changed. Pass new OAuth tokens here after a sign-in.
+   */
+  async updateSettings(device, settings) {
+    const result = await this.#native.updateSettings(device, settings);
+    if (result.error) throw new IntegrationsError(result.error);
   }
 
   /** Last known state and connection status, or null if not open. */

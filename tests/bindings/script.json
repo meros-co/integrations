@@ -1,5 +1,5 @@
 {
-  "about": "Played through every delivery against integrations-sim. Each step's result, with every 'message' field removed, must equal 'expect' exactly. '$name' is replaced by a simulator port or a saved device id. A 'stream' step watches a stream: with 'expect', opening it must fail with that error; otherwise 'frames' frames must arrive within 5 s, each of 'format', starting with the JPEG marker FF D8, with rising sequence numbers, and the stream is then closed. An 'event' step takes queued events, discarding others, until 'count' (1 if absent) of them have every field of 'match' equal, within 5 s.",
+  "about": "Played through every delivery against integrations-sim. Each step's result, with every 'message' field removed, must equal 'expect' exactly. '$name' is replaced by a simulator port or a saved device id. A 'stream' step watches a stream: with 'expect', opening it must fail with that error; otherwise 'frames' frames must arrive within 5 s, each of 'format', starting with the JPEG marker FF D8, with rising sequence numbers, and the stream is then closed. An 'event' step takes queued events, discarding others, until 'count' (1 if absent) of them have every field of 'match' equal, within 5 s. An 'update_settings' step merges 'settings' into an open device's (update_settings in every delivery) and its result must equal 'expect'.",
   "steps": [
     { "op": "catalog", "path": "devices.kramer-p3000.vendor", "expect": "Kramer Electronics" },
 
@@ -32,6 +32,9 @@
       "expect": { "error": { "error": "invalid_params" } } },
     { "op": "execute", "device": "$k", "command": "no_such_command", "params": {},
       "expect": { "error": { "error": "unknown_command", "command": "no_such_command" } } },
+    { "op": "update_settings", "device": "$k", "settings": {}, "expect": { "ok": true } },
+    { "op": "execute", "device": "$k", "command": "get_model", "params": {},
+      "expect": { "ok": { "kind": "value", "value": "VS-88UT" } } },
 
     { "op": "open", "request": { "device": "no-such-device", "model": "x", "host": "127.0.0.1" },
       "expect": { "error": { "error": "unknown_device", "device": "no-such-device" } } },
@@ -55,7 +58,14 @@
     { "op": "stream", "device": "$s", "stream": "live", "frames": 3, "format": "jpeg" },
     { "op": "stream", "device": "$s", "stream": "no_such_stream",
       "expect": { "error": { "error": "unknown_stream", "stream": "no_such_stream" } } },
+    { "op": "update_settings", "device": "$s", "settings": { "no_such_setting": 1 },
+      "expect": { "error": { "error": "invalid_settings" } } },
+    { "op": "update_settings", "device": "$s", "settings": { "interval_ms": 100 }, "expect": { "ok": true } },
+    { "op": "wait", "device": "$s", "path": "connection.status", "equals": "connected" },
+    { "op": "stream", "device": "$s", "stream": "live", "frames": 2, "format": "jpeg" },
     { "op": "close", "device": "$s" },
+    { "op": "update_settings", "device": "$s", "settings": { "interval_ms": 50 },
+      "expect": { "error": { "error": "closed" } } },
     { "op": "stream", "device": "$s", "stream": "live",
       "expect": { "error": { "error": "closed" } } },
 

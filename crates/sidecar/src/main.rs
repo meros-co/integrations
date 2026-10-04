@@ -25,6 +25,7 @@
 //! | POST /v1/open                | an OpenRequest                        | {device} or {error}        |
 //! | POST /v1/discover            | {action, protocols?, hints?}          | {ok} or {error}            |
 //! | POST /v1/execute             | {device, command, params}             | {ok} or {error}            |
+//! | POST /v1/settings            | {device, settings}                    | {ok: true} or {error}      |
 //! | GET  /v1/snapshot/{device}   |                                       | snapshot, or null          |
 //! | POST /v1/close               | {device}                              | {}                         |
 //! | GET  /v1/events              | ?max=256&wait_ms=25000                | [events], empty on timeout |
@@ -36,6 +37,19 @@
 //! Videohub, HyperDeck, SmartView and MultiView); none means every protocol
 //! that finds a device in the service's catalogue. `hints` are addresses
 //! where devices were last seen.
+//!
+//! `/v1/settings` changes an open device's settings without closing it, as
+//! `update_settings` does in every delivery: `settings` are merged into the
+//! device's current ones and validated against its spec first (an unknown
+//! setting is `invalid_settings` and changes nothing). A spec-driven device
+//! takes them live, and one whose credential was refused connects again; a
+//! native one is restarted under the same id. After a sign-in the consumer
+//! passes the new OAuth tokens here.
+//!
+//! An `auth: oauth2` device (YouTube, Planning Center) refreshes its access
+//! token itself and reports each new token in a `credentials` event (SPEC.md,
+//! Events). The service keeps tokens in memory only: the consumer persists
+//! them from the events and passes them when it opens the device again.
 //!
 //! Every request needs `Authorization: Bearer <token>`. The token is read from
 //! the token file, which is created with a random token if absent. The service
@@ -176,6 +190,24 @@ async fn snapshot(
         return unauthorized();
     }
     Json(api::snapshot(&app.core, device)).into_response()
+}
+
+#[derive(Deserialize)]
+struct Settings {
+    device: u64,
+    #[serde(default)]
+    settings: Value,
+}
+
+async fn settings(
+    State(app): State<Shared>,
+    headers: HeaderMap,
+    Json(body): Json<Settings>,
+) -> Response {
+    if !authorized(&app, &headers) {
+        return unauthorized();
+    }
+    Json(api::update_settings(&app.core, body.device, &body.settings).await).into_response()
 }
 
 #[derive(Deserialize)]
@@ -338,6 +370,7 @@ fn router(app: Shared) -> Router {
         .route("/v1/open", post(open))
         .route("/v1/discover", post(discover))
         .route("/v1/execute", post(execute))
+        .route("/v1/settings", post(settings))
         .route("/v1/snapshot/{device}", get(snapshot))
         .route("/v1/close", post(close))
         .route("/v1/events", get(events))

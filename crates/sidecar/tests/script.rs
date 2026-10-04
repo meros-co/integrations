@@ -300,6 +300,11 @@ async fn the_shared_binding_script() {
                 let url = format!("{}{path}.mjpg?access_token=wrong", client.base);
                 assert_eq!(client.http.get(&url).send().await.unwrap().status(), 401);
             }
+            "update_settings" => {
+                let body = json!({"device": device, "settings": step["settings"]});
+                let result = client.post("/v1/settings", body).await;
+                assert_eq!(strip_messages(&result), step["expect"], "{label}");
+            }
             "close" => {
                 client.post("/v1/close", json!({"device": device})).await;
             }

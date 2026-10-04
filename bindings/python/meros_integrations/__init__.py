@@ -152,15 +152,38 @@ class Core:
     async def execute_async(self, device: int, command: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         return await asyncio.to_thread(self.execute, device, command, params)
 
+    def update_settings(self, device: int, settings: dict[str, Any]) -> None:
+        """Change an open device's settings without closing it.
+
+        settings are merged into the device's current ones (None puts one
+        back to its default) and the whole set is validated against the spec
+        first. A spec-driven device takes them live, keeping its state,
+        connection and commands in flight; one whose credential was refused
+        (connection "unauthorized") connects again with them. A native device
+        is restarted under the same id. Pass new OAuth tokens here after a
+        sign-in. Raises IntegrationsError ("invalid_settings", "closed")
+        having changed nothing."""
+        result = json.loads(self._native.update_settings(device, json.dumps(settings)))
+        if "error" in result:
+            raise IntegrationsError(result["error"])
+
+    async def update_settings_async(self, device: int, settings: dict[str, Any]) -> None:
+        await asyncio.to_thread(self.update_settings, device, settings)
+
     def snapshot(self, device: int) -> Optional[dict[str, Any]]:
         """Last known state and connection status; None if the device is not open."""
         return json.loads(self._native.snapshot(device))
 
     def poll_events(self, max: int = 256) -> list[dict[str, Any]]:
         """Queued events without waiting, each {"event": "connection" | "state"
-        | "alive" | "log" | "closed" | "message" | "dropped" | "discovered" |
-        "discovery", ...} (SPEC.md, Events). A "message" event is one message
-        a listener received, reported even when it repeats the last."""
+        | "alive" | "log" | "closed" | "message" | "credentials" | "dropped" |
+        "discovered" | "discovery", ...} (SPEC.md, Events). A "message" event
+        is one message a listener received, reported even when it repeats
+        the last. A "credentials" event, {"event": "credentials", "device":
+        id, "settings": {"access_token", "expires_at" (Unix seconds or None),
+        "refresh_token" (only when rotated)}}, carries OAuth tokens the core
+        refreshed: secrets it keeps in memory only, which the caller must
+        persist and pass when it next opens the device."""
         return json.loads(self._native.poll_events(max))
 
     def wait_events(self, max: int = 256, timeout_ms: int = 25_000) -> list[dict[str, Any]]:

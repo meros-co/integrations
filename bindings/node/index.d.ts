@@ -78,6 +78,14 @@ export type Event =
   | { event: 'log'; device: DeviceId; level: 'debug' | 'info' | 'warning'; message: string }
   | { event: 'closed'; device: DeviceId }
   /**
+   * New values of the device's settings the core obtained itself: OAuth
+   * tokens it refreshed for an `auth: oauth2` device. Secrets, held by the
+   * core in memory only: persist them and pass them when the device is next
+   * opened. `refresh_token` is present only when the service rotated it, and
+   * then replaces the stored one. Never discarded.
+   */
+  | { event: 'credentials'; device: DeviceId; settings: CredentialSettings }
+  /**
    * One message a listener received (an OSC control surface's button), every
    * time, even when it repeats the last: a button pressed twice is two events.
    * `source` is the sender's ip:port; `types` the OSC type tags without the
@@ -112,6 +120,15 @@ export type Event =
       evidence: Record<string, string>;
     }
   | { event: 'discovery'; protocol: string; message: string };
+
+export interface CredentialSettings {
+  access_token: string;
+  /** When the access token expires, in Unix seconds; null when the service gave no lifetime. */
+  expires_at: number | null;
+  /** Present only when the service issued a new refresh token. */
+  refresh_token?: string;
+  [setting: string]: unknown;
+}
 
 export type ErrorCode =
   | 'invalid_request'
@@ -181,6 +198,15 @@ export class Core extends EventEmitter {
   /** Found devices arrive as `discovered` events. */
   discover(request: DiscoverRequest): void;
   execute(device: DeviceId, command: string, params?: Record<string, unknown>): Promise<Outcome>;
+  /**
+   * Change an open device's settings without closing it: merged into its
+   * current ones (null puts one back to its default) and validated against
+   * the spec first. A spec-driven device takes them live (a refused
+   * credential is let go and it connects again); a native one is restarted
+   * under the same id. Rejects with an IntegrationsError ('invalid_settings',
+   * 'closed'), having changed nothing.
+   */
+  updateSettings(device: DeviceId, settings: Record<string, unknown>): Promise<void>;
   snapshot(device: DeviceId): Snapshot | null;
   close(device: DeviceId): Promise<void>;
   /**
@@ -205,6 +231,7 @@ export class Core extends EventEmitter {
   on(event: 'log', listener: (event: Extract<Event, { event: 'log' }>) => void): this;
   on(event: 'closed', listener: (event: Extract<Event, { event: 'closed' }>) => void): this;
   on(event: 'message', listener: (event: Extract<Event, { event: 'message' }>) => void): this;
+  on(event: 'credentials', listener: (event: Extract<Event, { event: 'credentials' }>) => void): this;
   on(event: 'dropped', listener: (event: Extract<Event, { event: 'dropped' }>) => void): this;
   on(event: 'discovered', listener: (event: Extract<Event, { event: 'discovered' }>) => void): this;
   on(event: 'discovery', listener: (event: Extract<Event, { event: 'discovery' }>) => void): this;
