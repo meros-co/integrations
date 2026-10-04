@@ -498,12 +498,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## dataton-watchout7 — Dataton WATCHOUT 7
 
-- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:347](specs/dataton-watchout7.yaml#L347))
-- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:355](specs/dataton-watchout7.yaml#L355))
-- [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:154](specs/dataton-watchout7.yaml#L154))
-- [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:33](specs/dataton-watchout7.yaml#L33))
-- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:322](specs/dataton-watchout7.yaml#L322))
-- [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:237](specs/dataton-watchout7.yaml#L237))
+- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:389](specs/dataton-watchout7.yaml#L389))
+- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:397](specs/dataton-watchout7.yaml#L397))
+- [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:165](specs/dataton-watchout7.yaml#L165))
+- [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:35](specs/dataton-watchout7.yaml#L35))
+- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:372](specs/dataton-watchout7.yaml#L372))
+- [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:248](specs/dataton-watchout7.yaml#L248))
+- [ ] Record the shape of GET /v0/state ({clockTime, timelines: [{id, playbackStatus}]} bare, or under value as in the event stream, are both read) and confirm it lists every timeline of the show, stopped ones included: each read replaces the timelines state. ([specs/dataton-watchout7.yaml:319](specs/dataton-watchout7.yaml#L319))
+- [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:362](specs/dataton-watchout7.yaml#L362))
 
 ## digico-sd — DiGiCo SD and Quantum consoles
 

@@ -9,7 +9,8 @@ category: playback
 # protocol" switch). Timelines and cues are addressed by their numeric ids,
 # which survive renaming (Producer: Copy ID). Inputs are show variables
 # addressed by their Key. Playback changes, countdowns and show revisions are
-# pushed on the server-sent event stream /v2/sse. WATCHOUT 7's WATCHOUT 6
+# pushed on the server-sent event stream /v2/sse; the whole playback state
+# (/v0/state) is read as well, so removed timelines leave. WATCHOUT 7's WATCHOUT 6
 # compatibility layer is the dataton-watchout6 integration's watchout7-compat
 # model.
 
@@ -88,7 +89,8 @@ models:
     verification: none
     notes: >
       No /v0/hittest and no v2 event stream (both 7.8), so playback state is not
-      pushed: read it with get_state.
+      pushed: timelines.* comes from the minute's read of /v0/state, and
+      get_state reads it at once.
 
 commands:
   # ── Reading ──────────────────────────────────────────────────────────────
@@ -305,7 +307,40 @@ telemetry:
   # timeline, countdowns to cues and the show revision.
   sse:
     path: /v2/sse
+  # The stream's playback states are differences, so a timeline removed from
+  # the show is never reported gone there: /v0/state, the playback state of
+  # every timeline, is read on connecting, each time the show revision
+  # changes, and every minute, and replaces the timelines.
+  poll:
+    send:
+      - { method: GET, path: /v0/state }
+    every_ms: 60000
   updates:
+    # /v0/state: its shape is served only by the node; it is taken to be the
+    # playback state the stream sends ({clockTime, timelines: [{id,
+    # playbackStatus}]}), bare or under value as in the stream.
+    - path: "^/v0/state$"
+      json_match: { "$.timelines": "^\\[" }
+      json_each: "$.timelines"
+      json: { id: "$.id", status: "$.playbackStatus" }
+      replace: timelines
+      state:
+        timelines.{id}.status: "{status}"
+    - path: "^/v0/state$"
+      json_match: { "$.value.timelines": "^\\[" }
+      json_each: "$.value.timelines"
+      json: { id: "$.id", status: "$.playbackStatus" }
+      replace: timelines
+      state:
+        timelines.{id}.status: "{status}"
+    - path: "^/v0/state$"
+      json: { clock: "$.clockTime" }
+      state:
+        clock_time_ms: "{clock}"
+    - path: "^/v0/state$"
+      json: { clock: "$.value.clockTime" }
+      state:
+        clock_time_ms: "{clock}"
     - json_match: { "$.data.kind": "^playbackState$" }
       json_each: "$.data.value.timelines"
       json: { id: "$.id", status: "$.playbackStatus" }
@@ -324,6 +359,9 @@ telemetry:
     - json_match: { "$.data.kind": "^showRevision$" }
       json: { revision: "$.data.value" }
       state: { show.revision: "{revision}" }
+      # The show changed: timelines may have been added or removed.
+      then_send:
+        - { method: GET, path: /v0/state }
 
 state:
   timelines.*.status:     { type: string, description: "Playback status of a timeline, keyed by timeline id: run, pause or stop" }
@@ -358,8 +396,11 @@ quirks:
     text: >
       The shape of the event stream's messages comes from Bitfocus's Companion
       module, not Dataton's page: JSON {"kind", "value"} without event names, with
-      v2 playback states as differences by timeline id. A timeline removed from the
-      show stays in the timelines state until the device is opened again.
+      v2 playback states as differences by timeline id. The playback state of
+      every timeline (/v0/state) is read on connecting, whenever the show
+      revision changes and every minute, and replaces the timelines state, so a
+      timeline removed from the show leaves it then; the shape of /v0/state
+      is taken to match the stream's playback state.
   - models: [all]
     severity: info
     text: >
