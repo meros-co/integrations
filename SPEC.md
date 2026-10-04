@@ -1180,6 +1180,25 @@ that the reply answers.
         "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
 ```
 
+`json_each` names an array, and may reach it through arrays: `[*]` in its
+path goes through every element of an array on the way, so
+`$.data[*].ingest_streams` is each ingest stream of each of the Page's live
+videos. In each match, `json` paths are the element's; `$^.` names the
+element one level out (the live video, or the whole reply for an array
+without `[*]`), `$^^.` two; and `{index}` is the element's index in its
+array, for state keyed by position where the elements have no id:
+
+```yaml
+    - path: '^/v[0-9.]+/[0-9]+/live_videos\?'
+      json_each: "$.data[*].ingest_streams"
+      json: { video: "$^.id", stream: "$.id", bitrate: "$.stream_health.video_bitrate" }
+      state: { "live_videos.{video}.ingest_streams.{stream}.video_bitrate": "{bitrate}" }
+```
+
+A JSON path anywhere may also index an array, `$.streams[0].name` (§5).
+State keyed this way keeps what a later reply no longer lists, so a list
+that shrinks (a tag list) is better kept whole, as JSON text.
+
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.

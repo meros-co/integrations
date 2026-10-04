@@ -33,7 +33,9 @@ _VIDEO = {"id": _LV, "title": "Sunday Service", "description": "Live from the ma
 _VIDEO_STATE = {"title": "Sunday Service", "description": "Live from the main hall", "status": "LIVE",
                 "live_views": 214, "broadcast_start_time": "2026-10-04T16:00:12+0000", "seconds_left": 27588,
                 "permalink_url": "/1093482904102/videos/10155832421501570/",
-                "ingest_streams": json.dumps(_INGEST, separators=(",", ":"))}
+                "ingest_streams": {"10155832421506570": {
+                    "is_master": True, "video_bitrate": 4005000, "audio_bitrate": 128000.5, "video_framerate": 30.0,
+                    "video_gop_size": 2000, "video_width": 1920, "video_height": 1080}}}
 _CREATED = {"id": _LV, "stream_url": "rtmp://live-api-s.facebook.com:80/rtmp/FB-10155832421501570-0-AbzX",
             "secure_stream_url": "rtmps://live-api-s.facebook.com:443/rtmp/FB-10155832421501570-0-AbzX"}
 
@@ -110,8 +112,14 @@ telemetry(FB, "page-live-videos", settings=_FBS, inbound_http={
     "body": json.dumps({"data": [_VIDEO, {"id": "10155832421501001", "title": "Last week", "status": "VOD",
                                           "live_views": 0, "ingest_streams": []}], "paging": {}})},
     expect_state={"live_videos": {_LV: _VIDEO_STATE,
-                                  "10155832421501001": {"title": "Last week", "status": "VOD", "live_views": 0,
-                                                        "ingest_streams": "[]"}}})
+                                  "10155832421501001": {"title": "Last week", "status": "VOD", "live_views": 0}}})
 telemetry(FB, "live-video", settings=_FBS, inbound_http={
     "path": _V + "/" + _LV + "?" + _F, "body": json.dumps(_VIDEO)},
     expect_state={"live_videos": {_LV: _VIDEO_STATE}})
+telemetry(FB, "ingest-streams", settings=_FBS, inbound_http={
+    "path": _V + "/" + _LV + "?fields=" + _q("ingest_streams{id,stream_id,is_master,stream_health}", safe=""),
+    "body": json.dumps({"ingest_streams": _INGEST + [{"id": "10155832421506571", "is_master": False,
+                                                      "stream_health": {"video_bitrate": 0}}], "id": _LV})},
+    expect_state={"live_videos": {_LV: {"ingest_streams": {
+        "10155832421506570": _VIDEO_STATE["ingest_streams"]["10155832421506570"],
+        "10155832421506571": {"is_master": False, "video_bitrate": 0}}}}})

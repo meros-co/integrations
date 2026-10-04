@@ -83,6 +83,99 @@ enum Matcher {
     HttpXml { path: Regex, element: String },
 }
 
+/// One element `json_each` reaches: the element, its index in its array,
+/// and the elements it lies in, outermost first (the document, then each
+/// `[*]` level's element).
+struct EachItem<'a> {
+    item: &'a Value,
+    index: usize,
+    outer: Vec<&'a Value>,
+}
+
+/// The elements of the array at `each`, through every `[*]` in it:
+/// `$.data[*].ingest_streams` is each ingest stream of each live video.
+fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
+    let parts: Vec<&str> = each.split("[*]").collect();
+    // Elements reached so far, each with the elements it lies in.
+    let mut level: Vec<(&Value, Vec<&Value>)> = vec![(doc, Vec::new())];
+    let last = parts.len() - 1;
+    let mut out = Vec::new();
+    for (i, part) in parts.iter().enumerate() {
+        let path = if i == 0 {
+            part.to_string()
+        } else {
+            format!("${part}")
+        };
+        let mut next = Vec::new();
+        for (node, outer) in level {
+            let Some(array) = super::expect::json_path(node, &path).and_then(Value::as_array)
+            else {
+                continue;
+            };
+            let mut within = outer.clone();
+            within.push(node);
+            for (index, item) in array.iter().enumerate() {
+                if i == last {
+                    out.push(EachItem {
+                        item,
+                        index,
+                        outer: within.clone(),
+                    });
+                } else {
+                    next.push((item, within.clone()));
+                }
+            }
+        }
+        level = next;
+    }
+    out
+}
+
+/// The captures of each match of a JSON rule: `base` (the path's and the
+/// selectors'), then its `json` names. With `json_each`, once per element:
+/// `json` paths are the element's, `$^.` names the element one level out
+/// (`$^^.` two), and `{index}` is the element's index in its array.
+fn each_values(
+    doc: &Value,
+    each: Option<&str>,
+    json: &BTreeMap<String, String>,
+    base: &[(String, Value)],
+) -> Vec<Vec<(String, Value)>> {
+    let items = match each {
+        Some(each) => each_items(doc, each),
+        None => vec![EachItem {
+            item: doc,
+            index: 0,
+            outer: Vec::new(),
+        }],
+    };
+    items
+        .into_iter()
+        .map(|e| {
+            let mut values = base.to_vec();
+            if each.is_some() {
+                values.push(("index".to_string(), Value::from(e.index)));
+            }
+            for (name, path) in json {
+                let up = path
+                    .strip_prefix('$')
+                    .map_or(0, |rest| rest.len() - rest.trim_start_matches('^').len());
+                let (node, path) = match up {
+                    0 => (Some(e.item), path.clone()),
+                    n => (
+                        e.outer.len().checked_sub(n).map(|i| e.outer[i]),
+                        format!("${}", &path[1 + n..]),
+                    ),
+                };
+                if let Some(v) = present(node.and_then(|n| super::expect::json_path(n, &path))) {
+                    values.push((name.clone(), v.clone()));
+                }
+            }
+            values
+        })
+        .collect()
+}
+
 /// A rule's `json:` names and JSON paths; empty when it has none.
 /// `json_match`-style selectors: JSON paths to regexes.
 fn selectors(v: Option<&Value>, what: &str) -> Result<Vec<(String, Regex)>, String> {
@@ -629,20 +722,7 @@ impl Telemetry {
                     if !select(&doc, reply_select, &mut base) {
                         continue;
                     }
-                    let items: Vec<&Value> = match each {
-                        Some(each) => super::expect::json_path(&doc, each)
-                            .and_then(Value::as_array)
-                            .map(|a| a.iter().collect())
-                            .unwrap_or_default(),
-                        None => vec![&doc],
-                    };
-                    for item in items {
-                        let mut values = base.clone();
-                        for (name, json_path) in json {
-                            if let Some(v) = present(super::expect::json_path(item, json_path)) {
-                                values.push((name.clone(), v.clone()));
-                            }
-                        }
+                    for values in each_values(&doc, each.as_deref(), json, &base) {
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
@@ -681,20 +761,7 @@ impl Telemetry {
                     if !select(doc, selectors, &mut base) {
                         continue;
                     }
-                    let items: Vec<&Value> = match each {
-                        Some(each) => super::expect::json_path(doc, each)
-                            .and_then(Value::as_array)
-                            .map(|a| a.iter().collect())
-                            .unwrap_or_default(),
-                        None => vec![*doc],
-                    };
-                    for item in items {
-                        let mut values = base.clone();
-                        for (name, json_path) in json {
-                            if let Some(v) = present(super::expect::json_path(item, json_path)) {
-                                values.push((name.clone(), v.clone()));
-                            }
-                        }
+                    for values in each_values(doc, each.as_deref(), json, &base) {
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
@@ -1326,6 +1393,53 @@ mod tests {
         // Without its request, a bare value is nothing.
         assert_eq!(t.apply(&Inbound::Text("1")), None);
         assert_eq!(answer("1", "Subnet.Status ?").0, None);
+    }
+
+    #[test]
+    fn nested_arrays_keyed_by_a_field_or_an_index() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/live_videos$", "json_each": "$.data[*].ingest_streams",
+                 "json": {"video": "$^.id", "stream": "$.id", "kbps": "$.stream_health.video_bitrate",
+                          "page": "$^^.page"},
+                 "state": {"videos.{video}.ingest.{stream}.bitrate": "{kbps}",
+                           "videos.{video}.ingest.{stream}.position": "{index}",
+                           "videos.{video}.page": "{page}"}},
+                {"json_match": {"$.type": "^tags$"}, "json_each": "$.tags",
+                 "json": {"tag": "$"}, "state": {"tags.{index}": "{tag}"}},
+            ]})),
+            &state(json!({
+                "videos.*.ingest.*.bitrate": {"type": "int", "description": "x"},
+                "videos.*.ingest.*.position": {"type": "int", "description": "x"},
+                "videos.*.page": {"type": "string", "description": "x"},
+                "tags.*": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = json!({"page": "P1", "data": [
+            {"id": "V1", "ingest_streams": [
+                {"id": "S1", "stream_health": {"video_bitrate": 4000}},
+                {"id": "S2", "stream_health": {"video_bitrate": 3900}}]},
+            {"id": "V2", "ingest_streams": []},
+            {"id": "V3"}]})
+        .to_string();
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/live_videos",
+                headers: &[],
+                body: body.as_bytes(),
+                request: None
+            }),
+            Some(json!({"videos": {"V1": {"page": "P1", "ingest": {
+                "S1": {"bitrate": 4000, "position": 0},
+                "S2": {"bitrate": 3900, "position": 1}}}}}))
+        );
+        let tags = json!({"type": "tags", "tags": ["English", "Music"]});
+        assert_eq!(
+            t.apply(&Inbound::Json(&tags)),
+            Some(json!({"tags": {"0": "English", "1": "Music"}}))
+        );
     }
 
     #[test]
