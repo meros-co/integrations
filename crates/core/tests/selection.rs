@@ -99,7 +99,7 @@ async fn a_selected_device_opens_and_any_other_is_refused() {
 fn discovery_runs_only_the_protocols_of_the_selected_devices() {
     let core = wireless();
     assert_eq!(core.discovery_protocols(), ["mcp"]);
-    for excluded in ["ssdp", "pjlink"] {
+    for excluded in ["ssdp", "pjlink", "mdns"] {
         let err = core
             .discover(discover(&[excluded], DiscoverAction::Scan))
             .unwrap_err();

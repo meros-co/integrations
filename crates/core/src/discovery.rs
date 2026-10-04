@@ -7,8 +7,9 @@
 //!
 //! Sennheiser EW G3/G4 receivers (MCP) are found by `crate::mcp_discovery`,
 //! Sony cameras (SSDP) by `crate::ssdp`, and PJLink Class 2 projectors
-//! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, whose rules
-//! are there. Each is compiled only with the integration whose devices it
+//! (SRCH/ACKN and LKUP on UDP 4352) by `crate::pjlink_discovery`, and
+//! Blackmagic Design devices (mDNS / DNS-SD) by `crate::mdns`, whose rules
+//! are there. Each is compiled only with the integrations whose devices it
 //! finds. Protocols are independent: each listens, scans and stops on its own.
 
 use std::net::{IpAddr, Ipv4Addr};
@@ -27,6 +28,16 @@ pub const PROTOCOLS: &[(&str, &[&str])] = &[
     ("mcp", &["sennheiser-ew-g3-g4"]),
     ("ssdp", &["sony-camera"]),
     ("pjlink", &["pjlink"]),
+    (
+        "mdns",
+        &[
+            "blackmagic-atem",
+            "blackmagic-hyperdeck",
+            "blackmagic-multiview",
+            "blackmagic-smartview",
+            "blackmagic-videohub",
+        ],
+    ),
 ];
 
 /// What a host asks of discovery.
@@ -35,7 +46,8 @@ pub struct DiscoverRequest {
     /// `listen` (passively), `scan` (listen, and probe now) or `stop`.
     pub action: DiscoverAction,
     /// Which discovery protocols: `mcp` (Sennheiser G3/G4), `ssdp` (Sony
-    /// cameras) and `pjlink` (PJLink Class 2 projectors). Empty means every
+    /// cameras), `pjlink` (PJLink Class 2 projectors) and `mdns` (Blackmagic
+    /// ATEM, Videohub, HyperDeck, SmartView and MultiView). Empty means every
     /// protocol that finds a device in this core's catalogue; naming one that
     /// finds none of them is an error.
     #[serde(default)]
@@ -43,7 +55,8 @@ pub struct DiscoverRequest {
     /// Addresses where devices were last seen. An MCP scan also sweeps their
     /// /24s; an SSDP scan also asks each by unicast M-SEARCH, which reaches
     /// cameras multicast does not (across a router); a PJLink scan also
-    /// sends each a unicast `%2SRCH`.
+    /// sends each a unicast `%2SRCH`; an mDNS scan also sends each its query
+    /// by unicast to UDP 5353.
     #[serde(default)]
     pub hints: Vec<Ipv4Addr>,
 }
@@ -79,6 +92,14 @@ pub(crate) struct Discovery {
     ssdp: crate::ssdp::Ssdp,
     #[cfg(feature = "pjlink")]
     pjlink: crate::pjlink_discovery::PjLinkDiscovery,
+    #[cfg(any(
+        feature = "blackmagic-atem",
+        feature = "blackmagic-hyperdeck",
+        feature = "blackmagic-multiview",
+        feature = "blackmagic-smartview",
+        feature = "blackmagic-videohub"
+    ))]
+    mdns: crate::mdns::Mdns,
     /// The protocols that find a device in the core's catalogue.
     available: Vec<&'static str>,
 }
@@ -101,6 +122,14 @@ impl Discovery {
             ssdp: Default::default(),
             #[cfg(feature = "pjlink")]
             pjlink: Default::default(),
+            #[cfg(any(
+                feature = "blackmagic-atem",
+                feature = "blackmagic-hyperdeck",
+                feature = "blackmagic-multiview",
+                feature = "blackmagic-smartview",
+                feature = "blackmagic-videohub"
+            ))]
+            mdns: crate::mdns::Mdns::new(catalog),
             available: protocols_for(catalog),
         }
     }
@@ -140,8 +169,9 @@ impl Discovery {
         let wants = |p: &str| wanted.contains(&p);
         // A protocol whose integration is not built in is never available, so
         // its branches below are compiled only with that integration.
-        let (mcp, ssdp, pjlink) = (wants("mcp"), wants("ssdp"), wants("pjlink"));
-        let _ = (mcp, ssdp, pjlink);
+        let (mcp, ssdp, pjlink, mdns) =
+            (wants("mcp"), wants("ssdp"), wants("pjlink"), wants("mdns"));
+        let _ = (mcp, ssdp, pjlink, mdns);
         match request.action {
             DiscoverAction::Stop => {
                 #[cfg(feature = "sennheiser-ew-g3-g4")]
@@ -155,6 +185,16 @@ impl Discovery {
                 #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.stop(services);
+                }
+                #[cfg(any(
+                    feature = "blackmagic-atem",
+                    feature = "blackmagic-hyperdeck",
+                    feature = "blackmagic-multiview",
+                    feature = "blackmagic-smartview",
+                    feature = "blackmagic-videohub"
+                ))]
+                if mdns {
+                    self.mdns.stop();
                 }
                 Ok(())
             }
@@ -170,6 +210,16 @@ impl Discovery {
                 #[cfg(feature = "pjlink")]
                 if pjlink {
                     self.pjlink.listen(services)?;
+                }
+                #[cfg(any(
+                    feature = "blackmagic-atem",
+                    feature = "blackmagic-hyperdeck",
+                    feature = "blackmagic-multiview",
+                    feature = "blackmagic-smartview",
+                    feature = "blackmagic-videohub"
+                ))]
+                if mdns {
+                    self.mdns.listen(services)?;
                 }
                 Ok(())
             }
@@ -188,6 +238,17 @@ impl Discovery {
                 if pjlink {
                     self.pjlink.listen(services)?;
                     self.pjlink.scan(services, &request.hints);
+                }
+                #[cfg(any(
+                    feature = "blackmagic-atem",
+                    feature = "blackmagic-hyperdeck",
+                    feature = "blackmagic-multiview",
+                    feature = "blackmagic-smartview",
+                    feature = "blackmagic-videohub"
+                ))]
+                if mdns {
+                    self.mdns.listen(services)?;
+                    self.mdns.scan(services, &request.hints);
                 }
                 Ok(())
             }
@@ -240,7 +301,10 @@ mod tests {
         assert_eq!(projectors.wanted(&request(&[])).unwrap(), ["pjlink"]);
 
         let every = Discovery::new(&Catalog::source_tree());
-        assert_eq!(every.protocols(), ["mcp", "ssdp", "pjlink"]);
+        assert_eq!(every.protocols(), ["mcp", "ssdp", "pjlink", "mdns"]);
+
+        let switchers = Discovery::new(&catalog(&["blackmagic-atem", "vmix"]));
+        assert_eq!(switchers.wanted(&request(&[])).unwrap(), ["mdns"]);
     }
 
     #[test]
