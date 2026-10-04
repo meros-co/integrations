@@ -1184,6 +1184,32 @@ A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
 `inbound`, plus `request` (the JSON request body) for a `request_match` rule
 and `headers` (name to value) for a `headers` rule.
 
+#### Replies and what they answer
+
+Some line devices answer with the value alone: Lab.gruppen's NLB 60E
+answers `AMP1.Power ?` with `1`, and `Subnet.Mute ?` with `1` too. A device
+that answers one message at a time, in order, still says what it answers:
+the message in flight. A `match` rule names the text of that message with
+`request_match`, an RE2-safe regex; its captures are numbered on after the
+reply's:
+
+```yaml
+    - match: "^([01])$"
+      request_match: '^([A-Z0-9@-]+)\.Mute([A-H]) (?:= [01]|\?)$'
+      state: { "amps.{2}.channels.{3}.mute": { value: "{1}", map: { "0": false, "1": true } } }
+```
+
+The rule then matches only a message taken as the reply to a command, a
+query or a probe, and only when the text sent (the template rendered,
+without framing) matches `request_match`: a reply to a set and to a get
+alike, and never a message the device pushes. Rules without
+`request_match` see replies as before. A telemetry vector for such a rule
+gives `request`, the text of the message the `inbound` reply answers.
+
+With `then_send` (below, "Re-reads on a push"), a reply can have more read: the NLB's VDN table
+names each amplifier, and each name has that amplifier's status, power and
+mutes read in turn.
+
 #### Poll replies on another address
 
 An OSC query is answered on its own address by most devices. ETC Eos answers

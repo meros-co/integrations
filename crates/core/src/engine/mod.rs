@@ -440,11 +440,15 @@ impl Await {
 struct InFlight {
     /// `None` for a liveness probe.
     id: Option<CommandId>,
-    messages: VecDeque<(Outgoing, Option<OscReply>)>,
+    /// Each message, the OSC reply it waits for, and on a line transport
+    /// its text without framing (what a reply's `request_match` reads).
+    messages: VecDeque<(Outgoing, Option<OscReply>, Option<String>)>,
     /// Over a websocket: what identifies the reply (`expect.reply_json`).
     ws_reply: Option<Vec<(String, String)>>,
     /// On a line transport: text the reply holds (`expect.reply_contains`).
     text_reply: Option<String>,
+    /// The text of the line message now awaiting its reply.
+    request_text: Option<String>,
     expect: Map<String, Value>,
     returns: String,
     awaiting: Option<Await>,
@@ -1482,13 +1486,21 @@ impl SpecEngine {
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
-            messages.push_back((outgoing, awaited_address.clone()));
+            let text = match (&self.transport, &item) {
+                (
+                    Transport::LineTcp { .. } | Transport::LineUdp { .. },
+                    Value::String(template),
+                ) => Some(render(template, &values, no_escape)?),
+                _ => None,
+            };
+            messages.push_back((outgoing, awaited_address.clone(), text));
         }
         Ok(InFlight {
             id: job.id,
             messages,
             ws_reply,
             text_reply,
+            request_text: None,
             expect,
             returns,
             awaiting: None,
@@ -1593,7 +1605,7 @@ impl SpecEngine {
                 return;
             };
             let waits = replies && (flight.returns != "none" || flight.id.is_none());
-            let Some((outgoing, address)) = flight.messages.pop_front() else {
+            let Some((outgoing, address, text)) = flight.messages.pop_front() else {
                 // Everything sent and, where the protocol replies, answered.
                 let flight = self.current.take().unwrap();
                 if let Some(id) = flight.id {
@@ -1601,6 +1613,7 @@ impl SpecEngine {
                 }
                 return;
             };
+            flight.request_text = text;
             let awaiting = match outgoing {
                 Outgoing::Ws(text) => {
                     cx.ws_send(SOCKET, text);
@@ -2418,7 +2431,6 @@ impl SpecEngine {
         // text that happens to match is not about the login.
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
-        self.apply_message(cx, &message);
         let waiting = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
             Some(Await::Text(None)) => true,
             // `expect.reply_contains`: a message that does not hold the text
@@ -2440,16 +2452,40 @@ impl SpecEngine {
         {
             if !re.is_match(&message) {
                 // Unsolicited: status the device pushes on its own.
+                self.apply_message(cx, &message);
                 self.last_heard = cx.now();
                 cx.alive();
                 return;
             }
+        }
+        // The reply to the message in flight is offered with that message's
+        // text, for a rule that needs to know what it answers.
+        let request = waiting
+            .then(|| self.current.as_ref().and_then(|f| f.request_text.clone()))
+            .flatten();
+        match request {
+            Some(request) => {
+                self.offer_answer(cx, &message, &request);
+            }
+            None => self.apply_message(cx, &message),
         }
         if waiting {
             self.reply(cx, Reply::Text(message));
         } else {
             self.last_heard = cx.now();
             cx.alive();
+        }
+    }
+
+    /// A line reply, offered with the text of the message it answers: as
+    /// JSON where it parses, and as text.
+    fn offer_answer(&mut self, cx: &mut Cx, message: &str, request: &str) {
+        if let Ok(doc) = serde_json::from_str::<Value>(message) {
+            self.offer(cx, &telemetry::Inbound::Json(&doc));
+        }
+        let text = message.trim();
+        if !text.is_empty() {
+            self.offer(cx, &telemetry::Inbound::Answer { text, request });
         }
     }
 
@@ -5471,5 +5507,45 @@ mod tests {
             e.queue.len()
         );
         assert!(requests(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn a_line_reply_updates_the_state_of_what_was_asked() {
+        let spec = Catalog::source_tree()
+            .device("labgruppen-nlb60e")
+            .unwrap()
+            .clone();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "nlb-60e".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        let params = json!({"vdn": "amp1"}).as_object().unwrap().clone();
+        let mut cx = Cx::new(1);
+        e.command(&mut cx, 3, "get_mute_status", &params);
+        assert_eq!(tcp_sent(&cx.take()), vec!["amp1.MuteStatus ?\r\n"]);
+        let mut cx = Cx::new(2);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b"01\r\n".to_vec()));
+        let a = cx.take();
+        assert!(
+            a.contains(&Action::State(json!({"amps": {"AMP1": {"channels":
+            {"A": {"mute": false}, "B": {"mute": true}}}}})))
+        );
+        assert_eq!(
+            completed(&a),
+            vec![(3, Ok(Outcome::Value { value: json!("01") }))]
+        );
     }
 }

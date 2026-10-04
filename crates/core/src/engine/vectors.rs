@@ -230,7 +230,13 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     // What the connection queued (polls) is dropped, so what the message
     // queues (`then_send`) is all that is left.
     engine.queue.clear();
-    if let Some(text) = v.get("inbound").and_then(Value::as_str) {
+    if let (Some(text), Some(request)) = (
+        v.get("inbound").and_then(Value::as_str),
+        v.get("request").and_then(Value::as_str),
+    ) {
+        // A reply, with the text of the message it answers.
+        engine.offer_answer(&mut cx, text.trim_end(), request);
+    } else if let Some(text) = v.get("inbound").and_then(Value::as_str) {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
         engine.datagram(&mut cx, "device", SocketAddr::new(HOST, 1), &unhex(h));
@@ -298,13 +304,22 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         let waiting: Vec<super::Job> = engine.queue.drain(..).collect();
         for job in waiting {
             let flight = engine.prepare(&job)?;
-            for (outgoing, _) in flight.messages {
-                if let super::Outgoing::Http(request) = outgoing {
-                    sent.extend(wire(&[Action::Http { id: 0, request }]));
+            for (outgoing, _, _) in flight.messages {
+                match outgoing {
+                    super::Outgoing::Http(request) => {
+                        sent.extend(wire(&[Action::Http { id: 0, request }]))
+                    }
+                    super::Outgoing::Bytes(bytes) => sent.push(Wire::Bytes(bytes)),
+                    super::Outgoing::Ws(text) => sent.push(Wire::Bytes(text.into_bytes())),
                 }
             }
         }
-        let expected = expected_wire(&json!({ "expect_request": expected })).unwrap();
+        // Requests as expect_request gives them, or line messages as text.
+        let key = match expected.get(0) {
+            Some(Value::String(_)) => "expect_wire",
+            _ => "expect_request",
+        };
+        let expected = expected_wire(&json!({ key: expected })).unwrap();
         if sent != expected {
             return Err(format!(
                 "then_send mismatch\n  expected {expected:?}\n  sent     {sent:?}"

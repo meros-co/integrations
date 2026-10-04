@@ -728,10 +728,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## labgruppen-nlb60e — Lab.gruppen NLB 60E (NomadLink)
 
-- [ ] Confirm the bridge accepts the operator with spaces around it (`Subnet.Mute = 1`, `Subnet.Mute ?`), as the examples write it, and answers with the value alone. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
-- [ ] Check virtual device names with dots (the document's examples) are accepted, as its character rules exclude them. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
-- [ ] Check what `Subnet.Status ?` answers with no faulty amplifier (nothing after the faults flag, or a trailing space). ([specs/labgruppen-nlb60e.yaml:222](specs/labgruppen-nlb60e.yaml#L222))
-- [ ] Note whether polling `Subnet.Status ?` every 2 s is acceptable to the bridge, and whether the third-party port still works on firmware newer than 2.1.0. ([specs/labgruppen-nlb60e.yaml:216](specs/labgruppen-nlb60e.yaml#L216))
+- [ ] Confirm the bridge accepts the operator with spaces around it (`Subnet.Mute = 1`, `Subnet.Mute ?`), as the examples write it, and answers with the value alone. ([specs/labgruppen-nlb60e.yaml:375](specs/labgruppen-nlb60e.yaml#L375))
+- [ ] Check virtual device names with dots (the document's examples) are accepted, as its character rules exclude them; such names are not kept in state. ([specs/labgruppen-nlb60e.yaml:375](specs/labgruppen-nlb60e.yaml#L375))
+- [ ] Check what `Subnet.Status ?` answers with no faulty amplifier (nothing after the faults flag, or a trailing space). ([specs/labgruppen-nlb60e.yaml:221](specs/labgruppen-nlb60e.yaml#L221))
+- [ ] Note whether polling `Subnet.Status ?` and the 60 VDN slots every 5 s, with three reads per named amplifier, is acceptable to the bridge, and whether the third-party port still works on firmware newer than 2.1.0. ([specs/labgruppen-nlb60e.yaml:219](specs/labgruppen-nlb60e.yaml#L219))
+- [ ] Confirm the bridge answers strictly one message at a time and in order, so a value is the answer to the message in flight, as the state per amplifier assumes (document section 2). ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
+- [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
+- [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 

@@ -573,7 +573,18 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     re.compile(rule[key])
                 except re.error as e:
                     errors.append(f"{where}.{key}: {e}")
+        asked = rule.get("request_match")
+        if isinstance(asked, str):
+            # The text of the line message a reply answers (SPEC.md §8).
+            try:
+                re.compile(asked)
+            except re.error as e:
+                errors.append(f"{where}.request_match: {e}")
+            if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
+                errors.append(f"{where}: a request_match regex goes with match, on a line transport")
         for key in ("json_match", "request_match"):
+            if not isinstance(rule.get(key) or {}, dict):
+                continue
             for jpath, pattern in (rule.get(key) or {}).items():
                 if not jpath.startswith("$"):
                     errors.append(f"{where}.{key}: '{jpath}' is not a JSON path")
@@ -584,7 +595,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         if "json_match" in rule and "path" not in rule and not has_json:
             errors.append(f"{where}: json_match reads JSON messages; the spec has no websocket, "
                           "event stream or line transport")
-        if "request_match" in rule and "path" not in rule:
+        if isinstance(asked, dict) and "path" not in rule:
             errors.append(f"{where}: request_match applies to a path rule")
         if "headers" in rule and "path" not in rule:
             errors.append(f"{where}: headers applies to a path rule (an HTTP reply)")

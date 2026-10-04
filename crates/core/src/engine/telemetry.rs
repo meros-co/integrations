@@ -31,8 +31,10 @@ struct Assign {
 
 #[derive(Debug)]
 enum Matcher {
-    /// The whole message matches; captures are `{1}`, `{2}`, ...
-    Message(Regex),
+    /// The whole message matches; captures are `{1}`, `{2}`, ... With
+    /// `request` (`request_match`), only a reply whose request's text
+    /// matches it too, its captures numbered on after the message's.
+    Message { re: Regex, request: Option<Regex> },
     /// The first line matches `header`; `line` is applied to every other line.
     Lines { header: Regex, line: Regex },
     /// The first line matches `header`; the other lines are `name: value`.
@@ -186,6 +188,12 @@ pub(crate) fn capture_params(values: &[(String, Value)]) -> (Params, BTreeMap<St
 /// An inbound message, as the rules see it.
 pub(crate) enum Inbound<'a> {
     Text(&'a str),
+    /// A line transport's reply, with the text of the message it answers:
+    /// text to every text rule, and to a `match` rule's `request_match`.
+    Answer {
+        text: &'a str,
+        request: &'a str,
+    },
     Osc {
         address: &'a str,
         /// The type tags, without the leading comma.
@@ -348,7 +356,13 @@ impl Telemetry {
                 assigns.push(assign(path, v)?);
             }
             let matcher = if let Some(m) = rule.get("match") {
-                Matcher::Message(regex(m, "match")?)
+                Matcher::Message {
+                    re: regex(m, "match")?,
+                    request: match rule.get("request_match") {
+                        Some(r @ Value::String(_)) => Some(regex(r, "request_match")?),
+                        _ => None,
+                    },
+                }
             } else if let Some(a) = rule.get("address") {
                 Matcher::Osc {
                     address: regex(a, "address")?,
@@ -521,14 +535,31 @@ impl Telemetry {
         message: &Inbound,
         triggers: &mut Vec<Triggered>,
     ) -> Option<Value> {
+        // A reply is text to the text rules; its request is for request_match.
+        let (message, request) = match message {
+            Inbound::Answer { text, request } => (&Inbound::Text(text), Some(*request)),
+            other => (other, None),
+        };
         let mut patch = Value::Object(Map::new());
         let mut any = false;
         for rule in &self.rules {
             match (&rule.matcher, message) {
-                (Matcher::Message(re), Inbound::Text(text)) => {
-                    if let Some(caps) = re.captures(text.trim_end()) {
-                        any |= self.matched(rule, &captures(&caps), &mut patch, triggers);
+                (Matcher::Message { re, request: asked }, Inbound::Text(text)) => {
+                    let Some(caps) = re.captures(text.trim_end()) else {
+                        continue;
+                    };
+                    let mut values = captures(&caps);
+                    if let Some(asked) = asked {
+                        let Some(request_caps) = request.and_then(|r| asked.captures(r)) else {
+                            continue;
+                        };
+                        let offset = caps.len() - 1;
+                        for (i, v) in captures(&request_caps) {
+                            let n: usize = i.parse().unwrap_or(0);
+                            values.push(((n + offset).to_string(), v));
+                        }
                     }
+                    any |= self.matched(rule, &values, &mut patch, triggers);
                 }
                 (Matcher::Lines { header, line }, Inbound::Text(text)) => {
                     let mut lines = text.lines();
@@ -1258,6 +1289,43 @@ mod tests {
         // An id that would reach elsewhere ("a.b") deletes nothing.
         let dotted = json!({"event": "removed", "type": "layers", "id": "A1.name"});
         assert_eq!(t.apply(&Inbound::Json(&dotted)), None);
+    }
+
+    #[test]
+    fn a_line_reply_is_read_with_the_message_it_answers() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"match": "^([01])$", "request_match": "^([A-Z0-9]+)\\.Mute([A-H]) \\?$",
+                 "state": {"amps.{2}.mute.{3}": {"value": "{1}", "map": {"0": false, "1": true}}}},
+                {"match": "^([01])$", "request_match": "^([A-Z0-9]+)\\.Power \\?$",
+                 "state": {"amps.{2}.power": {"value": "{1}", "map": {"0": false, "1": true}}},
+                 "then_send": ["{2}.Status ?"]},
+            ]})),
+            &state(json!({
+                "amps.*.mute.*": {"type": "bool", "description": "x"},
+                "amps.*.power": {"type": "bool", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let answer = |text, request| {
+            let mut triggers = Vec::new();
+            let patch = t.apply_into(&Inbound::Answer { text, request }, &mut triggers);
+            (patch, triggers)
+        };
+        let (patch, triggers) = answer("1", "AMP2.MuteC ?");
+        assert_eq!(
+            patch,
+            Some(json!({"amps": {"AMP2": {"mute": {"C": true}}}}))
+        );
+        assert!(triggers.is_empty());
+        let (patch, triggers) = answer("0", "AMP2.Power ?");
+        assert_eq!(patch, Some(json!({"amps": {"AMP2": {"power": false}}})));
+        assert_eq!(triggers.len(), 1);
+        assert_eq!(triggers[0].params["2"], json!("AMP2"));
+        // Without its request, a bare value is nothing.
+        assert_eq!(t.apply(&Inbound::Text("1")), None);
+        assert_eq!(answer("1", "Subnet.Status ?").0, None);
     }
 
     #[test]
