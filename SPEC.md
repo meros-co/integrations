@@ -1125,6 +1125,26 @@ and a wire value the map does not list is not assigned:
         single clip: { path: transport.single_clip, map: { "true": true, "false": false } }
 ```
 
+A rule can also remove what the device says is gone. `{delete: true}` in
+place of a value removes the path from state: one declared value, or a whole
+subtree of them (`layers.<id>` and everything under it). mimoLive pushes
+`{"event": "removed", "type": "layers", "id": "..."}` when a layer is
+deleted:
+
+```yaml
+    - json_match: { "$.event": "^removed$", "$.type": "^(layers|sources)$", "$.id": "^([^.]+)$" }
+      json: {}
+      state: { "{1}.{2}": { delete: true } }
+```
+
+The state patch carries `null` there, which RFC 7386 reads as a removal:
+the snapshot loses the subtree, and the `state` event tells consumers so.
+The path must be declared, or lead to declared paths; a captured segment
+that renders empty or holds a `.` removes nothing, so a device can never
+name something else. Within one message a removal wins over a value the same
+message assigns under it. A telemetry vector for a removal gives
+`state_before`, the state the message arrives on.
+
 Over HTTP, `poll` requests and command requests alike have their replies
 offered to `path` rules, which match the request's path and query:
 

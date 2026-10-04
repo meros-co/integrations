@@ -24,6 +24,9 @@ struct Assign {
     /// Wire text to state value, for enumerations and booleans spelled in the
     /// device's own words. A wire value missing from the map is not assigned.
     map: Option<Map<String, Value>>,
+    /// `{delete: true}`: the path, a value or a whole subtree, is removed
+    /// from state (a JSON merge patch null).
+    delete: bool,
 }
 
 #[derive(Debug)]
@@ -190,6 +193,13 @@ fn assign(path: &str, v: &Value) -> Result<Assign, String> {
             path: path.into(),
             value: value.clone(),
             map: None,
+            delete: false,
+        },
+        Value::Object(o) if o.get("delete") == Some(&Value::Bool(true)) => Assign {
+            path: path.into(),
+            value: String::new(),
+            map: None,
+            delete: true,
         },
         Value::Object(o) => Assign {
             path: path.into(),
@@ -199,10 +209,11 @@ fn assign(path: &str, v: &Value) -> Result<Assign, String> {
                 .ok_or(format!("telemetry: '{path}' needs a value"))?
                 .into(),
             map: o.get("map").and_then(Value::as_object).cloned(),
+            delete: false,
         },
         _ => {
             return Err(format!(
-                "telemetry: '{path}' must be a template or {{value, map}}"
+                "telemetry: '{path}' must be a template, {{value, map}} or {{delete: true}}"
             ))
         }
     })
@@ -370,6 +381,7 @@ impl Telemetry {
                                 path: path.clone(),
                                 value: "{value}".into(),
                                 map: None,
+                                delete: false,
                             },
                             Value::Object(o) => Assign {
                                 path: o
@@ -379,6 +391,7 @@ impl Telemetry {
                                     .into(),
                                 value: "{value}".into(),
                                 map: o.get("map").and_then(Value::as_object).cloned(),
+                                delete: false,
                             },
                             _ => return Err(format!("telemetry: field '{name}' is malformed")),
                         };
@@ -403,15 +416,18 @@ impl Telemetry {
         }
         // Every path a rule writes must be declared, so its type is known.
         for rule in &t.rules {
-            let paths: Vec<&str> = match &rule.matcher {
-                Matcher::Fields { fields, .. } => {
-                    fields.values().map(|a| a.path.as_str()).collect()
-                }
-                _ => rule.assign.iter().map(|a| a.path.as_str()).collect(),
+            let paths: Vec<&Assign> = match &rule.matcher {
+                Matcher::Fields { fields, .. } => fields.values().collect(),
+                _ => rule.assign.iter().collect(),
             };
-            for path in paths {
+            for Assign { path, delete, .. } in paths {
                 let shape = placeholder_to_star(path);
-                if t.kind_of(&shape).is_none() {
+                // A deletion may remove a declared value or a subtree of them.
+                let declared = match delete {
+                    true => t.declares(&shape),
+                    false => t.kind_of(&shape).is_some(),
+                };
+                if !declared {
                     return Err(format!(
                         "telemetry: '{path}' is not declared in the spec's state"
                     ));
@@ -423,6 +439,19 @@ impl Telemetry {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.rules.is_empty() && self.subscribe.is_empty() && self.poll.is_empty()
+    }
+
+    /// Whether a concrete or starred path is declared, or is a prefix of
+    /// declared paths: what a deletion may remove.
+    fn declares(&self, path: &str) -> bool {
+        let parts: Vec<&str> = path.split('.').collect();
+        self.types.iter().any(|(pattern, _)| {
+            pattern.len() >= parts.len()
+                && pattern
+                    .iter()
+                    .zip(&parts)
+                    .all(|(p, s)| p == "*" || p == s || *s == "*")
+        })
     }
 
     /// The declared type of a concrete or starred path.
@@ -675,6 +704,19 @@ impl Telemetry {
             let Ok(path) = render(&a.path, &ctx, |s| s.to_string()) else {
                 continue;
             };
+            if a.delete {
+                // A segment rendered empty, or holding a dot, would delete
+                // something other than what the rule names.
+                if path.split('.').any(str::is_empty)
+                    || path.split('.').count() != a.path.split('.').count()
+                    || !self.declares(&path)
+                {
+                    continue;
+                }
+                set_path(patch, &path, Value::Null);
+                any = true;
+                continue;
+            }
             let Some(kind) = self.kind_of(&path) else {
                 continue;
             };
@@ -1077,6 +1119,59 @@ mod tests {
             t.apply(&Inbound::Json(&layer)).unwrap(),
             json!({"layer": {"name": "Lower Third"}})
         );
+    }
+
+    #[test]
+    fn a_rule_can_delete_a_value_or_a_subtree() {
+        let state_decl = state(json!({
+            "layers.*.name": {"type": "string", "description": "x"},
+            "layers.*.live": {"type": "bool", "description": "x"},
+            "sources.*.name": {"type": "string", "description": "x"},
+            "clip": {"type": "string", "description": "x"},
+        }));
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.event": "^removed$", "$.type": "^(layers|sources)$", "$.id": "^(.+)$"},
+                 "state": {"{1}.{2}": {"delete": true}}},
+                {"match": "^CLEAR$", "state": {"clip": {"delete": true}}},
+                {"json_match": {"$.event": "^renamed$", "$.id": "^(.+)$"},
+                 "json": {"name": "$.name"},
+                 "state": {"layers.{1}.name": "{name}", "layers.{1}.live": {"delete": true}}},
+            ]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap();
+        let removed = json!({"event": "removed", "type": "layers", "id": "A1"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&removed)),
+            Some(json!({"layers": {"A1": null}}))
+        );
+        assert_eq!(
+            t.apply(&Inbound::Text("CLEAR")),
+            Some(json!({"clip": null}))
+        );
+        let renamed = json!({"event": "renamed", "id": "A2", "name": "Lower third"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&renamed)),
+            Some(json!({"layers": {"A2": {"name": "Lower third", "live": null}}}))
+        );
+        // Applied as a merge patch, the deletion removes the whole subtree.
+        let mut s = json!({"layers": {"A1": {"name": "Bg", "live": true}, "A2": {"name": "x", "live": false}}});
+        crate::session::merge_patch(&mut s, &t.apply(&Inbound::Json(&removed)).unwrap());
+        crate::session::merge_patch(&mut s, &t.apply(&Inbound::Json(&renamed)).unwrap());
+        assert_eq!(s, json!({"layers": {"A2": {"name": "Lower third"}}}));
+        // A path that does not lead to declared state is refused at load.
+        let e = Telemetry::parse(
+            Some(&json!({"updates": [{"match": "^X$", "state": {"nope.{1}": {"delete": true}}}]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap_err();
+        assert!(e.contains("not declared"), "{e}");
+        // An id that would reach elsewhere ("a.b") deletes nothing.
+        let dotted = json!({"event": "removed", "type": "layers", "id": "A1.name"});
+        assert_eq!(t.apply(&Inbound::Json(&dotted)), None);
     }
 
     #[test]

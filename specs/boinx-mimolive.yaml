@@ -997,7 +997,6 @@ state:
   documents.*.width: { type: int, unit: px, description: "Document video width" }
   documents.*.height: { type: int, unit: px, description: "Document video height" }
   documents.*.framerate: { type: float, unit: fps, description: "Document frame rate" }
-  documents.*.removed: { type: bool, description: "True once mimoLive reports the document closed" }
   documents.*.outputs.*.live_state: { type: string, description: "A built-in output's state (record, stream, playout, fullscreen): off or live" }
   layers.*.name: { type: string, description: "Layer name as shown in the layer stack" }
   layers.*.live_state: { type: string, description: "off, live, preview, or shutdown while an outgoing transition runs" }
@@ -1007,11 +1006,9 @@ state:
   layers.*.document: { type: string, description: "ID of the document the layer is in" }
   layers.*.active_variant: { type: string, description: "ID of the variant selected to go live" }
   layers.*.live_variant: { type: string, description: "ID of the variant on air, while the layer is live; not cleared when it goes off" }
-  layers.*.removed: { type: bool, description: "True once mimoLive reports the layer removed" }
   variants.*.name: { type: string, description: "Variant name" }
   variants.*.live_state: { type: string, description: "live when its layer is live with this variant, otherwise off" }
   variants.*.layer: { type: string, description: "ID of the layer the variant belongs to" }
-  variants.*.removed: { type: bool, description: "True once mimoLive reports the variant removed" }
   sources.*.name: { type: string, description: "Source name" }
   sources.*.tally_state: { type: string, description: "Highest use of the source: off, in-use, effect, preview or program" }
   sources.*.gain: { type: float, description: "Audio gain, 0.0 (silent), 1.0 (unchanged) to 2.0, for a source with audio" }
@@ -1022,7 +1019,6 @@ state:
   sources.*.summary: { type: string, description: "Summary text as mimoLive shows it" }
   sources.*.source_type: { type: string, description: "Source type identifier" }
   sources.*.document: { type: string, description: "ID of the document the source is in" }
-  sources.*.removed: { type: bool, description: "True once mimoLive reports the source removed" }
   output-destinations.*.title: { type: string, description: "Output destination name" }
   output-destinations.*.kind: { type: string, description: "Kind, as mimoLive names it: File Recording, Live Streaming, NDI®, Fullscreen and others" }
   output-destinations.*.live_state: { type: string, description: "off (not configured), preview (ready), startup, live (recording or streaming) or shutdown" }
@@ -1031,11 +1027,9 @@ state:
   output-destinations.*.stops_with_show: { type: bool, description: "Whether it stops when the show stops" }
   output-destinations.*.summary: { type: string, description: "Summary of its most important settings" }
   output-destinations.*.document: { type: string, description: "ID of the document it belongs to" }
-  output-destinations.*.removed: { type: bool, description: "True once mimoLive reports it removed" }
   layer-sets.*.name: { type: string, description: "Layer set name" }
   layer-sets.*.active: { type: bool, description: "Whether the layer stack matches the layer set" }
   layer-sets.*.document: { type: string, description: "ID of the document it belongs to" }
-  layer-sets.*.removed: { type: bool, description: "True once mimoLive reports it removed" }
 
 telemetry:
   # mimoLive pushes each change on its websocket; it closes a client that
@@ -1122,7 +1116,6 @@ telemetry:
         "{type}.{id}.active_variant": "{active_variant}"
         "{type}.{id}.live_variant": "{live_variant}"
         "{type}.{id}.layer": "{layer}"
-        "{type}.{id}.removed": "false"
 
     # The objects sideloaded in included (the poll's layers, sources, output
     # destinations and layer sets).
@@ -1183,10 +1176,10 @@ telemetry:
       json_each: "$.data.attributes.outputs"
       json: { output: "$.id", live: "$.live-state" }
       state: { "documents.{2}.outputs.{output}.live_state": "{live}" }
-    # Pushed: an object removed. Its last state stays, marked removed.
-    - json_match: { "$.event": "^removed$", "$.type": "^(documents|layers|variants|sources|output-destinations|layer-sets)$", "$.id": "^(.+)$" }
+    # Pushed: an object removed. It leaves state, with everything under it.
+    - json_match: { "$.event": "^removed$", "$.type": "^(documents|layers|variants|sources|output-destinations|layer-sets)$", "$.id": "^([^.]+)$" }
       json: {}
-      state: { "{1}.{2}.removed": "true" }
+      state: { "{1}.{2}": { delete: true } }
 
 quirks:
   - models: [all]
@@ -1269,7 +1262,7 @@ quirks:
       mimoLive closes a quiet client after 15. The document list with each kind of object
       sideloaded is read on connecting and every minute. State is keyed by mimoLive's own type
       names and IDs (layers.<id>.live_state, output-destinations.<id>.live_state); a removed
-      object keeps its last state with removed true. A layer's live_variant is not cleared when
+      object leaves state with everything under it. A layer's live_variant is not cleared when
       the layer goes off, so its live_state is the one to read. Layer variants enter the state
       from websocket events and get_layer replies, not from the poll, which cannot sideload them.
 

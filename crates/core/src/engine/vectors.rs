@@ -278,7 +278,9 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             engine.apply_text(&mut cx, text);
         }
     }
-    let mut state = json!({});
+    // `state_before`: the state the message arrives on, for one that removes
+    // something.
+    let mut state = v.get("state_before").cloned().unwrap_or(json!({}));
     for a in cx.take() {
         if let Action::State(p) = a {
             crate::session::merge_patch(&mut state, &p);

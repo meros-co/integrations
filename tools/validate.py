@@ -534,14 +534,16 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         errors.append("telemetry.sse needs an http transport")
     declared = [key.split(".") for key in (doc.get("state") or {})]
 
-    def is_declared(path: str) -> bool:
+    def is_declared(path: str, prefix: bool = False) -> bool:
         # As the engine reads it: a templated segment may stand for any
         # declared segment (mimoLive's '{type}.{id}.name' writes layers.<id>.name
         # and sources.<id>.name), and a concrete path no declaration matches is
-        # not assigned at run time.
+        # not assigned at run time. A deletion may remove a whole subtree, so
+        # for it a prefix of declared paths will do.
         parts = ["*" if "{" in seg else seg for seg in path.split(".")]
         return any(
-            len(d) == len(parts) and all(a == "*" or b == "*" or a == b for a, b in zip(d, parts))
+            (len(d) >= len(parts) if prefix else len(d) == len(parts))
+            and all(a == "*" or b == "*" or a == b for a, b in zip(d, parts))
             for d in declared
         )
 
@@ -577,11 +579,13 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     c = CONVERSION.match(d)
                     if c and c.group(2) not in (conversions or {}):
                         errors.append(f"{where}: ':{d}' names undeclared conversion '{c.group(2)}'")
+        deletions = {p for p, v in (rule.get("state") or {}).items()
+                     if isinstance(v, dict) and v.get("delete") is True}
         paths = list((rule.get("state") or {}).keys())
         for field in (rule.get("fields") or {}).values():
             paths.append(field if isinstance(field, str) else field.get("path", ""))
         for path in paths:
-            if not is_declared(path):
+            if not is_declared(path, prefix=path in deletions):
                 errors.append(f"{where}: '{path}' is not declared in 'state'")
     return errors
 
