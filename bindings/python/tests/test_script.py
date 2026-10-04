@@ -124,7 +124,7 @@ class SharedScript(unittest.TestCase):
             time.sleep(0.02)
         self.assertEqual(core.execute(device, "get_model"), {"kind": "value", "value": "VS-88UT"})
         with self.assertRaises(IntegrationsError) as caught:
-            core.execute(device, "route_video", {"input": 300, "output": 1})
+            core.execute(device, "route_video", {"input": -1, "output": 1})
         self.assertEqual(caught.exception.code, "invalid_params")
         core.close(device)
 
