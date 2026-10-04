@@ -17,6 +17,7 @@ snake_case reliably (PTZMoveUp), so the module looks them up in the table.
 import html
 import json
 import re
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -312,4 +313,6 @@ pub(crate) const FUNCTIONS: &[(&str, &str)] = &[
 {rows}
 ];
 ''', encoding="utf-8", newline="\n")
+# Formatted as `cargo fmt` would, so regenerating leaves no diff to tidy.
+subprocess.run(["rustfmt", "--edition", "2021", str(TABLE)], check=True)
 print(f"{len(names)} commands")
