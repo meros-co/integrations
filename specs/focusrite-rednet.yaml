@@ -1,74 +1,53 @@
 spec: 1
-id: aes70
-name: AES70 / OCA devices (OCP.1)
-vendor: AES70 (Open Control Architecture)
+id: focusrite-rednet
+name: Focusrite RedNet (AES70)
+vendor: Focusrite
 category: other
 implementation: native
 reason: >
-  AES70 is an object protocol: the controller discovers the device's objects by walking its blocks, addresses
-  each by a session-independent object number and a class it must know to marshal parameters, and keeps state
-  current through subscriptions whose notifications arrive asynchronously. OCP.1 is binary, with a sync byte,
-  PDU headers, several messages per PDU matched to requests by handle, and a negotiated keep-alive. None of
-  this is expressible as data.
+  AES70 over OCP.1: a binary object protocol whose objects are found by walking the device's blocks, addressed by
+  object numbers and classes the controller must know, and followed through subscriptions (see aes70). This
+  integration is the AES70 module with Focusrite's controls named as commands.
 
 source:
-  - title: "tschiemer/ocac: AES70/OCA device framework in C99 (master, LICENSE: MIT)"
-    author: Philip Tschiemer
-    url: "https://github.com/tschiemer/ocac"
-    note: >
-      Top-level LICENSE is MIT (checked 2026-10-02). Read: src/include/ocac/ocp/ocp1.h (sync value 0x3B, the
-      9-byte header of protocol version, PDU size, PDU type and message count, message types 0-4, command,
-      response and notification layouts, keep-alive heartbeat in u16 seconds or u32 milliseconds told apart by
-      size, and the keep-alive timeout of three heartbeat times, "as defined in standard (AES70-3-2018 5.3)"),
-      src/include/ocac/occ/datatypes (base, framework, eventsubscription, time: OcaClassID is a field count and
-      u16 fields, OcaTimeInterval is OcaFloat32 in seconds), docs/occ_classes.md (a human-readable extract of
-      AES70-2-2018 Annex A: class ids and versions, OcaRoot 1.1 GetClassIdentification and 1.5 GetRole,
-      OcaWorker, OcaBlock 3.5 GetMembers and 3.6 GetMembersRecursive, OcaDeviceManager methods 3.1-3.20 and
-      properties, OcaSubscriptionManager 3.1 AddSubscription and 3.5 AddPropertyChangeSubscription, well-known
-      object numbers 1-13 and root block 100) and docs/subscriptions.md (reliable delivery on the control
-      connection, lightweight subscriptions with zero subscriber method and empty context). No code was copied.
-  - title: "PADL/SwiftOCA: AES70 controller and device library in Swift (main, LICENSE.md: Apache-2.0)"
-    author: PADL Software Pty Ltd
-    url: "https://github.com/PADL/SwiftOCA"
-    note: >
-      Top-level LICENSE.md is Apache-2.0 (checked 2026-10-02). Read: OCF/Messages (Header, MessageType with
-      type 5 notification 2 of AES70-2023, Command, Response, KeepAlive1/2, Notification1/2),
-      OCA/OcaConnection+Codable.swift (PDU size counts every byte after the sync byte; each message starts with
-      its own size; a keep-alive PDU's body is its heartbeat), OCP.1/Ocp1Encoder.swift (an OcaString's length
-      counts Unicode scalar values, lists and maps are u16-counted, blobs u16-length), OCA/OcaConnectionMonitor
-      (no message for three heartbeat times means the connection is lost; a keep-alive is sent when nothing
-      else has been for a heartbeat time), OCA/OcaConnection+Subscribe.swift (OCP.1 uses AddSubscription for the
-      PropertyChanged event 1.1, normal delivery mode 1, empty context and destination),
-      OCC/ControlDataTypes (OcaStatus 0-17 with their meanings, OcaPropertyChangedEventData as property id,
-      value and change type 1-6, OcaModelGUID, OcaModelDescription, OcaDeviceState bits, well-known object
-      numbers) and OCC/ControlClasses (class ids of the workers, sensors, agents and managers; property and
-      method ids of OcaRoot, OcaWorker, OcaBlock, OcaGain, OcaMute, OcaPolarity, OcaSwitch, OcaDelay,
-      OcaIdentificationActuator, the basic actuators, OcaSensor, OcaLevelSensor, OcaDeviceManager and
-      OcaSubscriptionManager). No code was copied.
-  - title: "OCAAlliance/OcaToolsAndDemos: OCAMicro reference device (main, OCA Alliance EULA)"
-    author: OCA Alliance
-    url: "https://github.com/OCAAlliance/OcaToolsAndDemos"
-    note: >
-      Licensed under the OCA Alliance EULA, a permissive Apache-style licence (checked 2026-10-02). Read:
-      OCAMicro/Src/common/OCALite/OCP.1/Ocp1LiteSocketConnection.cpp (the device takes its heartbeat time from
-      the controller's first keep-alive, in seconds or milliseconds, sends a keep-alive when it has sent nothing
-      for that long, and drops a connection silent for three heartbeat times),
-      OCC/ControlDataTypes/OcaLiteFrameworkDataTypes.h (OcaStatus 0-15), OcaLiteBaseDataTypes.h, and the class
-      headers OcaLiteDelay.h, OcaLiteLevelSensor.h, OcaLiteSwitch.h, OcaLiteStringActuator.h, OcaLiteWorker.h,
-      OcaLiteRoot.h and OcaLiteDeviceManager.h. No code was copied.
-  - title: "OCA Alliance: AES70 Control Model"
-    author: OCA Alliance
-    url: "https://ocaalliance.com/aes70-control-model/"
-    note: >
-      Manufacturer-neutral overview: control classes as templates, objects as instances with object numbers,
-      blocks containing objects, roles. Used for the concepts only.
-  - title: "OCA Alliance technical site: Downloads"
-    author: OCA Alliance
+  - title: "AES70 Implementation Chart: Focusrite RedNet8, 2017.06.09, revision 6"
+    author: Focusrite / OCA Alliance
     url: "https://ocaalliance.github.io/downloads.html"
     note: >
-      Lists the AES70 Implementation Chart (a spreadsheet template documenting a device's OCA objects; vendors
-      such as d&b publish theirs) and the Focusrite RedNet Virtual OCA Device, a freeware simulator useful for
-      checking this integration. The full AES70-1/2/3 standards are sold by the AES and were not used.
+      The MP8R's AES70 objects as Focusrite documented them: every control in the root block (100), per channel
+      1-8 the OcaSwitch roles 48V-n, HPF-n, Phase-n, Impedance-n, Pad-n and GComp-n, the OcaGain Gain-n and the
+      OcaLevelSensor roles IpLvl-n and GCompLvl-n, numbered 0x01nn00pp; and the unit's OcaSwitch roles Fan, FP
+      Lock, Identify, GComp Hroom, SCP ID and Preferred Master and OcaInt8Sensor roles Dante Device Lock, PSU A,
+      PSU B, NetPri, NetSec and Network Clock Master (0x030000pp), with the OcaMediaClock DanteMediaClock and a
+      proprietary stream network agent. Distributed under the OCA Alliance EULA; facts only are used.
+  - title: "Focusrite RedNet virtual OCA device (OCALiteRednetVirtual) and its object lists RedNet1.xlsx, RedNet2.xlsx, RedNet4.xlsx, RedNet8.xlsx and Rednet MP8R OCA Device (virtual).xlsx"
+    author: Focusrite Audio Engineering / OCA Alliance
+    url: "https://ocaalliance.github.io/downloads.html"
+    note: >
+      The object lists of RedNet 1 (8 channels of InputLvl-n and OutputLvl-n level sensors), RedNet 2 (16), RedNet
+      4 (48V-n, Source-n with positions Mic, Line and DI, Gain-n 0-63 dB, HPF-n, Lvl-n, and the Link1-2 to Link7-8
+      switches) and RedNet 8 / MP8R (48V-n, Gain-n 10-65 dB, HPF-n, Lvl-n, MonLvl-n, Phase-n, Impedance-n with
+      positions 10k and 2k4, Pad-n with positions 0 dB and -20 dB, TrimEnable-n), each with a Fan switch (0 off,
+      1 on) and a DanteMediaClock (44.1 to 192 kHz); objects numbered 4352 + 256 x (channel - 1) + offset. Its
+      readme: the device advertises _oca._tcp over DNS-SD (seen on port 65000) with TXT modelGUID
+      0000130e000000xx, 0x00130E being Focusrite's code. Distributed under the OCA Alliance EULA (no reverse
+      engineering of the executable; none was done); facts only are used.
+  - title: "RedNet Control 2.4 release notes, and the RedNet A16R MkII and D16R MkII user guides"
+    author: Focusrite Audio Engineering
+    url: "https://focusritepro.com/rednet-control/"
+    note: >
+      AES70 compatibility arrived for RedNet Brooklyn 2 devices and the X2P with RedNet Control 2.4, and each
+      device has an AES70 on/off setting in RedNet Control (A16R MkII and D16R MkII guides, device settings).
+  - title: "Focusrite Pro MIDI Controller User Guide 1.01 (MIDI control for RedNet 4, MP8R, X2P, Red 4Pre, 8Pre, 8Line, 16Line)"
+    author: Focusrite Audio Engineering
+    url: "https://fael-downloads-prod.focusrite.com/customer/prod/downloads/Focusrite%20Pro%20MIDI%20Controller%20User%20Guide%201.01%20English%20-%20EN.pdf"
+    note: >
+      Corroborates the controls and their ranges per model (MP8R gain 10-65 dB, RedNet 4 0-63 dB, gain
+      compensation headroom 0, 3 or 6 dB). The MIDI bridge itself runs inside RedNet Control on a computer and is
+      not a protocol the devices speak, so it is not implemented.
+  - title: "aes70 integration (this repository)"
+    url: "specs/aes70.yaml"
+    note: The OCP.1 session, walk, subscriptions, meters and generic commands, with their own sources.
 
 settings:
   # The heartbeat time sent to the device in the keep-alive on connecting: the
@@ -110,20 +89,50 @@ settings:
                    description: "Requests waiting for a response at once; more are queued." }
 
 ports:
-  - { port: null, protocol: tcp, role: control, note: "AES70 (OCP.1) has no standard port: the port is given when the device is opened" }
+  - { port: null, protocol: tcp, role: control, note: "No fixed OCP.1 port: the device advertises it as _oca._tcp over DNS-SD, and it is given when the device is opened" }
 
 models:
-  - id: aes70-device
-    name: "Any AES70 device over OCP.1/TCP (give the device's OCP.1 port)"
-    supports: &all
-      [set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, identify,
+  - id: rednet-mp8r
+    name: Focusrite RedNet MP8R (RedNet 8)
+    channels: 8
+    supports: [set_phantom_power, set_preamp_gain, set_high_pass_filter, set_phase_invert, set_impedance, set_pad,
+      set_gain_compensation, set_fan, identify, set_front_panel_lock, set_preferred_leader, set_gain,
+      set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property,
+      set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: >
+      Eight remote-controlled mic preamps. Objects as in Focusrite's RedNet8 implementation chart; the virtual
+      device numbers them differently and calls gain compensation TrimEnable-n.
+  - id: rednet-4
+    name: Focusrite RedNet 4
+    channels: 8
+    supports: [set_phantom_power, set_preamp_gain, set_high_pass_filter, set_input_source, set_channel_link, set_fan,
+      set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string, get_property,
+      set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: Eight mic/line/DI preamps with stereo linking, as in the virtual device's RedNet4 list.
+  - id: rednet-1
+    name: Focusrite RedNet 1
+    channels: 8
+    supports: [set_fan, set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string,
+      get_property, set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: Eight-channel AD/DA; its AES70 objects are input and output meters and the fan (virtual device's RedNet1 list).
+  - id: rednet-2
+    name: Focusrite RedNet 2
+    channels: 16
+    supports: [set_fan, set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string,
+      get_property, set_property, call_method, refresh_objects, get_device_info]
+    verification: none
+    notes: Sixteen-channel AD/DA; its AES70 objects are input and output meters and the fan (virtual device's RedNet2 list).
+  - id: rednet-other
+    name: "Other RedNet devices with AES70 enabled (Brooklyn 2 interfaces such as A16R MkII and D16R MkII, X2P)"
+    supports: [set_gain, set_mute, set_switch, set_polarity, set_delay, set_bool, set_int, set_float, set_string,
       get_property, set_property, call_method, refresh_objects, get_device_info]
     verification: none
     notes: >
-      One model for every device: what a device offers is discovered from its object tree, not declared here.
-      AES70 assigns no TCP port; the device's documentation, or its _oca._tcp DNS-SD record, gives it. Remote
-      preamps on AES67 and ST 2110 stageboxes, d&b audiotechnik amplifiers and DS processors, and other
-      devices that speak OCP.1 over TCP.
+      Focusrite publishes no object list for these; what they offer is found by walking their object tree and is
+      reached with the generic AES70 commands, by role path or object number.
 
 commands:
   set_gain:
@@ -216,17 +225,6 @@ commands:
                label: Value,
                description: "New text for the string actuator." }
     returns: ack
-  identify:
-    summary: >
-      OcaIdentificationActuator SetActive (4.2): start or stop the device's identification (a flashing LED or
-      display). Without object or ono, the first identification actuator found in the tree
-    params:
-      object: *object
-      ono: *ono
-      enabled: { type: bool, default: true,
-                 label: Identify,
-                 description: "True starts the device's identification (a flashing LED or display), false stops it." }
-    returns: ack
   get_property:
     summary: >
       Read one property ("level.index", e.g. "4.1") of an object, with the getter of its class. Returns the
@@ -281,6 +279,87 @@ commands:
       role, user inventory code, enabled, state, message and revision id. A property the device does not
       implement is null
     returns: value
+  set_phantom_power:
+    summary: "Switch a preamp's +48 V phantom power (OcaSwitch 48V-n: 0 off, 1 on)"
+    params:
+      channel: &channel { type: int, min: 1, max: 8, required: true, label: Channel,
+                          description: "Preamp channel, numbered from 1 as on the front panel." }
+      enabled: { type: bool, default: true, label: Phantom power, description: "On applies +48 V to the input, off removes it." }
+    returns: ack
+  set_preamp_gain:
+    summary: "Set a preamp's gain (OcaGain Gain-n), in dB"
+    params:
+      channel: *channel
+      gain_db: { type: float, min: 0, max: 65, required: true, label: Gain,
+                 description: "Preamp gain in dB: 10 to 65 on an MP8R, 0 to 63 on a RedNet 4; the object's own range applies." }
+    returns: ack
+  set_high_pass_filter:
+    summary: "Switch a preamp's high-pass filter (OcaSwitch HPF-n: 0 off, 1 on)"
+    params:
+      channel: *channel
+      enabled: { type: bool, default: true, label: High-pass filter, description: "On engages the high-pass filter, off bypasses it." }
+    returns: ack
+  set_phase_invert:
+    summary: "Invert a preamp's polarity (OcaSwitch Phase-n: 0 off, 1 on)"
+    params:
+      channel: *channel
+      inverted: { type: bool, default: true, label: Invert, description: "On inverts the channel's polarity, off leaves it normal." }
+    returns: ack
+  set_impedance:
+    summary: "Set a preamp's input impedance (OcaSwitch Impedance-n: 0 10 kOhm, 1 2.4 kOhm)"
+    params:
+      channel: *channel
+      impedance: { type: enum, values: ["10k", "2k4"], required: true, label: Impedance,
+                   description: "Input impedance: 10k is 10 kOhm, 2k4 is 2.4 kOhm." }
+    returns: ack
+  set_pad:
+    summary: "Switch a preamp's pad (OcaSwitch Pad-n: 0 0 dB, 1 -20 dB)"
+    params:
+      channel: *channel
+      enabled: { type: bool, default: true, label: Pad, description: "On engages the -20 dB pad, off removes it." }
+    returns: ack
+  set_gain_compensation:
+    summary: "Switch a preamp's gain compensation for shared preamps (OcaSwitch GComp-n: 0 off, 1 on)"
+    params:
+      channel: *channel
+      enabled: { type: bool, default: true, label: Gain compensation,
+                 description: "On holds the channel's level on the network when another controller changes the preamp gain, off follows it." }
+    returns: ack
+  set_input_source:
+    summary: "Choose a RedNet 4 channel's input (OcaSwitch Source-n: 0 mic, 1 line, 2 DI)"
+    params:
+      channel: *channel
+      source: { type: enum, values: [mic, line, di], required: true, label: Input,
+                description: "Microphone, line or instrument (DI) input." }
+    returns: ack
+  set_channel_link:
+    summary: "Link a RedNet 4 channel pair for stereo (OcaSwitch Link1-2 to Link7-8: 0 off, 1 on)"
+    params:
+      pair: { type: enum, values: ["1-2", "3-4", "5-6", "7-8"], required: true, label: Channel pair,
+              description: "The odd and even channels to link." }
+      enabled: { type: bool, default: true, label: Link, description: "On links the pair's controls, off unlinks them." }
+    returns: ack
+  set_fan:
+    summary: "Switch the unit's fan (OcaSwitch Fan: 0 off, 1 on)"
+    params:
+      enabled: { type: bool, default: true, label: Fan, description: "On runs the fan, off stops it." }
+    returns: ack
+  identify:
+    summary: "Make the unit identify itself (OcaSwitch Identify: 0 off, 1 on)"
+    params:
+      enabled: { type: bool, default: true, label: Identify, description: "On starts the unit's identification, off stops it." }
+    returns: ack
+  set_front_panel_lock:
+    summary: "Lock or unlock the unit's front panel controls (OcaSwitch FP Lock: 0 off, 1 on)"
+    params:
+      enabled: { type: bool, default: true, label: Panel lock, description: "On locks the front panel, off unlocks it." }
+    returns: ack
+  set_preferred_leader:
+    summary: "Make the unit the preferred Dante clock leader (OcaSwitch Preferred Master: 0 off, 1 on)"
+    params:
+      enabled: { type: bool, default: true, label: Preferred leader,
+                 description: "On asks Dante to elect this unit clock leader, off leaves it to the election." }
+    returns: ack
 
 state:
   discovery.complete:              { type: bool, description: "The walk of the root block has been answered or has timed out throughout" }
@@ -335,85 +414,41 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      AES70 assigns no TCP port to OCP.1, so the device's port must be given when it is opened (the open fails
-      without it). Devices advertise it as _oca._tcp over DNS-SD. Only OCP.1 over plain TCP is implemented; the
-      secure (_ocasec._tcp), UDP and WebSocket variants are not.
-  - models: [all]
-    severity: info
-    text: >
-      The AES70 standards were not available; the wire format, ids and status codes come from open
-      implementations (ocac, SwiftOCA, OCAMicro), which agree with one another where they overlap. Any detail
-      only one of them states is listed here.
+      AES70 is off on a RedNet unit until it is enabled for that unit in RedNet Control (2.4 or later, Brooklyn 2
+      units and the X2P); a Dante Domain Manager operator cannot change the setting. The OCP.1 port is not fixed:
+      the unit advertises it as _oca._tcp over DNS-SD (the virtual device used 65000), and it must be given when
+      the device is opened. Only OCP.1 over plain TCP is implemented.
   - models: [all]
     severity: warning
     text: >
-      OcaTimeInterval (OcaDelay's delay time) is a 32-bit float in ocac (AES70-2018) and OCAMicro, and a 64-bit
-      float in SwiftOCA (later revisions). The module reads it at whichever width the device sends (by the
-      reply's length) and writes it at the width last read from that object, 32-bit until one has been read.
+      Focusrite's RedNet8 implementation chart (2017) and the RedNet virtual device (2016) number the same objects
+      differently (0x01nn00pp per channel against 4352 + 256 per channel), so the named commands address objects
+      by role ("48V-1", "Gain-1"), which both agree on, and the AES70 module finds the number. Where they disagree
+      on a role (the chart's GComp-n and IpLvl-n against the virtual device's TrimEnable-n and Lvl-n), the chart's
+      is used; on a unit that uses the other name, reach it with set_switch by role. A role the unit lacks fails
+      the command as not found.
   - models: [all]
     severity: info
     text: >
-      The device is reported connected when the first PDU arrives from it, not when TCP connects: OCP.1 has no
-      handshake. Opened for commands only, that is the device's first keep-alive, up to one heartbeat time
-      after connecting. The module sends its keep-alive first, in seconds when the interval is whole seconds and
-      in milliseconds otherwise; a device that knows only the seconds form (before AES70-2018) needs a whole
-      number of seconds.
+      Switch positions follow the virtual device's lists (0 off and 1 on; Impedance 0 = 10 kOhm and 1 = 2.4 kOhm;
+      Pad 0 = 0 dB and 1 = -20 dB; Source 0 mic, 1 line, 2 DI). The chart gives no positions, so those of its
+      unit-wide switches (Identify, FP Lock, Preferred Master, GComp Hroom, SCP ID) are assumed 0 off and 1 on;
+      the position names the unit reports are in state under objects.<role>.position_names.
+  - models: [rednet-mp8r]
+    severity: warning
+    text: >
+      MP8R preamps can be shared with a Yamaha console (Yamaha ID set in RedNet Control) and RedNet Control at the
+      same time; a gain change from any of them moves the preamp for all. With gain compensation on, the level
+      sent to the network is held when another controller changes the gain.
   - models: [all]
     severity: info
     text: >
-      Loss is judged as three heartbeat times without any PDU from the device (keep-alive, response or
-      notification), as ocac cites AES70-3-2018 5.3 and as SwiftOCA and OCAMicro do. A device that does not send
-      keep-alives when idle is dropped and reconnected after three intervals; raise keepalive_interval_ms for
-      it.
+      Meters (the IpLvl-n or Lvl-n, MonLvl-n, GCompLvl-n, InputLvl-n and OutputLvl-n level sensors, -128 to +1 dB)
+      are read as the level_sensors setting says, every second by default. The unit-wide status sensors (PSU A and
+      B, network ports, clock leader, Dante device lock) are OcaInt8Sensor objects, read on connecting and followed
+      by subscription into objects.<role>.reading; what each value means is not documented.
   - models: [all]
     severity: info
     text: >
-      Changes are followed with AddSubscription (subscription manager 3.1) to each known object's
-      PropertyChanged event (1.1), delivery mode 1 on this connection, naming subscriber method 1.1 of object
-      4096 and an empty context, as SwiftOCA does on OCP.1. A lightweight device returns the subscriber and
-      context zeroed, which the module ignores. AddPropertyChangeSubscription (3.5) and the AES70-2023
-      subscription methods are not used. Subscriptions end with the connection and are made again after a
-      reconnection. A refused subscription is logged once; the values read on connecting then go stale.
-  - models: [all]
-    severity: info
-    text: >
-      The walk asks each block for its members with GetMembers (3.5), not GetMembersRecursive (3.6), and each
-      object for its role with GetRole (1.5): one request per object, sent several to a PDU and at most
-      max_in_flight at a time. A device with thousands of objects takes a moment to walk; walk_depth and walk
-      limit it. Objects outside the root block (the managers) are not walked; the device manager is read
-      directly.
-  - models: [all]
-    severity: info
-    text: >
-      Roles are meant to be unique within their block; a role containing '/' makes its role path ambiguous, and
-      a second object with the same path is keyed with "#<ono>" appended. Object numbers are stable for a
-      device's configuration, so ono addressing is the robust choice for automation; role paths are readable.
-  - models: [all]
-    severity: info
-    text: >
-      Opened for commands only, a command naming an object by role path asks the blocks on the way for their
-      members and the members' roles, one level per round trip, and remembers them for the session. A
-      command naming an object by number asks for its class (GetClassIdentification, 1.1) first when the
-      command must check the class or marshal by it; call_method needs nothing. When monitored and walked, a
-      number not found in the tree is refused at once.
-  - models: [all]
-    severity: info
-    text: >
-      Setters are acknowledged by the device's OK response and the new value is put in state then; a device
-      that clamps rather than refusing reports the clamped value by notification when subscribed. Non-OK
-      statuses fail the command as device_error with the status number and its name (1 ProtocolVersionError, 2
-      DeviceError, 3 Locked, 4 BadFormat, 5 BadONo, 6 ParameterError, 7 ParameterOutOfRange, 8 NotImplemented,
-      9 InvalidRequest, 10 ProcessingFailed, 11 BadMethod, 12 PartiallySucceeded, 13 Timeout, 14
-      BufferOverflow, 15 PermissionDenied, 16 OutOfMemory, 17 Busy; 16 and 17 from SwiftOCA only).
-  - models: [all]
-    severity: info
-    text: >
-      Level sensors are polled once a second by default (one GetReading per sensor, no new one while the last
-      is unanswered), not subscribed, since a meter's changes can arrive many times a second. Set level_sensors
-      to subscribe to follow them by notification instead, or off.
-  - models: [all]
-    severity: info
-    text: >
-      An OCP.1 notification of type 2 (AES70-2023) is read like a type 1 notification; an exception
-      notification is logged. Commands the device sends are ignored. A property change of a list item (change
-      types 4-6) makes the module read the whole property again.
+      Everything else (connection, keep-alives, the walk, subscriptions, status codes and commands-only opening)
+      is the aes70 integration's; see its quirks.

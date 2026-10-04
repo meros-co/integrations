@@ -167,6 +167,10 @@ fn a_vendor_group_selects_its_integrations() {
     let mut ids: Vec<&str> = core.catalog().devices.keys().map(String::as_str).collect();
     ids.sort();
     let mut expected = WIRELESS.to_vec();
+    // Built in when the build has it; the group always names it.
+    if cfg!(feature = "sennheiser-spectera") {
+        expected.push("sennheiser-spectera");
+    }
     expected.sort();
     assert_eq!(ids, expected);
     let options = api::core_options(&json!({"devices": ["vendor-shure"]})).unwrap();

@@ -1,0 +1,633 @@
+spec: 1
+id: sennheiser-spectera
+name: Sennheiser Spectera (SSCv2)
+vendor: Sennheiser
+category: wireless
+implementation: native
+reason: >
+  Telemetry is a server-sent event stream whose subscriptions are added using a session id the Base Station
+  issues when the stream opens; its collections then arrive as a whole list followed by single created, changed
+  or deleted items, which have to be merged into the list kept so far; a quiet stream has to be told apart from a
+  dead one by probing; and every write to a mobile device must name the device type learnt from that state.
+
+source:
+  - title: "SPECTERA API, OpenAPI 3.1.0 description, v18.1.0"
+    author: Sennheiser
+    url: "https://assets.sennheiser.com/download/assets/Spectera-openapi-api-18.1.yaml/2b6397366ae611f192e97a3cea19d2b0"
+    note: >
+      Linked from https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/spectera/open-api-specification-18-1.html.
+      Every resource path, request and response schema, field range and enum used here: /api/device/*,
+      /api/ssc/*, /api/health/*, /api/firmware/update/state, /api/rf/channels, /api/rf/antennas, /api/rf/scan,
+      /api/rf/restrictions, /api/audio/links, /api/audio/inputs, /api/audio/outputs, /api/audio/metering,
+      /api/audio/interface/*, /api/audio/pendingactions and /api/mts/*. The security schemes (users
+      initialSennheiser, controlSennheiser and api) and the resources that need no authentication.
+  - title: "SPECTERA API, OpenAPI description, v17.0.1"
+    author: Sennheiser
+    url: "https://assets.sennheiser.com/download/assets/Spectera-openapi-api-17.0.yaml/a4d30e180d9d11f1b8a5daafe4c42da3"
+    note: Compared with 18.1 for the differences on Base Station firmware 1.3.x (see the quirks).
+  - title: "Sennheiser 3rd Party API documentation: Spectera (introduction, usage, supported versions, release notes 17.0 and 18.1), v6.2, 08/2026"
+    author: Sennheiser
+    url: "https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/spectera.html"
+    note: >
+      The api user is not implemented yet and clients authenticate as controlSennheiser with the password set in
+      LinkDesk or the WebUI; API 18.1 needs Base Station firmware 1.4.1 or later, 17.0 firmware 1.3.0 to 1.4.0;
+      one event stream plus one request connection per client; the audio link modes, their timeslots and
+      whether each serves a microphone or an IEM; the validation rules for audio links; the WebUI deleting
+      links with no mobile device; and that there is no audio mute per mobile device, input or output.
+  - title: "Sennheiser Sound Control (SSCv2) Specification, version 2.3"
+    author: Sennheiser
+    url: "https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/sscv2-specification-2.3.html"
+    note: >
+      HTTPS, Basic authentication, PUT as a transactional partial update, the subscription stream
+      (/api/ssc/state/subscriptions, the open event carrying sessionUUID, PUT .../{sessionUUID}/add), the current
+      value sent for each resource as it is added, control resources (a collection subscription covering its
+      items, {} on creation and null on deletion), and the close event.
+  - title: "Spectera network guide: ports and protocols of the Base Station, v1.4.1, 07/2026"
+    author: Sennheiser
+    url: "https://docs.cloud.sennheiser.com/en-us/spectera/spectera/network-guide-ports-protocols-bs.html"
+    note: The API is HTTPS on TCP 443; the Base Station presents a self-signed certificate (security guide).
+  - title: "bitfocus/companion-module-sennheiser-spectera (MIT), CHANGELOG 1.1.0, 2026-07-14"
+    url: "https://github.com/bitfocus/companion-module-sennheiser-spectera"
+    note: >
+      Top-level LICENSE is MIT. Read as corroboration only: it authenticates as controlSennheiser, accepts the
+      self-signed certificate, takes the session id from the open event, subscribes the collections rather
+      than their items, and names the id and type fields in every write. No code was copied.
+
+settings:
+  password: { type: string, secret: true, required: true, label: Password,
+              description: "The device password set when the Base Station was claimed in LinkDesk or the Spectera WebUI." }
+  username: { type: string, default: controlSennheiser, max_length: 64, label: User,
+              description: "The API user; controlSennheiser until Spectera implements the third-party user api, which is then used instead." }
+  metering_poll_ms: { type: int, min: 0, max: 60000, default: 0, label: Meter interval,
+                      description: "Milliseconds between reads of the input and output meters while monitored; 0 reads none." }
+
+ports:
+  - { port: 443, protocol: https, role: control }
+
+models:
+  - id: base-station
+    name: Sennheiser Spectera Base Station (API 18.1, firmware 1.4.1 or later)
+    supports: &all
+      [identify, set_usage_mark, clear_firmware_update_status, set_rf_active, set_rf_frequency, set_rf_tx_power,
+      set_rf_bandwidth, set_rf_state_on_startup, set_antenna_binding, identify_antenna, set_antenna_led_colors,
+      set_scan_config, get_scan_results, get_rf_restrictions, create_audio_link, set_audio_link_mode,
+      delete_audio_link, route_input, set_input_name, set_input_source, route_output, set_output_interface,
+      set_clock_output, get_metering, set_pairing, pair_device, unpair_device, identify_pairable_device,
+      dismiss_pairable_device, identify_mobile_device, set_mobile_device_name, set_mobile_device_rf_channel,
+      set_mobile_device_sleep, set_mobile_device_color, assign_mic_link, assign_iem_link, set_headphone_volume,
+      set_headphone_volume_limits, set_headphone_balance, set_headphone_mono, set_mic_gain, set_mic_low_cut,
+      set_test_tone, set_mic_line_selection, set_cable_emulation, set_command_behavior,
+      update_mobile_device_firmware, clear_mobile_device_firmware_update_status, get_device_time, get_resource]
+    verification: none
+    notes: >
+      One Base Station with its DAD antennas and its paired mobile devices (SEK bodypacks, SKM handhelds),
+      which are reached through it and are kept in state, not opened as devices of their own.
+
+commands:
+  identify:
+    summary: "Flash the Base Station's LED (PUT /api/device/identification, visual)"
+    params:
+      enabled: { type: bool, default: true, label: Identify, description: "On starts the identification flashing, off stops it." }
+    returns: ack
+  set_usage_mark:
+    summary: >
+      Mark the Base Station as in use by a client (PUT /api/ssc/usagemark), an advisory lock other clients and the
+      WebUI respect; it lapses after the timer unless renewed. An empty name clears it
+    params:
+      used_by: { type: string, required: true, max_length: 255, label: Used by,
+                 description: "Name of the client holding the mark, such as the application and host; empty frees the device." }
+      timer_s: { type: int, min: 5, max: 3600, default: 300, label: Timeout,
+                 description: "Seconds after which the Base Station removes the mark unless it is set again." }
+    returns: ack
+  clear_firmware_update_status:
+    summary: "Reset the Base Station's firmware update status to its defaults (PUT /api/firmware/update/state/clear); refused while an update runs"
+    returns: ack
+  set_rf_active:
+    summary: "Switch an RF channel's transmission on or off (rfState RfActive or RfMuted)"
+    params:
+      rf_channel: &rf_channel { type: int, min: 0, max: 1, required: true, label: RF channel,
+                                description: "RF channel of the Base Station, 0 or 1 as numbered in the API." }
+      active: { type: bool, default: true, label: Active,
+                description: "On transmits on the RF channel, off mutes it and drops every mobile device on it." }
+    returns: ack
+  set_rf_frequency:
+    summary: "Set an RF channel's centre frequency (PUT /api/rf/channels/{id}, frequency)"
+    params:
+      rf_channel: *rf_channel
+      frequency_khz: { type: int, min: 10000, max: 10000000, required: true, label: Frequency,
+                       description: "Centre frequency in kHz, a whole number of MHz inside a range the Base Station's restrictions allow." }
+    returns: ack
+  set_rf_tx_power:
+    summary: "Set an RF channel's transmit power (txPower)"
+    params:
+      rf_channel: *rf_channel
+      power_mw: { type: enum, values: ["10", "20", "30", "50", "100"], required: true, label: Transmit power,
+                  description: "Transmit power in mW, up to what the frequency range's restriction allows." }
+    returns: ack
+  set_rf_bandwidth:
+    summary: "Set an RF channel's bandwidth (bandwidthMode)"
+    params:
+      rf_channel: *rf_channel
+      bandwidth_khz: { type: enum, values: ["6000", "8000"], required: true, label: Bandwidth,
+                       description: "Occupied bandwidth in kHz, 6000 or 8000, within the range's bandwidth limit." }
+    returns: ack
+  set_rf_state_on_startup:
+    summary: "Set whether an RF channel transmits after the Base Station starts (rfStateOnStartup)"
+    params:
+      rf_channel: *rf_channel
+      state: { type: enum, values: [active, muted, last], required: true, label: State on startup,
+               description: "active transmits, muted stays off, last restores the state before the restart." }
+    returns: ack
+  set_antenna_binding:
+    summary: "Bind an antenna port's antenna to an RF channel, to scanning, or to nothing (bindings, sub-antenna 0)"
+    params:
+      antenna: &antenna { type: enum, values: [a, b, c, d], required: true, label: Antenna port,
+                          description: "Antenna port of the Base Station, a to d." }
+      binding: { type: enum, values: [RfChannel0, RfChannel1, Scan, "Off"], required: true, label: Binding,
+                 description: "What the antenna serves: RF channel 0 or 1, the RF scan, or nothing." }
+    returns: ack
+  identify_antenna:
+    summary: "Flash an antenna's LED (identify)"
+    params:
+      antenna: *antenna
+      enabled: { type: bool, default: true, label: Identify, description: "On starts the antenna's identification, off stops it." }
+    returns: ack
+  set_antenna_led_colors:
+    summary: "Set the colours an antenna's LED shows while its RF channel is active and muted (ledColors)"
+    params:
+      antenna: *antenna
+      rf_active_color: &color { type: string, required: true, pattern: "^#[0-9a-fA-F]{6}$", label: Active colour,
+                                description: "Colour as #RRGGBB hex, e.g. #00A100." }
+      rf_muted_color: { type: string, required: true, pattern: "^#[0-9a-fA-F]{6}$", label: Muted colour,
+                        description: "Colour while the RF channel is muted, as #RRGGBB hex, e.g. #A18700." }
+    returns: ack
+  set_scan_config:
+    summary: "Configure the RF scan of an antenna bound to Scan (PUT /api/rf/scan/{port}/0/config); clears the results"
+    params:
+      antenna: *antenna
+      ref_level_dbm: { type: int, min: -15, max: 15, default: -15, label: Reference level,
+                       description: "Reference level of the scan in dBm." }
+      sweep_time_s: { type: int, min: 2, max: 60, default: 5, label: Sweep time,
+                      description: "Seconds one sweep of the band takes." }
+      rbw: { type: enum, values: [40kHz, 200kHz], default: 200kHz, label: Resolution bandwidth,
+             description: "Resolution bandwidth of the scan: finer at 40 kHz, faster at 200 kHz." }
+    returns: ack
+  get_scan_results:
+    summary: >
+      Read an antenna's latest RF scan (GET /api/rf/scan/{port}/0/results): its state, and when Valid the start
+      frequency, step and rms and peak levels per step
+    params:
+      antenna: *antenna
+    returns: value
+  get_rf_restrictions:
+    summary: "Read the frequency ranges, bandwidth and power limits the Base Station allows (GET /api/rf/restrictions)"
+    returns: value
+  create_audio_link:
+    summary: >
+      Create an audio link on an RF channel (POST /api/audio/links); returns the link with its id. Assign it to a
+      mobile device within 5 s, or an open WebUI deletes it
+    params:
+      rf_channel: *rf_channel
+      mode: &mode { type: enum, required: true, label: Mode,
+                    values: [max_range, max_link_density, live_link_density_mono, live_mono, live_low_latency_mono,
+                             live_link_density_stereo, live_stereo, live_low_latency_stereo,
+                             live_ultra_low_latency_stereo, raw, raw_low_latency, empty_mono, empty_stereo],
+                    description: "Link mode (modeId 1-11, 1001, 1002): range, density and latency trade-offs; stereo and ultra low latency modes are IEM-only, raw and mono low latency mic-only." }
+      link: { type: int, min: 0, max: 255, label: Link id,
+              description: "Id to give the link; the Base Station picks one when not given." }
+    returns: value
+  set_audio_link_mode:
+    summary: "Change an audio link's mode (PUT /api/audio/links/{id}); audio on the link is interrupted, and mono and stereo cannot be swapped"
+    params:
+      link: &link { type: int, min: 0, max: 255, required: true, label: Link id, description: "Id of the audio link." }
+      mode: *mode
+    returns: ack
+  delete_audio_link:
+    summary: "Delete an audio link (DELETE /api/audio/links/{id})"
+    params:
+      link: *link
+    returns: ack
+  route_input:
+    summary: "Send a Base Station input to an IEM audio link (iemAudiolinkId), or to none with -1"
+    params:
+      input: &input { type: int, min: 0, max: 31, required: true, label: Input,
+                      description: "Audio input of the Base Station, 0 to 31 as numbered in the API." }
+      link: &route_link { type: int, min: -1, max: 255, required: true, label: Link id,
+                          description: "Id of the audio link, or -1 for none." }
+    returns: ack
+  set_input_name:
+    summary: "Name a Base Station input"
+    params:
+      input: *input
+      name: &name { type: string, required: true, max_length: 16, pattern: '^[ a-zA-Z0-9#*+,./;<=>|-]{0,16}$', label: Name,
+                    description: "Up to 16 letters, digits, spaces and the characters # * + , . / ; < = > | -." }
+    returns: ack
+  set_input_source:
+    summary: "Choose the interface a Base Station input takes its audio from (inputSource)"
+    params:
+      input: *input
+      source: { type: enum, values: [AoIp, Madi1, Madi2], required: true, label: Source,
+                description: "Audio over IP (Dante), or MADI 1 or 2." }
+    returns: ack
+  route_output:
+    summary: "Feed a Base Station output from a microphone audio link (micAudiolinkId), or from none with -1"
+    params:
+      output: &output { type: int, min: 0, max: 31, required: true, label: Output,
+                        description: "Audio output of the Base Station, 0 to 31 as numbered in the API." }
+      link: *route_link
+    returns: ack
+  set_output_interface:
+    summary: >
+      Switch an output on one interface on, off, or (while the mobile device's command function is engaged)
+      to mute or talk: the {interface}EnableIfCommandIsDisabled and ...IsEnabled fields, the only way to mute an
+      output
+    params:
+      output: *output
+      interface: { type: enum, values: [aoip, madi1, madi2], required: true, label: Interface,
+                   description: "Interface of the output: audio over IP, MADI 1 or MADI 2." }
+      command: { type: enum, values: [disabled, enabled], required: true, label: Command state,
+                 description: "Which setting to change: the one in force normally, or the one while the command button is engaged." }
+      value: { type: enum, values: ["On", "Off", Mute, Talk], required: true, label: Setting,
+               description: "On or Off; Mute and Talk only for the command-engaged setting." }
+    returns: ack
+  set_clock_output:
+    summary: "Choose the clock a MADI or word clock output runs from (outputClockSource)"
+    params:
+      interface: { type: enum, values: [madi1, madi2, wordclock], required: true, label: Interface,
+                   description: "Output whose clock to set." }
+      source: { type: enum, values: [Internal48kHz, Internal96kHz, WordclockIn, AoIp, Madi1In, Madi2In], required: true,
+                label: Clock source, description: "Internal clock at 48 or 96 kHz, or the clock of an input." }
+    returns: ack
+  get_metering:
+    summary: "Read the input and output meters of every interface (GET /api/audio/metering): peak and rms per channel in dBFS"
+    returns: value
+  set_pairing:
+    summary: "Enable or disable pairing mode (PUT /api/mts/pairing); it ends by itself after 300 s"
+    params:
+      enabled: { type: bool, default: true, label: Pairing, description: "On lets new mobile devices appear as pairable, off stops it." }
+    returns: ack
+  pair_device:
+    summary: "Pair a pairable mobile device with the Base Station (POST /api/mts/paired/all)"
+    params:
+      mt_uid: &mt_uid { type: int, min: 0, max: 4294967295, required: true, label: Mobile device,
+                        description: "The mobile device's mtUid, as listed in state; serial numbers are not unique across types." }
+    returns: ack
+  unpair_device:
+    summary: "Unpair a mobile device (DELETE /api/mts/paired/all/{mtUid})"
+    params:
+      mt_uid: *mt_uid
+    returns: ack
+  identify_pairable_device:
+    summary: "Flash a pairable (not yet paired) mobile device's LED"
+    params:
+      mt_uid: *mt_uid
+      enabled: { type: bool, default: true, label: Identify, description: "On starts the identification, off stops it." }
+    returns: ack
+  dismiss_pairable_device:
+    summary: "Send a pairable mobile device away to look for another Base Station (DELETE /api/mts/pairable/{mtUid})"
+    params:
+      mt_uid: *mt_uid
+    returns: ack
+  identify_mobile_device:
+    summary: "Flash a paired mobile device's white LED"
+    params:
+      mt_uid: *mt_uid
+      enabled: { type: bool, default: true, label: Identify, description: "On starts the identification, off stops it." }
+      device_type: &device_type { type: enum, values: [SEK, SKM], label: Device type,
+                                  description: "SEK bodypack or SKM handheld; only needed before the device has been seen in state." }
+    returns: ack
+  set_mobile_device_name:
+    summary: "Name a paired mobile device"
+    params:
+      mt_uid: *mt_uid
+      name: *name
+      device_type: *device_type
+    returns: ack
+  set_mobile_device_rf_channel:
+    summary: "Move a paired mobile device to an RF channel; refused while it has an audio link"
+    params:
+      mt_uid: *mt_uid
+      rf_channel: *rf_channel
+      device_type: *device_type
+    returns: ack
+  set_mobile_device_sleep:
+    summary: "Put a paired mobile device to sleep or wake it (sleep, preliminary in the API)"
+    params:
+      mt_uid: *mt_uid
+      enabled: { type: bool, default: true, label: Sleep, description: "On sends the device to sleep, off wakes it." }
+      device_type: *device_type
+    returns: ack
+  set_mobile_device_color:
+    summary: "Set the colour a mobile device's LED shows while connected (connectedStateColor)"
+    params:
+      mt_uid: *mt_uid
+      color: { type: string, required: true, pattern: "^#[0-9a-fA-F]{6}$", label: Colour,
+               description: "Colour as #RRGGBB hex, e.g. #00A100." }
+      device_type: *device_type
+    returns: ack
+  assign_mic_link:
+    summary: "Give a mobile device's microphone an audio link (micAudiolinkId), or none with -1"
+    params:
+      mt_uid: *mt_uid
+      link: *route_link
+      device_type: *device_type
+    returns: ack
+  assign_iem_link:
+    summary: "Give an SEK's in-ear monitor an audio link (iemAudiolinkId), or none with -1"
+    params:
+      mt_uid: *mt_uid
+      link: *route_link
+      device_type: *device_type
+    returns: ack
+  set_headphone_volume:
+    summary: "Set an SEK's headphone volume"
+    params:
+      mt_uid: *mt_uid
+      volume_db: { type: float, min: -100, max: 27.5, required: true, label: Volume,
+                   description: "Headphone volume in dB in 0.5 dB steps; -100 mutes." }
+      device_type: *device_type
+    returns: ack
+  set_headphone_volume_limits:
+    summary: "Set the range an SEK's own volume control can reach"
+    params:
+      mt_uid: *mt_uid
+      min_db: { type: float, min: -100, max: 27.5, required: true, label: Minimum volume,
+                description: "Lowest volume the wearer can set, in dB in 0.5 dB steps." }
+      max_db: { type: float, min: -100, max: 27.5, required: true, label: Maximum volume,
+                description: "Highest volume the wearer can set, in dB in 0.5 dB steps." }
+      device_type: *device_type
+    returns: ack
+  set_headphone_balance:
+    summary: "Set an SEK's headphone balance"
+    params:
+      mt_uid: *mt_uid
+      balance: { type: int, min: -100, max: 100, required: true, label: Balance,
+                 description: "0 is centre, -100 fully left and 100 fully right." }
+      device_type: *device_type
+    returns: ack
+  set_headphone_mono:
+    summary: "Switch an SEK's headphone output to balanced mono (headphoneMonoBalanced)"
+    params:
+      mt_uid: *mt_uid
+      enabled: { type: bool, default: true, label: Mono, description: "On sends balanced mono to the headphones, off stereo." }
+      device_type: *device_type
+    returns: ack
+  set_mic_gain:
+    summary: "Set a mobile device's microphone preamp gain (micPreampGain)"
+    params:
+      mt_uid: *mt_uid
+      gain_db: { type: int, min: -10, max: 42, required: true, label: Gain,
+                 description: "Preamp gain in dB: -6 to 42 on an SEK, -10 to 42 on an SKM." }
+      device_type: *device_type
+    returns: ack
+  set_mic_low_cut:
+    summary: "Set a mobile device's microphone low cut filter (micLowCutHz)"
+    params:
+      mt_uid: *mt_uid
+      frequency_hz: { type: enum, values: ["20", "30", "60", "80", "100", "120"], required: true, label: Low cut,
+                      description: "Corner frequency in Hz; an SKM has 60 Hz and above only." }
+      device_type: *device_type
+    returns: ack
+  set_test_tone:
+    summary: "Switch a mobile device's test tone on or off, optionally at a level"
+    params:
+      mt_uid: *mt_uid
+      enabled: { type: bool, default: true, label: Test tone, description: "On sends the test tone instead of the microphone, off stops it." }
+      level_dbfs: { type: int, min: -60, max: 0, label: Level, description: "Test tone level in dBFS; unchanged when not given." }
+      device_type: *device_type
+    returns: ack
+  set_mic_line_selection:
+    summary: "Set whether an SEK's input is a microphone, a line, or detected (micLineSelection)"
+    params:
+      mt_uid: *mt_uid
+      selection: { type: enum, values: [Auto, Mic, Line], required: true, label: Input type,
+                   description: "Mic or Line, or Auto to follow what is plugged in." }
+      device_type: *device_type
+    returns: ack
+  set_cable_emulation:
+    summary: "Set an SEK's guitar cable emulation (cableEmulation)"
+    params:
+      mt_uid: *mt_uid
+      emulation: { type: enum, values: ["Off", Short, Mid, Long], required: true, label: Cable emulation,
+                   description: "The cable length emulated for an instrument, or Off." }
+      device_type: *device_type
+    returns: ack
+  set_command_behavior:
+    summary: "Set how a mobile device's command button works (commandBehavior)"
+    params:
+      mt_uid: *mt_uid
+      behavior: { type: enum, values: [Disabled, Momentary, Latching], required: true, label: Command button,
+                  description: "Disabled, Momentary (engaged while held) or Latching (each press toggles)." }
+      device_type: *device_type
+    returns: ack
+  update_mobile_device_firmware:
+    summary: "Start the over-the-air firmware update of every connected mobile device whose version differs (POST /api/mts/firmware/update)"
+    returns: ack
+  clear_mobile_device_firmware_update_status:
+    summary: "Reset the mobile device firmware update status (PUT /api/mts/firmware/update/state/clear); refused while an update runs"
+    returns: ack
+  get_device_time:
+    summary: "Read the Base Station's clock (GET /api/device/time): seconds since 2000-01-01 UTC, time zone and whether it is synchronised"
+    returns: value
+  get_resource:
+    summary: "Read any API resource by path (GET), for the ones not kept in state; the value is the device's JSON"
+    params:
+      path: { type: string, required: true, max_length: 256, pattern: '^/api/[A-Za-z0-9_/-]+$', label: Path,
+              description: "Resource path from /api/, e.g. /api/interfaces/network." }
+    returns: value
+
+state:
+  device.identity:                      { type: object, description: "GET /api/device/identity: product, hardware_revision, serial, vendor" }
+  device.status.state:                  { type: string, description: "Base Station state: Initializing, Normal, FactoryReset, Standby, Cooldown, Warmup or CriticalFailure" }
+  device.status.warnings:               { type: array, description: "Device warnings, e.g. FailureLogsAvailable" }
+  device.site.device_name:              { type: string, description: "Device name (also its mDNS name); set in LinkDesk or the WebUI only" }
+  device.site.location:                 { type: string, description: "Location text" }
+  device.site.position:                 { type: string, description: "Position text" }
+  device.identification.visual:         { type: bool, description: "The Base Station is flashing to identify itself" }
+  device.entitlement:                   { type: object, description: "Licence state: ACTIVATED with name, code and lease end, or NOT_ACTIVATED with a reason" }
+  device.usage_mark.used_by:            { type: string, description: "Client holding the advisory usage mark; empty when free" }
+  device.usage_mark.timer:              { type: int, unit: s, description: "Seconds the usage mark lasts" }
+  device.time:                          { type: object, description: "From get_device_time: time (s since 2000-01-01 UTC), timezone, valid" }
+  health.psu.psu1:                      { type: string, description: "Power supply 1: connected, unconnected or disconnected" }
+  health.psu.psu2:                      { type: string, description: "Power supply 2: connected, unconnected or disconnected" }
+  health.temperature.value:             { type: string, description: "Overall temperature state: normal, low, high or critical" }
+  health.fans.*.value:                  { type: string, description: "Fan FAN_1 to FAN_3 error state: Ok, Error_1, Error_2 or Broken" }
+  firmware.base_station:                { type: object, description: "Base Station firmware update state: device_version, ao_ip_version, state (Updating or Idle), progress 0-100, last_status" }
+  firmware.mobile_devices:              { type: object, description: "Mobile device firmware update state: state (Updating or Idle) and last_status" }
+  rf.channels.*.rf_channel_id:          { type: int, description: "RF channel, keyed by its API id 0 or 1" }
+  rf.channels.*.frequency:              { type: int, unit: kHz, description: "Centre frequency" }
+  rf.channels.*.tx_power:               { type: int, unit: mW, description: "Transmit power: 10, 20, 30, 50 or 100" }
+  rf.channels.*.bandwidth_mode:         { type: int, unit: kHz, description: "Bandwidth: 6000, 8000 or 10000" }
+  rf.channels.*.rf_state:               { type: string, description: "RfActive or RfMuted" }
+  rf.channels.*.rf_state_on_startup:    { type: string, description: "RfActive, RfMuted or RfLastState" }
+  rf.channels.*.rf_restriction_violation: { type: bool, description: "The frequency, bandwidth or power is outside the allowed ranges, so the channel does not transmit" }
+  rf.antennas.*.state:                  { type: string, description: "Antenna on port a-d: Unconnected, Connected, Updating, Initialized or Error" }
+  rf.antennas.*.error_state_details:    { type: string, description: "Why the antenna is in error, or NA" }
+  rf.antennas.*.warning_high_temperature: { type: bool, description: "The antenna is running hot" }
+  rf.antennas.*.warning_packet_error:   { type: bool, description: "Packet errors on the antenna cable in the last 15 s" }
+  rf.antennas.*.interference:           { type: object, description: "Interference seen: severity (None, Low, Mid, High), total_power dBm, residual and main_interferers" }
+  rf.antennas.*.temperature:            { type: int, unit: "°C", description: "Antenna temperature" }
+  rf.antennas.*.type:                   { type: string, description: "UHF, 1G4 or NA" }
+  rf.antennas.*.serial:                 { type: string, description: "Antenna serial number" }
+  rf.antennas.*.version:                { type: string, description: "Antenna firmware version" }
+  rf.antennas.*.identify:               { type: bool, description: "The antenna is identifying itself" }
+  rf.antennas.*.led_colors:             { type: object, description: "rf_active and rf_muted LED colours as #RRGGBB" }
+  rf.antennas.*.bindings:               { type: array, description: "Per sub-antenna: sub_antenna_id, binding (RfChannel0, RfChannel1, Scan, Off) and mismatch" }
+  rf.antennas.*.sw_update_progress:     { type: int, unit: "%", description: "Antenna firmware update progress, -1 when none runs" }
+  rf.restrictions:                      { type: object, description: "Allowed frequency ranges and their bandwidth, power and electronic key limits" }
+  audio.links.*.audiolink_id:           { type: int, description: "Audio link, keyed by its id; removed when deleted" }
+  audio.links.*.rf_channel_id:          { type: int, description: "RF channel the link uses" }
+  audio.links.*.mode_id:                { type: int, description: "Link mode id (1-11, 1001, 1002)" }
+  audio.inputs.*.iem_audiolink_id:      { type: int, description: "IEM audio link the input feeds, -1 for none; inputs keyed 0-31" }
+  audio.inputs.*.input_source:          { type: string, description: "AoIp, Madi1 or Madi2" }
+  audio.inputs.*.name:                  { type: string, description: "Input name" }
+  audio.outputs.*.mic_audiolink_id:     { type: int, description: "Microphone audio link feeding the output, -1 for none; outputs keyed 0-31" }
+  audio.outputs.*.ao_ip_enable_if_command_is_disabled:   { type: string, description: "On or Off on audio over IP, normally" }
+  audio.outputs.*.ao_ip_enable_if_command_is_enabled:    { type: string, description: "On, Off, Mute or Talk on audio over IP, while the command button is engaged" }
+  audio.outputs.*.madi1_enable_if_command_is_disabled:   { type: string, description: "On or Off on MADI 1, normally" }
+  audio.outputs.*.madi1_enable_if_command_is_enabled:    { type: string, description: "On, Off, Mute or Talk on MADI 1, while the command button is engaged" }
+  audio.outputs.*.madi2_enable_if_command_is_disabled:   { type: string, description: "On or Off on MADI 2, normally" }
+  audio.outputs.*.madi2_enable_if_command_is_enabled:    { type: string, description: "On, Off, Mute or Talk on MADI 2, while the command button is engaged" }
+  audio.interfaces.*.status:            { type: object, description: "Interface aoip, madi1, madi2 or wordclock: lock status, sample rate, mute and channels" }
+  audio.interfaces.*.output:            { type: object, description: "Output clock source of madi1, madi2 or wordclock" }
+  audio.pending_actions:                { type: object, description: "num_pending_actions and seamless_configuration_supported" }
+  audio.metering:                       { type: object, description: "Per interface (ao_ip_in, madi1_in, madi2_in, ao_ip_out, madi1_out, madi2_out): peak and rms arrays of 32 dBFS levels, -127.5 for digital silence; when metering_poll_ms is set" }
+  pairing.enable:                       { type: bool, description: "Pairing mode is on" }
+  pairing.progress:                     { type: int, unit: s, description: "Seconds until pairing mode ends" }
+  pairable_devices.*:                   { type: object, description: "Mobile devices offering to pair, keyed by mtUid: type, rf_channel_id, identify, name, pairing_pin_code" }
+  mobile_devices.*.type:                { type: string, description: "SEK (bodypack) or SKM (handheld); paired devices keyed by mtUid, removed when unpaired" }
+  mobile_devices.*.name:                { type: string, description: "Mobile device name" }
+  mobile_devices.*.serial:              { type: string, description: "Serial number" }
+  mobile_devices.*.state:               { type: string, description: "Connected, Disconnected, Syncing, Sleeping or Updating" }
+  mobile_devices.*.rf_channel_id:       { type: int, description: "RF channel the device uses" }
+  mobile_devices.*.battery_fill_level:  { type: int, unit: "%", description: "Battery charge, -1 when unknown" }
+  mobile_devices.*.battery_runtime:     { type: int, unit: min, description: "Remaining runtime, -1 when unknown" }
+  mobile_devices.*.battery_low:         { type: bool, description: "Battery low warning" }
+  mobile_devices.*.mic_lqi:             { type: int, description: "Microphone link quality 0-4: 0 not available, 1 muted, 2 concealment, 3 insecure bits, 4 good" }
+  mobile_devices.*.iem_lqi:             { type: int, description: "IEM link quality 0-4, as mic_lqi (SEK)" }
+  mobile_devices.*.rssi:                { type: float, unit: dBm, description: "Received signal strength" }
+  mobile_devices.*.dominant_antenna:    { type: string, description: "Antenna port receiving it best, or NotAvailable" }
+  mobile_devices.*.interference:        { type: object, description: "Interference severity at the device" }
+  mobile_devices.*.mic_audiolink_id:    { type: int, description: "Microphone audio link, -1 for none" }
+  mobile_devices.*.iem_audiolink_id:    { type: int, description: "IEM audio link, -1 for none (SEK)" }
+  mobile_devices.*.mic_audiolink_active: { type: bool, description: "The microphone link is carrying audio" }
+  mobile_devices.*.iem_audiolink_active: { type: bool, description: "The IEM link is carrying audio (SEK)" }
+  mobile_devices.*.mic_preamp_gain:     { type: int, unit: dB, description: "Microphone preamp gain" }
+  mobile_devices.*.mic_low_cut_hz:      { type: int, unit: Hz, description: "Low cut corner frequency" }
+  mobile_devices.*.mic_test_tone_enabled: { type: bool, description: "Test tone on" }
+  mobile_devices.*.mic_test_tone_level: { type: int, unit: dBFS, description: "Test tone level" }
+  mobile_devices.*.mic_line_selection:  { type: string, description: "Auto, Mic or Line (SEK)" }
+  mobile_devices.*.mic_line_selection_auto_value: { type: string, description: "What Auto detected: Unknown, Mic or Line (SEK)" }
+  mobile_devices.*.cable_emulation:     { type: string, description: "Off, Short, Mid or Long (SEK)" }
+  mobile_devices.*.headphone_plug_state: { type: string, description: "NotAvailable, Unplugged or Plugged (SEK)" }
+  mobile_devices.*.headphone_volume:    { type: float, unit: dB, description: "Headphone volume, -100 muted (SEK)" }
+  mobile_devices.*.headphone_volume_min: { type: float, unit: dB, description: "Lowest volume the wearer can set (SEK)" }
+  mobile_devices.*.headphone_volume_max: { type: float, unit: dB, description: "Highest volume the wearer can set (SEK)" }
+  mobile_devices.*.headphone_balance:   { type: int, description: "Balance, -100 left to 100 right (SEK)" }
+  mobile_devices.*.headphone_mono_balanced: { type: bool, description: "Balanced mono to the headphones (SEK)" }
+  mobile_devices.*.command_behavior:    { type: string, description: "Disabled, Momentary or Latching" }
+  mobile_devices.*.command_state:       { type: string, description: "Unknown, NotAvailable, Released, Pressed, Unlatched or Latched" }
+  mobile_devices.*.mic_module:          { type: object, description: "SKM microphone head: name, pickup_pattern and pad" }
+  mobile_devices.*.identify:            { type: bool, description: "The device is identifying itself" }
+  mobile_devices.*.reverse_identify:    { type: bool, description: "The wearer asked to be highlighted" }
+  mobile_devices.*.sleep:               { type: bool, description: "The device is asleep" }
+  mobile_devices.*.version:             { type: string, description: "Firmware version" }
+  mobile_devices.*.version_mismatch:    { type: bool, description: "The firmware differs from the Base Station's, so update_mobile_device_firmware would update it" }
+  mobile_devices.*.sw_update_progress:  { type: int, unit: "%", description: "Firmware update progress, -1 when none runs" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Spectera does not yet implement SSCv2's third-party user "api" (Sennheiser's Spectera API introduction):
+      requests authenticate as "controlSennheiser" with the device password set in LinkDesk or the WebUI, which
+      can change anything the WebUI can. Set username to api once a firmware implements it. The API is
+      unavailable until a password has been set. A 401 or 403 on any request is terminal: the core sends
+      nothing more until the device is opened again with a corrected password, since repeated bad credentials
+      block the client's address for a while.
+  - models: [all]
+    severity: warning
+    text: >
+      The Base Station presents a self-signed certificate, so it is accepted without verification. The
+      connection is encrypted but the device is not authenticated.
+  - models: [all]
+    severity: info
+    text: >
+      Ids are the API's own, numbered from 0: RF channels 0 and 1, inputs and outputs 0 to 31, audio links by
+      their id, mobile devices by mtUid, antenna ports a to d. State is keyed by the same ids, with the API's
+      field names in snake_case.
+  - models: [all]
+    severity: critical
+    text: >
+      set_rf_active with active off, set_rf_frequency, set_rf_bandwidth and set_antenna_binding take an RF
+      channel off the air or move it: every mobile device on it drops its audio until it reconnects. rfState is
+      not kept over a restart (rfStateOnStartup decides), and an RF channel stays off even when active while its
+      settings break the restrictions, or no initialized antenna is bound to it without a mismatch.
+  - models: [all]
+    severity: critical
+    text: >
+      set_audio_link_mode interrupts the link's audio; delete_audio_link, unpair_device, assign_mic_link and
+      assign_iem_link with -1, and route_input or route_output to another link cut audio on that path at once.
+      Creating and deleting many links on one RF channel can briefly interrupt other links' audio on current
+      firmware (Companion module notes).
+  - models: [all]
+    severity: critical
+    text: >
+      update_mobile_device_firmware pauses all audio transmission of the Base Station, including for mobile
+      devices that are not being updated, until the update ends.
+  - models: [all]
+    severity: warning
+    text: >
+      Audio links are validated as a set and a write that breaks a rule is refused with 409: one source per
+      link, a link and its mobile device on the same RF channel, at most 128 timeslots per RF channel, some
+      modes microphone-only or IEM-only, stereo links on an even input with the next odd input taken, no link on
+      both an input and an output, and no move between RF channels while a mobile device has a link. An open
+      Spectera WebUI deletes any link no mobile device uses, so assign a created link within 5 s.
+  - models: [all]
+    severity: warning
+    text: >
+      There is no audio mute per mobile device, input or output. An output is silenced with
+      set_output_interface (Off), an IEM by its headphone volume at -100 dB, a microphone link by assigning -1.
+  - models: [all]
+    severity: info
+    text: >
+      Collections (RF channels, antennas, audio links, inputs, outputs, pairable and paired mobile devices) are
+      subscribed as collections, not item by item, so each change arrives once. The first notification is the
+      whole list; later ones are one created ({}), changed or deleted (null) item, on the item's path or, for the
+      fixed lists, as the changed item on the collection's path. Items of a list read again that are no longer
+      in it are removed from state.
+  - models: [all]
+    severity: info
+    text: >
+      Meters are not subscribed, since the Base Station would send them up to 60 times a second; with
+      metering_poll_ms set they are read at that interval while monitored, the next read waiting for the last
+      answer. get_metering reads them once.
+  - models: [all]
+    severity: info
+    text: >
+      A write to a mobile device has to name its type (SEK or SKM), which the module takes from the paired list
+      in state, or from device_type before the device has been seen (opened for commands only). Commands an SKM
+      lacks (IEM link, headphones, mic or line, cable emulation, low cut below 60 Hz, gain below -6 dB on an SEK)
+      are refused before sending.
+  - models: [all]
+    severity: info
+    text: >
+      Telemetry arrives only when a value changes, and SSCv2 defines no keep-alive on the stream. A quiet stream
+      is checked by requesting /api/ssc/version (which needs no authentication) after 3 s of silence; two failed
+      checks in a row are a lost connection. The Base Station allows few concurrent connections and answers a
+      new stream with 503 when full.
+  - models: [all]
+    severity: info
+    text: >
+      Written for API 18.1 (Base Station firmware 1.4.1 and later). On API 17.0 (firmware 1.3.x) the
+      aoip interface status and the metering resource do not exist, mobile devices carry a connected flag
+      instead of the Disabled command behaviour, and outputs have commandMode fields; the deprecated fields
+      (source, clockSource, danteVersion, ledBrightness) are kept in state as the device sends them. A
+      subscription batch refused because it names a resource the firmware lacks is logged, and the batches
+      after it are still added.
+  - models: [all]
+    severity: info
+    text: >
+      Not in the API, so not offered: the device name and site (read only), presets, network settings, Base
+      Station firmware upload, reboot, factory reset, licence activation, passwords and electronic key import.
+      Level Recording (its own preliminary event streams of FlatBuffers frames) is not implemented.

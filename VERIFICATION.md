@@ -44,6 +44,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:335](specs/aes70.yaml#L335))
 - [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:343](specs/aes70.yaml#L343))
 - [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:238](specs/aes70.yaml#L238))
+- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:310](specs/aes70.yaml#L310))
 - [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:352](specs/aes70.yaml#L352))
 - [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:262](specs/aes70.yaml#L262))
 - [ ] Check a role or label with non-ASCII characters: OCP.1 string lengths are taken to count Unicode characters, not bytes. ([crates/core/src/modules/aes70_codec.rs:244](crates/core/src/modules/aes70_codec.rs#L244))
@@ -553,6 +554,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1070](specs/extron-switcher.yaml#L1070))
 - [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:1018](specs/extron-switcher.yaml#L1018))
 
+## focusrite-rednet — Focusrite RedNet (AES70)
+
+- [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
+- [ ] On an MP8R, check which object numbers and roles the firmware uses: the implementation chart's (0x01nn00pp, GComp-n, IpLvl-n) or the virtual device's (4352 + 256 per channel, TrimEnable-n, Lvl-n). ([specs/focusrite-rednet.yaml:421](specs/focusrite-rednet.yaml#L421))
+- [ ] Check the switch positions: Phase-n 1 inverts, Impedance-n 0 is 10 kOhm, Pad-n 1 is -20 dB, and the unit-wide Identify, FP Lock and Preferred Master switches take 1 for on. ([specs/focusrite-rednet.yaml:430](specs/focusrite-rednet.yaml#L430))
+- [ ] Read the PSU, network and clock leader sensors on a unit and note what each value means. ([specs/focusrite-rednet.yaml:443](specs/focusrite-rednet.yaml#L443))
+- [ ] On a RedNet 4, RedNet 1 or 2, check the roles match the virtual device's lists (Source-n positions mic, line, DI; Link1-2 to Link7-8; Fan). ([specs/focusrite-rednet.yaml:430](specs/focusrite-rednet.yaml#L430))
+- [ ] Walk an A16R MkII, D16R MkII or X2P with AES70 enabled and record its object tree, so their controls can be named. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
+
+## focusrite-rednet-rcp — Focusrite RedNet MP8R (Yamaha RCP)
+
+- [ ] Confirm the MP8R answers RCP on TCP 49280 directly, and whether it needs a Yamaha ID set in RedNet Control for it. ([specs/focusrite-rednet-rcp.yaml:386](specs/focusrite-rednet-rcp.yaml#L386))
+- [ ] Check the get and set replies follow Yamaha's grammar (OK get ... value, OK set, OKm when clamped, ERROR) and that changes made in RedNet Control are pushed as NOTIFY set. ([specs/focusrite-rednet-rcp.yaml:379](specs/focusrite-rednet-rcp.yaml#L379))
+- [ ] Check how HAGain 0-66 maps onto the MP8R's 10-65 dB preamp range, and what CompGain and ExecMode mean. ([specs/focusrite-rednet-rcp.yaml:393](specs/focusrite-rednet-rcp.yaml#L393))
+- [ ] Try the same addresses on a RedNet 4. ([specs/focusrite-rednet-rcp.yaml:407](specs/focusrite-rednet-rcp.yaml#L407))
+
 ## freeshow — FreeShow
 
 - [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1489](specs/freeshow.yaml#L1489))
@@ -634,6 +651,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Find the LOGIN level argument's wire spelling, so login can be modelled. ([specs/kramer-p3000.yaml:1176](specs/kramer-p3000.yaml#L1176))
 - [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:1187](specs/kramer-p3000.yaml#L1187))
 - [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:1162](specs/kramer-p3000.yaml#L1162))
+
+## labgruppen-lake — Lab.gruppen Lake (DLM)
+
+- [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:701](specs/labgruppen-lake.yaml#L701))
+- [ ] Confirm dynamic port mode: a packet to UDP 6016 is answered to the sending port, so the core works beside Lake Controller. ([specs/labgruppen-lake.yaml:696](specs/labgruppen-lake.yaml#L696))
+- [ ] Record the exact text of a get's answer (the value alone, or the command echoed) for one-value and several-value gets, such as `Mod.Out.Gain?A 1` and `Dev.LoadPilot.Readings?1`. ([specs/labgruppen-lake.yaml:715](specs/labgruppen-lake.yaml#L715))
+- [ ] Check labels and preset names with spaces are accepted as the last argument (`Mod.Out.Label=A 1 Main Left`, `Dev.Preset.Store!1 Show A`). ([specs/labgruppen-lake.yaml:676](specs/labgruppen-lake.yaml#L676))
+- [ ] Check the acknowledgement codes a frame really sends for a bad parameter and an unknown path (-3 to -6 in the document's misaligned table). ([specs/labgruppen-lake.yaml:728](specs/labgruppen-lake.yaml#L728))
+- [ ] Check `Dev.MD.FullBin?3` answers with the 108-byte version 3 structure as the payload alone, with no text before it, and the same for `?2` on a PLM and the LM structure. ([specs/labgruppen-lake.yaml:721](specs/labgruppen-lake.yaml#L721))
+- [ ] Check the RMS gain reduction scale (0.1 dB a step, as read here, or 0.5 dB as one table says). ([specs/labgruppen-lake.yaml:721](specs/labgruppen-lake.yaml#L721))
+- [ ] Confirm the D 10:4L, D 20:4L and D 40:4L answer DLM as the other D Series, and note their model names from `Dev.ModelName?`. ([specs/labgruppen-lake.yaml:747](specs/labgruppen-lake.yaml#L747))
+- [ ] Check whether `Dev.NetworkIPConf?` (as the document spells it) or `Dev.Network.IPConf?` answers, and whether the PLM 20000Q takes `Dev.PTG2.Active` (the example) or `Dev.PTG.Active` (the heading). ([specs/labgruppen-lake.yaml:741](specs/labgruppen-lake.yaml#L741))
+- [ ] Note how many polled requests a second a frame takes before it falls behind, and whether a full parameter round every 5 s disturbs Lake Controller. ([specs/labgruppen-lake.yaml:707](specs/labgruppen-lake.yaml#L707))
+- [ ] Confirm a frame does not reset on any typed command on firmware before 2.50 (the Lake Controller 8 known issue about invalid DLM messages). ([specs/labgruppen-lake.yaml:683](specs/labgruppen-lake.yaml#L683))
+
+## labgruppen-nlb60e — Lab.gruppen NLB 60E (NomadLink)
+
+- [ ] Confirm the bridge accepts the operator with spaces around it (`Subnet.Mute = 1`, `Subnet.Mute ?`), as the examples write it, and answers with the value alone. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
+- [ ] Check virtual device names with dots (the document's examples) are accepted, as its character rules exclude them. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
+- [ ] Check what `Subnet.Status ?` answers with no faulty amplifier (nothing after the faults flag, or a trailing space). ([specs/labgruppen-nlb60e.yaml:222](specs/labgruppen-nlb60e.yaml#L222))
+- [ ] Note whether polling `Subnet.Status ?` every 2 s is acceptable to the bridge, and whether the third-party port still works on firmware newer than 2.1.0. ([specs/labgruppen-nlb60e.yaml:216](specs/labgruppen-nlb60e.yaml#L216))
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
@@ -950,6 +988,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which bit of States is TX mute against a real receiver, using mute_flags, since the document's examples disagree with its table. ([specs/sennheiser-ew-g3-g4.yaml:187](specs/sennheiser-ew-g3-g4.yaml#L187))
 - [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig and FirmwareRevision behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:205](specs/sennheiser-ew-g3-g4.yaml#L205))
 - [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:31](crates/core/src/modules/sennheiser_mcp.rs#L31))
+
+## sennheiser-spectera — Sennheiser Spectera
+
+- [ ] Confirm the API accepts controlSennheiser with the device password on firmware 1.4.x, and whether the user api works on any firmware yet. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))
+- [ ] Note how long the Base Station blocks an address after bad credentials, so the terminal refusal can be weighed against it. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))
+- [ ] Confirm the first notification of each collection after it is added is the whole list, and that later ones are the changed item alone on the collection's path (fixed lists) or on the item's path (links, mobile devices). ([specs/sennheiser-spectera.yaml:591](specs/sennheiser-spectera.yaml#L591))
+- [ ] Confirm a created audio link is notified as {} and then in full, and a deleted one as null. ([specs/sennheiser-spectera.yaml:591](specs/sennheiser-spectera.yaml#L591))
+- [ ] Check the Base Station sends nothing on an idle stream, and that a version check after 3 s of quiet never counts against its connection limit or trips a 503. ([specs/sennheiser-spectera.yaml:612](specs/sennheiser-spectera.yaml#L612))
+- [ ] Confirm a PUT to a mobile device without its type is refused, and that one naming the type with only the changed field is applied. ([specs/sennheiser-spectera.yaml:605](specs/sennheiser-spectera.yaml#L605))
+- [ ] Check how long an open WebUI waits before deleting an audio link no mobile device uses (documented as about 5 s). ([specs/sennheiser-spectera.yaml:578](specs/sennheiser-spectera.yaml#L578))
+- [ ] Check polling /api/audio/metering at the chosen interval while subscribed elsewhere does not disturb the stream. ([specs/sennheiser-spectera.yaml:599](specs/sennheiser-spectera.yaml#L599))
+- [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
+- [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
 
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 

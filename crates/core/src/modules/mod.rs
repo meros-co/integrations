@@ -6,7 +6,7 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
-#[cfg(feature = "aes70")]
+#[cfg(any(feature = "aes70", feature = "focusrite-rednet"))]
 mod aes70;
 #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
@@ -48,6 +48,8 @@ mod bss_london;
 mod easyworship;
 #[cfg(feature = "emberplus")]
 mod emberplus;
+#[cfg(feature = "focusrite-rednet")]
+mod focusrite_rednet;
 #[cfg(feature = "generic-http")]
 mod generic_http;
 #[cfg(feature = "generic-osc")]
@@ -56,6 +58,8 @@ mod generic_osc;
 mod generic_tcp_udp;
 #[cfg(feature = "http-snapshot")]
 mod http_snapshot;
+#[cfg(feature = "labgruppen-lake")]
+mod lake_dlm;
 #[cfg(feature = "magewell-proconvert")]
 mod magewell;
 #[cfg(feature = "novastar-central-control")]
@@ -84,6 +88,8 @@ mod sennheiser_d6000;
 mod sennheiser_ewdx;
 #[cfg(feature = "sennheiser-ew-g3-g4")]
 mod sennheiser_mcp;
+#[cfg(feature = "sennheiser-spectera")]
+mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
 #[cfg(feature = "sony-camera")]
@@ -100,6 +106,8 @@ mod sony_camera_http;
 mod sony_camera_props;
 #[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
+#[cfg(any(feature = "sennheiser-ew-dx", feature = "sennheiser-spectera"))]
+mod sscv2;
 #[cfg(feature = "probel-swp08")]
 mod swp08;
 #[cfg(feature = "biamp-tesira")]
@@ -208,13 +216,24 @@ pub(crate) fn construct(
             Some(port) => Ok(Box::new(aes70::Aes70::new(context, port))),
             None => Err("AES70 (OCP.1) has no standard port: give the device's OCP.1 port".into()),
         },
+        // RedNet's OCP.1 port is advertised, not fixed, so the host must give it.
+        #[cfg(feature = "focusrite-rednet")]
+        "focusrite-rednet" => match context.port {
+            Some(port) => Ok(Box::new(focusrite_rednet::RedNet::new(context, port))),
+            None => Err(
+                "RedNet has no fixed OCP.1 port: give the port its _oca._tcp record advertises"
+                    .into(),
+            ),
+        },
+        #[cfg(feature = "labgruppen-lake")]
+        "labgruppen-lake" => Ok(Box::new(lake_dlm::LakeDlm::new(context)?)),
         #[cfg(feature = "emberplus")]
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
         // EasyWorship advertises its port over Bonjour, so the host must give it.
         #[cfg(feature = "softouch-easyworship")]
         "softouch-easyworship" => match context.port {
             Some(port) => Ok(Box::new(easyworship::EasyWorship::new(&context, port))),
-            None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour                          (_ezwremote._tcp)"
+            None => Err("EasyWorship has no fixed port: give the port it advertises over Bonjour (_ezwremote._tcp)"
                 .into()),
         },
         #[cfg(feature = "probel-swp08")]
@@ -230,7 +249,11 @@ pub(crate) fn construct(
         #[cfg(feature = "http-snapshot")]
         "http-snapshot" => Ok(Box::new(http_snapshot::HttpSnapshot::new(context)?)),
         #[cfg(feature = "sennheiser-ew-dx")]
-        "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
+        "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::from_context(context))),
+        #[cfg(feature = "sennheiser-spectera")]
+        "sennheiser-spectera" => Ok(Box::new(sennheiser_spectera::Spectera::from_context(
+            context,
+        ))),
         #[cfg(any(
             feature = "allenheath-ahm",
             feature = "allenheath-cq",

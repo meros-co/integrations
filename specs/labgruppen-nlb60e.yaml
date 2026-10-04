@@ -1,0 +1,244 @@
+spec: 1
+id: labgruppen-nlb60e
+name: Lab.gruppen NomadLink amplifiers through the NLB 60E bridge (C Series, FP+, IPD)
+vendor: Lab.gruppen
+category: other
+
+source:
+  - title: "Lab.gruppen NLB 60E Third Party Integration, Protocol Description, Revision 2B, 2009-07-02"
+    author: Lab.gruppen AB
+    url: "https://www.eviaudio.fr/wp-content/uploads/2020/04/NLB-60E-Communication-and-Third-Party-Control-Protocol-Ver-2B.pdf"
+    note: >
+      Mirrored by a distributor. Connection management (2: TCP 65010, one third-party client at a time, a new
+      connection drops the old one, refused while DeviceControl is connected; messages handled in order),
+      addressing (3: amplifiers by virtual device name, up to 60, 1-10 characters A-Z, 0-9, @ and -), the message
+      layout (4: Context.Parameter followed by = value or ?, case insensitive, CR+LF, a set answered as a get,
+      several values separated by spaces), error replies (5.1), subnet messages (5.2: Power, Mute, StatusOk,
+      Status, SerialAtPos1-60), device messages (5.3: Power, MuteA-H, MuteStatus, Status) and VDN management
+      (5.4: Subnet.VDN1-60).
+
+transport:
+  type: line-tcp
+  port: 65010
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  error_match: "^ERROR!"
+  probe: "Subnet.StatusOk ?"
+
+ports:
+  - { port: 65010, protocol: tcp, role: control }
+
+models:
+  - id: nlb-60e
+    name: Lab.gruppen NLB 60E NomadLink bridge, with its C Series, FP+ and IPD amplifiers
+    supports:
+      [set_subnet_power, get_subnet_power, set_subnet_mute, get_subnet_mute, get_subnet_status_ok, get_subnet_status,
+      get_serial_at_position, set_power, get_power, set_mute, get_mute, get_mute_status, get_status, set_vdn,
+      clear_vdn, get_vdn]
+    verification: none
+    notes: >
+      Requires NLB 60E firmware 2.1.0 or later. One bridge serves one NomadLink subnet of up to 60 amplifiers,
+      each addressed by the virtual device name given it in the VDN table.
+
+commands:
+  set_subnet_power:
+    summary: "Switch every amplifier in the subnet on or off, in sequence (Subnet.Power =); answers the subnet power state"
+    params:
+      powered: { type: bool, required: true, label: Power, description: "On switches every amplifier on, off switches them all off." }
+    send: "Subnet.Power = {powered:bool01}"
+    expect:
+      matches: "^([0-3])$"
+    returns: value
+  get_subnet_power:
+    summary: "Read the subnet's power state (Subnet.Power ?): 0 all off, 1 all on, 2 mixed, 3 in transition"
+    send: "Subnet.Power ?"
+    expect:
+      matches: "^([0-3])$"
+    returns: value
+  set_subnet_mute:
+    summary: "Mute or unmute every amplifier in the subnet (Subnet.Mute =)"
+    params:
+      muted: { type: bool, required: true, label: Mute, description: "On mutes the whole subnet, off unmutes it." }
+    send: "Subnet.Mute = {muted:bool01}"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  get_subnet_mute:
+    summary: "Read the subnet mute (Subnet.Mute ?): 1 muted, 0 unmuted"
+    send: "Subnet.Mute ?"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  get_subnet_status_ok:
+    summary: "Read whether the subnet is free of faults (Subnet.StatusOk ?): 1 no faults, 0 faults"
+    send: "Subnet.StatusOk ?"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  get_subnet_status:
+    summary: >
+      Read the subnet's full status (Subnet.Status ?): subnet number, amplifiers connected, mute, closed loop, GPI 1-3,
+      power state, faults present, then the names of the amplifiers with faults
+    send: "Subnet.Status ?"
+    expect:
+      matches: "^(\\d+ \\d+ [01] [01] [01] [01] [01] [0-3] [01].*)$"
+    returns: value
+  get_serial_at_position:
+    summary: "Read the serial number of the amplifier at a position of the subnet (Subnet.SerialAtPos<n> ?); 0 when none"
+    params:
+      position: { type: int, min: 1, max: 60, required: true, label: Position,
+                  description: "Position in the NomadLink subnet topology, 1 to 60." }
+    send: "Subnet.SerialAtPos{position} ?"
+    expect:
+      matches: "^(\\d+)$"
+    returns: value
+  set_power:
+    summary: "Set an amplifier's desired power state (<VDN>.Power =)"
+    params:
+      vdn: &vdn { type: string, required: true, max_length: 10, pattern: "^[A-Za-z0-9@.-]{1,10}$", label: Amplifier,
+                  description: "The amplifier's virtual device name in the bridge's VDN table, up to 10 of A-Z, 0-9, @ and -." }
+      powered: { type: bool, required: true, label: Power, description: "On switches the amplifier on, off switches it off." }
+    send: "{vdn}.Power = {powered:bool01}"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  get_power:
+    summary: "Read an amplifier's desired power state (<VDN>.Power ?): 1 on, 0 off"
+    params:
+      vdn: *vdn
+    send: "{vdn}.Power ?"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  set_mute:
+    summary: "Mute or unmute an amplifier output channel (<VDN>.Mute<A-H> =)"
+    params:
+      vdn: *vdn
+      channel: &channel { type: enum, values: [A, B, C, D, E, F, G, H], required: true, label: Channel,
+                          description: "Amplifier output channel, A to H as the amplifier has them." }
+      muted: { type: bool, required: true, label: Mute, description: "On mutes the channel, off unmutes it." }
+    send: "{vdn}.Mute{channel} = {muted:bool01}"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  get_mute:
+    summary: "Read an amplifier output channel's mute (<VDN>.Mute<A-H> ?): 1 muted, 0 unmuted"
+    params:
+      vdn: *vdn
+      channel: *channel
+    send: "{vdn}.Mute{channel} ?"
+    expect:
+      matches: "^([01])$"
+    returns: value
+  get_mute_status:
+    summary: "Read every output channel's mute of an amplifier (<VDN>.MuteStatus ?): one digit per channel from A, 1 muted"
+    params:
+      vdn: *vdn
+    send: "{vdn}.MuteStatus ?"
+    expect:
+      matches: "^([01]+)$"
+    returns: value
+  get_status:
+    summary: >
+      Read an amplifier's status and meters (<VDN>.Status ?): fault present, power state (0 as desired, 1 on but
+      should be off, 2 off but should be on), PAL, then per channel from A its attenuation (-100 silent, -44, -29 to 0
+      at VPL clip), VPL, CPL, VHF fault, DC fault, load shorted, temperature fault, high impedance warning and
+      temperature warning
+    params:
+      vdn: *vdn
+    send: "{vdn}.Status ?"
+    expect:
+      matches: "^([01] [0-2] [01](?: -?\\d+(?: [01]){8})+)$"
+    returns: value
+  set_vdn:
+    summary: "Assign a virtual device name to an amplifier's serial number in a VDN table slot (Subnet.VDN<n> = <VDN> <SN>)"
+    params:
+      position: &vdn_position { type: int, min: 1, max: 60, required: true, label: Slot,
+                                description: "VDN table slot, 1 to 60." }
+      vdn: *vdn
+      serial: { type: string, required: true, max_length: 16, pattern: "^[0-9]{1,16}$", label: Serial number,
+                description: "The amplifier's serial number, as Subnet.SerialAtPos reports it." }
+    send: "Subnet.VDN{position} = {vdn} {serial}"
+    expect:
+      not_contains: "ERROR!"
+    returns: text
+  clear_vdn:
+    summary: "Clear a VDN table slot (Subnet.VDN<n> = with nothing); answers ** for an empty slot"
+    params:
+      position: *vdn_position
+    send: "Subnet.VDN{position} ="
+    expect:
+      not_contains: "ERROR!"
+    returns: text
+  get_vdn:
+    summary: "Read a VDN table slot (Subnet.VDN<n> ?): the name and serial number, * for unassigned"
+    params:
+      position: *vdn_position
+    send: "Subnet.VDN{position} ?"
+    expect:
+      not_contains: "ERROR!"
+    returns: text
+
+state:
+  subnet.number:          { type: int, description: "Subnet number" }
+  subnet.devices:         { type: int, description: "Amplifiers connected to the subnet" }
+  subnet.mute:            { type: bool, description: "The subnet is muted" }
+  subnet.closed_loop:     { type: bool, description: "The NomadLink subnet is a closed loop" }
+  subnet.gpi1:            { type: bool, description: "GPI 1 is high" }
+  subnet.gpi2:            { type: bool, description: "GPI 2 is high" }
+  subnet.gpi3:            { type: bool, description: "GPI 3 is high" }
+  subnet.power:           { type: int, description: "Subnet power: 0 all off, 1 all on, 2 mixed, 3 in transition" }
+  subnet.faults:          { type: bool, description: "One or more amplifiers have faults" }
+  subnet.faulty_devices:  { type: string, description: "Names of the amplifiers with faults, separated by spaces; empty when none" }
+
+telemetry:
+  poll:
+    send: ["Subnet.Status ?"]
+    every_ms: 2000
+  updates:
+    - match: "^(\\d+) (\\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([0-3]) ([01]) ?(.*)$"
+      state:
+        subnet.number: "{1}"
+        subnet.devices: "{2}"
+        subnet.mute: { value: "{3}", map: { "0": false, "1": true } }
+        subnet.closed_loop: { value: "{4}", map: { "0": false, "1": true } }
+        subnet.gpi1: { value: "{5}", map: { "0": false, "1": true } }
+        subnet.gpi2: { value: "{6}", map: { "0": false, "1": true } }
+        subnet.gpi3: { value: "{7}", map: { "0": false, "1": true } }
+        subnet.power: "{8}"
+        subnet.faults: { value: "{9}", map: { "0": false, "1": true } }
+        subnet.faulty_devices: "{10}"
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The bridge takes one third-party client at a time: connecting drops any other third-party connection, and
+      while Lab.gruppen DeviceControl is connected every message is refused with "ERROR! Device Control is
+      connected". There is no authentication.
+  - models: [all]
+    severity: warning
+    text: >
+      Answers carry only the value, not what was asked, so only the subnet status (whose shape is its own) is kept
+      in state by polling every 2 s. An amplifier's power, mutes and status are read with get_power, get_mute_status
+      and get_status, which return the answer; the spec format cannot attribute a bare value to the amplifier asked.
+  - models: [all]
+    severity: info
+    text: >
+      A set is answered as the matching get, with the new value. Subnet power switches amplifiers on in sequence,
+      so set_subnet_power usually answers 3 (in transition). Errors answer "ERROR! ..." (unable to parse, VDN does not
+      exist, device not found, Device Control is connected, channel out of range, internal error).
+  - models: [all]
+    severity: info
+    text: >
+      The document's examples put spaces around the operator ("Subnet.Mute = 1", "Subnet.Mute ?"), which is how
+      the commands are sent. Virtual device names are case insensitive and stored in capitals; the document allows
+      A-Z, 0-9, @ and -, though its own examples use dots, which are allowed here too.
+  - models: [all]
+    severity: info
+    text: >
+      Gain and other processing are not reachable through the bridge: the protocol offers power, mute and status
+      only.

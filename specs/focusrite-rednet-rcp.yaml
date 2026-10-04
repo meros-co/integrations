@@ -1,0 +1,413 @@
+# Focusrite RedNet MP8R over Yamaha's Remote Control Protocol (RCP): text lines on TCP 49280, the protocol a
+# Yamaha console uses to control the MP8R's preamps.
+
+spec: 1
+id: focusrite-rednet-rcp
+name: Focusrite RedNet MP8R (Yamaha Remote Control Protocol, TCP 49280)
+vendor: Focusrite
+category: other
+
+source:
+  - title: "Focusrite RedNet MP8R User Guide (Yamaha console control: the Yamaha ID set in RedNet Control)"
+    author: Focusrite Audio Engineering
+    url: "https://focusritepro.com/products/rednet-mp8r/"
+    note: >
+      The MP8R's preamps can be controlled from a Yamaha CL, QL or Rivage console once the unit has a Yamaha ID
+      (Y000-Y00F) in RedNet Control. Focusrite does not publish the protocol itself.
+  - title: "bitfocus/companion-module-focusrite-mp8r, v1.0.2 (MIT): MP8R Parameters-1.txt, mp8rChoices.json, index.js, variables.js"
+    author: Andrew Broughton and Phillip Pietruschka (community, not Focusrite)
+    url: "https://github.com/bitfocus/companion-module-focusrite-mp8r"
+    note: >
+      Top-level LICENSE is MIT (checked 2026-10-04). MP8R Parameters-1.txt is the unit's own answer to RCP prminfo
+      and mtrinfo: the addresses IO:Current/InCh/48VOn, HPFOn and GainCompOn (8 channels, 0-1), HAGain (0-66 dB),
+      CompGain (-6 to 66 dB), IO:Current/Dev/SystemStatus (0-10), SyncStatus (0-12) and ExecMode (0-2), read-only,
+      the current and next-boot IP settings, and the meter IO:Current/Meter/InCh/InputLevel. mp8rChoices.json
+      names the SystemStatus values 0-11 and SyncStatus values 0-12, and the devstatus runmode and error words.
+      index.js and variables.js: TCP port 49280, LF-terminated lines, devinfo productname, devstatus runmode and
+      error, and scpmode keepalive. The module's help says it may also work with the RedNet 4, untested. No code
+      was copied.
+  - title: DME7 Remote Control Protocol Specifications, Version 1.1.0 rev2
+    author: Yamaha Corporation
+    url: https://usa.yamaha.com/files/download/other_assets/4/2230684/DME7-remote-V110_en.pdf
+    note: >
+      The RCP grammar (for a Yamaha processor, not for the MP8R): 3.1 basic syntax (LF-terminated lines, options
+      separated by spaces, text in double quotes), 3.2.2 NOTIFY set, 3.3.1 devstatus runmode and error, 3.3.3
+      scpmode keepalive, 3.3.4 get and OK get, 3.3.5 set, OK set and OKm (clamped), 3.4.1 devinfo, 3.5.1 ERROR
+      replies and their codes.
+
+transport:
+  type: line-tcp
+  port: 49280
+  framing: terminated
+  terminator: lf
+  encoding: ascii
+  timeout_ms: 2000
+  reply: expected
+  reply_match: '^(OK|OKm|ERROR) '
+  probe: devstatus runmode
+
+ports:
+  - { port: 49280, protocol: tcp, role: control }
+
+models:
+  - id: rednet-mp8r
+    name: Focusrite RedNet MP8R
+    channels: 8
+    supports:
+      - set_phantom_power
+      - get_phantom_power
+      - set_high_pass_filter
+      - get_high_pass_filter
+      - set_gain_compensation
+      - get_gain_compensation
+      - set_preamp_gain
+      - get_preamp_gain
+      - set_compensated_gain
+      - get_compensated_gain
+      - get_system_status
+      - get_sync_status
+      - get_exec_mode
+      - get_parameter
+      - set_parameter
+      - get_product_name
+      - get_device_name
+      - get_run_mode
+      - get_error_status
+      - set_keepalive
+    verification: none
+    notes: Eight remote-controlled mic preamps, channels 1-8 (0-7 on the wire).
+
+commands:
+  set_phantom_power:
+    summary: "Switch a preamp's +48 V phantom power (set IO:Current/InCh/48VOn; 1 on, 0 off)"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+      enabled: { type: bool, default: true, label: Phantom power,
+                 description: "On applies +48 V to the input, off removes it." }
+    send: set IO:Current/InCh/48VOn {channel:-1} 0 {enabled:bool01}
+    expect:
+      matches: '^OKm? set IO:Current/InCh/48VOn \d+ \d+ '
+    returns: ack
+  get_phantom_power:
+    summary: "Read a preamp's +48 V phantom power (get IO:Current/InCh/48VOn); returns 1 on or 0 off"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+    send: get IO:Current/InCh/48VOn {channel:-1} 0
+    expect:
+      matches: '^OK get IO:Current/InCh/48VOn \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  set_high_pass_filter:
+    summary: "Switch a preamp's high-pass filter (set IO:Current/InCh/HPFOn; 1 on, 0 off)"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+      enabled: { type: bool, default: true, label: High-pass filter,
+                 description: "On engages the high-pass filter, off bypasses it." }
+    send: set IO:Current/InCh/HPFOn {channel:-1} 0 {enabled:bool01}
+    expect:
+      matches: '^OKm? set IO:Current/InCh/HPFOn \d+ \d+ '
+    returns: ack
+  get_high_pass_filter:
+    summary: "Read a preamp's high-pass filter (get IO:Current/InCh/HPFOn); returns 1 on or 0 off"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+    send: get IO:Current/InCh/HPFOn {channel:-1} 0
+    expect:
+      matches: '^OK get IO:Current/InCh/HPFOn \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  set_gain_compensation:
+    summary: "Switch a preamp's gain compensation (set IO:Current/InCh/GainCompOn; 1 on, 0 off)"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+      enabled: { type: bool, default: true, label: Gain compensation,
+                 description: "On holds the level sent to the network when the preamp gain is changed elsewhere, off follows the gain." }
+    send: set IO:Current/InCh/GainCompOn {channel:-1} 0 {enabled:bool01}
+    expect:
+      matches: '^OKm? set IO:Current/InCh/GainCompOn \d+ \d+ '
+    returns: ack
+  get_gain_compensation:
+    summary: "Read a preamp's gain compensation (get IO:Current/InCh/GainCompOn); returns 1 on or 0 off"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+    send: get IO:Current/InCh/GainCompOn {channel:-1} 0
+    expect:
+      matches: '^OK get IO:Current/InCh/GainCompOn \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  set_preamp_gain:
+    summary: "Set a preamp's gain (set IO:Current/InCh/HAGain), in whole dB, 0 to 66 as the unit reports the parameter's range"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+      gain_db: { type: int, min: 0, max: 66, required: true, label: Gain,
+                 description: "Preamp gain in dB as the unit's parameter list gives it (0 to 66); the MP8R's own range is 10 to 65 dB." }
+    send: set IO:Current/InCh/HAGain {channel:-1} 0 {gain_db}
+    expect:
+      matches: '^OKm? set IO:Current/InCh/HAGain \d+ \d+ '
+    returns: ack
+  get_preamp_gain:
+    summary: "Read a preamp's gain (get IO:Current/InCh/HAGain), in dB"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+    send: get IO:Current/InCh/HAGain {channel:-1} 0
+    expect:
+      matches: '^OK get IO:Current/InCh/HAGain \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  set_compensated_gain:
+    summary: "Set a preamp's compensated gain (the gain held when gain compensation is on) (set IO:Current/InCh/CompGain), in whole dB, -6 to 66 as the unit reports the parameter's range"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+      gain_db: { type: int, min: -6, max: 66, required: true, label: Gain,
+                 description: "Gain in dB, -6 to 66 as the unit's parameter list gives it." }
+    send: set IO:Current/InCh/CompGain {channel:-1} 0 {gain_db}
+    expect:
+      matches: '^OKm? set IO:Current/InCh/CompGain \d+ \d+ '
+    returns: ack
+  get_compensated_gain:
+    summary: "Read a preamp's compensated gain (the gain held when gain compensation is on) (get IO:Current/InCh/CompGain), in dB"
+    params:
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Preamp channel, numbered from 1 as on the front panel (0-7 on the wire)." }
+    send: get IO:Current/InCh/CompGain {channel:-1} 0
+    expect:
+      matches: '^OK get IO:Current/InCh/CompGain \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  get_system_status:
+    summary: "Read the unit's system status (0-11, see the state's description) (get IO:Current/Dev/SystemStatus 0 0); returns the status number"
+    send: get IO:Current/Dev/SystemStatus 0 0
+    expect:
+      matches: '^OK get IO:Current/Dev/SystemStatus \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  get_sync_status:
+    summary: "Read the unit's Dante sync status (0-12, see the state's description) (get IO:Current/Dev/SyncStatus 0 0); returns the status number"
+    send: get IO:Current/Dev/SyncStatus 0 0
+    expect:
+      matches: '^OK get IO:Current/Dev/SyncStatus \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  get_exec_mode:
+    summary: "Read the unit's execution mode (0-2) (get IO:Current/Dev/ExecMode 0 0); returns the status number"
+    send: get IO:Current/Dev/ExecMode 0 0
+    expect:
+      matches: '^OK get IO:Current/Dev/ExecMode \d+ \d+ "?(-?\d+)"?'
+    returns: value
+  set_parameter:
+    summary: >
+      Set any parameter by its RCP address with a raw integer (as the unit's prminfo gives it); x and y are sent
+      as given, numbered from 0
+    params:
+      address: { type: string, max_length: 128, pattern: '^[A-Za-z]+:[A-Za-z0-9/]+$', required: true, label: Address,
+                 description: "RCP parameter address, e.g. IO:Current/InCh/HAGain." }
+      x: { type: int, min: 0, max: 255, required: true, label: X index,
+           description: "First index of the address (the channel for InCh parameters), numbered from 0." }
+      y: { type: int, min: 0, max: 255, required: true, label: Y index,
+           description: "Second index of the address, numbered from 0; 0 where the address has none." }
+      value: { type: int, required: true, label: Value, description: "Raw integer value in the parameter's own unit." }
+    send: set {address} {x} {y} {value}
+    expect:
+      matches: '^OKm? set \S+ \d+ \d+ '
+    returns: ack
+  get_parameter:
+    summary: Read any parameter by its RCP address; returns the value as sent
+    params:
+      address: { type: string, max_length: 128, pattern: '^[A-Za-z]+:[A-Za-z0-9/]+$', required: true, label: Address,
+                 description: "RCP parameter address, e.g. IO:Current/Dev/SyncStatus." }
+      x: { type: int, min: 0, max: 255, required: true, label: X index,
+           description: "First index of the address (the channel for InCh parameters), numbered from 0." }
+      y: { type: int, min: 0, max: 255, required: true, label: Y index,
+           description: "Second index of the address, numbered from 0; 0 where the address has none." }
+    send: get {address} {x} {y}
+    expect:
+      matches: ^OK get \S+ \d+ \d+ (.*?)\s*$
+    returns: value
+  get_product_name:
+    summary: Read the product name (devinfo productname)
+    send: devinfo productname
+    expect:
+      matches: ^OK devinfo productname "?([^"]*?)"?\s*$
+    returns: value
+  get_device_name:
+    summary: Read the device name (devinfo devicename)
+    send: devinfo devicename
+    expect:
+      matches: ^OK devinfo devicename "?([^"]*?)"?\s*$
+    returns: value
+  get_run_mode:
+    summary: 'Read the run mode (devstatus runmode): normal, emergency, booting, update or diagnostics'
+    send: devstatus runmode
+    expect:
+      matches: ^OK devstatus runmode "?([a-z]+)"?
+    returns: value
+  get_error_status:
+    summary: 'Read the error status (devstatus error): nothing, devfail, assert or sysdown'
+    send: devstatus error
+    expect:
+      matches: ^OK devstatus error "?([a-z]+)"?
+    returns: value
+  set_keepalive:
+    summary: >
+      Ask the unit to close the connection if nothing arrives for interval_ms milliseconds (scpmode keepalive;
+      more than 1000)
+    params:
+      interval_ms: { type: int, min: 1001, max: 3600000, required: true, label: Interval,
+                     description: "Milliseconds of silence after which the unit closes the connection; more than 1000." }
+    send: scpmode keepalive {interval_ms}
+    expect:
+      matches: ^OK scpmode keepalive
+    returns: ack
+
+state:
+  channels.*.phantom_power:       { type: bool, description: "+48 V phantom power on (IO:Current/InCh/48VOn)" }
+  channels.*.high_pass_filter:    { type: bool, description: "High-pass filter on (IO:Current/InCh/HPFOn)" }
+  channels.*.gain_compensation:   { type: bool, description: "Gain compensation on (IO:Current/InCh/GainCompOn)" }
+  channels.*.preamp_gain_db:      { type: int, unit: dB, description: "Preamp gain (IO:Current/InCh/HAGain), 0-66 as the unit reports the range" }
+  channels.*.compensated_gain_db: { type: int, unit: dB, description: "Compensated gain (IO:Current/InCh/CompGain), -6 to 66" }
+  device.system_status:           { type: int, description: "IO:Current/Dev/SystemStatus: 0 virtual state, 1 not operating, 2 operating normally, 3 Brooklyn 2 error, 4 corrupt MAC address, 5 cooling fan stopping, 6 corrupt SRAM data, 7 device ID conflict, 8 DIP switch setting error, 9 version mismatch, 10 Dante resource overflow, 11 Dante setting mismatch" }
+  device.sync_status:             { type: int, description: "IO:Current/Dev/SyncStatus: 0 not operating, 1 operating normally, 2 synchronized, 3 incorrect word clock setting, 4 Dante not connected, 5 Dante connection failure, 6 not gigabit Ethernet, 7 redundant (secondary) running, 8 redundant (secondary) error, 9 leader running, 10 leader running and not gigabit, 11 leader running and redundant running, 12 leader running and redundant error" }
+  device.exec_mode:               { type: int, description: "IO:Current/Dev/ExecMode, 0-2; the values' meanings are not documented" }
+  device.product_name:            { type: string, description: "Product name (devinfo productname)" }
+  device.name:                    { type: string, description: "Device name (devinfo devicename)" }
+  device.run_mode:                { type: string, description: "Run mode: normal, emergency, booting, update or diagnostics (devstatus runmode)" }
+  device.error:                   { type: string, description: "Error status: nothing, devfail, assert or sysdown (devstatus error)" }
+
+telemetry:
+  poll:
+    send:
+      - devinfo productname
+      - devinfo devicename
+      - devstatus runmode
+      - devstatus error
+      - get IO:Current/Dev/SystemStatus 0 0
+      - get IO:Current/Dev/SyncStatus 0 0
+      - get IO:Current/Dev/ExecMode 0 0
+      - get IO:Current/InCh/48VOn 0 0
+      - get IO:Current/InCh/48VOn 1 0
+      - get IO:Current/InCh/48VOn 2 0
+      - get IO:Current/InCh/48VOn 3 0
+      - get IO:Current/InCh/48VOn 4 0
+      - get IO:Current/InCh/48VOn 5 0
+      - get IO:Current/InCh/48VOn 6 0
+      - get IO:Current/InCh/48VOn 7 0
+      - get IO:Current/InCh/HPFOn 0 0
+      - get IO:Current/InCh/HPFOn 1 0
+      - get IO:Current/InCh/HPFOn 2 0
+      - get IO:Current/InCh/HPFOn 3 0
+      - get IO:Current/InCh/HPFOn 4 0
+      - get IO:Current/InCh/HPFOn 5 0
+      - get IO:Current/InCh/HPFOn 6 0
+      - get IO:Current/InCh/HPFOn 7 0
+      - get IO:Current/InCh/GainCompOn 0 0
+      - get IO:Current/InCh/GainCompOn 1 0
+      - get IO:Current/InCh/GainCompOn 2 0
+      - get IO:Current/InCh/GainCompOn 3 0
+      - get IO:Current/InCh/GainCompOn 4 0
+      - get IO:Current/InCh/GainCompOn 5 0
+      - get IO:Current/InCh/GainCompOn 6 0
+      - get IO:Current/InCh/GainCompOn 7 0
+      - get IO:Current/InCh/HAGain 0 0
+      - get IO:Current/InCh/HAGain 1 0
+      - get IO:Current/InCh/HAGain 2 0
+      - get IO:Current/InCh/HAGain 3 0
+      - get IO:Current/InCh/HAGain 4 0
+      - get IO:Current/InCh/HAGain 5 0
+      - get IO:Current/InCh/HAGain 6 0
+      - get IO:Current/InCh/HAGain 7 0
+      - get IO:Current/InCh/CompGain 0 0
+      - get IO:Current/InCh/CompGain 1 0
+      - get IO:Current/InCh/CompGain 2 0
+      - get IO:Current/InCh/CompGain 3 0
+      - get IO:Current/InCh/CompGain 4 0
+      - get IO:Current/InCh/CompGain 5 0
+      - get IO:Current/InCh/CompGain 6 0
+      - get IO:Current/InCh/CompGain 7 0
+  updates:
+    - match: ^OK devinfo productname "?([^"]*?)"?\s*$
+      state:
+        device.product_name: '{1}'
+    - match: ^OK devinfo devicename "?([^"]*?)"?\s*$
+      state:
+        device.name: '{1}'
+    - match: ^(?:OK|NOTIFY) devstatus runmode "?([a-z]+)"?\s*$
+      state:
+        device.run_mode: '{1}'
+    - match: ^(?:OK|NOTIFY) devstatus error "?([a-z]+)"?\s*$
+      state:
+        device.error: '{1}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) IO:Current/InCh/48VOn (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        channels.{1:+1}.phantom_power:
+          value: '{3}'
+          map:
+            '0': false
+            '1': true
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) IO:Current/InCh/HPFOn (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        channels.{1:+1}.high_pass_filter:
+          value: '{3}'
+          map:
+            '0': false
+            '1': true
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) IO:Current/InCh/GainCompOn (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        channels.{1:+1}.gain_compensation:
+          value: '{3}'
+          map:
+            '0': false
+            '1': true
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) IO:Current/InCh/HAGain (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        channels.{1:+1}.preamp_gain_db: '{3}'
+    - match: '^(?:OK|OKm|NOTIFY) (?:set|get) IO:Current/InCh/CompGain (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        channels.{1:+1}.compensated_gain_db: '{3}'
+    - match: '^(?:OK|NOTIFY) (?:set|get) IO:Current/Dev/SystemStatus (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        device.system_status: '{3}'
+    - match: '^(?:OK|NOTIFY) (?:set|get) IO:Current/Dev/SyncStatus (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        device.sync_status: '{3}'
+    - match: '^(?:OK|NOTIFY) (?:set|get) IO:Current/Dev/ExecMode (\d+) (\d+) "?(-?\d+)"?(?: .*)?$'
+      state:
+        device.exec_mode: '{3}'
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      Focusrite publishes no specification of the MP8R's RCP service. The addresses, ranges and status values come
+      from the unit's own prminfo answers and the status names in the MIT-licensed Companion module, and the
+      grammar (OK get, OK set, OKm, NOTIFY set, ERROR, devstatus, devinfo, scpmode keepalive) from Yamaha's RCP
+      specification for its own processors. Everything here is unconfirmed on hardware.
+  - models: [all]
+    severity: warning
+    text: >
+      The unit's preamps are shared: a Yamaha console, RedNet Control and this integration can all change them,
+      and each change moves the preamp for all. With gain compensation on, the level sent to the network is held
+      when another controller changes the gain. The unit must have a Yamaha ID set in RedNet Control for Yamaha
+      control; whether this RCP service needs it too is not documented.
+  - models: [all]
+    severity: info
+    text: >
+      Channels are 1-8 in commands and state and 0-7 on the wire. HAGain is reported with a range of 0 to 66 dB
+      while the MP8R's preamp spans 10 to 65 dB; the unit clamps a value outside its own range and answers OKm.
+  - models: [all]
+    severity: info
+    text: >
+      Changes made elsewhere are pushed as NOTIFY set lines, which the telemetry rules apply; on connecting every
+      channel's switches and gains and the status values are read once. The input meters
+      (IO:Current/Meter/InCh/InputLevel, through mtrstart) are not covered: the format cannot map RCP meter
+      notifications to state. The IP settings (IO:Current/Dev/IPSelectMode, IPAddress, DefaultGateway,
+      SubnetMask, and their NextBoot forms) are reachable with get_parameter and set_parameter only; changing them
+      can take the unit off the network.
+  - models: [all]
+    severity: info
+    text: >
+      scpmode keepalive makes the unit close the connection itself when it hears nothing for the given time,
+      which frees the slot after a controller vanishes; after it is set the host must send something within the
+      interval, which this spec does not schedule. The RedNet 4 may answer the same addresses (Companion module
+      help), unconfirmed, so it is not listed as a model.

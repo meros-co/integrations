@@ -82,6 +82,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-extron", &["extron-matrix", "extron-switcher"]),
     ("vendor-figure53", &["qlab"]),
     (
+        "vendor-focusrite",
+        &["focusrite-rednet", "focusrite-rednet-rcp"],
+    ),
+    (
         "vendor-generic",
         &[
             "generic-http",
@@ -95,6 +99,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
     ("vendor-kramer", &["kramer-p3000"]),
+    (
+        "vendor-labgruppen",
+        &["labgruppen-lake", "labgruppen-nlb60e"],
+    ),
     ("vendor-lawo", &["emberplus"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
@@ -143,6 +151,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "sennheiser-digital-6000",
             "sennheiser-ew-dx",
             "sennheiser-ew-g3-g4",
+            "sennheiser-spectera",
         ],
     ),
     (
