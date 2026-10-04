@@ -1363,6 +1363,16 @@ impl SpecEngine {
         };
         for item in items {
             if queued {
+                // A slow device must not fall behind: a poll item still
+                // waiting from the last round is not queued again.
+                if poll
+                    && self
+                        .queue
+                        .iter()
+                        .any(|j| j.id.is_none() && j.item.as_ref() == Some(&item))
+                {
+                    continue;
+                }
                 self.queue.push_back(Job {
                     id: None,
                     name: String::new(),
@@ -3428,5 +3438,29 @@ mod tests {
         let a = cx.take();
         assert_eq!(completed(&a), vec![(2, Err(CommandError::Timeout))]);
         assert!(!a.iter().any(|a| matches!(a, Action::TcpClose { .. })));
+    }
+
+    #[test]
+    fn a_slow_device_does_not_pile_up_polls() {
+        let telemetry = json!({
+            "poll": {"every_ms": 1000, "send": [{"method": "GET", "path": "/status"}]},
+            "updates": [],
+        });
+        let mut e = http_with(telemetry, json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        // The first poll is in flight and unanswered; three more rounds come
+        // due, and only one request is left waiting behind it.
+        for t in 1..=3 {
+            let mut cx = Cx::new(t * 1000);
+            e.timer(&mut cx, POLL);
+        }
+        let waiting = e
+            .queue
+            .iter()
+            .filter(|j| j.item.as_ref().and_then(|i| i.get("path")) == Some(&json!("/status")))
+            .count();
+        assert!(waiting <= 1, "{waiting} polls queued");
     }
 }
