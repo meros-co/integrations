@@ -569,6 +569,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1070](specs/extron-switcher.yaml#L1070))
 - [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:1018](specs/extron-switcher.yaml#L1018))
 
+## facebook-live — Facebook Live
+
+- [ ] Confirm an invalid or expired Page token answers HTTP 400 with error code 190 (and which subcodes), that a 401 is never used for other errors, and that permission and rate-limit errors carry other codes. ([specs/facebook-live.yaml:153](specs/facebook-live.yaml#L153))
+- [ ] Confirm GET /{api_version}/me with a Page token answers the Page's id, so the idle probe checks the token. ([specs/facebook-live.yaml:156](specs/facebook-live.yaml#L156))
+- [ ] Confirm reading GET /{page-id}/live_videos still works on v26.0 (the current reference says reading is not supported; the v19.0 reference and the scheduling guide document it), and that source=owner includes UNPUBLISHED and scheduled live videos. ([specs/facebook-live.yaml:594](specs/facebook-live.yaml#L594))
+- [ ] Record the shape of ingest_streams in a field expansion (a plain array, or an object with data), and the stream_health fields Facebook actually returns, including while the encoder is not sending. ([specs/facebook-live.yaml:607](specs/facebook-live.yaml#L607))
+- [ ] Confirm the Graph API takes a JSON request body (Content-Type application/json) for creating and updating live videos, as it takes form-encoded parameters. ([specs/facebook-live.yaml:273](specs/facebook-live.yaml#L273))
+- [ ] Confirm scheduling with status SCHEDULED_UNPUBLISHED and event_params start_time, and record the earliest and latest start times accepted. ([specs/facebook-live.yaml:291](specs/facebook-live.yaml#L291))
+- [ ] Record which privacy values a Page's live video accepts, and whether privacy can be changed while live. ([specs/facebook-live.yaml:335](specs/facebook-live.yaml#L335))
+- [ ] Confirm go_live and end_live_video answer the id (not success), and that a video ended with end_live_video reads back as VOD. ([specs/facebook-live.yaml:391](specs/facebook-live.yaml#L391))
+- [ ] Confirm DELETE answers 200 with success true, and whether a live video can be deleted while live. ([specs/facebook-live.yaml:413](specs/facebook-live.yaml#L413))
+- [ ] Confirm master_ingest_stream_id switches between primary and backup ingest streams on a live video created with enable_backup_ingest. ([specs/facebook-live.yaml:363](specs/facebook-live.yaml#L363))
+- [ ] Confirm comments and reactions with summary=total_count and limit=0 answer the total count only, and which permission comments need with a Page token. ([specs/facebook-live.yaml:439](specs/facebook-live.yaml#L439))
+- [ ] Confirm seconds_left counts down from the 8-hour maximum while live, and what it reads before and after. ([specs/facebook-live.yaml:581](specs/facebook-live.yaml#L581))
+- [ ] Record the Page Business Use Case usage the 15-second poll costs (X-Business-Use-Case-Usage), on a Page with few engaged users. ([specs/facebook-live.yaml:590](specs/facebook-live.yaml#L590))
+- [ ] Confirm a request naming a retired Graph API version is answered by the oldest available one, rather than refused. ([specs/facebook-live.yaml:165](specs/facebook-live.yaml#L165))
+
 ## focusrite-rednet — Focusrite RedNet (AES70)
 
 - [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
@@ -1153,6 +1170,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the exact form of the WINDOW, PRESET, STBD and CANVAS event lines (spaces after the commas vary in the reference). ([specs/tvone-coriomaster.yaml:567](specs/tvone-coriomaster.yaml#L567))
 - [ ] Check what happens when a second client (CORIOgrapher) connects while this one is connected. ([specs/tvone-coriomaster.yaml:681](specs/tvone-coriomaster.yaml#L681))
 - [ ] Confirm that On and Off are accepted for HFlip, VFlip, SCFTB and the shrink animations, and whether Yes and No are also accepted. ([specs/tvone-coriomaster.yaml:199](specs/tvone-coriomaster.yaml#L199))
+
+## twitch — Twitch
+
+- [ ] Confirm a public client's refresh at https://id.twitch.tv/oauth2/token with client_id alone succeeds, answers a new refresh token every time, and that the old one then answers 400 "Invalid refresh token". ([specs/twitch.yaml:111](specs/twitch.yaml#L111))
+- [ ] Record the body Helix answers with a 401 (expired token, and a Client-Id that does not match the token), and confirm 403 is never used for a refused token. ([specs/twitch.yaml:119](specs/twitch.yaml#L119))
+- [ ] Confirm every Helix request is refused without the Client-Id header, and accepted with it beside the bearer token. ([specs/twitch.yaml:116](specs/twitch.yaml#L116))
+- [ ] Confirm GET /helix/users with no parameters answers the token's own user and costs one rate-limit point. ([specs/twitch.yaml:123](specs/twitch.yaml#L123))
+- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:724](specs/twitch.yaml#L724))
+- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:716](specs/twitch.yaml#L716))
+- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:388](specs/twitch.yaml#L388))
+- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:381](specs/twitch.yaml#L381))
+- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:476](specs/twitch.yaml#L476))
+- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:287](specs/twitch.yaml#L287))
+- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:307](specs/twitch.yaml#L307))
+- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:330](specs/twitch.yaml#L330))
+- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:363](specs/twitch.yaml#L363))
+- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:252](specs/twitch.yaml#L252))
+- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:230](specs/twitch.yaml#L230))
+- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:671](specs/twitch.yaml#L671))
 
 ## visca — VISCA over IP
 
