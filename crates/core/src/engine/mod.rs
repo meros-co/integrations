@@ -3421,6 +3421,71 @@ mod tests {
             .any(|a| matches!(a, Action::Connection(Connection::Connected)))
     }
 
+    /// A rule carrying only `replace` and the plain rule writing the values
+    /// both match one reply, and the removal goes out first although the
+    /// replacing rule comes second (Planning Center's items).
+    #[test]
+    fn a_replace_only_rule_clears_before_its_neighbour_writes() {
+        let spec = Catalog::source_tree()
+            .device("planningcenter-services")
+            .unwrap()
+            .clone();
+        let settings =
+            json!({"auth": "oauth2", "access_token": "t", "service_type_id": "1", "plan_id": "5"})
+                .as_object()
+                .unwrap()
+                .clone();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "services-v2".into(),
+                channels: None,
+                settings,
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let items = |links: Value| {
+            json!({"links": links, "data": [{"id": "11", "attributes": {"title": "Welcome"}}]})
+                .to_string()
+        };
+        let offer = |e: &mut SpecEngine, body: String| {
+            let mut cx = Cx::new(0);
+            e.offer(
+                &mut cx,
+                &telemetry::Inbound::Http {
+                    path: "/services/v2/service_types/1/plans/5/items?per_page=100",
+                    headers: &[],
+                    body: body.as_bytes(),
+                    request: None,
+                },
+            );
+            cx.take()
+                .into_iter()
+                .filter_map(|a| match a {
+                    Action::State(p) => Some(p),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let welcome = json!({"plans": {"5": {"items": {"11": {"title": "Welcome"}}}}});
+        // The whole list: the removal, then the values.
+        let patches = offer(&mut e, items(json!({"self": "https://x/items"})));
+        assert_eq!(
+            patches,
+            vec![json!({"plans": {"5": {"items": null}}}), welcome.clone()]
+        );
+        // One page of several: the values alone.
+        let patches = offer(
+            &mut e,
+            items(json!({"self": "https://x/items", "next": "https://x/items?offset=100"})),
+        );
+        assert_eq!(patches, vec![welcome]);
+    }
+
     #[test]
     fn bearer_tokens_and_a_chosen_scheme() {
         let mut spec = Catalog::source_tree()

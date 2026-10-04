@@ -1171,7 +1171,11 @@ lists of plain lines (Ultimatte's FILE LIST):
 `replace` is a path or a list of them, templates over the captures before
 `json_each` (the path's, the selectors'), each declared or leading to
 declared paths. Consumers see the removal and the new list as two `state`
-events in a row.
+events in a row. A rule may carry `replace` with no `state` when only some
+messages hold the whole list (Planning Center's first page with no `next`
+link): it sits beside the plain rule that writes the values for the same
+messages, and since every removal of a message is applied before any of its
+values, the order of the two rules does not matter.
 
 Over HTTP, `poll` requests and command requests alike have their replies
 offered to `path` rules, which match the request's path and query:

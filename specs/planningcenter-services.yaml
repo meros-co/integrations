@@ -585,52 +585,34 @@ telemetry:
         plans.{id}.total_length: "{total_length}"
         plans.{id}.items_count: "{items_count}"
         plans.{id}.planning_center_url: "{url}"
-    # A complete item list (top-level links with no next: the first page holds
-    # them all) replaces the plan's items, so an item deleted from the plan
-    # leaves the state. A plan of more than 100 items is read one page deep:
-    # its items are added to, never replaced.
+    # A plan's items. A list that is complete (top-level links with no next:
+    # the first page holds them all) also replaces the plan's items, by the
+    # rule after this one, so an item deleted from the plan leaves the
+    # state. A plan of more than 100 items is read one page deep: its items
+    # are added to, never replaced.
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        title: "$.attributes.title"
+        sequence: "$.attributes.sequence"
+        length: "$.attributes.length"
+        item_type: "$.attributes.item_type"
+        service_position: "$.attributes.service_position"
+        description: "$.attributes.description"
+        key_name: "$.attributes.key_name"
+      state:
+        plans.{1}.items.{id}.title: "{title}"
+        plans.{1}.items.{id}.sequence: "{sequence}"
+        plans.{1}.items.{id}.length: "{length}"
+        plans.{1}.items.{id}.item_type: "{item_type}"
+        plans.{1}.items.{id}.service_position: "{service_position}"
+        plans.{1}.items.{id}.description: "{description}"
+        plans.{1}.items.{id}.key_name: "{key_name}"
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
       json_match: { "$.links": '^\{(?:"(?:[^n"]|n[^e"]|ne[^x"]|nex[^t"]|next[^"])[^"]*":"[^"]*",?)*\}$' }
+      json: {}
       replace: plans.{1}.items
-      json_each: "$.data"
-      json:
-        id: "$.id"
-        title: "$.attributes.title"
-        sequence: "$.attributes.sequence"
-        length: "$.attributes.length"
-        item_type: "$.attributes.item_type"
-        service_position: "$.attributes.service_position"
-        description: "$.attributes.description"
-        key_name: "$.attributes.key_name"
-      state:
-        plans.{1}.items.{id}.title: "{title}"
-        plans.{1}.items.{id}.sequence: "{sequence}"
-        plans.{1}.items.{id}.length: "{length}"
-        plans.{1}.items.{id}.item_type: "{item_type}"
-        plans.{1}.items.{id}.service_position: "{service_position}"
-        plans.{1}.items.{id}.description: "{description}"
-        plans.{1}.items.{id}.key_name: "{key_name}"
-    # One page of several (a next link): added to, never replaced.
-    - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
-      json_match: { "$.links.next": "." }
-      json_each: "$.data"
-      json:
-        id: "$.id"
-        title: "$.attributes.title"
-        sequence: "$.attributes.sequence"
-        length: "$.attributes.length"
-        item_type: "$.attributes.item_type"
-        service_position: "$.attributes.service_position"
-        description: "$.attributes.description"
-        key_name: "$.attributes.key_name"
-      state:
-        plans.{1}.items.{id}.title: "{title}"
-        plans.{1}.items.{id}.sequence: "{sequence}"
-        plans.{1}.items.{id}.length: "{length}"
-        plans.{1}.items.{id}.item_type: "{item_type}"
-        plans.{1}.items.{id}.service_position: "{service_position}"
-        plans.{1}.items.{id}.description: "{description}"
-        plans.{1}.items.{id}.key_name: "{key_name}"
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/items/\d+(\?.*)?$'
       json:
         id: "$.data.id"
@@ -649,61 +631,39 @@ telemetry:
         plans.{1}.items.{id}.service_position: "{service_position}"
         plans.{1}.items.{id}.description: "{description}"
         plans.{1}.items.{id}.key_name: "{key_name}"
-    # A complete list of the plan's times (no next link) replaces the last.
+    # A plan's times; a complete list (no next link) replaces the last, by
+    # the rule after this one.
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        name: "$.attributes.name"
+        time_type: "$.attributes.time_type"
+        starts_at: "$.attributes.starts_at"
+        ends_at: "$.attributes.ends_at"
+        live_starts_at: "$.attributes.live_starts_at"
+        live_ends_at: "$.attributes.live_ends_at"
+      state:
+        plans.{1}.plan_times.{id}.name: "{name}"
+        plans.{1}.plan_times.{id}.time_type: "{time_type}"
+        plans.{1}.plan_times.{id}.starts_at: "{starts_at}"
+        plans.{1}.plan_times.{id}.ends_at: "{ends_at}"
+        plans.{1}.plan_times.{id}.live_starts_at: "{live_starts_at}"
+        plans.{1}.plan_times.{id}.live_ends_at: "{live_ends_at}"
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
       json_match: { "$.links": '^\{(?:"(?:[^n"]|n[^e"]|ne[^x"]|nex[^t"]|next[^"])[^"]*":"[^"]*",?)*\}$' }
+      json: {}
       replace: plans.{1}.plan_times
+    # The service types; a complete list (no next link) replaces the last,
+    # by the rule after this one.
+    - path: '^/services/v2/service_types(\?.*)?$'
       json_each: "$.data"
       json:
         id: "$.id"
         name: "$.attributes.name"
-        time_type: "$.attributes.time_type"
-        starts_at: "$.attributes.starts_at"
-        ends_at: "$.attributes.ends_at"
-        live_starts_at: "$.attributes.live_starts_at"
-        live_ends_at: "$.attributes.live_ends_at"
       state:
-        plans.{1}.plan_times.{id}.name: "{name}"
-        plans.{1}.plan_times.{id}.time_type: "{time_type}"
-        plans.{1}.plan_times.{id}.starts_at: "{starts_at}"
-        plans.{1}.plan_times.{id}.ends_at: "{ends_at}"
-        plans.{1}.plan_times.{id}.live_starts_at: "{live_starts_at}"
-        plans.{1}.plan_times.{id}.live_ends_at: "{live_ends_at}"
-    # One page of several (a next link): added to, never replaced.
-    - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
-      json_match: { "$.links.next": "." }
-      json_each: "$.data"
-      json:
-        id: "$.id"
-        name: "$.attributes.name"
-        time_type: "$.attributes.time_type"
-        starts_at: "$.attributes.starts_at"
-        ends_at: "$.attributes.ends_at"
-        live_starts_at: "$.attributes.live_starts_at"
-        live_ends_at: "$.attributes.live_ends_at"
-      state:
-        plans.{1}.plan_times.{id}.name: "{name}"
-        plans.{1}.plan_times.{id}.time_type: "{time_type}"
-        plans.{1}.plan_times.{id}.starts_at: "{starts_at}"
-        plans.{1}.plan_times.{id}.ends_at: "{ends_at}"
-        plans.{1}.plan_times.{id}.live_starts_at: "{live_starts_at}"
-        plans.{1}.plan_times.{id}.live_ends_at: "{live_ends_at}"
-    # A complete list of service types (no next link) replaces the last.
+        service_types.{id}.name: "{name}"
     - path: '^/services/v2/service_types(\?.*)?$'
       json_match: { "$.links": '^\{(?:"(?:[^n"]|n[^e"]|ne[^x"]|nex[^t"]|next[^"])[^"]*":"[^"]*",?)*\}$' }
+      json: {}
       replace: service_types
-      json_each: "$.data"
-      json:
-        id: "$.id"
-        name: "$.attributes.name"
-      state:
-        service_types.{id}.name: "{name}"
-    # One page of several (a next link): added to, never replaced.
-    - path: '^/services/v2/service_types(\?.*)?$'
-      json_match: { "$.links.next": "." }
-      json_each: "$.data"
-      json:
-        id: "$.id"
-        name: "$.attributes.name"
-      state:
-        service_types.{id}.name: "{name}"

@@ -643,7 +643,7 @@ telemetry:
       state: *broadcast_state
     - path: '^/youtube/v3/liveStreams\?'
       json_each: "$.items"
-      json: &stream
+      json:
         id: "$.id"
         title: "$.snippet.title"
         status: "$.status.streamStatus"
@@ -653,7 +653,7 @@ telemetry:
         ingestion: "$.cdn.ingestionType"
         resolution: "$.cdn.resolution"
         frame_rate: "$.cdn.frameRate"
-      state: &stream_state
+      state:
         streams.{id}.title: "{title}"
         streams.{id}.stream_status: "{status}"
         streams.{id}.health: "{health}"
@@ -663,15 +663,13 @@ telemetry:
         streams.{id}.resolution: "{resolution}"
         streams.{id}.frame_rate: "{frame_rate}"
     # The poll's list of the channel's streams (mine, 50 a page) is the whole
-    # list when its total fits on the page: it then replaces the streams, so
-    # a deleted stream leaves the state. A lookup by id, a smaller page or a
-    # longer list adds and removes nothing.
+    # list when its total fits on the page: it then also replaces the streams
+    # (the rule above writes them), so a deleted stream leaves the state. A
+    # lookup by id, a smaller page or a longer list adds and removes nothing.
     - path: '^/youtube/v3/liveStreams\?part=[^&]*&mine=true&maxResults=50$'
       json_match: { "$.pageInfo.totalResults": '^(?:[0-9]|[1-4][0-9]|50)$', "$.items": '^\[' }
+      json: {}
       replace: streams
-      json_each: "$.items"
-      json: *stream
-      state: *stream_state
     - path: '^/youtube/v3/videos\?'
       json_each: "$.items"
       json:

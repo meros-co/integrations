@@ -183,16 +183,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## barco-eventmaster — Barco Event Master
 
-- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1314](specs/barco-eventmaster.yaml#L1314))
-- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1364](specs/barco-eventmaster.yaml#L1364))
-- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1371](specs/barco-eventmaster.yaml#L1371))
-- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1380](specs/barco-eventmaster.yaml#L1380))
-- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1383](specs/barco-eventmaster.yaml#L1383))
-- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1466](specs/barco-eventmaster.yaml#L1466))
-- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1437](specs/barco-eventmaster.yaml#L1437))
-- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1330](specs/barco-eventmaster.yaml#L1330))
-- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1416](specs/barco-eventmaster.yaml#L1416))
-- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1211](specs/barco-eventmaster.yaml#L1211))
+- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1289](specs/barco-eventmaster.yaml#L1289))
+- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1339](specs/barco-eventmaster.yaml#L1339))
+- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1346](specs/barco-eventmaster.yaml#L1346))
+- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1355](specs/barco-eventmaster.yaml#L1355))
+- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1358](specs/barco-eventmaster.yaml#L1358))
+- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1441](specs/barco-eventmaster.yaml#L1441))
+- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1412](specs/barco-eventmaster.yaml#L1412))
+- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1305](specs/barco-eventmaster.yaml#L1305))
+- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1391](specs/barco-eventmaster.yaml#L1391))
+- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1208](specs/barco-eventmaster.yaml#L1208))
 
 ## behringer-wing — Behringer WING
 
@@ -910,7 +910,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm per_page=100 is accepted on items, plan_times, item_notes and live_controllers, and how a plan with more than 100 items is paged. ([specs/planningcenter-services.yaml:399](specs/planningcenter-services.yaml#L399))
 - [ ] Confirm the OAuth token endpoint is https://api.planningcenteronline.com/oauth/token (taken from Planning Center's example app and its OAuth library's default path, not from a documented URL) and that it accepts the refresh token grant with client_id and client_secret in the form body. ([specs/planningcenter-services.yaml:89](specs/planningcenter-services.yaml#L89))
 - [ ] Record whether a refresh returns a new refresh token (rotation) and whether the old one then stops working, and what a revoked or expired refresh token answers (400 invalid_grant expected). ([specs/planningcenter-services.yaml:344](specs/planningcenter-services.yaml#L344))
-- [ ] Confirm a list that fits on one page has top-level links with self and no next, and a longer one links.next (taken from Planning Center's pco_api_ruby README): only a list without next replaces a plan's items, its plan times or the service types. ([specs/planningcenter-services.yaml:594](specs/planningcenter-services.yaml#L594))
+- [ ] Confirm a list that fits on one page has top-level links with self and no next, and a longer one links.next (taken from Planning Center's pco_api_ruby README): only a list without next replaces a plan's items, its plan times or the service types. ([specs/planningcenter-services.yaml:613](specs/planningcenter-services.yaml#L613))
 - [ ] Confirm the Live resource's included array holds only the current and next item times, and is empty or absent when LIVE is not running: each Live reply replaces plans.<plan_id>.item_times. ([specs/planningcenter-services.yaml:521](specs/planningcenter-services.yaml#L521))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
@@ -1372,7 +1372,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a refresh at https://oauth2.googleapis.com/token with client_id alone (an installed-app client, no client_secret) succeeds, and that Google never rotates the refresh token on refresh. ([specs/youtube-live.yaml:117](specs/youtube-live.yaml#L117))
 - [ ] Confirm a refresh token from a project in publishing status Testing fails with 400 invalid_grant after 7 days, and that a revoked one answers the same. ([specs/youtube-live.yaml:485](specs/youtube-live.yaml#L485))
 - [ ] Record the access token lifetime Google gives (expires_in, about 3599 s expected), so the 300 s refresh margin is right. ([specs/youtube-live.yaml:118](specs/youtube-live.yaml#L118))
-- [ ] Confirm pageInfo.totalResults on liveStreams.list with mine=true counts every stream of the channel: when it is 50 or fewer, the poll's page replaces streams. ([specs/youtube-live.yaml:671](specs/youtube-live.yaml#L671))
+- [ ] Confirm pageInfo.totalResults on liveStreams.list with mine=true counts every stream of the channel: when it is 50 or fewer, the poll's page replaces streams. ([specs/youtube-live.yaml:672](specs/youtube-live.yaml#L672))
 
 ## Integrations with no open items
 
