@@ -1,0 +1,605 @@
+spec: 1
+id: youtube-live
+name: YouTube Live (YouTube Data API v3, live streaming)
+vendor: Google
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host www.googleapis.com on port 443 and follows one broadcast,
+# named by the broadcast_id setting. The consumer owns the credential: an
+# OAuth 2 access token for the channel, which it obtains and refreshes
+# itself. The core never runs an OAuth flow. Every request spends the
+# consumer's Google Cloud project quota (10,000 units a day by default).
+
+source:
+  - title: YouTube Live Streaming API reference, liveBroadcasts (resource; list, insert, update, delete, bind, transition, cuepoint)
+    author: Google
+    url: https://developers.google.com/youtube/v3/live/docs/liveBroadcasts
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Resource properties
+      (snippet, status.lifeCycleStatus and its values complete, created,
+      live, liveStarting, ready, revoked, testStarting, testing,
+      contentDetails.boundStreamId, monitorStream, enableAutoStart,
+      enableAutoStop, statistics.totalChatCount). list: GET
+      /youtube/v3/liveBroadcasts, part, exactly one of broadcastStatus
+      (active, all, completed, upcoming), id or mine, broadcastType (all,
+      event, persistent; default event), maxResults 0 to 50 (default 5).
+      transition: POST /liveBroadcasts/transition with broadcastStatus
+      (testing, live, complete), id and part; the stream must be active, and
+      testing needs the monitor stream; errors invalidTransition,
+      redundantTransition, errorStreamInactive (403). bind: POST
+      /liveBroadcasts/bind with id, part and streamId; without streamId the
+      binding is removed. cuepoint: POST /liveBroadcasts/cuepoint with id and
+      a body whose cueType must be cueTypeAd, durationSecs default 30.
+      insert: POST /liveBroadcasts, requires snippet.title,
+      snippet.scheduledStartTime and status.privacyStatus. update: PUT
+      /liveBroadcasts; a mutable property left out of the body is deleted.
+      delete: DELETE /liveBroadcasts with id.
+  - title: YouTube Live Streaming API reference, liveStreams (resource; list, insert, update, delete)
+    author: Google
+    url: https://developers.google.com/youtube/v3/live/docs/liveStreams
+    note: >
+      Manufacturer document, retrieved 2026-10-04. status.streamStatus
+      (active, created, error, inactive, ready), status.healthStatus.status
+      (good, ok, bad, noData), lastUpdateTimeSeconds, configurationIssues
+      (type, severity info, warning or error, reason, description), cdn
+      (ingestionType dash, hls or rtmp, ingestionInfo, resolution,
+      frameRate). list: GET /youtube/v3/liveStreams, part (id, snippet, cdn,
+      status), id or mine, maxResults 0 to 50 (default 5).
+  - title: YouTube Data API reference, videos (liveStreamingDetails, statistics)
+    author: Google
+    url: https://developers.google.com/youtube/v3/docs/videos
+    note: >
+      Manufacturer document, retrieved 2026-10-04.
+      liveStreamingDetails.concurrentViewers is present only while the
+      broadcast has viewers and the owner shows the count, and is not kept
+      after the broadcast ends; activeLiveChatId only while live with chat.
+  - title: YouTube Live Streaming API reference, liveChatMessages (list, insert, delete) and liveChatBans (insert, delete)
+    author: Google
+    url: https://developers.google.com/youtube/v3/live/docs/liveChatMessages
+    note: >
+      Manufacturer document, retrieved 2026-10-04. GET and POST
+      /youtube/v3/liveChat/messages (liveChatId, part id, snippet,
+      authorDetails; maxResults 200 to 2000, default 500; reply carries
+      pollingIntervalMillis); insert body snippet.liveChatId, snippet.type
+      textMessageEvent and snippet.textMessageDetails.messageText. POST
+      /youtube/v3/liveChat/bans with snippet.liveChatId, snippet.type
+      (permanent or temporary), snippet.bannedUserDetails.channelId and
+      snippet.banDurationSeconds; DELETE with the ban's id.
+  - title: YouTube Data API, Quota costs (determine_quota_cost)
+    author: Google
+    url: https://developers.google.com/youtube/v3/determine_quota_cost
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Every list costs 1 unit;
+      insert, update, delete, bind, transition and cuepoint on
+      liveBroadcasts, insert, update and delete on liveStreams, and
+      liveChatMessages and liveChatBans inserts and deletes cost 50. The
+      default quota is 10,000 units a day per project, reset at midnight
+      Pacific Time.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: bearer
+  # Google answers 403 for quota, rate limits, permissions and invalid
+  # transitions; only 401 means the token was refused.
+  refusal_status: [401]
+  timeout_ms: 10000
+  # A path that is no API method: Google answers it at once, without
+  # touching the token or spending quota, so idle probes cost nothing.
+  probe: { method: GET, path: /youtube/v3/ }
+
+settings:
+  token: { type: string, secret: true, max_length: 4096, default: "",
+           label: OAuth access token,
+           description: "An OAuth 2 access token for the channel with the youtube or youtube.force-ssl scope; it expires after about an hour, and the consumer refreshes it and opens the integration again with the new one." }
+  broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                  label: Broadcast ID,
+                  description: "The id of the broadcast to follow (also its video id), from YouTube Studio's URL or list_broadcasts." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at www.googleapis.com, opened by that host name" }
+
+models:
+  - id: data-api-v3
+    name: YouTube Data API v3, live streaming
+    supports: [list_broadcasts, get_broadcast, start_testing, go_live, complete_broadcast,
+               bind_stream, unbind_stream, insert_ad_break, insert_broadcast, update_broadcast,
+               delete_broadcast, list_streams, get_stream, insert_stream, update_stream,
+               delete_stream, get_live_details, list_chat_messages, send_chat_message,
+               delete_chat_message, ban_chat_user, ban_chat_user_temporarily, unban_chat_user]
+    verification: none
+    notes: >
+      Live streaming must be enabled on the channel. The integration follows
+      the broadcast named by broadcast_id; the other commands take any ids.
+
+commands:
+  # ── Broadcasts ───────────────────────────────────────────────────────────
+  list_broadcasts:
+    summary: The channel's broadcasts with a lifecycle status, newest first (liveBroadcasts.list with broadcastStatus; 1 quota unit)
+    params:
+      broadcast_status: { type: enum, values: [active, upcoming, completed, all], default: active,
+                          label: Status,
+                          description: "active for broadcasts now testing or live, upcoming for those not started, completed for ended ones, all for every one." }
+      broadcast_type: { type: enum, values: [all, event, persistent], default: all,
+                        label: Type,
+                        description: "event for scheduled broadcasts, persistent for the channel's default broadcast, all for both." }
+      max_results: { type: int, min: 0, max: 50, default: 25,
+                     label: Broadcasts per page,
+                     description: "How many broadcasts to return, from 0 to 50." }
+    send: { method: GET, path: /youtube/v3/liveBroadcasts,
+            query: { part: "id,snippet,contentDetails,status", broadcastStatus: "{broadcast_status}",
+                     broadcastType: "{broadcast_type}", maxResults: "{max_results}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_broadcast:
+    summary: One broadcast (liveBroadcasts.list with id; 1 quota unit)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast's id, which is also its video id." }
+    send: { method: GET, path: /youtube/v3/liveBroadcasts,
+            query: { part: "id,snippet,contentDetails,status", id: "{broadcast_id}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  start_testing:
+    summary: Start the broadcast's test, visible only to the channel on its monitor stream (liveBroadcasts.transition to testing; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast to test; its bound stream must be active and its monitor stream enabled." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts/transition,
+            query: { broadcastStatus: testing, id: "{broadcast_id}", part: "id,snippet,contentDetails,status" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  go_live:
+    summary: Make the broadcast public, live to viewers (liveBroadcasts.transition to live; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast to take live; its bound stream must be active." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts/transition,
+            query: { broadcastStatus: live, id: "{broadcast_id}", part: "id,snippet,contentDetails,status" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  complete_broadcast:
+    summary: End the broadcast for good (liveBroadcasts.transition to complete; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast to end." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts/transition,
+            query: { broadcastStatus: complete, id: "{broadcast_id}", part: "id,snippet,contentDetails,status" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  bind_stream:
+    summary: Bind a stream (an ingest point and key) to the broadcast (liveBroadcasts.bind; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast to bind; a broadcast has at most one stream." }
+      stream_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 128, required: true,
+                   label: Stream ID,
+                   description: "The stream to bind, from list_streams; one stream may serve several broadcasts." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts/bind,
+            query: { id: "{broadcast_id}", part: "id,snippet,contentDetails,status", streamId: "{stream_id}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  unbind_stream:
+    summary: Remove the broadcast's stream binding (liveBroadcasts.bind without streamId; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast whose stream is unbound." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts/bind,
+            query: { id: "{broadcast_id}", part: "id,snippet,contentDetails,status" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_ad_break:
+    summary: Insert an ad break into the live broadcast now (liveBroadcasts.cuepoint, cueType cueTypeAd; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast, which must be actively streaming." }
+      duration_secs: { type: int, min: 1, default: 30,
+                       label: Duration,
+                       description: "Length of the ad break in seconds; YouTube's default is 30." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts/cuepoint, query: { id: "{broadcast_id}" },
+            body: '{"cueType":"cueTypeAd","durationSecs":{duration_secs}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  insert_broadcast:
+    summary: Create a broadcast from a liveBroadcast resource with snippet.title, snippet.scheduledStartTime and status.privacyStatus (liveBroadcasts.insert; 50 quota units)
+    params:
+      broadcast: { type: json, required: true,
+                   label: Broadcast,
+                   description: "A liveBroadcast resource as YouTube documents it, with at least snippet.title, snippet.scheduledStartTime (ISO 8601) and status.privacyStatus (public, private or unlisted)." }
+    send: { method: POST, path: /youtube/v3/liveBroadcasts, query: { part: "id,snippet,contentDetails,status" },
+            body: '{broadcast}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_broadcast:
+    summary: Replace a broadcast's snippet, contentDetails and status with a liveBroadcast resource; properties left out are deleted (liveBroadcasts.update; 50 quota units)
+    params:
+      broadcast: { type: json, required: true,
+                   label: Broadcast,
+                   description: "The whole liveBroadcast resource with its id, snippet.scheduledStartTime and contentDetails.monitorStream; every mutable property left out is deleted, privacy included." }
+    send: { method: PUT, path: /youtube/v3/liveBroadcasts, query: { part: "id,snippet,contentDetails,status" },
+            body: '{broadcast}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_broadcast:
+    summary: Delete a broadcast (liveBroadcasts.delete; 50 quota units)
+    params:
+      broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                      label: Broadcast ID,
+                      description: "The broadcast to delete." }
+    send: { method: DELETE, path: /youtube/v3/liveBroadcasts, query: { id: "{broadcast_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Streams ──────────────────────────────────────────────────────────────
+  list_streams:
+    summary: The channel's streams with their status and health (liveStreams.list mine; 1 quota unit)
+    params:
+      max_results: { type: int, min: 0, max: 50, default: 25,
+                     label: Streams per page,
+                     description: "How many streams to return, from 0 to 50." }
+    send: { method: GET, path: /youtube/v3/liveStreams,
+            query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "{max_results}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  get_stream:
+    summary: One stream with its status and health (liveStreams.list with id; 1 quota unit)
+    params:
+      stream_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 128, required: true,
+                   label: Stream ID,
+                   description: "The stream's id, as a broadcast's contentDetails.boundStreamId names it." }
+    send: { method: GET, path: /youtube/v3/liveStreams, query: { part: "id,snippet,cdn,status", id: "{stream_id}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  insert_stream:
+    summary: Create a stream from a liveStream resource with snippet.title and cdn (liveStreams.insert; 50 quota units)
+    params:
+      stream: { type: json, required: true,
+                label: Stream,
+                description: "A liveStream resource as YouTube documents it, with snippet.title and cdn.ingestionType, cdn.resolution and cdn.frameRate." }
+    send: { method: POST, path: /youtube/v3/liveStreams, query: { part: "id,snippet,cdn,status" },
+            body: '{stream}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_stream:
+    summary: Replace a stream's snippet and cdn with a liveStream resource (liveStreams.update; 50 quota units)
+    params:
+      stream: { type: json, required: true,
+                label: Stream,
+                description: "The whole liveStream resource with its id; a property left out is deleted." }
+    send: { method: PUT, path: /youtube/v3/liveStreams, query: { part: "id,snippet,cdn,status" },
+            body: '{stream}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_stream:
+    summary: Delete a stream and its stream key (liveStreams.delete; 50 quota units)
+    params:
+      stream_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 128, required: true,
+                   label: Stream ID,
+                   description: "The stream to delete." }
+    send: { method: DELETE, path: /youtube/v3/liveStreams, query: { id: "{stream_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Viewers ──────────────────────────────────────────────────────────────
+  get_live_details:
+    summary: A broadcast's video live details and statistics, with concurrent viewers while live (videos.list part liveStreamingDetails, statistics; 1 quota unit)
+    params:
+      video_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                  label: Video ID,
+                  description: "The broadcast's id, which is also its video id." }
+    send: { method: GET, path: /youtube/v3/videos, query: { part: "liveStreamingDetails,statistics", id: "{video_id}" } }
+    expect: { status: 200, json_path: "$.items" }
+    returns: value
+
+  # ── Live chat ────────────────────────────────────────────────────────────
+  list_chat_messages:
+    summary: A live chat's messages, oldest first, with nextPageToken and pollingIntervalMillis (liveChatMessages.list; 1 quota unit)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+    send: { method: GET, path: /youtube/v3/liveChat/messages,
+            query: { liveChatId: "{live_chat_id}", part: "id,snippet,authorDetails" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  send_chat_message:
+    summary: Post a text message to a live chat as the channel (liveChatMessages.insert; 50 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+      text: { type: string, required: true,
+              label: Message,
+              description: "The message text, posted as the channel the token belongs to." }
+    send: { method: POST, path: /youtube/v3/liveChat/messages, query: { part: snippet },
+            body: '{"snippet":{"liveChatId":{live_chat_id:json},"type":"textMessageEvent","textMessageDetails":{"messageText":{text:json}}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_chat_message:
+    summary: Delete a live chat message (liveChatMessages.delete; 50 quota units)
+    params:
+      message_id: { type: string, pattern: "^[A-Za-z0-9_.-]+$", max_length: 256, required: true,
+                    label: Message ID,
+                    description: "The message's id, from list_chat_messages." }
+    send: { method: DELETE, path: /youtube/v3/liveChat/messages, query: { id: "{message_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  ban_chat_user:
+    summary: Ban a viewer from a live chat permanently (liveChatBans.insert, type permanent; 50 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+      channel_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                    label: Viewer channel ID,
+                    description: "The banned viewer's channel id, a chat message's authorDetails.channelId." }
+    send: { method: POST, path: /youtube/v3/liveChat/bans, query: { part: snippet },
+            body: '{"snippet":{"liveChatId":{live_chat_id:json},"type":"permanent","bannedUserDetails":{"channelId":{channel_id:json}}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  ban_chat_user_temporarily:
+    summary: Time a viewer out of a live chat (liveChatBans.insert, type temporary; 50 quota units)
+    params:
+      live_chat_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 256, required: true,
+                      label: Live chat ID,
+                      description: "The chat's id, a broadcast's snippet.liveChatId." }
+      channel_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
+                    label: Viewer channel ID,
+                    description: "The viewer's channel id, a chat message's authorDetails.channelId." }
+      duration_secs: { type: int, min: 1, default: 300,
+                       label: Duration,
+                       description: "How long the viewer is kept out of the chat, in seconds." }
+    send: { method: POST, path: /youtube/v3/liveChat/bans, query: { part: snippet },
+            body: '{"snippet":{"liveChatId":{live_chat_id:json},"type":"temporary","bannedUserDetails":{"channelId":{channel_id:json}},"banDurationSeconds":{duration_secs}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  unban_chat_user:
+    summary: Lift a live chat ban (liveChatBans.delete; 50 quota units)
+    params:
+      ban_id: { type: string, pattern: "^[A-Za-z0-9_.-]+$", max_length: 256, required: true,
+                label: Ban ID,
+                description: "The ban's id, from the reply to ban_chat_user." }
+    send: { method: DELETE, path: /youtube/v3/liveChat/bans, query: { id: "{ban_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host www.googleapis.com and
+      port 443; it is reached over HTTPS and the certificate is checked
+      against that name. The broadcast followed is the one named by the
+      broadcast_id setting; to follow another, open the integration again.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The consumer owns the credential: an OAuth 2 access token for the
+      channel (scope youtube or youtube.force-ssl), sent as Bearer. Google's
+      access tokens expire after about an hour and the core never refreshes
+      them. When one expires Google answers 401, which is terminal: the
+      integration reports unauthorized, pending and later commands fail with
+      auth, and nothing more is sent until the consumer opens it again with a
+      fresh token. A consumer that refreshes before expiry opens it again
+      with the new token. Google's 403s (quota, rate limits, permissions, an
+      invalid transition) are ordinary command failures, not refusals.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Every request spends the consumer's Google Cloud project quota, by
+      default 10,000 units a day shared by every user of that project and
+      reset at midnight Pacific Time. Lists cost 1 unit; transitions, binds,
+      ad breaks, inserts, updates, deletes, chat messages and bans cost 50.
+      State is polled once a minute with three lists (the broadcast, the
+      channel's streams and the broadcast's video details): 3 units a minute,
+      180 an hour, 4,320 a day if left open. Open the integration with
+      monitoring only while a broadcast is being produced, and commands-only
+      otherwise. Once the quota is spent, Google answers 403 quotaExceeded to
+      everything until it resets. Idle probes ask for a path that is no API
+      method, which costs nothing.
+
+  - models: [all]
+    severity: critical
+    text: >
+      go_live makes the broadcast public at once, and complete_broadcast ends
+      it for good: a completed broadcast can't be taken live again, and
+      viewers see it end. With the broadcast's enableAutoStop on, YouTube
+      also completes it about a minute after the stream stops. start_testing
+      and go_live need the bound stream active (receiving data), else Google
+      answers 403 errorStreamInactive; a transition YouTube is still
+      carrying out (testStarting, liveStarting) answers 403 too.
+
+  - models: [all]
+    severity: critical
+    text: >
+      delete_broadcast and delete_stream can't be undone. Deleting a stream
+      deletes its stream key: an encoder still sending to it loses the
+      broadcast. update_broadcast and update_stream replace the resource:
+      a property left out of the body is deleted, and a broadcast's privacy
+      falls back to the default.
+
+  - models: [all]
+    severity: info
+    text: >
+      State is polled, so a change made in YouTube Studio shows up within a
+      minute; the replies to this integration's own transitions and binds
+      update the broadcast at once. Stream health (streams.<id>.health) is
+      YouTube's own assessment and lags the encoder by YouTube's update
+      interval (health_updated is its time). The broadcast's stream is
+      streams.<broadcasts.<id>.bound_stream_id>. concurrent_viewers is only
+      reported while live and when the channel shows the count, and is not
+      cleared when it stops being reported. Only the channel's first 50
+      streams are polled. YouTube reports nothing it pushes; webhooks are
+      not offered for live streaming.
+
+  - models: [all]
+    severity: info
+    text: >
+      The list commands return the replies' items, which for streams
+      include cdn.ingestionInfo.streamName, the stream key: treat it as a
+      secret. The key is not copied into state. Strings YouTube leaves null
+      are kept as the text null.
+
+  - models: [all]
+    severity: info
+    text: >
+      Live chat is read with list_chat_messages, which the consumer polls at
+      the reply's pollingIntervalMillis (1 unit each), passing nothing back:
+      the format has no page-token chaining, so each call returns the chat
+      from the start. YouTube's streaming liveChatMessages.streamList is a
+      server-streamed gRPC-style call the core does not speak. Chat is not
+      polled into state.
+
+state:
+  broadcasts.*.title:               { type: string, description: "Broadcast title (snippet.title), keyed by broadcast id" }
+  broadcasts.*.life_cycle_status:   { type: string, description: "created, ready, testStarting, testing, liveStarting, live, complete or revoked (status.lifeCycleStatus)" }
+  broadcasts.*.privacy_status:      { type: string, description: "public, private or unlisted (status.privacyStatus)" }
+  broadcasts.*.recording_status:    { type: string, description: "notRecording, recording or recorded (status.recordingStatus)" }
+  broadcasts.*.bound_stream_id:     { type: string, description: "Id of the stream bound to the broadcast (contentDetails.boundStreamId)" }
+  broadcasts.*.scheduled_start_time: { type: string, description: "Scheduled start, ISO 8601 (snippet.scheduledStartTime)" }
+  broadcasts.*.actual_start_time:   { type: string, description: "When the broadcast went live, ISO 8601 (snippet.actualStartTime)" }
+  broadcasts.*.actual_end_time:     { type: string, description: "When the broadcast ended, ISO 8601 (snippet.actualEndTime)" }
+  broadcasts.*.live_chat_id:        { type: string, description: "Id of the broadcast's live chat (snippet.liveChatId)" }
+  broadcasts.*.monitor_stream:      { type: bool, description: "The monitor stream is on, so the broadcast can be tested (contentDetails.monitorStream.enableMonitorStream)" }
+  broadcasts.*.stream_delay_ms:     { type: int, unit: ms, description: "Broadcast delay behind the monitor stream (contentDetails.monitorStream.broadcastStreamDelayMs)" }
+  broadcasts.*.auto_start:          { type: bool, description: "The broadcast goes live when its stream starts (contentDetails.enableAutoStart)" }
+  broadcasts.*.auto_stop:           { type: bool, description: "The broadcast completes about a minute after its stream stops (contentDetails.enableAutoStop)" }
+  broadcasts.*.dvr:                 { type: bool, description: "Viewers can seek back in the live stream (contentDetails.enableDvr)" }
+  broadcasts.*.latency_preference:  { type: string, description: "normal, low or ultraLow (contentDetails.latencyPreference)" }
+  broadcasts.*.concurrent_viewers:  { type: int, description: "People watching now, while live (video liveStreamingDetails.concurrentViewers)" }
+  broadcasts.*.active_live_chat_id: { type: string, description: "Id of the live chat while live (video liveStreamingDetails.activeLiveChatId)" }
+  broadcasts.*.view_count:          { type: int, description: "Video views (video statistics.viewCount)" }
+  broadcasts.*.like_count:          { type: int, description: "Video likes (video statistics.likeCount)" }
+  broadcasts.*.comment_count:       { type: int, description: "Video comments (video statistics.commentCount)" }
+  streams.*.title:                  { type: string, description: "Stream title (snippet.title), keyed by stream id" }
+  streams.*.stream_status:          { type: string, description: "active (receiving data), inactive, ready, created or error (status.streamStatus)" }
+  streams.*.health:                 { type: string, description: "good, ok, bad or noData (status.healthStatus.status)" }
+  streams.*.health_updated:         { type: int, unit: s, description: "When YouTube last assessed the health, Unix time (status.healthStatus.lastUpdateTimeSeconds)" }
+  streams.*.configuration_issues:   { type: string, description: "The health's configuration issues as JSON, each with type, severity (info, warning, error), reason and description (status.healthStatus.configurationIssues)" }
+  streams.*.ingestion_type:         { type: string, description: "rtmp, dash or hls (cdn.ingestionType)" }
+  streams.*.resolution:             { type: string, description: "Declared resolution, such as 1080p or variable (cdn.resolution)" }
+  streams.*.frame_rate:             { type: string, description: "Declared frame rate, 30fps, 60fps or variable (cdn.frameRate)" }
+
+telemetry:
+  # YouTube pushes nothing, and every request spends quota: the followed
+  # broadcast, the channel's streams and the broadcast's viewers are polled
+  # once a minute (3 units).
+  poll:
+    every_ms: 60000
+    send:
+      - { method: GET, path: /youtube/v3/liveBroadcasts,
+          query: { part: "id,snippet,contentDetails,status", id: "{settings.broadcast_id}" } }
+      - { method: GET, path: /youtube/v3/liveStreams,
+          query: { part: "id,snippet,cdn,status", mine: "true", maxResults: "50" } }
+      - { method: GET, path: /youtube/v3/videos,
+          query: { part: "liveStreamingDetails,statistics", id: "{settings.broadcast_id}" } }
+  updates:
+    - path: '^/youtube/v3/liveBroadcasts\?'
+      json_each: "$.items"
+      json: &broadcast
+        id: "$.id"
+        title: "$.snippet.title"
+        life: "$.status.lifeCycleStatus"
+        privacy: "$.status.privacyStatus"
+        recording: "$.status.recordingStatus"
+        stream: "$.contentDetails.boundStreamId"
+        scheduled: "$.snippet.scheduledStartTime"
+        started: "$.snippet.actualStartTime"
+        ended: "$.snippet.actualEndTime"
+        chat: "$.snippet.liveChatId"
+        monitor: "$.contentDetails.monitorStream.enableMonitorStream"
+        delay: "$.contentDetails.monitorStream.broadcastStreamDelayMs"
+        auto_start: "$.contentDetails.enableAutoStart"
+        auto_stop: "$.contentDetails.enableAutoStop"
+        dvr: "$.contentDetails.enableDvr"
+        latency: "$.contentDetails.latencyPreference"
+      state: &broadcast_state
+        broadcasts.{id}.title: "{title}"
+        broadcasts.{id}.life_cycle_status: "{life}"
+        broadcasts.{id}.privacy_status: "{privacy}"
+        broadcasts.{id}.recording_status: "{recording}"
+        broadcasts.{id}.bound_stream_id: "{stream}"
+        broadcasts.{id}.scheduled_start_time: "{scheduled}"
+        broadcasts.{id}.actual_start_time: "{started}"
+        broadcasts.{id}.actual_end_time: "{ended}"
+        broadcasts.{id}.live_chat_id: "{chat}"
+        broadcasts.{id}.monitor_stream: "{monitor}"
+        broadcasts.{id}.stream_delay_ms: "{delay}"
+        broadcasts.{id}.auto_start: "{auto_start}"
+        broadcasts.{id}.auto_stop: "{auto_stop}"
+        broadcasts.{id}.dvr: "{dvr}"
+        broadcasts.{id}.latency_preference: "{latency}"
+    # A transition, bind or insert answers with the one broadcast.
+    - path: '^/youtube/v3/liveBroadcasts(/transition|/bind)?\?'
+      json_match: { "$.kind": "^youtube#liveBroadcast$" }
+      json: *broadcast
+      state: *broadcast_state
+    - path: '^/youtube/v3/liveStreams\?'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        title: "$.snippet.title"
+        status: "$.status.streamStatus"
+        health: "$.status.healthStatus.status"
+        updated: "$.status.healthStatus.lastUpdateTimeSeconds"
+        issues: "$.status.healthStatus.configurationIssues"
+        ingestion: "$.cdn.ingestionType"
+        resolution: "$.cdn.resolution"
+        frame_rate: "$.cdn.frameRate"
+      state:
+        streams.{id}.title: "{title}"
+        streams.{id}.stream_status: "{status}"
+        streams.{id}.health: "{health}"
+        streams.{id}.health_updated: "{updated}"
+        streams.{id}.configuration_issues: "{issues}"
+        streams.{id}.ingestion_type: "{ingestion}"
+        streams.{id}.resolution: "{resolution}"
+        streams.{id}.frame_rate: "{frame_rate}"
+    - path: '^/youtube/v3/videos\?'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        viewers: "$.liveStreamingDetails.concurrentViewers"
+        chat: "$.liveStreamingDetails.activeLiveChatId"
+        views: "$.statistics.viewCount"
+        likes: "$.statistics.likeCount"
+        comments: "$.statistics.commentCount"
+      state:
+        broadcasts.{id}.concurrent_viewers: "{viewers}"
+        broadcasts.{id}.active_live_chat_id: "{chat}"
+        broadcasts.{id}.view_count: "{views}"
+        broadcasts.{id}.like_count: "{likes}"
+        broadcasts.{id}.comment_count: "{comments}"

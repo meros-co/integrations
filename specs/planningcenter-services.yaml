@@ -1,0 +1,589 @@
+spec: 1
+id: planningcenter-services
+name: Planning Center Services LIVE (Services API v2)
+vendor: Planning Center
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host api.planningcenteronline.com on port 443, and follows one
+# plan's LIVE session, named by the service_type_id and plan_id settings. The
+# consumer owns the credential: a Personal Access Token (HTTP Basic with its
+# application id and secret) or an OAuth access token it obtained and
+# refreshes itself (Bearer). The core never runs an OAuth flow.
+
+source:
+  - title: Planning Center Services API, version 2018-11-01 (API documentation graph)
+    author: Planning Center
+    url: https://api.planningcenteronline.com/services/v2/documentation/2018-11-01
+    note: >
+      Manufacturer document, retrieved 2026-10-04: the machine-readable form of
+      https://developer.planning.center/docs/#/apps/services. Vertices used:
+      Live (attributes can_chat, can_control, can_control_video_feed,
+      can_take_control, chat_room_channel, dates, live_channel, series_title,
+      title; actions go_to_next_item, go_to_previous_item, toggle_control;
+      includes controller, current_item_time, items, next_item_time,
+      service_type), ItemTime (exclude, length, length_offset, live_start_at,
+      live_end_at; relationships item, plan_time, plan), Item (title,
+      sequence, length, item_type, service_position, description, key_name,
+      html_details; edge item_notes), Plan (title, series_title, dates,
+      short_dates, sort_date, last_time_at, total_length, items_count,
+      planning_center_url; edges items, plan_times, live, next_plan,
+      previous_plan), PlanTime (name, time_type, starts_at, ends_at,
+      live_starts_at, live_ends_at), ServiceType (name; edges plans with
+      filters after, before, future, no_dates and past, live_controllers),
+      and the per_page (1 to 100, default 25) and offset parameters.
+  - title: Planning Center API documentation, Overview (Authentication, Rate Limiting, Versioning)
+    author: Planning Center
+    url: https://developer.planning.center/docs/#/overview/authentication
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Two ways to authenticate:
+      a Personal Access Token, sent as HTTP Basic with the application id and
+      secret, and OAuth 2, sent as a Bearer token; OAuth access tokens expire
+      2 hours after issue and are renewed with a refresh token. Rate limiting:
+      usually 100 requests per 20 seconds per user, subject to change, with
+      X-PCO-API-Request-Rate-Limit, -Rate-Period and -Rate-Count headers and
+      HTTP 429 with Retry-After when exceeded. Versioning: an
+      X-PCO-API-Version header, else the application's default version.
+  - title: companion-module-planningcenter-serviceslive (src/api.js), MIT licence
+    author: Bitfocus contributors
+    url: https://github.com/bitfocus/companion-module-planningcenter-serviceslive
+    note: >
+      Community code, read for corroboration only; no command comes from it.
+      Corroborates that the LIVE actions are POSTs to
+      /service_types/{id}/plans/{id}/live/<action> (the documentation graph
+      prints them under a series path with a live id), that their reply is the
+      Live resource, that include=current_item_time works on them, and that a
+      plan can only be moved by the person in control (toggle_control).
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # Basic for a Personal Access Token, Bearer for an OAuth access token.
+  auth: { setting: auth }
+  # 403 is a permission answer (a plan this user can't see or control), not a
+  # refused credential; only 401 is.
+  refusal_status: [401]
+  timeout_ms: 10000
+  # The organization: answers any valid credential, and nothing else.
+  probe: { method: GET, path: /services/v2 }
+
+settings:
+  auth: { type: enum, values: [basic, bearer], default: basic,
+          label: Credential type,
+          description: "basic for a Personal Access Token (application id and secret), bearer for an OAuth access token the consumer obtained." }
+  username: { type: string, max_length: 256, default: "",
+              label: Application ID,
+              description: "The Personal Access Token's application id, from api.planningcenteronline.com/oauth/applications; used when the credential type is basic." }
+  password: { type: string, secret: true, max_length: 256, default: "",
+              label: Secret,
+              description: "The Personal Access Token's secret; used when the credential type is basic." }
+  token: { type: string, secret: true, max_length: 4096, default: "",
+           label: OAuth access token,
+           description: "An OAuth 2 access token for the user, which expires 2 hours after issue; the consumer refreshes it and opens the integration again with the new one." }
+  service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                     label: Service type ID,
+                     description: "The numeric id of the service type that holds the plan to follow, as in the plan's Planning Center URL or list_service_types." }
+  plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+             label: Plan ID,
+             description: "The numeric id of the plan whose LIVE session is followed and controlled, as in the plan's Planning Center URL or list_plans." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at api.planningcenteronline.com, opened by that host name" }
+
+models:
+  - id: services-v2
+    name: Planning Center Services API v2 (version 2018-11-01)
+    supports: [go_to_next_item, go_to_previous_item, toggle_control, get_live,
+               get_organization, list_service_types, list_live_controllers,
+               list_plans, get_plan, get_next_plan, get_previous_plan,
+               list_items, get_item, list_item_notes, list_plan_times]
+    verification: none
+    notes: >
+      Version 2018-11-01 is the current version of the Services API. The
+      integration follows the plan named by its settings; to follow another
+      plan, open it again with that plan's ids.
+
+commands:
+  # ── LIVE control, on the plan the integration follows ────────────────────
+  go_to_next_item:
+    summary: Advance the plan's LIVE session to the next item (Live action go_to_next_item); needs control of the session
+    send: { method: POST, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live/go_to_next_item",
+            query: { include: "current_item_time,next_item_time" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  go_to_previous_item:
+    summary: Move the plan's LIVE session back to the previous item (Live action go_to_previous_item); needs control of the session
+    send: { method: POST, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live/go_to_previous_item",
+            query: { include: "current_item_time,next_item_time" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  toggle_control:
+    summary: Take control of the plan's LIVE session, or give it up when this user holds it (Live action toggle_control)
+    send: { method: POST, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live/toggle_control",
+            query: { include: "current_item_time,next_item_time" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_live:
+    summary: The plan's LIVE session with its current and next item times (Live, include current_item_time and next_item_time)
+    send: { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live",
+            query: { include: "current_item_time,next_item_time" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Reading plans ────────────────────────────────────────────────────────
+  get_organization:
+    summary: The organization the credential belongs to (Organization, the API root)
+    send: { method: GET, path: /services/v2 }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_service_types:
+    summary: The organization's service types, up to 100 (ServiceType list)
+    send: { method: GET, path: /services/v2/service_types, query: { per_page: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_live_controllers:
+    summary: The people who can control LIVE for a service type (ServiceType edge live_controllers)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/live_controllers", query: { per_page: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_plans:
+    summary: A service type's plans, filtered and ordered (ServiceType edge plans, filter future, past or no_dates)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type whose plans are listed." }
+      filter: { type: enum, values: [future, past, no_dates], default: future,
+                label: Filter,
+                description: "future for plans still to come, past for those already held, no_dates for plans without a time." }
+      order: { type: enum, values: [sort_date, -sort_date, title, -title, created_at, -created_at, updated_at, -updated_at], default: sort_date,
+               label: Order,
+               description: "The attribute plans are sorted by; a leading minus sorts it descending." }
+      per_page: { type: int, min: 1, max: 100, default: 25,
+                  label: Plans per page,
+                  description: "How many plans to return, from 1 to 100." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans",
+            query: { filter: "{filter}", order: "{order}", per_page: "{per_page}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_plan:
+    summary: One plan (Plan)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_next_plan:
+    summary: The plan after this one in its service type (Plan edge next_plan)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan whose successor is wanted." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/next_plan" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_previous_plan:
+    summary: The plan before this one in its service type (Plan edge previous_plan)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan whose predecessor is wanted." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/previous_plan" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_items:
+    summary: A plan's items, up to 100, each with its sequence (Plan edge items)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan whose items are listed." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items", query: { per_page: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_item:
+    summary: One item of a plan (Item)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan that holds the item." }
+      item_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Item ID,
+                 description: "The numeric id of the item." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items/{item_id}" }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_item_notes:
+    summary: An item's notes, such as lighting or camera notes, up to 100 (Item edge item_notes)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan that holds the item." }
+      item_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Item ID,
+                 description: "The numeric id of the item whose notes are listed." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/items/{item_id}/item_notes", query: { per_page: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_plan_times:
+    summary: A plan's times (services, rehearsals and others) with the start and end LIVE recorded (Plan edge plan_times)
+    params:
+      service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                         label: Service type ID,
+                         description: "The numeric id of the service type that holds the plan." }
+      plan_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                 label: Plan ID,
+                 description: "The numeric id of the plan whose times are listed." }
+    send: { method: GET, path: "/services/v2/service_types/{service_type_id}/plans/{plan_id}/plan_times", query: { per_page: "100" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host
+      api.planningcenteronline.com and port 443; it is reached over HTTPS and
+      the certificate is checked against that name. The plan followed and
+      controlled is the one named by the service_type_id and plan_id settings
+      (both in the plan's Planning Center URL); to follow another plan, open
+      the integration again with its ids. Reading commands take any ids.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The consumer owns the credential. A Personal Access Token is the
+      application id and secret, sent as Basic. An OAuth access token is sent
+      as Bearer and expires 2 hours after issue: the core never refreshes it.
+      When it expires Planning Center answers 401, which is terminal: the
+      integration reports unauthorized, pending and later commands fail with
+      auth, and nothing more is sent until the consumer opens it again with a
+      fresh token. A consumer that refreshes before expiry opens it again with
+      the new token. A 403 (a plan this user can't see or control) is an
+      ordinary command failure, not a refusal.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Only the person in control of the LIVE session can move it. Before
+      go_to_next_item or go_to_previous_item, the credential's user takes
+      control with toggle_control. toggle_control is a toggle: when this user
+      already has control it gives it up, and when someone else has it, it
+      takes it from them, so an operator running LIVE on another screen
+      loses control mid-service. Check the session's controller first.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Planning Center limits the API to about 100 requests per 20 seconds
+      per user (subject to change), shared by every application acting as
+      that user, and answers 429 with Retry-After when it is exceeded; a 429
+      fails the command that met it. State is polled every 10 seconds with
+      four requests (the LIVE session, the plan, its items and its times),
+      about 8 per 20 seconds, plus a probe of the organization when the
+      integration has been idle for 10 seconds.
+
+  - models: [all]
+    severity: info
+    text: >
+      State is polled, so a change made in Planning Center (another
+      operator advancing LIVE) shows up within about 10 seconds. The replies
+      to this integration's own LIVE actions update state at once. Planning
+      Center's own LIVE view is pushed over a realtime channel named by the
+      Live resource's live_channel attribute, but the API documentation does
+      not describe that channel or how to subscribe to it, so it isn't used;
+      live_channel is kept in state for a consumer that can. Webhooks would
+      need a public HTTP listener, which the core does not run.
+
+  - models: [all]
+    severity: info
+    text: >
+      State is a cache keyed by Planning Center ids: plans, items, item times
+      and plan times. The plan's current and next item times are named in
+      plans.<plan_id>.live, and each item time names its item, so the current
+      item is items.<item_times.<current_item_time_id>.item_id>. Countdowns
+      are computed by the consumer from live_start_at and length; Planning
+      Center reports times, not a running clock. An item deleted from the
+      plan stays in state until the integration is opened again. Only the
+      first 100 items and plan times of the plan are polled.
+
+  - models: [all]
+    severity: info
+    text: >
+      No X-PCO-API-Version header is sent (the format has no request
+      headers), so requests use the application's default API version. For a
+      Personal Access Token or OAuth application created recently that is
+      2018-11-01, the version this spec is written from.
+
+  - models: [all]
+    severity: info
+    text: >
+      Times are kept as Planning Center sends them. The documentation gives
+      ISO 8601 (2000-01-01T12:00:00Z); LIVE's item and plan times have been
+      seen in the form 2026/06/16 11:24:29 -0500 instead.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not built: LIVE chat and video feed control (the documentation
+      describes chat_room_channel and can_control_video_feed but no actions
+      for them), resetting a plan's recorded LIVE times (not in the
+      documentation), and planning writes (items, item reorder, plan import,
+      scheduling), which are outside production control.
+
+state:
+  plans.*.service_type_id:  { type: string, description: "Id of the plan's service type, keyed by plan id" }
+  plans.*.title:            { type: string, description: "Plan title (Plan.title), keyed by plan id" }
+  plans.*.series_title:     { type: string, description: "Plan series title (Plan.series_title)" }
+  plans.*.dates:            { type: string, description: "Plan dates as Planning Center words them (Plan.dates)" }
+  plans.*.short_dates:      { type: string, description: "Plan dates, short form (Plan.short_dates)" }
+  plans.*.sort_date:        { type: string, description: "Date the plan sorts by, ISO 8601 (Plan.sort_date)" }
+  plans.*.last_time_at:     { type: string, description: "Start of the plan's last time, ISO 8601 (Plan.last_time_at)" }
+  plans.*.total_length:     { type: int, unit: s, description: "Total length of the plan's items (Plan.total_length)" }
+  plans.*.items_count:      { type: int, description: "Number of items in the plan (Plan.items_count)" }
+  plans.*.planning_center_url: { type: string, description: "The plan's page in Planning Center (Plan.planning_center_url)" }
+  plans.*.live.title:       { type: string, description: "LIVE session title (Live.title)" }
+  plans.*.live.series_title: { type: string, description: "LIVE session series title (Live.series_title)" }
+  plans.*.live.dates:       { type: string, description: "LIVE session dates (Live.dates)" }
+  plans.*.live.live_channel: { type: string, description: "Name of the realtime channel Planning Center's LIVE view listens on (Live.live_channel)" }
+  plans.*.live.chat_room_channel: { type: string, description: "Name of the LIVE chat channel (Live.chat_room_channel)" }
+  plans.*.live.can_control: { type: bool, description: "The credential's user can control this LIVE session (Live.can_control)" }
+  plans.*.live.can_take_control: { type: bool, description: "The credential's user can take control from whoever has it (Live.can_take_control)" }
+  plans.*.live.can_control_video_feed: { type: bool, description: "The credential's user can control the LIVE video feed (Live.can_control_video_feed)" }
+  plans.*.live.can_chat:    { type: bool, description: "The credential's user can use LIVE chat (Live.can_chat)" }
+  plans.*.live.current_item_time_id: { type: string, description: "Id of the item time now live (Live relationship current_item_time)" }
+  plans.*.live.next_item_time_id: { type: string, description: "Id of the item time that goes live next (Live relationship next_item_time)" }
+  plans.*.live.controller_id: { type: string, description: "Id of the person in control of the LIVE session (Live relationship controller)" }
+  item_times.*.item_id:     { type: string, description: "Id of the item this time is for, keyed by item time id (ItemTime relationship item)" }
+  item_times.*.plan_time_id: { type: string, description: "Id of the plan time (service) this item time belongs to (ItemTime relationship plan_time)" }
+  item_times.*.live_start_at: { type: string, description: "When LIVE started this item (ItemTime.live_start_at)" }
+  item_times.*.live_end_at: { type: string, description: "When LIVE ended this item (ItemTime.live_end_at)" }
+  item_times.*.length:      { type: int, unit: s, description: "Item length for this time (ItemTime.length)" }
+  item_times.*.length_offset: { type: int, unit: s, description: "Length offset for this time (ItemTime.length_offset)" }
+  item_times.*.exclude:     { type: bool, description: "The item is excluded from this time (ItemTime.exclude)" }
+  items.*.plan_id:          { type: string, description: "Id of the item's plan, keyed by item id" }
+  items.*.title:            { type: string, description: "Item title (Item.title)" }
+  items.*.sequence:         { type: int, description: "Item position in the plan, ascending (Item.sequence)" }
+  items.*.length:           { type: int, unit: s, description: "Item length (Item.length)" }
+  items.*.item_type:        { type: string, description: "song, header, media or item (Item.item_type)" }
+  items.*.service_position: { type: string, description: "pre, during or post: before, during or after the service (Item.service_position)" }
+  items.*.description:      { type: string, description: "Item description (Item.description)" }
+  items.*.key_name:         { type: string, description: "Song key (Item.key_name)" }
+  plan_times.*.plan_id:     { type: string, description: "Id of the time's plan, keyed by plan time id" }
+  plan_times.*.name:        { type: string, description: "Plan time name (PlanTime.name)" }
+  plan_times.*.time_type:   { type: string, description: "service, rehearsal or other (PlanTime.time_type)" }
+  plan_times.*.starts_at:   { type: string, description: "Planned start (PlanTime.starts_at)" }
+  plan_times.*.ends_at:     { type: string, description: "Planned end (PlanTime.ends_at)" }
+  plan_times.*.live_starts_at: { type: string, description: "Start as recorded by LIVE (PlanTime.live_starts_at)" }
+  plan_times.*.live_ends_at: { type: string, description: "End as recorded by LIVE (PlanTime.live_ends_at)" }
+  service_types.*.name:     { type: string, description: "Service type name, keyed by service type id (ServiceType.name)" }
+
+telemetry:
+  # Planning Center pushes nothing the documentation describes, so the
+  # followed plan is polled every 10 seconds; replies to the reading commands
+  # and LIVE actions go through the same rules.
+  poll:
+    every_ms: 10000
+    send:
+      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/live",
+          query: { include: "current_item_time,next_item_time" } }
+      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}" }
+      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/items",
+          query: { per_page: "100" } }
+      - { method: GET, path: "/services/v2/service_types/{settings.service_type_id}/plans/{settings.plan_id}/plan_times",
+          query: { per_page: "100" } }
+  updates:
+    # The Live resource: from a read, or the reply to a LIVE action.
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/live(/(go_to_next_item|go_to_previous_item|toggle_control))?(\?.*)?$'
+      json:
+        title: "$.data.attributes.title"
+        series_title: "$.data.attributes.series_title"
+        dates: "$.data.attributes.dates"
+        live_channel: "$.data.attributes.live_channel"
+        chat_room_channel: "$.data.attributes.chat_room_channel"
+        can_control: "$.data.attributes.can_control"
+        can_take_control: "$.data.attributes.can_take_control"
+        can_control_video_feed: "$.data.attributes.can_control_video_feed"
+        can_chat: "$.data.attributes.can_chat"
+        current: "$.data.relationships.current_item_time.data.id"
+        next: "$.data.relationships.next_item_time.data.id"
+        controller: "$.data.relationships.controller.data.id"
+      state:
+        plans.{1}.live.title: "{title}"
+        plans.{1}.live.series_title: "{series_title}"
+        plans.{1}.live.dates: "{dates}"
+        plans.{1}.live.live_channel: "{live_channel}"
+        plans.{1}.live.chat_room_channel: "{chat_room_channel}"
+        plans.{1}.live.can_control: "{can_control}"
+        plans.{1}.live.can_take_control: "{can_take_control}"
+        plans.{1}.live.can_control_video_feed: "{can_control_video_feed}"
+        plans.{1}.live.can_chat: "{can_chat}"
+        plans.{1}.live.current_item_time_id: "{current}"
+        plans.{1}.live.next_item_time_id: "{next}"
+        plans.{1}.live.controller_id: "{controller}"
+    # The current and next item times, included with the Live resource.
+    - path: '^/services/v2/service_types/\d+/plans/\d+/live(/(go_to_next_item|go_to_previous_item|toggle_control))?(\?.*)?$'
+      json_each: "$.included"
+      json:
+        id: "$.id"
+        item: "$.relationships.item.data.id"
+        plan_time: "$.relationships.plan_time.data.id"
+        live_start_at: "$.attributes.live_start_at"
+        live_end_at: "$.attributes.live_end_at"
+        length: "$.attributes.length"
+        length_offset: "$.attributes.length_offset"
+        exclude: "$.attributes.exclude"
+      state:
+        item_times.{id}.item_id: "{item}"
+        item_times.{id}.plan_time_id: "{plan_time}"
+        item_times.{id}.live_start_at: "{live_start_at}"
+        item_times.{id}.live_end_at: "{live_end_at}"
+        item_times.{id}.length: "{length}"
+        item_times.{id}.length_offset: "{length_offset}"
+        item_times.{id}.exclude: "{exclude}"
+    - path: '^/services/v2/service_types/(\d+)/plans/(\d+)(\?.*)?$'
+      json:
+        title: "$.data.attributes.title"
+        series_title: "$.data.attributes.series_title"
+        dates: "$.data.attributes.dates"
+        short_dates: "$.data.attributes.short_dates"
+        sort_date: "$.data.attributes.sort_date"
+        last_time_at: "$.data.attributes.last_time_at"
+        total_length: "$.data.attributes.total_length"
+        items_count: "$.data.attributes.items_count"
+        url: "$.data.attributes.planning_center_url"
+      state:
+        plans.{2}.service_type_id: "{1}"
+        plans.{2}.title: "{title}"
+        plans.{2}.series_title: "{series_title}"
+        plans.{2}.dates: "{dates}"
+        plans.{2}.short_dates: "{short_dates}"
+        plans.{2}.sort_date: "{sort_date}"
+        plans.{2}.last_time_at: "{last_time_at}"
+        plans.{2}.total_length: "{total_length}"
+        plans.{2}.items_count: "{items_count}"
+        plans.{2}.planning_center_url: "{url}"
+    - path: '^/services/v2/service_types/(\d+)/plans(\?.*)?$'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        title: "$.attributes.title"
+        series_title: "$.attributes.series_title"
+        dates: "$.attributes.dates"
+        short_dates: "$.attributes.short_dates"
+        sort_date: "$.attributes.sort_date"
+        last_time_at: "$.attributes.last_time_at"
+        total_length: "$.attributes.total_length"
+        items_count: "$.attributes.items_count"
+        url: "$.attributes.planning_center_url"
+      state:
+        plans.{id}.service_type_id: "{1}"
+        plans.{id}.title: "{title}"
+        plans.{id}.series_title: "{series_title}"
+        plans.{id}.dates: "{dates}"
+        plans.{id}.short_dates: "{short_dates}"
+        plans.{id}.sort_date: "{sort_date}"
+        plans.{id}.last_time_at: "{last_time_at}"
+        plans.{id}.total_length: "{total_length}"
+        plans.{id}.items_count: "{items_count}"
+        plans.{id}.planning_center_url: "{url}"
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        title: "$.attributes.title"
+        sequence: "$.attributes.sequence"
+        length: "$.attributes.length"
+        item_type: "$.attributes.item_type"
+        service_position: "$.attributes.service_position"
+        description: "$.attributes.description"
+        key_name: "$.attributes.key_name"
+      state:
+        items.{id}.plan_id: "{1}"
+        items.{id}.title: "{title}"
+        items.{id}.sequence: "{sequence}"
+        items.{id}.length: "{length}"
+        items.{id}.item_type: "{item_type}"
+        items.{id}.service_position: "{service_position}"
+        items.{id}.description: "{description}"
+        items.{id}.key_name: "{key_name}"
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/items/\d+(\?.*)?$'
+      json:
+        id: "$.data.id"
+        title: "$.data.attributes.title"
+        sequence: "$.data.attributes.sequence"
+        length: "$.data.attributes.length"
+        item_type: "$.data.attributes.item_type"
+        service_position: "$.data.attributes.service_position"
+        description: "$.data.attributes.description"
+        key_name: "$.data.attributes.key_name"
+      state:
+        items.{id}.plan_id: "{1}"
+        items.{id}.title: "{title}"
+        items.{id}.sequence: "{sequence}"
+        items.{id}.length: "{length}"
+        items.{id}.item_type: "{item_type}"
+        items.{id}.service_position: "{service_position}"
+        items.{id}.description: "{description}"
+        items.{id}.key_name: "{key_name}"
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        name: "$.attributes.name"
+        time_type: "$.attributes.time_type"
+        starts_at: "$.attributes.starts_at"
+        ends_at: "$.attributes.ends_at"
+        live_starts_at: "$.attributes.live_starts_at"
+        live_ends_at: "$.attributes.live_ends_at"
+      state:
+        plan_times.{id}.plan_id: "{1}"
+        plan_times.{id}.name: "{name}"
+        plan_times.{id}.time_type: "{time_type}"
+        plan_times.{id}.starts_at: "{starts_at}"
+        plan_times.{id}.ends_at: "{ends_at}"
+        plan_times.{id}.live_starts_at: "{live_starts_at}"
+        plan_times.{id}.live_ends_at: "{live_ends_at}"
+    - path: '^/services/v2/service_types(\?.*)?$'
+      json_each: "$.data"
+      json:
+        id: "$.id"
+        name: "$.attributes.name"
+      state:
+        service_types.{id}.name: "{name}"

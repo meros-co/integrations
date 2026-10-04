@@ -681,6 +681,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the power-on response is "%1POWR=OK". ([specs/pjlink.yaml:240](specs/pjlink.yaml#L240))
 - [ ] On a Class 2 projector, find how the controller address for status notifications is registered. ([specs/pjlink.yaml:254](specs/pjlink.yaml#L254))
 
+## planningcenter-services — Planning Center Services LIVE
+
+- [ ] Confirm the LIVE actions are POSTs to /service_types/{id}/plans/{id}/live/<action> without a live id (the documentation graph prints them under a series path with one). ([specs/planningcenter-services.yaml:109](specs/planningcenter-services.yaml#L109))
+- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honour include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:112](specs/planningcenter-services.yaml#L112))
+- [ ] Confirm toggle_control takes control from another user who holds it, rather than failing, and what it answers when it gives control up. ([specs/planningcenter-services.yaml:123](specs/planningcenter-services.yaml#L123))
+- [ ] Record what the Live resource's relationships hold (the documentation's example has none): current_item_time, next_item_time and controller ids, and what they are when LIVE is not running. ([specs/planningcenter-services.yaml:444](specs/planningcenter-services.yaml#L444))
+- [ ] Check that a move without control answers 403 and not another status. ([specs/planningcenter-services.yaml:65](specs/planningcenter-services.yaml#L65))
+- [ ] Confirm GET /services/v2 answers any valid credential, and 401 for an expired OAuth token or a revoked Personal Access Token. ([specs/planningcenter-services.yaml:69](specs/planningcenter-services.yaml#L69))
+- [ ] Record the format of LIVE times (ItemTime live_start_at and live_end_at, PlanTime live_starts_at): ISO 8601 as documented, or 2026/06/16 11:24:29 -0500 as seen. ([specs/planningcenter-services.yaml:359](specs/planningcenter-services.yaml#L359))
+- [ ] Confirm per_page=100 is accepted on items, plan_times, item_notes and live_controllers, and how a plan with more than 100 items is paged. ([specs/planningcenter-services.yaml:344](specs/planningcenter-services.yaml#L344))
+
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
 - [ ] Confirm the TCP port in use (2008 assumed; SW-P-08 over IP leaves it to the controller's configuration). ([specs/probel-swp08.yaml:442](specs/probel-swp08.yaml#L442))
@@ -1011,6 +1022,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether a scene recall pushes NOTIFY set for every changed parameter. ([specs/yamaha-tf.yaml:430](specs/yamaha-tf.yaml#L430))
 - [ ] Confirm get_current_scene (sscurrent_ex scene_a|scene_b) and its reply, and that the inactive list's query is answered with an error. ([specs/yamaha-tf.yaml:461](specs/yamaha-tf.yaml#L461))
 - [ ] Confirm the address uses "InCh" (the QLab guide prints "Inch"). ([specs/yamaha-tf.yaml:476](specs/yamaha-tf.yaml#L476))
+
+## youtube-live — YouTube Live
+
+- [ ] Confirm GET /youtube/v3/ answers without spending quota and without checking the token (a 404), so idle probes are free. ([specs/youtube-live.yaml:91](specs/youtube-live.yaml#L91))
+- [ ] Confirm an expired or revoked access token answers 401 on every method, and that quota and permission failures answer 403. ([specs/youtube-live.yaml:87](specs/youtube-live.yaml#L87))
+- [ ] Confirm transition, bind and cuepoint answer 200 (the reference gives no status), and that a transition's reply is the broadcast. ([specs/youtube-live.yaml:159](specs/youtube-live.yaml#L159))
+- [ ] Confirm the deletes (broadcasts, streams, chat messages, bans) answer 204. ([specs/youtube-live.yaml:249](specs/youtube-live.yaml#L249))
+- [ ] Record the limits on an ad break's durationSecs and a temporary ban's banDurationSeconds (the reference gives none). ([specs/youtube-live.yaml:212](specs/youtube-live.yaml#L212))
+- [ ] Record the longest live chat message YouTube accepts (the reference gives no limit). ([specs/youtube-live.yaml:335](specs/youtube-live.yaml#L335))
+- [ ] Check that lastUpdateTimeSeconds and concurrentViewers arrive as JSON strings, as Google's 64-bit integers do. ([specs/youtube-live.yaml:577](specs/youtube-live.yaml#L577))
+- [ ] Confirm that a stream's health status and configuration issues are reported while it is active and bound, and how soon after a change. ([specs/youtube-live.yaml:578](specs/youtube-live.yaml#L578))
 
 ## Integrations with no open items
 
