@@ -1,0 +1,492 @@
+spec: 1
+id: openlp
+name: OpenLP (HTTP API v2)
+vendor: OpenLP
+category: playback
+
+# OpenLP 3's HTTP API (v2) on the remote's port, 4316, under /api/v2: JSON
+# requests and replies, 204 for an action. OpenLP pushes its state (the live
+# item, slide, blank and display mode, each change counted) on a websocket
+# server of its own, port 4317, which keeps the state current; the live item's
+# title and slide text and the service list are read on a short poll, since
+# the websocket only says that they changed. OpenLP's code is GPL and was not
+# read; this spec is written from OpenLP's documentation.
+
+source:
+  - title: OpenLP Wiki, Documentation > HTTP API (API version 2)
+    author: OpenLP
+    url: https://gitlab.com/openlp/wiki/-/wikis/Documentation/HTTP-API
+    note: >
+      Manufacturer document (the OpenLP project's wiki, last activity 2026-09-06, retrieved
+      2026-10-04). OpenLP 3.x serves v1 (deprecated) and v2; port 4316 by default, prefix
+      /api/v2; authentication by POST /core/login with username and password, answered with a
+      token for the Authorization header; endpoints marked as needing it. Every endpoint here:
+      controller live-items, live-item, show (slide index from 0), progress (next, previous),
+      theme-level GET and POST (global, service, song), themes, themes/<name>, live-theme, theme
+      GET and POST (song level answers 501), clear/<live|preview>; core display (hide, show,
+      blank, theme, desktop), plugins, system (login_required, websocket_port, api_version and
+      api_revision from 3.0.2), login, live-image; plugins/<plugin>/search?text=, add, live,
+      search-options GET and POST (bibles only, 501 otherwise); service items, show (a service
+      item id or position), progress, new (does not save the open service). Return shapes and
+      status codes as each endpoint states them.
+  - title: OpenLP Wiki, Documentation > WebSockets
+    author: OpenLP
+    url: https://gitlab.com/openlp/wiki/-/wikis/Documentation/WebSockets
+    note: >
+      Manufacturer document. The websocket server on port 4317, separate from the HTTP API, sends
+      the state whenever it changes, as JSON under results: counter, service, slide, item, twelve,
+      blank, theme, display, version, isSecure and chordNotation. Its example reads each message
+      as a Blob, so the JSON arrives in binary frames.
+
+# Commands that change OpenLP need the login token when "require
+# authentication" is on in OpenLP's remote settings: the token setting holds
+# what login returns, sent as the Authorization header; empty sends none.
+transport:
+  type: http
+  port: 4316
+  scheme: http
+  auth: header
+  auth_header: Authorization
+  timeout_ms: 4000
+  probe: { method: GET, path: /api/v2/core/system }
+
+settings:
+  token: { type: string, secret: true, default: "", max_length: 512,
+    label: Login token,
+    description: "The token OpenLP's login answers with (the login command returns it), for a remote that requires authentication; leave empty when it does not." }
+
+ports:
+  - { port: 4316, protocol: http, role: control }
+  - { port: 4317, protocol: ws, role: push, note: "OpenLP's websocket server, which pushes its state" }
+
+models:
+  - id: openlp-3
+    name: OpenLP 3.0 and later (remote enabled)
+    supports: [get_live_items, get_live_item, show_slide, next_slide, previous_slide, get_theme_level,
+               set_theme_level, list_themes, get_theme, get_live_theme, get_theme_name, set_theme,
+               clear_live, clear_preview, set_display, show_display, blank_display, blank_to_theme,
+               show_desktop, hide_display, list_plugins, get_system, login, get_live_image,
+               search_plugin, add_plugin_item, go_live_plugin_item, get_search_options,
+               set_search_option, list_service_items, show_service_item, show_service_item_at,
+               next_service_item, previous_service_item, new_service]
+    verification: none
+
+commands:
+  # ── Controller: the live item, slides and themes ──────────────────────────
+  get_live_items:
+    summary: The live service item with all its slides (GET /controller/live-items); {} when nothing is live
+    send: { method: GET, path: /api/v2/controller/live-items }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_live_item:
+    summary: The live service item with only its selected slide (GET /controller/live-item); {} when nothing is live
+    send: { method: GET, path: /api/v2/controller/live-item }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  show_slide:
+    summary: Go to a slide of the live item (POST /controller/show)
+    params:
+      slide: { type: int, min: 1, max: 100000, required: true, label: Slide,
+        description: "Slide of the live item to show, counted from 1 (OpenLP numbers them from 0)." }
+    send: { method: POST, path: /api/v2/controller/show, body: '{"id":{slide:-1}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  next_slide:
+    summary: Go to the live item's next slide (POST /controller/progress, next)
+    send: { method: POST, path: /api/v2/controller/progress, body: '{"action":"next"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  previous_slide:
+    summary: Go to the live item's previous slide (POST /controller/progress, previous)
+    send: { method: POST, path: /api/v2/controller/progress, body: '{"action":"previous"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  get_theme_level:
+    summary: The theme level, global, service or song (GET /controller/theme-level)
+    send: { method: GET, path: /api/v2/controller/theme-level }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_theme_level:
+    summary: Set the theme level (POST /controller/theme-level)
+    params:
+      level: { type: enum, values: [global, service, song], required: true, label: Theme level,
+        description: "Which theme applies: the global theme, the service's theme, or each song's own." }
+    send: { method: POST, path: /api/v2/controller/theme-level, body: '{"level":"{level}"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  list_themes:
+    summary: Every theme with its name, whether it is selected at the current level, and a base64 thumbnail (GET /controller/themes)
+    send: { method: GET, path: /api/v2/controller/themes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_theme:
+    summary: One theme's data (GET /controller/themes/<theme_name>)
+    params:
+      name: { type: string, max_length: 256, required: true, label: Theme name,
+        description: "The theme's name as OpenLP lists it." }
+    send: { method: GET, path: "/api/v2/controller/themes/{name}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_live_theme:
+    summary: The live theme's data (GET /controller/live-theme)
+    send: { method: GET, path: /api/v2/controller/live-theme }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_theme_name:
+    summary: The current theme's name (GET /controller/theme)
+    send: { method: GET, path: /api/v2/controller/theme }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_theme:
+    summary: Set the theme at the current theme level (POST /controller/theme); song level answers 501
+    params:
+      name: { type: string, max_length: 256, required: true, label: Theme name,
+        description: "The theme's name as OpenLP lists it; an unknown name falls back to OpenLP's black default theme." }
+    send: { method: POST, path: /api/v2/controller/theme, body: '{"theme":{name:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  clear_live:
+    summary: Clear the live controller; the display itself does not change (/controller/clear/live)
+    send: { method: POST, path: /api/v2/controller/clear/live }
+    expect: { status: 204 }
+    returns: ack
+
+  clear_preview:
+    summary: Clear the preview controller (/controller/clear/preview)
+    send: { method: POST, path: /api/v2/controller/clear/preview }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Core: the display, plugins and login ──────────────────────────────────
+  set_display:
+    summary: Set the live display mode (POST /core/display)
+    params:
+      mode: { type: enum, values: [hide, show, blank, theme, desktop], required: true, label: Display mode,
+        description: "show the live item, blank to black, theme to the theme background, desktop to show the desktop, or hide the display." }
+    send: { method: POST, path: /api/v2/core/display, body: '{"display":"{mode}"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  show_display:
+    summary: Show the live item on the display again (POST /core/display, show)
+    send: { method: POST, path: /api/v2/core/display, body: '{"display":"show"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  blank_display:
+    summary: Blank the display to black (POST /core/display, blank)
+    send: { method: POST, path: /api/v2/core/display, body: '{"display":"blank"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  blank_to_theme:
+    summary: Blank the display to the theme background (POST /core/display, theme)
+    send: { method: POST, path: /api/v2/core/display, body: '{"display":"theme"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  show_desktop:
+    summary: Show the desktop instead of the display (POST /core/display, desktop)
+    send: { method: POST, path: /api/v2/core/display, body: '{"display":"desktop"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  hide_display:
+    summary: Hide the live display (POST /core/display, hide)
+    send: { method: POST, path: /api/v2/core/display, body: '{"display":"hide"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  list_plugins:
+    summary: The plugins that can be searched, with their key and name (GET /core/plugins)
+    send: { method: GET, path: /api/v2/core/plugins }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_system:
+    summary: Whether login is required, the websocket port and the API version and revision (GET /core/system)
+    send: { method: GET, path: /api/v2/core/system }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  login:
+    summary: Log in and get the token for the token setting (POST /core/login); a wrong login answers 401
+    params:
+      username: { type: string, max_length: 256, required: true, label: Username,
+        description: "The username set in OpenLP's remote settings." }
+      password: { type: string, max_length: 256, required: true, label: Password,
+        description: "The password set in OpenLP's remote settings." }
+    send: { method: POST, path: /api/v2/core/login, body: '{"username":{username:json},"password":{password:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.token" }
+    returns: value
+
+  get_live_image:
+    summary: A screenshot of the live display, as base64 image text (GET /core/live-image)
+    send: { method: GET, path: /api/v2/core/live-image }
+    expect: { status: 200, json_path: "$.binary_image" }
+    returns: value
+
+  # ── Plugins: search and add service items ─────────────────────────────────
+  search_plugin:
+    summary: Search a plugin's items, such as songs or bible verses (GET /plugins/<plugin>/search?text=)
+    params:
+      plugin: { type: string, max_length: 64, pattern: "^[a-z]+$", required: true, label: Plugin,
+        description: "The plugin's key from the plugin list, such as songs, bibles, custom, images, media or presentations." }
+      text: { type: string, max_length: 1024, required: true, label: Search text,
+        description: "What to search for: a title or words for songs, a reference such as John 3:16 for bibles." }
+    send: { method: GET, path: "/api/v2/plugins/{plugin}/search", query: { text: "{text}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  add_plugin_item:
+    summary: Add a plugin item to the end of the service (POST /plugins/<plugin>/add)
+    params:
+      plugin: { type: string, max_length: 64, pattern: "^[a-z]+$", required: true, label: Plugin,
+        description: "The plugin's key from the plugin list, such as songs or bibles." }
+      id: { type: string, max_length: 1024, required: true, label: Item ID,
+        description: "The item's id as the plugin's search results give it." }
+    send: { method: POST, path: "/api/v2/plugins/{plugin}/add", body: '{"id":{id:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  go_live_plugin_item:
+    summary: Send a plugin item straight to the live display (POST /plugins/<plugin>/live)
+    params:
+      plugin: { type: string, max_length: 64, pattern: "^[a-z]+$", required: true, label: Plugin,
+        description: "The plugin's key from the plugin list, such as songs or bibles." }
+      id: { type: string, max_length: 1024, required: true, label: Item ID,
+        description: "The item's id as the plugin's search results give it." }
+    send: { method: POST, path: "/api/v2/plugins/{plugin}/live", body: '{"id":{id:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  get_search_options:
+    summary: A plugin's search options and their selected values (GET /plugins/<plugin>/search-options); only bibles has them
+    params:
+      plugin: { type: string, max_length: 64, pattern: "^[a-z]+$", required: true, label: Plugin,
+        description: "The plugin's key; only bibles has search options, others answer 501." }
+    send: { method: GET, path: "/api/v2/plugins/{plugin}/search-options" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_search_option:
+    summary: Set one of a plugin's search options, such as the bible translation (POST /plugins/<plugin>/search-options)
+    params:
+      plugin: { type: string, max_length: 64, pattern: "^[a-z]+$", required: true, label: Plugin,
+        description: "The plugin's key; only bibles has search options." }
+      option: { type: string, max_length: 256, required: true, label: Option,
+        description: "The search option's name, as get_search_options lists it." }
+      value: { type: string, max_length: 256, required: true, label: Value,
+        description: "One of the option's values, as get_search_options lists them." }
+    send: { method: POST, path: "/api/v2/plugins/{plugin}/search-options", body: '{"option":{option:json},"value":{value:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Service ───────────────────────────────────────────────────────────────
+  list_service_items:
+    summary: The items in the service, with which one is live (GET /service/items)
+    send: { method: GET, path: /api/v2/service/items }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  show_service_item:
+    summary: Make a service item live by its id (POST /service/show)
+    params:
+      id: { type: string, max_length: 256, required: true, label: Service item ID,
+        description: "The service item's unique id, as the service list gives it." }
+    send: { method: POST, path: /api/v2/service/show, body: '{"id":{id:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  show_service_item_at:
+    summary: Make a service item live by its position in the service (POST /service/show)
+    params:
+      position: { type: int, min: 0, max: 100000, required: true, label: Position,
+        description: "The item's position in the service, as OpenLP numbers it (see quirks)." }
+    send: { method: POST, path: /api/v2/service/show, body: '{"id":{position}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  next_service_item:
+    summary: Go to the next service item (POST /service/progress, next)
+    send: { method: POST, path: /api/v2/service/progress, body: '{"action":"next"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  previous_service_item:
+    summary: Go to the previous service item (POST /service/progress, previous)
+    send: { method: POST, path: /api/v2/service/progress, body: '{"action":"previous"}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  new_service:
+    summary: Start a new, empty service without saving the open one (GET /service/new)
+    send: { method: GET, path: /api/v2/service/new }
+    expect: { status: 204 }
+    returns: ack
+
+state:
+  live.counter: { type: int, description: "Rises each time the live display changes" }
+  live.service_counter: { type: int, description: "Rises each time the service is changed" }
+  live.slide: { type: int, description: "The live item's selected slide, numbered from 0 as OpenLP reports it" }
+  live.item_id: { type: string, description: "Unique id of the live service item" }
+  live.blank: { type: bool, description: "Whether the display is blanked to black" }
+  live.theme: { type: bool, description: "Whether the display shows only the theme background" }
+  live.desktop: { type: bool, description: "Whether the desktop is shown instead of the display" }
+  live.twelve_hour: { type: bool, description: "Whether OpenLP shows times in twelve-hour form" }
+  live.auth_enabled: { type: bool, description: "Whether endpoints that change OpenLP require a login" }
+  live.chord_notation: { type: string, description: "Chord notation: english, german or neo-latin" }
+  live_item.title: { type: string, description: "Title of the live service item; not cleared when nothing is live" }
+  live_item.plugin: { type: string, description: "Plugin that made the live item (songs, bibles, custom...)" }
+  live_item.type: { type: string, description: "Display type: ServiceItemType.Text, ServiceItemType.Image or ServiceItemType.Command" }
+  live_item.notes: { type: string, description: "Notes of the live item" }
+  live_item.theme: { type: string, description: "The live item's own theme, when it has one" }
+  live_item.slide_text: { type: string, description: "Plain text of the selected slide, without chords" }
+  live_item.slide_tag: { type: string, description: "Tag of the selected slide's verse (V1, C1...)" }
+  service.items.*.title: { type: string, description: "A service item's title, by its unique id" }
+  service.items.*.plugin: { type: string, description: "The plugin that provides the service item" }
+  service.items.*.live: { type: bool, description: "Whether the service item is live" }
+  service.items.*.valid: { type: bool, description: "False when a file the item needs is missing" }
+  service.items.*.notes: { type: string, description: "The service item's notes" }
+  theme.name: { type: string, description: "The current theme's name" }
+  system.login_required: { type: bool, description: "Whether endpoints that change OpenLP require a login" }
+  system.websocket_port: { type: int, description: "The websocket server's port" }
+  system.api_version: { type: int, description: "API version (2), from OpenLP 3.0.2" }
+  system.api_revision: { type: int, description: "API revision, raised with each new capability, from OpenLP 3.0.2" }
+
+telemetry:
+  # OpenLP's websocket server pushes the state each time it changes, as JSON
+  # in binary frames.
+  websocket:
+    path: /
+    port: 4317
+  # What the websocket only counts: the live item's title and selected slide,
+  # and the service list.
+  poll:
+    send:
+      - { method: GET, path: /api/v2/controller/live-item }
+      - { method: GET, path: /api/v2/service/items }
+    every_ms: 2000
+  updates:
+    - json_match: { "$.results.counter": "^\\d+$" }
+      json:
+        counter: "$.results.counter"
+        service: "$.results.service"
+        slide: "$.results.slide"
+        item: "$.results.item"
+        blank: "$.results.blank"
+        theme: "$.results.theme"
+        display: "$.results.display"
+        twelve: "$.results.twelve"
+        secure: "$.results.isSecure"
+        chords: "$.results.chordNotation"
+      state:
+        live.counter: "{counter}"
+        live.service_counter: "{service}"
+        live.slide: "{slide}"
+        live.item_id: "{item}"
+        live.blank: "{blank}"
+        live.theme: "{theme}"
+        live.desktop: "{display}"
+        live.twelve_hour: "{twelve}"
+        live.auth_enabled: "{secure}"
+        live.chord_notation: "{chords}"
+
+    - path: "^/api/v2/controller/live-item$"
+      json: { title: "$.title", plugin: "$.name", type: "$.type", notes: "$.notes", theme: "$.theme" }
+      state:
+        live_item.title: "{title}"
+        live_item.plugin: "{plugin}"
+        live_item.type: "{type}"
+        live_item.notes: "{notes}"
+        live_item.theme: "{theme}"
+    - path: "^/api/v2/controller/live-item$"
+      json_each: "$.slides"
+      json: { text: "$.text", tag: "$.tag" }
+      state:
+        live_item.slide_text: "{text}"
+        live_item.slide_tag: "{tag}"
+
+    - path: "^/api/v2/service/items$"
+      json_each: "$"
+      json: { id: "$.id", title: "$.title", plugin: "$.plugin", selected: "$.selected", valid: "$.is_valid", notes: "$.notes" }
+      state:
+        service.items.{id}.title: "{title}"
+        service.items.{id}.plugin: "{plugin}"
+        service.items.{id}.live: "{selected}"
+        service.items.{id}.valid: "{valid}"
+        service.items.{id}.notes: "{notes}"
+
+    - path: "^/api/v2/controller/theme$"
+      json: { name: "$" }
+      state: { theme.name: "{name}" }
+
+    - path: "^/api/v2/core/system$"
+      json: { login: "$.login_required", port: "$.websocket_port", version: "$.api_version", revision: "$.api_revision" }
+      state:
+        system.login_required: "{login}"
+        system.websocket_port: "{port}"
+        system.api_version: "{version}"
+        system.api_revision: "{revision}"
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      new_service closes the open service without saving it, so unsaved changes to the service are
+      lost; there is no undo through the API.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The remote has to be enabled in OpenLP's settings (Remote tab), and serves the local
+      network. With "require authentication" on, every command marked as needing a login answers
+      401 without one, which stops the device here until it is opened again: run login with the
+      remote's username and password, put the token it returns in the token setting and open the
+      device again. The token goes as the Authorization header with nothing before it, as the
+      documentation shows. Reading (the live item, service list, themes, system) needs no login.
+
+  - models: [all]
+    severity: warning
+    text: >
+      State comes from OpenLP's websocket server on port 4317 (OpenLP's remote settings can move
+      it; get_system reports the port), which sends the live state each time it changes, as JSON
+      in binary frames. The websocket only counts changes to the live item and the service, so the
+      live item's title and selected slide text and the service list are read every 2 seconds.
+      When nothing is live, live-item answers {}, which leaves the last title and slide text in the
+      state; live.item_id and the service items' live flags are the ones to read. Items removed
+      from the service stay in the state with their last values.
+
+  - models: [all]
+    severity: info
+    text: >
+      show_slide counts slides from 1 and sends OpenLP's index from 0; live.slide is OpenLP's own
+      number, from 0. show_service_item_at sends a position, which the documentation says the
+      endpoint takes as well as an id but does not number; show_service_item sends the item's id.
+
+  - models: [all]
+    severity: info
+    text: >
+      The websocket's slide field is documented with the same words as its service field (a
+      number incremented when the service is modified); it is read here as the selected slide's
+      index.
+
+  - models: [all]
+    severity: info
+    text: >
+      Commands send their arguments as a JSON body (Content-Type application/json): the
+      documentation lists each POST endpoint's arguments without saying how they are carried, and
+      the login reply's "missing request body" answer points to a body. The clear endpoint gives no method and is sent as POST. Plugin item ids are sent as JSON
+      strings, since a bible id is a reference text.

@@ -68,6 +68,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-christie", &["christie-spyder"]),
     ("vendor-churchapps", &["freeshow"]),
+    ("vendor-cockos", &["cockos-reaper"]),
     ("vendor-digico", &["digico-sd"]),
     (
         "vendor-dataton",
@@ -102,6 +103,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-obs", &["obs-studio"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
+    ("vendor-openlp", &["openlp"]),
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-probel", &["probel-swp08"]),
