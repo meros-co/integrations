@@ -311,6 +311,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:715](specs/blackmagic-streaming.yaml#L715))
 - [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:706](specs/blackmagic-streaming.yaml#L706))
 
+## blackmagic-teranex — Blackmagic Teranex
+
+- [ ] Check which output format text set_output_video_mode needs: 1080i5994 (the Command Syntax example) or 1080i59.94 (the table and the Companion module). ([specs/blackmagic-teranex.yaml:1691](specs/blackmagic-teranex.yaml#L1691))
+- [ ] Confirm the AUDIO and NETWORK CONFIG block headers, which are inferred from the section titles. ([specs/blackmagic-teranex.yaml:1704](specs/blackmagic-teranex.yaml#L1704))
+- [ ] Check whether the refusal is NACK (as documented) or NAK, and that ACK is followed by a blank line on Teranex AV and Express. ([specs/blackmagic-teranex.yaml:1684](specs/blackmagic-teranex.yaml#L1684))
+- [ ] Check whether on/off settings are accepted as true/false (sent here) and how they are reported (true/false or ON/OFF). ([specs/blackmagic-teranex.yaml:1711](specs/blackmagic-teranex.yaml#L1711))
+- [ ] Check the ranges the unit accepts for genlock line and pixel offsets, Variable Aspect Ratio and camera align values, and that whole numbers are accepted where it reports decimals. ([specs/blackmagic-teranex.yaml:1718](specs/blackmagic-teranex.yaml#L1718))
+
+## blackmagic-ultimatte — Blackmagic Ultimatte 12
+
+- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1297](specs/blackmagic-ultimatte.yaml#L1297))
+- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1307](specs/blackmagic-ultimatte.yaml#L1307))
+- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1329](specs/blackmagic-ultimatte.yaml#L1329))
+- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
+- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1339](specs/blackmagic-ultimatte.yaml#L1339))
+- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1322](specs/blackmagic-ultimatte.yaml#L1322))
+
 ## blackmagic-videohub — Blackmagic Videohub
 
 - [ ] Check how the router answers a port number beyond its count. ([specs/blackmagic-videohub.yaml:1053](specs/blackmagic-videohub.yaml#L1053))
