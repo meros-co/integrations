@@ -42,6 +42,8 @@ mod digest;
 mod discovery;
 mod engine;
 pub mod events;
+#[cfg(test)]
+mod facebook_account_session_tests;
 mod files;
 mod http;
 pub mod json;
