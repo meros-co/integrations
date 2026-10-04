@@ -152,3 +152,27 @@ _fs("get_dynamic_value", {"value": "{time_}"}, "get_dynamic_value", {"value": "{
 # A refused action is a device error, not success.
 _fs("get_cleared", {}, "get_cleared", http_reply={"status": 500, "body": ""},
     expect_result={"error": {"error": "device_error", "code": "500"}})
+# ── State: FreeShow's variables over Socket.IO ───────────────────────────
+# The answer to the variable request, as the Companion module (maintained by
+# FreeShow's author) receives it: a "data" event whose argument is
+# {isVariable: true, values: {...}}. Engine.IO message 4, Socket.IO event 2.
+_FS_VARS = {"show_name": "Amazing Grace", "show_name_next": "How Great", "layout_slides": 6,
+            "slide_number": 2, "slide_group": "Verse 1", "slide_group_next": "Chorus",
+            "slide_text_current": "Amazing grace, how sweet the sound", "video_time": "00:12",
+            "audio_title": "Prelude", "audio_volume": 0.8, "active_project_name": "Sunday",
+            "timer_status": "Playing", "output_windows_active": True, "outputs_locked": False,
+            "log_song_usage": True, "timer_Countdown": "04:59"}
+telemetry(FS, "variables", inbound_ws="42" + json.dumps(["data", {"isVariable": True, "values": _FS_VARS}],
+                                                         separators=(",", ":")),
+          expect_state={"show": {"name": "Amazing Grace", "next_name": "How Great"},
+                        "layout": {"slides": 6},
+                        "slide": {"number": 2, "group": "Verse 1", "next_group": "Chorus",
+                                  "text": "Amazing grace, how sweet the sound"},
+                        "video": {"time": "00:12"},
+                        "audio": {"title": "Prelude", "volume": "0.8"},
+                        "project": {"name": "Sunday"},
+                        "timer": {"status": "Playing"},
+                        "output": {"windows_active": True, "locked": False},
+                        "song_usage": {"logging": True}})
+# Anything else on the "data" event (an action's answer) is not variables.
+telemetry(FS, "not-variables", inbound_ws='42["data",{"action":"get_actions","data":[]}]', expect_state={})

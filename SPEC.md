@@ -218,13 +218,16 @@ transport:
   type: http
   port: 80
   scheme: http                # http | https
-  auth: none                  # none | basic | digest | bearer | query-token
+  auth: none                  # none | basic | digest | bearer | header | query-token
   timeout_ms: 4000
   probe: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&ptzstop&1&1" }
 ```
 
 With `auth: bearer`, the `token` setting is sent as `Authorization: Bearer
-<token>` on every request (none while it is empty). With `auth: basic`, the
+<token>` on every request (none while it is empty). With `auth: header`, it is
+sent as it is in the header `auth_header` names, for a device that takes a key
+in a header of its own (mimoLive's `auth_header: X-MimoLive-Password-SHA256`),
+again none while it is empty. With `auth: basic`, the
 `username` and `password` settings are sent on every request, and a Digest challenge in reply is answered as below, for devices
 that can be set to either. A device that answers 403 for other reasons (a
 setting that cannot be changed in the current state) narrows the refusal to
@@ -781,7 +784,7 @@ telemetry needs a required setting gives `settings`, as a command vector does.
 writes must be declared in `state` (§1), whose `type` decides how each value
 is converted: `int`, `float`, `bool` (from `true` / `false`, or through a
 `map`) or `string`. A value that does not convert is not assigned; the core
-never guesses.
+never guesses. A JSON null is no value: the path keeps what it had.
 
 ```yaml
 telemetry:
@@ -936,7 +939,14 @@ telemetry:
     accept_invalid_certs: false # over wss; defaults to the http transport's
     send:                     # sent each time it opens: the subscriptions
       - '{"action":"subscribe","parameter":"/composition/master"}'
+    every_ms: 5000            # optional: send them again at this interval
 ```
+
+`every_ms` sends the `send` items again at that interval while the websocket
+is open: a keepalive a device requires of a client (mimoLive closes a socket
+that sends nothing for 15 seconds), or a request a device answers with its
+state (FreeShow's variables). Text that arrives in binary frames (OpenLP's
+state) goes to the rules as text when it is UTF-8.
 
 A device that pushes over Socket.IO (H2R Graphics, FreeShow) sets `socketio`:
 
@@ -944,7 +954,7 @@ A device that pushes over Socket.IO (H2R Graphics, FreeShow) sets `socketio`:
 telemetry:
   websocket:
     path: /socket.io/
-    socketio: true            # or { engine_io: 3, namespace: /stage }
+    socketio: true            # or { engine_io: 3, namespace: /stage, auth: '...' }
     send:                     # events emitted once the namespace is joined
       - '["subscribe", {"topic": "slides"}]'
   updates:
@@ -957,9 +967,12 @@ The core adds `EIO=4&transport=websocket` (or `EIO=3`) to the query, joins
 the namespace when the server's open packet arrives, answers pings (Engine.IO
 4) or sends them at the server's interval (Engine.IO 3), and gives each event
 to the `json_match` rules as `{"event": <name>, "data": <first argument>,
-"args": [<every argument>]}`.
+"args": [<every argument>]}`. `auth`, a JSON object written as a template over
+settings (`'{"token":{settings.token:json}}'`), goes with the namespace
+connect, as Socket.IO's handshake `auth`. With `every_ms`, the `send` events
+are emitted again at that interval.
 
-The transport's `basic` or `bearer` credential goes on its opening request; a
+The transport's `basic`, `bearer` or `header` credential goes on its opening request; a
 401 or 403 answer is the terminal refusal of §2. `send` items are templates
 over settings. Its messages go through the rules like any other.
 

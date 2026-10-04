@@ -1,0 +1,781 @@
+spec: 1
+id: cockos-reaper
+name: Cockos REAPER (OSC)
+vendor: Cockos
+category: recorder
+
+# REAPER as an OSC control surface (Preferences > Control/OSC/web, Control
+# surface mode OSC) with REAPER's Default pattern config (Default.ReaperOSC),
+# which defines every message here. REAPER listens on its local listen port
+# and sends every change to the device IP and port configured there, which is
+# this host's feedback port. Nothing is acknowledged, so commands are
+# unverified; the feedback keeps the state current. Track numbers address the
+# device's bank of tracks, whose size the connection sets.
+
+source:
+  - title: Default.ReaperOSC (REAPER's default OSC pattern config file)
+    author: Cockos Incorporated
+    url: https://www.reaper.fm/sdk/osc/osc.php
+    note: >
+      Manufacturer document, shipped with REAPER (InstallData/OSC/Default.ReaperOSC, dated
+      2023-06-05 in the REAPER install read, 531 lines); the OSC page says to read its comments for
+      how messages are formed and what they mean. Read for: the argument flags n (normalized 0-1,
+      the fader position), f (raw float), b (0 or 1, set and fed back), t (trigger or toggle, with
+      no argument or 1; fed back as b), r (rotary), s (string) and i (integer); '@' as the target's
+      number; every action and pattern used here (PLAY, STOP, PAUSE, RECORD, REPEAT, METRONOME,
+      REPLACE, AUTO_REC_ARM, SOLO_RESET, ANY_SOLO, REWIND, FORWARD, GOTO_MARKER, GOTO_REGION, TIME,
+      BEAT, FRAMES, TEMPO, PLAY_RATE, the MARKER_, REGION_, LAST_MARKER_ and LAST_REGION_ feedback,
+      LOOP_START_TIME, LOOP_END_TIME, MASTER_VOLUME, MASTER_PAN, the TRACK_ and FX_ patterns,
+      ACTION, MIDIACTION, VKB_MIDI_NOTE, VKB_MIDI_CC, VKB_MIDI_PROGRAM and the DEVICE_ bank and
+      count messages); the defaults DEVICE_TRACK_COUNT 8 and DEVICE_MARKER_COUNT and
+      DEVICE_REGION_COUNT 0, overridable by the device; that feedback for a track bank goes only to
+      the bank's tracks; the note that the default feedback can flood a device.
+  - title: REAPER OSC (developer page)
+    author: Cockos Incorporated
+    url: https://www.reaper.fm/sdk/osc/osc.php
+    note: >
+      Manufacturer document, retrieved 2026-10-04: adding an OSC control surface in
+      Options/Preferences/Control Surfaces, sending and receiving, and that the pattern config file
+      defines the messages REAPER understands.
+  - title: reaper-osc.js (OSC client library for REAPER, MIT licence)
+    author: Ben Simpson
+    url: https://github.com/LykaiosNZ/reaper-osc.js
+    note: >
+      Read for corroboration only (dist/Messages.js, dist/Client/Client.js, dist/Client/Events.js
+      of version 0.9.0, the library the Bitfocus Companion REAPER module uses): binary values are
+      sent as OSC integers 1 and 0; FX bypass is inverted on the wire, REAPER sending and taking 0
+      for a bypassed effect; track record monitoring is an integer, 0 off, 1 on, 2 tape-auto.
+  - title: companion-module-cockos-reaper (Bitfocus Companion module, MIT licence)
+    author: Bitfocus AS, William Viker and Håkon Nessjøen
+    url: https://github.com/bitfocus/companion-module-cockos-reaper
+    note: >
+      Read for corroboration only (companion/HELP.md, src/actions.ts): REAPER's settings for an
+      OSC device (Control surface mode OSC, Mode "Configure device IP+local port", Device IP and
+      Device port the controller's, Local listen port the one commands go to), and the action and
+      feedback set a show control needs.
+
+transport:
+  type: osc-udp
+  port: 8000
+  reply: none
+  listen_port: { setting: feedback_port }
+
+settings:
+  feedback_port: { type: int, min: 1, max: 65535, default: 9000,
+    label: Feedback port,
+    description: "Local UDP port this host listens on for REAPER's feedback; set the OSC device's Device IP to this host and Device port to this value in REAPER." }
+  track_count: { type: int, min: 1, max: 1024, default: 32,
+    label: Tracks followed,
+    description: "How many tracks REAPER reports and the track numbers reach (the device's track bank size), sent to REAPER on connecting." }
+  marker_count: { type: int, min: 0, max: 1024, default: 16,
+    label: Markers followed,
+    description: "How many markers REAPER reports names and times for, sent on connecting; 0 for none." }
+  region_count: { type: int, min: 0, max: 1024, default: 16,
+    label: Regions followed,
+    description: "How many regions REAPER reports names, times and lengths for, sent on connecting; 0 for none." }
+
+# The device's display capabilities, which the pattern config's defaults
+# (8 tracks, no markers or regions) would otherwise limit.
+on_connect:
+  - { address: /device/track/count, args: [ { value: "{settings.track_count}", type: int } ] }
+  - { address: /device/marker/count, args: [ { value: "{settings.marker_count}", type: int } ] }
+  - { address: /device/region/count, args: [ { value: "{settings.region_count}", type: int } ] }
+
+ports:
+  - { port: 8000, protocol: udp, role: control, note: "REAPER's Local listen port for the OSC device" }
+  - { port: 9000, protocol: udp, role: feedback, listener: core, setting: feedback_port, note: "REAPER's Device port: where REAPER sends its feedback" }
+
+models:
+  - id: reaper
+    name: REAPER 6 and 7 (OSC control surface, Default pattern config)
+    supports: [play, stop, pause, record, toggle_repeat, toggle_metronome, toggle_replace,
+               toggle_auto_record_arm, reset_solos, rewind, forward, go_to_marker, go_to_region,
+               set_time, set_tempo, set_playrate, set_master_volume, set_master_pan, set_track_volume,
+               set_track_volume_db, set_track_pan, set_track_pan2, set_track_mute, toggle_track_mute,
+               set_track_solo, toggle_track_solo, set_track_arm, toggle_track_arm, set_track_monitor,
+               set_track_selected, set_track_name, set_track_automation_trim,
+               set_track_automation_read, set_track_automation_latch, set_track_automation_touch,
+               set_track_automation_write, set_track_send_volume, set_track_send_pan,
+               set_track_receive_volume, set_fx_bypass, set_fx_ui_open, next_fx_preset,
+               previous_fx_preset, set_fx_preset, set_fx_wet_dry, set_fx_param, run_action,
+               run_named_action, run_midi_editor_action, select_track_bank, select_device_track,
+               set_device_track_count, set_device_marker_count, set_device_region_count, vkb_note,
+               vkb_cc, vkb_program]
+    verification: none
+
+commands:
+  # ── Transport ─────────────────────────────────────────────────────────────
+  play:
+    summary: "Start playback (PLAY)"
+    send: { address: "/play" }
+    returns: none
+
+  stop:
+    summary: "Stop playback or recording (STOP)"
+    send: { address: "/stop" }
+    returns: none
+
+  pause:
+    summary: "Pause, or resume when paused (PAUSE)"
+    send: { address: "/pause" }
+    returns: none
+
+  record:
+    summary: "Start recording, or stop it when recording (RECORD)"
+    send: { address: "/record" }
+    returns: none
+
+  toggle_repeat:
+    summary: "Toggle repeat (REPEAT)"
+    send: { address: "/repeat" }
+    returns: none
+
+  toggle_metronome:
+    summary: "Toggle the metronome (METRONOME)"
+    send: { address: "/click" }
+    returns: none
+
+  toggle_replace:
+    summary: "Toggle replace recording mode (REPLACE)"
+    send: { address: "/replace" }
+    returns: none
+
+  toggle_auto_record_arm:
+    summary: "Toggle automatic record-arm of selected tracks (AUTO_REC_ARM)"
+    send: { address: "/autorecarm" }
+    returns: none
+
+  reset_solos:
+    summary: "Unsolo every track (SOLO_RESET)"
+    send: { address: "/soloreset" }
+    returns: none
+
+  rewind:
+    summary: "Hold or release the rewind button (REWIND)"
+    params:
+      held: { type: bool, default: true, label: Held, description: "On starts rewinding as if the button were held; off releases it." }
+    send: { address: "/rewind", args: [{ value: "{held:bool01}", type: int }] }
+    returns: none
+
+  forward:
+    summary: "Hold or release the fast-forward button (FORWARD)"
+    params:
+      held: { type: bool, default: true, label: Held, description: "On starts fast-forwarding as if the button were held; off releases it." }
+    send: { address: "/forward", args: [{ value: "{held:bool01}", type: int }] }
+    returns: none
+
+  go_to_marker:
+    summary: "Move the edit cursor to a marker by its number (GOTO_MARKER)"
+    params:
+      marker: { type: int, min: 1, max: 99999, required: true, label: Marker, description: "The marker's number as REAPER shows it on the timeline." }
+    send: { address: "/marker", args: [{ value: "{marker}", type: int }] }
+    returns: none
+
+  go_to_region:
+    summary: "Move the edit cursor to a region by its number (GOTO_REGION)"
+    params:
+      region: { type: int, min: 1, max: 99999, required: true, label: Region, description: "The region's number as REAPER shows it on the timeline." }
+    send: { address: "/region", args: [{ value: "{region}", type: int }] }
+    returns: none
+
+  set_time:
+    summary: "Move the play or edit cursor to a time in seconds (TIME)"
+    params:
+      seconds: { type: float, min: 0.0, required: true, label: Time, description: "Project time in seconds from the project start." }
+    send: { address: "/time", args: [{ value: "{seconds}", type: float }] }
+    returns: none
+
+  set_tempo:
+    summary: "Set the project tempo in BPM (TEMPO, /tempo/raw)"
+    params:
+      bpm: { type: float, min: 1.0, required: true, label: Tempo, description: "Tempo in beats per minute, sent as it is." }
+    send: { address: "/tempo/raw", args: [{ value: "{bpm}", type: float }] }
+    returns: none
+
+  set_playrate:
+    summary: "Set the play rate (PLAY_RATE, /playrate/raw)"
+    params:
+      rate: { type: float, min: 0.0, required: true, label: "Play rate", description: "Play rate as a multiple of normal speed, 1.0 for normal." }
+    send: { address: "/playrate/raw", args: [{ value: "{rate}", type: float }] }
+    returns: none
+
+  # ── Master ────────────────────────────────────────────────────────────────
+  set_master_volume:
+    summary: "Set the master fader (MASTER_VOLUME)"
+    params:
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/master/volume", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_master_pan:
+    summary: "Set the master pan (MASTER_PAN)"
+    params:
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Pan, description: "Pan from 0.0 (full left) through 0.5 (centre) to 1.0 (full right)." }
+    send: { address: "/master/pan", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  # ── Tracks ────────────────────────────────────────────────────────────────
+  set_track_volume:
+    summary: "Set a track's fader position (TRACK_VOLUME, normalized)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/track/{track}/volume", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_track_volume_db:
+    summary: "Set a track's volume in dB (TRACK_VOLUME, /volume/db)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      db: { type: float, min: -150.0, required: true, label: Volume, description: "Track volume in dB, sent as it is; the top of the fader is REAPER's fader-range preference." }
+    send: { address: "/track/{track}/volume/db", args: [{ value: "{db}", type: float }] }
+    returns: none
+
+  set_track_pan:
+    summary: "Set a track's pan (TRACK_PAN)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Pan, description: "Pan from 0.0 (full left) through 0.5 (centre) to 1.0 (full right)." }
+    send: { address: "/track/{track}/pan", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_track_pan2:
+    summary: "Set a track's second pan control, width or right pan by pan mode (TRACK_PAN2)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/track/{track}/pan2", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_track_mute:
+    summary: "Mute a track on or off (TRACK_MUTE)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      enabled: { type: bool, required: true, label: Mute, description: "On sets the state, off clears it." }
+    send: { address: "/track/{track}/mute", args: [{ value: "{enabled:bool01}", type: int }] }
+    returns: none
+
+  toggle_track_mute:
+    summary: "Toggle a track's mute (mute/toggle)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/mute/toggle" }
+    returns: none
+
+  set_track_solo:
+    summary: "Solo a track on or off (TRACK_SOLO)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      enabled: { type: bool, required: true, label: Solo, description: "On sets the state, off clears it." }
+    send: { address: "/track/{track}/solo", args: [{ value: "{enabled:bool01}", type: int }] }
+    returns: none
+
+  toggle_track_solo:
+    summary: "Toggle a track's solo (solo/toggle)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/solo/toggle" }
+    returns: none
+
+  set_track_arm:
+    summary: "Record-arm a track on or off (TRACK_REC_ARM)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      enabled: { type: bool, required: true, label: Record-arm, description: "On sets the state, off clears it." }
+    send: { address: "/track/{track}/recarm", args: [{ value: "{enabled:bool01}", type: int }] }
+    returns: none
+
+  toggle_track_arm:
+    summary: "Toggle a track's record-arm (recarm/toggle)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/recarm/toggle" }
+    returns: none
+
+  set_track_monitor:
+    summary: "Set a track's record monitoring: off, on, or tape-auto (TRACK_MONITOR)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      mode: { type: int, min: 0, max: 2, required: true, label: Monitoring, description: "Record monitoring: 0 off, 1 on, 2 tape-auto (not while playing)." }
+    send: { address: "/track/{track}/monitor", args: [{ value: "{mode}", type: int }] }
+    returns: none
+
+  set_track_selected:
+    summary: "Select or deselect a track in REAPER (TRACK_SELECT)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      selected: { type: bool, required: true, label: Selected, description: "On sets the state, off clears it." }
+    send: { address: "/track/{track}/select", args: [{ value: "{selected:bool01}", type: int }] }
+    returns: none
+
+  set_track_name:
+    summary: "Rename a track (TRACK_NAME)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      name: { type: string, max_length: 256, required: true, label: Name, description: "The track's new name." }
+    send: { address: "/track/{track}/name", args: [{ value: "{name}", type: string }] }
+    returns: none
+
+  set_track_automation_trim:
+    summary: "Set a track's automation mode to trim (TRACK_AUTO_TRIM)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/autotrim" }
+    returns: none
+
+  set_track_automation_read:
+    summary: "Set a track's automation mode to read (TRACK_AUTO_READ)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/autoread" }
+    returns: none
+
+  set_track_automation_latch:
+    summary: "Set a track's automation mode to latch (TRACK_AUTO_LATCH)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/autolatch" }
+    returns: none
+
+  set_track_automation_touch:
+    summary: "Set a track's automation mode to touch (TRACK_AUTO_TOUCH)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/autotouch" }
+    returns: none
+
+  set_track_automation_write:
+    summary: "Set a track's automation mode to write (TRACK_AUTO_WRITE)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/track/{track}/autowrite" }
+    returns: none
+
+  set_track_send_volume:
+    summary: "Set the level of one of a track's sends (TRACK_SEND_VOLUME)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      send: { type: int, min: 1, max: 999, required: true, label: Send, description: "The track's send, numbered from 1 in REAPER's routing order." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/track/{track}/send/{send}/volume", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_track_send_pan:
+    summary: "Set the pan of one of a track's sends (TRACK_SEND_PAN)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      send: { type: int, min: 1, max: 999, required: true, label: Send, description: "The track's send, numbered from 1 in REAPER's routing order." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Pan, description: "Pan from 0.0 (left) through 0.5 (centre) to 1.0 (right)." }
+    send: { address: "/track/{track}/send/{send}/pan", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_track_receive_volume:
+    summary: "Set the level of one of a track's receives (TRACK_RECV_VOLUME)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      receive: { type: int, min: 1, max: 999, required: true, label: Receive, description: "The track's receive, numbered from 1 in REAPER's routing order." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/track/{track}/recv/{receive}/volume", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  # ── Track effects ─────────────────────────────────────────────────────────
+  set_fx_bypass:
+    summary: "Bypass or un-bypass an effect on a track (FX_BYPASS)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+      bypassed: { type: bool, required: true, label: Bypassed, description: "On bypasses the effect, off makes it active again." }
+    send: { address: "/track/{track}/fx/{fx}/bypass", args: [{ value: "{bypassed:bool10}", type: int }] }
+    returns: none
+
+  set_fx_ui_open:
+    summary: "Open or close an effect's window (FX_OPEN_UI)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+      open: { type: bool, required: true, label: Open, description: "On opens the effect's window, off closes it." }
+    send: { address: "/track/{track}/fx/{fx}/openui", args: [{ value: "{open:bool01}", type: int }] }
+    returns: none
+
+  next_fx_preset:
+    summary: "Load an effect's next preset (FX_NEXT_PRESET)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+    send: { address: "/track/{track}/fx/{fx}/preset+" }
+    returns: none
+
+  previous_fx_preset:
+    summary: "Load an effect's previous preset (FX_PREV_PRESET)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+    send: { address: "/track/{track}/fx/{fx}/preset-" }
+    returns: none
+
+  set_fx_preset:
+    summary: "Load an effect preset by name (FX_PRESET)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+      preset: { type: string, max_length: 256, required: true, label: Preset, description: "The preset's name as the effect lists it." }
+    send: { address: "/track/{track}/fx/{fx}/preset", args: [{ value: "{preset}", type: string }] }
+    returns: none
+
+  set_fx_wet_dry:
+    summary: "Set an effect's wet/dry mix (FX_WETDRY)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Wet, description: "From 0.0 (dry) to 1.0 (fully wet)." }
+    send: { address: "/track/{track}/fx/{fx}/wetdry", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  set_fx_param:
+    summary: "Set an effect parameter (FX_PARAM_VALUE)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+      fx: { type: int, min: 1, max: 999, required: true, label: FX, description: "Position of the effect in the track's FX chain, from 1." }
+      param: { type: int, min: 1, max: 9999, required: true, label: Parameter, description: "The effect parameter's number, from 1, as REAPER orders the effect's parameters." }
+      position: { type: float, min: 0.0, max: 1.0, required: true, label: Position, description: "Normalized position from 0.0 (minimum) to 1.0 (maximum), as the control's fader or knob in REAPER." }
+    send: { address: "/track/{track}/fx/{fx}/fxparam/{param}/value", args: [{ value: "{position}", type: float }] }
+    returns: none
+
+  # ── Actions ───────────────────────────────────────────────────────────────
+  run_action:
+    summary: "Run a REAPER action by its command ID number (ACTION)"
+    params:
+      command: { type: int, min: 1, max: 65535, required: true, label: "Command ID", description: "The action's command ID from REAPER's Actions list, such as 40757 (split items at edit cursor)." }
+    send: { address: "/action", args: [{ value: "{command}", type: int }] }
+    returns: none
+
+  run_named_action:
+    summary: "Run an action by its named command ID, for scripts, custom actions and extensions (ACTION, /action/str)"
+    params:
+      command: { type: string, max_length: 256, pattern: "^_[A-Za-z0-9_]+$", required: true, label: "Command ID", description: "The named command ID REAPER's Actions list shows for a script or custom action, starting with an underscore." }
+    send: { address: "/action/str", args: [{ value: "{command}", type: string }] }
+    returns: none
+
+  run_midi_editor_action:
+    summary: "Run a MIDI editor action by its command ID (MIDIACTION)"
+    params:
+      command: { type: int, min: 1, max: 65535, required: true, label: "Command ID", description: "The MIDI editor action's command ID from REAPER's Actions list." }
+    send: { address: "/midiaction", args: [{ value: "{command}", type: int }] }
+    returns: none
+
+  # ── The device's view ─────────────────────────────────────────────────────
+  select_track_bank:
+    summary: "Choose which bank of tracks the track numbers address (DEVICE_TRACK_BANK_SELECT)"
+    params:
+      bank: { type: int, min: 1, max: 9999, required: true, label: Bank, description: "Track bank from 1; with a bank size of 8, bank 2 makes track 1 address REAPER's track 9." }
+    send: { address: "/device/track/bank/select", args: [{ value: "{bank}", type: int }] }
+    returns: none
+
+  select_device_track:
+    summary: "Choose the device's selected track, which /track messages without a number address (DEVICE_TRACK_SELECT)"
+    params:
+      track: { type: int, min: 1, max: 9999, required: true, label: Track, description: "Track number within the device's track bank, from 1; with bank 1 selected this is REAPER's track number." }
+    send: { address: "/device/track/select", args: [{ value: "{track}", type: int }] }
+    returns: none
+
+  set_device_track_count:
+    summary: "Set how many tracks the device follows, the track bank size (DEVICE_TRACK_COUNT)"
+    params:
+      count: { type: int, min: 1, max: 1024, required: true, label: "Track count", description: "How many tracks REAPER reports and the track numbers reach." }
+    send: { address: "/device/track/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_marker_count:
+    summary: "Set how many markers REAPER reports (DEVICE_MARKER_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "Marker count", description: "How many markers REAPER reports names and times for; 0 for none." }
+    send: { address: "/device/marker/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  set_device_region_count:
+    summary: "Set how many regions REAPER reports (DEVICE_REGION_COUNT)"
+    params:
+      count: { type: int, min: 0, max: 1024, required: true, label: "Region count", description: "How many regions REAPER reports names, times and lengths for; 0 for none." }
+    send: { address: "/device/region/count", args: [{ value: "{count}", type: int }] }
+    returns: none
+
+  # ── Virtual MIDI keyboard ─────────────────────────────────────────────────
+  vkb_note:
+    summary: "Send a note to REAPER's virtual MIDI keyboard input (VKB_MIDI_NOTE)"
+    params:
+      channel: { type: int, min: 0, max: 15, required: true, label: "MIDI channel", description: "MIDI channel from 0 to 15 (channel 1 is 0)." }
+      note: { type: int, min: 0, max: 127, required: true, label: Note, description: "MIDI note number, 60 for middle C." }
+      velocity: { type: int, min: 0, max: 127, required: true, label: Velocity, description: "Note velocity; 0 is a note-off." }
+    send: { address: "/vkb_midi/{channel}/note/{note}", args: [{ value: "{velocity}", type: int }] }
+    returns: none
+
+  vkb_cc:
+    summary: "Send a control change to REAPER's virtual MIDI keyboard input (VKB_MIDI_CC)"
+    params:
+      channel: { type: int, min: 0, max: 15, required: true, label: "MIDI channel", description: "MIDI channel from 0 to 15 (channel 1 is 0)." }
+      controller: { type: int, min: 0, max: 127, required: true, label: Controller, description: "MIDI controller number." }
+      value: { type: int, min: 0, max: 127, required: true, label: Value, description: "Controller value." }
+    send: { address: "/vkb_midi/{channel}/cc/{controller}", args: [{ value: "{value}", type: int }] }
+    returns: none
+
+  vkb_program:
+    summary: "Send a program change to REAPER's virtual MIDI keyboard input (VKB_MIDI_PROGRAM)"
+    params:
+      channel: { type: int, min: 0, max: 15, required: true, label: "MIDI channel", description: "MIDI channel from 0 to 15 (channel 1 is 0)." }
+      program: { type: int, min: 0, max: 127, required: true, label: Program, description: "MIDI program number from 0." }
+    send: { address: "/vkb_midi/{channel}/program", args: [{ value: "{program}", type: int }] }
+    returns: none
+
+state:
+  transport.playing: { type: bool, description: "Playing" }
+  transport.stopped: { type: bool, description: "Stopped" }
+  transport.paused: { type: bool, description: "Paused" }
+  transport.recording: { type: bool, description: "Recording" }
+  transport.repeat: { type: bool, description: "Repeat on" }
+  transport.metronome: { type: bool, description: "Metronome on" }
+  transport.replace: { type: bool, description: "Replace recording mode on" }
+  transport.auto_record_arm: { type: bool, description: "Automatic record-arm on" }
+  transport.rewinding: { type: bool, description: "Rewind held" }
+  transport.forwarding: { type: bool, description: "Fast-forward held" }
+  transport.any_solo: { type: bool, description: "Some track is soloed" }
+  transport.time: { type: float, unit: s, description: "Play or edit cursor position" }
+  transport.beat: { type: string, description: "Position in measures and beats, as REAPER formats it" }
+  transport.frames: { type: string, description: "Position as timecode with frames, as REAPER formats it" }
+  transport.tempo: { type: float, unit: BPM, description: "Project tempo" }
+  transport.playrate: { type: float, description: "Play rate, 1.0 for normal speed" }
+  transport.loop_start: { type: float, unit: s, description: "Loop start" }
+  transport.loop_end: { type: float, unit: s, description: "Loop end" }
+  master.volume: { type: float, description: "Master fader position, 0.0 to 1.0" }
+  master.volume_text: { type: string, description: "Master volume as REAPER shows it (dB)" }
+  master.pan: { type: float, description: "Master pan, 0.0 (left) to 1.0 (right)" }
+  master.pan_text: { type: string, description: "Master pan as REAPER shows it" }
+  tracks.*.name: { type: string, description: "Track name" }
+  tracks.*.number: { type: string, description: "Track number as REAPER shows it" }
+  tracks.*.mute: { type: bool, description: "Muted" }
+  tracks.*.solo: { type: bool, description: "Soloed" }
+  tracks.*.armed: { type: bool, description: "Record-armed" }
+  tracks.*.monitor: { type: int, description: "Record monitoring: 0 off, 1 on, 2 tape-auto" }
+  tracks.*.selected: { type: bool, description: "Selected in REAPER" }
+  tracks.*.volume: { type: float, description: "Fader position, 0.0 to 1.0" }
+  tracks.*.volume_db: { type: float, unit: dB, description: "Volume in dB" }
+  tracks.*.volume_text: { type: string, description: "Volume as REAPER shows it" }
+  tracks.*.pan: { type: float, description: "Pan, 0.0 (left) to 1.0 (right)" }
+  tracks.*.pan_text: { type: string, description: "Pan as REAPER shows it" }
+  tracks.*.pan2: { type: float, description: "Second pan control (width or right pan), 0.0 to 1.0" }
+  tracks.*.pan_mode: { type: string, description: "Pan mode" }
+  tracks.*.vu: { type: float, description: "Level meter, 0.0 to 1.0" }
+  tracks.*.fx.*.name: { type: string, description: "Effect name" }
+  tracks.*.fx.*.active: { type: bool, description: "Effect active (REAPER's bypass flag reads 1 for active)" }
+  tracks.*.fx.*.ui_open: { type: bool, description: "Effect window open" }
+  tracks.*.fx.*.preset: { type: string, description: "Effect preset name" }
+  tracks.*.fx.*.wet: { type: float, description: "Wet/dry mix, 0.0 to 1.0" }
+  tracks.*.sends.*.name: { type: string, description: "Send destination name" }
+  tracks.*.sends.*.volume: { type: float, description: "Send level, 0.0 to 1.0" }
+  tracks.*.sends.*.volume_text: { type: string, description: "Send level as REAPER shows it" }
+  tracks.*.sends.*.pan: { type: float, description: "Send pan, 0.0 to 1.0" }
+  markers.*.name: { type: string, description: "Marker name, by its place among the reported markers" }
+  markers.*.number: { type: string, description: "Marker number as REAPER shows it" }
+  markers.*.time: { type: float, unit: s, description: "Marker position" }
+  regions.*.name: { type: string, description: "Region name, by its place among the reported regions" }
+  regions.*.number: { type: string, description: "Region number as REAPER shows it" }
+  regions.*.time: { type: float, unit: s, description: "Region position" }
+  regions.*.length: { type: float, unit: s, description: "Region length" }
+  last_marker.name: { type: string, description: "Name of the last marker passed" }
+  last_marker.number: { type: string, description: "Number of the last marker passed" }
+  last_marker.time: { type: float, unit: s, description: "Position of the last marker passed" }
+  last_region.name: { type: string, description: "Name of the last region passed" }
+  last_region.number: { type: string, description: "Number of the last region passed" }
+  last_region.time: { type: float, unit: s, description: "Position of the last region passed" }
+  last_region.length: { type: float, unit: s, description: "Length of the last region passed" }
+  selected_track.name: { type: string, description: "Name of the device's selected track" }
+  selected_track.number: { type: string, description: "Number of the device's selected track" }
+
+telemetry:
+  # REAPER sends each change to the device IP and port set for the control
+  # surface; the core listens on the feedback port.
+  updates:
+    - address: '^/play$'
+      state: { "transport.playing": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/stop$'
+      state: { "transport.stopped": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/pause$'
+      state: { "transport.paused": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/record$'
+      state: { "transport.recording": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/repeat$'
+      state: { "transport.repeat": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/click$'
+      state: { "transport.metronome": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/replace$'
+      state: { "transport.replace": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/autorecarm$'
+      state: { "transport.auto_record_arm": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/rewind$'
+      state: { "transport.rewinding": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/forward$'
+      state: { "transport.forwarding": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/anysolo$'
+      state: { "transport.any_solo": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/time$'
+      arg_types: f
+      state: { "transport.time": "{arg0}" }
+    - address: '^/beat/str$'
+      state: { "transport.beat": "{arg0}" }
+    - address: '^/frames/str$'
+      state: { "transport.frames": "{arg0}" }
+    - address: '^/tempo/raw$'
+      state: { "transport.tempo": "{arg0}" }
+    - address: '^/playrate/raw$'
+      state: { "transport.playrate": "{arg0}" }
+    - address: '^/loop/start/time$'
+      state: { "transport.loop_start": "{arg0}" }
+    - address: '^/loop/end/time$'
+      state: { "transport.loop_end": "{arg0}" }
+    - address: '^/master/volume$'
+      state: { "master.volume": "{arg0}" }
+    - address: '^/master/volume/str$'
+      state: { "master.volume_text": "{arg0}" }
+    - address: '^/master/pan$'
+      state: { "master.pan": "{arg0}" }
+    - address: '^/master/pan/str$'
+      state: { "master.pan_text": "{arg0}" }
+    - address: '^/track/(\d+)/name$'
+      state: { "tracks.{1}.name": "{arg0}" }
+    - address: '^/track/(\d+)/number/str$'
+      state: { "tracks.{1}.number": "{arg0}" }
+    - address: '^/track/(\d+)/mute$'
+      state: { "tracks.{1}.mute": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/solo$'
+      state: { "tracks.{1}.solo": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/recarm$'
+      state: { "tracks.{1}.armed": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/monitor$'
+      state: { "tracks.{1}.monitor": "{arg0}" }
+    - address: '^/track/(\d+)/select$'
+      state: { "tracks.{1}.selected": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/volume$'
+      state: { "tracks.{1}.volume": "{arg0}" }
+    - address: '^/track/(\d+)/volume/db$'
+      state: { "tracks.{1}.volume_db": "{arg0}" }
+    - address: '^/track/(\d+)/volume/str$'
+      state: { "tracks.{1}.volume_text": "{arg0}" }
+    - address: '^/track/(\d+)/pan$'
+      state: { "tracks.{1}.pan": "{arg0}" }
+    - address: '^/track/(\d+)/pan/str$'
+      state: { "tracks.{1}.pan_text": "{arg0}" }
+    - address: '^/track/(\d+)/pan2$'
+      state: { "tracks.{1}.pan2": "{arg0}" }
+    - address: '^/track/(\d+)/panmode$'
+      state: { "tracks.{1}.pan_mode": "{arg0}" }
+    - address: '^/track/(\d+)/vu$'
+      state: { "tracks.{1}.vu": "{arg0}" }
+    - address: '^/track/(\d+)/fx/(\d+)/name$'
+      state: { "tracks.{1}.fx.{2}.name": "{arg0}" }
+    - address: '^/track/(\d+)/fx/(\d+)/bypass$'
+      state: { "tracks.{1}.fx.{2}.active": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/fx/(\d+)/openui$'
+      state: { "tracks.{1}.fx.{2}.ui_open": { value: "{arg0}", map: { "0": false, "1": true, "0.0": false, "1.0": true } } }
+    - address: '^/track/(\d+)/fx/(\d+)/preset$'
+      state: { "tracks.{1}.fx.{2}.preset": "{arg0}" }
+    - address: '^/track/(\d+)/fx/(\d+)/wetdry$'
+      state: { "tracks.{1}.fx.{2}.wet": "{arg0}" }
+    - address: '^/track/(\d+)/send/(\d+)/name$'
+      state: { "tracks.{1}.sends.{2}.name": "{arg0}" }
+    - address: '^/track/(\d+)/send/(\d+)/volume$'
+      state: { "tracks.{1}.sends.{2}.volume": "{arg0}" }
+    - address: '^/track/(\d+)/send/(\d+)/volume/str$'
+      state: { "tracks.{1}.sends.{2}.volume_text": "{arg0}" }
+    - address: '^/track/(\d+)/send/(\d+)/pan$'
+      state: { "tracks.{1}.sends.{2}.pan": "{arg0}" }
+    - address: '^/marker/(\d+)/name$'
+      state: { "markers.{1}.name": "{arg0}" }
+    - address: '^/marker/(\d+)/number/str$'
+      state: { "markers.{1}.number": "{arg0}" }
+    - address: '^/marker/(\d+)/time$'
+      state: { "markers.{1}.time": "{arg0}" }
+    - address: '^/region/(\d+)/name$'
+      state: { "regions.{1}.name": "{arg0}" }
+    - address: '^/region/(\d+)/number/str$'
+      state: { "regions.{1}.number": "{arg0}" }
+    - address: '^/region/(\d+)/time$'
+      state: { "regions.{1}.time": "{arg0}" }
+    - address: '^/region/(\d+)/length$'
+      state: { "regions.{1}.length": "{arg0}" }
+    - address: '^/lastmarker/name$'
+      state: { "last_marker.name": "{arg0}" }
+    - address: '^/lastmarker/number/str$'
+      state: { "last_marker.number": "{arg0}" }
+    - address: '^/lastmarker/time$'
+      state: { "last_marker.time": "{arg0}" }
+    - address: '^/lastregion/name$'
+      state: { "last_region.name": "{arg0}" }
+    - address: '^/lastregion/number/str$'
+      state: { "last_region.number": "{arg0}" }
+    - address: '^/lastregion/time$'
+      state: { "last_region.time": "{arg0}" }
+    - address: '^/lastregion/length$'
+      state: { "last_region.length": "{arg0}" }
+    - address: '^/track/name$'
+      state: { "selected_track.name": "{arg0}" }
+    - address: '^/track/number/str$'
+      state: { "selected_track.number": "{arg0}" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      stop ends a recording in progress and record starts or stops one; record toggles, so sent
+      while recording it stops the take. run_action, run_named_action and run_midi_editor_action
+      run any REAPER action, including ones that delete items, close the project or quit REAPER,
+      with no confirmation through OSC.
+
+  - models: [all]
+    severity: warning
+    text: >
+      REAPER must have an OSC control surface added (Preferences > Control/OSC/web, Control surface
+      mode OSC, Default pattern config), set to "Configure device IP+local port": Local listen port
+      the port commands go to (8000 here by default), Device IP this host and Device port the
+      feedback_port setting (9000 by default). REAPER never acknowledges a message, so every
+      command is reported unverified, and with no feedback configured nothing reaches the state.
+      A custom pattern config that renames or removes patterns breaks the commands and feedback
+      that use them.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Track numbers address the device's track bank, not REAPER's track list directly: on
+      connecting the core sets the bank size to the track_count setting, and with bank 1 selected
+      track n is REAPER's track n. select_track_bank moves the bank, after which the same numbers
+      address other tracks and the state's tracks.* follow the new bank. REAPER reports only the
+      bank's tracks, and markers and regions only up to the marker_count and region_count
+      settings, numbered by their place among those reported.
+
+  - models: [all]
+    severity: warning
+    text: >
+      REAPER sends feedback when something changes, so the state fills as things change; there is
+      no documented request for the whole state. Running REAPER's "Control surface: Refresh all
+      surfaces" action with run_action makes REAPER send everything again; its command ID is in
+      REAPER's Actions list.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The default pattern config sends a lot of feedback, including time, beat, frames and level
+      meters many times a second; REAPER's own notes warn it can flood a device. The core keeps the
+      latest values; comment out unwanted patterns in a copy of the config to reduce the traffic.
+
+  - models: [all]
+    severity: info
+    text: >
+      Fader, pan and send levels are REAPER's normalized fader positions from 0.0 to 1.0, whose dB
+      depend on REAPER's fader preferences; set_track_volume_db and tracks.*.volume_db carry dB.
+      FX bypass is inverted on the wire (1 is active, 0 bypassed): set_fx_bypass sends it that way
+      and the state holds tracks.*.fx.*.active.
+
+  - models: [all]
+    severity: info
+    text: >
+      Binary values (mute, solo, arm, select, bypass, rewind, forward) are sent as OSC integers 1
+      and 0, as the pattern config's b flag describes them; trigger and toggle messages are sent
+      with no argument.

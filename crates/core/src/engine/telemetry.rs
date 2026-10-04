@@ -112,6 +112,14 @@ fn select(doc: &Value, selectors: &[(String, Regex)], base: &mut Vec<(String, Va
     true
 }
 
+/// A JSON value a rule names, unless it is null: a device that reports
+/// nothing there (OpenLP's theme, mimoLive's live variant of a layer that is
+/// off) has given no value, and the state keeps what it had rather than the
+/// text "null".
+fn present(v: Option<&Value>) -> Option<&Value> {
+    v.filter(|v| !v.is_null())
+}
+
 fn json_paths(rule: &Value) -> Result<BTreeMap<String, String>, String> {
     rule.get("json")
         .and_then(Value::as_object)
@@ -492,7 +500,7 @@ impl Telemetry {
                     for item in items {
                         let mut values = base.clone();
                         for (name, json_path) in json {
-                            if let Some(v) = super::expect::json_path(item, json_path) {
+                            if let Some(v) = present(super::expect::json_path(item, json_path)) {
                                 values.push((name.clone(), v.clone()));
                             }
                         }
@@ -544,7 +552,7 @@ impl Telemetry {
                     for item in items {
                         let mut values = base.clone();
                         for (name, json_path) in json {
-                            if let Some(v) = super::expect::json_path(item, json_path) {
+                            if let Some(v) = present(super::expect::json_path(item, json_path)) {
                                 values.push((name.clone(), v.clone()));
                             }
                         }
@@ -581,7 +589,7 @@ impl Telemetry {
                                 continue;
                             };
                             for (name, path) in json {
-                                if let Some(v) = super::expect::json_path(&doc, path) {
+                                if let Some(v) = present(super::expect::json_path(&doc, path)) {
                                     values.push((name.clone(), v.clone()));
                                 }
                             }
@@ -1020,6 +1028,26 @@ mod tests {
         )
         .unwrap();
         assert!(t.apply(&Inbound::Text("SPEED fast")).is_none());
+    }
+
+    #[test]
+    fn a_json_null_is_no_value() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [{"json_match": {"$.type": "^layers$"},
+                "json": {"name": "$.name", "variant": "$.live"},
+                "state": {"layer.name": "{name}", "layer.live_variant": "{variant}"}}]})),
+            &state(json!({
+                "layer.name": {"type": "string", "description": "x"},
+                "layer.live_variant": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let layer = json!({"type": "layers", "name": "Lower Third", "live": null});
+        assert_eq!(
+            t.apply(&Inbound::Json(&layer)).unwrap(),
+            json!({"layer": {"name": "Lower Third"}})
+        );
     }
 
     #[test]

@@ -45,8 +45,8 @@ _LIVE_STATE = {"live": {
     "current_item_time_id": "901", "next_item_time_id": "902", "controller_id": "42"}}
 _ITEM_TIMES = {
     "901": {"item_id": "11", "plan_time_id": "77", "live_start_at": "2026-10-04T16:05:00Z",
-            "live_end_at": "null", "length": 300, "length_offset": 0, "exclude": False},
-    "902": {"item_id": "12", "plan_time_id": "77", "live_start_at": "null", "live_end_at": "null",
+            "length": 300, "length_offset": 0, "exclude": False},
+    "902": {"item_id": "12", "plan_time_id": "77",
             "length": 240, "length_offset": 0, "exclude": False}}
 
 # LIVE actions: POST, answered with the Live resource.
@@ -110,16 +110,16 @@ telemetry(PC, "items", settings=_PCS, inbound_http={"path": _PCP + "/items?per_p
                                                 "description": None, "key_name": "G"}}]})},
     expect_state={"items": {
         "11": {"plan_id": "5678", "title": "Welcome", "sequence": 1, "length": 300, "item_type": "item",
-               "service_position": "during", "description": "Host on stage", "key_name": "null"},
+               "service_position": "during", "description": "Host on stage"},
         "12": {"plan_id": "5678", "title": "Amazing Grace", "sequence": 2, "length": 240, "item_type": "song",
-               "service_position": "during", "description": "null", "key_name": "G"}}})
+               "service_position": "during", "key_name": "G"}}})
 telemetry(PC, "plan-times", settings=_PCS, inbound_http={"path": _PCP + "/plan_times?per_page=100", "body": json.dumps({"data": [
     {"type": "PlanTime", "id": "77", "attributes": {
         "name": "9:00", "time_type": "service", "starts_at": "2026-10-04T16:00:00Z",
         "ends_at": "2026-10-04T17:15:00Z", "live_starts_at": "2026-10-04T16:01:12Z", "live_ends_at": None}}]})},
     expect_state={"plan_times": {"77": {
         "plan_id": "5678", "name": "9:00", "time_type": "service", "starts_at": "2026-10-04T16:00:00Z",
-        "ends_at": "2026-10-04T17:15:00Z", "live_starts_at": "2026-10-04T16:01:12Z", "live_ends_at": "null"}}})
+        "ends_at": "2026-10-04T17:15:00Z", "live_starts_at": "2026-10-04T16:01:12Z"}}})
 telemetry(PC, "plans", settings=_PCS, inbound_http={
     "path": "/services/v2/service_types/1234/plans?filter=future&order=sort_date&per_page=25",
     "body": json.dumps({"data": [{"type": "Plan", "id": "5679", "attributes": {
@@ -127,7 +127,7 @@ telemetry(PC, "plans", settings=_PCS, inbound_http={
         "sort_date": "2026-10-04T23:00:00Z", "last_time_at": "2026-10-05T00:00:00Z", "total_length": 3600,
         "items_count": 9, "planning_center_url": "https://services.planningcenteronline.com/plans/5679"}}]})},
     expect_state={"plans": {"5679": {
-        "service_type_id": "1234", "title": "Evening", "series_title": "null", "dates": "October 4, 2026",
+        "service_type_id": "1234", "title": "Evening", "dates": "October 4, 2026",
         "short_dates": "Oct 4", "sort_date": "2026-10-04T23:00:00Z", "last_time_at": "2026-10-05T00:00:00Z",
         "total_length": 3600, "items_count": 9,
         "planning_center_url": "https://services.planningcenteronline.com/plans/5679"}}})

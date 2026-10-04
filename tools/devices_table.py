@@ -54,6 +54,7 @@ NATIVE = {
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2)",
     "sennheiser-ew-g3-g4": "MCP over UDP 53212",
     "shure-wireless": "Command strings over TCP 2202",
+    "softouch-easyworship": "JSON lines over TCP (the port EasyWorship advertises over Bonjour)",
     "sony-camera": "PTP-IP over TCP 15740, or through SSH",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",
     "tsl-umd-listener": "TSL UMD over UDP, or TCP for V3.1 and V5.0; receives",

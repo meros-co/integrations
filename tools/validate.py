@@ -326,13 +326,19 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         if decl is None:
             errors.append(f"transport.auth names unknown setting '{auth.get('setting')}'")
             methods = set()
-        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer"}:
-            errors.append("transport.auth's setting must be an enum of none, basic, digest and bearer")
+        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer", "header"}:
+            errors.append("transport.auth's setting must be an enum of none, basic, digest, bearer and header")
             methods = set()
         else:
             methods = set(decl.get("values", []))
-    if "bearer" in methods and "token" not in settings:
-        errors.append("auth: bearer needs a 'token' setting")
+    for method in sorted(methods & {"bearer", "header"}):
+        if "token" not in settings:
+            errors.append(f"auth: {method} needs a 'token' setting")
+    if ("header" in methods) != bool(transport.get("auth_header")):
+        errors.append("auth: header and auth_header go together")
+    sio = (websocket or {}).get("socketio")
+    if isinstance(sio, dict) and sio.get("auth"):
+        errors += check_template("text", sio["auth"], {}, settings, "telemetry.websocket.socketio.auth")
     for method in sorted(methods & {"basic", "digest"}):
         if not {"username", "password"} <= settings.keys():
             errors.append(f"auth: {method} needs 'username' and 'password' settings")
@@ -399,9 +405,13 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
     declared = [key.split(".") for key in (doc.get("state") or {})]
 
     def is_declared(path: str) -> bool:
+        # As the engine reads it: a templated segment may stand for any
+        # declared segment (mimoLive's '{type}.{id}.name' writes layers.<id>.name
+        # and sources.<id>.name), and a concrete path no declaration matches is
+        # not assigned at run time.
         parts = ["*" if "{" in seg else seg for seg in path.split(".")]
         return any(
-            len(d) == len(parts) and all(a == "*" or a == b for a, b in zip(d, parts))
+            len(d) == len(parts) and all(a == "*" or b == "*" or a == b for a, b in zip(d, parts))
             for d in declared
         )
 

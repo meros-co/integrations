@@ -8,10 +8,11 @@ category: playback
 # action as an HTTP POST to / on port 5506 with the JSON body
 # {"action": ACTION_ID, ...data}; the same actions go over a Socket.IO
 # websocket and OSC on port 5505. Actions answer 204 with no body; the get_
-# actions answer with the data. FreeShow reports state changes only to
-# Socket.IO clients (the Companion module's variables), which the format has
-# no transport for (Engine.IO handshake and ping/pong), so this spec has no
-# telemetry. FreeShow's source is GPL-3 and was not read.
+# actions answer with the data. State comes from the same Socket.IO server
+# on 5505: once a second the core emits the "data" event asking for
+# FreeShow's variables, as FreeShow's own Companion module does, and FreeShow
+# answers with their values on a "data" event. FreeShow's source is GPL-3 and
+# was not read.
 
 source:
   - title: FreeShow API Documentation
@@ -49,9 +50,14 @@ source:
       Read for corroboration only (main.js, src/connect.js, src/actions.js, src/variables.js,
       companion/HELP.md). It connects over Socket.IO to port 5505 and sends the same action ids; its
       indexes start at 1, its transition types are none, blur, fade, crossfade, fly, scale and spin
-      with easing "sine" by default, and its volume is 0-1. It reads state by emitting
-      {isVariable: true, keys: [...]} every second and receiving variables on the "data" event, an
-      exchange the FreeShow API page does not document.
+      with easing "sine" by default, and its volume is 0-1. The module is maintained by FreeShow's
+      author (companion/manifest.json, maintainer Kristoffer Vassbø, version 1.2.0, retrieved
+      2026-10-04), so it is the vendor's own client: src/variables.js emits the "data" event with
+      the JSON text {"isVariable": true, "keys": [...]} every second, naming each variable (show,
+      layout, slide, video, audio, project, timer, output, stage and song-usage variables), and
+      src/connect.js takes FreeShow's answer on the "data" event as an object {isVariable: true,
+      values: {key: value}}, where values can also hold timer_<name> and variable_<name> keys. The
+      telemetry here is that exchange; the FreeShow API page does not document it.
 
 # REST on 5506 (the WebSocket/OSC port is 5505). With an API password set in
 # Connections, the token setting holds it and is sent as Authorization:
@@ -69,12 +75,13 @@ transport:
     content_type: application/json
 
 settings:
-  token: { type: string, secret: true,
+  token: { type: string, secret: true, default: "",
     label: API password,
     description: "The API password set in FreeShow's Settings > Connections, sent as a bearer token; leave empty when none is set." }
 
 ports:
   - { port: 5506, protocol: http, role: control }
+  - { port: 5505, protocol: ws, role: push, note: "FreeShow's Socket.IO server (Engine.IO 4), where its variables are read" }
 
 models:
   - id: freeshow
@@ -1643,6 +1650,110 @@ commands:
       content_type: application/json
     expect: { status: 200 }
     returns: text
+
+# FreeShow's variables, as its answer to the variable request names them.
+state:
+  show.name: { type: string, description: "Name of the show on output" }
+  show.next_name: { type: string, description: "Name of the next show in the project" }
+  layout.slides: { type: int, description: "Number of slides in the active layout" }
+  layout.notes: { type: string, description: "Notes of the active layout" }
+  slide.number: { type: int, description: "Number of the slide on output, as FreeShow counts it" }
+  slide.group: { type: string, description: "Group (verse, chorus...) of the slide on output" }
+  slide.next_group: { type: string, description: "Group of the next slide" }
+  slide.notes: { type: string, description: "Notes of the slide on output" }
+  slide.next_notes: { type: string, description: "Notes of the next slide" }
+  slide.previous_text: { type: string, description: "Text of the previous slide" }
+  slide.text: { type: string, description: "Text of the slide on output" }
+  slide.next_text: { type: string, description: "Text of the next slide" }
+  video.time: { type: string, description: "Playing video's position, as FreeShow formats it (00:00)" }
+  video.remaining: { type: string, description: "Playing video's time remaining, as FreeShow formats it" }
+  video.duration: { type: string, description: "Playing video's length, as FreeShow formats it" }
+  audio.title: { type: string, description: "Title of the playing audio" }
+  audio.time: { type: string, description: "Playing audio's position, as FreeShow formats it (00:00)" }
+  audio.remaining: { type: string, description: "Playing audio's time remaining, as FreeShow formats it" }
+  audio.duration: { type: string, description: "Playing audio's length, as FreeShow formats it" }
+  audio.volume: { type: string, description: "Audio volume, as FreeShow reports it" }
+  project.name: { type: string, description: "Name of the active project" }
+  timer.status: { type: string, description: "Timer state as FreeShow reports it: playing, paused or stopped" }
+  output.active_layers: { type: string, description: "Output layers showing something, as FreeShow lists them" }
+  output.active_styles: { type: string, description: "Output styles in use, as FreeShow lists them" }
+  output.windows_active: { type: bool, description: "Whether the output windows are shown" }
+  output.locked: { type: bool, description: "Whether the outputs are locked" }
+  stage.layout: { type: string, description: "Stage layout on the stage output" }
+  song_usage.logging: { type: bool, description: "Whether song usage is being logged" }
+
+telemetry:
+  # FreeShow's Socket.IO server on 5505 answers the variable request with
+  # every variable's value; the request goes once a second, as the
+  # Companion module sends it. With an API password, it goes in the
+  # Socket.IO handshake's auth as FreeShow's API page shows (auth: {token}).
+  websocket:
+    path: /socket.io/
+    port: 5505
+    socketio: { auth: '{"token":{settings.token:json}}' }
+    send: '["data","{\"isVariable\":true,\"keys\":[\"show_name\",\"show_name_next\",\"layout_slides\",\"layout_notes\",\"slide_number\",\"slide_group\",\"slide_group_next\",\"slide_notes\",\"slide_notes_next\",\"slide_text_previous\",\"slide_text_current\",\"slide_text_next\",\"video_time\",\"video_countdown\",\"video_duration\",\"audio_title\",\"audio_time\",\"audio_countdown\",\"audio_duration\",\"audio_volume\",\"active_project_name\",\"timer_status\",\"active_layers\",\"active_styles\",\"output_windows_active\",\"outputs_locked\",\"stage_output_layout\",\"log_song_usage\"]}"]'
+    every_ms: 1000
+  updates:
+    - json_match: { "$.event": "^data$", "$.data.isVariable": "^true$" }
+      json:
+        show_name: "$.data.values.show_name"
+        show_name_next: "$.data.values.show_name_next"
+        layout_slides: "$.data.values.layout_slides"
+        layout_notes: "$.data.values.layout_notes"
+        slide_number: "$.data.values.slide_number"
+        slide_group: "$.data.values.slide_group"
+        slide_group_next: "$.data.values.slide_group_next"
+        slide_notes: "$.data.values.slide_notes"
+        slide_notes_next: "$.data.values.slide_notes_next"
+        slide_text_previous: "$.data.values.slide_text_previous"
+        slide_text_current: "$.data.values.slide_text_current"
+        slide_text_next: "$.data.values.slide_text_next"
+        video_time: "$.data.values.video_time"
+        video_countdown: "$.data.values.video_countdown"
+        video_duration: "$.data.values.video_duration"
+        audio_title: "$.data.values.audio_title"
+        audio_time: "$.data.values.audio_time"
+        audio_countdown: "$.data.values.audio_countdown"
+        audio_duration: "$.data.values.audio_duration"
+        audio_volume: "$.data.values.audio_volume"
+        active_project_name: "$.data.values.active_project_name"
+        timer_status: "$.data.values.timer_status"
+        active_layers: "$.data.values.active_layers"
+        active_styles: "$.data.values.active_styles"
+        output_windows_active: "$.data.values.output_windows_active"
+        outputs_locked: "$.data.values.outputs_locked"
+        stage_output_layout: "$.data.values.stage_output_layout"
+        log_song_usage: "$.data.values.log_song_usage"
+      state:
+        show.name: "{show_name}"
+        show.next_name: "{show_name_next}"
+        layout.slides: "{layout_slides}"
+        layout.notes: "{layout_notes}"
+        slide.number: "{slide_number}"
+        slide.group: "{slide_group}"
+        slide.next_group: "{slide_group_next}"
+        slide.notes: "{slide_notes}"
+        slide.next_notes: "{slide_notes_next}"
+        slide.previous_text: "{slide_text_previous}"
+        slide.text: "{slide_text_current}"
+        slide.next_text: "{slide_text_next}"
+        video.time: "{video_time}"
+        video.remaining: "{video_countdown}"
+        video.duration: "{video_duration}"
+        audio.title: "{audio_title}"
+        audio.time: "{audio_time}"
+        audio.remaining: "{audio_countdown}"
+        audio.duration: "{audio_duration}"
+        audio.volume: "{audio_volume}"
+        project.name: "{active_project_name}"
+        timer.status: "{timer_status}"
+        output.active_layers: "{active_layers}"
+        output.active_styles: "{active_styles}"
+        output.windows_active: { value: "{output_windows_active}", map: { "true": true, "false": false } }
+        output.locked: { value: "{outputs_locked}", map: { "true": true, "false": false } }
+        stage.layout: "{stage_output_layout}"
+        song_usage.logging: { value: "{log_song_usage}", map: { "true": true, "false": false } }
+
 quirks:
   - models: [all]
     severity: critical
@@ -1691,9 +1802,13 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      FreeShow pushes state only to Socket.IO clients on the WebSocket port (Engine.IO framing with
-      its own ping and pong), which the spec format cannot carry, so this spec keeps no state. Use
-      the get_ queries to read the output, timers and playing media on demand.
+      State is read from FreeShow's Socket.IO server on port 5505, the WebSocket/OSC port, not the
+      REST port: the core asks for FreeShow's variables once a second and applies the answer, as
+      FreeShow's own Companion module does. This exchange is not on the FreeShow API page; it is
+      taken from that module. When the WebSocket port is changed from 5505 in FreeShow, the state is
+      not read; commands still work. Variable values arrive as FreeShow formats them (times as
+      00:00 text); a slide number or count that is not a number is not assigned. Per-timer (timer_<name>) and per-variable
+      (variable_<name>) values in the answer are not kept, since their names are the user's.
 
   - models: [all]
     severity: info

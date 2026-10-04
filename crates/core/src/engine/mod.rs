@@ -40,6 +40,8 @@ const PUSH: Key = "push";
 const PUSH_RECONNECT: Key = "push-reconnect";
 /// Engine.IO v3: the client's ping on the push websocket.
 const PUSH_PING: Key = "push-ping";
+/// `telemetry.websocket.every_ms`: the push websocket's messages again.
+const PUSH_RENEW: Key = "push-renew";
 /// The server-sent event stream (`telemetry.sse`).
 const EVENTS: Key = "events";
 const EVENTS_RECONNECT: Key = "events-reconnect";
@@ -116,6 +118,12 @@ struct Push {
     request: WsRequest,
     /// Messages sent each time it opens: the subscriptions.
     send: Vec<Value>,
+    /// `every_ms`: the `send` messages again at this interval while it is
+    /// open, for a device that drops a client gone quiet (mimoLive's
+    /// keepalive) or answers state only when asked (FreeShow's variables).
+    every: Option<Millis>,
+    /// Whether its opening request carries the transport's credential.
+    credentialed: bool,
     /// Socket.IO over Engine.IO, when the device speaks it.
     socketio: Option<SocketIo>,
 }
@@ -134,6 +142,10 @@ struct SocketIo {
     namespace: String,
     /// Engine.IO v3: the ping interval the server's open packet gave.
     ping_every: Option<Millis>,
+    /// `socketio.auth`: a JSON object (a template over settings) sent with
+    /// the namespace connect, Socket.IO's handshake `auth` (FreeShow's
+    /// `{"token": ...}`).
+    auth: Option<String>,
 }
 
 /// How an HTTP or websocket device authenticates (SPEC.md §2).
@@ -144,6 +156,9 @@ enum HttpAuth {
     Digest,
     /// The `token` setting as `Authorization: Bearer <token>`.
     Bearer,
+    /// The `token` setting as is, in the header the transport's
+    /// `auth_header` names (mimoLive's `X-MimoLive-Password-SHA256`).
+    Header,
 }
 
 impl Transport {
@@ -250,6 +265,8 @@ struct Job {
 
 pub(crate) struct SpecEngine {
     spec: Arc<DeviceSpec>,
+    /// `auth: header`: the header the `token` setting is sent in.
+    auth_header: String,
     host: IpAddr,
     settings: Params,
     transport: Transport,
@@ -347,8 +364,9 @@ fn auth_of(t: &Value, settings: &Params) -> Result<String, String> {
 }
 
 /// `Authorization` for Basic and Bearer, from the `username`, `password` and
-/// `token` settings; nothing for a bearer token left empty.
-fn auth_headers(auth: HttpAuth, settings: &Params) -> Vec<(String, String)> {
+/// `token` settings, or the `token` in the header `header` names; nothing
+/// for a token left empty.
+fn auth_headers(auth: HttpAuth, header: &str, settings: &Params) -> Vec<(String, String)> {
     let setting = |name: &str| {
         settings
             .get(name)
@@ -372,6 +390,14 @@ fn auth_headers(auth: HttpAuth, settings: &Params) -> Vec<(String, String)> {
                 Vec::new()
             } else {
                 vec![("Authorization".to_string(), format!("Bearer {token}"))]
+            }
+        }
+        HttpAuth::Header => {
+            let token = setting("token");
+            if token.is_empty() || header.is_empty() {
+                Vec::new()
+            } else {
+                vec![(header.to_string(), token)]
             }
         }
         HttpAuth::None | HttpAuth::Digest => Vec::new(),
@@ -399,13 +425,14 @@ fn ws_request(
     port: u16,
     settings: &Params,
     auth: HttpAuth,
+    auth_header: &str,
 ) -> Result<WsRequest, String> {
     let scheme = scheme_of(t, settings, "ws", "wss")?;
     let path = str_field(t, "path").unwrap_or("/");
     if !path.starts_with('/') {
         return Err("a websocket path starts with /".into());
     }
-    let mut headers = auth_headers(auth, settings);
+    let mut headers = auth_headers(auth, auth_header, settings);
     if let Some(p) = str_field(t, "subprotocol") {
         headers.push(("Sec-WebSocket-Protocol".to_string(), p.to_string()));
     }
@@ -440,6 +467,8 @@ impl SpecEngine {
             .and_then(Value::as_u64)
             .unwrap_or(DEFAULT_TIMEOUT);
 
+        // `auth: header`: the header the `token` setting goes in.
+        let auth_header = str_field(&t, "auth_header").unwrap_or("").to_string();
         let transport = match kind {
             "line-tcp" => {
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
@@ -543,7 +572,7 @@ impl SpecEngine {
                 };
                 Transport::Ws {
                     port,
-                    request: ws_request(&t, &url_host(&ctx), port, &ctx.settings, auth)?,
+                    request: ws_request(&t, &url_host(&ctx), port, &ctx.settings, auth, "")?,
                     auth,
                     replies: str_field(&t, "reply") != Some("none"),
                     reply_match,
@@ -556,8 +585,12 @@ impl SpecEngine {
                     "basic" => HttpAuth::Basic,
                     "digest" => HttpAuth::Digest,
                     "bearer" => HttpAuth::Bearer,
+                    "header" => HttpAuth::Header,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
+                if auth == HttpAuth::Header && auth_header.is_empty() {
+                    return Err("http auth header needs auth_header".into());
+                }
                 let host = url_host(&ctx);
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
@@ -606,6 +639,7 @@ impl SpecEngine {
                         version: 4,
                         namespace: String::new(),
                         ping_every: None,
+                        auth: None,
                     }),
                     Some(Value::Object(o)) => Some(SocketIo {
                         version: match o.get("engine_io").and_then(Value::as_u64) {
@@ -621,12 +655,20 @@ impl SpecEngine {
                             }
                         },
                         ping_every: None,
+                        auth: o.get("auth").and_then(Value::as_str).map(str::to_string),
                     }),
                     Some(_) => {
                         return Err("telemetry.websocket.socketio is true or an object".into())
                     }
                 };
-                let mut request = ws_request(w, &url_host(&ctx), push_port, &ctx.settings, auth)?;
+                let mut request = ws_request(
+                    w,
+                    &url_host(&ctx),
+                    push_port,
+                    &ctx.settings,
+                    auth,
+                    &auth_header,
+                )?;
                 if let Some(sio) = &socketio {
                     // Engine.IO's query.
                     let sep = if request.url.contains('?') { '&' } else { '?' };
@@ -646,6 +688,10 @@ impl SpecEngine {
                 {
                     request.accept_invalid_certs = true;
                 }
+                let credentialed = request
+                    .headers
+                    .iter()
+                    .any(|(name, _)| name != "Sec-WebSocket-Protocol");
                 Some(Push {
                     request,
                     send: match w.get("send") {
@@ -653,6 +699,18 @@ impl SpecEngine {
                         Some(one) => vec![one.clone()],
                         None => Vec::new(),
                     },
+                    every: match w.get("every_ms") {
+                        None => None,
+                        Some(v) => match v.as_u64() {
+                            Some(ms @ 1..) => Some(ms),
+                            _ => {
+                                return Err(
+                                    "telemetry.websocket.every_ms is not a positive integer".into(),
+                                )
+                            }
+                        },
+                    },
+                    credentialed,
                     socketio,
                 })
             }
@@ -670,7 +728,7 @@ impl SpecEngine {
                     return Err("telemetry.sse needs an http transport".into());
                 };
                 let path = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
-                let mut headers = auth_headers(*auth, &ctx.settings);
+                let mut headers = auth_headers(*auth, &auth_header, &ctx.settings);
                 headers.push(("Accept".into(), "text/event-stream".into()));
                 let setting = |name: &str| {
                     ctx.settings
@@ -698,6 +756,7 @@ impl SpecEngine {
         };
         Ok(SpecEngine {
             spec,
+            auth_header,
             host: ctx.host,
             monitor: ctx.monitor,
             settings: ctx.settings,
@@ -819,7 +878,7 @@ impl SpecEngine {
                     url.push('?');
                     url.push_str(&pairs.join("&"));
                 }
-                let mut headers = auth_headers(*auth, &self.settings);
+                let mut headers = auth_headers(*auth, &self.auth_header, &self.settings);
                 let setting = |name: &str| {
                     self.settings
                         .get(name)
@@ -1609,6 +1668,17 @@ impl SpecEngine {
                 self.last_heard = cx.now();
                 cx.alive();
             }
+            // Text pushed in binary frames (OpenLP's state): offered to the
+            // rules as text when it is UTF-8.
+            WsInput::Binary(bytes) if std::str::from_utf8(&bytes).is_ok() => {
+                let text = String::from_utf8(bytes).unwrap_or_default();
+                match self.push.as_ref().and_then(|p| p.socketio.clone()) {
+                    Some(sio) => self.socketio_input(cx, &sio, &text),
+                    None => self.apply_message(cx, &text),
+                }
+                self.last_heard = cx.now();
+                cx.alive();
+            }
             WsInput::Text(text) => {
                 match self.push.as_ref().and_then(|p| p.socketio.clone()) {
                     Some(sio) => self.socketio_input(cx, &sio, &text),
@@ -1623,6 +1693,7 @@ impl SpecEngine {
             }
             WsInput::Closed { reason, .. } => {
                 cx.cancel_timer(PUSH_PING);
+                cx.cancel_timer(PUSH_RENEW);
                 let credentialed = !auth_headers_empty(&self.push);
                 if credentialed && handshake_refused(&reason) {
                     self.refuse(
@@ -1649,6 +1720,9 @@ impl SpecEngine {
             .as_ref()
             .map(|p| p.send.clone())
             .unwrap_or_default();
+        if let Some(every) = self.push.as_ref().and_then(|p| p.every) {
+            cx.set_timer(PUSH_RENEW, every);
+        }
         let empty = Params::new();
         let empty_specs = BTreeMap::new();
         let values = self.values(&empty, &empty_specs);
@@ -1677,7 +1751,22 @@ impl SpecEngine {
                     }
                     cx.set_timer(PUSH_PING, every);
                 }
-                cx.ws_send(PUSH, format!("40{}", sio.namespace));
+                let auth = match &sio.auth {
+                    None => String::new(),
+                    Some(template) => {
+                        let empty = Params::new();
+                        let empty_specs = BTreeMap::new();
+                        let values = self.values(&empty, &empty_specs);
+                        match render(template, &values, no_escape) {
+                            Ok(text) => text,
+                            Err(e) => {
+                                cx.log(Level::Warning, format!("socket.io auth not sent: {e}"));
+                                String::new()
+                            }
+                        }
+                    }
+                };
+                cx.ws_send(PUSH, format!("40{}{auth}", sio.namespace));
             }
             // The server's ping (v4), answered with a pong.
             "2" => cx.ws_send(PUSH, format!("3{payload}")),
@@ -1743,12 +1832,7 @@ impl SpecEngine {
 
 /// Whether the push channel's opening request carries a credential.
 fn auth_headers_empty(push: &Option<Push>) -> bool {
-    push.as_ref().is_none_or(|p| {
-        !p.request
-            .headers
-            .iter()
-            .any(|(name, _)| name == "Authorization")
-    })
+    push.as_ref().is_none_or(|p| !p.credentialed)
 }
 
 /// Encode one OSC `send` item: `{address, args: [{value, type}]}`.
@@ -2014,6 +2098,14 @@ impl Module for SpecEngine {
             }
             RECONNECT => self.connect(cx),
             PUSH_RECONNECT => self.open_push(cx),
+            // `every_ms`: the push websocket's messages again.
+            PUSH_RENEW => {
+                let prefix = match self.push.as_ref().and_then(|p| p.socketio.as_ref()) {
+                    Some(sio) => format!("42{}", sio.namespace),
+                    None => String::new(),
+                };
+                self.send_push_items(cx, &prefix);
+            }
             PUSH_PING => {
                 // Engine.IO v3: the client pings while the websocket is open.
                 let every = self
@@ -3373,6 +3465,215 @@ mod tests {
         assert!(cx
             .take()
             .contains(&Action::State(json!({"slide": {"index": 4}}))));
+    }
+
+    fn push_sent(cx: Cx) -> Vec<String> {
+        cx.take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::WsSend { socket: PUSH, text } => Some(text),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_push_websocket_resends_its_messages_every_interval_while_open() {
+        let telemetry = json!({
+            "websocket": {"path": "/api/v1/socket", "send": r#"{"event":"ping"}"#, "every_ms": 5000},
+        });
+        let mut e = http_with(telemetry, json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        let actions = cx.take();
+        assert!(actions.contains(&Action::WsSend {
+            socket: PUSH,
+            text: r#"{"event":"ping"}"#.into()
+        }));
+        assert!(actions.contains(&Action::SetTimer {
+            key: PUSH_RENEW,
+            after: 5000
+        }));
+        let mut cx = Cx::new(5001);
+        e.timer(&mut cx, PUSH_RENEW);
+        assert_eq!(push_sent(cx), [r#"{"event":"ping"}"#]);
+        // Closed: no more until it opens again.
+        let mut cx = Cx::new(6000);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Closed {
+                code: None,
+                reason: "gone".into(),
+            },
+        );
+        assert!(cx.take().contains(&Action::CancelTimer { key: PUSH_RENEW }));
+    }
+
+    #[test]
+    fn a_socketio_push_channel_sends_its_auth_and_renews_its_events() {
+        let telemetry = json!({
+            "websocket": {"path": "/socket.io/",
+                          "socketio": {"auth": r#"{"token":{settings.token:json}}"#},
+                          "send": r#"["data","{\"isVariable\":true}"]"#, "every_ms": 1000},
+        });
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        spec.telemetry = Some(telemetry);
+        spec.state = Default::default();
+        spec.settings.insert(
+            "token".into(),
+            serde_json::from_value(json!({"type": "string", "label": "x", "description": "x"}))
+                .unwrap(),
+        );
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: json!({"token": "k3y"}).as_object().unwrap().clone(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Text(r#"0{"sid":"a"}"#.into()));
+        assert_eq!(push_sent(cx), [r#"40{"token":"k3y"}"#]);
+        let mut cx = Cx::new(2);
+        e.ws(&mut cx, PUSH, WsInput::Text("40".into()));
+        assert_eq!(push_sent(cx), [r#"42["data","{\"isVariable\":true}"]"#]);
+        let mut cx = Cx::new(1002);
+        e.timer(&mut cx, PUSH_RENEW);
+        assert_eq!(push_sent(cx), [r#"42["data","{\"isVariable\":true}"]"#]);
+    }
+
+    #[test]
+    fn text_in_binary_push_frames_goes_to_the_rules() {
+        let telemetry = json!({
+            "websocket": {"path": "/"},
+            "updates": [{
+                "json_match": {"$.results.blank": "^(true|false)$"},
+                "json": {"blank": "$.results.blank"},
+                "state": {"display.blank": "{blank}"},
+            }],
+        });
+        let state = json!({"display.blank": {"type": "bool", "description": "x"}});
+        let mut e = http_with(telemetry, state, true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Binary(br#"{"results":{"blank":true}}"#.to_vec()),
+        );
+        assert!(cx
+            .take()
+            .contains(&Action::State(json!({"display": {"blank": true}}))));
+    }
+
+    #[test]
+    fn a_token_in_a_named_header() {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        let t = spec.transport.as_mut().unwrap();
+        t["auth"] = json!("header");
+        t["auth_header"] = json!("X-MimoLive-Password-SHA256");
+        spec.telemetry = Some(json!({"websocket": {"path": "/api/v1/socket"}}));
+        let open = |token: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "propresenter-7".into(),
+                    channels: None,
+                    settings: json!({"token": token}).as_object().unwrap().clone(),
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let actions = cx.take();
+            let http = actions
+                .iter()
+                .find_map(|a| match a {
+                    Action::Http { request, .. } => Some(request.headers.clone()),
+                    _ => None,
+                })
+                .expect("the probe");
+            let ws = actions
+                .iter()
+                .find_map(|a| match a {
+                    Action::WsOpen { request, .. } => Some(request.headers.clone()),
+                    _ => None,
+                })
+                .expect("the push websocket");
+            (http, ws)
+        };
+        let header = ("X-MimoLive-Password-SHA256".to_string(), "ab12".to_string());
+        let (http, ws) = open("ab12");
+        assert!(http.contains(&header));
+        assert!(ws.contains(&header));
+        let (http, ws) = open("");
+        assert!(http.iter().all(|(name, _)| name != &header.0));
+        assert!(ws.is_empty());
+
+        // A refusal of the token is terminal, as for any credential.
+        let mut e = SpecEngine::new(
+            Arc::new(spec.clone()),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: json!({"token": "bad"}).as_object().unwrap().clone(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let id = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::Http { id, .. } => Some(id),
+                _ => None,
+            })
+            .unwrap();
+        let mut cx = Cx::new(1);
+        e.http_response(
+            &mut cx,
+            id,
+            Ok(HttpResponse {
+                status: 401,
+                body: Vec::new(),
+            }),
+        );
+        assert!(cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
     }
 
     #[test]

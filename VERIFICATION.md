@@ -322,6 +322,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
 - [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
 
+## boinx-mimolive — Boinx mimoLive
+
+- [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:1240](specs/boinx-mimolive.yaml#L1240))
+- [ ] Check the body shape PUT /documents/(DocumentID) takes for programOutputMasterVolume (a plain object assumed, as for layers). ([specs/boinx-mimolive.yaml:168](specs/boinx-mimolive.yaml#L168))
+- [ ] Check which body POST /documents/(DocumentID)/layers takes: the manual's layer-identifier, name and index, or the reference's data.attributes.composition-id. ([specs/boinx-mimolive.yaml:1251](specs/boinx-mimolive.yaml#L1251))
+- [ ] Confirm that GET /documents?include=layers (and sources, output-destinations, layer-sets) sideloads every document's objects in included, as the poll reads them. ([specs/boinx-mimolive.yaml:1052](specs/boinx-mimolive.yaml#L1052))
+- [ ] Record the websocket's added, changed and removed messages: that data is the whole object as the HTTP API returns it, and that a removed message carries type and id at the top level. ([specs/boinx-mimolive.yaml:1187](specs/boinx-mimolive.yaml#L1187))
+- [ ] Confirm that the websocket closes a client that sends nothing for 15 seconds and that {"event":"ping"} every 5 seconds keeps it open. ([specs/boinx-mimolive.yaml:1044](specs/boinx-mimolive.yaml#L1044))
+- [ ] With a remote control password set, confirm that the X-MimoLive-Password-SHA256 header is accepted on the websocket's opening request, and that a wrong key answers 401 on HTTP. ([specs/boinx-mimolive.yaml:88](specs/boinx-mimolive.yaml#L88))
+- [ ] Check that output destination PATCH bodies are accepted with type and id, and layer set PATCH bodies without them. ([specs/boinx-mimolive.yaml:680](specs/boinx-mimolive.yaml#L680))
+- [ ] Check that layer set PATCH and POST bodies take the JSON:API data.attributes form shown in the manual. ([specs/boinx-mimolive.yaml:777](specs/boinx-mimolive.yaml#L777))
+- [ ] Check that a number input accepts four decimals and that set_layer_flag's JSON true and false are taken for a bool input. ([specs/boinx-mimolive.yaml:307](specs/boinx-mimolive.yaml#L307))
+- [ ] Confirm the built-in outputs record, stream, playout and fullscreen in the document's outputs attribute, and their live-state values. ([specs/boinx-mimolive.yaml:177](specs/boinx-mimolive.yaml#L177))
+- [ ] Check that comments/new takes its parameters in the query of a POST. ([specs/boinx-mimolive.yaml:883](specs/boinx-mimolive.yaml#L883))
+- [ ] Check what a layer's live-variant relationship holds while the layer is off (null assumed, which leaves live_variant as it was). ([specs/boinx-mimolive.yaml:1009](specs/boinx-mimolive.yaml#L1009))
+
 ## brompton-tessera — Brompton Tessera
 
 - [ ] Confirm that GET /api/ answers the whole tree under an "api" key, with groups, input ports, cable loops and frame remapping frames keyed "1", "2", ... (ports and frames numbered from 1), as the poll reads it. ([specs/brompton-tessera.yaml:3315](specs/brompton-tessera.yaml#L3315))
@@ -391,6 +407,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what learn_command_key answers (command key ID and script ID) on X20 and X80. ([specs/christie-spyder.yaml:146](specs/christie-spyder.yaml#L146))
 - [ ] Check whether an X20 accepts ILA with the fifth (gamma) argument, which only the X80 reference lists. ([specs/christie-spyder.yaml:384](specs/christie-spyder.yaml#L384))
 - [ ] Check how often UDP commands or answers are lost on a busy network, and whether a repeated command is harmless. ([specs/christie-spyder.yaml:890](specs/christie-spyder.yaml#L890))
+
+## cockos-reaper — Cockos REAPER (OSC)
+
+- [ ] Confirm REAPER's default Local listen port (8000) and Device port (9000) when a new OSC control surface is added. ([specs/cockos-reaper.yaml:59](specs/cockos-reaper.yaml#L59))
+- [ ] Confirm that /device/track/count, /device/marker/count and /device/region/count sent on connecting take effect, and whether REAPER then sends the new bank's state at once. ([specs/cockos-reaper.yaml:79](specs/cockos-reaper.yaml#L79))
+- [ ] Record the OSC types REAPER sends feedback in for b and t patterns (float 1.0 and 0.0 or integers); the state accepts both. ([specs/cockos-reaper.yaml:597](specs/cockos-reaper.yaml#L597))
+- [ ] Confirm that REAPER takes binary values as OSC integers, as reaper-osc.js sends them, and floats where the pattern is n or f. ([specs/cockos-reaper.yaml:153](specs/cockos-reaper.yaml#L153))
+- [ ] Confirm the inverted FX bypass (0 bypasses, 1 makes active) in both directions. ([specs/cockos-reaper.yaml:382](specs/cockos-reaper.yaml#L382))
+- [ ] Record the track monitor values REAPER takes and sends (0 off, 1 on, 2 tape-auto, from reaper-osc.js) and the OSC type of the feedback, which the state reads as an integer. ([specs/cockos-reaper.yaml:652](specs/cockos-reaper.yaml#L652))
+- [ ] Check whether /time, /tempo/raw and /playrate/raw sent to REAPER move the cursor and set the tempo and rate, and the tempo range REAPER accepts. ([specs/cockos-reaper.yaml:181](specs/cockos-reaper.yaml#L181))
+- [ ] Check the lowest and highest dB /track/@/volume/db accepts (REAPER's fader-range preference assumed for the top). ([specs/cockos-reaper.yaml:226](specs/cockos-reaper.yaml#L226))
+- [ ] Confirm that /action/str runs a named command ID (_SWS_..., a script's ID). ([specs/cockos-reaper.yaml:452](specs/cockos-reaper.yaml#L452))
 
 ## dataton-watchout6 — Dataton WATCHOUT 6
 
@@ -500,14 +528,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## freeshow — FreeShow
 
-- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1482](specs/freeshow.yaml#L1482))
-- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1490](specs/freeshow.yaml#L1490))
-- [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:59](specs/freeshow.yaml#L59))
-- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1474](specs/freeshow.yaml#L1474))
-- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:314](specs/freeshow.yaml#L314))
-- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:761](specs/freeshow.yaml#L761))
-- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:208](specs/freeshow.yaml#L208))
-- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1198](specs/freeshow.yaml#L1198))
+- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1489](specs/freeshow.yaml#L1489))
+- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1497](specs/freeshow.yaml#L1497))
+- [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:65](specs/freeshow.yaml#L65))
+- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1481](specs/freeshow.yaml#L1481))
+- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:321](specs/freeshow.yaml#L321))
+- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:768](specs/freeshow.yaml#L768))
+- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:215](specs/freeshow.yaml#L215))
+- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1205](specs/freeshow.yaml#L1205))
+- [ ] Confirm that FreeShow's Socket.IO server on 5505 (Engine.IO 4 assumed) answers the variable request {"isVariable": true, "keys": [...]} on the "data" event with {isVariable: true, values: {...}}, as the Companion module receives it. ([specs/freeshow.yaml:1697](specs/freeshow.yaml#L1697))
+- [ ] Record the type each variable arrives as: whether slide_number and layout_slides are numbers, and whether output_windows_active, outputs_locked and log_song_usage are true/false or text. ([specs/freeshow.yaml:1752](specs/freeshow.yaml#L1752))
+- [ ] Check what slide_number counts from (1 assumed for the slide shown) and what it holds with nothing on output. ([specs/freeshow.yaml:1660](specs/freeshow.yaml#L1660))
+- [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1693](specs/freeshow.yaml#L1693))
+- [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1695](specs/freeshow.yaml#L1695))
 
 ## grandma2 — MA Lighting grandMA2
 
@@ -667,6 +700,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether playback page actions need a release (0) after the key down. ([specs/obsidian-onyx-osc.yaml:1050](specs/obsidian-onyx-osc.yaml#L1050))
 - [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
 - [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
+
+## openlp — OpenLP
+
+- [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:88](specs/openlp.yaml#L88))
+- [ ] Confirm that the login token goes in the Authorization header with nothing before it, whether it stays valid across OpenLP restarts, and that a missing or wrong token answers 401. ([specs/openlp.yaml:49](specs/openlp.yaml#L49))
+- [ ] Confirm that the websocket on 4317 sends its state in binary frames, sends the current state when a client connects, and needs no message from the client. ([specs/openlp.yaml:373](specs/openlp.yaml#L373))
+- [ ] Confirm that the websocket's slide field is the selected slide's index from 0 (its documentation repeats the service field's words). ([specs/openlp.yaml:343](specs/openlp.yaml#L343))
+- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:383](specs/openlp.yaml#L383))
+- [ ] Check how /service/show tells a position from an id, and whether positions count from 0 or 1. ([specs/openlp.yaml:313](specs/openlp.yaml#L313))
+- [ ] Check which method /controller/clear/<controller> takes (POST assumed). ([specs/openlp.yaml:160](specs/openlp.yaml#L160))
+- [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:253](specs/openlp.yaml#L253))
+- [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:151](specs/openlp.yaml#L151))
 
 ## panasonic-ptz — Panasonic PTZ
 
@@ -907,6 +952,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On AD4Q with frequency diversity combined (FD-C), check the second RF section in SAMPLE and that the first is the right one to report. ([specs/shure-wireless.yaml:199](specs/shure-wireless.yaml#L199))
 - [ ] Confirm the PSM1000 answers REPORT with string values without braces. ([specs/shure-wireless.yaml:223](specs/shure-wireless.yaml#L223))
 - [ ] Opened for commands only, confirm a receiver that is not metering answers `GET DEVICE_ID` (`GET DEVICE_NAME` on the PSM1000) promptly enough for the 5 s liveness check. ([crates/core/src/modules/shure.rs:48](crates/core/src/modules/shure.rs#L48))
+
+## softouch-easyworship — Softouch EasyWorship
+
+- [ ] Confirm the whole exchange against EasyWorship 7.3 or later: the pairing request and its paired and notPaired answers, a heartbeat after each message, and status messages. ([specs/softouch-easyworship.yaml:130](specs/softouch-easyworship.yaml#L130))
+- [ ] Check whether EasyWorship sends paired on the same connection once the pairing request is approved, or only on the next request (sent again every 15 seconds). ([crates/core/src/modules/easyworship.rs:39](crates/core/src/modules/easyworship.rs#L39))
+- [ ] Check whether the pairing request is accepted with any uid text (meros-<name> by default), and whether repeating it while EasyWorship is asking shows a second request. ([specs/softouch-easyworship.yaml:39](specs/softouch-easyworship.yaml#L39))
+- [ ] Record whether the advertised port stays the same across EasyWorship restarts. ([specs/softouch-easyworship.yaml:44](specs/softouch-easyworship.yaml#L44))
+- [ ] Check what a status sent with only the logo, black and clear flags (before EasyWorship's first status) does. ([specs/softouch-easyworship.yaml:101](specs/softouch-easyworship.yaml#L101))
+- [ ] Check whether gotoSlide and gotoSchedule count from 1, and what pres_no, slide_no and rectype hold. ([specs/softouch-easyworship.yaml:134](specs/softouch-easyworship.yaml#L134))
+- [ ] Check whether UTF-8 is accepted where the Companion module sends Latin-1 (only the controller name can hold non-ASCII text, and it is limited to ASCII here). ([specs/softouch-easyworship.yaml:62](specs/softouch-easyworship.yaml#L62))
 
 ## sony-camera — Sony cameras
 
