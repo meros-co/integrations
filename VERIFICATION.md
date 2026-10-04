@@ -44,6 +44,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a role path lookup when opened for commands only (GetMembers and GetRole level by level) works, and that GetClassIdentification (1.1) answers for an object addressed by number. ([specs/aes70.yaml:335](specs/aes70.yaml#L335))
 - [ ] Check what a setter answers for a value out of range (ParameterOutOfRange, or a clamped value notified) and for a locked object, and record the status codes seen. ([specs/aes70.yaml:343](specs/aes70.yaml#L343))
 - [ ] Confirm the bounded getters (OcaGain GetGain, OcaSwitch GetPosition, OcaDelay GetDelayTime, the numeric basic actuators, OcaLevelSensor GetReading) return the value, minimum and maximum in that order. ([specs/aes70.yaml:238](specs/aes70.yaml#L238))
+- [ ] Confirm the basic sensors (OcaBooleanSensor to OcaStringSensor) answer GetReading (5.1) with the reading, and the numeric ones also the minimum and maximum, as the basic actuators' GetSetting does; Focusrite's RedNet8 chart has OcaInt8Sensor status objects. ([specs/aes70.yaml:310](specs/aes70.yaml#L310))
 - [ ] Check level sensor readings: the unit (dBFS or dBu) and range, and whether polling every sensor once a second is acceptable on a device with many meters. ([specs/aes70.yaml:352](specs/aes70.yaml#L352))
 - [ ] Confirm the device manager getters: ModelGUID (3.2) as 8 bytes, ModelDescription (3.6) as three strings, State (3.13) as a 16-bit set, and which optional ones (DeviceRevisionID 3.20) the device implements. ([specs/aes70.yaml:262](specs/aes70.yaml#L262))
 - [ ] Check a role or label with non-ASCII characters: OCP.1 string lengths are taken to count Unicode characters, not bytes. ([crates/core/src/modules/aes70_codec.rs:244](crates/core/src/modules/aes70_codec.rs#L244))
@@ -497,6 +498,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On IN1606/IN1608, check whether the unsolicited signal message (IN00 ...) is sent, as on IN1808. ([specs/extron-switcher.yaml:1063](specs/extron-switcher.yaml#L1063))
 - [ ] Confirm the HDCP status codes on each family (1 and 2 are documented the opposite way). ([specs/extron-switcher.yaml:1070](specs/extron-switcher.yaml#L1070))
 - [ ] Record what a wrong password produces (the prompt again assumed). ([specs/extron-switcher.yaml:1018](specs/extron-switcher.yaml#L1018))
+
+## focusrite-rednet — Focusrite RedNet (AES70)
+
+- [ ] Note the OCP.1 port a RedNet unit advertises as _oca._tcp once AES70 is enabled in RedNet Control, and check it accepts OCP.1 on plain TCP. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
+- [ ] On an MP8R, check which object numbers and roles the firmware uses: the implementation chart's (0x01nn00pp, GComp-n, IpLvl-n) or the virtual device's (4352 + 256 per channel, TrimEnable-n, Lvl-n). ([specs/focusrite-rednet.yaml:421](specs/focusrite-rednet.yaml#L421))
+- [ ] Check the switch positions: Phase-n 1 inverts, Impedance-n 0 is 10 kOhm, Pad-n 1 is -20 dB, and the unit-wide Identify, FP Lock and Preferred Master switches take 1 for on. ([specs/focusrite-rednet.yaml:430](specs/focusrite-rednet.yaml#L430))
+- [ ] Read the PSU, network and clock leader sensors on a unit and note what each value means. ([specs/focusrite-rednet.yaml:443](specs/focusrite-rednet.yaml#L443))
+- [ ] On a RedNet 4, RedNet 1 or 2, check the roles match the virtual device's lists (Source-n positions mic, line, DI; Link1-2 to Link7-8; Fan). ([specs/focusrite-rednet.yaml:430](specs/focusrite-rednet.yaml#L430))
+- [ ] Walk an A16R MkII, D16R MkII or X2P with AES70 enabled and record its object tree, so their controls can be named. ([specs/focusrite-rednet.yaml:414](specs/focusrite-rednet.yaml#L414))
+
+## focusrite-rednet-rcp — Focusrite RedNet MP8R (Yamaha RCP)
+
+- [ ] Confirm the MP8R answers RCP on TCP 49280 directly, and whether it needs a Yamaha ID set in RedNet Control for it. ([specs/focusrite-rednet-rcp.yaml:386](specs/focusrite-rednet-rcp.yaml#L386))
+- [ ] Check the get and set replies follow Yamaha's grammar (OK get ... value, OK set, OKm when clamped, ERROR) and that changes made in RedNet Control are pushed as NOTIFY set. ([specs/focusrite-rednet-rcp.yaml:379](specs/focusrite-rednet-rcp.yaml#L379))
+- [ ] Check how HAGain 0-66 maps onto the MP8R's 10-65 dB preamp range, and what CompGain and ExecMode mean. ([specs/focusrite-rednet-rcp.yaml:393](specs/focusrite-rednet-rcp.yaml#L393))
+- [ ] Try the same addresses on a RedNet 4. ([specs/focusrite-rednet-rcp.yaml:407](specs/focusrite-rednet-rcp.yaml#L407))
 
 ## freeshow — FreeShow
 

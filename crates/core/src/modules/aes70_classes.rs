@@ -268,6 +268,20 @@ pub(crate) const PROPS: &[Prop] = &[
     // Sensors
     p(&[1, 1, 2], (3, 1), "reading_state", Some((3, 1)), None, Ty::SensorState, false, false),
     p(LEVEL_SENSOR, (4, 1), "reading_db", Some((4, 1)), None, Ty::F32, true, true),
+    // Basic sensors: Reading (5.1), read with GetReading (5.1), as the basic
+    // actuators' Setting; numeric ones bounded.
+    p(&[1, 1, 2, 1, 1], (5, 1), "reading", Some((5, 1)), None, Ty::Bool, false, true),
+    p(&[1, 1, 2, 1, 2], (5, 1), "reading", Some((5, 1)), None, Ty::I8, true, true),
+    p(&[1, 1, 2, 1, 3], (5, 1), "reading", Some((5, 1)), None, Ty::I16, true, true),
+    p(&[1, 1, 2, 1, 4], (5, 1), "reading", Some((5, 1)), None, Ty::I32, true, true),
+    p(&[1, 1, 2, 1, 5], (5, 1), "reading", Some((5, 1)), None, Ty::I64, true, true),
+    p(&[1, 1, 2, 1, 6], (5, 1), "reading", Some((5, 1)), None, Ty::U8, true, true),
+    p(&[1, 1, 2, 1, 7], (5, 1), "reading", Some((5, 1)), None, Ty::U16, true, true),
+    p(&[1, 1, 2, 1, 8], (5, 1), "reading", Some((5, 1)), None, Ty::U32, true, true),
+    p(&[1, 1, 2, 1, 9], (5, 1), "reading", Some((5, 1)), None, Ty::U64, true, true),
+    p(&[1, 1, 2, 1, 10], (5, 1), "reading", Some((5, 1)), None, Ty::F32, true, true),
+    p(&[1, 1, 2, 1, 11], (5, 1), "reading", Some((5, 1)), None, Ty::F64, true, true),
+    p(&[1, 1, 2, 1, 12], (5, 1), "reading", Some((5, 1)), None, Ty::Str, false, true),
     // OcaDeviceManager (object number 1)
     p(DEVICE_MANAGER, (3, 1), "model_guid", Some((3, 2)), None, Ty::ModelGuid, false, true),
     p(DEVICE_MANAGER, (3, 2), "serial_number", Some((3, 3)), None, Ty::Str, false, true),

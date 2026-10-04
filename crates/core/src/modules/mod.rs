@@ -6,7 +6,7 @@
 //! A module shared by several integrations (one protocol, several product
 //! lines) is compiled when any of them is.
 
-#[cfg(feature = "aes70")]
+#[cfg(any(feature = "aes70", feature = "focusrite-rednet"))]
 mod aes70;
 #[cfg(any(feature = "aja-kipro", feature = "aja-kumo"))]
 mod aja_config_events;
@@ -46,6 +46,8 @@ mod atem;
 mod bss_london;
 #[cfg(feature = "emberplus")]
 mod emberplus;
+#[cfg(feature = "focusrite-rednet")]
+mod focusrite_rednet;
 #[cfg(feature = "generic-http")]
 mod generic_http;
 #[cfg(feature = "generic-osc")]
@@ -199,6 +201,15 @@ pub(crate) fn construct(
         "aes70" => match context.port {
             Some(port) => Ok(Box::new(aes70::Aes70::new(context, port))),
             None => Err("AES70 (OCP.1) has no standard port: give the device's OCP.1 port".into()),
+        },
+        // RedNet's OCP.1 port is advertised, not fixed, so the host must give it.
+        #[cfg(feature = "focusrite-rednet")]
+        "focusrite-rednet" => match context.port {
+            Some(port) => Ok(Box::new(focusrite_rednet::RedNet::new(context, port))),
+            None => Err(
+                "RedNet has no fixed OCP.1 port: give the port its _oca._tcp record advertises"
+                    .into(),
+            ),
         },
         #[cfg(feature = "emberplus")]
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),

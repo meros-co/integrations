@@ -39,6 +39,7 @@ NATIVE = {
     "blackmagic-atem": "Proprietary UDP 9910",
     "bss-london": "London Direct Inject over TCP 1023",
     "emberplus": "Ember+ (S101) over TCP",
+    "focusrite-rednet": "OCP.1 over TCP (the device's port)",
     "generic-http": "HTTP or HTTPS",
     "generic-osc": "OSC over UDP or TCP",
     "generic-tcp-udp": "Text or bytes over TCP or UDP",

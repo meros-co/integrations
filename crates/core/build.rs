@@ -78,6 +78,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-extron", &["extron-matrix", "extron-switcher"]),
     ("vendor-figure53", &["qlab"]),
     (
+        "vendor-focusrite",
+        &["focusrite-rednet", "focusrite-rednet-rcp"],
+    ),
+    (
         "vendor-generic",
         &[
             "generic-http",
