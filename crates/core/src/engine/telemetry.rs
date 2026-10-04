@@ -143,6 +143,44 @@ fn json_paths(rule: &Value) -> Result<BTreeMap<String, String>, String> {
 struct Rule {
     matcher: Matcher,
     assign: Vec<Assign>,
+    /// `then_send`: requests queued when the rule matches, templates over
+    /// its captures and the settings (a re-read the push only announces).
+    then_send: Vec<Value>,
+}
+
+/// A `then_send` item a matching rule queued, with the captures it is
+/// rendered from.
+#[derive(Debug, Clone)]
+pub(crate) struct Triggered {
+    pub(crate) item: Value,
+    pub(crate) params: Params,
+    pub(crate) specs: BTreeMap<String, ParamSpec>,
+}
+
+/// Captures as template parameters: a number or a numeric string is an
+/// integer, a JSON number a float, a JSON boolean a bool, anything else a
+/// string.
+pub(crate) fn capture_params(values: &[(String, Value)]) -> (Params, BTreeMap<String, ParamSpec>) {
+    let mut params = Params::new();
+    let mut specs = BTreeMap::new();
+    for (name, v) in values {
+        let kind = match v {
+            Value::Number(n) if n.is_i64() => ParamType::Int,
+            Value::Number(_) => ParamType::Float,
+            Value::Bool(_) => ParamType::Bool,
+            Value::String(s) if s.parse::<i64>().is_ok() => ParamType::Int,
+            _ => ParamType::String,
+        };
+        let value = match (kind, v) {
+            (ParamType::Int, Value::String(s)) => Value::from(s.parse::<i64>().unwrap()),
+            // An object or array: its JSON text, as a string.
+            (ParamType::String, Value::Object(_) | Value::Array(_)) => Value::String(v.to_string()),
+            _ => v.clone(),
+        };
+        params.insert(name.clone(), value);
+        specs.insert(name.clone(), spec_of(kind));
+    }
+    (params, specs)
 }
 
 /// An inbound message, as the rules see it.
@@ -412,6 +450,7 @@ impl Telemetry {
             t.rules.push(Rule {
                 matcher,
                 assign: assigns,
+                then_send: items(rule.get("then_send")),
             });
         }
         // Every path a rule writes must be declared, so its type is known.
@@ -470,14 +509,25 @@ impl Telemetry {
     }
 
     /// The state patch this message produces, if any rule matches.
+    #[cfg(test)]
     pub(crate) fn apply(&self, message: &Inbound) -> Option<Value> {
+        self.apply_into(message, &mut Vec::new())
+    }
+
+    /// As `apply`, adding to `triggers` the `then_send` items of every rule
+    /// that matched, once per match, with its captures.
+    pub(crate) fn apply_into(
+        &self,
+        message: &Inbound,
+        triggers: &mut Vec<Triggered>,
+    ) -> Option<Value> {
         let mut patch = Value::Object(Map::new());
         let mut any = false;
         for rule in &self.rules {
             match (&rule.matcher, message) {
                 (Matcher::Message(re), Inbound::Text(text)) => {
                     if let Some(caps) = re.captures(text.trim_end()) {
-                        any |= self.assign_all(&rule.assign, &captures(&caps), &mut patch);
+                        any |= self.matched(rule, &captures(&caps), &mut patch, triggers);
                     }
                 }
                 (Matcher::Lines { header, line }, Inbound::Text(text)) => {
@@ -487,7 +537,7 @@ impl Telemetry {
                     }
                     for l in lines {
                         if let Some(caps) = line.captures(l.trim_end()) {
-                            any |= self.assign_all(&rule.assign, &captures(&caps), &mut patch);
+                            any |= self.matched(rule, &captures(&caps), &mut patch, triggers);
                         }
                     }
                 }
@@ -496,6 +546,7 @@ impl Telemetry {
                     if !lines.next().is_some_and(|h| header.is_match(h.trim_end())) {
                         continue;
                     }
+                    self.trigger(rule, &[], triggers);
                     for l in lines {
                         let Some((name, value)) = l.split_once(':') else {
                             continue;
@@ -561,7 +612,7 @@ impl Telemetry {
                                 values.push((name.clone(), v.clone()));
                             }
                         }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body, .. }) => {
@@ -584,7 +635,7 @@ impl Telemetry {
                         for a in node.attributes() {
                             values.push((a.name().to_string(), Value::String(a.value().into())));
                         }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 (
@@ -613,7 +664,7 @@ impl Telemetry {
                                 values.push((name.clone(), v.clone()));
                             }
                         }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 (
@@ -651,13 +702,48 @@ impl Telemetry {
                                 }
                             }
                         }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 _ => {}
             }
         }
         any.then_some(patch)
+    }
+
+    /// A rule matched with these captures: its assignments, and its
+    /// `then_send` items queued.
+    fn matched(
+        &self,
+        rule: &Rule,
+        values: &[(String, Value)],
+        patch: &mut Value,
+        triggers: &mut Vec<Triggered>,
+    ) -> bool {
+        self.trigger(rule, values, triggers);
+        self.assign_all(&rule.assign, values, patch)
+    }
+
+    fn trigger(&self, rule: &Rule, values: &[(String, Value)], triggers: &mut Vec<Triggered>) {
+        if rule.then_send.is_empty() {
+            return;
+        }
+        let (params, specs) = capture_params(values);
+        for item in &rule.then_send {
+            let t = Triggered {
+                item: item.clone(),
+                params: params.clone(),
+                specs: specs.clone(),
+            };
+            // Once per message: a rule matching every element of a list
+            // asks for the same re-read once.
+            if !triggers
+                .iter()
+                .any(|x| x.item == t.item && x.params == t.params)
+            {
+                triggers.push(t);
+            }
+        }
     }
 
     fn assign_all(

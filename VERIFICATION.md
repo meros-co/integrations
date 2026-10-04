@@ -854,11 +854,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that the login token goes in the Authorization header with nothing before it, whether it stays valid across OpenLP restarts, and that a missing or wrong token answers 401. ([specs/openlp.yaml:49](specs/openlp.yaml#L49))
 - [ ] Confirm that the websocket on 4317 sends its state in binary frames, sends the current state when a client connects, and needs no message from the client. ([specs/openlp.yaml:376](specs/openlp.yaml#L376))
 - [ ] Confirm that the websocket's slide field is the selected slide's index from 0 (its documentation repeats the service field's words). ([specs/openlp.yaml:346](specs/openlp.yaml#L346))
-- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:386](specs/openlp.yaml#L386))
+- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:387](specs/openlp.yaml#L387))
 - [ ] Check how /service/show tells a position from an id, and whether positions count from 0 or 1. ([specs/openlp.yaml:316](specs/openlp.yaml#L316))
 - [ ] Check which method /controller/clear/<controller> takes (POST assumed). ([specs/openlp.yaml:163](specs/openlp.yaml#L163))
 - [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:256](specs/openlp.yaml#L256))
 - [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:154](specs/openlp.yaml#L154))
+
+- [ ] Confirm the websocket sends a message for every change of the live item, slide and service, so re-reading on each one keeps the live item and service list current, and that the one-minute safety poll is enough for anything it misses. ([specs/openlp.yaml:388](specs/openlp.yaml#L388))
+- [ ] Confirm live-item answers {} (status 200) while nothing is live, the case that removes live_item from state. ([specs/openlp.yaml:416](specs/openlp.yaml#L416))
 
 ## osc-listener — OSC received from any sender
 
@@ -1228,21 +1231,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the body Helix answers with a 401 (expired token, and a Client-Id that does not match the token), and confirm 403 is never used for a refused token. ([specs/twitch.yaml:126](specs/twitch.yaml#L126))
 - [ ] Confirm every Helix request is refused without the Client-Id header, and accepted with it beside the bearer token. ([specs/twitch.yaml:123](specs/twitch.yaml#L123))
 - [ ] Confirm GET /helix/users with no parameters answers the token's own user and costs one rate-limit point. ([specs/twitch.yaml:130](specs/twitch.yaml#L130))
-- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:740](specs/twitch.yaml#L740))
-- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:732](specs/twitch.yaml#L732))
-- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:395](specs/twitch.yaml#L395))
-- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:388](specs/twitch.yaml#L388))
-- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:483](specs/twitch.yaml#L483))
-- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:294](specs/twitch.yaml#L294))
-- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:314](specs/twitch.yaml#L314))
-- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:337](specs/twitch.yaml#L337))
-- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:370](specs/twitch.yaml#L370))
-- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:259](specs/twitch.yaml#L259))
-- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:237](specs/twitch.yaml#L237))
-- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:687](specs/twitch.yaml#L687))
+- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:759](specs/twitch.yaml#L759))
+- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:751](specs/twitch.yaml#L751))
+- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:396](specs/twitch.yaml#L396))
+- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:389](specs/twitch.yaml#L389))
+- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:484](specs/twitch.yaml#L484))
+- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:295](specs/twitch.yaml#L295))
+- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:315](specs/twitch.yaml#L315))
+- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:338](specs/twitch.yaml#L338))
+- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:371](specs/twitch.yaml#L371))
+- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:260](specs/twitch.yaml#L260))
+- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:238](specs/twitch.yaml#L238))
+- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:706](specs/twitch.yaml#L706))
 
 - [ ] Confirm https://id.twitch.tv/oauth2/validate answers 200 to "Authorization: OAuth <token>" without a Client-Id, and 401 with message "invalid access token" once the user disconnects the application or the token is revoked. ([specs/twitch.yaml:120](specs/twitch.yaml#L120))
 - [ ] Confirm validating when the integration opens, after each refresh and hourly satisfies Twitch's audit, and record whether validation counts against the Helix rate limit. ([specs/twitch.yaml:120](specs/twitch.yaml#L120))
+- [ ] Confirm the four EventSub subscriptions are created (202) within the 10 seconds after the welcome when they wait behind the poll, and that the welcome's session id is accepted as sent. ([specs/twitch.yaml:792](specs/twitch.yaml#L792))
+- [ ] Confirm that not following session_reconnect costs only the events between Twitch's close (4004) and the new session's subscriptions, and that the disabled subscriptions of old sessions do not count against the limit of three websockets or the total cost. ([specs/twitch.yaml:701](specs/twitch.yaml#L701))
+- [ ] Confirm channel.follow v2 is refused with 403 without moderator:read:followers and accepted with the broadcaster as moderator_user_id. ([specs/twitch.yaml:832](specs/twitch.yaml#L832))
 
 ## vimeo-live — Vimeo Live
 

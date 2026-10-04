@@ -588,6 +588,16 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
             errors.append(f"{where}: request_match applies to a path rule")
         if "headers" in rule and "path" not in rule:
             errors.append(f"{where}: headers applies to a path rule (an HTTP reply)")
+        # then_send: templates over the rule's captures and the settings.
+        captures = set(rule.get("json") or {}) | set(rule.get("headers") or {})
+        settings = doc.get("settings") or {}
+        for context, text in template_strings(rule.get("then_send") or []):
+            for m in PLACEHOLDER.finditer(text):
+                name = m.group(1)
+                if name.startswith("settings."):
+                    errors += check_template(context, m.group(0), {}, settings, f"{where}.then_send")
+                elif not (name.isdigit() or name in captures or name.startswith("arg")):
+                    errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
         for value in (rule.get("state") or {}).values():

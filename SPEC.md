@@ -1319,6 +1319,46 @@ over settings. Its messages go through the rules like any other.
 A telemetry vector for a websocket gives `inbound_ws` (the message text), and
 optionally `expect_connect_ws`, the messages sent when it opens.
 
+#### Re-reads on a push
+
+A push that only says something changed (OpenLP's websocket counts changes
+to the live item and the service, without their content) has the rule that
+matches it ask for the rest with `then_send`: messages, like poll items,
+queued when the rule matches.
+
+```yaml
+  updates:
+    - json_match: { "$.results.counter": "^\\d+$" }
+      json: { counter: "$.results.counter" }
+      state: { live.counter: "{counter}" }
+      then_send:
+        - { method: GET, path: /api/v2/controller/live-item }
+        - { method: GET, path: /api/v2/service/items }
+```
+
+They go through the command queue as poll items do, behind commands, and
+their replies go to the rules. A message still waiting in the queue is not
+queued again, so a burst of pushes asks for one re-read; one already sent is
+answered before the next is sent, so a change that arrives meanwhile is read
+too. A rule with `then_send` may have no `state`. The messages are templates
+over the rule's captures (`{1}`, its `json` and `headers` names) and the
+settings, so a push can name what to read or a request can carry what the
+push gave. Twitch's EventSub websocket welcomes each connection with a
+session id, and subscriptions for that session must be created within ten
+seconds:
+
+```yaml
+    - json_match: { "$.metadata.message_type": "^session_welcome$", "$.payload.session.id": "^(.+)$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"stream.online","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+```
+
+Nothing is queued while the device is open for commands only. A telemetry
+vector names what a message queues with `expect_then_send`, a list of
+requests as `expect_request` gives them.
+
 #### An event stream beside an HTTP transport
 
 `telemetry.sse` opens a server-sent event stream (`text/event-stream`) on the

@@ -477,6 +477,9 @@ struct Job {
     login: bool,
     /// Sent once more after a fresh login: a second "session ended" stands.
     relogged: bool,
+    /// A `then_send` item's captures: the types of `params`, which hold
+    /// them.
+    specs: Option<Arc<BTreeMap<String, ParamSpec>>>,
 }
 
 impl Job {
@@ -489,6 +492,7 @@ impl Job {
             setup,
             login: false,
             relogged: false,
+            specs: None,
         }
     }
 }
@@ -1422,7 +1426,8 @@ impl SpecEngine {
                     Some(item) => item.clone(),
                     None => self.probe.clone().ok_or("no probe")?,
                 };
-                (vec![item], Map::new(), "ack".into(), &empty_specs)
+                let specs = job.specs.as_deref().unwrap_or(&empty_specs);
+                (vec![item], Map::new(), "ack".into(), specs)
             }
             Some(_) => {
                 let command = spec.commands.get(&job.name).ok_or("unknown command")?;
@@ -2288,9 +2293,23 @@ impl SpecEngine {
     /// goes through the command queue so its reply is not mistaken for a
     /// command's; otherwise it is sent straight away, like `on_connect`.
     fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>, poll: bool) {
-        let items: Vec<Value> = items
+        let items = items
             .into_iter()
-            .filter(|i| for_model(i, &self.ctx.model))
+            .map(|item| telemetry::Triggered {
+                item,
+                params: Params::new(),
+                specs: BTreeMap::new(),
+            })
+            .collect();
+        self.send_items(cx, items, poll);
+    }
+
+    /// Telemetry messages, each rendered from its own values: none for a
+    /// subscription or a poll, a rule's captures for `then_send`.
+    fn send_items(&mut self, cx: &mut Cx, items: Vec<telemetry::Triggered>, poll: bool) {
+        let items: Vec<telemetry::Triggered> = items
+            .into_iter()
+            .filter(|t| for_model(&t.item, &self.ctx.model))
             .collect();
         // HTTP requests are always queued: each reply is matched to its
         // request. Poll items are queries, so on any transport that answers
@@ -2306,19 +2325,28 @@ impl SpecEngine {
             // subscription goes to the rules like anything else.
             Transport::Ws { .. } => false,
         };
-        for item in items {
+        for telemetry::Triggered {
+            item,
+            params,
+            specs,
+        } in items
+        {
             if queued {
                 // A slow device must not fall behind: a poll item still
-                // waiting from the last round is not queued again.
+                // waiting from the last round is not queued again, and a
+                // re-read already waiting serves a second push too.
                 if poll
-                    && self
-                        .queue
-                        .iter()
-                        .any(|j| j.id.is_none() && j.item.as_ref() == Some(&item))
+                    && self.queue.iter().any(|j| {
+                        j.id.is_none() && j.item.as_ref() == Some(&item) && j.params == params
+                    })
                 {
                     continue;
                 }
-                self.queue.push_back(Job::internal(Some(item), false));
+                self.queue.push_back(Job {
+                    params,
+                    specs: (!specs.is_empty()).then(|| Arc::new(specs)),
+                    ..Job::internal(Some(item), false)
+                });
                 continue;
             }
             let item = match &item {
@@ -2327,9 +2355,7 @@ impl SpecEngine {
                 }
                 _ => item,
             };
-            let empty = Params::new();
-            let empty_specs = BTreeMap::new();
-            let values = self.values(&empty, &empty_specs);
+            let values = self.values(&params, &specs);
             match self.build(&item, &values) {
                 Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
                 Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
@@ -2340,6 +2366,19 @@ impl SpecEngine {
             }
         }
         self.pump(cx);
+    }
+
+    /// Offer a message to the telemetry rules: the state it changes, and
+    /// the `then_send` items of the rules it matches, queued like polls
+    /// (only while monitored).
+    fn offer(&mut self, cx: &mut Cx, message: &telemetry::Inbound) {
+        let mut triggered = Vec::new();
+        if let Some(patch) = self.telemetry.apply_into(message, &mut triggered) {
+            cx.state(patch);
+        }
+        if !triggered.is_empty() && self.monitor && self.refused.is_none() {
+            self.send_items(cx, triggered, true);
+        }
     }
 
     /// After connecting: subscribe, poll once, and schedule both.
@@ -2362,14 +2401,12 @@ impl SpecEngine {
     /// Offer a text message to the telemetry rules: a line or block from the
     /// device, a text HTTP reply, or a notification a native extension
     /// received on the spec's behalf.
-    pub(crate) fn apply_text(&self, cx: &mut Cx, text: &str) {
+    pub(crate) fn apply_text(&mut self, cx: &mut Cx, text: &str) {
         let text = text.trim();
         if text.is_empty() {
             return;
         }
-        if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Text(text)) {
-            cx.state(patch);
-        }
+        self.offer(cx, &telemetry::Inbound::Text(text));
     }
 
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
@@ -2418,11 +2455,9 @@ impl SpecEngine {
 
     /// Offer a message to the telemetry rules: as JSON where it parses (a
     /// websocket message, a line or block of a JSON protocol), and as text.
-    fn apply_message(&self, cx: &mut Cx, text: &str) {
+    fn apply_message(&mut self, cx: &mut Cx, text: &str) {
         if let Ok(doc) = serde_json::from_str::<Value>(text) {
-            if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
-                cx.state(patch);
-            }
+            self.offer(cx, &telemetry::Inbound::Json(&doc));
         }
         self.apply_text(cx, text);
     }
@@ -2534,9 +2569,7 @@ impl SpecEngine {
                 let data = serde_json::from_str::<Value>(&event.data)
                     .unwrap_or_else(|_| Value::String(event.data.clone()));
                 let doc = serde_json::json!({"event": event.event, "data": data});
-                if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
-                    cx.state(patch);
-                }
+                self.offer(cx, &telemetry::Inbound::Json(&doc));
                 self.apply_text(cx, &event.data);
                 self.last_heard = cx.now();
                 cx.alive();
@@ -2718,11 +2751,7 @@ impl SpecEngine {
                                 "data": data,
                                 "args": args.get(1..).map(<[Value]>::to_vec).unwrap_or_default(),
                             });
-                            if let Some(patch) =
-                                self.telemetry.apply(&telemetry::Inbound::Json(&doc))
-                            {
-                                cx.state(patch);
-                            }
+                            self.offer(cx, &telemetry::Inbound::Json(&doc));
                         }
                     }
                     "4" => cx.log(
@@ -2738,13 +2767,14 @@ impl SpecEngine {
 
     fn inbound_osc(&mut self, cx: &mut Cx, packet: &[u8]) {
         for message in osc::decode(packet) {
-            if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Osc {
-                address: &message.address,
-                types: &message.types,
-                args: &message.args,
-            }) {
-                cx.state(patch);
-            }
+            self.offer(
+                cx,
+                &telemetry::Inbound::Osc {
+                    address: &message.address,
+                    types: &message.types,
+                    args: &message.args,
+                },
+            );
             let matches = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Osc(None)) => true,
                 Some(Await::Osc(Some(reply))) => reply.matches(&message.address),
@@ -2966,9 +2996,7 @@ impl Module for SpecEngine {
                     body: &response.body,
                     request: request.as_ref(),
                 };
-                if let Some(patch) = self.telemetry.apply(&inbound) {
-                    cx.state(patch);
-                }
+                self.offer(cx, &inbound);
                 // A text reply ("p1" from a Panasonic camera) is also offered to
                 // the rules for text messages.
                 if let Ok(text) = std::str::from_utf8(&response.body) {
@@ -5382,5 +5410,66 @@ mod tests {
                 ..
             }
         )));
+    }
+
+    fn openlp(monitor: bool) -> SpecEngine {
+        let spec = Catalog::source_tree().device("openlp").unwrap().clone();
+        let settings = crate::catalog::validate(&spec.settings, &Params::new()).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "openlp-3".into(),
+                channels: None,
+                settings,
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_push_queues_its_re_reads_once() {
+        let mut e = openlp(true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        // The first poll is in flight; the rest of the start waits.
+        let (first, _) = requests(&cx.take()).remove(0);
+        e.queue.clear();
+        let push = r#"{"results":{"counter":5,"service":2,"slide":0,"item":"a1"}}"#;
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Binary(push.as_bytes().to_vec()));
+        e.ws(&mut cx, PUSH, WsInput::Binary(push.as_bytes().to_vec()));
+        let waiting: Vec<&str> = e
+            .queue
+            .iter()
+            .filter_map(|j| j.item.as_ref()?.get("path")?.as_str())
+            .collect();
+        // Two pushes, one re-read of each waiting.
+        assert_eq!(
+            waiting,
+            ["/api/v2/controller/live-item", "/api/v2/service/items"]
+        );
+        // They go in turn once the request in flight is answered.
+        let mut cx = Cx::new(2);
+        e.http_response(&mut cx, first, answer("{}", None));
+        let sent = requests(&cx.take());
+        assert!(sent[0].1.url.ends_with("/api/v2/controller/live-item"));
+
+        // Opened for commands only, a push queues nothing.
+        let mut e = openlp(false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Binary(push.as_bytes().to_vec()));
+        assert!(
+            e.queue.iter().all(|j| j.item.is_none()),
+            "{:?}",
+            e.queue.len()
+        );
+        assert!(requests(&cx.take()).is_empty());
     }
 }

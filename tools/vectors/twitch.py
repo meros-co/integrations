@@ -152,3 +152,58 @@ telemetry(TW, "chat-settings", settings=_TWS, inbound_http={
                            "follower_mode_duration": 0, "subscriber_mode": False, "emote_mode": False,
                            "unique_chat_mode": False, "non_moderator_chat_delay": True,
                            "non_moderator_chat_delay_duration": 4}})
+
+# EventSub over WebSocket: the messages as Twitch's reference shows them
+# (Handling WebSocket Events, EventSub Subscription Types).
+_TWSES = "AQoQILE98gtqShGmLD7AM6yJThAB"
+
+
+def _tw_sub(kind, version, condition):
+    return {"method": "POST", "target": "/helix/eventsub/subscriptions",
+            "body": json.dumps({"type": kind, "version": version, "condition": condition,
+                                "transport": {"method": "websocket", "session_id": _TWSES}},
+                               separators=(",", ":"))}
+
+
+_TWB = {"broadcaster_user_id": "141981764"}
+telemetry(TW, "eventsub-welcome", settings=_TWS, inbound_ws=json.dumps({
+    "metadata": {"message_id": "96a3f3b5-5dec-4eed-908e-e11ee657416c", "message_type": "session_welcome",
+                 "message_timestamp": "2023-07-19T14:56:51.634234626Z"},
+    "payload": {"session": {"id": _TWSES, "status": "connected", "connected_at": "2023-07-19T14:56:51.616329898Z",
+                            "keepalive_timeout_seconds": 30, "reconnect_url": None}}}),
+    expect_state={},
+    expect_then_send=[_tw_sub("stream.online", "1", _TWB), _tw_sub("stream.offline", "1", _TWB),
+                      _tw_sub("channel.update", "2", _TWB),
+                      _tw_sub("channel.follow", "2", {**_TWB, "moderator_user_id": "141981764"})])
+
+
+def _tw_note(kind, version, event):
+    return json.dumps({
+        "metadata": {"message_id": "befa7b53-d79d-478f-86b9-120f112b044e", "message_type": "notification",
+                     "message_timestamp": "2023-07-19T10:11:12.464757833Z", "subscription_type": kind,
+                     "subscription_version": version},
+        "payload": {"subscription": {"id": "f1c2a387-161a-49f9-a165-0f21d7a4e1c4", "status": "enabled",
+                                     "type": kind, "version": version, "cost": 0, "condition": _TWB,
+                                     "transport": {"method": "websocket", "session_id": _TWSES},
+                                     "created_at": "2023-07-19T10:11:12.464757833Z"},
+                    "event": event}})
+
+
+_TWU = {"broadcaster_user_id": "141981764", "broadcaster_user_login": "twitchdev",
+        "broadcaster_user_name": "TwitchDev"}
+telemetry(TW, "eventsub-online", settings=_TWS, inbound_ws=_tw_note("stream.online", "1", {
+    "id": "9001", **_TWU, "type": "live", "started_at": "2020-10-11T10:11:12.123Z"}),
+    expect_state={"stream": {"live": True, "id": "9001", "started_at": "2020-10-11T10:11:12.123Z"}},
+    expect_then_send=[{"method": "GET", "target": "/helix/streams?user_id=141981764&type=all"}])
+telemetry(TW, "eventsub-offline", settings=_TWS, inbound_ws=_tw_note("stream.offline", "1", _TWU),
+          expect_state={"stream": {"live": False, "id": "", "viewer_count": 0, "started_at": ""}})
+telemetry(TW, "eventsub-channel-update", settings=_TWS, inbound_ws=_tw_note("channel.update", "2", {
+    **_TWU, "title": "Best Stream Ever", "language": "en", "category_id": "12453", "category_name": "Grand Theft Auto",
+    "content_classification_labels": ["MatureGame"]}),
+    expect_state={"channel": {"title": "Best Stream Ever", "language": "en", "category_id": "12453",
+                              "category_name": "Grand Theft Auto", "content_labels": '["MatureGame"]'}})
+telemetry(TW, "eventsub-follow", settings=_TWS, inbound_ws=_tw_note("channel.follow", "2", {
+    "user_id": "1234", "user_login": "cool_user", "user_name": "Cool_User", **_TWU,
+    "followed_at": "2020-07-15T18:16:11.17106713Z"}),
+    expect_state={},
+    expect_then_send=[{"method": "GET", "target": "/helix/channels/followers?broadcaster_id=141981764&first=1"}])

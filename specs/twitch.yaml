@@ -155,6 +155,7 @@ settings:
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.twitch.tv, opened by that host name; token refreshes and the hourly token validation go to id.twitch.tv:443" }
+  - { port: 443, protocol: wss, role: push, note: "EventSub's websocket at eventsub.wss.twitch.tv" }
 
 models:
   - id: helix
@@ -616,11 +617,24 @@ quirks:
       Twitch publishes no ingest-health API: the encoder's bitrate, frame
       rate and dropped frames as Twitch receives them are not available, and
       stream health is not reported. stream.live says only that the channel
-      is live. Twitch pushes changes only through EventSub (a websocket or
-      webhook subscription the format does not speak), so everything is
-      polled and a change made on twitch.tv shows up within 30 seconds.
-      viewer_count is Twitch's own figure and lags. Content classification
-      labels and tags are kept as JSON text.
+      is live. Twitch pushes changes through EventSub: the core keeps its
+      websocket open (wss://eventsub.wss.twitch.tv/ws, keepalives every 30
+      seconds, reopened after 45 silent ones), and on each welcome subscribes
+      that session to stream.online, stream.offline, channel.update and
+      channel.follow for the broadcaster, within the 10 seconds Twitch allows.
+      Going live or offline and title, category and language changes then
+      show at once; a new follower has the follower count read again. Twitch
+      drops a session's subscriptions when its websocket closes; a reopened
+      websocket is a new session and subscribes again. A session_reconnect
+      message is not followed: the core reconnects when Twitch closes the old
+      websocket 30 seconds later, and subscribes again, so a few events can be
+      missed then. Each subscription costs nothing for the broadcaster's own
+      token; channel.follow needs the moderator:read:followers scope and is
+      refused without it, which leaves the follower count to the poll.
+      Everything is also polled every 30 seconds (viewer_count, chat
+      settings and tags have no event here). viewer_count is Twitch's own
+      figure and lags. Content classification labels and tags are kept as
+      JSON text.
 
   - models: [all]
     severity: warning
@@ -681,8 +695,13 @@ state:
   chat.non_moderator_chat_delay_duration: { type: int, unit: s, description: "Seconds non-moderators' messages are held (non_moderator_chat_delay_duration)" }
 
 telemetry:
-  # Twitch pushes only through EventSub: the channel, its stream, its chat
-  # settings and its follower count are polled every 30 seconds (4 points).
+  # EventSub over WebSocket (Handling WebSocket Events): Twitch sends a
+  # welcome with the session id, then keepalives every 30 seconds.
+  websocket:
+    url: "wss://eventsub.wss.twitch.tv/ws?keepalive_timeout_seconds=30"
+    idle_ms: 45000
+  # Also polled every 30 seconds (4 points): what EventSub does not carry
+  # (viewers, chat settings, tags), and a safety net for the rest.
   poll:
     every_ms: 30000
     send:
@@ -767,3 +786,50 @@ telemetry:
         chat.unique_chat_mode: "{unique}"
         chat.non_moderator_chat_delay: "{delay}"
         chat.non_moderator_chat_delay_duration: "{delay_for}"
+
+    # EventSub: the welcome names the session; subscriptions made with it
+    # within 10 seconds (Create EventSub Subscription, transport websocket).
+    - json_match: { "$.metadata.message_type": "^session_welcome$", "$.payload.session.id": "^(.+)$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"stream.online","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"stream.offline","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.update","version":"2","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"channel.follow","version":"2","condition":{"broadcaster_user_id":"{settings.broadcaster_id}","moderator_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^stream\\.online$" }
+      json: { id: "$.payload.event.id", started: "$.payload.event.started_at", type: "$.payload.event.type" }
+      state:
+        stream.live: { value: "{type}", map: { "live": true } }
+        stream.id: "{id}"
+        stream.started_at: "{started}"
+      # The title, category and viewers come with Get Streams.
+      then_send:
+        - { method: GET, path: /helix/streams, query: { user_id: "{settings.broadcaster_id}", type: all } }
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^stream\\.offline$" }
+      json: {}
+      state:
+        stream.live: "false"
+        stream.id: ""
+        stream.viewer_count: "0"
+        stream.started_at: ""
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.update$" }
+      json:
+        title: "$.payload.event.title"
+        language: "$.payload.event.language"
+        category_id: "$.payload.event.category_id"
+        category: "$.payload.event.category_name"
+        labels: "$.payload.event.content_classification_labels"
+      state:
+        channel.title: "{title}"
+        channel.language: "{language}"
+        channel.category_id: "{category_id}"
+        channel.category_name: "{category}"
+        channel.content_labels: "{labels}"
+    - json_match: { "$.metadata.message_type": "^notification$", "$.metadata.subscription_type": "^channel\\.follow$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /helix/channels/followers, query: { broadcaster_id: "{settings.broadcaster_id}", first: "1" } }

@@ -74,7 +74,13 @@ telemetry(OL, "websocket-state", inbound_ws=json.dumps({"results": {
     "display": False, "version": 3, "isSecure": False, "chordNotation": "english"}}),
     expect_state={"live": {"counter": 12, "service_counter": 3, "slide": 1, "item_id": "6c1f2a", "blank": False,
                            "theme": True, "desktop": False, "twelve_hour": True, "auth_enabled": False,
-                           "chord_notation": "english"}})
+                           "chord_notation": "english"}},
+    # The websocket only counts changes: the live item and service are read.
+    expect_then_send=[{"method": "GET", "target": "/api/v2/controller/live-item"},
+                      {"method": "GET", "target": "/api/v2/service/items"}])
+telemetry(OL, "nothing-live", inbound_http={"path": "/api/v2/controller/live-item", "body": "{}"},
+          state_before={"live_item": {"title": "Amazing Grace", "slide_text": "Amazing grace"}, "theme": {"name": "x"}},
+          expect_state={"theme": {"name": "x"}})
 telemetry(OL, "live-item", inbound_http={"path": "/api/v2/controller/live-item", "body": json.dumps({
     "audit": ["Amazing Grace", "John Newton", "Public Domain", ""], "name": "songs", "notes": "",
     "theme": None, "title": "Amazing Grace", "type": "ServiceItemType.Text",

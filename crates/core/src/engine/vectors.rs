@@ -227,6 +227,9 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     }
 
     let mut cx = Cx::new(3);
+    // What the connection queued (polls) is dropped, so what the message
+    // queues (`then_send`) is all that is left.
+    engine.queue.clear();
     if let Some(text) = v.get("inbound").and_then(Value::as_str) {
         engine.tcp(&mut cx, "device", TcpInput::Data(text.as_bytes().to_vec()));
     } else if let Some(h) = v.get("inbound_hex").and_then(Value::as_str) {
@@ -265,14 +268,15 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             .flatten()
             .map(|(k, v)| (k.to_ascii_lowercase(), v.as_str().unwrap_or("").to_string()))
             .collect();
-        if let Some(patch) = engine.telemetry.apply(&super::telemetry::Inbound::Http {
-            path,
-            headers: &headers,
-            body,
-            request,
-        }) {
-            cx.state(patch);
-        }
+        engine.offer(
+            &mut cx,
+            &super::telemetry::Inbound::Http {
+                path,
+                headers: &headers,
+                body,
+                request,
+            },
+        );
         // As the engine does: a text reply also goes to the text rules.
         if let Ok(text) = std::str::from_utf8(body) {
             engine.apply_text(&mut cx, text);
@@ -281,9 +285,30 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
     // `state_before`: the state the message arrives on, for one that removes
     // something.
     let mut state = v.get("state_before").cloned().unwrap_or(json!({}));
-    for a in cx.take() {
+    let actions = cx.take();
+    for a in &actions {
         if let Action::State(p) = a {
-            crate::session::merge_patch(&mut state, &p);
+            crate::session::merge_patch(&mut state, p);
+        }
+    }
+    // `expect_then_send`: the requests the message queued, sent at once or
+    // waiting behind the one in flight.
+    if let Some(expected) = v.get("expect_then_send") {
+        let mut sent = wire(&actions);
+        let waiting: Vec<super::Job> = engine.queue.drain(..).collect();
+        for job in waiting {
+            let flight = engine.prepare(&job)?;
+            for (outgoing, _) in flight.messages {
+                if let super::Outgoing::Http(request) = outgoing {
+                    sent.extend(wire(&[Action::Http { id: 0, request }]));
+                }
+            }
+        }
+        let expected = expected_wire(&json!({ "expect_request": expected })).unwrap();
+        if sent != expected {
+            return Err(format!(
+                "then_send mismatch\n  expected {expected:?}\n  sent     {sent:?}"
+            ));
         }
     }
     let expected = v

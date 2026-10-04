@@ -351,7 +351,7 @@ state:
   live.twelve_hour: { type: bool, description: "Whether OpenLP shows times in twelve-hour form" }
   live.auth_enabled: { type: bool, description: "Whether endpoints that change OpenLP require a login" }
   live.chord_notation: { type: string, description: "Chord notation: english, german or neo-latin" }
-  live_item.title: { type: string, description: "Title of the live service item; not cleared when nothing is live" }
+  live_item.title: { type: string, description: "Title of the live service item; live_item is absent while nothing is live" }
   live_item.plugin: { type: string, description: "Plugin that made the live item (songs, bibles, custom...)" }
   live_item.type: { type: string, description: "Display type: ServiceItemType.Text, ServiceItemType.Image or ServiceItemType.Command" }
   live_item.notes: { type: string, description: "Notes of the live item" }
@@ -376,14 +376,18 @@ telemetry:
     path: /
     port: { setting: websocket_port }
   # What the websocket only counts: the live item's title and selected slide,
-  # and the service list.
+  # and the service list. Read again whenever the websocket reports a
+  # change, and every minute as a safety net.
   poll:
     send:
       - { method: GET, path: /api/v2/controller/live-item }
       - { method: GET, path: /api/v2/service/items }
-    every_ms: 2000
+    every_ms: 60000
   updates:
     - json_match: { "$.results.counter": "^\\d+$" }
+      then_send:
+        - { method: GET, path: /api/v2/controller/live-item }
+        - { method: GET, path: /api/v2/service/items }
       json:
         counter: "$.results.counter"
         service: "$.results.service"
@@ -407,6 +411,11 @@ telemetry:
         live.auth_enabled: "{secure}"
         live.chord_notation: "{chords}"
 
+    # Nothing live: live-item answers {}, and the last live item leaves state.
+    - path: "^/api/v2/controller/live-item$"
+      json_match: { "$": "^\\{\\}$" }
+      json: {}
+      state: { live_item: { delete: true } }
     - path: "^/api/v2/controller/live-item$"
       json: { title: "$.title", plugin: "$.name", type: "$.type", notes: "$.notes", theme: "$.theme" }
       state:
@@ -465,12 +474,12 @@ quirks:
     severity: warning
     text: >
       State comes from OpenLP's websocket server on port 4317 (OpenLP's remote settings can move
-      it; get_system reports the port, and the websocket_port setting follows it), which sends the live state each time it changes, as JSON
-      in binary frames. The websocket only counts changes to the live item and the service, so the
-      live item's title and selected slide text and the service list are read every 2 seconds.
-      When nothing is live, live-item answers {}, which leaves the last title and slide text in the
-      state; live.item_id and the service items' live flags are the ones to read. Items removed
-      from the service stay in the state with their last values.
+      it, get_system reports the port, and the websocket_port setting follows it), which sends
+      the live state each time it changes, as JSON in binary frames. The websocket only counts
+      changes to the live item and the service, so each message it sends has the live item and
+      the service list read again (one of each waits at a time), and both are read every minute
+      as well. When nothing is live, live-item answers {} and live_item leaves the state. Items
+      removed from the service stay in the state with their last values.
 
   - models: [all]
     severity: info
