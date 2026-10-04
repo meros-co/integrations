@@ -1,0 +1,673 @@
+spec: 1
+id: vimeo-live
+name: Vimeo Live (Vimeo API live events)
+vendor: Vimeo
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host api.vimeo.com on port 443 and acts for the Vimeo user the
+# access token belongs to. It follows one event, the live_event_id setting,
+# keeping its settings, its ingest session and its simulcast destinations in
+# state; the commands take any event. Vimeo's access tokens have no refresh
+# grant: the consumer passes one (a personal access token, or one from its
+# own app's sign-in) as the token setting.
+
+source:
+  - title: Vimeo API Reference, Live (essentials, event activation, event end, low latency, sessions, M3U8 playback, destinations, videos, embed privacy)
+    author: Vimeo
+    url: https://developer.vimeo.com/api/reference/live
+    note: >
+      Manufacturer document, API version 3.4, retrieved 2026-10-04 (the
+      OpenAPI data the page embeds). GET, POST /me/live_events (aliases of
+      /users/{user_id}/live_events; title required; latency fail-safe, low
+      or standard; stream_privacy.view anybody, embed_only, nobody, password,
+      team or unlisted; schedule.start_time, end_time, rrule, time_zone;
+      chat_enabled, dvr, auto_cc_*, stream_title, stream_description,
+      automatically_title_stream; create answers 200). GET, PATCH, DELETE
+      /me/live_events/{id} (PATCH answers 200 with the event; DELETE 204;
+      401 or 403 error 3200 when the user may not, 404 error 5000). POST
+      .../activate (creates the RTMP links; 400 error 2428 already
+      activated). POST .../end (400 error 10004 not streaming). PATCH
+      .../low_latency (low_latency). GET .../m3u8_playback (ttl 10 to 60).
+      GET /live_events/{id}/session_status (no /me alias). GET, POST
+      /me/live_events/{id}/destinations; GET, PATCH, DELETE
+      /destination/{id} (display_name, is_enabled, service_name custom_rtmp,
+      facebook, linkedin or youtube, stream_url, stream_key; up to 20
+      custom RTMP and 10 platform destinations). GET /me/destinations. GET
+      /me/live_events/{id}/videos. Error code 8000 means invalid user
+      credentials.
+  - title: Vimeo API Reference, responses recurring-event, event-session-status, event-destination, recurring-event-low-latency
+    author: Vimeo
+    url: https://developer.vimeo.com/api/reference/responses/recurring-event
+    note: >
+      Manufacturer document, retrieved 2026-10-04. The event: uri
+      (/live_events/{id}), title, status (started or ended), latency,
+      stream_mode (live, record or simulive), stream_privacy.view,
+      chat_enabled, dvr, auto_cc_enabled, next_occurrence_time, start_time,
+      rtmp_link, rtmps_link, stream_key, backup_stream_key, srt_link,
+      srt_passphrase, stream_password, link, embed. The session status
+      (https://developer.vimeo.com/api/reference/responses/event-session-status):
+      id (the live video), status, stream_mode, ingest.status 0 to 5 (no
+      link yet, provisioning, ready, timed out, streaming, ended),
+      ingest.encoder_type, width, height, start_time, end_time,
+      stream_ended_reason, rtmp_link, stream_key, metering.seconds_remaining.
+      The destination: id, display_name, is_enabled, service_name, state (0
+      OK, 1 error) and state_message, stream_url, stream_key.
+  - title: Vimeo API, Authentication guide
+    author: Vimeo
+    url: https://developer.vimeo.com/api/authentication
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Requests carry
+      Authorization "bearer {token}" and Accept
+      application/vnd.vimeo.*+json;version=3.4. An unrecognised or missing
+      token answers 401 with error code 8003. Some tokens have a limited
+      lifespan (expires_in), others work indefinitely while used; Vimeo
+      deletes tokens that look inactive.
+  - title: Vimeo API, Working with Vimeo Events
+    author: Vimeo
+    url: https://developer.vimeo.com/api/live/events
+    note: >
+      Manufacturer document, retrieved 2026-10-04. The live API is for
+      Vimeo Enterprise customers and enabled per API app on request through
+      the sales representative or partner support. The RTMPS link and stream
+      key come from the event. After an RTMP encoder disconnects the session
+      stays open five minutes for it to reconnect, and a new stream to the
+      event cannot start until then. The videos streamed to an event are its
+      recordings.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The token setting as "Authorization: Bearer"; Vimeo has no refresh grant.
+  auth: bearer
+  # Version 3.4 of the API, as Vimeo asks of every request.
+  headers:
+    Accept: "application/vnd.vimeo.*+json;version=3.4"
+  # Vimeo answers 401 both for a refused token (error 8000 or 8003) and for
+  # a resource the user may not touch (error 3200): only the token codes are
+  # the refusal.
+  refusal_status: []
+  refusal_json: { "$.error_code": "^(8000|8003)$" }
+  timeout_ms: 10000
+  # The token's own user, its URI only.
+  probe: { method: GET, path: /me, query: { fields: uri } }
+
+settings:
+  token: { type: string, secret: true, max_length: 4096, required: true,
+           label: Access token,
+           description: "A Vimeo access token with the private, create, edit, delete and public scopes, from the consumer's own Vimeo app (a personal access token or one from its sign-in); Vimeo has no way to refresh it." }
+  live_event_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                   label: Event ID,
+                   description: "The numeric id of the event to follow, as in its URL vimeo.com/event/<id> or from list_live_events." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at api.vimeo.com, opened by that host name" }
+
+models:
+  - id: api-v3-4
+    name: Vimeo API 3.4, live events
+    supports: [list_live_events, get_live_event, get_stream_key, get_backup_stream_key,
+               get_rtmp_link, get_rtmps_link, get_srt_link, get_srt_passphrase, create_live_event,
+               create_scheduled_live_event, create_live_event_custom, update_live_event, set_title,
+               set_stream_title, set_stream_description, set_privacy, set_latency, set_low_latency,
+               set_chat_enabled, set_dvr, set_auto_captions, set_schedule, activate_live_event,
+               end_live_event, delete_live_event, get_session_status, get_m3u8_playback,
+               list_live_event_videos, list_destinations, add_rtmp_destination,
+               add_destination_custom, set_destination_enabled, update_destination,
+               delete_destination, list_available_destinations]
+    verification: none
+    notes: >
+      Vimeo's live API is enabled only for Vimeo Enterprise accounts, per
+      API app, on request to Vimeo. Follows the event named by
+      live_event_id; the commands take any event of the token's user.
+
+commands:
+  # ── Events ────────────────────────────────────────────────────────────────
+  list_live_events:
+    summary: The user's events, newest first, a page at a time (GET /me/live_events)
+    params:
+      type: { type: enum, values: [all, one_time, recurring], default: all,
+              label: Type,
+              description: "Which events to return: all, one-time ones or recurring ones." }
+      per_page: { type: int, min: 1, max: 100, default: 25,
+                  label: Events per page,
+                  description: "How many events each page holds, up to 100." }
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+    send: { method: GET, path: /me/live_events,
+            query: { type: "{type}", sort: date, direction: desc, per_page: "{per_page}", page: "{page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_live_event:
+    summary: One event with all its settings; it includes the stream key, RTMP and SRT links and stream password, so the value is never kept or logged (GET /me/live_events/{id})
+    params:
+      live_event_id: &event_id { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
+                                 label: Event ID,
+                                 description: "The event's numeric id." }
+    send: { method: GET, path: "/me/live_events/{live_event_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_key:
+    summary: The event's stream key for the encoder; a secret, returned here only and never kept in state (the event's stream_key)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}", query: { fields: stream_key } }
+    expect: { status: 200, json_path: "$.stream_key" }
+    returns: value
+
+  get_backup_stream_key:
+    summary: The event's backup stream key for a second encoder; a secret, returned here only (the event's backup_stream_key)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}", query: { fields: backup_stream_key } }
+    expect: { status: 200, json_path: "$.backup_stream_key" }
+    returns: value
+
+  get_rtmp_link:
+    summary: The event's upstream RTMP URL for the encoder (the event's rtmp_link)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}", query: { fields: rtmp_link } }
+    expect: { status: 200, json_path: "$.rtmp_link" }
+    returns: value
+
+  get_rtmps_link:
+    summary: The event's upstream RTMPS URL for the encoder (the event's rtmps_link)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}", query: { fields: rtmps_link } }
+    expect: { status: 200, json_path: "$.rtmps_link" }
+    returns: value
+
+  get_srt_link:
+    summary: The event's upstream SRT URL for the encoder (the event's srt_link)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}", query: { fields: srt_link } }
+    expect: { status: 200, json_path: "$.srt_link" }
+    returns: value
+
+  get_srt_passphrase:
+    summary: The event's SRT encryption passphrase; a secret, returned here only (the event's srt_passphrase)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}", query: { fields: srt_passphrase } }
+    expect: { status: 200, json_path: "$.srt_passphrase" }
+    returns: value
+
+  create_live_event:
+    summary: Create an event with a title, privacy and latency; answers the event, its uri holding the new id (POST /me/live_events)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 128, required: true,
+               label: Title,
+               description: "The event's title, also the base title of the videos streamed to it." }
+      privacy: &privacy { type: enum, values: [anybody, unlisted, password, team, embed_only, nobody], default: anybody,
+                          label: Privacy,
+                          description: "Who can watch: anybody (Public), unlisted (private link), password, team (Company only), embed_only (only embedded elsewhere) or nobody (Private)." }
+      latency: &latency { type: enum, values: [standard, low, fail-safe], default: standard,
+                          label: Latency,
+                          description: "Viewer delay: standard 15 to 20 seconds, low 5 to 7, fail-safe 60 to 75." }
+    send: { method: POST, path: /me/live_events,
+            body: '{"title":{title:json},"stream_privacy":{"view":{privacy:json}},"latency":{latency:json}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.uri" }
+    returns: value
+
+  create_scheduled_live_event:
+    summary: Create an event scheduled for a start time; answers its uri, which holds the new id (POST /me/live_events with schedule)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 128, required: true,
+               label: Title,
+               description: "The event's title, also the base title of the videos streamed to it." }
+      start_time: &start_time { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?(Z|[+-]\\d{2}:\\d{2})$", required: true,
+                                label: Start time,
+                                description: "When the event is expected to go live, ISO 8601 with a time zone, such as 2026-10-11T09:30:00Z." }
+      privacy: *privacy
+      latency: *latency
+    send: { method: POST, path: /me/live_events,
+            body: '{"title":{title:json},"schedule":{"start_time":{start_time:json}},"stream_privacy":{"view":{privacy:json}},"latency":{latency:json}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.uri" }
+    returns: value
+
+  create_live_event_custom:
+    summary: Create an event with a full Create an event body (title, schedule with rrule, stream_privacy, latency, chat_enabled, dvr, auto_cc_*, embed and more); answers its uri
+    params:
+      event: { type: json, required: true,
+               label: Event,
+               description: "A JSON object as Vimeo documents for Create an event; title is required." }
+    send: { method: POST, path: /me/live_events, body: '{event}', content_type: application/json }
+    expect: { status: 200, json_path: "$.uri" }
+    returns: value
+
+  update_live_event:
+    summary: Change several event settings at once with an Update an event body (title, stream_title, stream_description, stream_privacy, latency, schedule, chat_enabled, dvr, auto_cc_*, stream_mode, embed and more)
+    params:
+      live_event_id: *event_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields Vimeo documents for Update an event; fields left out are unchanged." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_title:
+    summary: Change the event's title (Update an event, title)
+    params:
+      live_event_id: *event_id
+      title: { type: string, pattern: "\\S", max_length: 128, required: true,
+               label: Title,
+               description: "The event's new title." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"title":{title:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_stream_title:
+    summary: Title the next video streamed to the event, and stop generating titles from the time (Update an event, stream_title and automatically_title_stream)
+    params:
+      live_event_id: *event_id
+      title: { type: string, pattern: "\\S", max_length: 128, required: true,
+               label: Video title,
+               description: "The title of the next video streamed to the event." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"automatically_title_stream":false,"stream_title":{title:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_stream_description:
+    summary: Describe the next video streamed to the event (Update an event, stream_description)
+    params:
+      live_event_id: *event_id
+      description: { type: string, max_length: 5000, required: true,
+                     label: Video description,
+                     description: "The description of the next video streamed to the event." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"stream_description":{description:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_privacy:
+    summary: Change who can watch the event's videos (Update an event, stream_privacy.view)
+    params:
+      live_event_id: *event_id
+      privacy: { type: enum, values: [anybody, unlisted, password, team, embed_only, nobody], required: true,
+                 label: Privacy,
+                 description: "anybody (Public), unlisted (private link), password, team (Company only), embed_only (only embedded elsewhere) or nobody (Private); password needs a stream password set." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"stream_privacy":{"view":{privacy:json}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_latency:
+    summary: Change the viewer delay (Update an event, latency)
+    params:
+      live_event_id: *event_id
+      latency: { type: enum, values: [standard, low, fail-safe], required: true,
+                 label: Latency,
+                 description: "standard 15 to 20 seconds, low 5 to 7, fail-safe 60 to 75." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"latency":{latency:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_low_latency:
+    summary: Turn the event's low-latency option on or off; answers the new setting (Toggle the low-latency option)
+    params:
+      live_event_id: *event_id
+      enabled: { type: bool, required: true,
+                 label: Low latency,
+                 description: "On for low latency, off for the event's normal latency." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}/low_latency",
+            body: '{"low_latency":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_chat_enabled:
+    summary: Show or hide live chat on the event's Vimeo page (Update an event, chat_enabled)
+    params:
+      live_event_id: *event_id
+      enabled: { type: bool, required: true,
+                 label: Chat,
+                 description: "On to show the live chat on the event page." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"chat_enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_dvr:
+    summary: Let viewers seek back in the live stream, or not (Update an event, dvr)
+    params:
+      live_event_id: *event_id
+      enabled: { type: bool, required: true,
+                 label: DVR,
+                 description: "On to let viewers rewind the live stream." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"dvr":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_auto_captions:
+    summary: Turn automated closed captions on or off, in a language (Update an event, auto_cc_enabled and auto_cc_language)
+    params:
+      live_event_id: *event_id
+      enabled: { type: bool, required: true,
+                 label: Automated captions,
+                 description: "On to caption the live stream automatically; uses the account's captioning allowance." }
+      language: { type: enum, values: [en-US, de-DE, es-ES, fr-FR, pt-BR], default: en-US,
+                  label: Language,
+                  description: "The language spoken, which the captions are written in." }
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"auto_cc_enabled":{enabled},"auto_cc_language":{language:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_schedule:
+    summary: Change when the event is expected to go live (Update an event, schedule.start_time)
+    params:
+      live_event_id: *event_id
+      start_time: *start_time
+    send: { method: PATCH, path: "/me/live_events/{live_event_id}",
+            body: '{"schedule":{"start_time":{start_time:json}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  activate_live_event:
+    summary: Prepare the event's RTMP links so an encoder can stream to it; answers the event's video (Activate an event)
+    params: { live_event_id: *event_id }
+    send: { method: POST, path: "/me/live_events/{live_event_id}/activate", body: '{}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  end_live_event:
+    summary: End the event's live stream for every viewer (End an event)
+    params: { live_event_id: *event_id }
+    send: { method: POST, path: "/me/live_events/{live_event_id}/end" }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_live_event:
+    summary: Delete an event (Delete a specific event)
+    params: { live_event_id: *event_id }
+    send: { method: DELETE, path: "/me/live_events/{live_event_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  get_session_status:
+    summary: The event's ingest session, its status from 0 (no link) to 5 (ended), encoder protocol, size and times; it includes the stream key, so the value is never kept or logged (Get the ingest status of an event)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/live_events/{live_event_id}/session_status" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_m3u8_playback:
+    summary: An HLS playback URL for the event's live stream, for an external player (Get an M3U8 playback URL)
+    params:
+      live_event_id: *event_id
+      ttl: { type: int, min: 10, max: 60, default: 60,
+             label: Link lifetime,
+             description: "Seconds the playlist link stays valid, 10 to 60." }
+    send: { method: GET, path: "/me/live_events/{live_event_id}/m3u8_playback", query: { ttl: "{ttl}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_live_event_videos:
+    summary: The videos streamed to an event, its recordings, newest first (Get all the videos in an event)
+    params:
+      live_event_id: *event_id
+      per_page: { type: int, min: 1, max: 100, default: 25,
+                  label: Videos per page,
+                  description: "How many videos each page holds, up to 100." }
+    send: { method: GET, path: "/me/live_events/{live_event_id}/videos",
+            query: { sort: date, direction: desc, per_page: "{per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Simulcast destinations ────────────────────────────────────────────────
+  list_destinations:
+    summary: The event's simulcast destinations with their state; they include stream keys, so the value is never kept or logged (Get all the destinations of a recurring event)
+    params: { live_event_id: *event_id }
+    send: { method: GET, path: "/me/live_events/{live_event_id}/destinations" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  add_rtmp_destination:
+    summary: Simulcast the event to a custom RTMP server (Create an event destination, service_name custom_rtmp)
+    params:
+      live_event_id: *event_id
+      display_name: { type: string, pattern: "\\S", max_length: 100, required: true,
+                      label: Name,
+                      description: "The destination's name in Vimeo." }
+      stream_url: { type: string, pattern: "^rtmps?://\\S+$", max_length: 1024, required: true,
+                    label: Server URL,
+                    description: "The destination's RTMP or RTMPS server URL." }
+      stream_key: { type: string, pattern: "^\\S+$", max_length: 1024, required: true,
+                    label: Stream key,
+                    description: "The destination's stream key, a secret sent to Vimeo and not kept." }
+      enabled: { type: bool, default: true,
+                 label: Enabled,
+                 description: "On to send the stream to the destination." }
+    send: { method: POST, path: "/me/live_events/{live_event_id}/destinations",
+            body: '{"service_name":"custom_rtmp","type":"custom","display_name":{display_name:json},"stream_url":{stream_url:json},"stream_key":{stream_key:json},"is_enabled":{enabled}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.id" }
+    returns: value
+
+  add_destination_custom:
+    summary: Simulcast the event to a destination with a full Create an event destination body (service_name, type, display_name, provider_destination_id, privacy, stream_url, stream_key, is_enabled, scheduled_at)
+    params:
+      live_event_id: *event_id
+      destination: { type: json, required: true,
+                     label: Destination,
+                     description: "A JSON object as Vimeo documents for Create an event destination, such as a connected Facebook page or YouTube channel." }
+    send: { method: POST, path: "/me/live_events/{live_event_id}/destinations", body: '{destination}', content_type: application/json }
+    expect: { status: 200, json_path: "$.id" }
+    returns: value
+
+  set_destination_enabled:
+    summary: Turn sending to a simulcast destination on or off (Update an event destination, is_enabled)
+    params:
+      destination_id: &destination_id { type: int, min: 1, required: true,
+                                        label: Destination ID,
+                                        description: "The destination's id, from list_destinations." }
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On to send the stream to the destination, off to stop." }
+    send: { method: PATCH, path: "/destination/{destination_id}",
+            body: '{"is_enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  update_destination:
+    summary: Change a simulcast destination with an Update an event destination body (display_name, is_enabled, privacy, stream_url, stream_key and more)
+    params:
+      destination_id: *destination_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields Vimeo documents for Update an event destination." }
+    send: { method: PATCH, path: "/destination/{destination_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_destination:
+    summary: Remove a simulcast destination from its event (Delete an event destination)
+    params: { destination_id: *destination_id }
+    send: { method: DELETE, path: "/destination/{destination_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  list_available_destinations:
+    summary: The Facebook, YouTube and LinkedIn accounts connected to the user that events can simulcast to (Get all available event destinations)
+    send: { method: GET, path: /me/destinations }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host api.vimeo.com and port
+      443; it is reached over HTTPS and the certificate is checked against
+      that name. Vimeo's live API is available only to Vimeo Enterprise
+      customers and is switched on for each API app on request to Vimeo
+      (sales or partner support); without it the live endpoints refuse with
+      403 or 404, which are ordinary failures.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The token setting is sent as Bearer with every request, beside the
+      Accept header for API version 3.4. Vimeo's tokens have no refresh
+      grant: a personal access token, or one from the consumer's own Vimeo
+      app, works until revoked (Vimeo also deletes tokens that look
+      inactive, and tokens from the implicit grant expire). Vimeo answers
+      401 for a refused token (error code 8000 or 8003) and also for an
+      event the user may not see (error code 3200), so only an error answer
+      with code 8000 or 8003 is the terminal refusal: the integration
+      reports unauthorized and sends nothing more until the consumer passes
+      a new token with update_settings.
+
+  - models: [all]
+    severity: warning
+    text: >
+      get_live_event, get_session_status and list_destinations answer
+      objects that hold the event's stream key, backup key, SRT passphrase
+      and stream password, or the destinations' stream keys; get_stream_key,
+      get_backup_stream_key and get_srt_passphrase return one of them. They
+      are returned as the command's value only, never kept in state or
+      logged. Show them to the operator only on demand.
+
+  - models: [all]
+    severity: critical
+    text: >
+      end_live_event stops the live stream for every viewer at once and
+      can't be undone; Vimeo recommends ending from the encoder instead.
+      After an RTMP encoder stops, Vimeo holds the session open for five
+      minutes so the encoder can reconnect, and a new stream to the event
+      can't start until then. delete_live_event deletes the event; its
+      recorded videos are kept only if Vimeo's account settings keep them.
+
+  - models: [all]
+    severity: info
+    text: >
+      Vimeo pushes nothing. The followed event, its ingest session and its
+      destinations are polled every 30 seconds (3 requests), and every
+      change command's answer updates state at once for the event it
+      touched. State is keyed by event id; set_destination_enabled answers
+      on /destination/{id} and shows in state at the next poll. The
+      session's status (event.*.ingest_status) is the stream's health as
+      far as Vimeo reports it: 2 ready, 4 streaming, 3 timed out before
+      the encoder started, 5 ended. Vimeo has no viewer count or bitrate in
+      this API. Rate limits are per user and plan, and Vimeo reports them in
+      each answer's X-RateLimit headers.
+
+state:
+  events.*.title:              { type: string, description: "The event's title, keyed by event id" }
+  events.*.status:             { type: string, description: "started or ended (the event's status)" }
+  events.*.stream_mode:        { type: string, description: "live, record or simulive (stream_mode)" }
+  events.*.latency:            { type: string, description: "standard, low or fail-safe (latency)" }
+  events.*.low_latency:        { type: bool, description: "The low-latency option is on (Toggle the low-latency option's answer)" }
+  events.*.privacy:            { type: string, description: "anybody, unlisted, password, team, embed_only or nobody (stream_privacy.view)" }
+  events.*.chat_enabled:       { type: bool, description: "Live chat shows on the event page (chat_enabled)" }
+  events.*.dvr:                { type: bool, description: "Viewers can rewind the live stream (dvr)" }
+  events.*.auto_cc_enabled:    { type: bool, description: "Automated closed captions are on (auto_cc_enabled)" }
+  events.*.stream_title:       { type: string, description: "The next video's title, when not generated from the time (stream_title)" }
+  events.*.start_time:         { type: string, description: "The scheduled start, ISO 8601 (start_time)" }
+  events.*.next_occurrence_time: { type: string, description: "The next expected time live, ISO 8601 (next_occurrence_time)" }
+  events.*.link:               { type: string, description: "The event's page on Vimeo (link)" }
+  events.*.session_status:     { type: string, description: "started or ended (the session status's status)" }
+  events.*.live_video_id:      { type: int, description: "The id of the live video the session streams to (the session status's id)" }
+  events.*.ingest_status:      { type: int, description: "0 no RTMP link yet, 1 provisioning, 2 ready for the encoder, 3 timed out before the stream started, 4 streaming, 5 ended (ingest.status)" }
+  events.*.encoder_type:       { type: string, description: "rtmp, srt, webrtc, studio_cloud, simple_live, dash or unknown (ingest.encoder_type)" }
+  events.*.ingest_width:       { type: int, unit: px, description: "Width of the incoming stream (ingest.width)" }
+  events.*.ingest_height:      { type: int, unit: px, description: "Height of the incoming stream (ingest.height)" }
+  events.*.ingest_start_time:  { type: int, unit: s, description: "When the stream started, Unix seconds (ingest.start_time)" }
+  events.*.ingest_end_time:    { type: int, unit: s, description: "When the stream ended, Unix seconds (ingest.end_time)" }
+  events.*.stream_ended_reason: { type: int, description: "Why the stream ended, Vimeo's code; absent while streaming (ingest.stream_ended_reason)" }
+  events.*.seconds_remaining:  { type: int, unit: s, description: "Streaming time left on the account's metering (metering.seconds_remaining)" }
+  events.*.destinations.*.name:    { type: string, description: "The destination's name (display_name), keyed by destination id" }
+  events.*.destinations.*.service: { type: string, description: "custom_rtmp, facebook, linkedin or youtube (service_name)" }
+  events.*.destinations.*.enabled: { type: bool, description: "Vimeo sends the stream to the destination (is_enabled)" }
+  events.*.destinations.*.state:   { type: int, description: "0 OK, 1 an error, described in state_message (state)" }
+  events.*.destinations.*.state_message: { type: string, description: "What went wrong with the destination, such as a failed connection (state_message)" }
+
+telemetry:
+  # Vimeo pushes nothing: the followed event, its session and its
+  # destinations are polled every 30 seconds.
+  poll:
+    every_ms: 30000
+    send:
+      - { method: GET, path: "/me/live_events/{settings.live_event_id}",
+          query: { fields: "uri,title,status,stream_mode,latency,stream_privacy,chat_enabled,dvr,auto_cc_enabled,stream_title,start_time,next_occurrence_time,link" } }
+      - { method: GET, path: "/live_events/{settings.live_event_id}/session_status" }
+      - { method: GET, path: "/me/live_events/{settings.live_event_id}/destinations" }
+  updates:
+    # Polls, get_live_event, and every PATCH answering the event.
+    - path: '^/me/live_events/(\d+)(\?.*)?$'
+      json_match: { "$.uri": '^/live_events/\d+$' }
+      json:
+        title: "$.title"
+        status: "$.status"
+        mode: "$.stream_mode"
+        latency: "$.latency"
+        privacy: "$.stream_privacy.view"
+        chat: "$.chat_enabled"
+        dvr: "$.dvr"
+        cc: "$.auto_cc_enabled"
+        stream_title: "$.stream_title"
+        start: "$.start_time"
+        next: "$.next_occurrence_time"
+        link: "$.link"
+      state:
+        events.{1}.title: "{title}"
+        events.{1}.status: "{status}"
+        events.{1}.stream_mode: "{mode}"
+        events.{1}.latency: "{latency}"
+        events.{1}.privacy: "{privacy}"
+        events.{1}.chat_enabled: "{chat}"
+        events.{1}.dvr: "{dvr}"
+        events.{1}.auto_cc_enabled: "{cc}"
+        events.{1}.stream_title: "{stream_title}"
+        events.{1}.start_time: "{start}"
+        events.{1}.next_occurrence_time: "{next}"
+        events.{1}.link: "{link}"
+    - path: '^/me/live_events/(\d+)/low_latency$'
+      json: { enabled: "$.lowLatency" }
+      state: { "events.{1}.low_latency": "{enabled}" }
+    - path: '^/live_events/(\d+)/session_status$'
+      json:
+        status: "$.status"
+        video: "$.id"
+        ingest: "$.ingest.status"
+        encoder: "$.ingest.encoder_type"
+        width: "$.ingest.width"
+        height: "$.ingest.height"
+        started: "$.ingest.start_time"
+        ended: "$.ingest.end_time"
+        reason: "$.ingest.stream_ended_reason"
+        remaining: "$.metering.seconds_remaining"
+      state:
+        events.{1}.session_status: "{status}"
+        events.{1}.live_video_id: "{video}"
+        events.{1}.ingest_status: "{ingest}"
+        events.{1}.encoder_type: "{encoder}"
+        events.{1}.ingest_width: "{width}"
+        events.{1}.ingest_height: "{height}"
+        events.{1}.ingest_start_time: "{started}"
+        events.{1}.ingest_end_time: "{ended}"
+        events.{1}.stream_ended_reason: "{reason}"
+        events.{1}.seconds_remaining: "{remaining}"
+    # The reference gives the destination list as an array; Vimeo's lists
+    # are usually wrapped in a page with data, so both are read.
+    - path: '^/me/live_events/(\d+)/destinations$'
+      json_each: "$"
+      json: &destination { id: "$.id", name: "$.display_name", service: "$.service_name", enabled: "$.is_enabled",
+                           state: "$.state", message: "$.state_message" }
+      state: &destination_state
+        events.{1}.destinations.{id}.name: "{name}"
+        events.{1}.destinations.{id}.service: "{service}"
+        events.{1}.destinations.{id}.enabled: "{enabled}"
+        events.{1}.destinations.{id}.state: "{state}"
+        events.{1}.destinations.{id}.state_message: "{message}"
+    - path: '^/me/live_events/(\d+)/destinations$'
+      json_each: "$.data"
+      json: *destination
+      state: *destination_state
