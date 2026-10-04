@@ -164,6 +164,10 @@ async fn the_shared_binding_script() {
                     tokio::time::sleep(Duration::from_millis(20)).await;
                 }
             }
+            "update_settings" => {
+                let result = api::update_settings(&core, device, &step["settings"]).await;
+                assert_eq!(strip_messages(&result), step["expect"], "{label}");
+            }
             "close" => core.close(device).await,
             other => panic!("unknown op {other}"),
         }

@@ -6,10 +6,12 @@ category: other
 
 # A cloud service, not a device on the venue network: the integration is
 # opened with host www.googleapis.com on port 443 and follows one broadcast,
-# named by the broadcast_id setting. The consumer owns the credential: an
-# OAuth 2 access token for the channel, which it obtains and refreshes
-# itself. The core never runs an OAuth flow. Every request spends the
-# consumer's Google Cloud project quota (10,000 units a day by default).
+# named by the broadcast_id setting. The consumer owns the credential: it
+# registers its own Google OAuth client, runs the sign-in, and passes the
+# tokens as settings; the core keeps the access token fresh with the refresh
+# token and reports new tokens as credentials events. The core never runs a
+# sign-in. Every request spends the consumer's Google Cloud project quota
+# (10,000 units a day by default).
 
 source:
   - title: YouTube Live Streaming API reference, liveBroadcasts (resource; list, insert, update, delete, bind, transition, cuepoint)
@@ -66,6 +68,33 @@ source:
       /youtube/v3/liveChat/bans with snippet.liveChatId, snippet.type
       (permanent or temporary), snippet.bannedUserDetails.channelId and
       snippet.banDurationSeconds; DELETE with the ban's id.
+  - title: Using OAuth 2.0 for iOS & Desktop Apps (Refreshing an access token)
+    author: Google
+    url: https://developers.google.com/identity/protocols/oauth2/native-app
+    note: >
+      Manufacturer document, retrieved 2026-10-04. The token endpoint is
+      https://oauth2.googleapis.com/token; a refresh is a POST with
+      client_id, client_secret (optional for installed apps), grant_type
+      refresh_token and refresh_token; the answer carries access_token,
+      expires_in (seconds), token_type Bearer and scope. A refresh that fails
+      with invalid_grant means the refresh token expired or was revoked and
+      the user must sign in again.
+  - title: Using OAuth 2.0 to Access Google APIs (Refresh token expiration)
+    author: Google
+    url: https://developers.google.com/identity/protocols/oauth2
+    note: >
+      Manufacturer document, retrieved 2026-10-04. A project whose OAuth
+      consent screen is for external users with publishing status Testing
+      is issued refresh tokens that expire in 7 days (unless it asks only
+      for basic profile scopes). There is a limit of 100 refresh tokens per
+      Google Account per client ID; a new one past it invalidates the oldest
+      without warning.
+  - title: RFC 6749, The OAuth 2.0 Authorization Framework, section 6 (Refreshing an Access Token) and 5.2 (Error Response)
+    author: IETF
+    url: https://www.rfc-editor.org/rfc/rfc6749
+    note: >
+      The refresh request, the client authentication of section 2.3.1, a new
+      refresh token in the answer replacing the old one, and invalid_grant.
   - title: YouTube Data API, Quota costs (determine_quota_cost)
     author: Google
     url: https://developers.google.com/youtube/v3/determine_quota_cost
@@ -81,7 +110,13 @@ transport:
   type: http
   port: 443
   scheme: https
-  auth: bearer
+  # The access_token setting as Bearer, refreshed with refresh_token at
+  # Google's token endpoint (or the token_url setting's proxy).
+  auth: oauth2
+  oauth:
+    token_url: https://oauth2.googleapis.com/token
+    refresh_ahead_s: 300
+    client_auth: body
   # Google answers 403 for quota, rate limits, permissions and invalid
   # transitions; only 401 means the token was refused.
   refusal_status: [401]
@@ -91,9 +126,25 @@ transport:
   probe: { method: GET, path: /youtube/v3/ }
 
 settings:
-  token: { type: string, secret: true, max_length: 4096, default: "",
-           label: OAuth access token,
-           description: "An OAuth 2 access token for the channel with the youtube or youtube.force-ssl scope; it expires after about an hour, and the consumer refreshes it and opens the integration again with the new one." }
+  client_id: { type: string, max_length: 512, default: "",
+               label: OAuth client ID,
+               description: "The consumer's own Google OAuth client ID (an installed or web application client), sent with each token refresh." }
+  client_secret: { type: string, secret: true, max_length: 512, default: "",
+                   label: OAuth client secret,
+                   description: "The client's secret, sent with each token refresh when set; leave empty for an installed-app client that refreshes without one, or when token_url names a proxy that adds it." }
+  refresh_token: { type: string, secret: true, max_length: 4096, default: "",
+                   label: Refresh token,
+                   description: "The refresh token from the consumer's sign-in (scope youtube or youtube.force-ssl); with it the core keeps the access token fresh, and without it the access token is used until Google refuses it." }
+  access_token: { type: string, secret: true, max_length: 4096, default: "",
+                  label: Access token,
+                  description: "The current OAuth access token, about an hour long; may be left empty when a refresh token is given, and the core reports each new one in a credentials event." }
+  expires_at: { type: int, min: 0,
+                label: Access token expiry,
+                description: "When the access token expires, in Unix seconds; the core refreshes 5 minutes before, and reports each new expiry in a credentials event." }
+  token_url: { type: string, max_length: 2048, default: "",
+               pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
+               label: Token endpoint override,
+               description: "A token endpoint to refresh at instead of Google's, such as the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Google's." }
   broadcast_id: { type: string, pattern: "^[A-Za-z0-9_-]+$", max_length: 64, required: true,
                   label: Broadcast ID,
                   description: "The id of the broadcast to follow (also its video id), from YouTube Studio's URL or list_broadcasts." }
@@ -406,15 +457,38 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      The consumer owns the credential: an OAuth 2 access token for the
-      channel (scope youtube or youtube.force-ssl), sent as Bearer. Google's
-      access tokens expire after about an hour and the core never refreshes
-      them. When one expires Google answers 401, which is terminal: the
-      integration reports unauthorized, pending and later commands fail with
-      auth, and nothing more is sent until the consumer opens it again with a
-      fresh token. A consumer that refreshes before expiry opens it again
-      with the new token. Google's 403s (quota, rate limits, permissions, an
-      invalid transition) are ordinary command failures, not refusals.
+      The consumer owns the credential. It registers its own Google OAuth
+      client, runs the sign-in (scope youtube or youtube.force-ssl) and
+      passes client_id, client_secret (empty for an installed-app client),
+      refresh_token, access_token and expires_at as settings. The access
+      token is sent as Bearer and refreshed at Google's token endpoint 5
+      minutes before it expires (about hourly), or at once when there is
+      none; requests wait for the refresh. Each new access token and expiry
+      is reported in a credentials event, which the consumer must persist:
+      the core keeps tokens in memory only. A 401 from the API refreshes the
+      token and sends the request once more; a second 401, or a refresh
+      Google refuses (invalid_grant: the refresh token expired or was
+      revoked), is terminal: the integration reports unauthorized, commands
+      fail with auth, and nothing more is sent until the consumer signs in
+      again and passes the new tokens with update_settings. A token endpoint
+      that cannot be reached is retried with backoff. Without a refresh
+      token, access_token alone is a plain bearer token, used until Google
+      refuses it. Google's 403s (quota, rate limits, permissions, an invalid
+      transition) are ordinary command failures, not refusals. Refreshing
+      costs no YouTube quota.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A Google Cloud project whose OAuth consent screen is for external
+      users and still in publishing status Testing gets refresh tokens that
+      expire after 7 days: a week after signing in, the refresh fails with
+      invalid_grant and the integration reports unauthorized until the user
+      signs in again. Publish the consent screen (Google's verification for
+      the youtube scopes) for refresh tokens that last. Google also keeps at
+      most 100 refresh tokens per Google account per client ID; signing in a
+      101st time silently invalidates the oldest, so a product should reuse
+      one sign-in per account rather than signing in per device.
 
   - models: [all]
     severity: warning

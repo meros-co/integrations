@@ -62,13 +62,27 @@ char *mi_discover(const MiCore *core, const char *request);
  * returns: {"ok":{"kind":"ack"|"value"|"unverified",...}} or {"error":{...}} */
 char *mi_execute(const MiCore *core, uint64_t device, const char *command, const char *params);
 
+/* Change an open device's settings without closing it. settings: a JSON
+ * object merged into the device's current settings (null puts one back to
+ * its default); the whole set is validated against the spec first.
+ * A spec-driven device takes them live (state, connection and commands in
+ * flight kept; a refused credential is let go and it connects again); a
+ * native one is restarted under the same id.
+ * returns: {"ok":true} or {"error":{"error":"invalid_settings"|"invalid_request"|"closed",...}} */
+char *mi_update_settings(const MiCore *core, uint64_t device, const char *settings);
+
 /* {"connection":{...},"state":{...}}, or null if the device is not open. */
 char *mi_snapshot(const MiCore *core, uint64_t device);
 
 /* A JSON array of events, each {"event":"connection"|"state"|"alive"|"log"|
- * "closed"|"message"|"dropped"|"discovered"|"discovery",...} (SPEC.md,
- * Events). mi_poll_events never waits; mi_wait_events waits up to timeout_ms
- * and returns [] on timeout or after mi_interrupt_events. */
+ * "closed"|"message"|"credentials"|"dropped"|"discovered"|"discovery",...}
+ * (SPEC.md, Events). A credentials event,
+ * {"event":"credentials","device":N,"settings":{"access_token":...,
+ * "expires_at":<Unix seconds>,"refresh_token":... when rotated}}, carries
+ * OAuth tokens the core refreshed: secrets it keeps in memory only, which
+ * the caller must persist and pass when it next opens the device.
+ * mi_poll_events never waits; mi_wait_events waits up to timeout_ms and
+ * returns [] on timeout or after mi_interrupt_events. */
 char *mi_poll_events(const MiCore *core, uint32_t max);
 char *mi_wait_events(const MiCore *core, uint32_t max, uint32_t timeout_ms);
 void mi_interrupt_events(const MiCore *core);

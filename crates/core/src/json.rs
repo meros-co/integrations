@@ -80,6 +80,25 @@ pub async fn execute(core: &Core, device: DeviceId, command: &str, params: &Valu
     }
 }
 
+/// Change an open device's settings (`Core::update_settings`): `{"ok": true}`
+/// or `{"error": {...}}` with a readable `message`, its `error` being
+/// `invalid_settings`, `invalid_request` (settings that are not an object) or
+/// `closed`.
+pub async fn update_settings(core: &Core, device: DeviceId, settings: &Value) -> Value {
+    let Value::Object(settings) = settings else {
+        return json!({"error": {"error": "invalid_request",
+                                "message": "settings must be an object"}});
+    };
+    match core.update_settings(device, settings.clone()).await {
+        Ok(()) => json!({ "ok": true }),
+        Err(e) => {
+            let mut v = serde_json::to_value(&e).expect("SettingsError serialises");
+            v["message"] = json!(e.to_string());
+            json!({ "error": v })
+        }
+    }
+}
+
 pub fn catalog(core: &Core) -> Value {
     serde_json::to_value(core.catalog()).expect("catalog serialises")
 }

@@ -106,6 +106,9 @@ class SharedScript(unittest.TestCase):
                 native.close_stream(stream_id)
                 self.assertIsNone(native.wait_frame(stream_id, 100))
                 self.assertTrue(native.stream_ended(stream_id))
+            elif op == "update_settings":
+                result = json.loads(native.update_settings(step["device"], json.dumps(step["settings"])))
+                self.assertEqual(strip_messages(result), step["expect"], label)
             elif op == "close":
                 native.close(step["device"])
             else:

@@ -68,6 +68,20 @@ doesn't take a subscription slot the device has few of (a Behringer WING has
 one). Each device's most recent request-to-reply time is reported as
 `latency_ms` on its snapshot and `alive` events.
 
+**Settings and credentials** belong to the consumer, and the core persists
+nothing. A device's settings can be changed while it is open with
+`update_settings` (`updateSettings` in Node, `mi_update_settings` in C,
+`POST /v1/settings` from the HTTP service): they are merged into its current
+ones and checked against the spec first. A cloud service signed in to with
+OAuth 2 (YouTube, Planning Center) is opened with the tokens from the
+consumer's own sign-in, made with its own registered application; the core
+refreshes the access token before it expires and reports each new token in a
+`credentials` event, which the consumer must store. After a refused refresh
+(the user revoked access) the device reports `unauthorized` until the consumer
+signs the user in again and passes the new tokens with `update_settings`. A
+product that cannot ship its client secret points the `token_url` setting at
+its own token proxy.
+
 **Events** come from one queue, the same JSON in every package (SPEC.md,
 Events). A listener such as `osc-listener`, which hears OSC from any control
 surface and is opened with no host, reports each message it receives as a

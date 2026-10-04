@@ -14,14 +14,15 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-use crate::catalog::Params;
+use crate::catalog::{ParamSpec, Params};
 use crate::events::{Event, EventQueue};
 use crate::http::HttpClients;
 use crate::module::{
     Action, Bind, CommandError, CommandId, CommandResult, Connection, Cx, HttpResponse, Key, Level,
-    Module, RequestId, SseInput, TcpInput, WsInput,
+    Module, RequestId, SettingsUpdate, SseInput, TcpInput, WsInput,
 };
 use crate::udp::{Buffers, SharedUdp, RECV_BUFFER, SEND_BUFFER};
+use crate::SettingsError;
 
 pub type DeviceId = u64;
 
@@ -45,6 +46,23 @@ pub(crate) enum SessionMsg {
     Close {
         done: oneshot::Sender<()>,
     },
+    /// Merge these settings into the device's (`Core::update_settings`).
+    Settings {
+        settings: Params,
+        reply: oneshot::Sender<Result<(), SettingsError>>,
+    },
+}
+
+/// Builds a device's module from its settings.
+pub(crate) type Build = Box<dyn Fn(Params) -> Result<Box<dyn Module>, String> + Send>;
+
+/// What a session needs to take new settings: the spec's declarations, the
+/// device's current settings (written here only), and how to build its
+/// module afresh from new ones.
+pub(crate) struct Reconfigure {
+    pub(crate) declared: std::collections::BTreeMap<String, ParamSpec>,
+    pub(crate) settings: Params,
+    pub(crate) build: Build,
 }
 
 pub(crate) enum Inbound {
@@ -58,6 +76,9 @@ pub(crate) enum Inbound {
         message: String,
     },
     Http {
+        /// The module the request was made for: a reply to one replaced
+        /// by new settings is not its successor's.
+        epoch: u64,
         id: RequestId,
         result: Result<HttpResponse, String>,
     },
@@ -185,6 +206,10 @@ pub(crate) struct Session {
     stream_wake: Arc<tokio::sync::Notify>,
     /// Streams the module has been told are watched.
     watched: Vec<String>,
+    /// How to take new settings; absent, they are refused.
+    reconfigure: Option<Reconfigure>,
+    /// Counts modules this session has run, for [`Inbound::Http`].
+    epoch: u64,
 }
 
 impl Session {
@@ -222,11 +247,84 @@ impl Session {
             last_alive: None,
             stream_wake,
             watched: Vec::new(),
+            reconfigure: None,
+            epoch: 0,
         }
     }
 
+    /// Let the session take new settings.
+    pub(crate) fn reconfigurable(mut self, reconfigure: Reconfigure) -> Session {
+        self.reconfigure = Some(reconfigure);
+        self
+    }
+
     fn cx(&self) -> Cx {
-        Cx::new(self.started.elapsed().as_millis() as u64)
+        let unix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis() as u64);
+        Cx::at(self.started.elapsed().as_millis() as u64, unix)
+    }
+
+    /// Merge `delta` into the settings, validate them, and hand them to the
+    /// module, or restart it with them.
+    async fn update_settings(&mut self, delta: Params) -> Result<(), SettingsError> {
+        let invalid = |message: String| SettingsError::InvalidSettings { message };
+        let fixed = || invalid("this device's settings cannot be changed".into());
+        let Some(reconfigure) = self.reconfigure.as_ref() else {
+            return Err(fixed());
+        };
+        let mut merged = reconfigure.settings.clone();
+        merged.extend(delta);
+        let settings = crate::catalog::validate(&reconfigure.declared, &merged).map_err(invalid)?;
+        let mut cx = self.cx();
+        let update = self.module.update_settings(&mut cx, &settings);
+        if update == SettingsUpdate::Applied {
+            // Credentials the module reports from here on merge onto these.
+            if let Some(r) = self.reconfigure.as_mut() {
+                r.settings = settings.clone();
+            }
+        }
+        self.apply(cx.take()).await;
+        match update {
+            SettingsUpdate::Applied => Ok(()),
+            SettingsUpdate::Rejected(message) => Err(invalid(message)),
+            SettingsUpdate::Restart => {
+                let built = self
+                    .reconfigure
+                    .as_ref()
+                    .map(|r| (r.build)(settings.clone()));
+                match built {
+                    Some(Ok(module)) => {
+                        if let Some(r) = self.reconfigure.as_mut() {
+                            r.settings = settings;
+                        }
+                        self.restart(module).await;
+                        Ok(())
+                    }
+                    Some(Err(message)) => Err(invalid(message)),
+                    None => Err(fixed()),
+                }
+            }
+        }
+    }
+
+    /// Replace the module: stop the old one as on closing, then start the
+    /// new one under the same device, state and stream watchers.
+    async fn restart(&mut self, module: Box<dyn Module>) {
+        self.teardown(CommandError::Transport {
+            message: "the device's settings changed; it is reconnecting".into(),
+        })
+        .await;
+        self.timers.clear();
+        // What is queued came from the old module's sockets and files.
+        while self.inbound_rx.try_recv().is_ok() {}
+        self.epoch += 1;
+        self.module = module;
+        self.watched.clear();
+        let mut cx = self.cx();
+        self.module.start(&mut cx);
+        self.apply(cx.take()).await;
+        self.sync_watched().await;
     }
 
     pub(crate) async fn run(mut self, mut messages: mpsc::Receiver<SessionMsg>) {
@@ -249,6 +347,10 @@ impl Session {
                         self.module.command(&mut cx, id, &name, &params);
                         self.apply(cx.take()).await;
                     }
+                    Some(SessionMsg::Settings { settings, reply }) => {
+                        let result = self.update_settings(settings).await;
+                        let _ = reply.send(result);
+                    }
                     Some(SessionMsg::Close { done }) => {
                         self.shutdown().await;
                         let _ = done.send(());
@@ -269,7 +371,10 @@ impl Session {
                             self.drop_socket(socket);
                             self.module.socket_error(&mut cx, socket, &message);
                         }
-                        Inbound::Http { id, result } => {
+                        Inbound::Http { epoch, id, result } => {
+                            if epoch != self.epoch {
+                                continue;
+                            }
                             self.module.http_response(&mut cx, id, result);
                         }
                         Inbound::Sse { stream, generation, input } => {
@@ -624,9 +729,12 @@ impl Session {
                 }
                 Action::WsClose { socket } => self.close_ws(socket),
                 Action::Http { id, request } => {
-                    self.services
-                        .http
-                        .spawn_request(id, &request, self.inbound_tx.clone());
+                    self.services.http.spawn_request(
+                        self.epoch,
+                        id,
+                        &request,
+                        self.inbound_tx.clone(),
+                    );
                 }
                 Action::SseOpen { stream, request } => {
                     self.close_stream(stream);
@@ -704,6 +812,15 @@ impl Session {
                 }
                 Action::RoundTrip(millis) => {
                     self.snapshot.lock().unwrap().latency_ms = Some(millis);
+                }
+                Action::Credentials(settings) => {
+                    if let Some(reconfigure) = self.reconfigure.as_mut() {
+                        reconfigure.settings.extend(settings.clone());
+                    }
+                    self.services.events.push(Event::Credentials {
+                        device: self.device,
+                        settings,
+                    });
                 }
                 Action::Log { level, message } => {
                     self.services.events.push(Event::Log {
@@ -841,6 +958,16 @@ impl Session {
     }
 
     async fn shutdown(&mut self) {
+        self.teardown(CommandError::Closed).await;
+        self.services.streams.remove_device(self.device);
+        self.services.events.push(Event::Closed {
+            device: self.device,
+        });
+    }
+
+    /// Stop the module and release everything it holds, failing its pending
+    /// commands with `error`.
+    async fn teardown(&mut self, error: CommandError) {
         let mut cx = self.cx();
         self.module.stop(&mut cx);
         // What the module sends on stopping (a subscription cancelled, a
@@ -865,7 +992,9 @@ impl Session {
                 // Sent; the reply only says it arrived.
                 Action::Http { id, request } => {
                     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
-                    self.services.http.spawn_request(id, &request, tx);
+                    self.services
+                        .http
+                        .spawn_request(self.epoch, id, &request, tx);
                     flushing.push(Box::pin(async move {
                         let _ = rx.recv().await;
                     }));
@@ -874,7 +1003,7 @@ impl Session {
             }
         }
         for (_, p) in self.pending.drain() {
-            let _ = p.reply.send(Err(CommandError::Closed));
+            let _ = p.reply.send(Err(error.clone()));
         }
         let keys: Vec<Key> = self.sockets.keys().copied().collect();
         for key in keys {
@@ -913,10 +1042,8 @@ impl Session {
         for (_, port) in self.listening.drain() {
             self.services.shared_tcp.unregister(port, self.host);
         }
-        self.services.streams.remove_device(self.device);
-        self.services.events.push(Event::Closed {
-            device: self.device,
-        });
+        self.reads.clear();
+        self.files.clear();
     }
 }
 

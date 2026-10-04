@@ -90,6 +90,13 @@ impl NativeCore {
         Ok(json::execute(&self.core, device, &command, &params).await)
     }
 
+    /// `{ok: true}` or `{error}`: merge settings into an open device's.
+    #[napi]
+    pub async fn update_settings(&self, device: f64, settings: Value) -> Result<Value> {
+        let device = device_id(device)?;
+        Ok(json::update_settings(&self.core, device, &settings).await)
+    }
+
     #[napi]
     pub fn snapshot(&self, device: f64) -> Result<Value> {
         Ok(json::snapshot(&self.core, device_id(device)?))

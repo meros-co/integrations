@@ -120,6 +120,11 @@ test('the shared binding script', async () => {
           if (after !== null) assert.strictEqual(await core.nextFrame(opened.stream), null, label);
           break;
         }
+        case 'update_settings': {
+          const result = await core.updateSettings(step.device, step.settings);
+          assert.deepStrictEqual(stripMessages(result), step.expect, label);
+          break;
+        }
         case 'close':
           await core.close(step.device);
           break;

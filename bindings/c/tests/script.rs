@@ -183,6 +183,11 @@ fn the_shared_binding_script() {
                     assert_eq!(mi_stream_ended(stream), 1);
                     mi_stream_free(stream);
                 }
+                "update_settings" => {
+                    let settings = cs(&step["settings"].to_string());
+                    let result = take(mi_update_settings(core, device, settings.as_ptr()));
+                    assert_eq!(strip_messages(&result), step["expect"], "{label}");
+                }
                 "close" => mi_close(core, device),
                 other => panic!("unknown op {other}"),
             }

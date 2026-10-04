@@ -198,6 +198,28 @@ pub unsafe extern "C" fn mi_execute(
     })
 }
 
+/// Change an open device's settings: `settings` is a JSON object merged into
+/// the device's current ones. Returns `{"ok":true}` or `{"error":...}`.
+///
+/// # Safety
+/// `core` must be a live core; `settings` a NUL-terminated string. Do not
+/// call from inside an async runtime.
+#[no_mangle]
+pub unsafe extern "C" fn mi_update_settings(
+    core: *const MiCore,
+    device: u64,
+    settings: *const c_char,
+) -> *mut c_char {
+    guard(|| {
+        let settings = match read_json(settings) {
+            Ok(s) => s,
+            Err(e) => return e,
+        };
+        let core = &(*core).core;
+        to_c(core.block_on(api::update_settings(core, device, &settings)))
+    })
+}
+
 /// The device's snapshot as JSON, or `null` if it is not open.
 ///
 /// # Safety
