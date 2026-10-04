@@ -46,7 +46,10 @@
 //! backlog. A refused stream is answered with a JSON error and status 404
 //! (unknown stream, or device not open) or 406 (not a JPEG stream).
 //!
-//! Events are one queue: run one event consumer per service.
+//! Events are one queue: run one event consumer per service. Their kinds and
+//! shapes are those of every delivery (SPEC.md, Events), including `message`
+//! events from a listener such as `osc-listener`, which a POST /v1/open opens
+//! with no `host`.
 //!
 //! SIGTERM (systemd's stop) and SIGINT stop the service cleanly, as do
 //! Ctrl-C, closing the console and a system shutdown on Windows: it stops

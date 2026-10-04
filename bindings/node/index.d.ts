@@ -7,8 +7,11 @@ export interface OpenRequest {
   device: string;
   /** Model id within the spec, e.g. 'em-2'. */
   model: string;
-  /** IP address or hostname. */
-  host: string;
+  /**
+   * IP address or hostname. May be left out for an integration on which only
+   * the core listens (every port `listener: core`), such as 'osc-listener'.
+   */
+  host?: string;
   /** The device's port, when it is not the protocol's default. */
   port?: number;
   /** Settings declared by the spec, such as a password. */
@@ -69,8 +72,26 @@ export type Event =
   | { event: 'alive'; device: DeviceId; latency_ms?: number }
   | { event: 'log'; device: DeviceId; level: 'debug' | 'info' | 'warning'; message: string }
   | { event: 'closed'; device: DeviceId }
-  /** State patches were discarded; resynchronise from snapshots. */
-  | { event: 'dropped'; count: number }
+  /**
+   * One message a listener received (an OSC control surface's button), every
+   * time, even when it repeats the last: a button pressed twice is two events.
+   * `source` is the sender's ip:port; `types` the OSC type tags without the
+   * comma. Kept when the consumer falls behind, unlike state patches.
+   */
+  | {
+      event: 'message';
+      device: DeviceId;
+      address: string;
+      types?: string;
+      args: unknown[];
+      source: string;
+    }
+  /**
+   * `count` state patches were discarded; resynchronise from snapshots.
+   * `messages` message events were discarded past the queue's hard ceiling
+   * (absent when none were).
+   */
+  | { event: 'dropped'; count: number; messages?: number }
   /**
    * A device found by discovery, or more learned about one. `models` lists
    * every model it can be; `evidence` says what the identification rests on.
@@ -178,6 +199,7 @@ export class Core extends EventEmitter {
   on(event: 'alive', listener: (event: Extract<Event, { event: 'alive' }>) => void): this;
   on(event: 'log', listener: (event: Extract<Event, { event: 'log' }>) => void): this;
   on(event: 'closed', listener: (event: Extract<Event, { event: 'closed' }>) => void): this;
+  on(event: 'message', listener: (event: Extract<Event, { event: 'message' }>) => void): this;
   on(event: 'dropped', listener: (event: Extract<Event, { event: 'dropped' }>) => void): this;
   on(event: 'discovered', listener: (event: Extract<Event, { event: 'discovered' }>) => void): this;
   on(event: 'discovery', listener: (event: Extract<Event, { event: 'discovery' }>) => void): this;

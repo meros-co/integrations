@@ -121,7 +121,9 @@ class Core:
 
         request: {"device", "model", "host", "port"?, "settings"?, "monitor"?}.
         "monitor": False opens the device for commands only: no subscription,
-        connect-time read or poll, so none of its subscription slots is taken."""
+        connect-time read or poll, so none of its subscription slots is taken.
+        "host" may be left out for an integration on which only the core
+        listens, such as "osc-listener"."""
         result = json.loads(self._native.open(json.dumps(request)))
         if "error" in result:
             raise IntegrationsError(result["error"])
@@ -150,6 +152,10 @@ class Core:
         return json.loads(self._native.snapshot(device))
 
     def poll_events(self, max: int = 256) -> list[dict[str, Any]]:
+        """Queued events without waiting, each {"event": "connection" | "state"
+        | "alive" | "log" | "closed" | "message" | "dropped" | "discovered" |
+        "discovery", ...} (SPEC.md, Events). A "message" event is one message
+        a listener received, reported even when it repeats the last."""
         return json.loads(self._native.poll_events(max))
 
     def wait_events(self, max: int = 256, timeout_ms: int = 25_000) -> list[dict[str, Any]]:

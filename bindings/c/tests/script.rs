@@ -128,6 +128,22 @@ fn the_shared_binding_script() {
                         std::thread::sleep(Duration::from_millis(20));
                     }
                 }
+                "event" => {
+                    let wanted = step.get("count").and_then(Value::as_u64).unwrap_or(1);
+                    let fields = step["match"].as_object().unwrap();
+                    let deadline = Instant::now() + Duration::from_secs(5);
+                    let mut found = 0;
+                    while found < wanted {
+                        assert!(Instant::now() < deadline, "{label}: {found} found");
+                        let events = take(mi_wait_events(core, 256, 100));
+                        found += events
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .filter(|e| fields.iter().all(|(k, v)| &e[k] == v))
+                            .count() as u64;
+                    }
+                }
                 "execute" => {
                     let command = cs(step["command"].as_str().unwrap());
                     let params = cs(&step["params"].to_string());
