@@ -1,0 +1,570 @@
+spec: 1
+id: castr
+name: Castr (Castr API v2)
+vendor: Castr
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host api.castr.com on port 443 and acts for the Castr account
+# the API access token belongs to. It follows one live stream, the stream_id
+# setting, keeping its status, its multistream platforms and its ingest stats
+# in state; the commands take any stream.
+
+source:
+  - title: Castr API documentation, Guides (Overview, Accessing the API, HTTP Verbs, Response Codes, Versioning)
+    author: Castr
+    url: https://developers.castr.com/docs/getting-started
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Requests authenticate with
+      HTTP Basic, the access token's ID as the username and its secret key
+      as the password; tokens are issued by Castr (through chat support while
+      the dashboard tool is being built) and the secret is shown once.
+      Requests and answers are JSON. 401 means no valid key, 403 a key
+      without permission or a feature not on the plan, 404 a missing
+      resource. The verbs page calls PUT a partial change and PATCH a
+      replacement, while the reference uses PATCH for every update.
+  - title: Castr API documentation, Guides (Create Stream, Custom Destinations, Manage Social Media Meta, Get Stream Stats, Pull URLs, Stream Recordings, Instant Video Clipping)
+    author: Castr
+    url: https://developers.castr.com/docs/create-livestream
+    note: >
+      Manufacturer document, retrieved 2026-10-04. POST /v2/live_streams
+      (name, enabled, settings abr, cloud_recording, embed_password,
+      country_block, country_whitelist, domain_whitelist, chat_enabled)
+      answers the stream with ingest.server and ingest.key. Setting enabled
+      false through Update stops the stream receiving from the encoder at
+      once. POST /v2/live_streams/{id}/platforms (template custom, server,
+      key, enabled) adds a multistream target; GET /v2/live_streams/{id}
+      gives broadcasting_status online or offline for the stream and each
+      platform, and pull_urls while online; PATCH
+      /v2/live_streams/{id}/platforms/{platform_id} with enabled false
+      pauses a target even while live; DELETE removes it. The same PATCH
+      with metadata title and description changes a linked Facebook or
+      YouTube platform's title. GET /v2/live_streams/{id}/stats (status,
+      bitrate, alive, opened_at, retry_count, media_info.tracks with codec,
+      bitrate, width, height, fps, sample_rate, channels) answers 404
+      "Stream not found in upstreams." while the stream is offline.
+      Temporary recordings are kept 72 hours and can be converted to VOD
+      with from and duration.
+  - title: Castr API V2 reference (OpenAPI 3.0 definitions per endpoint)
+    author: Castr
+    url: https://developers.castr.com/reference/get_v2-live-streams
+    note: >
+      Manufacturer document, retrieved 2026-10-04 (the .md export of each
+      endpoint). GET /v2/live_streams (page, limit, low_latency_playback),
+      POST, GET, PATCH and DELETE /v2/live_streams/{stream_id} (LiveStream:
+      _id, name, enabled, ingest, playback with embed_url, hls_url and
+      ll_embed_url, platforms, settings with abr, cloud_recording,
+      country_block, country_whitelist, domain_whitelist, embed_password,
+      chat_enabled, varying_rewind -1, 3600, 7200, 10800 or 14400,
+      low_latency_playback). POST, PATCH and DELETE .../platforms
+      (name, template, server, key, enabled; answer the stream; DELETE
+      answers success). GET .../stats, .../temporary_recordings,
+      .../recordings (page, limit, start_time, end_time), .../epg; POST
+      .../temporary_recordings/{recording_id} (from, duration). Webhook
+      endpoints, sub-second streams, VOD folders and activity logs and
+      events (which name an auth-token header) are also listed.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The access token's ID and secret as HTTP Basic (username and password).
+  auth: basic
+  # 403 is a plan or permission limit, not a refused key.
+  refusal_status: [401]
+  timeout_ms: 10000
+  # The followed stream: one request that also checks the key.
+  probe: { method: GET, path: "/v2/live_streams/{settings.stream_id}" }
+
+settings:
+  username: { type: string, max_length: 256, required: true,
+              label: Token ID,
+              description: "The ID of the Castr API access token, sent as the HTTP Basic username." }
+  password: { type: string, secret: true, max_length: 256, required: true,
+              label: Secret key,
+              description: "The access token's secret key, shown by Castr only once when the token is made, sent as the HTTP Basic password." }
+  stream_id: { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+               label: Stream ID,
+               description: "The id of the live stream to follow, 24 hexadecimal characters, from list_streams or the stream's dashboard URL." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at api.castr.com, opened by that host name" }
+
+models:
+  - id: api-v2
+    name: Castr API v2, live streams
+    supports: [list_streams, get_stream, get_ingest, get_playback, get_pull_urls, create_stream,
+               create_stream_custom, update_stream, rename_stream, set_stream_enabled,
+               set_cloud_recording, set_abr, set_low_latency_playback, set_chat_enabled,
+               delete_stream, add_platform, add_platform_custom, set_platform_enabled,
+               set_platform_meta, update_platform, delete_platform, get_stream_stats,
+               list_temporary_recordings, convert_recording_to_vod, list_vod_recordings, get_epg]
+    verification: none
+    notes: >
+      Follows the live stream named by stream_id; the commands take any
+      stream of the account. API access is part of Castr's plans, and some
+      features (ABR, recording, multistream targets) depend on the plan.
+
+commands:
+  # ── Live streams ──────────────────────────────────────────────────────────
+  list_streams:
+    summary: The account's live streams with status and settings; they include ingest and platform stream keys, so the value is never kept or logged (List live streams)
+    params:
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Streams per page,
+               description: "How many streams each page holds." }
+    send: { method: GET, path: /v2/live_streams, query: { page: "{page}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream:
+    summary: One live stream with status, platforms, settings and playback; it includes ingest and platform stream keys, so the value is never kept or logged (Get a live stream)
+    params:
+      stream_id: &stream_id { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+                              label: Stream ID,
+                              description: "The live stream's id, 24 hexadecimal characters." }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_ingest:
+    summary: The stream's ingest server and stream key for the encoder; the key is a secret, returned here only and never kept in state (the stream's ingest)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}" }
+    expect: { status: 200, json_path: "$.ingest" }
+    returns: value
+
+  get_playback:
+    summary: The stream's player embed URL, HLS URL and low-latency embed URL (the stream's playback)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}" }
+    expect: { status: 200, json_path: "$.playback" }
+    returns: value
+
+  get_pull_urls:
+    summary: RTMP and SRT URLs to pull the stream from Castr into another tool, while it is online only (the stream's pull_urls)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}" }
+    expect: { status: 200, json_path: "$.pull_urls" }
+    returns: value
+
+  create_stream:
+    summary: Create a live stream; answers its id (Create a new live stream)
+    params:
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The stream's name in Castr." }
+      enabled: { type: bool, default: true,
+                 label: Enabled,
+                 description: "On to accept the encoder's stream as soon as it arrives." }
+      cloud_recording: { type: bool, default: false,
+                         label: Recording,
+                         description: "On to record the stream in the cloud, kept 72 hours unless converted to VOD." }
+      abr: { type: bool, default: false,
+             label: Adaptive bitrate,
+             description: "On to transcode viewers' renditions at several bitrates." }
+    send: { method: POST, path: /v2/live_streams,
+            body: '{"name":{name:json},"enabled":{enabled},"settings":{"abr":{abr},"cloud_recording":{cloud_recording}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$._id" }
+    returns: value
+
+  create_stream_custom:
+    summary: Create a live stream with a full Create body (name, enabled, settings abr, cloud_recording, embed_password, country_block, country_whitelist, domain_whitelist, chat_enabled, varying_rewind, low_latency_playback); answers its id
+    params:
+      stream: { type: json, required: true,
+                label: Stream,
+                description: "A JSON object as Castr documents for Create a new live stream." }
+    send: { method: POST, path: /v2/live_streams, body: '{stream}', content_type: application/json }
+    expect: { status: 200, json_path: "$._id" }
+    returns: value
+
+  update_stream:
+    summary: Change a stream with an Update a live stream body (name, enabled, settings)
+    params:
+      stream_id: *stream_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields Castr documents for Update a live stream." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  rename_stream:
+    summary: Change a stream's name (Update a live stream, name)
+    params:
+      stream_id: *stream_id
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The stream's new name in Castr." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"name":{name:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_stream_enabled:
+    summary: Turn a stream on or off; off stops it receiving from the encoder at once, the documented emergency stop (Update a live stream, enabled)
+    params:
+      stream_id: *stream_id
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On to accept the encoder's stream, off to cut it off." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_cloud_recording:
+    summary: Turn cloud recording on or off for a stream (Update a live stream, settings.cloud_recording)
+    params:
+      stream_id: *stream_id
+      enabled: { type: bool, required: true,
+                 label: Recording,
+                 description: "On to record the stream in the cloud." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"cloud_recording":{enabled}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_abr:
+    summary: Turn adaptive bitrate transcoding on or off for a stream (Update a live stream, settings.abr)
+    params:
+      stream_id: *stream_id
+      enabled: { type: bool, required: true,
+                 label: Adaptive bitrate,
+                 description: "On to give viewers several bitrates." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"abr":{enabled}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_low_latency_playback:
+    summary: Turn low-latency playback on or off for a stream (Update a live stream, settings.low_latency_playback)
+    params:
+      stream_id: *stream_id
+      enabled: { type: bool, required: true,
+                 label: Low latency,
+                 description: "On to offer the low-latency embed URL." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"low_latency_playback":{enabled}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_chat_enabled:
+    summary: Show or hide the chat in the stream's embedded player (Update a live stream, settings.chat_enabled)
+    params:
+      stream_id: *stream_id
+      enabled: { type: bool, required: true,
+                 label: Chat,
+                 description: "On to show the chat beside the embedded player." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}",
+            body: '{"settings":{"chat_enabled":{enabled}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_stream:
+    summary: Delete a live stream (Delete a live stream)
+    params: { stream_id: *stream_id }
+    send: { method: DELETE, path: "/v2/live_streams/{stream_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Multistream platforms ─────────────────────────────────────────────────
+  add_platform:
+    summary: Multistream a stream to an RTMP server with a stream key (Add Platform, template custom)
+    params:
+      stream_id: *stream_id
+      name: { type: string, pattern: "\\S", max_length: 200, required: true,
+              label: Name,
+              description: "The target's name in Castr." }
+      server: { type: string, pattern: "^rtmps?://\\S+$", max_length: 1024, required: true,
+                label: Server URL,
+                description: "The target's RTMP or RTMPS server URL, such as rtmp://a.rtmp.youtube.com/live2." }
+      key: { type: string, pattern: "^\\S+$", max_length: 1024, required: true,
+             label: Stream key,
+             description: "The target's stream key, a secret sent to Castr and not kept." }
+      enabled: { type: bool, default: true,
+                 label: Enabled,
+                 description: "On to send the stream to the target when it goes live." }
+    send: { method: POST, path: "/v2/live_streams/{stream_id}/platforms",
+            body: '{"template":"custom","name":{name:json},"server":{server:json},"key":{key:json},"enabled":{enabled}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  add_platform_custom:
+    summary: Multistream a stream to a target with a full Add Platform body (template, name, server, key, enabled)
+    params:
+      stream_id: *stream_id
+      platform: { type: json, required: true,
+                  label: Platform,
+                  description: "A JSON object as Castr documents for Add Platform." }
+    send: { method: POST, path: "/v2/live_streams/{stream_id}/platforms", body: '{platform}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_platform_enabled:
+    summary: Pause or resume sending a stream to one multistream target, also while live (Update Platform, enabled)
+    params:
+      stream_id: *stream_id
+      platform_id: &platform_id { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+                                  label: Platform ID,
+                                  description: "The target's id in the stream's platforms, 24 hexadecimal characters." }
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On to send the stream to the target, off to pause it." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}/platforms/{platform_id}",
+            body: '{"enabled":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_platform_meta:
+    summary: Change the title and description of the live video on a linked Facebook or YouTube target (Update Platform, metadata)
+    params:
+      stream_id: *stream_id
+      platform_id: *platform_id
+      title: { type: string, pattern: "\\S", max_length: 500, required: true,
+               label: Title,
+               description: "The live video's title on the platform; the platform's own length limit applies." }
+      description: { type: string, max_length: 5000, required: true,
+                     label: Description,
+                     description: "The live video's description on the platform." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}/platforms/{platform_id}",
+            body: '{"metadata":{"title":{title:json},"description":{description:json}}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  update_platform:
+    summary: Change a multistream target with an Update Platform body (name, template, server, key, enabled)
+    params:
+      stream_id: *stream_id
+      platform_id: *platform_id
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with the fields Castr documents for Update Platform." }
+    send: { method: PATCH, path: "/v2/live_streams/{stream_id}/platforms/{platform_id}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_platform:
+    summary: Remove a multistream target from a stream (Delete Platform)
+    params:
+      stream_id: *stream_id
+      platform_id: *platform_id
+    send: { method: DELETE, path: "/v2/live_streams/{stream_id}/platforms/{platform_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Stats and recordings ──────────────────────────────────────────────────
+  get_stream_stats:
+    summary: The stream's ingest stats while online, status, bitrate, uptime and each track's codec, size, frame rate and bitrate; 404 while offline (Get stream stats)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}/stats" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_temporary_recordings:
+    summary: The stream's cloud recordings of the last 72 hours, with start, end, duration and download URL (Get Recordings)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}/temporary_recordings" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  convert_recording_to_vod:
+    summary: Keep part of a temporary recording as a VOD, from a start time for a duration (Convert Live-to-VOD)
+    params:
+      stream_id: *stream_id
+      recording_id: { type: string, pattern: "^[0-9a-f]{24}$", required: true,
+                      label: Recording ID,
+                      description: "The recording's id, from list_temporary_recordings." }
+      from: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$", required: true,
+              label: From,
+              description: "Where the VOD starts, an ISO 8601 UTC time inside the recording, such as 2026-10-11T09:30:00.000Z." }
+      duration: { type: int, min: 1, required: true,
+                  label: Duration,
+                  description: "Seconds of the recording to keep, from the start time." }
+    send: { method: POST, path: "/v2/live_streams/{stream_id}/temporary_recordings/{recording_id}",
+            body: '{"from":{from:json},"duration":{duration}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_vod_recordings:
+    summary: The stream's recordings converted to VOD, a page at a time (Get Live-to-Vod)
+    params:
+      stream_id: *stream_id
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Recordings per page,
+               description: "How many recordings each page holds." }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}/recordings", query: { page: "{page}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_epg:
+    summary: The stream's electronic programme guide (Get Live EPG)
+    params: { stream_id: *stream_id }
+    send: { method: GET, path: "/v2/live_streams/{stream_id}/epg" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host api.castr.com and port
+      443; it is reached over HTTPS and the certificate is checked against
+      that name. The access token's ID and secret key go as HTTP Basic with
+      every request; Castr issues tokens on request (through its chat
+      support until the dashboard can make them) and shows the secret once.
+      A 401 is the terminal refusal: the integration reports unauthorized
+      and sends nothing more until the consumer passes a new key with
+      update_settings. A 403 (a feature not on the plan) is an ordinary
+      failure.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Castr's stream answers hold the encoder's stream key (ingest.key,
+      with its password) and each multistream target's key. get_ingest,
+      get_stream and list_streams return them as the command's value only;
+      they are never kept in state or logged. add_platform sends a target's
+      stream key to Castr; it is not kept. Show keys to the operator only
+      on demand.
+
+  - models: [all]
+    severity: critical
+    text: >
+      set_stream_enabled off cuts the stream off from the encoder at once,
+      live or not, and every multistream target with it; Castr documents it
+      as the emergency stop. delete_stream deletes the stream, its ingest
+      key and its targets, and can't be undone. delete_platform removes a
+      target and its key; set_platform_enabled off pauses one instead.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Castr's HTTP Verbs page calls PATCH a replacement and PUT a partial
+      change, while its reference and guides send only the changed fields
+      with PATCH. The setting commands send one field (or one settings
+      field) each; whether Castr keeps the stream's other settings when a
+      settings object holds only one is unconfirmed. The Social Media Meta
+      guide's example also sends the platform's name and enabled false,
+      saying false applies no update; set_platform_meta sends metadata
+      alone. set_platform_meta works only for Facebook and YouTube targets
+      linked through Castr's dashboard.
+
+  - models: [all]
+    severity: info
+    text: >
+      Castr pushes nothing to the API (webhooks need a server of the
+      consumer's). The followed stream and its stats are polled every 15
+      seconds (2 requests); answers to commands that change a stream or its
+      platforms update state at once. Stats exist only while the stream is
+      online: Castr answers 404 otherwise, so streams.*.stats_* and the
+      tracks keep their last values after the stream goes offline, and
+      streams.*.broadcasting_status says whether they are current. The
+      documents state no rate limits.
+
+state:
+  streams.*.name:                 { type: string, description: "The stream's name, keyed by stream id" }
+  streams.*.enabled:              { type: bool, description: "The stream accepts the encoder's input (enabled)" }
+  streams.*.broadcasting_status:  { type: string, description: "online while the encoder is streaming, else offline (broadcasting_status)" }
+  streams.*.abr:                  { type: bool, description: "Adaptive bitrate transcoding is on (settings.abr)" }
+  streams.*.cloud_recording:      { type: bool, description: "Cloud recording is on (settings.cloud_recording)" }
+  streams.*.low_latency_playback: { type: bool, description: "Low-latency playback is on (settings.low_latency_playback)" }
+  streams.*.chat_enabled:         { type: bool, description: "The embedded player shows chat (settings.chat_enabled)" }
+  streams.*.embed_url:            { type: string, description: "The player's embed URL (playback.embed_url)" }
+  streams.*.hls_url:              { type: string, description: "The HLS playback URL (playback.hls_url)" }
+  streams.*.platforms.*.name:     { type: string, description: "The multistream target's name, keyed by its id" }
+  streams.*.platforms.*.template: { type: string, description: "The target's kind, such as custom (template)" }
+  streams.*.platforms.*.enabled:  { type: bool, description: "The stream is sent to the target (enabled)" }
+  streams.*.platforms.*.broadcasting_status: { type: string, description: "online while the target receives the stream, else offline (broadcasting_status)" }
+  streams.*.stats_status:         { type: string, description: "The ingest's state, such as running (stats status)" }
+  streams.*.stats_alive:          { type: bool, description: "The ingest is receiving data (stats alive)" }
+  streams.*.stats_bitrate:        { type: int, unit: kbps, description: "Total incoming bitrate (stats bitrate)" }
+  streams.*.stats_opened_at:      { type: int, unit: ms, description: "When the ingest opened, Unix milliseconds (stats opened_at)" }
+  streams.*.stats_retry_count:    { type: int, description: "How often the ingest has reconnected (stats retry_count)" }
+  streams.*.tracks.*.content:     { type: string, description: "video or audio, keyed by track id such as v1 or a1 (media_info.tracks content)" }
+  streams.*.tracks.*.codec:       { type: string, description: "The track's codec, such as h264 or aac" }
+  streams.*.tracks.*.bitrate:     { type: int, unit: kbps, description: "The track's bitrate" }
+  streams.*.tracks.*.width:       { type: int, unit: px, description: "Video width" }
+  streams.*.tracks.*.height:      { type: int, unit: px, description: "Video height" }
+  streams.*.tracks.*.fps:         { type: float, unit: fps, description: "Video frame rate" }
+  streams.*.tracks.*.sample_rate: { type: int, unit: Hz, description: "Audio sample rate" }
+  streams.*.tracks.*.channels:    { type: int, description: "Audio channels" }
+
+telemetry:
+  # Castr pushes nothing to the API: the followed stream and its stats are
+  # polled every 15 seconds.
+  poll:
+    every_ms: 15000
+    send:
+      - { method: GET, path: "/v2/live_streams/{settings.stream_id}" }
+      - { method: GET, path: "/v2/live_streams/{settings.stream_id}/stats" }
+  updates:
+    # Polls, get_stream, every stream update and every platform change
+    # answer the stream.
+    - path: '^/v2/live_streams/([0-9a-f]{24})(/platforms(/[0-9a-f]{24})?)?$'
+      json_match: { "$._id": '^[0-9a-f]{24}$' }
+      json:
+        name: "$.name"
+        enabled: "$.enabled"
+        status: "$.broadcasting_status"
+        abr: "$.settings.abr"
+        recording: "$.settings.cloud_recording"
+        low_latency: "$.settings.low_latency_playback"
+        chat: "$.settings.chat_enabled"
+        embed: "$.playback.embed_url"
+        hls: "$.playback.hls_url"
+      state:
+        streams.{1}.name: "{name}"
+        streams.{1}.enabled: "{enabled}"
+        streams.{1}.broadcasting_status: "{status}"
+        streams.{1}.abr: "{abr}"
+        streams.{1}.cloud_recording: "{recording}"
+        streams.{1}.low_latency_playback: "{low_latency}"
+        streams.{1}.chat_enabled: "{chat}"
+        streams.{1}.embed_url: "{embed}"
+        streams.{1}.hls_url: "{hls}"
+    - path: '^/v2/live_streams/([0-9a-f]{24})(/platforms(/[0-9a-f]{24})?)?$'
+      json_each: "$.platforms"
+      json: { id: "$._id", name: "$.name", template: "$.template", enabled: "$.enabled", status: "$.broadcasting_status" }
+      state:
+        streams.{1}.platforms.{id}.name: "{name}"
+        streams.{1}.platforms.{id}.template: "{template}"
+        streams.{1}.platforms.{id}.enabled: "{enabled}"
+        streams.{1}.platforms.{id}.broadcasting_status: "{status}"
+    - path: '^/v2/live_streams/([0-9a-f]{24})/stats$'
+      json: { status: "$.status", alive: "$.alive", bitrate: "$.bitrate", opened: "$.opened_at", retries: "$.retry_count" }
+      state:
+        streams.{1}.stats_status: "{status}"
+        streams.{1}.stats_alive: "{alive}"
+        streams.{1}.stats_bitrate: "{bitrate}"
+        streams.{1}.stats_opened_at: "{opened}"
+        streams.{1}.stats_retry_count: "{retries}"
+    - path: '^/v2/live_streams/([0-9a-f]{24})/stats$'
+      json_each: "$.media_info.tracks"
+      json:
+        track: "$.track_id"
+        content: "$.content"
+        codec: "$.codec"
+        bitrate: "$.bitrate"
+        width: "$.width"
+        height: "$.height"
+        fps: "$.fps"
+        sample_rate: "$.sample_rate"
+        channels: "$.channels"
+      state:
+        streams.{1}.tracks.{track}.content: "{content}"
+        streams.{1}.tracks.{track}.codec: "{codec}"
+        streams.{1}.tracks.{track}.bitrate: "{bitrate}"
+        streams.{1}.tracks.{track}.width: "{width}"
+        streams.{1}.tracks.{track}.height: "{height}"
+        streams.{1}.tracks.{track}.fps: "{fps}"
+        streams.{1}.tracks.{track}.sample_rate: "{sample_rate}"
+        streams.{1}.tracks.{track}.channels: "{channels}"

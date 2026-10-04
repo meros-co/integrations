@@ -1,0 +1,1003 @@
+spec: 1
+id: restream
+name: Restream (Restream API)
+vendor: Restream
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host api.restream.io on port 443 and acts for the Restream
+# account that signed in. The consumer owns the credential: it registers its
+# own Restream application, runs the authorization code sign-in, and passes
+# the tokens as settings; the core keeps the access token fresh with the
+# refresh token and reports every new pair as a credentials event. The core
+# never runs a sign-in and persists nothing.
+
+source:
+  - title: Restream Developers, Authentication (Overview, Authorize Dialog, Code Exchange, Refreshing Tokens, Revoking Tokens)
+    author: Restream
+    url: https://developers.restream.io/authentication
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Sign-in at
+      https://api.restream.io/login (response_type code, client_id,
+      redirect_uri, state). Tokens at POST https://api.restream.io/oauth/token,
+      form-encoded, with client_id and client_secret either as HTTP Basic or
+      in the body. Access tokens last 1 hour (expires_in 3600), refresh
+      tokens 1 year from the grant. A refresh invalidates the previous access
+      and refresh token pair and answers a new pair. An invalid refresh token
+      answers 400 with error name invalid_grant. Refreshing needs the client
+      secret, so a user's device should refresh through a proxy run by the
+      application rather than hold the secret. POST
+      https://api.restream.io/oauth/revoke revokes a token and its pair.
+  - title: Restream Developers, Public API (Platforms, Ingest Servers) and Private API (Profile, Selected Ingest, Stream Key, Chat URL, Streaming Updates)
+    author: Restream
+    url: https://developers.restream.io/private-api
+    note: >
+      Manufacturer document, retrieved 2026-10-04. GET /v2/platform/all and
+      GET /v2/server/all need no authentication. GET /v2/user/profile
+      (profile.read; id, username, email), GET /v2/user/ingest
+      (channels.read; ingestId), GET /v2/user/streamKey (stream.read;
+      streamKey, srtUrl null without SRT), GET /v2/user/webchat/url
+      (chat.read; webchatUrl). Streaming Updates is a websocket at
+      wss://streaming.api.restream.io/ws with the access token in the
+      accessToken query parameter: updateIncoming (fps, bitrate, codecs,
+      size), deleteIncoming, updateOutgoing (per channel, status CONNECTING,
+      CONNECTED or DISCONNECTED, bitrate), deleteOutgoing and updateStatuses
+      (viewers, followers, title, online per channel); on connecting it
+      replays about a minute of updates. Every error answers JSON with
+      error.statusCode, error.message and error.name; a refused token
+      answers 401 invalid_token, a missing scope 403 insufficient_scope.
+  - title: Restream Developers, Channels (Channels, Channel, Add Channel, Delete Channel)
+    author: Restream
+    url: https://developers.restream.io/channels
+    note: >
+      Manufacturer document, retrieved 2026-10-04. GET /v2/user/channels
+      (channels.read; channels with id, platformId, channelUrl,
+      displayName), GET /v2/user/channels/{channelId}, POST
+      /v2/user/channels (channels.write; platformId, streamUrl, streamKey,
+      displayName, rtmpUsername, rtmpPassword, instagramUsername; 201; the
+      platforms that can be added manually and which fields each needs),
+      DELETE /v2/user/channels/{channelId} (204; a deleted channel no longer
+      receives upcoming or in-progress events).
+  - title: Restream Developers, Events (Create Event, Add and Delete Event Destination, Upcoming, In Progress, History, Event, Stream Keys, Recordings, Transcriptions, Chat History) and Analytics
+    author: Restream
+    url: https://developers.restream.io/events
+    note: >
+      Manufacturer document, retrieved 2026-10-04. POST /v2/user/events/new
+      (stream.write; streamType studio, encoder or file, title,
+      description, scheduledFor ISO 8601, fileId, loopsCount 0 to 9; 201
+      with id). POST /v2/user/events/{eventId}/destinations (channelId,
+      streamingOrientation horizontal or vertical; YouTube and Embed Player
+      take title and more; Facebook, Instagram, TikTok, LinkedIn and X not
+      yet supported; 201). DELETE
+      /v2/user/events/{eventId}/destinations/{destinationId} (only while
+      the event is scheduled; 204). GET /v2/user/events/upcoming,
+      /in-progress (arrays) and /history?page&limit (items, pagination;
+      finished or missed). GET /v2/user/events/{eventId} (status upcoming,
+      in-progress or finished; scheduledFor, startedAt, finishedAt in Unix
+      seconds or null; destinations). GET .../streamKey and
+      .../srt/streamKey (SRT on Business and Enterprise plans only). GET
+      .../recordings, POST .../recordings/download-url (fileName), GET
+      .../recordings/transcriptions (storage.read). GET .../chat/history
+      (pageSize 1 to 1000) and POST .../chat/history/download-url
+      (chat.read). GET .../analytics/viewers and .../analytics/messages
+      (stream.read; 404 for an event with no incoming stream).
+  - title: Restream Developers, Studio (Audio, Brands, Captions, Fonts, QR Codes, Tickers), Storage and Clips
+    author: Restream
+    url: https://developers.restream.io/studio
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Under /v2/user/studio:
+      GET audio-backgrounds, audio/countdown-music, brands, fonts;
+      captions, qr-codes and tickers each with list (brandId filter), get,
+      POST create, PATCH update, DELETE (204); PATCH qr-codes/order and
+      tickers/order with ids (204). Tickers take text and brandId, captions
+      text, secondaryText and brandId, QR codes brandId, title, link and
+      shouldShowTitle (studio.read, studio.write). GET /v2/user/storage/files
+      (storage.read). GET and POST /v2/user/clips/projects, GET
+      /v2/user/clips/projects/{projectId} (clips.read, clips.write; create
+      answers 201 and clips asynchronously).
+  - title: Restream Developers, earlier API reference (Channel Update, Channel Meta, Channel Meta Update), as archived
+    author: Restream
+    url: https://web.archive.org/web/20230105143912/https://developers.restream.io/docs
+    note: >
+      Manufacturer document as archived 2023-01-05, retrieved 2026-10-04: its
+      navigation lists GET /v2/user/channel/all, PATCH channel-update, GET
+      channel-meta and PATCH channel-meta-update; the pages themselves were
+      not archived. The current reference no longer lists them. Used only
+      for the four legacy channel commands and the enabled poll, which are
+      unconfirmed.
+  - title: bitfocus/companion-module-restream-api (MIT)
+    author: Bitfocus and contributors
+    url: https://github.com/bitfocus/companion-module-restream-api
+    note: >
+      Read as corroboration only, no code copied (main.js, retrieved
+      2026-10-04): GET /v2/user/channel/all with an enabled flag per channel,
+      PATCH /v2/user/channel/{id} with {"active": true|false}, GET and PATCH
+      /v2/user/channel-meta/{id} with {"title": ...}.
+  - title: RFC 6749, The OAuth 2.0 Authorization Framework, section 6 (Refreshing an Access Token)
+    author: IETF
+    url: https://www.rfc-editor.org/rfc/rfc6749
+    note: >
+      The refresh request, and a new refresh token in the answer replacing
+      the old one.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The access_token setting as Bearer, refreshed with refresh_token at
+  # Restream's token endpoint (or the token_url setting's proxy, which an
+  # open-source consumer must use, since Restream's refresh needs the
+  # client secret).
+  auth: oauth2
+  oauth:
+    token_url: https://api.restream.io/oauth/token
+    refresh_ahead_s: 300
+    client_auth: body
+  # Restream answers a refused token with 401 invalid_token and a missing
+  # scope with 403 insufficient_scope: only 401 is the refusal.
+  refusal_status: [401]
+  timeout_ms: 10000
+  # The signed-in user's profile: one request that also checks the token.
+  probe: { method: GET, path: /v2/user/profile }
+
+settings:
+  client_id: { type: string, max_length: 512, default: "",
+               label: Client ID,
+               description: "The consumer's own Restream application's client ID, sent with each token refresh; it must be the application the tokens were issued to." }
+  client_secret: { type: string, secret: true, max_length: 512, default: "",
+                   label: Client secret,
+                   description: "The application's client secret, needed by Restream for every refresh; leave empty when token_url names the consumer's proxy that adds it, as a product that cannot ship its secret must." }
+  refresh_token: { type: string, secret: true, max_length: 4096, default: "",
+                   label: Refresh token,
+                   description: "The refresh token from the consumer's sign-in, valid a year; every refresh replaces it, so persist each one the credentials event reports." }
+  access_token: { type: string, secret: true, max_length: 4096, default: "",
+                  label: Access token,
+                  description: "The current access token, valid an hour; may be left empty when a refresh token is given, and the core reports each new one in a credentials event." }
+  expires_at: { type: int, min: 0,
+                label: Access token expiry,
+                description: "When the access token expires, in Unix seconds; the core refreshes 5 minutes before, and reports each new expiry in a credentials event." }
+  token_url: { type: string, max_length: 2048, default: "",
+               pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
+               label: Token endpoint override,
+               description: "A token endpoint to refresh at instead of Restream's, the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Restream's." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at api.restream.io, opened by that host name; token refreshes go to the same host (or the token_url proxy)" }
+
+models:
+  - id: api-v2
+    name: Restream API v2
+    supports: [get_profile, get_selected_ingest, get_stream_key, get_chat_url, list_platforms,
+               list_ingest_servers, list_channels, get_channel, add_channel, add_rtmp_channel,
+               delete_channel, set_channel_enabled, get_channel_meta, set_channel_title,
+               set_channel_meta, list_upcoming_events, list_in_progress_events, list_events_history,
+               get_event, create_event, create_scheduled_event, create_event_custom,
+               add_event_destination, add_event_destination_custom, delete_event_destination,
+               get_event_stream_key, get_event_srt_stream_key, list_event_recordings,
+               get_recording_download_url, list_event_transcriptions, get_event_chat_history,
+               get_chat_history_download_url, get_event_viewer_analytics, get_event_chat_analytics,
+               list_brands, list_fonts, list_countdown_music, list_audio_backgrounds, list_tickers,
+               create_ticker, update_ticker, delete_ticker, reorder_tickers, list_captions,
+               create_caption, update_caption, delete_caption, list_qr_codes, create_qr_code,
+               update_qr_code, delete_qr_code, reorder_qr_codes, list_storage_files,
+               list_clip_projects, get_clip_project, create_clip_project]
+    verification: none
+    notes: >
+      Acts for the Restream account that signed in. Each command needs its
+      scope granted at sign-in (named in its summary) and selected for the
+      application in Restream's developer settings.
+
+commands:
+  # ── Account and reference data ────────────────────────────────────────────
+  get_profile:
+    summary: The signed-in account's id, username and email (Profile; profile.read)
+    send: { method: GET, path: /v2/user/profile }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_selected_ingest:
+    summary: The ingest server the account streams to, as an id from list_ingest_servers (Selected Ingest; channels.read)
+    send: { method: GET, path: /v2/user/ingest }
+    expect: { status: 200, json_path: "$.ingestId" }
+    returns: value
+
+  get_stream_key:
+    summary: The account's RTMP stream key and SRT URL for the encoder; secrets, returned here only and never kept in state (Stream Key; stream.read)
+    send: { method: GET, path: /v2/user/streamKey }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_chat_url:
+    summary: The URL of the account's combined chat for embedding; it carries a token, so it is returned here only (Chat URL; chat.read)
+    send: { method: GET, path: /v2/user/webchat/url }
+    expect: { status: 200, json_path: "$.webchatUrl" }
+    returns: value
+
+  list_platforms:
+    summary: Every platform Restream can stream to, with its id, name and URL (Platforms; no scope)
+    send: { method: GET, path: /v2/platform/all }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_ingest_servers:
+    summary: Restream's ingest servers with their RTMP URLs and locations (Ingest Servers; no scope)
+    send: { method: GET, path: /v2/server/all }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Channels (destinations) ───────────────────────────────────────────────
+  list_channels:
+    summary: The account's channels (destinations) with platform, URL and display name (Channels; channels.read)
+    send: { method: GET, path: /v2/user/channels }
+    expect: { status: 200, json_path: "$.channels" }
+    returns: value
+
+  get_channel:
+    summary: One channel (Channel; channels.read)
+    params:
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels." }
+    send: { method: GET, path: "/v2/user/channels/{channel_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  add_channel:
+    summary: Add a manually configured channel with an Add Channel body (platformId, streamUrl, streamKey, displayName, rtmpUsername, rtmpPassword, instagramUsername; channels.write)
+    params:
+      channel: { type: json, required: true,
+                 label: Channel,
+                 description: "A JSON object as Restream documents for Add Channel: platformId and the fields that platform needs, such as streamUrl and streamKey." }
+    send: { method: POST, path: /v2/user/channels, body: '{channel}', content_type: application/json }
+    expect: { status: 201, json_path: "$" }
+    returns: value
+
+  add_rtmp_channel:
+    summary: Add a Custom RTMP channel, platform 29, sending to a server URL with a stream key (Add Channel; channels.write)
+    params:
+      stream_url: { type: string, pattern: "^rtmps?://\\S+$", max_length: 1024, required: true,
+                    label: Server URL,
+                    description: "The destination's RTMP or RTMPS server URL, such as rtmp://a.rtmp.youtube.com/live2." }
+      stream_key: { type: string, pattern: "^\\S+$", max_length: 1024, required: true,
+                    label: Stream key,
+                    description: "The destination's stream key, a secret that is sent to Restream and not kept." }
+      display_name: { type: string, pattern: "\\S", max_length: 100, required: true,
+                      label: Name,
+                      description: "The name the channel shows in Restream." }
+    send: { method: POST, path: /v2/user/channels,
+            body: '{"platformId":29,"streamUrl":{stream_url:json},"streamKey":{stream_key:json},"displayName":{display_name:json}}',
+            content_type: application/json }
+    expect: { status: 201, json_path: "$" }
+    returns: value
+
+  delete_channel:
+    summary: Remove a channel from the account; upcoming and in-progress events stop sending to it (Delete Channel; channels.write)
+    params:
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels." }
+    send: { method: DELETE, path: "/v2/user/channels/{channel_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  set_channel_enabled:
+    summary: Turn a channel on or off, so the next stream goes to it or not (legacy Channel Update, PATCH /v2/user/channel/{id}; channels.write; unconfirmed)
+    params:
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels." }
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On to stream to the channel, off to skip it." }
+    send: { method: PATCH, path: "/v2/user/channel/{channel_id}",
+            body: '{"active":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  get_channel_meta:
+    summary: A channel's stream title and description as set for its platform (legacy Channel Meta, GET /v2/user/channel-meta/{id}; channels.read; unconfirmed)
+    params:
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels." }
+    send: { method: GET, path: "/v2/user/channel-meta/{channel_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_channel_title:
+    summary: Change the stream title Restream sets on one channel's platform (legacy Channel Meta Update, title only; channels.write; unconfirmed)
+    params:
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels." }
+      title: { type: string, pattern: "\\S", max_length: 500, required: true,
+               label: Title,
+               description: "The stream title for that platform; the platform's own length limit applies." }
+    send: { method: PATCH, path: "/v2/user/channel-meta/{channel_id}",
+            body: '{"title":{title:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_channel_meta:
+    summary: Change the stream title and description Restream sets on one channel's platform (legacy Channel Meta Update; channels.write; unconfirmed)
+    params:
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels." }
+      title: { type: string, pattern: "\\S", max_length: 500, required: true,
+               label: Title,
+               description: "The stream title for that platform; the platform's own length limit applies." }
+      description: { type: string, max_length: 5000, required: true,
+                     label: Description,
+                     description: "The stream description for that platform; empty clears it where the platform allows." }
+    send: { method: PATCH, path: "/v2/user/channel-meta/{channel_id}",
+            body: '{"title":{title:json},"description":{description:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Events ────────────────────────────────────────────────────────────────
+  list_upcoming_events:
+    summary: The account's events that have not started (Upcoming Events; stream.read)
+    send: { method: GET, path: /v2/user/events/upcoming }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_in_progress_events:
+    summary: The account's events live now (In Progress Events; stream.read)
+    send: { method: GET, path: /v2/user/events/in-progress }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_events_history:
+    summary: The account's finished and missed events, a page at a time (Events History; stream.read)
+    params:
+      page: { type: int, min: 1, default: 1,
+              label: Page,
+              description: "Which page of results, from 1." }
+      limit: { type: int, min: 1, max: 100, default: 10,
+               label: Events per page,
+               description: "How many events each page holds." }
+    send: { method: GET, path: /v2/user/events/history, query: { page: "{page}", limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_event:
+    summary: One event with its status, times and destinations (Event; stream.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID, from the event lists or create_event." }
+    send: { method: GET, path: "/v2/user/events/{event_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_event:
+    summary: Create an unscheduled live event with no destinations; answers its id (Create Event; stream.write)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 500, required: true,
+               label: Title,
+               description: "The event's title; Restream refuses one too long with EventTitleTooLong." }
+      description: { type: string, max_length: 5000, default: "",
+                     label: Description,
+                     description: "The event's description." }
+      stream_type: { type: enum, values: [encoder, studio], default: encoder,
+                     label: Source,
+                     description: "encoder to stream from a third-party encoder, studio to stream from Restream Studio." }
+    send: { method: POST, path: /v2/user/events/new,
+            body: '{"streamType":{stream_type:json},"title":{title:json},"description":{description:json}}',
+            content_type: application/json }
+    expect: { status: 201, json_path: "$.id" }
+    returns: value
+
+  create_scheduled_event:
+    summary: Create a live event scheduled for a time, with no destinations; answers its id (Create Event with scheduledFor; stream.write)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 500, required: true,
+               label: Title,
+               description: "The event's title; Restream refuses one too long with EventTitleTooLong." }
+      description: { type: string, max_length: 5000, default: "",
+                     label: Description,
+                     description: "The event's description." }
+      stream_type: { type: enum, values: [encoder, studio], default: encoder,
+                     label: Source,
+                     description: "encoder to stream from a third-party encoder, studio to stream from Restream Studio." }
+      scheduled_for: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})$", required: true,
+                       label: Start time,
+                       description: "When the event is scheduled to start, ISO 8601 with a time zone, such as 2026-10-11T09:30:00Z." }
+    send: { method: POST, path: /v2/user/events/new,
+            body: '{"streamType":{stream_type:json},"title":{title:json},"description":{description:json},"scheduledFor":{scheduled_for:json}}',
+            content_type: application/json }
+    expect: { status: 201, json_path: "$.id" }
+    returns: value
+
+  create_event_custom:
+    summary: Create an event with a full Create Event body (streamType studio, encoder or file, title, description, scheduledFor, fileId, loopsCount); answers its id (stream.write)
+    params:
+      event: { type: json, required: true,
+               label: Event,
+               description: "A JSON object as Restream documents for Create Event, such as a file event with streamType file, fileId and loopsCount." }
+    send: { method: POST, path: /v2/user/events/new, body: '{event}', content_type: application/json }
+    expect: { status: 201, json_path: "$.id" }
+    returns: value
+
+  add_event_destination:
+    summary: Send an event to one of the account's channels (Add Event Destination with channelId and streamingOrientation; stream.write)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+      channel_id: { type: int, min: 1, required: true,
+                    label: Channel ID,
+                    description: "The channel's id, from list_channels; YouTube and Embed Player channels need add_event_destination_custom with a title." }
+      orientation: { type: enum, values: [horizontal, vertical], default: horizontal,
+                     label: Orientation,
+                     description: "Which orientation of the stream goes to the channel." }
+    send: { method: POST, path: "/v2/user/events/{event_id}/destinations",
+            body: '{"channelId":{channel_id},"streamingOrientation":{orientation:json}}', content_type: application/json }
+    expect: { status: 201, json_path: "$.id" }
+    returns: value
+
+  add_event_destination_custom:
+    summary: Send an event to a channel with a full Add Event Destination body (channelId, streamingOrientation, and YouTube's title, description, privacyStatus, latencyPreference and more; stream.write)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+      destination: { type: json, required: true,
+                     label: Destination,
+                     description: "A JSON object as Restream documents for Add Event Destination, with channelId and the fields the channel's platform reads." }
+    send: { method: POST, path: "/v2/user/events/{event_id}/destinations", body: '{destination}', content_type: application/json }
+    expect: { status: 201, json_path: "$.id" }
+    returns: value
+
+  delete_event_destination:
+    summary: Stop a scheduled event from going to a destination; the channel itself stays (Delete Event Destination; stream.write)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+      destination_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                        label: Destination ID,
+                        description: "The destination's UUID, from get_event's destinations." }
+    send: { method: DELETE, path: "/v2/user/events/{event_id}/destinations/{destination_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  get_event_stream_key:
+    summary: An event's RTMP stream key and SRT URL for the encoder; secrets, returned here only (Event Stream Key; stream.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/streamKey" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_event_srt_stream_key:
+    summary: An event's SRT stream id, passphrase and URL, Business and Enterprise plans only; secrets, returned here only (Event SRT Stream Keys; stream.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/srt/streamKey" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_event_recordings:
+    summary: An event's recordings, primary and secondary video and audio, with their expiry (Event Recordings; storage.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/recordings" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_recording_download_url:
+    summary: A temporary download URL for one recording file (Recording Download URL; storage.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+      file_name: { type: string, pattern: "^\\S+$", max_length: 255, required: true,
+                   label: File name,
+                   description: "The recording's fileName from list_event_recordings." }
+    send: { method: POST, path: "/v2/user/events/{event_id}/recordings/download-url",
+            body: '{"fileName":{file_name:json}}', content_type: application/json }
+    expect: { json_path: "$.downloadUrl" }
+    returns: value
+
+  list_event_transcriptions:
+    summary: Transcriptions of an event's recordings, with status and download URL when completed (Event Recording Transcriptions; storage.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/recordings/transcriptions" }
+    expect: { status: 200, json_path: "$.transcriptions" }
+    returns: value
+
+  get_event_chat_history:
+    summary: The latest chat messages of an event across every platform, oldest first (Event Chat History; chat.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+      page_size: { type: int, min: 1, max: 1000, default: 100,
+                   label: Messages,
+                   description: "How many messages to return, 1 to 1000." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/chat/history", query: { pageSize: "{page_size}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_chat_history_download_url:
+    summary: A one-time URL to download an event's whole chat history (Chat History Download URL; chat.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: POST, path: "/v2/user/events/{event_id}/chat/history/download-url" }
+    expect: { json_path: "$.downloadUrl" }
+    returns: value
+
+  get_event_viewer_analytics:
+    summary: An event's viewers, in total and per channel, mean, peak, views and watched time (Live Stream Analytics, Viewers; stream.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/analytics/viewers" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_event_chat_analytics:
+    summary: An event's chat messages and chatters, in total and per channel (Live Stream Analytics, Chat Messages; stream.read)
+    params:
+      event_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Event ID,
+                  description: "The event's UUID." }
+    send: { method: GET, path: "/v2/user/events/{event_id}/analytics/messages" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── Studio ────────────────────────────────────────────────────────────────
+  list_brands:
+    summary: The account's Restream Studio brands, which tickers, captions and QR codes belong to (Brands; studio.read)
+    send: { method: GET, path: /v2/user/studio/brands }
+    expect: { status: 200, json_path: "$.brands" }
+    returns: value
+
+  list_fonts:
+    summary: The fonts available for Studio text (Fonts; studio.read)
+    send: { method: GET, path: /v2/user/studio/fonts }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_countdown_music:
+    summary: The countdown music tracks available in Studio (Countdown Music; studio.read)
+    send: { method: GET, path: /v2/user/studio/audio/countdown-music }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_audio_backgrounds:
+    summary: The background audio tracks available in Studio (Audio Backgrounds; studio.read)
+    send: { method: GET, path: /v2/user/studio/audio-backgrounds }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_tickers:
+    summary: The account's Studio tickers, scrolling text lines (Tickers; studio.read)
+    send: { method: GET, path: /v2/user/studio/tickers }
+    expect: { status: 200, json_path: "$.tickers" }
+    returns: value
+
+  create_ticker:
+    summary: Add a Studio ticker to a brand; answers it with its id (Create Ticker; studio.write)
+    params:
+      text: { type: string, pattern: "\\S", max_length: 1000, required: true,
+              label: Text,
+              description: "The ticker's scrolling text." }
+      brand_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Brand ID,
+                  description: "The brand the ticker belongs to, from list_brands." }
+    send: { method: POST, path: /v2/user/studio/tickers,
+            body: '{"text":{text:json},"brandId":{brand_id:json}}', content_type: application/json }
+    expect: { json_path: "$.id" }
+    returns: value
+
+  update_ticker:
+    summary: Change a Studio ticker's text (Update Ticker; studio.write)
+    params:
+      ticker_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                   label: Ticker ID,
+                   description: "The ticker's id, from list_tickers." }
+      text: { type: string, pattern: "\\S", max_length: 1000, required: true,
+              label: Text,
+              description: "The ticker's new scrolling text." }
+    send: { method: PATCH, path: "/v2/user/studio/tickers/{ticker_id}",
+            body: '{"text":{text:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.id" }
+    returns: value
+
+  delete_ticker:
+    summary: Remove a Studio ticker (Delete Ticker; studio.write)
+    params:
+      ticker_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                   label: Ticker ID,
+                   description: "The ticker's id, from list_tickers." }
+    send: { method: DELETE, path: "/v2/user/studio/tickers/{ticker_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  reorder_tickers:
+    summary: Put the Studio tickers in a new order (Reorder Tickers; studio.write)
+    params:
+      ids: { type: json, required: true,
+             label: Order,
+             description: "A JSON array of ticker ids in the order wanted, as Restream documents for Reorder Tickers." }
+    send: { method: PATCH, path: /v2/user/studio/tickers/order, body: '{"ids":{ids}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  list_captions:
+    summary: The account's Studio captions, lower-third text with a secondary line (Captions; studio.read)
+    send: { method: GET, path: /v2/user/studio/captions }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_caption:
+    summary: Add a Studio caption to a brand; answers it with its id (Create Caption; studio.write)
+    params:
+      text: { type: string, pattern: "\\S", max_length: 1000, required: true,
+              label: Text,
+              description: "The caption's main line, such as a speaker's name." }
+      secondary_text: { type: string, max_length: 1000, default: "",
+                        label: Secondary text,
+                        description: "The caption's second line, such as a title; empty for none." }
+      brand_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Brand ID,
+                  description: "The brand the caption belongs to, from list_brands." }
+    send: { method: POST, path: /v2/user/studio/captions,
+            body: '{"text":{text:json},"secondaryText":{secondary_text:json},"brandId":{brand_id:json}}',
+            content_type: application/json }
+    expect: { json_path: "$.id" }
+    returns: value
+
+  update_caption:
+    summary: Change a Studio caption's lines (Update Caption; studio.write)
+    params:
+      caption_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                    label: Caption ID,
+                    description: "The caption's id, from list_captions." }
+      text: { type: string, pattern: "\\S", max_length: 1000, required: true,
+              label: Text,
+              description: "The caption's new main line." }
+      secondary_text: { type: string, max_length: 1000, default: "",
+                        label: Secondary text,
+                        description: "The caption's new second line; empty for none." }
+    send: { method: PATCH, path: "/v2/user/studio/captions/{caption_id}",
+            body: '{"text":{text:json},"secondaryText":{secondary_text:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_caption:
+    summary: Remove a Studio caption (Delete Caption; studio.write)
+    params:
+      caption_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                    label: Caption ID,
+                    description: "The caption's id, from list_captions." }
+    send: { method: DELETE, path: "/v2/user/studio/captions/{caption_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  list_qr_codes:
+    summary: The account's Studio QR codes (QR Codes; studio.read)
+    send: { method: GET, path: /v2/user/studio/qr-codes }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_qr_code:
+    summary: Add a Studio QR code linking to a URL to a brand; answers it with its id (Create QR Code; studio.write)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 200, required: true,
+               label: Title,
+               description: "The QR code's title, shown beside it when show_title is on." }
+      link: { type: string, pattern: "^https?://\\S+$", max_length: 2048, required: true,
+              label: Link,
+              description: "The URL the QR code opens." }
+      show_title: { type: bool, default: true,
+                    label: Show title,
+                    description: "On to show the title on screen with the code." }
+      brand_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                  label: Brand ID,
+                  description: "The brand the QR code belongs to, from list_brands." }
+    send: { method: POST, path: /v2/user/studio/qr-codes,
+            body: '{"brandId":{brand_id:json},"title":{title:json},"link":{link:json},"shouldShowTitle":{show_title}}',
+            content_type: application/json }
+    expect: { json_path: "$.id" }
+    returns: value
+
+  update_qr_code:
+    summary: Change a Studio QR code's title, link and title display (Update QR Code; studio.write)
+    params:
+      qr_code_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                    label: QR code ID,
+                    description: "The QR code's id, from list_qr_codes." }
+      title: { type: string, pattern: "\\S", max_length: 200, required: true,
+               label: Title,
+               description: "The QR code's new title." }
+      link: { type: string, pattern: "^https?://\\S+$", max_length: 2048, required: true,
+              label: Link,
+              description: "The URL the QR code opens." }
+      show_title: { type: bool, required: true,
+                    label: Show title,
+                    description: "On to show the title on screen with the code." }
+    send: { method: PATCH, path: "/v2/user/studio/qr-codes/{qr_code_id}",
+            body: '{"title":{title:json},"link":{link:json},"shouldShowTitle":{show_title}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_qr_code:
+    summary: Remove a Studio QR code (Delete QR Code; studio.write)
+    params:
+      qr_code_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                    label: QR code ID,
+                    description: "The QR code's id, from list_qr_codes." }
+    send: { method: DELETE, path: "/v2/user/studio/qr-codes/{qr_code_id}" }
+    expect: { status: 204 }
+    returns: ack
+
+  reorder_qr_codes:
+    summary: Put the Studio QR codes in a new order (Reorder QR Codes; studio.write)
+    params:
+      ids: { type: json, required: true,
+             label: Order,
+             description: "A JSON array of QR code ids in the order wanted, as Restream documents for Reorder QR Codes." }
+    send: { method: PATCH, path: /v2/user/studio/qr-codes/order, body: '{"ids":{ids}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Storage and clips ─────────────────────────────────────────────────────
+  list_storage_files:
+    summary: The files in the account's Video Storage, with status and duration, for file events and clips (Storage Files; storage.read)
+    send: { method: GET, path: /v2/user/storage/files }
+    expect: { status: 200, json_path: "$.files" }
+    returns: value
+
+  list_clip_projects:
+    summary: The account's clip projects, newest first (Clip Projects; clips.read)
+    params:
+      limit: { type: int, min: 1, max: 100, default: 20,
+               label: Projects,
+               description: "How many projects to return, up to 100." }
+    send: { method: GET, path: /v2/user/clips/projects, query: { limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_clip_project:
+    summary: A clip project with the clips made so far and whether more are coming (Project Details; clips.read)
+    params:
+      project_id: { type: string, pattern: "^[0-9a-fA-F-]{36}$", required: true,
+                    label: Project ID,
+                    description: "The project's id, from create_clip_project or list_clip_projects." }
+    send: { method: GET, path: "/v2/user/clips/projects/{project_id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_clip_project:
+    summary: Make clips from a past event, a storage file or a public URL with a Create Project body (sourceType, eventId, videoStorageFileId, publicUrl, title, singleClipMode, selectedTimeRange, forceReprocess; clips.write)
+    params:
+      project: { type: json, required: true,
+                 label: Project,
+                 description: "A JSON object as Restream documents for Create Project, such as {\"sourceType\":\"Event\",\"eventId\":\"...\"}." }
+    send: { method: POST, path: /v2/user/clips/projects, body: '{project}', content_type: application/json }
+    expect: { status: 201, json_path: "$" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host api.restream.io and
+      port 443; it is reached over HTTPS and the certificate is checked
+      against that name. It acts for the Restream account that signed in.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The consumer owns the credential. It registers its own Restream
+      application (with the scopes of the commands it uses), runs the
+      authorization code sign-in at api.restream.io/login itself, and passes
+      client_id, refresh_token, access_token and expires_at as settings. The
+      access token (1 hour) is refreshed 5 minutes before it expires, or at
+      once when there is none. Restream's refresh needs the client secret,
+      and Restream says a user's device must not hold it: an open-source or
+      installed product sets token_url to its own token proxy, which adds
+      the secret and forwards to https://api.restream.io/oauth/token, and
+      leaves client_secret empty; only a product that keeps its secret on
+      its own server fills client_secret. A 401 refreshes the token and
+      sends the request once more; a second 401, or a refresh Restream
+      refuses (400 invalid_grant), is terminal: the integration reports
+      unauthorized and nothing more is sent until the consumer signs the
+      user in again and passes the new tokens with update_settings. A 403
+      (insufficient_scope, a feature not on the plan) is an ordinary failure.
+
+  - models: [all]
+    severity: critical
+    text: >
+      Every refresh invalidates the old access and refresh token pair and
+      answers a new one. The core reports the new refresh token in a
+      credentials event, and the consumer must persist it at once; if it
+      keeps the old one, the next open refreshes with a dead token and the
+      user must sign in again. One sign-in must feed one open integration
+      only: two integrations refreshing with the same refresh token
+      invalidate each other. A refresh token lasts a year from the grant
+      (the documents do not say whether a refresh extends it), and revoking
+      either token at api.restream.io/oauth/revoke revokes the pair.
+
+  - models: [all]
+    severity: info
+    text: >
+      Restream pushes streaming updates (the encoder's incoming bitrate, fps
+      and codecs, each destination's CONNECTING, CONNECTED or DISCONNECTED
+      status and outgoing bitrate, and each platform's viewers) over a
+      websocket at wss://streaming.api.restream.io/ws, and chat over
+      wss://chat.api.restream.io/ws, both with the access token in the URL's
+      query. The format's push websocket opens on the transport's own host
+      and cannot carry a rotating OAuth token in its URL, so neither is
+      used: state is polled every 30 seconds (in-progress, upcoming and
+      recent events, channels and the selected ingest), and ingest health,
+      per-destination status and live viewer counts are not in state. A
+      consumer wanting them opens those websockets itself with the access
+      token from the latest credentials event. The documents state no rate
+      limits.
+
+  - models: [all]
+    severity: warning
+    text: >
+      get_stream_key, get_event_stream_key and get_event_srt_stream_key
+      return stream keys and SRT passphrases anyone could stream to the
+      account with, and get_chat_url a URL carrying a token: they are
+      returned as the command's value only, never kept in state or logged.
+      add_rtmp_channel and add_channel send a destination's stream key to
+      Restream; it is not kept. Show them to the operator only on demand.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_channel_enabled, get_channel_meta, set_channel_title,
+      set_channel_meta and the channels.*.enabled poll use Restream's earlier
+      channel endpoints (/v2/user/channel/{id}, /v2/user/channel/all and
+      /v2/user/channel-meta/{id}), which the current reference no longer
+      lists; they are taken from the archived reference's navigation and
+      Bitfocus's Restream module and are unconfirmed. If Restream has
+      removed them they fail (the poll's answer is then ignored), and the
+      current API has no other way to switch a channel on or off: attach
+      and detach event destinations instead. A title change applies to the
+      platform's next or current stream as the platform allows.
+
+  - models: [all]
+    severity: critical
+    text: >
+      delete_channel removes the destination from the account at once and
+      can't be undone: an upcoming or in-progress event stops sending to it,
+      mid-stream included, and re-adding it needs its stream key again.
+      delete_event_destination works only while the event is scheduled (409
+      EventInProgress or EventFinished otherwise).
+
+  - models: [all]
+    severity: info
+    text: >
+      Events are keyed in state by their UUID. An event leaves the upcoming
+      and in-progress lists as it changes, and its finished status comes
+      from the first page of history (the 10 most recent), so an event that
+      ends while older ones fill that page keeps its last polled status.
+      stream.live is true while any event is in progress; Restream only
+      knows an event is in progress once an encoder or Studio streams to
+      it. Times are Unix seconds, absent when Restream gives null.
+
+state:
+  user.id:                  { type: int, description: "The signed-in account's id (Profile id)" }
+  user.username:            { type: string, description: "The signed-in account's username (Profile username)" }
+  ingest.selected_id:       { type: int, description: "The ingest server the account streams to, an id from list_ingest_servers (Selected Ingest ingestId)" }
+  stream.live:              { type: bool, description: "An event is in progress now (In Progress Events is not empty)" }
+  stream.event_id:          { type: string, description: "The UUID of the event in progress, empty when none" }
+  channels.*.platform_id:   { type: int, description: "The channel's platform, an id from list_platforms (platformId), keyed by channel id" }
+  channels.*.display_name:  { type: string, description: "The channel's name in Restream (displayName)" }
+  channels.*.url:           { type: string, description: "The channel's page on its platform (channelUrl)" }
+  channels.*.enabled:       { type: bool, description: "The channel is switched on for streaming (legacy channel list enabled; unconfirmed)" }
+  events.*.status:          { type: string, description: "upcoming, in-progress, finished or missed, keyed by event UUID" }
+  events.*.title:           { type: string, description: "The event's title" }
+  events.*.description:     { type: string, description: "The event's description" }
+  events.*.scheduled_for:   { type: int, unit: s, description: "When the event is scheduled, Unix seconds (scheduledFor)" }
+  events.*.started_at:      { type: int, unit: s, description: "When the event started, Unix seconds (startedAt)" }
+  events.*.finished_at:     { type: int, unit: s, description: "When the event finished, Unix seconds (finishedAt)" }
+  events.*.record_only:     { type: bool, description: "The event is streamed in record-only mode (isRecordOnly)" }
+
+telemetry:
+  # The streaming-updates websocket is on another host with the token in its
+  # URL (see quirks): events, channels and the selected ingest are polled
+  # every 30 seconds (6 requests).
+  poll:
+    every_ms: 30000
+    send:
+      - { method: GET, path: /v2/user/events/in-progress }
+      - { method: GET, path: /v2/user/events/upcoming }
+      - { method: GET, path: /v2/user/events/history, query: { page: "1", limit: "10" } }
+      - { method: GET, path: /v2/user/channels }
+      - { method: GET, path: /v2/user/channel/all }
+      - { method: GET, path: /v2/user/ingest }
+  updates:
+    - path: '^/v2/user/profile$'
+      json: { id: "$.id", username: "$.username" }
+      state:
+        user.id: "{id}"
+        user.username: "{username}"
+    - path: '^/v2/user/ingest$'
+      json: { id: "$.ingestId" }
+      state: { ingest.selected_id: "{id}" }
+    # Live: an event in progress.
+    - path: '^/v2/user/events/in-progress$'
+      json_each: "$"
+      json: &event
+        id: "$.id"
+        status: "$.status"
+        title: "$.title"
+        description: "$.description"
+        scheduled: "$.scheduledFor"
+        started: "$.startedAt"
+        finished: "$.finishedAt"
+        record_only: "$.isRecordOnly"
+      state:
+        stream.live: { value: "{status}", map: { "in-progress": true } }
+        stream.event_id: "{id}"
+        events.{id}.status: "{status}"
+        events.{id}.title: "{title}"
+        events.{id}.description: "{description}"
+        events.{id}.scheduled_for: "{scheduled}"
+        events.{id}.started_at: "{started}"
+        events.{id}.finished_at: "{finished}"
+        events.{id}.record_only: "{record_only}"
+    # Nothing in progress.
+    - path: '^/v2/user/events/in-progress$'
+      json_match: { "$": '^\[\]$' }
+      json: {}
+      state:
+        stream.live: "false"
+        stream.event_id: ""
+    - path: '^/v2/user/events/upcoming$'
+      json_each: "$"
+      json: *event
+      state: &event_state
+        events.{id}.status: "{status}"
+        events.{id}.title: "{title}"
+        events.{id}.description: "{description}"
+        events.{id}.scheduled_for: "{scheduled}"
+        events.{id}.started_at: "{started}"
+        events.{id}.finished_at: "{finished}"
+        events.{id}.record_only: "{record_only}"
+    - path: '^/v2/user/events/history\?'
+      json_each: "$.items"
+      json: *event
+      state: *event_state
+    # get_event.
+    - path: '^/v2/user/events/[0-9a-fA-F-]{36}$'
+      json: *event
+      state: *event_state
+    - path: '^/v2/user/channels$'
+      json_each: "$.channels"
+      json: &channel { id: "$.id", platform: "$.platformId", name: "$.displayName", url: "$.channelUrl" }
+      state: &channel_state
+        channels.{id}.platform_id: "{platform}"
+        channels.{id}.display_name: "{name}"
+        channels.{id}.url: "{url}"
+    # get_channel.
+    - path: '^/v2/user/channels/\d+$'
+      json: *channel
+      state: *channel_state
+    # The legacy list's enabled flag (unconfirmed).
+    - path: '^/v2/user/channel/all$'
+      json_each: "$"
+      json: { id: "$.id", enabled: "$.enabled" }
+      state:
+        channels.{id}.enabled: "{enabled}"

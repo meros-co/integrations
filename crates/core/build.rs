@@ -66,6 +66,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),
+    ("vendor-castr", &["castr"]),
     ("vendor-bss", &["bss-london"]),
     ("vendor-chamsys", &["chamsys-magicq", "chamsys-magicq-udp"]),
     ("vendor-christie", &["christie-spyder"]),
@@ -130,6 +131,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["propresenter", "renewedvision-pvp"],
     ),
     ("vendor-resolume", &["resolume"]),
+    ("vendor-restream", &["restream"]),
     (
         "vendor-roland",
         &[
@@ -187,6 +189,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-tvone", &["tvone-coriomaster"]),
     ("vendor-twitch", &["twitch"]),
+    ("vendor-vimeo", &["vimeo-live"]),
     (
         "vendor-yamaha",
         &[

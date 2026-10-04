@@ -421,6 +421,22 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check Digest authentication with an administrator account and with guest access, on firmware with HTTPS enabled. ([specs/canon-ptz.yaml:57](specs/canon-ptz.yaml#L57))
 - [ ] On the EOS C80 and XF605, confirm the XC protocol is enabled over the network the same way, and which commands they accept. ([specs/canon-ptz.yaml:305](specs/canon-ptz.yaml#L305))
 
+## castr — Castr
+
+- [ ] Confirm HTTP Basic with the access token's ID and secret key is accepted, and that a wrong key answers 401 (not 403). ([specs/castr.yaml:72](specs/castr.yaml#L72))
+- [ ] Confirm GET /v2/live_streams/{id} as the idle probe is cheap and record any rate limits Castr applies. ([specs/castr.yaml:77](specs/castr.yaml#L77))
+- [ ] Confirm PATCH /v2/live_streams/{id} with a body of enabled alone changes only that field, and that enabled false cuts the encoder off at once. ([specs/castr.yaml:208](specs/castr.yaml#L208))
+- [ ] Confirm a PATCH whose settings object holds one field (cloud_recording, abr, low_latency_playback, chat_enabled) keeps the stream's other settings, despite the HTTP Verbs page calling PATCH a replacement. ([specs/castr.yaml:220](specs/castr.yaml#L220))
+- [ ] Confirm PATCH .../platforms/{platform_id} with metadata alone changes a linked Facebook or YouTube title and description (the guide's example also sends name and enabled false). ([specs/castr.yaml:324](specs/castr.yaml#L324))
+- [ ] Confirm PATCH .../platforms/{platform_id} with enabled alone pauses and resumes a target while live, and that it answers the whole stream. ([specs/castr.yaml:309](specs/castr.yaml#L309))
+- [ ] Record the status codes Create, Add Platform and the platform PATCH answer (the reference says 200; the guide's create example does not say) and confirm Create answers the stream with _id. ([specs/castr.yaml:154](specs/castr.yaml#L154))
+- [ ] Confirm DELETE of a stream and of a platform answers 200 with success true. ([specs/castr.yaml:268](specs/castr.yaml#L268))
+- [ ] Confirm GET .../stats answers 404 while the stream is offline, and record its bitrate's unit (kbps assumed) and whether opened_at is Unix milliseconds. ([specs/castr.yaml:365](specs/castr.yaml#L365))
+- [ ] Confirm broadcasting_status is reported for the stream and each platform in GET /v2/live_streams/{id}, and how soon it follows the encoder starting and stopping. ([specs/castr.yaml:535](specs/castr.yaml#L535))
+- [ ] Confirm the add_platform body (template custom, name, server, key, enabled) is accepted and the target's id is a 24-character hexadecimal id. ([specs/castr.yaml:276](specs/castr.yaml#L276))
+- [ ] Record what Convert Live-to-VOD answers, and confirm from takes an ISO 8601 UTC time inside the recording. ([specs/castr.yaml:376](specs/castr.yaml#L376))
+- [ ] Confirm list_streams' page and limit parameters and the largest limit Castr accepts (100 assumed). ([specs/castr.yaml:110](specs/castr.yaml#L110))
+
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
 - [ ] Check the blackout sense: whether /dbo 0 turns blackout on (manual) or off (Companion). ([specs/chamsys-magicq.yaml:1104](specs/chamsys-magicq.yaml#L1104))
@@ -938,6 +954,23 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a deck switch, deck open and deck close bring no new composition on the websocket (so the REST read is needed). ([specs/resolume.yaml:954](specs/resolume.yaml#L954))
 - [ ] On Avenue, check whether get_deck, replace_deck and deck delete and duplicate answer 402. ([specs/resolume.yaml:996](specs/resolume.yaml#L996))
 
+## restream — Restream
+
+- [ ] Confirm a refresh at https://api.restream.io/oauth/token with client_id and client_secret in the form body (not Basic) succeeds, answers a new refresh token every time, and that the old one then answers 400 invalid_grant. ([specs/restream.yaml:135](specs/restream.yaml#L135))
+- [ ] Confirm a refresh extends the refresh token's one-year life (refreshTokenExpiresIn) or keeps the original grant's. ([specs/restream.yaml:135](specs/restream.yaml#L135))
+- [ ] Confirm an expired or revoked access token answers 401 invalid_token on every endpoint, and that 403 is used only for a missing scope or plan feature. ([specs/restream.yaml:138](specs/restream.yaml#L138))
+- [ ] Confirm GET /v2/user/profile as the idle probe needs only profile.read and is not rate limited at that rate. ([specs/restream.yaml:141](specs/restream.yaml#L141))
+- [ ] Confirm the legacy PATCH /v2/user/channel/{id} with {"active": true|false} still exists, what it answers (200 assumed), and that it switches the channel for the next stream. ([specs/restream.yaml:283](specs/restream.yaml#L283))
+- [ ] Confirm the legacy GET /v2/user/channel/all still exists and answers an array of channels with id and enabled. ([specs/restream.yaml:999](specs/restream.yaml#L999))
+- [ ] Confirm the legacy GET and PATCH /v2/user/channel-meta/{id} still exist, take title and description, and answer 200. ([specs/restream.yaml:321](specs/restream.yaml#L321))
+- [ ] Confirm get_channel_meta works for the platforms that have metadata (YouTube, Facebook, Twitch) and record what it answers for others. ([specs/restream.yaml:297](specs/restream.yaml#L297))
+- [ ] Confirm In Progress Events answers [] when nothing is live, and record how soon an event appears there after the encoder starts. ([specs/restream.yaml:963](specs/restream.yaml#L963))
+- [ ] Confirm an event that ends leaves In Progress and shows in Events History with status finished on the first page. ([specs/restream.yaml:926](specs/restream.yaml#L926))
+- [ ] Record the status codes Create Ticker, Create Caption, Create QR Code and the Recording and Chat History Download URL methods answer (the reference does not say), and what Update Caption and Update QR Code answer. ([specs/restream.yaml:594](specs/restream.yaml#L594))
+- [ ] Confirm Create Caption accepts an empty secondaryText, and Update Caption with an empty one clears the second line. ([specs/restream.yaml:648](specs/restream.yaml#L648))
+- [ ] Confirm Add Event Destination for a YouTube channel without title is refused, so add_event_destination_custom is needed there. ([specs/restream.yaml:423](specs/restream.yaml#L423))
+- [ ] Record Restream's API rate limits, which the reference does not state, against the 30-second poll of six requests. ([specs/restream.yaml:926](specs/restream.yaml#L926))
+
 ## roland-p20hd — Roland P-20HD
 
 - [ ] Confirm the login exchange: USR sent on connecting with no prompt, ACK after USR and after PSS, NAK on refusal. ([specs/roland-p20hd.yaml:572](specs/roland-p20hd.yaml#L572))
@@ -1189,6 +1222,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:252](specs/twitch.yaml#L252))
 - [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:230](specs/twitch.yaml#L230))
 - [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:671](specs/twitch.yaml#L671))
+
+## vimeo-live — Vimeo Live
+
+- [ ] Confirm a refused or revoked token answers 401 with error_code 8000 or 8003 on the live endpoints, and that error 3200 under 401 is only a permission refusal. ([specs/vimeo-live.yaml:91](specs/vimeo-live.yaml#L91))
+- [ ] Confirm the live endpoints accept Accept application/vnd.vimeo.*+json;version=3.4 and JSON request bodies with Content-Type application/json. ([specs/vimeo-live.yaml:86](specs/vimeo-live.yaml#L86))
+- [ ] Confirm GET /me?fields=uri as the idle probe, and record the X-RateLimit figures against the 30-second poll of three requests. ([specs/vimeo-live.yaml:94](specs/vimeo-live.yaml#L94))
+- [ ] Confirm GET /me/live_events answers a page object with data (the reference shows an array), and that type, sort, direction, per_page and page are honoured. ([specs/vimeo-live.yaml:127](specs/vimeo-live.yaml#L127))
+- [ ] Confirm GET /me/live_events/{id}/destinations answers a page object with data or a plain array, as the two rules expect. ([specs/vimeo-live.yaml:661](specs/vimeo-live.yaml#L661))
+- [ ] Confirm fields= filtering works on GET /me/live_events/{id} for stream_key, backup_stream_key, rtmp_link, rtmps_link, srt_link and srt_passphrase. ([specs/vimeo-live.yaml:154](specs/vimeo-live.yaml#L154))
+- [ ] Confirm Create an event answers 200 (not 201) with the event, its uri /live_events/{id}. ([specs/vimeo-live.yaml:196](specs/vimeo-live.yaml#L196))
+- [ ] Confirm Activate an event accepts an empty JSON body, answers 200, and what it answers once already activated (400 error 2428). ([specs/vimeo-live.yaml:373](specs/vimeo-live.yaml#L373))
+- [ ] Confirm End an event works without clip_id and answers 200, and record what viewers see. ([specs/vimeo-live.yaml:380](specs/vimeo-live.yaml#L380))
+- [ ] Confirm GET /live_events/{id}/session_status (no /me alias) answers while no session exists, and record ingest.status as a number or a string. ([specs/vimeo-live.yaml:397](specs/vimeo-live.yaml#L397))
+- [ ] Confirm the low_latency PATCH answers {"lowLatency": ...} and whether it is the same setting as latency low. ([specs/vimeo-live.yaml:312](specs/vimeo-live.yaml#L312))
+- [ ] Confirm the Update an event body's auto_cc_language takes de-DE, en-US, es-ES, fr-FR and pt-BR (the auto_cc endpoint lists other codes). ([specs/vimeo-live.yaml:348](specs/vimeo-live.yaml#L348))
+- [ ] Confirm set_stream_title's automatically_title_stream false with stream_title is accepted in one PATCH. ([specs/vimeo-live.yaml:264](specs/vimeo-live.yaml#L264))
+- [ ] Confirm PATCH /destination/{id} with is_enabled alone toggles a simulcast destination while live. ([specs/vimeo-live.yaml:465](specs/vimeo-live.yaml#L465))
+- [ ] Record what Get an M3U8 playback URL answers (the reference gives no schema). ([specs/vimeo-live.yaml:401](specs/vimeo-live.yaml#L401))
+- [ ] Record which ingest.status values occur in practice through a stream's life (0 to 5 documented). ([specs/vimeo-live.yaml:578](specs/vimeo-live.yaml#L578))
 
 ## visca — VISCA over IP
 
