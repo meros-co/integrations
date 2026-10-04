@@ -285,7 +285,6 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 | Devices | Protocol | Documentation |
 |---|---|---|
-| FreeShow: state push (variables over the Socket.IO API) | Socket.IO over WebSocket | Community |
 | ProPresenter 6 and early 7 (legacy remote) | WebSocket JSON | Community |
 | Microsoft PowerPoint | Local automation through a helper | Closed |
 | Apple Keynote | AppleScript through a helper | Public |

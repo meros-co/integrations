@@ -516,14 +516,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## freeshow — FreeShow
 
-- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1482](specs/freeshow.yaml#L1482))
-- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1490](specs/freeshow.yaml#L1490))
-- [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:59](specs/freeshow.yaml#L59))
-- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1474](specs/freeshow.yaml#L1474))
-- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:314](specs/freeshow.yaml#L314))
-- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:761](specs/freeshow.yaml#L761))
-- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:208](specs/freeshow.yaml#L208))
-- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1198](specs/freeshow.yaml#L1198))
+- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1489](specs/freeshow.yaml#L1489))
+- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1497](specs/freeshow.yaml#L1497))
+- [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:65](specs/freeshow.yaml#L65))
+- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1481](specs/freeshow.yaml#L1481))
+- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:321](specs/freeshow.yaml#L321))
+- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:768](specs/freeshow.yaml#L768))
+- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:215](specs/freeshow.yaml#L215))
+- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1205](specs/freeshow.yaml#L1205))
+- [ ] Confirm that FreeShow's Socket.IO server on 5505 (Engine.IO 4 assumed) answers the variable request {"isVariable": true, "keys": [...]} on the "data" event with {isVariable: true, values: {...}}, as the Companion module receives it. ([specs/freeshow.yaml:1697](specs/freeshow.yaml#L1697))
+- [ ] Record the type each variable arrives as: whether slide_number and layout_slides are numbers, and whether output_windows_active, outputs_locked and log_song_usage are true/false or text. ([specs/freeshow.yaml:1752](specs/freeshow.yaml#L1752))
+- [ ] Check what slide_number counts from (1 assumed for the slide shown) and what it holds with nothing on output. ([specs/freeshow.yaml:1660](specs/freeshow.yaml#L1660))
+- [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1693](specs/freeshow.yaml#L1693))
+- [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1695](specs/freeshow.yaml#L1695))
 
 ## grandma2 — MA Lighting grandMA2
 
