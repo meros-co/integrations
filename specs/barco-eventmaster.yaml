@@ -1151,6 +1151,18 @@ telemetry:
       state:
         "cards.{card}.status": "{status}"
         "cards.{card}.type": "{type}"
+    # getFrameSettings lists every slot of the frame: it replaces cards, so a
+    # card taken out leaves the state. (The rule above writes the same values
+    # from any reply that holds slots; this one only adds the replacement.)
+    - path: "^/$"
+      request_match: { "$.method": "^getFrameSettings$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response.System.FrameCollection.Frame.Slot": "^\\[" }
+      replace: cards
+      json_each: "$.result.response.System.FrameCollection.Frame.Slot"
+      json: { card: "$.Card.CardID", status: "$.Card.CardStatusLabel", type: "$.Card.CardTypeLabel" }
+      state:
+        "cards.{card}.status": "{status}"
+        "cards.{card}.type": "{type}"
 
     # listDestinations: screen destinations.
     - path: "^/$"
@@ -1192,9 +1204,31 @@ telemetry:
           map: { "0": invalid, "1": valid, "2": format_mismatch, "3": out_of_range, "4": no_sync }
         "sources.{id}.frozen": { value: "{freeze}", map: { "0": false, "1": true } }
         "sources.{id}.type": { value: "{src_type}", map: { "0": input, "1": still } }
+    # listSources with no parameters lists every one: it replaces sources.
+    - path: "^/$"
+      request_match: { "$.method": "^listSources$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      replace: sources
+      json_each: "$.result.response"
+      json: { id: "$.id", status: "$.InputCfgVideoStatus", freeze: "$.Freeze", src_type: "$.SrcType" }
+      state:
+        "sources.{id}.video_status":
+          value: "{status}"
+          map: { "0": invalid, "1": valid, "2": format_mismatch, "3": out_of_range, "4": no_sync }
+        "sources.{id}.frozen": { value: "{freeze}", map: { "0": false, "1": true } }
+        "sources.{id}.type": { value: "{src_type}", map: { "0": input, "1": still } }
 
     # listInputs (Doc 8.2, Encore3): the only list whose elements hold SyncStatus.
     - path: "^/$"
+      json_each: "$.result.response"
+      json: { id: "$.id", sync: "$.SyncStatus" }
+      state:
+        "inputs.{id}.sync_status": "{sync}"
+    # listInputs with no parameters lists every one: it replaces inputs.
+    - path: "^/$"
+      request_match: { "$.method": "^listInputs$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      replace: inputs
       json_each: "$.result.response"
       json: { id: "$.id", sync: "$.SyncStatus" }
       state:
@@ -1209,9 +1243,32 @@ telemetry:
         "stills.{id}.file_size_kb": "{size}"
         "stills.{id}.width": "{width}"
         "stills.{id}.height": "{height}"
+    # listStill with no parameters lists every one: it replaces stills.
+    - path: "^/$"
+      request_match: { "$.method": "^listStill$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      replace: stills
+      json_each: "$.result.response"
+      json: { id: "$.id", state: "$.StillState.$t", size: "$.FileSize.$t", width: "$.HSize.$t", height: "$.VSize.$t" }
+      state:
+        "stills.{id}.state": "{state}"
+        "stills.{id}.file_size_kb": "{size}"
+        "stills.{id}.width": "{width}"
+        "stills.{id}.height": "{height}"
 
     # listOperators: the only list whose elements hold Enable, StartRange, EndRange.
     - path: "^/$"
+      json_each: "$.result.response"
+      json: { id: "$.id", enable: "$.Enable", start: "$.StartRange", end: "$.EndRange" }
+      state:
+        "operators.{id}.enabled": { value: "{enable}", map: { "0": false, "1": true } }
+        "operators.{id}.preset_start": "{start}"
+        "operators.{id}.preset_end": "{end}"
+    # listOperators with no parameters lists every one: it replaces operators.
+    - path: "^/$"
+      request_match: { "$.method": "^listOperators$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      replace: operators
       json_each: "$.result.response"
       json: { id: "$.id", enable: "$.Enable", start: "$.StartRange", end: "$.EndRange" }
       state:

@@ -126,6 +126,7 @@ telemetry(NC, "display-params", inbound_http={"path": "/api/v1/screen/displaypar
 telemetry(NC, "display-state", inbound_http={"path": "/api/v1/screen/output/display/state", "body": json.dumps(
     {"code": 0, "message": "Success", "data": {"mappingState": [{"canvasID": 1, "enable": False}],
                                                 "displayState": [{"canvasID": 1, "displayMode": 2}]}})},
+    state_before={"canvases": {"2": {"display_mode": 0, "mapping": True}}},
     expect_state={"canvases": {"1": {"display_mode": 2, "mapping": False}}})
 telemetry(NC, "monitor", inbound_http={"path": "/api/v1/device/monitor/info?isNeedCabinetInfo=1", "body": json.dumps(
     {"code": 0, "message": "Success", "data": {"name": "MX40 Pro", "runtime": 3600, "backupStatus": 109,

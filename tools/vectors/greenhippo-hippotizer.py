@@ -117,6 +117,7 @@ telemetry(GH, "info", inbound_http={"path": "/info", "body": json.dumps(INFO)},
                                         "has_layers": True, "fxc_name": "Standard.fxc"}}})
 telemetry(GH, "media-map", inbound_http={"path": "/media/map", "body": json.dumps(
     {"entries": [{"index": 1, "mediaID": MEDIA_ID, "name": "Intro.mov"}]})},
+          state_before={"media_map": {"2": {"media_id": "emptied", "name": "Outro.mov"}}},
           expect_state={"media_map": {"1": {"media_id": MEDIA_ID, "name": "Intro.mov"}}})
 telemetry(GH, "layer-level", inbound_http={"path": "/mix/1/layer/2/level", "body": "40"},
           expect_state={"mixes": {"1": {"layers": {"2": {"level": 40}}}}})
@@ -125,7 +126,9 @@ telemetry(GH, "mix-level", inbound_http={"path": "/mix/2/level", "body": "100"},
 telemetry(GH, "preset-banks", inbound_http={"path": "/presets/mix", "body": json.dumps(
     {"bankCount": 256, "presetType": "mix",
      "banks": [{"hasPresets": True, "index": 0, "name": "Looks", "presets": [], "thumbPreset": ""}]})},
-          expect_state={"preset_banks": {"mix": {"0": {"name": "Looks", "has_presets": True}}}})
+          state_before={"preset_banks": {"mix": {"1": {"name": "Old", "has_presets": False}}, "layer": {"0": {"name": "Kept"}}}},
+          expect_state={"preset_banks": {"mix": {"0": {"name": "Looks", "has_presets": True}},
+                                         "layer": {"0": {"name": "Kept"}}}})
 telemetry(GH, "system-status", expect_connect_ws=SUBSCRIBE,
           inbound_ws='{"category":"SYSTEM","event":"SYSTEM_STATUS_CHANGED","data":"Configuring"}',
           expect_state={"server": {"output_status": "Configuring"},

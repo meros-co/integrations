@@ -130,6 +130,7 @@ LIVE_SUB = ('{"subscribe":{"object":"transportmanager:default","properties":["{\
             'object.volume, \'brightness\': object.brightness}"],"configuration":{"updateFrequencyMs":250}}}')
 telemetry(DG, "transports", inbound_http={"path": "/api/session/transport/transports",
                                           "body": json.dumps(TRANSPORTS)},
+          state_before={"transports": {"99": {"name": "removed", "engaged": False}}},
           expect_state={"transports": {"2276480868532234653": {
               "name": "default", "engaged": True, "volume": 0.5, "brightness": 1.0, "playmode": "Stop",
               "current_track": "track 1", "receiving_timecode": False, "setlist": "Show"}}})
@@ -137,6 +138,7 @@ telemetry(DG, "health", inbound_http={"path": "/api/session/status/health", "bod
     "status": {"code": 0}, "result": [{"machine": {"uid": "1", "name": "director", "hostname": "VX4-01"},
                                        "status": {"averageFPS": 59.94, "videoDroppedFrames": 0,
                                                   "videoMissedFrames": 2, "states": []}}]})},
+          state_before={"machines": {"understudy": {"hostname": "VX4-02", "average_fps": 60.0}}},
           expect_state={"machines": {"director": {"hostname": "VX4-01", "average_fps": 59.94,
                                                   "video_dropped_frames": 0.0, "video_missed_frames": 2.0}}})
 telemetry(DG, "project", inbound_http={"path": "/api/session/status/project", "body": json.dumps({

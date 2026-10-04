@@ -259,7 +259,7 @@ _bm("unsubscribe", {"hostname": "192.168.247.131", "port": 3000, "notifications"
 
 # ── Telemetry ────────────────────────────────────────────────────────────
 # getFrameSettings, the Encore3 document's example (abridged to two cards).
-telemetry(BM, "frame", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
+telemetry(BM, "frame", inbound_http={"path": "/", "request": {"params": {}, "method": "getFrameSettings", "id": "1234", "jsonrpc": "2.0"}, "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": {"System": {"id": 0, "Name": "System1", "FrameCollection": {"id": 0, "Frame": {
         "id": "74:fe:48:7f:22:30", "Name": "ENCORE3", "Contact": "", "Version": "10.0.0.b7e01ed8852.3640",
         "OSVersion": "0.0.23", "FrameType": 8, "FrameTypeName": "Encore3",
@@ -270,6 +270,7 @@ telemetry(BM, "frame", inbound_http={"path": "/", "body": json.dumps({"jsonrpc":
                            "CardTypeLabel": "High Speed Link", "CardID": "Port1:4", "OverTemp": 0, "FanWarn": 0}},
                  {"Card": {"CardStatusID": 2, "CardStatusLabel": "Ready", "CardTypeID": 4,
                            "CardTypeLabel": "HDMI 2.0 Input", "CardID": "Card1", "OverTemp": 0, "FanWarn": 0}}]}}}}}})},
+    state_before={"cards": {"Card9": {"status": "Ready", "type": "SDI Input"}}},
     expect_state={"frame": {"name": "ENCORE3", "version": "10.0.0.b7e01ed8852.3640", "os_version": "0.0.23",
                             "type": 8, "type_name": "Encore3", "ip": "192.168.0.200", "mac": "74:fe:48:7f:22:30",
                             "over_temp": False, "fan_warning": False},
@@ -310,33 +311,45 @@ telemetry(BM, "screen-content", inbound_http={"path": "/", "body": json.dumps({"
         "Transition": [{"id": 0, "TransTime": 30, "TransPos": 0, "ArmMode": 1}]}}, "id": "1234"})},
     expect_state={"screens": {"0": {"active": True}}})
 # listSources, the document's example plus a still.
-telemetry(BM, "sources", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
+telemetry(BM, "sources", inbound_http={"path": "/", "request": {"params": {}, "method": "listSources", "id": "1234", "jsonrpc": "2.0"}, "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": SOURCES + [
         {"id": 1, "Name": "Still1", "HSize": 1920, "VSize": 1080, "SrcType": 1, "InputCfgIndex": -1, "StillIndex": 0,
          "DestIndex": -1, "UserKeyIndex": -1, "Mode3D": 0, "Freeze": 0, "Capacity": 1, "InputCfgVideoStatus": 1}]}})},
+    state_before={"sources": {"7": {"video_status": "valid", "type": "input"}}},
+    expect_state={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input"},
+                              "1": {"video_status": "valid", "frozen": False, "type": "still"}}})
+# listSources filtered by type lists only some sources: nothing is replaced.
+telemetry(BM, "sources-filtered", inbound_http={
+    "path": "/", "request": {"params": {"type": 1}, "method": "listSources", "id": "1234", "jsonrpc": "2.0"},
+    "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {"success": 0, "response": [
+        {"id": 1, "Name": "Still1", "SrcType": 1, "Freeze": 0, "InputCfgVideoStatus": 1}]}})},
+    state_before={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input"}}},
     expect_state={"sources": {"0": {"video_status": "no_sync", "frozen": True, "type": "input"},
                               "1": {"video_status": "valid", "frozen": False, "type": "still"}}})
 # listPresets holds none of the fields the source rule reads: no state.
 telemetry(BM, "presets-ignored", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": PRESETS}})}, expect_state={})
 # listInputs (Encore3 v10.0 example).
-telemetry(BM, "inputs", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
+telemetry(BM, "inputs", inbound_http={"path": "/", "request": {"params": {}, "method": "listInputs", "id": "1234", "jsonrpc": "2.0"}, "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": [{"id": 8, "Name": "DPInput1", "SyncStatus": "None", "VideoStatus": "No Sync",
                                 "Format": "3840x2160p @59.94", "Color_Space": "RGB, Full Range",
                                 "Colorimetry": "BT.709", "GammaFx": "SDR", "ColorDepth": "8"}]}})},
+    state_before={"inputs": {"9": {"sync_status": "Locked"}}},
     expect_state={"inputs": {"8": {"sync_status": "None"}}})
 # listStill (R5919184/00 example).
-telemetry(BM, "stills", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
+telemetry(BM, "stills", inbound_http={"path": "/", "request": {"params": {}, "method": "listStill", "id": "1234", "jsonrpc": "2.0"}, "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": [{"id": 0, "Name": "StillStore1", "LockMode": 0,
                                 "HSize": {"Min": 0, "Max": 99999, "$t": 1920}, "VSize": {"Min": 0, "Max": 99999, "$t": 1080},
                                 "StillState": {"Min": 0, "Max": 4, "$t": 3}, "PngState": {"Min": 0, "Max": 2, "$t": 0},
                                 "FileSize": {"Min": 0, "Max": 100000, "$t": 9331.2}}]}})},
+    state_before={"stills": {"5": {"state": 3}}},
     expect_state={"stills": {"0": {"state": 3, "file_size_kb": 9331.2, "width": 1920, "height": 1080}}})
 # listOperators (Doc 8.2 example, first two operators).
-telemetry(BM, "operators", inbound_http={"path": "/", "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
+telemetry(BM, "operators", inbound_http={"path": "/", "request": {"params": {}, "method": "listOperators", "id": "1234", "jsonrpc": "2.0"}, "body": json.dumps({"jsonrpc": "2.0", "id": "1234", "result": {
     "success": 0, "response": [
         {"id": 0, "Name": "Operator 1", "Enable": 0, "StartRange": 1, "EndRange": 1000, "InvertColor": 0, "DestCollection": []},
         {"id": 1, "Name": "Operator 2", "Enable": 1, "StartRange": 3, "EndRange": 4, "InvertColor": 0,
          "DestCollection": [{"id": 0, "DestType": 1, "DestXmlId": 0, "Name": "ScreenDest1"}]}]}})},
+    state_before={"operators": {"7": {"enabled": True}}},
     expect_state={"operators": {"0": {"enabled": False, "preset_start": 1, "preset_end": 1000},
                                 "1": {"enabled": True, "preset_start": 3, "preset_end": 4}}})

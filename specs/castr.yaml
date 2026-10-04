@@ -531,7 +531,11 @@ telemetry:
         streams.{1}.chat_enabled: "{chat}"
         streams.{1}.embed_url: "{embed}"
         streams.{1}.hls_url: "{hls}"
+    # The stream holds all its platforms: each answer replaces the last, so a
+    # deleted target leaves the state.
     - path: '^/v2/live_streams/([0-9a-f]{24})(/platforms(/[0-9a-f]{24})?)?$'
+      json_match: { "$._id": '^[0-9a-f]{24}$', "$.platforms": '^\[' }
+      replace: streams.{1}.platforms
       json_each: "$.platforms"
       json: { id: "$._id", name: "$.name", template: "$.template", enabled: "$.enabled", status: "$.broadcasting_status" }
       state:
@@ -547,7 +551,10 @@ telemetry:
         streams.{1}.stats_bitrate: "{bitrate}"
         streams.{1}.stats_opened_at: "{opened}"
         streams.{1}.stats_retry_count: "{retries}"
+    # The ingest's tracks, all of them: each answer replaces the last.
     - path: '^/v2/live_streams/([0-9a-f]{24})/stats$'
+      json_match: { "$.media_info.tracks": '^\[' }
+      replace: streams.{1}.tracks
       json_each: "$.media_info.tracks"
       json:
         track: "$.track_id"

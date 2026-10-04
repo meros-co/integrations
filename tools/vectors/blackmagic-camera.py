@@ -444,6 +444,16 @@ _bt("working-set", "/media/workingset",
     '"remainingSpace":128000000000,"clipCount":12},null]}',
     {"media": {"devices": {"cfast1": {"volume": "A001", "remaining_record_time": 3600, "total_space": 256000000000,
                                       "remaining_space": 128000000000, "clip_count": 12}}}})
+# The drive usb1 was taken out: its slot is null now, and it leaves the state.
+telemetry(BC, "working-set-removed", inbound_http={"path": _P + "/media/workingset", "body":
+          '{"size":2,"workingset":[{"volume":"A001","deviceName":"cfast1","remainingRecordTime":3600,'
+          '"totalSpace":256000000000,"remainingSpace":128000000000,"clipCount":12},null]}'},
+          state_before={"media": {"active": {"index": 0, "device": "cfast1"},
+                                  "devices": {"usb1": {"volume": "T7", "clip_count": 3}}}},
+          expect_state={"media": {"active": {"index": 0, "device": "cfast1"},
+                                  "devices": {"cfast1": {"volume": "A001", "remaining_record_time": 3600,
+                                                         "total_space": 256000000000,
+                                                         "remaining_space": 128000000000, "clip_count": 12}}}})
 _bt("product", "/system/product", '{"deviceName":"Camera 1","productName":"Blackmagic PYXIS 6K","softwareVersion":"9.2"}',
     {"system": {"device_name": "Camera 1", "product_name": "Blackmagic PYXIS 6K", "software_version": "9.2"}})
 _bt("codec-format", "/system/codecFormat", '{"codec":"BRaw:Q0","container":"Braw"}',
