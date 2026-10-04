@@ -6,7 +6,7 @@
 # are percent-encoded by hand (a comma is %2C). Reply bodies follow the
 # JSON:API shapes of the documentation's examples; ids are made up.
 PC = "planningcenter-services"
-_PCS = {"auth": "bearer", "token": "pco_tok_x", "service_type_id": "1234", "plan_id": "5678"}
+_PCS = {"auth": "oauth2", "access_token": "pco_tok_x", "service_type_id": "1234", "plan_id": "5678"}
 _PCP = "/services/v2/service_types/1234/plans/5678"
 _INC = "?include=current_item_time%2Cnext_item_time"
 
@@ -59,7 +59,7 @@ _pc("go_to_previous_item", {}, "POST", _PCP + "/live/go_to_previous_item" + _INC
     http_reply={"status": 403, "body": '{"errors":[{"status":"403","title":"Forbidden"}]}'},
     expect_result={"error": {"error": "device_error", "code": "403"}})
 _pc("toggle_control", {}, "POST", _PCP + "/live/toggle_control" + _INC)
-# An expired OAuth token: 401 is terminal, reported as auth.
+# A plain OAuth access token (no refresh token) refused: 401 is terminal, reported as auth.
 _pc("get_live", {}, "GET", _PCP + "/live" + _INC,
     http_reply={"status": 401, "body": '{"errors":[{"status":"401","title":"Unauthorized"}]}'},
     expect_result={"error": {"error": "auth"}})

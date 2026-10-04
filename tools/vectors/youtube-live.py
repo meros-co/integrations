@@ -6,7 +6,7 @@
 # %2C). Reply bodies follow the reference's resource representations; ids are
 # made up.
 YT = "youtube-live"
-_YTS = {"token": "ya29.x", "broadcast_id": "abcDEF12345"}
+_YTS = {"access_token": "ya29.x", "broadcast_id": "abcDEF12345"}
 _YB = "/youtube/v3/liveBroadcasts"
 _PART = "part=id%2Csnippet%2CcontentDetails%2Cstatus"
 
@@ -56,7 +56,7 @@ _yt("go_live", {"broadcast_id": "abcDEF12345"}, "POST",
     _YB + "/transition?broadcastStatus=live&id=abcDEF12345&" + _PART,
     http_reply={"status": 200, "body": json.dumps(_BROADCAST)},
     expect_result={"ok": {"kind": "value", "value": _BROADCAST}})
-# The access token has expired: 401 is terminal, reported as auth.
+# A plain access token (no refresh token) refused: 401 is terminal, reported as auth.
 _yt("complete_broadcast", {"broadcast_id": "abcDEF12345"}, "POST",
     _YB + "/transition?broadcastStatus=complete&id=abcDEF12345&" + _PART,
     http_reply={"status": 401, "body": '{"error":{"code":401,"message":"Invalid Credentials"}}'},

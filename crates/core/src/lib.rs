@@ -57,6 +57,8 @@ mod mcp_discovery;
 mod mdns;
 pub mod module;
 mod modules;
+#[cfg(test)]
+mod oauth_session_tests;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
 mod session;
@@ -157,6 +159,19 @@ pub enum OpenError {
     /// The core is shutting down (`Core::close_all`).
     #[error("the core is closing")]
     Closing,
+}
+
+/// Why `Core::update_settings` changed nothing.
+#[derive(Debug, Clone, PartialEq, Serialize, thiserror::Error)]
+#[serde(tag = "error", rename_all = "snake_case")]
+pub enum SettingsError {
+    /// A setting the spec does not declare, a value it does not allow, or
+    /// settings the device's module cannot use.
+    #[error("invalid settings: {message}")]
+    InvalidSettings { message: String },
+    /// The device is not open, or the core is closing.
+    #[error("session closed")]
+    Closed,
 }
 
 struct DeviceEntry {
@@ -260,7 +275,12 @@ impl Core {
     /// `devices` names an integration this build does not include, or is
     /// empty.
     pub fn with_options(options: CoreOptions) -> std::io::Result<Core> {
-        let embedded = Catalog::embedded();
+        Core::with_catalog(Catalog::embedded(), options)
+    }
+
+    /// A core over `embedded` rather than the build's specs, for tests that
+    /// change a spec (a cloud API's host and scheme) to reach a local server.
+    pub(crate) fn with_catalog(embedded: Catalog, options: CoreOptions) -> std::io::Result<Core> {
         let catalog = match &options.devices {
             None => embedded.clone(),
             Some(ids) => embedded
@@ -367,11 +387,28 @@ impl Core {
             settings,
             monitor: request.monitor,
         };
-        let module =
-            modules::construct(spec, context).map_err(|reason| OpenError::NotImplemented {
+        let module = modules::construct(spec, context.clone()).map_err(|reason| {
+            OpenError::NotImplemented {
                 device: spec.id.clone(),
                 reason,
-            })?;
+            }
+        })?;
+        let reconfigure = session::Reconfigure {
+            declared: spec.settings.clone(),
+            settings: context.settings.clone(),
+            build: {
+                let spec = spec.clone();
+                Box::new(move |settings| {
+                    modules::construct(
+                        &spec,
+                        module::OpenContext {
+                            settings,
+                            ..context.clone()
+                        },
+                    )
+                })
+            },
+        };
 
         let id = self.next_device.fetch_add(1, Ordering::Relaxed);
         let snapshot = Arc::new(Mutex::new(DeviceSnapshot {
@@ -380,7 +417,8 @@ impl Core {
             latency_ms: None,
         }));
         let (tx, rx) = mpsc::channel(256);
-        let session = Session::new(id, host, module, self.services.clone(), snapshot.clone());
+        let session = Session::new(id, host, module, self.services.clone(), snapshot.clone())
+            .reconfigurable(reconfigure);
         self.runtime().spawn(session.run(rx));
         self.devices.lock().unwrap().insert(
             id,
@@ -435,6 +473,55 @@ impl Core {
         .await
         .map_err(|_| CommandError::Closed)?;
         result.await.map_err(|_| CommandError::Closed)?
+    }
+
+    /// Change an open device's settings without closing it: `settings` are
+    /// merged into the device's current ones (a `null` puts one back to its
+    /// default) and the whole set is validated against the spec first, so a
+    /// setting the spec does not declare, or a value it does not allow,
+    /// changes nothing. The current settings include any credentials the
+    /// core obtained itself (`credentials` events).
+    ///
+    /// A spec-driven device takes them live: its state, connection and
+    /// commands in flight are kept, every later request uses them, and a
+    /// connection opened later (a reconnect) logs in with them. A device
+    /// whose credential was refused (connection `unauthorized`) is let go
+    /// again: it reconnects and resumes with the new settings. A natively
+    /// implemented device is restarted under the same id: its connection is
+    /// closed and opened again with the new settings, commands in flight
+    /// fail with `transport`, and its state and stream watchers are kept.
+    pub async fn update_settings(
+        &self,
+        device: DeviceId,
+        settings: Params,
+    ) -> Result<(), SettingsError> {
+        if self.closing.load(Ordering::SeqCst) {
+            return Err(SettingsError::Closed);
+        }
+        let tx = {
+            let devices = self.devices.lock().unwrap();
+            devices
+                .get(&device)
+                .ok_or(SettingsError::Closed)?
+                .tx
+                .clone()
+        };
+        let (reply, result) = oneshot::channel();
+        tx.send(SessionMsg::Settings { settings, reply })
+            .await
+            .map_err(|_| SettingsError::Closed)?;
+        result.await.map_err(|_| SettingsError::Closed)?
+    }
+
+    /// Blocking form of [`Core::update_settings`], for hosts without an async
+    /// runtime. Must not be called from within an async task.
+    pub fn update_settings_blocking(
+        &self,
+        device: DeviceId,
+        settings: Params,
+    ) -> Result<(), SettingsError> {
+        self.runtime()
+            .block_on(self.update_settings(device, settings))
     }
 
     /// Run a future on the core's runtime and wait for it, for bindings whose

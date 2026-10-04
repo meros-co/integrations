@@ -218,7 +218,7 @@ transport:
   type: http
   port: 80
   scheme: http                # http | https
-  auth: none                  # none | basic | digest | bearer | header | query-token
+  auth: none                  # none | basic | digest | bearer | header | query-token | oauth2
   timeout_ms: 4000
   probe: { method: GET, path: /cgi-bin/ptzctrl.cgi, raw_query: "ptzcmd&ptzstop&1&1" }
 ```
@@ -239,13 +239,74 @@ until it is replaced. A challenge the core cannot answer leaves the 401 as it
 is. A 401 or 403 on any request is a refusal of the credential, and it is
 terminal: pending and later commands fail with `auth`, the connection reports
 `unauthorized`, and nothing further is sent until the host opens the device
-again. A credential is never retried on a schedule, because repeated failed
+again or changes its settings (`update_settings`). A credential is never retried on a schedule, because repeated failed
 logins can lock a device out.
 
 A service taking more than one kind of credential names a setting instead,
 as for `scheme` below: `auth: { setting: auth }` with `auth: { type: enum,
-values: [basic, bearer] }`. Planning Center takes a personal access token as
-Basic and an OAuth token as Bearer.
+values: [basic, oauth2] }`. Planning Center takes a personal access token as
+Basic and OAuth tokens as `oauth2`.
+
+#### OAuth 2 (`auth: oauth2`)
+
+A cloud service signed in to with OAuth 2 (YouTube, Planning Center) takes
+`auth: oauth2` and an `oauth` block naming its token endpoint:
+
+```yaml
+transport:
+  type: http
+  port: 443
+  scheme: https
+  auth: oauth2
+  oauth:
+    token_url: https://oauth2.googleapis.com/token
+    refresh_ahead_s: 300        # default 300
+    client_auth: body           # body (default) | basic
+  refusal_status: [401]
+```
+
+The consumer owns the credential: it registers its own application with the
+service (its client id and secret), runs the browser sign-in itself, and
+passes the tokens as settings. The core never runs a sign-in and persists
+nothing. The spec declares these settings, none of them required:
+
+| Setting | Type | Meaning |
+|---|---|---|
+| `client_id` | string | The consumer's client id, sent with each refresh. |
+| `client_secret` | string, secret | Sent with each refresh only when set: a public client (an installed app, a Twitch public client) refreshes with its id alone, and the field is then left out of the request entirely. |
+| `refresh_token` | string, secret | Keeps the access token fresh. Without it the access token is a plain bearer token, used until refused. |
+| `access_token` | string, secret | Sent as `Authorization: Bearer`. May be empty when there is a refresh token: the core refreshes before the first request. |
+| `expires_at` | int | When the access token expires, in Unix seconds (whole seconds since 1970-01-01 UTC). Unknown when absent: the token is then used until refused. |
+| `token_url` | string | Replaces the spec's `token_url` when set: the consumer's own token proxy, for a product that cannot ship its client secret (an open-source one) and adds it server-side, as OBS does for its own sign-ins. `https`, or `http` only to this machine (`localhost`, `127.0.0.1`, `[::1]`). |
+
+Requests carry the access token as Bearer. When there is no access token, or
+it expires within `refresh_ahead_s` (at half its life for a token living
+shorter than twice that), the core first refreshes it with the refresh token
+grant (RFC 6749 §6): a form-encoded POST of `grant_type=refresh_token` and
+`refresh_token` to the token endpoint, with the client per `client_auth`:
+`client_id` and `client_secret` in the body, or HTTP Basic with the two
+form-encoded (§2.3.1). One refresh is in flight per device, and every request
+waits behind it. The answer's `access_token` and `expires_in` give the new
+token and its expiry; a `refresh_token` in it replaces the old one, which the
+service may already have invalidated (rotation).
+
+Whenever the core obtains new tokens it reports them in a `credentials` event
+(see [Events](#events)), and keeps them in memory only: **the consumer must
+persist them**, and pass the latest when it next opens the device.
+
+A 401 from the API (one of `refusal_status`) refreshes the token and sends
+the request once more; a second refusal of the same request is the terminal
+`unauthorized` above. A refresh the token endpoint refuses (`invalid_grant`,
+or HTTP 400 or 401: a refresh token expired or revoked, a wrong client) is
+terminal too. A token endpoint that cannot be reached, or answers otherwise
+(a 5xx, a 429), is an ordinary failure: the device reports `disconnected`,
+commands waiting fail with `transport`, and the refresh is tried again with
+backoff (1 s doubling to 60 s), so a network outage does not need a new
+sign-in. After a terminal refusal the consumer signs the user in again and
+passes the new tokens with `update_settings` (§2, Settings), which lets the
+device go again without reopening it. The token endpoint's answer is never
+offered to the telemetry rules, and no token or secret is ever written to a
+log event.
 
 Where the operator chooses HTTP or HTTPS on the device, `scheme` names a
 setting instead: `scheme: { setting: scheme }` with `scheme: { type: enum,
@@ -346,7 +407,7 @@ told apart by address, and refuses to open without it.
 
 Every delivery drains one queue of JSON events, each with an `event` field:
 `connection`, `state` (an RFC 7386 merge patch), `alive`, `log`, `closed`,
-`message`, `dropped`, `discovered` and `discovery`. A listener reports what it
+`message`, `credentials`, `dropped`, `discovered` and `discovery`. A listener reports what it
 receives as `message` events, one per message, even when one repeats the
 last exactly, since a state patch with an equal value is no change:
 
@@ -364,6 +425,20 @@ hard ceiling of 100,000 queued events, counted in `dropped`'s `messages`
 (present only when not zero), so a stalled consumer cannot grow memory without
 limit.
 
+A `credentials` event carries new values of a device's settings that the core
+obtained itself: the tokens of an `auth: oauth2` device after each refresh.
+`expires_at` is in Unix seconds, or `null` when the service gave no lifetime;
+`refresh_token` is present only when the service rotated it. The values are
+secrets, held by the core in memory only; the consumer persists them (a
+rotated refresh token replaces the stored one, which may no longer work) and
+passes them when it next opens the device. Credentials events are never
+discarded.
+
+```json
+{"event": "credentials", "device": 3,
+ "settings": {"access_token": "ya29...", "expires_at": 1791234567}}
+```
+
 ### Settings and connection setup
 
 Per-installation values that are not command parameters — credentials, ports,
@@ -377,6 +452,20 @@ settings:
 ```
 
 `secret: true` marks a value the core never logs or echoes.
+
+The consumer can change an open device's settings with `update_settings`
+(every delivery has it) instead of closing and opening it again. The values
+given are merged into the device's current ones (a `null` puts a setting
+back to its default) and the whole set is validated against the spec first:
+a setting the spec does not declare, or a value it does not allow, fails with
+`invalid_settings` and changes nothing. A spec-driven device takes the new
+settings live: its state, connection and commands in flight are kept, every
+later message uses them, and a later connection (a reconnect) logs in with
+them; a device whose credential was refused (`unauthorized`) connects again
+with them. A natively implemented device is restarted under the same device
+id: its connection is closed and opened again with the new settings, its
+commands in flight fail with `transport`, and its state and stream watchers
+are kept.
 
 `on_connect` is an ordered list of messages sent once after the socket opens,
 before any command. It references settings as `{settings.<name>}`.
@@ -424,7 +513,7 @@ dropped and retried with backoff. `refused` is a regex over reply lines: a
 match means the device refused the credential, which is terminal as for HTTP
 (§2): commands fail with `auth`, the connection reports `unauthorized`, and the
 password is not sent again until the host opens the device with corrected
-settings. This is still not a handshake: the step is sent once, unchanged,
+settings, or corrects them with `update_settings`. This is still not a handshake: the step is sent once, unchanged,
 whatever the device says.
 
 `refused` does not need `after_prompt`: on any line transport (`line-tcp` and

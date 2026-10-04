@@ -73,6 +73,7 @@ impl HttpClients {
     /// Make a request and report its response to the session.
     pub(crate) fn spawn_request(
         &self,
+        epoch: u64,
         id: RequestId,
         request: &HttpRequest,
         inbound: mpsc::Sender<Inbound>,
@@ -81,7 +82,7 @@ impl HttpClients {
         let request = request.clone();
         tokio::spawn(async move {
             let result = clients.execute(&request).await;
-            let _ = inbound.send(Inbound::Http { id, result }).await;
+            let _ = inbound.send(Inbound::Http { epoch, id, result }).await;
         });
     }
 

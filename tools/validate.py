@@ -326,8 +326,8 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         if decl is None:
             errors.append(f"transport.auth names unknown setting '{auth.get('setting')}'")
             methods = set()
-        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer", "header"}:
-            errors.append("transport.auth's setting must be an enum of none, basic, digest, bearer and header")
+        elif decl.get("type") != "enum" or set(decl.get("values", [])) - {"none", "basic", "digest", "bearer", "header", "oauth2"}:
+            errors.append("transport.auth's setting must be an enum of none, basic, digest, bearer, header and oauth2")
             methods = set()
         else:
             methods = set(decl.get("values", []))
@@ -342,6 +342,24 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for method in sorted(methods & {"basic", "digest"}):
         if not {"username", "password"} <= settings.keys():
             errors.append(f"auth: {method} needs 'username' and 'password' settings")
+    # OAuth 2: the consumer's tokens as settings, refreshed by the core.
+    if "oauth2" in methods:
+        if not isinstance(transport.get("oauth"), dict):
+            errors.append("auth: oauth2 needs an oauth block with token_url")
+        for name, kind, secret in [("client_id", "string", False), ("client_secret", "string", True),
+                                   ("refresh_token", "string", True), ("access_token", "string", True),
+                                   ("expires_at", "int", False), ("token_url", "string", False)]:
+            decl = settings.get(name)
+            if decl is None:
+                errors.append(f"auth: oauth2 needs a '{name}' setting")
+            elif decl.get("type") != kind:
+                errors.append(f"auth: oauth2's '{name}' setting is of type {kind}")
+            elif secret and decl.get("secret") is not True:
+                errors.append(f"auth: oauth2's '{name}' setting is secret: true")
+            elif decl.get("required"):
+                errors.append(f"auth: oauth2's '{name}' setting is not required: a plain or refreshed token may leave it out")
+    elif "oauth" in transport:
+        errors.append("transport.oauth is for auth: oauth2")
 
     listen = (doc.get("transport") or {}).get("listen_port")
     if isinstance(listen, dict) and listen.get("setting") not in settings:

@@ -8,8 +8,9 @@ category: other
 # opened with host api.planningcenteronline.com on port 443, and follows one
 # plan's LIVE session, named by the service_type_id and plan_id settings. The
 # consumer owns the credential: a Personal Access Token (HTTP Basic with its
-# application id and secret) or an OAuth access token it obtained and
-# refreshes itself (Bearer). The core never runs an OAuth flow.
+# application id and secret), or OAuth tokens from its own sign-in, which the
+# core keeps fresh with the refresh token and reports as credentials events.
+# The core never runs a sign-in.
 
 source:
   - title: Planning Center Services API, version 2018-11-01 (API documentation graph)
@@ -44,6 +45,20 @@ source:
       X-PCO-API-Request-Rate-Limit, -Rate-Period and -Rate-Count headers and
       HTTP 429 with Retry-After when exceeded. Versioning: an
       X-PCO-API-Version header, else the application's default version.
+  - title: pco_api_oauth_example_sinatra_ruby (app.rb), MIT licence
+    author: Planning Center (Ministry Centered Technologies)
+    url: https://github.com/planningcenter/pco_api_oauth_example_sinatra_ruby
+    note: >
+      Planning Center's own example, read for corroboration only. Its OAuth
+      client's site is https://api.planningcenteronline.com with the oauth2
+      library's default token path, /oauth/token, and it refreshes a token
+      that has a refresh token when it is within 300 seconds of expiring.
+  - title: RFC 6749, The OAuth 2.0 Authorization Framework, section 6 (Refreshing an Access Token) and 5.2 (Error Response)
+    author: IETF
+    url: https://www.rfc-editor.org/rfc/rfc6749
+    note: >
+      The refresh request, the client authentication of section 2.3.1, a new
+      refresh token in the answer replacing the old one, and invalid_grant.
   - title: companion-module-planningcenter-serviceslive (src/api.js), MIT licence
     author: Bitfocus contributors
     url: https://github.com/bitfocus/companion-module-planningcenter-serviceslive
@@ -59,8 +74,13 @@ transport:
   type: http
   port: 443
   scheme: https
-  # Basic for a Personal Access Token, Bearer for an OAuth access token.
+  # Basic for a Personal Access Token; oauth2 for OAuth tokens, the access
+  # token sent as Bearer and refreshed at the token endpoint.
   auth: { setting: auth }
+  oauth:
+    token_url: https://api.planningcenteronline.com/oauth/token
+    refresh_ahead_s: 300
+    client_auth: body
   # 403 is a permission answer (a plan this user can't see or control), not a
   # refused credential; only 401 is.
   refusal_status: [401]
@@ -69,18 +89,34 @@ transport:
   probe: { method: GET, path: /services/v2 }
 
 settings:
-  auth: { type: enum, values: [basic, bearer], default: basic,
+  auth: { type: enum, values: [basic, oauth2], default: basic,
           label: Credential type,
-          description: "basic for a Personal Access Token (application id and secret), bearer for an OAuth access token the consumer obtained." }
+          description: "basic for a Personal Access Token (application id and secret), oauth2 for OAuth tokens from the consumer's own sign-in, refreshed by the core." }
   username: { type: string, max_length: 256, default: "",
               label: Application ID,
               description: "The Personal Access Token's application id, from api.planningcenteronline.com/oauth/applications; used when the credential type is basic." }
   password: { type: string, secret: true, max_length: 256, default: "",
               label: Secret,
               description: "The Personal Access Token's secret; used when the credential type is basic." }
-  token: { type: string, secret: true, max_length: 4096, default: "",
-           label: OAuth access token,
-           description: "An OAuth 2 access token for the user, which expires 2 hours after issue; the consumer refreshes it and opens the integration again with the new one." }
+  client_id: { type: string, max_length: 512, default: "",
+               label: OAuth client ID,
+               description: "The consumer's own Planning Center OAuth application's client id, sent with each token refresh; used when the credential type is oauth2." }
+  client_secret: { type: string, secret: true, max_length: 512, default: "",
+                   label: OAuth client secret,
+                   description: "The OAuth application's secret, sent with each token refresh when set; leave empty when token_url names a proxy that adds it." }
+  refresh_token: { type: string, secret: true, max_length: 4096, default: "",
+                   label: Refresh token,
+                   description: "The refresh token from the consumer's sign-in; with it the core keeps the access token fresh, and without it the access token is used until Planning Center refuses it." }
+  access_token: { type: string, secret: true, max_length: 4096, default: "",
+                  label: Access token,
+                  description: "The current OAuth access token, which expires 2 hours after issue; may be left empty when a refresh token is given, and the core reports each new one in a credentials event." }
+  expires_at: { type: int, min: 0,
+                label: Access token expiry,
+                description: "When the access token expires, in Unix seconds; the core refreshes 5 minutes before, and reports each new expiry in a credentials event." }
+  token_url: { type: string, max_length: 2048, default: "",
+               pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
+               label: Token endpoint override,
+               description: "A token endpoint to refresh at instead of Planning Center's, such as the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Planning Center's." }
   service_type_id: { type: string, pattern: "^[0-9]+$", max_length: 20, required: true,
                      label: Service type ID,
                      description: "The numeric id of the service type that holds the plan to follow, as in the plan's Planning Center URL or list_service_types." }
@@ -289,13 +325,21 @@ quirks:
     severity: warning
     text: >
       The consumer owns the credential. A Personal Access Token is the
-      application id and secret, sent as Basic. An OAuth access token is sent
-      as Bearer and expires 2 hours after issue: the core never refreshes it.
-      When it expires Planning Center answers 401, which is terminal: the
-      integration reports unauthorized, pending and later commands fail with
-      auth, and nothing more is sent until the consumer opens it again with a
-      fresh token. A consumer that refreshes before expiry opens it again with
-      the new token. A 403 (a plan this user can't see or control) is an
+      application id and secret, sent as Basic (credential type basic). With
+      credential type oauth2 the consumer registers its own OAuth
+      application, runs the sign-in and passes client_id, client_secret,
+      refresh_token, access_token and expires_at; the access token (2 hours
+      long) is sent as Bearer and refreshed at
+      api.planningcenteronline.com/oauth/token 5 minutes before it expires,
+      or at once when there is none, and each new token is reported in a
+      credentials event that the consumer must persist (a refresh token
+      Planning Center replaces included). A 401 refreshes the token and sends
+      the request once more; a second 401, a refused refresh
+      (invalid_grant), or a 401 with a Personal Access Token, is terminal:
+      the integration reports unauthorized, commands fail with auth, and
+      nothing more is sent until the consumer passes corrected settings with
+      update_settings. Without a refresh token the access token is used
+      until refused. A 403 (a plan this user can't see or control) is an
       ordinary command failure, not a refusal.
 
   - models: [all]

@@ -431,25 +431,53 @@ pub enum Action {
         format: &'static str,
         data: Vec<u8>,
     },
+    /// New values of the device's own settings the module obtained itself,
+    /// such as OAuth tokens it refreshed: reported as an `Event::Credentials`
+    /// for the consumer to persist, and kept as the device's settings so a
+    /// later `update_settings` merges onto them.
+    Credentials(Params),
 }
 
 /// Collects a module's actions for one callback.
 #[derive(Debug)]
 pub struct Cx {
     now: Millis,
+    /// Wall-clock time, milliseconds since the Unix epoch.
+    unix: Millis,
     actions: Vec<Action>,
 }
 
 impl Cx {
+    /// A context at `now`, whose wall clock reads the same: synthetic time
+    /// for tests, where the Unix epoch is the session's start.
     pub fn new(now: Millis) -> Cx {
+        Cx::at(now, now)
+    }
+
+    /// A context at `now` on the session's clock and `unix` milliseconds
+    /// since the Unix epoch on the wall clock.
+    pub fn at(now: Millis, unix: Millis) -> Cx {
         Cx {
             now,
+            unix,
             actions: Vec::new(),
         }
     }
 
     pub fn now(&self) -> Millis {
         self.now
+    }
+
+    /// Wall-clock time in milliseconds since the Unix epoch, for what a
+    /// service states as a date (a token's expiry). Use [`Cx::now`] for
+    /// timeouts and intervals.
+    pub fn unix_millis(&self) -> Millis {
+        self.unix
+    }
+
+    /// Report settings the module obtained itself; see [`Action::Credentials`].
+    pub fn credentials(&mut self, settings: Params) {
+        self.push(Action::Credentials(settings));
     }
 
     pub fn take(self) -> Vec<Action> {
@@ -718,6 +746,30 @@ pub trait Module: Send + 'static {
     fn stop(&mut self, cx: &mut Cx) {
         let _ = cx;
     }
+
+    /// The consumer changed the device's settings (`Core::update_settings`).
+    /// `settings` is the whole set, validated against the spec, with the
+    /// change merged in. A module that can take them while running applies
+    /// them and answers [`SettingsUpdate::Applied`]. The default answers
+    /// [`SettingsUpdate::Restart`]: the session stops this module as on
+    /// closing, without a `closed` event, fails its pending commands, and
+    /// starts one built afresh from the new settings under the same device
+    /// id, keeping the device's state and stream watchers.
+    fn update_settings(&mut self, cx: &mut Cx, settings: &Params) -> SettingsUpdate {
+        let _ = (cx, settings);
+        SettingsUpdate::Restart
+    }
+}
+
+/// What a module did with new settings.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SettingsUpdate {
+    /// Applied while running; commands in flight carry on.
+    Applied,
+    /// Rebuild the module from the new settings.
+    Restart,
+    /// The settings cannot be used; nothing changed.
+    Rejected(String),
 }
 
 /// What a module is constructed from when a device is opened.

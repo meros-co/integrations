@@ -38,6 +38,17 @@ pub enum Event {
     },
     /// The device's session has ended after `close`.
     Closed { device: DeviceId },
+    /// The core obtained new values of the device's settings itself: OAuth
+    /// tokens it refreshed (`access_token`, `expires_at` in Unix seconds,
+    /// and `refresh_token` when the service rotated it). The core keeps them
+    /// in memory only, so the consumer must persist them and pass them when
+    /// it next opens the device; a rotated refresh token replaces the old
+    /// one, which may no longer work. The values are secrets. Kept on
+    /// overflow, unlike state patches.
+    Credentials {
+        device: DeviceId,
+        settings: crate::catalog::Params,
+    },
     /// One message a listener received (an OSC control surface's button or
     /// fader), reported every time, even when it repeats the last one: a
     /// button pressed twice is two events. `source` is the sender as
@@ -252,6 +263,34 @@ mod tests {
                 device: 1,
                 patch: json!({"a": 2})
             }
+        );
+    }
+
+    #[test]
+    fn overflow_keeps_credentials() {
+        let q = EventQueue::new(1);
+        let credentials = Event::Credentials {
+            device: 1,
+            settings: json!({"access_token": "a", "expires_at": 1})
+                .as_object()
+                .unwrap()
+                .clone(),
+        };
+        q.push(Event::State {
+            device: 1,
+            patch: json!({"a": 1}),
+        });
+        q.push(credentials.clone());
+        q.push(Event::State {
+            device: 1,
+            patch: json!({"a": 2}),
+        });
+        let events = q.drain(10);
+        assert!(events.contains(&credentials));
+        assert_eq!(
+            serde_json::to_value(&credentials).unwrap(),
+            json!({"event": "credentials", "device": 1,
+                   "settings": {"access_token": "a", "expires_at": 1}})
         );
     }
 

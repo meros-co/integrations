@@ -834,14 +834,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## planningcenter-services — Planning Center Services LIVE
 
-- [ ] Confirm the LIVE actions are POSTs to /service_types/{id}/plans/{id}/live/<action> without a live id (the documentation graph prints them under a series path with one). ([specs/planningcenter-services.yaml:109](specs/planningcenter-services.yaml#L109))
-- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honour include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:112](specs/planningcenter-services.yaml#L112))
-- [ ] Confirm toggle_control takes control from another user who holds it, rather than failing, and what it answers when it gives control up. ([specs/planningcenter-services.yaml:123](specs/planningcenter-services.yaml#L123))
-- [ ] Record what the Live resource's relationships hold (the documentation's example has none): current_item_time, next_item_time and controller ids, and what they are when LIVE is not running. ([specs/planningcenter-services.yaml:444](specs/planningcenter-services.yaml#L444))
-- [ ] Check that a move without control answers 403 and not another status. ([specs/planningcenter-services.yaml:65](specs/planningcenter-services.yaml#L65))
-- [ ] Confirm GET /services/v2 answers any valid credential, and 401 for an expired OAuth token or a revoked Personal Access Token. ([specs/planningcenter-services.yaml:69](specs/planningcenter-services.yaml#L69))
-- [ ] Record the format of LIVE times (ItemTime live_start_at and live_end_at, PlanTime live_starts_at): ISO 8601 as documented, or 2026/06/16 11:24:29 -0500 as seen. ([specs/planningcenter-services.yaml:359](specs/planningcenter-services.yaml#L359))
-- [ ] Confirm per_page=100 is accepted on items, plan_times, item_notes and live_controllers, and how a plan with more than 100 items is paged. ([specs/planningcenter-services.yaml:344](specs/planningcenter-services.yaml#L344))
+- [ ] Confirm the LIVE actions are POSTs to /service_types/{id}/plans/{id}/live/<action> without a live id (the documentation graph prints them under a series path with one). ([specs/planningcenter-services.yaml:145](specs/planningcenter-services.yaml#L145))
+- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honour include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:148](specs/planningcenter-services.yaml#L148))
+- [ ] Confirm toggle_control takes control from another user who holds it, rather than failing, and what it answers when it gives control up. ([specs/planningcenter-services.yaml:159](specs/planningcenter-services.yaml#L159))
+- [ ] Record what the Live resource's relationships hold (the documentation's example has none): current_item_time, next_item_time and controller ids, and what they are when LIVE is not running. ([specs/planningcenter-services.yaml:488](specs/planningcenter-services.yaml#L488))
+- [ ] Check that a move without control answers 403 and not another status. ([specs/planningcenter-services.yaml:85](specs/planningcenter-services.yaml#L85))
+- [ ] Confirm GET /services/v2 answers any valid credential, and 401 for an expired OAuth token or a revoked Personal Access Token. ([specs/planningcenter-services.yaml:89](specs/planningcenter-services.yaml#L89))
+- [ ] Record the format of LIVE times (ItemTime live_start_at and live_end_at, PlanTime live_starts_at): ISO 8601 as documented, or 2026/06/16 11:24:29 -0500 as seen. ([specs/planningcenter-services.yaml:403](specs/planningcenter-services.yaml#L403))
+- [ ] Confirm per_page=100 is accepted on items, plan_times, item_notes and live_controllers, and how a plan with more than 100 items is paged. ([specs/planningcenter-services.yaml:388](specs/planningcenter-services.yaml#L388))
+- [ ] Confirm the OAuth token endpoint is https://api.planningcenteronline.com/oauth/token (taken from Planning Center's example app and its OAuth library's default path, not from a documented URL) and that it accepts the refresh token grant with client_id and client_secret in the form body. ([specs/planningcenter-services.yaml:81](specs/planningcenter-services.yaml#L81))
+- [ ] Record whether a refresh returns a new refresh token (rotation) and whether the old one then stops working, and what a revoked or expired refresh token answers (400 invalid_grant expected). ([specs/planningcenter-services.yaml:336](specs/planningcenter-services.yaml#L336))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
@@ -1224,14 +1226,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## youtube-live — YouTube Live
 
-- [ ] Confirm GET /youtube/v3/ answers without spending quota and without checking the token (a 404), so idle probes are free. ([specs/youtube-live.yaml:91](specs/youtube-live.yaml#L91))
-- [ ] Confirm an expired or revoked access token answers 401 on every method, and that quota and permission failures answer 403. ([specs/youtube-live.yaml:87](specs/youtube-live.yaml#L87))
-- [ ] Confirm transition, bind and cuepoint answer 200 (the reference gives no status), and that a transition's reply is the broadcast. ([specs/youtube-live.yaml:159](specs/youtube-live.yaml#L159))
-- [ ] Confirm the deletes (broadcasts, streams, chat messages, bans) answer 204. ([specs/youtube-live.yaml:249](specs/youtube-live.yaml#L249))
-- [ ] Record the limits on an ad break's durationSecs and a temporary ban's banDurationSeconds (the reference gives none). ([specs/youtube-live.yaml:212](specs/youtube-live.yaml#L212))
-- [ ] Record the longest live chat message YouTube accepts (the reference gives no limit). ([specs/youtube-live.yaml:335](specs/youtube-live.yaml#L335))
-- [ ] Check that lastUpdateTimeSeconds and concurrentViewers arrive as JSON strings, as Google's 64-bit integers do. ([specs/youtube-live.yaml:577](specs/youtube-live.yaml#L577))
-- [ ] Confirm that a stream's health status and configuration issues are reported while it is active and bound, and how soon after a change. ([specs/youtube-live.yaml:578](specs/youtube-live.yaml#L578))
+- [ ] Confirm GET /youtube/v3/ answers without spending quota and without checking the token (a 404), so idle probes are free. ([specs/youtube-live.yaml:126](specs/youtube-live.yaml#L126))
+- [ ] Confirm an expired or revoked access token answers 401 on every method, and that quota and permission failures answer 403. ([specs/youtube-live.yaml:122](specs/youtube-live.yaml#L122))
+- [ ] Confirm transition, bind and cuepoint answer 200 (the reference gives no status), and that a transition's reply is the broadcast. ([specs/youtube-live.yaml:210](specs/youtube-live.yaml#L210))
+- [ ] Confirm the deletes (broadcasts, streams, chat messages, bans) answer 204. ([specs/youtube-live.yaml:300](specs/youtube-live.yaml#L300))
+- [ ] Record the limits on an ad break's durationSecs and a temporary ban's banDurationSeconds (the reference gives none). ([specs/youtube-live.yaml:263](specs/youtube-live.yaml#L263))
+- [ ] Record the longest live chat message YouTube accepts (the reference gives no limit). ([specs/youtube-live.yaml:386](specs/youtube-live.yaml#L386))
+- [ ] Check that lastUpdateTimeSeconds and concurrentViewers arrive as JSON strings, as Google's 64-bit integers do. ([specs/youtube-live.yaml:651](specs/youtube-live.yaml#L651))
+- [ ] Confirm that a stream's health status and configuration issues are reported while it is active and bound, and how soon after a change. ([specs/youtube-live.yaml:652](specs/youtube-live.yaml#L652))
+- [ ] Confirm a refresh at https://oauth2.googleapis.com/token with client_id alone (an installed-app client, no client_secret) succeeds, and that Google never rotates the refresh token on refresh. ([specs/youtube-live.yaml:117](specs/youtube-live.yaml#L117))
+- [ ] Confirm a refresh token from a project in publishing status Testing fails with 400 invalid_grant after 7 days, and that a revoked one answers the same. ([specs/youtube-live.yaml:485](specs/youtube-live.yaml#L485))
+- [ ] Record the access token lifetime Google gives (expires_in, about 3599 s expected), so the 300 s refresh margin is right. ([specs/youtube-live.yaml:118](specs/youtube-live.yaml#L118))
 
 ## Integrations with no open items
 

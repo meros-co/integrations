@@ -11,6 +11,7 @@
 
 mod expect;
 mod framing;
+mod oauth;
 mod osc;
 mod telemetry;
 pub(crate) mod template;
@@ -25,10 +26,12 @@ use serde_json::{Map, Value};
 use crate::catalog::{DeviceSpec, ParamSpec, Params};
 use crate::module::{
     Bind, CommandError, CommandId, Connection, Credentials, Cx, HttpRequest, HttpResponse, Key,
-    Level, Millis, Module, OpenContext, Outcome, RequestId, SseInput, TcpInput, WsInput, WsRequest,
+    Level, Millis, Module, OpenContext, Outcome, RequestId, SettingsUpdate, SseInput, TcpInput,
+    WsInput, WsRequest,
 };
 use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
+use oauth::{OAuth, Refreshed};
 use template::{
     no_escape, percent_encode, render, sole_converted, sole_value, Conversions, Values,
 };
@@ -51,6 +54,8 @@ const RECONNECT: Key = "reconnect";
 const RENEW: Key = "telemetry-renew";
 const POLL: Key = "telemetry-poll";
 const PROMPT: Key = "login-prompt";
+/// A token refresh that failed, tried again.
+const OAUTH_RETRY: Key = "oauth-retry";
 
 const DEFAULT_TIMEOUT: Millis = 2_000;
 /// A device silent this long, with nothing in flight, is probed.
@@ -159,6 +164,9 @@ enum HttpAuth {
     /// The `token` setting as is, in the header the transport's
     /// `auth_header` names (mimoLive's `X-MimoLive-Password-SHA256`).
     Header,
+    /// The `access_token` setting as Bearer, refreshed with the
+    /// `refresh_token` setting (`transport.oauth`).
+    OAuth2,
 }
 
 impl Transport {
@@ -249,6 +257,13 @@ struct InFlight {
     awaiting: Option<Await>,
     /// When the message now awaiting its reply was sent.
     sent_at: Millis,
+    /// The HTTP request now awaiting its reply, kept to send again once
+    /// after a refreshed OAuth token.
+    last_http: Option<HttpRequest>,
+    /// The request refused with the old token, waiting for the refresh.
+    retry: Option<HttpRequest>,
+    /// The token was refreshed for this request: a second refusal is final.
+    refreshed: bool,
 }
 
 struct Job {
@@ -265,6 +280,14 @@ struct Job {
 
 pub(crate) struct SpecEngine {
     spec: Arc<DeviceSpec>,
+    /// What the device was opened with, its settings kept current, for
+    /// settings changed while open.
+    ctx: OpenContext,
+    /// `auth: oauth2`: the token refresh.
+    oauth: Option<OAuth>,
+    /// The push websocket or event stream was opened after a refresh its
+    /// refusal asked for: a second refusal is final.
+    side_refreshed: bool,
     /// `auth: header`: the header the `token` setting is sent in.
     auth_header: String,
     host: IpAddr,
@@ -286,7 +309,8 @@ pub(crate) struct SpecEngine {
     request_paths: std::collections::HashMap<RequestId, (String, Option<Value>)>,
     /// Set when the device refuses the configured credential. Terminal: the
     /// credential is never presented again, since repeated failures can lock
-    /// a device out. The host re-opens the device with corrected settings.
+    /// a device out. The host re-opens the device with corrected settings,
+    /// or corrects them with `update_settings`, which clears this.
     refused: Option<String>,
     /// An `on_connect` step waiting for its `after_prompt` text: the step's
     /// index, the prompt, and what has arrived so far. Nothing else is sent,
@@ -398,6 +422,14 @@ fn auth_headers(auth: HttpAuth, header: &str, settings: &Params) -> Vec<(String,
                 Vec::new()
             } else {
                 vec![(header.to_string(), token)]
+            }
+        }
+        HttpAuth::OAuth2 => {
+            let token = setting("access_token");
+            if token.is_empty() {
+                Vec::new()
+            } else {
+                vec![("Authorization".to_string(), format!("Bearer {token}"))]
             }
         }
         HttpAuth::None | HttpAuth::Digest => Vec::new(),
@@ -586,6 +618,7 @@ impl SpecEngine {
                     "digest" => HttpAuth::Digest,
                     "bearer" => HttpAuth::Bearer,
                     "header" => HttpAuth::Header,
+                    "oauth2" => HttpAuth::OAuth2,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
                 if auth == HttpAuth::Header && auth_header.is_empty() {
@@ -754,8 +787,22 @@ impl SpecEngine {
                 })
             }
         };
+        let oauth = match &transport {
+            Transport::Http {
+                auth: HttpAuth::OAuth2,
+                ..
+            } => {
+                let oauth = OAuth::new(t.get("oauth"))?;
+                oauth.token_url(&ctx.settings)?;
+                Some(oauth)
+            }
+            _ => None,
+        };
         Ok(SpecEngine {
             spec,
+            ctx: ctx.clone(),
+            oauth,
+            side_refreshed: false,
             auth_header,
             host: ctx.host,
             monitor: ctx.monitor,
@@ -999,6 +1046,9 @@ impl SpecEngine {
             returns,
             awaiting: None,
             sent_at: 0,
+            last_http: None,
+            retry: None,
+            refreshed: false,
         })
     }
 
@@ -1014,6 +1064,9 @@ impl SpecEngine {
 
     fn pump(&mut self, cx: &mut Cx) {
         while self.current.is_none() {
+            if !self.queue.is_empty() && self.oauth_holds(cx) {
+                return;
+            }
             if !self.can_send() && self.queue.front().is_some_and(|j| j.id.is_some()) {
                 // Fail rather than hold: the caller should not wait out a
                 // reconnect it cannot see.
@@ -1074,16 +1127,10 @@ impl SpecEngine {
                     }
                 }
                 Outgoing::Http(request) => {
-                    let id = self.next_request;
-                    self.next_request += 1;
-                    let target = request.url.splitn(4, '/').nth(3).unwrap_or("");
-                    let body = request
-                        .body
-                        .as_deref()
-                        .and_then(|b| serde_json::from_slice::<Value>(b).ok());
-                    self.request_paths.insert(id, (format!("/{target}"), body));
-                    cx.http(id, request);
-                    Await::Http(id)
+                    if self.oauth.is_some() {
+                        flight.last_http = Some(request.clone());
+                    }
+                    Await::Http(self.send_http(cx, request))
                 }
             };
             if waits || matches!(awaiting, Await::Http(_)) {
@@ -1101,6 +1148,199 @@ impl SpecEngine {
                 }
                 return;
             }
+        }
+    }
+
+    /// Send an HTTP request whose reply goes to the telemetry rules.
+    fn send_http(&mut self, cx: &mut Cx, request: HttpRequest) -> RequestId {
+        let id = self.next_request;
+        self.next_request += 1;
+        let target = request.url.splitn(4, '/').nth(3).unwrap_or("");
+        let body = request
+            .body
+            .as_deref()
+            .and_then(|b| serde_json::from_slice::<Value>(b).ok());
+        self.request_paths.insert(id, (format!("/{target}"), body));
+        cx.http(id, request);
+        id
+    }
+
+    // ── OAuth ────────────────────────────────────────────────────────────
+
+    /// Whether queued requests wait for the access token: a refresh is in
+    /// flight, or one is due and is started now. After a refresh failed,
+    /// until its retry, queued commands fail rather than wait.
+    fn oauth_holds(&mut self, cx: &mut Cx) -> bool {
+        let Some(oauth) = &self.oauth else {
+            return false;
+        };
+        if oauth.refreshing.is_some() {
+            return true;
+        }
+        if !oauth.needs_refresh(&self.settings, cx.unix_millis()) {
+            return false;
+        }
+        if cx.now() < oauth.retry_at {
+            let message = format!(
+                "the access token could not be refreshed: {}",
+                oauth.last_error.clone().unwrap_or_default()
+            );
+            for job in self.queue.drain(..) {
+                if let Some(id) = job.id {
+                    cx.complete(
+                        id,
+                        Err(CommandError::Transport {
+                            message: message.clone(),
+                        }),
+                    );
+                }
+            }
+            return true;
+        }
+        self.start_refresh(cx);
+        true
+    }
+
+    fn start_refresh(&mut self, cx: &mut Cx) {
+        let accept_invalid_certs = matches!(
+            self.transport,
+            Transport::Http {
+                accept_invalid_certs: true,
+                ..
+            }
+        );
+        let Some(oauth) = self.oauth.as_mut() else {
+            return;
+        };
+        if oauth.refreshing.is_some() {
+            return;
+        }
+        match oauth.request(&self.settings, self.timeout, accept_invalid_certs) {
+            Ok(request) => {
+                let id = self.next_request;
+                self.next_request += 1;
+                oauth.refreshing = Some(id);
+                cx.cancel_timer(OAUTH_RETRY);
+                cx.http(id, request);
+            }
+            Err(reason) => self.refuse(cx, reason),
+        }
+    }
+
+    /// The token endpoint answered, or could not be reached.
+    fn refreshed(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
+        let Some(oauth) = self.oauth.as_mut() else {
+            return;
+        };
+        match oauth.response(&self.settings, result, cx.unix_millis(), cx.now()) {
+            Refreshed::Tokens(tokens) => {
+                for (name, value) in &tokens {
+                    self.settings.insert(name.clone(), value.clone());
+                }
+                self.ctx.settings = self.settings.clone();
+                cx.credentials(tokens);
+                cx.log(Level::Info, "OAuth access token refreshed");
+                self.resend(cx);
+                if self.current.is_none()
+                    && self.queue.is_empty()
+                    && self.link != Connection::Connected
+                {
+                    self.enqueue_probe(cx);
+                }
+                self.pump(cx);
+            }
+            Refreshed::Refused(reason) => self.refuse(cx, reason),
+            Refreshed::Failed(reason) => {
+                let wait = oauth.retry_at.saturating_sub(cx.now());
+                let message = format!("the access token could not be refreshed: {reason}");
+                cx.log(
+                    Level::Warning,
+                    format!("{message}; trying again in {} s", wait.div_ceil(1000)),
+                );
+                if self.current.as_ref().is_some_and(|f| f.retry.is_some()) {
+                    if let Some(id) = self.current.take().and_then(|f| f.id) {
+                        cx.complete(
+                            id,
+                            Err(CommandError::Transport {
+                                message: message.clone(),
+                            }),
+                        );
+                    }
+                }
+                for job in self.queue.drain(..) {
+                    if let Some(id) = job.id {
+                        cx.complete(
+                            id,
+                            Err(CommandError::Transport {
+                                message: message.clone(),
+                            }),
+                        );
+                    }
+                }
+                self.set_link(cx, Connection::Disconnected { reason: message });
+                cx.set_timer(OAUTH_RETRY, wait.max(1));
+            }
+        }
+    }
+
+    /// The request refused with the old token goes again with the new one.
+    fn resend(&mut self, cx: &mut Cx) {
+        let Some(mut request) = self.current.as_mut().and_then(|f| f.retry.take()) else {
+            return;
+        };
+        request.headers.retain(|(name, _)| name != "Authorization");
+        request
+            .headers
+            .extend(auth_headers(HttpAuth::OAuth2, "", &self.settings));
+        if let Some(flight) = self.current.as_mut() {
+            flight.last_http = Some(request.clone());
+        }
+        let id = self.send_http(cx, request);
+        if let Some(flight) = self.current.as_mut() {
+            flight.awaiting = Some(Await::Http(id));
+            flight.sent_at = cx.now();
+        }
+        cx.set_timer(REPLY, self.timeout);
+    }
+
+    /// The service refused the request in flight with 401: refresh the token
+    /// and send it once more, when there is a refresh token and this request
+    /// has not been sent with a refreshed one already. False when the
+    /// refusal stands.
+    fn retry_after_refresh(&mut self, cx: &mut Cx) -> bool {
+        let refreshable = self.oauth.as_ref().is_some_and(|o| o.refreshing.is_none())
+            && OAuth::can_refresh(&self.settings);
+        let Some(flight) = self.current.as_mut() else {
+            return false;
+        };
+        if !refreshable || flight.refreshed || flight.last_http.is_none() {
+            return false;
+        }
+        flight.refreshed = true;
+        flight.retry = flight.last_http.take();
+        flight.awaiting = None;
+        cx.cancel_timer(REPLY);
+        self.start_refresh(cx);
+        true
+    }
+
+    /// A push websocket or event stream refused its token: refresh it and
+    /// reopen, once. False when the refusal stands.
+    fn side_refresh(&mut self, cx: &mut Cx) -> bool {
+        if self.oauth.is_none() || !OAuth::can_refresh(&self.settings) || self.side_refreshed {
+            return false;
+        }
+        self.side_refreshed = true;
+        self.start_refresh(cx);
+        true
+    }
+
+    /// Headers with the current access token in place of the one they were
+    /// built with.
+    fn current_auth(&self, headers: &mut Vec<(String, String)>) {
+        if self.oauth.is_some() {
+            headers.retain(|(name, _)| name != "Authorization");
+            headers.extend(auth_headers(HttpAuth::OAuth2, "", &self.settings));
         }
     }
 
@@ -1192,7 +1432,7 @@ impl SpecEngine {
         cx.cancel_timer(RECONNECT);
         cx.log(
             Level::Warning,
-            format!("{reason}; no further requests until the device is opened again with corrected settings"),
+            format!("{reason}; no further requests until the device's settings are corrected"),
         );
         self.set_link(
             cx,
@@ -1588,7 +1828,9 @@ impl SpecEngine {
             return;
         }
         if let Some(push) = &self.push {
-            cx.ws_open(PUSH, push.request.clone());
+            let mut request = push.request.clone();
+            self.current_auth(&mut request.headers);
+            cx.ws_open(PUSH, request);
         }
     }
 
@@ -1597,7 +1839,9 @@ impl SpecEngine {
             return;
         }
         if let Some(request) = &self.events {
-            cx.sse_open(EVENTS, request.clone());
+            let mut request = request.clone();
+            self.current_auth(&mut request.headers);
+            cx.sse_open(EVENTS, request);
         }
     }
 
@@ -1611,6 +1855,7 @@ impl SpecEngine {
         match input {
             SseInput::Opened => {
                 self.events_backoff = RECONNECT_MIN;
+                self.side_refreshed = false;
                 self.last_heard = cx.now();
                 cx.alive();
             }
@@ -1636,6 +1881,10 @@ impl SpecEngine {
                     }
                     _ => false,
                 };
+                if refusal && self.side_refresh(cx) {
+                    cx.set_timer(EVENTS_RECONNECT, RECONNECT_MIN);
+                    return;
+                }
                 if refusal {
                     self.refuse(
                         cx,
@@ -1660,6 +1909,7 @@ impl SpecEngine {
         match input {
             WsInput::Opened => {
                 self.push_backoff = RECONNECT_MIN;
+                self.side_refreshed = false;
                 // Over Socket.IO the subscriptions wait for the namespace to
                 // be joined.
                 if self.push.as_ref().is_none_or(|p| p.socketio.is_none()) {
@@ -1695,6 +1945,10 @@ impl SpecEngine {
                 cx.cancel_timer(PUSH_PING);
                 cx.cancel_timer(PUSH_RENEW);
                 let credentialed = !auth_headers_empty(&self.push);
+                if credentialed && handshake_refused(&reason) && self.side_refresh(cx) {
+                    cx.set_timer(PUSH_RECONNECT, RECONNECT_MIN);
+                    return;
+                }
                 if credentialed && handshake_refused(&reason) {
                     self.refuse(
                         cx,
@@ -1994,6 +2248,17 @@ impl Module for SpecEngine {
     }
 
     fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        if self
+            .oauth
+            .as_ref()
+            .is_some_and(|o| o.refreshing == Some(id))
+        {
+            // The token endpoint's answer: never offered to the rules.
+            if self.refused.is_none() {
+                self.refreshed(cx, result);
+            }
+            return;
+        }
         if let (Some((path, request)), Ok(response)) = (self.request_paths.remove(&id), &result) {
             if (200..300).contains(&response.status) {
                 let inbound = telemetry::Inbound::Http {
@@ -2019,14 +2284,18 @@ impl Module for SpecEngine {
             return;
         }
         // Any credential the device can refuse: Basic, Digest or a token.
-        let refused = |status: u16| match &self.transport {
-            Transport::Http { auth, refusal, .. } => {
-                *auth != HttpAuth::None && refusal.contains(&status)
+        let refused = match (&self.transport, &result) {
+            (Transport::Http { auth, refusal, .. }, Ok(response)) => {
+                *auth != HttpAuth::None && refusal.contains(&response.status)
             }
             _ => false,
         };
+        // An OAuth token refused: refreshed, and the request sent once more.
+        if refused && self.retry_after_refresh(cx) {
+            return;
+        }
         match result {
-            Ok(response) if refused(response.status) => self.refuse(
+            Ok(response) if refused => self.refuse(
                 cx,
                 format!(
                     "the device refused the credential (HTTP {})",
@@ -2119,6 +2388,15 @@ impl Module for SpecEngine {
                 }
             }
             EVENTS_RECONNECT => self.open_events(cx),
+            OAUTH_RETRY => {
+                let due = self
+                    .oauth
+                    .as_ref()
+                    .is_some_and(|o| o.needs_refresh(&self.settings, cx.unix_millis()));
+                if due {
+                    self.start_refresh(cx);
+                }
+            }
             PROMPT => {
                 if self.prompt_wait.take().is_some() {
                     self.lost(cx, "no login prompt within the timeout".into());
@@ -2160,6 +2438,57 @@ impl Module for SpecEngine {
         if stream == EVENTS {
             self.events_input(cx, input);
         }
+    }
+
+    /// New settings, applied live: every later request and connection uses
+    /// them; the connection, state and commands in flight are kept. A
+    /// refused credential is let go: the device connects again.
+    fn update_settings(&mut self, cx: &mut Cx, settings: &Params) -> SettingsUpdate {
+        let ctx = OpenContext {
+            settings: settings.clone(),
+            ..self.ctx.clone()
+        };
+        let fresh = match SpecEngine::new(self.spec.clone(), ctx) {
+            Ok(fresh) => fresh,
+            Err(reason) => return SettingsUpdate::Rejected(reason),
+        };
+        self.ctx = fresh.ctx;
+        self.settings = fresh.settings;
+        self.transport = fresh.transport;
+        self.events = fresh.events;
+        if let (Some(push), Some(new)) = (self.push.as_mut(), fresh.push) {
+            push.request = new.request;
+            push.credentialed = new.credentialed;
+            push.send = new.send;
+        }
+        // A refresh in flight was for the old tokens: its answer is ignored.
+        self.oauth = fresh.oauth;
+        self.side_refreshed = false;
+        if self.refused.take().is_some() {
+            cx.log(Level::Info, "settings changed: connecting again");
+            self.refusals.clear();
+            self.set_link(cx, Connection::Connecting);
+            self.backoff = RECONNECT_MIN;
+            self.connect(cx);
+            self.open_push(cx);
+            self.open_events(cx);
+            return SettingsUpdate::Applied;
+        }
+        // A request waiting on a refresh goes with the new tokens, refreshed
+        // first if they need it.
+        if self.current.as_ref().is_some_and(|f| f.retry.is_some()) {
+            let due = self
+                .oauth
+                .as_ref()
+                .is_some_and(|o| o.needs_refresh(&self.settings, cx.unix_millis()));
+            if due {
+                self.start_refresh(cx);
+            } else {
+                self.resend(cx);
+            }
+        }
+        self.pump(cx);
+        SettingsUpdate::Applied
     }
 }
 
@@ -2403,6 +2732,68 @@ mod tests {
             Some("Basic YTpi")
         );
         assert_eq!(probe_auth(json!({})), None);
+    }
+
+    #[test]
+    fn planning_center_takes_a_personal_access_token_or_oauth_tokens() {
+        let first_request = |settings: Value| {
+            let spec = Catalog::source_tree()
+                .device("planningcenter-services")
+                .unwrap()
+                .clone();
+            let mut settings = settings.as_object().unwrap().clone();
+            settings.insert("service_type_id".into(), json!("1"));
+            settings.insert("plan_id".into(), json!("2"));
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: Some("api.planningcenteronline.com".into()),
+                    port: None,
+                    model: "services-v2".into(),
+                    channels: None,
+                    settings,
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            cx.take()
+                .into_iter()
+                .find_map(|a| match a {
+                    Action::Http { request, .. } => Some(request),
+                    _ => None,
+                })
+                .expect("a request")
+        };
+        let auth = |r: &HttpRequest| {
+            r.headers
+                .iter()
+                .find(|(k, _)| k == "Authorization")
+                .map(|(_, v)| v.clone())
+        };
+        let basic = first_request(json!({"auth": "basic", "username": "a", "password": "b"}));
+        assert_eq!(auth(&basic).as_deref(), Some("Basic YTpi"));
+        let plain = first_request(json!({"auth": "oauth2", "access_token": "t0k"}));
+        assert_eq!(auth(&plain).as_deref(), Some("Bearer t0k"));
+        assert_eq!(
+            plain.url,
+            "https://api.planningcenteronline.com:443/services/v2"
+        );
+        // No access token yet: the refresh goes first, to the token endpoint.
+        let refresh = first_request(json!({"auth": "oauth2", "refresh_token": "r",
+                                            "client_id": "id", "client_secret": "s"}));
+        assert_eq!(
+            refresh.url,
+            "https://api.planningcenteronline.com/oauth/token"
+        );
+        assert_eq!(refresh.method, "POST");
+        assert_eq!(
+            refresh.body.as_deref(),
+            Some(&b"grant_type=refresh_token&refresh_token=r&client_id=id&client_secret=s"[..])
+        );
+        assert_eq!(auth(&refresh), None);
     }
 
     #[test]
