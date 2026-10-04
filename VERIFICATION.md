@@ -703,6 +703,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
 - [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
 
+## omt — Open Media Transport (OMT) source
+
+- [ ] Confirm a source accepts a metadata-only receiver and sends its OMTInfo, connection metadata and tally on accepting it, before any subscription. ([specs/omt.yaml:121](specs/omt.yaml#L121))
+- [ ] Confirm tally from a metadata-only receiver is combined into the source's tally, and is dropped when that connection closes. ([specs/omt.yaml:112](specs/omt.yaml#L112))
+- [ ] Confirm metadata without a terminating NUL is accepted by senders other than libomtnet (the protocol document says the length includes a NUL). ([specs/omt.yaml:131](specs/omt.yaml#L131))
+- [ ] On a PTZ source announcing OMTPTZ Protocol VISCA, confirm inband commands reach the camera and the reply carries the same Sequence. ([specs/omt.yaml:140](specs/omt.yaml#L140))
+
+## omt-discovery — Open Media Transport (OMT) Discovery Server
+
+- [ ] Check whether a newly connected client receives the current registrations, or only later changes (the server sends them before the subscription can arrive). ([specs/omt-discovery.yaml:56](specs/omt-discovery.yaml#L56))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))

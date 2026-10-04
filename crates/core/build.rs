@@ -104,6 +104,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ),
     ("vendor-obs", &["obs-studio"]),
     ("vendor-obsidian", &["obsidian-onyx", "obsidian-onyx-osc"]),
+    ("vendor-omt", &["omt", "omt-discovery"]),
     ("vendor-panasonic", &["panasonic-ptz"]),
     ("vendor-pjlink", &["pjlink"]),
     ("vendor-probel", &["probel-swp08"]),

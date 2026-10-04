@@ -1,0 +1,71 @@
+spec: 1
+id: omt-discovery
+name: Open Media Transport (OMT) Discovery Server
+vendor: Open Media Transport
+category: other
+implementation: native
+reason: >
+  The discovery server speaks the OMT framing (a 16-byte little-endian header
+  and XML metadata frames) and announces every registered source as an
+  OMTAddress element, which the core turns into a source list.
+
+source:
+  - title: "Open Media Transport (OMT) Protocol 1.0 (PROTOCOL.md, libomtnet), Discovery Server"
+    author: Open Media Transport Contributors
+    url: "https://github.com/openmediatransport/libomtnet/blob/master/PROTOCOL.md"
+    note: >
+      The protocol's own document (MIT licence). The server uses the OMT
+      framing to send and receive XML; it keeps each client's register and
+      deregister requests, sets each source's address from the client's
+      connection, repeats every registration to all connected clients and
+      all current registrations to a new client, and removes a disconnected
+      client's sources, repeating the removal to the others. Register XML
+      OMTAddress with Name and Port; deregister adds Removed True.
+  - title: "OMTDiscoveryServer and libomtnet (src/server/OMTDiscoveryServer.cs, OMTDiscoveryClient.cs, OMTAddress.cs, OMTConstants.cs)"
+    author: Open Media Transport Contributors
+    url: "https://github.com/openmediatransport/OMTDiscoveryServer"
+    note: >
+      MIT licence, read for behaviour the protocol document leaves out. The
+      default server port is 6399. Addresses are written as IPAddress
+      elements inside Addresses (the protocol document shows Address). The
+      server sends only to connections subscribed to metadata, and sends the
+      current registrations as a client's connection is accepted.
+
+ports:
+  - { port: 6399, protocol: tcp, role: control }
+
+models:
+  - id: server
+    name: "OMT Discovery Server"
+    supports: []
+    verification: none
+    notes: >
+      The standalone OMTDiscoveryServer, or any server implementing the same
+      protocol. The core listens only: it registers no source of its own.
+
+commands: {}
+
+state:
+  sources.*.port:      { type: int, description: "TCP port of the source, keyed by its full name HOSTNAME (Source Name)" }
+  sources.*.addresses: { type: string, description: "The source's IP addresses as the server determined them, comma separated" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The reference server sends the current registrations as a client's
+      connection is accepted, but only to connections subscribed to metadata,
+      and the subscription arrives just after the connection. The first list
+      can therefore be empty, so sources registered before the core
+      connected may appear only once they register again; changes after
+      that arrive as they happen.
+
+  - models: [all]
+    severity: info
+    text: >
+      Sources leave state when the server announces them removed, and the
+      whole list is cleared when the connection to the server is lost. The
+      server determines each source's address from its client's connection,
+      so the address is the one the server can reach. Opened for commands
+      only, the core still subscribes, since keeping the list is all this
+      integration does.
