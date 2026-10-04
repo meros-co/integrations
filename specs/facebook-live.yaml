@@ -1,0 +1,620 @@
+spec: 1
+id: facebook-live
+name: Facebook Live (Meta Graph API, Live Video API)
+vendor: Meta
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host graph.facebook.com on port 443 and acts for one Facebook
+# Page, the page_id setting. The consumer owns the credential: it registers
+# its own Meta app, runs Facebook Login, exchanges the user's token for a
+# long-lived one and reads the Page's access token, which has no expiry, and
+# passes that Page access token as the token setting. Facebook has no refresh
+# grant for it, so the core sends it as a plain bearer token until Facebook
+# refuses it. The core never runs a sign-in and persists nothing.
+
+source:
+  - title: Live Video API, Guides, Go Live (streaming)
+    author: Meta
+    url: https://developers.facebook.com/documentation/live-video-api/guides/streaming
+    note: >
+      Manufacturer document, retrieved 2026-10-04 (examples on v25.0).
+      Creating a live video on a Page needs a Page access token of an admin
+      with pages_read_engagement and pages_manage_posts; POST
+      /{page-id}/live_videos with status (UNPUBLISHED or LIVE_NOW) answers
+      id, stream_url and secure_stream_url. POST /{live-video-id} with
+      status LIVE_NOW takes a previewed video live, and with end_live_video
+      true ends it, the video becoming a VOD; both answer the id. DELETE
+      /{live-video-id} answers success. GET /{live-video-id}?fields=
+      ingest_streams gives each ingest stream's stream_health (video_bitrate
+      and audio_bitrate in bits per second, video_framerate, video_gop_size
+      in milliseconds, video_height, video_width), refreshed every 2 seconds.
+      GET /{live-video-id}?fields=errors gives the broadcast's errors.
+  - title: Live Video API, Guides, Scheduling
+    author: Meta
+    url: https://developers.facebook.com/documentation/live-video-api/guides/scheduling
+    note: >
+      Manufacturer document, retrieved 2026-10-04. A scheduled live video is
+      created with status SCHEDULED_UNPUBLISHED and event_params start_time
+      (Unix time); planned_start_time is no longer accepted. GET
+      /{page-id}/live_videos with broadcast_status lists them.
+  - title: Live Video API, Overview and Support
+    author: Meta
+    url: https://developers.facebook.com/documentation/live-video-api/overview
+    note: >
+      Manufacturer document, retrieved 2026-10-04. RTMPS ingest; an unused
+      stream URL expires after 24 hours; a broadcast lasts at most 8 hours;
+      audio is required; after the feed drops the broadcast waits 2 to 3
+      minutes for it to return.
+  - title: Graph API reference, Page live_videos edge
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/page/live_videos/
+    note: >
+      Manufacturer document, retrieved 2026-10-04 (v26.0), with its v19.0
+      version (May 2024) for reading. Creating: title (up to 254
+      characters), description, status (UNPUBLISHED, LIVE_NOW,
+      SCHEDULED_UNPUBLISHED, SCHEDULED_LIVE, SCHEDULED_CANCELED),
+      event_params, privacy, enable_backup_ingest and others; the answer
+      carries id, stream_url, secure_stream_url, the secondary URLs,
+      dash_ingest_url and event_id. Going live needs the Facebook account
+      to be at least 60 days old and the Page to have at least 100
+      followers (errors 200 with subcodes 1363120 and 1363144). Reading
+      (v19.0): broadcast_status (UNPUBLISHED, LIVE, LIVE_STOPPED,
+      PROCESSING, VOD, SCHEDULED_UNPUBLISHED, SCHEDULED_LIVE,
+      SCHEDULED_EXPIRED, SCHEDULED_CANCELED) and source (target or owner);
+      the v26.0 page no longer documents reading.
+  - title: Graph API reference, Live Video (node; fields, updating, deleting)
+    author: Meta
+    url: https://web.archive.org/web/20240521020545/https://developers.facebook.com/docs/graph-api/reference/live-video/
+    note: >
+      Manufacturer document as archived on 2024-05-21 (v19.0); the live page
+      answers 404 on 2026-10-04. Fields id, title, description, status,
+      creation_time, broadcast_start_time, seconds_left, stream_url,
+      secure_stream_url, dash_ingest_url, ingest_streams, live_views (current
+      viewers), permalink_url, embed_html, video, errors. Updating (POST):
+      title, description, privacy, embeddable, end_live_video, status,
+      event_params, master_ingest_stream_id and others; answers the id.
+      Deleting answers success true. Edges comments and reactions.
+  - title: Graph API reference, Live Video Input Stream
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/live-video-input-stream/
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Fields id, stream_id,
+      stream_url, secure_stream_url, is_master, stream_health,
+      dash_ingest_url, dash_preview_url.
+  - title: Graph API reference, Live Video comments and reactions edges
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/reference/live-video/comments
+    note: >
+      Manufacturer document, retrieved 2026-10-04. comments: filter (stream
+      or toplevel), live_filter (filter_low_quality or no_filter), order
+      (chronological or reverse_chronological); summary total_count.
+      reactions (https://developers.facebook.com/docs/graph-api/reference/live-video/reactions):
+      summary total_count.
+  - title: Graph API, Handling errors
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/guides/error-handling
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Errors are a JSON error
+      object with message, type (OAuthException for token errors), code,
+      error_subcode and fbtrace_id. Code 190 is an invalid or expired access
+      token (subcodes 458 app removed, 460 password changed, 463 expired, 467
+      invalid, 492 Page role lost) and 102 an invalid session, both needing a
+      new token; 10 and 200 to 299 are permissions; 100 an invalid
+      parameter; 4, 17, 32, 613 and 80001 rate limits; 368 a policy block.
+      The HTTP status of each is not documented.
+  - title: Facebook Login, Long-lived access tokens, and Access tokens (Page access tokens)
+    author: Meta
+    url: https://developers.facebook.com/docs/facebook-login/guides/access-tokens/get-long-lived
+    note: >
+      Manufacturer document, retrieved 2026-10-04. A long-lived user token
+      (about 60 days) is exchanged server-side with the app secret; a Page
+      token read with it (GET /{user-id}/accounts) has no expiry date. There
+      is no refresh grant; a token ended by a password change, removal of
+      the app or loss of the Page role needs a new login.
+  - title: Graph API, Rate limiting
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/overview/rate-limiting
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Calls with a Page token
+      count against the Page's Business Use Case limit, 4800 times the Page's
+      engaged users per 24 hours, reported in X-Business-Use-Case-Usage;
+      error 80001 when exceeded.
+  - title: Permissions reference, and Features reference (Live Video API)
+    author: Meta
+    url: https://developers.facebook.com/docs/permissions
+    note: >
+      Manufacturer document, retrieved 2026-10-04. publish_video,
+      pages_manage_posts, pages_read_engagement, pages_show_list,
+      pages_read_user_content; Page permissions need App Review for
+      Advanced Access. The Live Video API feature
+      (https://developers.facebook.com/docs/features-reference/live-video-api)
+      needs App Review and Business Verification.
+  - title: Graph API changelog (versions)
+    author: Meta
+    url: https://developers.facebook.com/docs/graph-api/changelog/
+    note: >
+      Manufacturer document, retrieved 2026-10-04. v26.0 released
+      2026-07-29 (end date to be set); v25.0 released 2026-02-18, available
+      until 2028-07-29. A version stays available about two years.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The token setting (a Page access token) as Bearer. Facebook has no
+  # refresh grant for it.
+  auth: bearer
+  # Graph answers an invalid or expired token with HTTP 400 and error code
+  # 190 (or 102), and other errors (parameters, permissions, rate limits)
+  # with the same status and other codes: a 401, or a 190 or 102 under any
+  # error status, is the refusal.
+  refusal_status: [401]
+  refusal_json: { "$.error.code": "^(190|102)$" }
+  timeout_ms: 10000
+  # The token's own node (the Page, for a Page token): one call.
+  probe: { method: GET, path: "/{settings.api_version}/me", query: { fields: id } }
+
+settings:
+  token: { type: string, secret: true, max_length: 4096, required: true,
+           label: Page access token,
+           description: "The Page access token read with a long-lived user token from the consumer's own Meta app, which does not expire; Facebook has no way to refresh it, so a refused one needs a new login." }
+  page_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+             label: Page ID,
+             description: "The numeric id of the Facebook Page the live videos belong to, the Page the token was issued for." }
+  api_version: { type: string, pattern: "^v[0-9]{1,3}\\.[0-9]$", default: "v26.0",
+                 label: Graph API version,
+                 description: "The Graph API version every request names, such as v26.0; each version is retired about two years after release, so move to a newer one before then." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at graph.facebook.com, opened by that host name" }
+
+models:
+  - id: graph-api
+    name: Meta Graph API, Live Video API on a Page
+    supports: [list_live_videos, list_live_videos_by_status, get_live_video, get_stream_urls,
+               get_ingest_streams, get_errors, create_live_video, schedule_live_video,
+               create_live_video_custom, set_title, set_description, set_privacy, set_embeddable,
+               set_master_ingest_stream, update_live_video, go_live, end_live_video,
+               delete_live_video, list_comments, get_comment_count, get_reaction_count]
+    verification: none
+    notes: >
+      Acts for the Page named by page_id with a Page access token. The Meta
+      app needs the Live Video API feature (App Review and Business
+      Verification) and the Page permissions in the quirks.
+
+commands:
+  # ── Live videos ──────────────────────────────────────────────────────────
+  list_live_videos:
+    summary: The Page's live videos, newest first, with status, viewers and ingest health; no stream URLs (GET /{page-id}/live_videos, source owner)
+    params:
+      limit: { type: int, min: 1, max: 100, default: 10,
+               label: Live videos,
+               description: "How many live videos to return, newest first." }
+    send: { method: GET, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+            query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}",
+                     source: owner, limit: "{limit}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  list_live_videos_by_status:
+    summary: The Page's live videos in one status, such as those scheduled or live (GET /{page-id}/live_videos with broadcast_status)
+    params:
+      status: { type: enum, values: [UNPUBLISHED, LIVE, LIVE_STOPPED, PROCESSING, VOD, SCHEDULED_UNPUBLISHED,
+                                     SCHEDULED_LIVE, SCHEDULED_EXPIRED, SCHEDULED_CANCELED],
+                required: true,
+                label: Status,
+                description: "UNPUBLISHED for created but not live, LIVE for live now, SCHEDULED_* for scheduled ones, LIVE_STOPPED, PROCESSING or VOD for ended ones." }
+      limit: { type: int, min: 1, max: 100, default: 10,
+               label: Live videos,
+               description: "How many live videos to return, newest first." }
+    send: { method: GET, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+            query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}",
+                     source: owner, broadcast_status: '["{status}"]', limit: "{limit}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_live_video:
+    summary: One live video's title, status, viewers, time left and ingest health; no stream URLs (GET /{live-video-id})
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id, from create_live_video or list_live_videos." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}",
+            query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_stream_urls:
+    summary: The live video's RTMPS and RTMP ingest URLs, stream key included, for the encoder; a secret, returned here only (GET /{live-video-id} stream_url, secure_stream_url, ingest_streams)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}",
+            query: { fields: "stream_url,secure_stream_url,dash_ingest_url,ingest_streams{id,is_master,stream_url,secure_stream_url}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_ingest_streams:
+    summary: The live video's ingest streams, primary and backup, with Facebook's measured health (bitrates, frame rate, GOP, size); refreshed every 2 seconds (GET /{live-video-id} ingest_streams)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}",
+            query: { fields: "ingest_streams{id,stream_id,is_master,stream_health}" } }
+    expect: { status: 200, json_path: "$.ingest_streams" }
+    returns: value
+
+  get_errors:
+    summary: The live video's broadcast errors, such as a lost video signal (GET /{live-video-id} errors)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}", query: { fields: errors } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_live_video:
+    summary: Create a live video on the Page; the reply carries its id and the stream URLs with the key, a secret (POST /{page-id}/live_videos)
+    params:
+      title: { type: string, max_length: 254, default: "",
+               label: Title,
+               description: "The live video's title, up to 254 characters." }
+      description: { type: string, max_length: 10000, default: "",
+                     label: Description,
+                     description: "The text posted with the live video." }
+      status: { type: enum, values: [UNPUBLISHED, LIVE_NOW], default: UNPUBLISHED,
+                label: Start,
+                description: "UNPUBLISHED to preview the encoder's stream first and go_live later; LIVE_NOW to go live as soon as the stream arrives." }
+    send: { method: POST, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+            body: '{"title":{title:json},"description":{description:json},"status":{status:json}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  schedule_live_video:
+    summary: Create a scheduled live video, announced on the Page until it starts; the reply carries the stream URLs (POST /{page-id}/live_videos, status SCHEDULED_UNPUBLISHED, event_params start_time)
+    params:
+      title: { type: string, max_length: 254, default: "",
+               label: Title,
+               description: "The live video's title, up to 254 characters." }
+      description: { type: string, max_length: 10000, default: "",
+                     label: Description,
+                     description: "The text posted with the live video." }
+      start_time: { type: int, min: 0, required: true,
+                    label: Start time,
+                    description: "When the live video is planned to start, in Unix seconds." }
+    send: { method: POST, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+            body: '{"title":{title:json},"description":{description:json},"status":"SCHEDULED_UNPUBLISHED","event_params":{"start_time":{start_time}}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  create_live_video_custom:
+    summary: Create a live video from the parameters Meta documents for POST /{page-id}/live_videos (title, description, status, event_params, privacy, enable_backup_ingest, targeting and others)
+    params:
+      live_video: { type: json, required: true,
+                    label: Live video,
+                    description: "A JSON object of the live_videos creation parameters as Meta documents them, such as {\"status\":\"UNPUBLISHED\",\"enable_backup_ingest\":true}." }
+    send: { method: POST, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+            body: '{live_video}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_title:
+    summary: Change a live video's title (POST /{live-video-id} title)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      title: { type: string, max_length: 254, required: true,
+               label: Title,
+               description: "The new title, up to 254 characters." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"title":{title:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_description:
+    summary: Change a live video's description (POST /{live-video-id} description)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      description: { type: string, max_length: 10000, required: true,
+                     label: Description,
+                     description: "The new text posted with the live video." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"description":{description:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_privacy:
+    summary: Change who can see a live video, where Facebook allows it for a Page (POST /{live-video-id} privacy value)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      value: { type: enum, values: [EVERYONE, ALL_FRIENDS, FRIENDS_OF_FRIENDS, SELF], required: true,
+               label: Audience,
+               description: "EVERYONE for public; the other audiences belong to a person's profile, and a Page may refuse them." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"privacy":{"value":{value:json}}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_embeddable:
+    summary: Allow or refuse embedding the live video on other sites (POST /{live-video-id} embeddable)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      enabled: { type: bool, required: true,
+                 label: Embeddable,
+                 description: "On to let other sites embed the player." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"embeddable":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  set_master_ingest_stream:
+    summary: Make one of the live video's ingest streams the one viewers see, switching between primary and backup (POST /{live-video-id} master_ingest_stream_id)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      ingest_stream_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                          label: Ingest stream ID,
+                          description: "The ingest stream's id, from get_ingest_streams." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"master_ingest_stream_id":{ingest_stream_id:json}}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  update_live_video:
+    summary: Change a live video with the update parameters Meta documents for POST /{live-video-id} (title, description, privacy, embeddable, event_params, live_comment_moderation_setting and others)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of the update parameters to change, as Meta documents them; parameters left out are unchanged." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{changes}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  go_live:
+    summary: Take an unpublished or scheduled live video live to viewers now; the encoder's stream must be arriving (POST /{live-video-id} status LIVE_NOW)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video to publish." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"status":"LIVE_NOW"}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  end_live_video:
+    summary: End the live broadcast for good; the video stays on the Page as a recording (POST /{live-video-id} end_live_video)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video to end." }
+    send: { method: POST, path: "/{settings.api_version}/{live_video_id}",
+            body: '{"end_live_video":true}', content_type: application/json }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_live_video:
+    summary: Delete a live video (DELETE /{live-video-id})
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video to delete." }
+    send: { method: DELETE, path: "/{settings.api_version}/{live_video_id}" }
+    expect: { status: 200, json_equals: { "$.success": true } }
+    returns: ack
+
+  # ── Engagement ───────────────────────────────────────────────────────────
+  list_comments:
+    summary: The live video's newest comments, unfiltered, with the total count (GET /{live-video-id}/comments; pages_read_user_content)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+      limit: { type: int, min: 1, max: 100, default: 25,
+               label: Comments,
+               description: "How many comments to return, newest first." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}/comments",
+            query: { order: reverse_chronological, filter: stream, live_filter: no_filter,
+                     summary: total_count, limit: "{limit}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_comment_count:
+    summary: How many comments the live video has (GET /{live-video-id}/comments summary total_count)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}/comments",
+            query: { filter: stream, summary: total_count, limit: "0" } }
+    expect: { status: 200, json_path: "$.summary.total_count" }
+    returns: value
+
+  get_reaction_count:
+    summary: How many reactions the live video has (GET /{live-video-id}/reactions summary total_count)
+    params:
+      live_video_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                       label: Live video ID,
+                       description: "The live video's id." }
+    send: { method: GET, path: "/{settings.api_version}/{live_video_id}/reactions",
+            query: { summary: total_count, limit: "0" } }
+    expect: { status: 200, json_path: "$.summary.total_count" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host graph.facebook.com and
+      port 443; it is reached over HTTPS and the certificate is checked
+      against that name. It acts for the Page named by page_id. Every
+      request names the Graph API version in api_version (v26.0 by default,
+      the newest on 2026-10-04); Meta retires a version about two years
+      after release, and requests naming a retired one are answered by the
+      oldest version still available, so move the setting on in time.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The consumer owns the credential and the Meta app. It registers its
+      own app, gets the Live Video API feature through App Review (Meta
+      requires Business Verification for it) and Advanced Access to the Page
+      permissions it uses (pages_show_list, pages_read_engagement,
+      pages_manage_posts, and pages_read_user_content for comments;
+      publish_video for a person's own timeline, which this integration does
+      not use), runs Facebook Login, exchanges the user token for a
+      long-lived one on its own server (the exchange needs the app secret),
+      and reads the Page access token from GET /{user-id}/accounts. That
+      Page token has no expiry date, and Facebook has no refresh grant: the
+      core sends it as a plain Bearer token. It ends when the user changes
+      their password, removes the app or loses their role on the Page.
+
+  - models: [all]
+    severity: warning
+    text: >
+      A refused token is told apart from other errors by its error code, not
+      its HTTP status: Graph answers an invalid or expired token with HTTP
+      400 and error code 190 (OAuthException, subcodes such as 460 password
+      changed, 463 expired, 467 invalid, 492 Page role lost) or 102. A 401,
+      or code 190 or 102 under any error status, is terminal: the
+      integration reports unauthorized, commands fail with auth, and nothing
+      more is sent until the consumer logs the user in again and passes the
+      new Page token with update_settings. Every other error (100 a bad
+      parameter, 10 and 200 to 299 a missing permission or an ineligible
+      Page, 368 a policy block, 4, 17, 32, 613 and 80001 rate limits) is an
+      ordinary command failure with the HTTP status as its code; the Graph
+      error object in the body says which.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Facebook decides who may go live. Since 2024-06-10 the Facebook
+      account must be at least 60 days old and the Page must have at least
+      100 followers; otherwise creating or publishing a live video fails with
+      error 200 (subcodes 1363120 and 1363144). Live video also needs the
+      Page's own eligibility (no live restrictions for policy or copyright
+      strikes, error 368 or 475 while blocked).
+
+  - models: [all]
+    severity: critical
+    text: >
+      go_live (and create_live_video with LIVE_NOW) makes the broadcast
+      public on the Page at once. end_live_video ends it for good: an ended
+      live video can't go live again and becomes a recording (VOD) on the
+      Page; stopping the encoder for more than 2 to 3 minutes ends it too. A
+      broadcast lasts at most 8 hours. delete_live_video can't be undone:
+      the live video, its recording and its stream URLs are gone, and an
+      encoder still sending to them loses the broadcast.
+
+  - models: [all]
+    severity: warning
+    text: >
+      create_live_video, schedule_live_video, create_live_video_custom and
+      get_stream_urls return the ingest URLs, whose last part is the stream
+      key: anyone holding it can broadcast on the Page. They are returned as
+      the command's value only, never kept in state or logged, and the
+      polls never ask for them. An unused stream URL expires after 24 hours.
+      Audio is required: a stream without audio is ended.
+
+  - models: [all]
+    severity: info
+    text: >
+      State follows the Page's live videos: every 15 seconds the newest 5
+      the Page made (source owner) are read with their status, current
+      viewers, time left and ingest health, keyed by live video id, so a
+      video created elsewhere shows up too and one that ends is seen
+      becoming LIVE_STOPPED or VOD. get_live_video, list_live_videos and
+      list_live_videos_by_status update state from their replies at once.
+      Ingest health is Facebook's measurement, refreshed every 2 seconds,
+      and is kept as the JSON of the ingest streams (each with id, is_master
+      and stream_health: video_bitrate and audio_bitrate in bits per second,
+      video_framerate, video_gop_size in milliseconds, video_width,
+      video_height); get_ingest_streams reads it on demand. The current
+      reference no longer documents reading the Page's live_videos edge
+      (Meta's scheduling guide still does), so the poll is kept on its v19.0
+      description until confirmed.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Calls with a Page token count against the Page's Business Use Case
+      rate limit, 4800 calls a day times the Page's engaged users, shared
+      with every app using that Page. The poll makes 5,760 calls a day if
+      left open, and the idle probe (GET /me) one every 10 seconds when
+      nothing else is sent: a Page with few engaged users can run out, and
+      Graph then answers error 80001 (or 32) until access returns. Open the
+      integration with monitoring only while a broadcast is produced.
+      Comments and reactions are read on demand, not polled.
+
+  - models: [all]
+    severity: info
+    text: >
+      Scheduling uses status SCHEDULED_UNPUBLISHED and event_params
+      start_time; the older planned_start_time is refused by every current
+      Graph API version. Requests send their parameters as a JSON body; the
+      Graph API also takes them form-encoded. Strings Facebook leaves null
+      are not written to state.
+
+state:
+  live_videos.*.title:                { type: string, description: "The live video's title, keyed by live video id" }
+  live_videos.*.description:          { type: string, description: "The text posted with the live video" }
+  live_videos.*.status:               { type: string, description: "UNPUBLISHED, LIVE, LIVE_STOPPED, PROCESSING, VOD, SCHEDULED_UNPUBLISHED, SCHEDULED_LIVE, SCHEDULED_EXPIRED or SCHEDULED_CANCELED (status)" }
+  live_videos.*.live_views:           { type: int, description: "People watching now (live_views)" }
+  live_videos.*.broadcast_start_time: { type: string, description: "When the live video was first published, ISO 8601 (broadcast_start_time)" }
+  live_videos.*.seconds_left:         { type: int, unit: s, description: "Seconds left before the broadcast reaches its maximum length (seconds_left)" }
+  live_videos.*.permalink_url:        { type: string, description: "The live video's link on Facebook (permalink_url)" }
+  live_videos.*.ingest_streams:       { type: string, description: "The ingest streams as JSON: each with id, is_master and stream_health (video_bitrate and audio_bitrate in bit/s, video_framerate, video_gop_size in ms, video_width, video_height); no stream URLs" }
+
+telemetry:
+  # Facebook pushes nothing to a Page token holder (webhooks need a public
+  # endpoint): the Page's newest live videos are polled every 15 seconds,
+  # one call, about 5,760 a day.
+  poll:
+    every_ms: 15000
+    send:
+      - { method: GET, path: "/{settings.api_version}/{settings.page_id}/live_videos",
+          query: { fields: "id,title,description,status,live_views,broadcast_start_time,seconds_left,permalink_url,ingest_streams{id,is_master,stream_health}",
+                   source: owner, limit: "5" } }
+  updates:
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+/live_videos\?fields=id%2Ctitle'
+      json_each: "$.data"
+      json: &video
+        id: "$.id"
+        title: "$.title"
+        description: "$.description"
+        status: "$.status"
+        views: "$.live_views"
+        started: "$.broadcast_start_time"
+        left: "$.seconds_left"
+        link: "$.permalink_url"
+        ingest: "$.ingest_streams"
+      state: &video_state
+        live_videos.{id}.title: "{title}"
+        live_videos.{id}.description: "{description}"
+        live_videos.{id}.status: "{status}"
+        live_videos.{id}.live_views: "{views}"
+        live_videos.{id}.broadcast_start_time: "{started}"
+        live_videos.{id}.seconds_left: "{left}"
+        live_videos.{id}.permalink_url: "{link}"
+        live_videos.{id}.ingest_streams: "{ingest}"
+    # get_live_video: one live video.
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+\?fields=id%2Ctitle'
+      json: *video
+      state: *video_state

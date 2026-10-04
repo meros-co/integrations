@@ -1,0 +1,753 @@
+spec: 1
+id: twitch
+name: Twitch (Helix API)
+vendor: Twitch
+category: other
+
+# A cloud service, not a device on the venue network: the integration is
+# opened with host api.twitch.tv on port 443 and acts for one channel, the
+# broadcaster_id setting, as the user who signed in. The consumer owns the
+# credential: it registers its own Twitch application, runs the sign-in (the
+# Device Code Grant for a public client, or the authorization code grant for
+# a confidential one), and passes the tokens as settings; the core keeps the
+# access token fresh with the refresh token and reports every new token, a
+# rotated refresh token included, as a credentials event. The core never runs
+# a sign-in and persists nothing.
+
+source:
+  - title: Twitch API reference (Helix)
+    author: Twitch
+    url: https://dev.twitch.tv/docs/api/reference
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Get Users (GET /users; with
+      a user access token and no id or login, the token's user). Get Channel
+      Information (GET /channels, broadcaster_id; broadcaster_language,
+      game_id, game_name, title, delay, tags, content_classification_labels,
+      is_branded_content). Modify Channel Information (PATCH /channels,
+      channel:manage:broadcast; game_id "" or "0" unsets; title not empty, at
+      most 140 characters; delay Partner only, at most 900 s; tags at most 10
+      of at most 25 characters, [] clears; 204). Get Stream Key (GET
+      /streams/key, channel:read:stream_key). Get Streams (GET /streams,
+      user_id, type all or live; only broadcasting users are returned; type
+      "live", viewer_count, started_at RFC 3339). Search Categories (GET
+      /search/categories, query, first 1 to 100). Create Stream Marker (POST
+      /streams/markers, user_id, description at most 140 characters; 404 when
+      not live or VODs are off) and Get Stream Markers. Start Commercial (POST
+      /channels/commercial, channel:edit:commercial; length at most 180;
+      Partners and Affiliates, live, broadcaster only; length, message,
+      retry_after). Get Ad Schedule and Snooze Next Ad (channel:read:ads,
+      channel:manage:ads). Start a raid (POST /raids, from_broadcaster_id,
+      to_broadcaster_id, channel:manage:raids, 200; 10 requests per 10
+      minutes) and Cancel a raid (DELETE /raids, 204). Get Chat Settings and
+      Update Chat Settings (PATCH /chat/settings, broadcaster_id and
+      moderator_id, moderator:manage:chat_settings; follower_mode_duration 0
+      to 129600 minutes, slow_mode_wait_time 3 to 120 s,
+      non_moderator_chat_delay_duration 2, 4 or 6; a duration only with its
+      mode on; answers 200 with the settings). Send Chat Announcement (POST
+      /chat/announcements, moderator:manage:announcements; message at most 500
+      characters; color blue, green, orange, purple or primary; 204; one per
+      2 s). Send Chat Message (POST /chat/messages, user:write:chat).
+      Get Channel Followers (GET /channels/followers; total is returned with
+      any valid token). Create Clip (POST /clips, clips:edit, 202). Every
+      endpoint's 401 includes a Client-Id that does not match the token's
+      client.
+  - title: Twitch API guide (Twitch API rate limits)
+    author: Twitch
+    url: https://dev.twitch.tv/docs/api/guide
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Requests carry
+      Authorization Bearer and Client-Id. A token bucket per client id and
+      user for user tokens, normally 1 point per request; Ratelimit-Limit,
+      Ratelimit-Remaining and Ratelimit-Reset on every answer; 429 when
+      empty.
+  - title: Twitch authentication, Refresh tokens
+    author: Twitch
+    url: https://dev.twitch.tv/docs/authentication/refresh-tokens
+    note: >
+      Manufacturer document, retrieved 2026-10-04. POST
+      https://id.twitch.tv/oauth2/token, form-encoded grant_type
+      refresh_token, refresh_token, client_id and client_secret (not for a
+      public client); the answer carries access_token, refresh_token (which
+      may change), expires_in, scope and token_type. An invalid refresh
+      token answers 400 with message "Invalid refresh token" (no
+      invalid_grant), and one no longer valid may answer 401. A public
+      client's refresh token expires 30 days after it is issued.
+  - title: Twitch authentication, Getting OAuth access tokens (Device code grant flow)
+    author: Twitch
+    url: https://dev.twitch.tv/docs/authentication/getting-tokens-oauth
+    note: >
+      Manufacturer document, retrieved 2026-10-04. Public and confidential
+      clients may use the device code flow; a public client needs no secret,
+      also when refreshing. A public client's refresh token is single use: a
+      refresh replaces it, and the old one answers 400 "Invalid refresh
+      token"; it lapses after 30 days unused. A confidential client's
+      refresh token does not expire; both end when the user changes their
+      password or disconnects the application. Access tokens last about 4
+      hours.
+  - title: Twitch authentication, Validating tokens
+    author: Twitch
+    url: https://dev.twitch.tv/docs/authentication/validate-tokens
+    note: >
+      Manufacturer document, retrieved 2026-10-04. An application that keeps
+      an OAuth session validates its token at GET
+      https://id.twitch.tv/oauth2/validate on start and every hour; the
+      answer carries client_id, login, scopes, user_id and expires_in.
+  - title: RFC 6749, The OAuth 2.0 Authorization Framework, section 6 (Refreshing an Access Token)
+    author: IETF
+    url: https://www.rfc-editor.org/rfc/rfc6749
+    note: >
+      The refresh request, and a new refresh token in the answer replacing
+      the old one.
+
+transport:
+  type: http
+  port: 443
+  scheme: https
+  # The access_token setting as Bearer, refreshed with refresh_token at
+  # Twitch's token endpoint (or the token_url setting's proxy). A public
+  # client leaves client_secret empty and refreshes with client_id alone.
+  auth: oauth2
+  oauth:
+    token_url: https://id.twitch.tv/oauth2/token
+    refresh_ahead_s: 300
+    client_auth: body
+  # Helix wants the application's client id beside every bearer token.
+  headers:
+    Client-Id: "{settings.client_id}"
+  # Twitch answers 403 for a missing role or an unfinished account and 400
+  # for most rule breaches; only 401 means the token was refused.
+  refusal_status: [401]
+  timeout_ms: 10000
+  # Get Users with no parameters: the token's own user (1 rate-limit point),
+  # so an idle probe also checks the token.
+  probe: { method: GET, path: /helix/users }
+
+settings:
+  client_id: { type: string, max_length: 512, default: "",
+               label: Client ID,
+               description: "The consumer's own Twitch application's client ID, sent as Client-Id on every request and with each token refresh; it must be the client the tokens were issued to." }
+  client_secret: { type: string, secret: true, max_length: 512, default: "",
+                   label: Client secret,
+                   description: "The application's secret for a confidential client; leave empty for a public client (Device Code Grant), which refreshes with its client ID alone, or when token_url names a proxy that adds it." }
+  refresh_token: { type: string, secret: true, max_length: 4096, default: "",
+                   label: Refresh token,
+                   description: "The refresh token from the consumer's sign-in; a public client's is single use and replaced at every refresh, so persist each one the credentials event reports." }
+  access_token: { type: string, secret: true, max_length: 4096, default: "",
+                  label: Access token,
+                  description: "The current user access token, about 4 hours long; may be left empty when a refresh token is given, and the core reports each new one in a credentials event." }
+  expires_at: { type: int, min: 0,
+                label: Access token expiry,
+                description: "When the access token expires, in Unix seconds; the core refreshes 5 minutes before, and reports each new expiry in a credentials event." }
+  token_url: { type: string, max_length: 2048, default: "",
+               pattern: "^(https://[^\\s]+|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(:[0-9]+)?(/[^\\s]*)?)?$",
+               label: Token endpoint override,
+               description: "A token endpoint to refresh at instead of Twitch's, such as the consumer's own token proxy that holds the client secret; https, or http to this machine only. Empty uses Twitch's." }
+  broadcaster_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                    label: Broadcaster ID,
+                    description: "The numeric user ID of the channel acted on, which must be the signed-in user's own: user_id in the token validation answer, or id from get_user." }
+
+ports:
+  - { port: 443, protocol: https, role: control, note: "the cloud API at api.twitch.tv, opened by that host name; token refreshes go to id.twitch.tv:443" }
+
+models:
+  - id: helix
+    name: Twitch Helix API
+    supports: [get_user, get_users_by_login, get_channel_information, set_title, set_category,
+               set_language, set_tags, set_branded_content, set_stream_delay, modify_channel_information,
+               get_stream_key, get_stream, get_follower_count, search_categories, create_stream_marker,
+               get_stream_markers, create_clip, start_commercial, get_ad_schedule, snooze_next_ad,
+               start_raid, cancel_raid, get_chat_settings, update_chat_settings, slow_mode_on,
+               slow_mode_off, follower_mode_on, follower_mode_off, subscriber_mode, emote_mode,
+               unique_chat_mode, chat_delay_on, chat_delay_off, send_announcement, send_chat_message]
+    verification: none
+    notes: >
+      Acts for the channel named by broadcaster_id, as the signed-in user,
+      who must be that channel's broadcaster. Each command needs its scope
+      granted at sign-in (listed in its summary).
+
+commands:
+  # ── Users ────────────────────────────────────────────────────────────────
+  get_user:
+    summary: The signed-in user, whose id is the broadcaster_id (Get Users without parameters)
+    send: { method: GET, path: /helix/users }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_users_by_login:
+    summary: A user by login name, for the id a raid or a lookup needs (Get Users with login)
+    params:
+      login: { type: string, pattern: "^[A-Za-z0-9_]{1,25}$", required: true,
+               label: Login,
+               description: "The user's login name, as in their channel URL twitch.tv/<login>." }
+    send: { method: GET, path: /helix/users, query: { login: "{login}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Channel ──────────────────────────────────────────────────────────────
+  get_channel_information:
+    summary: A channel's title, category, language, tags, delay, labels and branded-content flag (Get Channel Information)
+    params:
+      broadcaster_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                        label: Broadcaster ID,
+                        description: "The numeric user ID of the channel, this one or any other." }
+    send: { method: GET, path: /helix/channels, query: { broadcaster_id: "{broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  set_title:
+    summary: Change the channel's stream title (Modify Channel Information; channel:manage:broadcast)
+    params:
+      title: { type: string, pattern: "\\S", max_length: 140, required: true,
+               label: Title,
+               description: "The new stream title, up to 140 characters; Twitch refuses an empty one." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{"title":{title:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_category:
+    summary: Change the channel's category, the game or other category it streams under (Modify Channel Information; channel:manage:broadcast)
+    params:
+      game_id: { type: string, pattern: "^[0-9]*$", max_length: 32, required: true,
+                 label: Category ID,
+                 description: "The category's id from search_categories; empty or 0 removes the category." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{"game_id":{game_id:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_language:
+    summary: Change the channel's broadcast language (Modify Channel Information; channel:manage:broadcast)
+    params:
+      language: { type: string, pattern: "^([a-z]{2}|other)$", required: true,
+                  label: Language,
+                  description: "A two-letter ISO 639-1 code such as en or de, or other." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{"broadcaster_language":{language:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_tags:
+    summary: Replace the channel's tags with a JSON array of strings (Modify Channel Information; channel:manage:broadcast)
+    params:
+      tags: { type: json, required: true,
+              label: Tags,
+              description: "A JSON array of up to 10 tags, each up to 25 letters and digits with no spaces; [] removes them all." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{"tags":{tags}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_branded_content:
+    summary: Mark the stream as branded content, or not (Modify Channel Information; channel:manage:broadcast)
+    params:
+      enabled: { type: bool, required: true,
+                 label: Branded content,
+                 description: "On when the stream carries paid promotion that must be disclosed to viewers." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{"is_branded_content":{enabled}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  set_stream_delay:
+    summary: Set the stream delay viewers see, Partners only (Modify Channel Information; channel:manage:broadcast)
+    params:
+      delay: { type: int, min: 0, max: 900, required: true,
+               label: Delay,
+               description: "Seconds the stream is held back before viewers see it, 0 to 900." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{"delay":{delay}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  modify_channel_information:
+    summary: Change several channel properties at once with a Modify Channel Information body (game_id, broadcaster_language, title, delay, tags, content_classification_labels, is_branded_content; channel:manage:broadcast)
+    params:
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object with at least one of the fields Twitch documents for Modify Channel Information; fields left out are unchanged." }
+    send: { method: PATCH, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" },
+            body: '{changes}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Stream ───────────────────────────────────────────────────────────────
+  get_stream_key:
+    summary: The channel's stream key for the encoder; a secret, returned here only and never kept in state (Get Stream Key; channel:read:stream_key)
+    send: { method: GET, path: /helix/streams/key, query: { broadcaster_id: "{settings.broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_stream:
+    summary: The channel's live stream, with viewer count and start time; an empty list while offline (Get Streams)
+    send: { method: GET, path: /helix/streams, query: { user_id: "{settings.broadcaster_id}", type: all } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_follower_count:
+    summary: How many users follow the channel (Get Channel Followers, total)
+    send: { method: GET, path: /helix/channels/followers,
+            query: { broadcaster_id: "{settings.broadcaster_id}", first: "1" } }
+    expect: { status: 200, json_path: "$.total" }
+    returns: value
+
+  search_categories:
+    summary: Categories (games and others) whose name matches, for set_category (Search Categories)
+    params:
+      query: { type: string, pattern: "\\S", max_length: 100, required: true,
+               label: Search,
+               description: "Text the category's name contains, such as Just Chatting." }
+      first: { type: int, min: 1, max: 100, default: 20,
+               label: Results,
+               description: "How many categories to return, 1 to 100." }
+    send: { method: GET, path: /helix/search/categories, query: { query: "{query}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  create_stream_marker:
+    summary: Mark the current moment of the live stream for the VOD, with a description (Create Stream Marker; channel:manage:broadcast)
+    params:
+      description: { type: string, max_length: 140, default: "",
+                     label: Description,
+                     description: "What happened at the marker, up to 140 characters." }
+    send: { method: POST, path: /helix/streams/markers,
+            body: '{"user_id":{settings.broadcaster_id:json},"description":{description:json}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_stream_markers:
+    summary: The markers of the channel's most recent VOD (Get Stream Markers; user:read:broadcast or channel:manage:broadcast)
+    params:
+      first: { type: int, min: 1, max: 100, default: 20,
+               label: Results,
+               description: "How many markers to return, 1 to 100." }
+    send: { method: GET, path: /helix/streams/markers,
+            query: { user_id: "{settings.broadcaster_id}", first: "{first}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  create_clip:
+    summary: Clip the live stream now; Twitch makes the clip in the background (Create Clip; clips:edit)
+    send: { method: POST, path: /helix/clips, query: { broadcaster_id: "{settings.broadcaster_id}" } }
+    expect: { status: 202, json_path: "$.data" }
+    returns: value
+
+  # ── Ads ──────────────────────────────────────────────────────────────────
+  start_commercial:
+    summary: Run a commercial break now, live Partners and Affiliates only (Start Commercial; channel:edit:commercial)
+    params:
+      length: { type: int, min: 1, max: 180, default: 30,
+                label: Length,
+                description: "Length of the break in seconds, up to 180; Twitch may run a shorter one." }
+    send: { method: POST, path: /helix/channels/commercial,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"length":{length}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  get_ad_schedule:
+    summary: The next scheduled ad, the last one, the preroll-free time and the snoozes left (Get Ad Schedule; channel:read:ads)
+    send: { method: GET, path: /helix/channels/ads, query: { broadcaster_id: "{settings.broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  snooze_next_ad:
+    summary: Push the next scheduled ad back 5 minutes, using one snooze (Snooze Next Ad; channel:manage:ads)
+    send: { method: POST, path: /helix/channels/ads/schedule/snooze,
+            query: { broadcaster_id: "{settings.broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  # ── Raids ────────────────────────────────────────────────────────────────
+  start_raid:
+    summary: Start a raid on another channel; it happens when the broadcaster confirms in Twitch or after 90 seconds (Start a raid; channel:manage:raids)
+    params:
+      to_broadcaster_id: { type: string, pattern: "^[0-9]+$", max_length: 32, required: true,
+                           label: Target channel ID,
+                           description: "The numeric user ID of the channel to raid, from get_users_by_login." }
+    send: { method: POST, path: /helix/raids,
+            query: { from_broadcaster_id: "{settings.broadcaster_id}", to_broadcaster_id: "{to_broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  cancel_raid:
+    summary: Cancel the pending raid (Cancel a raid; channel:manage:raids)
+    send: { method: DELETE, path: /helix/raids, query: { broadcaster_id: "{settings.broadcaster_id}" } }
+    expect: { status: 204 }
+    returns: ack
+
+  # ── Chat ─────────────────────────────────────────────────────────────────
+  get_chat_settings:
+    summary: The channel's chat modes, the moderator-only delay included (Get Chat Settings with moderator_id; moderator:read:chat_settings for the delay)
+    send: { method: GET, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" } }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  update_chat_settings:
+    summary: Change several chat modes at once with an Update Chat Settings body (emote_mode, follower_mode, follower_mode_duration, non_moderator_chat_delay, non_moderator_chat_delay_duration, slow_mode, slow_mode_wait_time, subscriber_mode, unique_chat_mode; moderator:manage:chat_settings)
+    params:
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of the chat settings to change, as Twitch documents them; a duration is accepted only with its mode on." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{changes}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  slow_mode_on:
+    summary: Make chatters wait between messages (Update Chat Settings slow_mode; moderator:manage:chat_settings)
+    params:
+      wait_time: { type: int, min: 3, max: 120, default: 30,
+                   label: Wait,
+                   description: "Seconds a chatter waits between messages, 3 to 120." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"slow_mode":true,"slow_mode_wait_time":{wait_time}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  slow_mode_off:
+    summary: End slow mode (Update Chat Settings slow_mode; moderator:manage:chat_settings)
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"slow_mode":false}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  follower_mode_on:
+    summary: Let only followers chat, optionally only those following for a while (Update Chat Settings follower_mode; moderator:manage:chat_settings)
+    params:
+      duration: { type: int, min: 0, max: 129600, default: 0,
+                  label: Following for,
+                  description: "Minutes a user must have followed before chatting, 0 to 129600 (90 days); 0 lets any follower chat." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"follower_mode":true,"follower_mode_duration":{duration}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  follower_mode_off:
+    summary: Let everyone chat, followers or not (Update Chat Settings follower_mode; moderator:manage:chat_settings)
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"follower_mode":false}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  subscriber_mode:
+    summary: Let only subscribers and moderators chat, or everyone again (Update Chat Settings subscriber_mode; moderator:manage:chat_settings)
+    params:
+      enabled: { type: bool, required: true,
+                 label: Subscribers only,
+                 description: "On to let only subscribers and moderators chat, off for everyone." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"subscriber_mode":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  emote_mode:
+    summary: Allow only emotes in chat, or any message again (Update Chat Settings emote_mode; moderator:manage:chat_settings)
+    params:
+      enabled: { type: bool, required: true,
+                 label: Emotes only,
+                 description: "On to allow messages made only of emotes." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"emote_mode":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  unique_chat_mode:
+    summary: Refuse messages that repeat one already sent, or allow them again (Update Chat Settings unique_chat_mode; moderator:manage:chat_settings)
+    params:
+      enabled: { type: bool, required: true,
+                 label: Unique messages only,
+                 description: "On to refuse a message identical to one already in chat." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"unique_chat_mode":{enabled}}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  chat_delay_on:
+    summary: Hold chatters' messages back so moderators can remove them first (Update Chat Settings non_moderator_chat_delay; moderator:manage:chat_settings)
+    params:
+      duration: { type: enum, values: ["2", "4", "6"], default: "4",
+                  label: Delay,
+                  description: "Seconds a non-moderator's message is held before others see it: 2, 4 or 6." }
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"non_moderator_chat_delay":true,"non_moderator_chat_delay_duration":{duration}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  chat_delay_off:
+    summary: Show chatters' messages at once (Update Chat Settings non_moderator_chat_delay; moderator:manage:chat_settings)
+    send: { method: PATCH, path: /helix/chat/settings,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"non_moderator_chat_delay":false}', content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+  send_announcement:
+    summary: Post a highlighted announcement in chat (Send Chat Announcement; moderator:manage:announcements)
+    params:
+      message: { type: string, pattern: "\\S", max_length: 500, required: true,
+                 label: Message,
+                 description: "The announcement text, up to 500 characters." }
+      color: { type: enum, values: [primary, blue, green, orange, purple], default: primary,
+               label: Colour,
+               description: "The announcement's highlight colour; primary uses the channel's accent colour." }
+    send: { method: POST, path: /helix/chat/announcements,
+            query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" },
+            body: '{"message":{message:json},"color":{color:json}}', content_type: application/json }
+    expect: { status: 204 }
+    returns: ack
+
+  send_chat_message:
+    summary: Post a message in the channel's chat as the signed-in user (Send Chat Message; user:write:chat)
+    params:
+      message: { type: string, pattern: "\\S", max_length: 500, required: true,
+                 label: Message,
+                 description: "The message text, up to 500 characters." }
+    send: { method: POST, path: /helix/chat/messages,
+            body: '{"broadcaster_id":{settings.broadcaster_id:json},"sender_id":{settings.broadcaster_id:json},"message":{message:json}}',
+            content_type: application/json }
+    expect: { status: 200, json_path: "$.data" }
+    returns: value
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      A cloud service. Open the integration with host api.twitch.tv and port
+      443; it is reached over HTTPS and the certificate is checked against
+      that name. It acts for the channel named by broadcaster_id, which must
+      be the signed-in user's own: Twitch refuses channel, stream-key, ad,
+      raid and chat-setting changes for another channel.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The consumer owns the credential. It registers its own Twitch
+      application, runs the sign-in itself (the Device Code Grant for a
+      public client, which has no secret, or the authorization code grant
+      for a confidential one), asks for the scopes of the commands it uses,
+      and passes client_id, client_secret (empty for a public client),
+      refresh_token, access_token and expires_at as settings. Every request
+      carries the access token as Bearer and the client ID as Client-Id;
+      Twitch refuses a token issued to another client. The access token
+      (about 4 hours) is refreshed at id.twitch.tv 5 minutes before it
+      expires, or at once when there is none; a public client refreshes
+      with client_id alone. A 401 refreshes the token and sends the request
+      once more; a second 401, or a refresh Twitch refuses (400 "Invalid
+      refresh token", or 401), is terminal: the integration reports
+      unauthorized, commands fail with auth, and nothing more is sent until
+      the consumer signs the user in again and passes the new tokens with
+      update_settings. A token endpoint that cannot be reached is retried
+      with backoff. A 403 (a missing role, a stream key the account may not
+      have yet) is an ordinary command failure.
+
+  - models: [all]
+    severity: critical
+    text: >
+      A public client's refresh token is single use and rotates on every
+      refresh: the answer carries a new refresh token and the old one stops
+      working. The core reports each new refresh token in a credentials
+      event, and the consumer must persist it at once, before anything else
+      can fail; if it keeps the old one, the next open refreshes with a dead
+      token and the user must sign in again. For the same reason, one sign-in
+      must feed one open integration only: two integrations (or two
+      products) refreshing with the same refresh token invalidate each
+      other, and the second refresh fails as unauthorized. A public client's
+      refresh token also expires 30 days after it was issued (Twitch's
+      documents also say after 30 days unused), so an integration not opened
+      for a month needs a new sign-in. A confidential client's refresh token
+      does not expire. Both end when the user changes their password or
+      disconnects the application.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Twitch requires an application that keeps a user's session to
+      validate the token at https://id.twitch.tv/oauth2/validate when it
+      starts and every hour after, and may revoke or throttle applications
+      that don't. That endpoint is on another host and is the consumer's to
+      call with the access token the latest credentials event carries; the
+      integration's idle probe (Get Users) checks the token against the API
+      but is not that validation.
+
+  - models: [all]
+    severity: info
+    text: >
+      Rate limits are a bucket per client ID and user, normally 1 point per
+      request, with the remaining points in each answer's Ratelimit headers;
+      an empty bucket answers 429 until Ratelimit-Reset. State is polled
+      every 30 seconds with four requests (the channel, the stream, the chat
+      settings and the follower count), plus Get Users when idle for 10
+      seconds: well within the bucket. Raids are limited to 10 requests per
+      10 minutes, announcements to one per 2 seconds, and commercials,
+      snoozes and raids answer 429 for their own cooldowns too.
+
+  - models: [all]
+    severity: info
+    text: >
+      Twitch publishes no ingest-health API: the encoder's bitrate, frame
+      rate and dropped frames as Twitch receives them are not available, and
+      stream health is not reported. stream.live says only that the channel
+      is live. Twitch pushes changes only through EventSub (a websocket or
+      webhook subscription the format does not speak), so everything is
+      polled and a change made on twitch.tv shows up within 30 seconds.
+      viewer_count is Twitch's own figure and lags. Content classification
+      labels and tags are kept as JSON text.
+
+  - models: [all]
+    severity: warning
+    text: >
+      get_stream_key returns the channel's stream key, a secret anyone could
+      stream to the channel with: it is returned as the command's value only,
+      never kept in state or logged. Show it to the operator only on demand.
+
+  - models: [all]
+    severity: critical
+    text: >
+      start_commercial runs an ad at once for every viewer and can't be
+      stopped; Twitch then refuses another until its cooldown ends
+      (retry_after). It needs a live Partner or Affiliate channel and the
+      broadcaster's own token. start_raid sends the channel's viewers to the
+      target channel when the broadcaster confirms on Twitch or after 90
+      seconds, which can't be undone; cancel_raid stops it only until then. create_clip clips the last seconds of the live stream and is
+      made in the background: the reply gives its id and edit URL only.
+
+  - models: [all]
+    severity: info
+    text: >
+      Chat settings are changed as the signed-in user acting as moderator of
+      their own channel (moderator_id is the broadcaster). A mode's duration
+      is accepted only with the mode on, so each mode with a duration has an
+      on and an off command. The non-moderator chat delay is returned only
+      to a moderator's token with moderator:read:chat_settings, and is kept
+      in state only when Twitch returns it. Update Chat Settings answers
+      with the new settings, which update state at once.
+
+state:
+  user.login:                  { type: string, description: "The signed-in user's login name (Get Users)" }
+  user.display_name:           { type: string, description: "The signed-in user's display name (Get Users)" }
+  user.broadcaster_type:       { type: string, description: "partner, affiliate, or empty for neither (Get Users broadcaster_type)" }
+  channel.title:               { type: string, description: "The channel's stream title (Get Channel Information title)" }
+  channel.category_id:         { type: string, description: "The category's id, empty when none is set (game_id)" }
+  channel.category_name:       { type: string, description: "The category's name, such as Just Chatting (game_name)" }
+  channel.language:            { type: string, description: "ISO 639-1 language code, or other (broadcaster_language)" }
+  channel.tags:                { type: string, description: "The channel's tags as a JSON array (tags)" }
+  channel.content_labels:      { type: string, description: "The content classification labels set, as a JSON array (content_classification_labels)" }
+  channel.branded_content:     { type: bool, description: "The stream is marked as branded content (is_branded_content)" }
+  channel.delay:               { type: int, unit: s, description: "Stream delay in seconds, Partners only (delay)" }
+  channel.followers:           { type: int, description: "How many users follow the channel (Get Channel Followers total)" }
+  stream.live:                 { type: bool, description: "The channel is live now (Get Streams returns it, type live)" }
+  stream.id:                   { type: string, description: "The live stream's id, empty while offline" }
+  stream.viewer_count:         { type: int, description: "People watching now, 0 while offline (viewer_count)" }
+  stream.started_at:           { type: string, description: "When the stream went live, RFC 3339 UTC, empty while offline (started_at)" }
+  stream.title:                { type: string, description: "The live stream's title (Get Streams title)" }
+  stream.category_name:        { type: string, description: "The live stream's category name (Get Streams game_name)" }
+  chat.slow_mode:              { type: bool, description: "Chatters wait between messages (slow_mode)" }
+  chat.slow_mode_wait_time:    { type: int, unit: s, description: "Seconds between a chatter's messages in slow mode (slow_mode_wait_time)" }
+  chat.follower_mode:          { type: bool, description: "Only followers may chat (follower_mode)" }
+  chat.follower_mode_duration: { type: int, unit: min, description: "Minutes a user must have followed to chat (follower_mode_duration)" }
+  chat.subscriber_mode:        { type: bool, description: "Only subscribers and moderators may chat (subscriber_mode)" }
+  chat.emote_mode:             { type: bool, description: "Only emotes are allowed (emote_mode)" }
+  chat.unique_chat_mode:       { type: bool, description: "A message repeating one already sent is refused (unique_chat_mode)" }
+  chat.non_moderator_chat_delay: { type: bool, description: "Non-moderators' messages are held back (non_moderator_chat_delay; returned to moderators only)" }
+  chat.non_moderator_chat_delay_duration: { type: int, unit: s, description: "Seconds non-moderators' messages are held (non_moderator_chat_delay_duration)" }
+
+telemetry:
+  # Twitch pushes only through EventSub: the channel, its stream, its chat
+  # settings and its follower count are polled every 30 seconds (4 points).
+  poll:
+    every_ms: 30000
+    send:
+      - { method: GET, path: /helix/channels, query: { broadcaster_id: "{settings.broadcaster_id}" } }
+      - { method: GET, path: /helix/streams, query: { user_id: "{settings.broadcaster_id}", type: all } }
+      - { method: GET, path: /helix/chat/settings,
+          query: { broadcaster_id: "{settings.broadcaster_id}", moderator_id: "{settings.broadcaster_id}" } }
+      - { method: GET, path: /helix/channels/followers, query: { broadcaster_id: "{settings.broadcaster_id}", first: "1" } }
+  updates:
+    # The probe and get_user: the signed-in user.
+    - path: '^/helix/users$'
+      json_each: "$.data"
+      json: { login: "$.login", name: "$.display_name", type: "$.broadcaster_type" }
+      state:
+        user.login: "{login}"
+        user.display_name: "{name}"
+        user.broadcaster_type: "{type}"
+    - path: '^/helix/channels\?broadcaster_id='
+      json_each: "$.data"
+      json:
+        title: "$.title"
+        game_id: "$.game_id"
+        game: "$.game_name"
+        language: "$.broadcaster_language"
+        tags: "$.tags"
+        labels: "$.content_classification_labels"
+        branded: "$.is_branded_content"
+        delay: "$.delay"
+      state:
+        channel.title: "{title}"
+        channel.category_id: "{game_id}"
+        channel.category_name: "{game}"
+        channel.language: "{language}"
+        channel.tags: "{tags}"
+        channel.content_labels: "{labels}"
+        channel.branded_content: "{branded}"
+        channel.delay: "{delay}"
+    - path: '^/helix/channels/followers\?'
+      json: { total: "$.total" }
+      state: { channel.followers: "{total}" }
+    # Live: Get Streams returns the stream.
+    - path: '^/helix/streams\?user_id='
+      json_each: "$.data"
+      json: { id: "$.id", type: "$.type", viewers: "$.viewer_count", started: "$.started_at",
+              title: "$.title", game: "$.game_name" }
+      state:
+        stream.live: { value: "{type}", map: { "live": true, "": false } }
+        stream.id: "{id}"
+        stream.viewer_count: "{viewers}"
+        stream.started_at: "{started}"
+        stream.title: "{title}"
+        stream.category_name: "{game}"
+    # Offline: Get Streams returns no stream at all.
+    - path: '^/helix/streams\?user_id='
+      json_match: { "$.data": '^\[\]$' }
+      json: {}
+      state:
+        stream.live: "false"
+        stream.id: ""
+        stream.viewer_count: "0"
+        stream.started_at: ""
+    # Polls, get_chat_settings and every chat-settings change.
+    - path: '^/helix/chat/settings\?'
+      json_each: "$.data"
+      json:
+        slow: "$.slow_mode"
+        slow_wait: "$.slow_mode_wait_time"
+        follower: "$.follower_mode"
+        follower_for: "$.follower_mode_duration"
+        subscriber: "$.subscriber_mode"
+        emote: "$.emote_mode"
+        unique: "$.unique_chat_mode"
+        delay: "$.non_moderator_chat_delay"
+        delay_for: "$.non_moderator_chat_delay_duration"
+      state:
+        chat.slow_mode: "{slow}"
+        chat.slow_mode_wait_time: "{slow_wait}"
+        chat.follower_mode: "{follower}"
+        chat.follower_mode_duration: "{follower_for}"
+        chat.subscriber_mode: "{subscriber}"
+        chat.emote_mode: "{emote}"
+        chat.unique_chat_mode: "{unique}"
+        chat.non_moderator_chat_delay: "{delay}"
+        chat.non_moderator_chat_delay_duration: "{delay_for}"

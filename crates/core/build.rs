@@ -109,6 +109,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
     ("vendor-magewell", &["magewell-proconvert"]),
     ("vendor-megapixel", &["megapixel-helios"]),
+    ("vendor-meta", &["facebook-live"]),
     ("vendor-newtek", &["newtek-tricaster"]),
     (
         "vendor-novastar",
@@ -185,6 +186,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         ],
     ),
     ("vendor-tvone", &["tvone-coriomaster"]),
+    ("vendor-twitch", &["twitch"]),
     (
         "vendor-yamaha",
         &[
