@@ -158,6 +158,16 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
         &["symetrix-composer", "symetrix-jupiter"],
     ),
     ("vendor-tsl", &["tsl-umd-display", "tsl-umd-listener"]),
+    (
+        "vendor-turtleav",
+        &[
+            "turtleav-amp150",
+            "turtleav-avoip-control",
+            "turtleav-bt-wallplate",
+            "turtleav-dante",
+            "turtleav-matrix",
+        ],
+    ),
     ("vendor-tvone", &["tvone-coriomaster"]),
     (
         "vendor-yamaha",

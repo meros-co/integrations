@@ -979,6 +979,31 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a Ross Carbonite sending TSLUMD_1.0 over TCP, confirm the core receives each 18-byte V3.1 packet back to back with nothing between them, and record the tally and text for program, preview and a key. ([specs/tsl-umd-listener.yaml:46](specs/tsl-umd-listener.yaml#L46))
 - [ ] On a Carbonite, confirm tally 1 is preview and tally 2 program on the TSL feed, and what ShowUMDId and ShowBusName add to the text. ([specs/tsl-umd-listener.yaml:94](specs/tsl-umd-listener.yaml#L94))
 
+## turtleav-amp150 — Turtle AV 150W Dante amplifier
+
+- [ ] Check the master volume and mute reply texts (assumed Master volume: 50 and Master mute: on), the line ending, and that port 8000 needs no login. ([specs/turtleav-amp150.yaml:165](specs/turtleav-amp150.yaml#L165))
+
+## turtleav-avoip-control — Turtle AV DARWIN and CHAZY controllers
+
+- [ ] Check the line ending (CR LF sent), whether Telnet on port 23 negotiates options, prints a banner or asks for a login, and whether it echoes commands. ([specs/turtleav-avoip-control.yaml:588](specs/turtleav-avoip-control.yaml#L588))
+- [ ] Check CHAZY Control Pro's acknowledgement texts: whether they start with [SUCCESS] and [ERROR]. ([specs/turtleav-avoip-control.yaml:598](specs/turtleav-avoip-control.yaml#L598))
+- [ ] Check whether the status blocks between = lines end in a way a client can find, so state could be read rather than kept from replies. ([specs/turtleav-avoip-control.yaml:579](specs/turtleav-avoip-control.yaml#L579))
+
+## turtleav-bt-wallplate — Turtle AV Dante Bluetooth wall plate
+
+- [ ] Check the line ending, which port carries the commands (8000 or 23), and the get bt mute reply text. ([specs/turtleav-bt-wallplate.yaml:156](specs/turtleav-bt-wallplate.yaml#L156))
+
+## turtleav-dante — Turtle AV Dante bridges, Downtown and 30W amplifier
+
+- [ ] Check the line ending (CR LF sent), that port 8000 is a raw socket with the same commands as Telnet 23, and that no login is asked. ([specs/turtleav-dante.yaml:429](specs/turtleav-dante.yaml#L429))
+- [ ] Check the real channel ranges and get type strings of Mineola 4x4, 8x8 and 16x16 (their manuals copy the 2x2's). ([specs/turtleav-dante.yaml:436](specs/turtleav-dante.yaml#L436))
+- [ ] Check the reply to an error, and Downtown's auto event report format. ([specs/turtleav-dante.yaml:444](specs/turtleav-dante.yaml#L444))
+
+## turtleav-matrix — Turtle AV 4K60 video wall, matrix and multiviewer
+
+- [ ] Check which port carries the s/r commands (23 or 8000), whether a CR LF after ! is accepted, and the replies' line ending. ([specs/turtleav-matrix.yaml:353](specs/turtleav-matrix.yaml#L353))
+- [ ] Check that r output 0 in source! reads every output, and the 4x4's error replies. ([specs/turtleav-matrix.yaml:361](specs/turtleav-matrix.yaml#L361))
+
 ## tvone-coriomaster — tvONE CORIOmaster
 
 - [ ] Record how a failed command answers (an "!Error" line is assumed) and what a wrong login answers. ([specs/tvone-coriomaster.yaml:689](specs/tvone-coriomaster.yaml#L689))

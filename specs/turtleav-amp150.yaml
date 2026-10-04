@@ -1,0 +1,168 @@
+spec: 1
+id: turtleav-amp150
+name: Turtle AV 150W Dante amplifier
+vendor: Turtle AV
+category: other
+
+source:
+  - title: 150W Dante Power Amp user manual, §8 (pp. 15-19)
+    author: Turtle AV
+    url: https://turtleav.com/download/179/user-guide/28565/150w-dante-power-amp-user-guide.pdf
+    note: >
+      Manufacturer-documented, free download. Serial 115200 8N1 and TCP/IP port 8000 with
+      the s and r commands: system, input select and volume (Set input: Line, Input line
+      volume: 50), master member, volume and mute, output volume, mute, mix, delay and
+      31-band EQ, presets, network and passwords; default LAN IP 192.168.0.200; it reports
+      its type as HDP-PA150D.
+
+transport:
+  type: line-tcp
+  port: 8000
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+
+ports:
+  - {port: 8000, protocol: tcp, role: control, note: 'TCP/IP control port, changeable'}
+
+models:
+  - id: amp-150w
+    name: Turtle AV 150W Dante power amplifier
+    supports:
+      [set_master_volume, set_master_mute, select_input, set_input_volume,
+       set_output_volume, set_output_mute, recall_preset, save_preset, set_power, reboot]
+    verification: none
+    notes: >
+      Line and Dante inputs; speaker, line and Dante outputs.
+
+commands:
+  set_master_volume:
+    summary: Set the master volume, 0-100
+    params:
+      volume: {type: int, min: 0, max: 100, required: true, label: Master volume, description: Master volume from 0 to 100.}
+    send: s master vol {volume}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_master_mute:
+    summary: Mute or unmute the master output
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: s master mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  select_input:
+    summary: Choose the line or Dante input
+    params:
+      input: {type: int, min: 1, max: 2, required: true, label: Input, description: '1 line, 2 Dante.'}
+    send: s input {input}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_input_volume:
+    summary: Set an input's volume, 0-100
+    params:
+      input: {type: int, min: 0, max: 2, required: true, label: Input, description: '1 line, 2 Dante; 0 both.'}
+      volume: {type: int, min: 0, max: 100, required: true, label: Volume, description: Input volume from 0 to 100.}
+    send: s input {input} vol {volume}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_output_volume:
+    summary: Set an output's volume, 0-100
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      volume: {type: int, min: 0, max: 100, required: true, label: Volume, description: Output volume from 0 to 100.}
+    send: s output {output} vol {volume}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_output_mute:
+    summary: Mute or unmute an output
+    params:
+      output: {type: int, min: 0, max: 3, required: true, label: Output, description: '1 speaker, 2 line, 3 Dante; 0 all.'}
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: s output {output} mute {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  recall_preset:
+    summary: 'Recall a preset: settings change at once'
+    params:
+      preset: {type: int, min: 1, max: 5, required: true, label: Preset, description: Preset 1 to 5.}
+    send: s preset recall {preset}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  save_preset:
+    summary: Save the current settings to a preset, overwriting it
+    params:
+      preset: {type: int, min: 1, max: 5, required: true, label: Preset, description: Preset 1 to 5.}
+    send: s preset save {preset}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  set_power:
+    summary: Power on, or off into standby
+    params:
+      state: {type: enum, values: ['on', 'off'], required: true, label: State, description: on or off.}
+    send: s power {state}
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+  reboot:
+    summary: Reboot the amplifier; audio stops until it is back
+    send: s reboot
+    expect: {not_contains: rror}
+    returns: ack
+    # 150W Dante Power Amp user manual, §8
+
+telemetry:
+  poll:
+    every_ms: 5000
+    send:
+    - r master vol
+    - r master mute
+    - r input
+  updates:
+    - match: '^(?:Increase |Decrease )?[Mm]aster volume: (\d+)$'
+      state:
+        master.volume: '{1}'
+    - match: ^Master mute:? (on|off)$
+      state:
+        master.mute: {value: '{1}', map: {'on': true, 'off': false}}
+    - match: '^(?:Set )?[Ii]nput: (Line|Dante)$'
+      state:
+        input: '{1}'
+
+state:
+  master.volume:  {type: int, description: 'Master volume, 0-100'}
+  master.mute:    {type: bool, description: Master output muted}
+  input:          {type: string, description: 'Selected input: Line or Dante'}
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset changes the amplifier's settings at once and reboot or power off stops
+      the audio. Neither asks for confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Nothing is pushed: master volume, mute and input are polled every 5 seconds. The
+      master volume and mute reply texts are assumed to match the other Turtle Dante
+      devices (Master volume: 50); the document shows only the input's. The documents
+      state no line ending (CR LF is sent) and no login.

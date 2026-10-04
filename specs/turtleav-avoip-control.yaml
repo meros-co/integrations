@@ -1,0 +1,608 @@
+spec: 1
+id: turtleav-avoip-control
+name: Turtle AV DARWIN and CHAZY controllers
+vendor: Turtle AV
+category: router
+
+source:
+  - title: DARWIN Control API Reference (67 pp., examples from controller firmware 2.03.19)
+    author: Turtle AV
+    url: https://turtleav.com/download/180/api/28420/darwin-control-api.pdf
+    note: >
+      Manufacturer-documented, free download. Telnet on TCP 23 (changeable) and the same
+      commands on RS-232 at 57600 8N1 (§1.2); system and GPIO (§2), decoder routing,
+      output, LED, OSD, resolution, rotation, pause, mode, name and reboot commands with
+      their [SUCCESS] and [ERROR] replies (§3), encoder EDID, audio input, bitrate and
+      main stream (§4), video walls and presets (§5), device search (§6) and network (§7).
+  - title: Chazy Control API Reference (90 pp., examples from firmware 1.00.17)
+    author: Turtle AV
+    url: https://turtleav.com/download/180/api/28419/chazy-control-api.pdf
+    note: >
+      Manufacturer-documented, free download. The same command line as DARWIN Control with
+      audio and CEC locks, the 'VARSUC unselect encoder' disconnect reply, output flip,
+      the CHAZY resolution and EDID lists, IO pins, relays, CEC and IR send, SET REBOOT,
+      the embedded Dante controller (§5) and the secondary stream (§6).
+  - title: CHAZY Control Pro API commands (FW 1.10.08 help listing)
+    author: Turtle AV
+    url: https://turtleav.com/download/180/api/28693/chazy-control-pro-api.pdf
+    note: >
+      Manufacturer-documented, free download, but only the controller's HELP listing:
+      syntax and ranges with no replies. Adds walls 1-256, groups, configuration presets,
+      Dante presets, ultra-low latency, freeze, SENDGUEST, resolutions 14-17 and EDIDs
+      24-27, 101 and 102.
+  - title: DARWIN Control, CHAZY Control and CHAZY Control Pro User Manuals
+    author: Turtle AV
+    url: https://turtleav.com/downloads/
+    note: >
+      Control and Video LANs both accept Telnet, SSH and API commands; host name
+      controller.local; Control LAN DHCP with fallback 192.168.6.100; web login
+      admin/admin.
+  - title: companion-module-turtleav-chazy-control (sj-bluei)
+    author: Community
+    url: https://github.com/sj-bluei/companion-module-turtleav-chazy-control
+    note: >
+      MIT licence, read as corroboration only and tested only against a simulator by its
+      author: Telnet 23, commands ended with CR LF, [SUCCESS] and [ERROR] acknowledgements
+      and blocks delimited by lines of = signs.
+
+transport:
+  type: line-tcp
+  port: 23
+  framing: terminated
+  terminator: crlf
+  encoding: ascii
+  timeout_ms: 3000
+  reply: expected
+  reply_match: ^\[(SUCCESS|ERROR)\]
+
+ports:
+  - {port: 23, protocol: tcp, role: control, note: 'Telnet, changeable on the controller; the same commands run on its RS-232 port'}
+
+models:
+  - id: darwin-control
+    name: Turtle AV DARWIN Control (TAV-DARWIN-CTL)
+    supports:
+      [route, route_signal, set_decoder_output, set_decoder_mute, set_decoder_osd,
+       flash_decoder_led, flash_encoder_led, set_decoder_resolution, set_decoder_rotate,
+       set_decoder_pause, set_decoder_mode, set_decoder_name, set_encoder_name,
+       set_encoder_edid, set_encoder_audio_input, set_encoder_bitrate,
+       set_encoder_main_stream, apply_wall_preset, set_wall_preset_source,
+       set_gpio_direction, set_gpio_level, reboot_decoder, reboot_encoder]
+    verification: none
+    notes: >
+      Controller for DARWIN HD H.265 encoders and decoders, up to 762 of each.
+  - id: chazy-control
+    name: Turtle AV CHAZY Control
+    supports:
+      [route, route_signal, route_signal_chazy, set_decoder_output, set_decoder_mute,
+       set_decoder_osd, flash_decoder_led, flash_encoder_led, set_decoder_resolution_chazy,
+       set_decoder_rotate, set_decoder_flip, set_decoder_mode, set_decoder_name,
+       set_encoder_name, set_encoder_edid_chazy, apply_wall_preset, set_wall_preset_source,
+       set_gpio_direction, set_gpio_level, set_relay, set_io_output, send_cec, send_ir,
+       reboot_decoder, reboot_encoder, reboot_controller, dante_subscribe,
+       set_dante_latency]
+    verification: none
+    notes: >
+      Controller for CHAZY 4K encoders and decoders, with an embedded Dante controller.
+  - id: chazy-control-pro
+    name: Turtle AV CHAZY Control Pro (TAV-CHAZYCTL-PRO)
+    supports:
+      [route, route_signal, route_signal_chazy, set_decoder_output, set_decoder_mute,
+       set_decoder_osd, flash_decoder_led, flash_encoder_led, set_decoder_resolution_pro,
+       set_decoder_rotate, set_decoder_flip, set_decoder_freeze, set_decoder_mode,
+       set_decoder_name, set_encoder_name, set_encoder_edid_pro, apply_wall_preset,
+       apply_wall_preset_pro, set_wall_preset_source, set_gpio_direction, set_gpio_level,
+       set_relay, set_io_output, send_cec, send_ir, reboot_decoder, reboot_encoder,
+       reboot_controller, dante_subscribe, set_dante_latency, apply_config_preset,
+       route_group, apply_dante_preset, set_ultra_low_latency, send_serial]
+    verification: none
+    notes: >
+      CHAZY controller with groups, configuration presets, Dante presets, media and
+      schedules; its replies are not published.
+
+commands:
+  route:
+    summary: 'Route an encoder to a decoder: video, audio, IR, RS-232, USB (and CEC) together; encoder 0 disconnects'
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      encoder: {type: int, min: 0, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762; 0 disconnects (or unlocks, for a single signal).'}
+    send: SET DEC {decoder} SWITCH {encoder} ALL
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.3, Chazy Control API Reference §3.3
+
+  route_signal:
+    summary: Lock one signal of a decoder to an encoder; encoder 0 unlocks it to follow the full route
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      encoder: {type: int, min: 0, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762; 0 disconnects (or unlocks, for a single signal).'}
+      signal: {type: enum, values: [VIDEO, IR, RS232, USB], required: true, label: Signal, description: 'The signal to lock: video, IR, RS-232 or USB.'}
+    send: SET DEC {decoder} SWITCH {encoder} {signal}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.4-3.7, Chazy Control API Reference §3.4-3.9
+
+  route_signal_chazy:
+    summary: Lock a decoder's audio or CEC to an encoder; encoder 0 unlocks it
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      encoder: {type: int, min: 0, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762; 0 disconnects (or unlocks, for a single signal).'}
+      signal: {type: enum, values: [AUDIO, CEC], required: true, label: Signal, description: 'The signal to lock: audio or CEC.'}
+    send: SET DEC {decoder} SWITCH {encoder} {signal}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §3.5, §3.9
+
+  set_decoder_output:
+    summary: Turn a decoder's HDMI output on or off
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      enabled: {type: bool, required: true, label: 'On', description: On or off.}
+    send: SET DEC {decoder} OUTPUT {enabled:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.11, Chazy Control API Reference §3.12
+
+  set_decoder_mute:
+    summary: Mute (black) a decoder's output, or unmute it
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      muted: {type: bool, required: true, label: Muted, description: On blacks the output; off restores it.}
+    send: SET DEC {decoder} OUTPUT MUTE {muted:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.12, Chazy Control API Reference §3.13
+
+  set_decoder_osd:
+    summary: Show or hide a decoder's on-screen display
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      visible: {type: bool, required: true, label: OSD, description: On shows the on-screen display.}
+    send: SET DEC {decoder} OUTPUT OSD {visible:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.9, Chazy Control API Reference §3.11
+
+  flash_decoder_led:
+    summary: Flash a decoder's power LED to find it, or stop
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      flash: {type: bool, required: true, label: Flash, description: On flashes the power LED; off stops it.}
+    send: SET DEC {decoder} LED {flash:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.8, Chazy Control API Reference §3.10
+
+  flash_encoder_led:
+    summary: Flash an encoder's power LED to find it, or stop
+    params:
+      encoder: {type: int, min: 0, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762; 0 addresses every encoder.'}
+      flash: {type: bool, required: true, label: Flash, description: On flashes the power LED; off stops it.}
+    send: SET ENC {encoder} LED {flash:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4, Chazy Control API Reference §4
+
+  set_decoder_resolution:
+    summary: Set a DARWIN decoder's output resolution by code
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      code: {type: int, min: 0, max: 19, required: true, label: Resolution, description: '0 bypass, 1 1080p60, 2 1080p50, 3 1080p30, 4 1080p25, 5 1080p24, 6 720p60, 7 720p50, 8 576p50, 9 480p60, 10 640x480, 11 800x600, 12 1024x768, 13 1280x800, 14 1280x1024, 15 1366x768, 16 1440x900, 17 1600x1200, 18 1680x1050, 19 1920x1200 (all 60 Hz unless named).'}
+    send: SET DEC {decoder} OUTPUT RESOLUTION {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.14
+
+  set_decoder_resolution_chazy:
+    summary: Set a CHAZY decoder's output resolution by code
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      code: {type: int, min: 0, max: 13, required: true, label: Resolution, description: '0 bypass, 1 1080p50, 2 1080p60, 3 720p50, 4 720p60, 5 2160p24, 6 2160p30, 7 2160p50, 8 2160p60, 9 1280x1024, 10 1360x768, 11 1440x900, 12 1680x1050, 13 1920x1200.'}
+    send: SET DEC {decoder} OUTPUT RESOLUTION {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §3.14
+
+  set_decoder_resolution_pro:
+    summary: Set a CHAZY Control Pro decoder's output resolution by code
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      code: {type: int, min: 0, max: 17, required: true, label: Resolution, description: 'As on CHAZY Control (0 bypass to 13 1920x1200), plus 14 2560x1440, 15 2560x1080, 16 3440x1440, 17 3840x1600.'}
+    send: SET DEC {decoder} OUTPUT RESOLUTION {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET DEC OUTPUT RESOLUTION
+
+  set_decoder_rotate:
+    summary: Rotate a decoder's output
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      rotation: {type: int, min: 0, max: 3, required: true, label: Rotation, description: '0 none, 1 90 degrees, 2 180 degrees, 3 270 degrees.'}
+    send: SET DEC {decoder} OUTPUT ROTATE {rotation}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.15, Chazy Control API Reference §3.15
+
+  set_decoder_flip:
+    summary: Flip a CHAZY decoder's output
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      flip: {type: enum, values: [HOR, VER, 'OFF'], required: true, label: Flip, description: 'Horizontal, vertical, or off.'}
+    send: SET DEC {decoder} OUTPUT FLIP {flip}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §3.16
+
+  set_decoder_pause:
+    summary: Freeze a DARWIN decoder's picture, or release it
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      paused: {type: bool, required: true, label: Paused, description: On freezes the picture.}
+    send: SET DEC {decoder} OUTPUT PAUSE {paused:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.13
+
+  set_decoder_freeze:
+    summary: Freeze a CHAZY Control Pro decoder's picture, or release it
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      frozen: {type: bool, required: true, label: Frozen, description: On freezes the picture.}
+    send: SET DEC {decoder} OUTPUT FREEZE {frozen:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET DEC OUTPUT FREEZE
+
+  set_decoder_mode:
+    summary: Use a decoder alone (matrix) or as part of a video wall
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      mode: {type: enum, values: [MX, VW], required: true, label: Mode, description: MX shows its own source; VW takes its part of a video wall.}
+    send: SET DEC {decoder} MODE {mode}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.20, Chazy Control API Reference §3.21
+
+  set_decoder_name:
+    summary: Rename a decoder
+    params:
+      decoder: {type: int, min: 1, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762.'}
+      name: {type: string, max_length: 16, pattern: '^[^ ]+$', required: true, label: Name, description: 'Decoder name, up to 16 characters without spaces.'}
+    send: SET DEC {decoder} NAME {name}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.2, Chazy Control API Reference §3.2
+
+  set_encoder_name:
+    summary: Rename an encoder
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      name: {type: string, max_length: 16, pattern: '^[^ ]+$', required: true, label: Name, description: 'Encoder name, up to 16 characters without spaces.'}
+    send: SET ENC {encoder} NAME {name}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4.2, Chazy Control API Reference §4.2
+
+  set_encoder_edid:
+    summary: Set a DARWIN encoder's EDID
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      code: {type: int, min: 0, max: 8, required: true, label: EDID, description: '0 HDMI 1080p60 2ch, 1 HDMI 720p60 2ch, 2 DVI 1280x1024, 3 DVI 1920x1080, 4 DVI 1920x1200, 5 HDMI 1920x1200 2ch, 6 copy, 7 user EDID 1, 8 user EDID 2.'}
+    send: SET ENC {encoder} EDID DEFAULT {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4.6
+
+  set_encoder_edid_chazy:
+    summary: Set a CHAZY encoder's EDID
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      code: {type: int, min: 0, max: 26, required: true, label: EDID, description: '0-2 1080p stereo, 5.1, 7.1; 3-5 1080i; 6-8 3D; 9-11 4K30 4:4:4; 12-14 4K60 4:2:0; 15-17 4K60 4:4:4 SDR; 18-20 4K60 4:4:4 HDR; 21-23 DVI; 25, 26 user EDID 1, 2.'}
+    send: SET ENC {encoder} EDID DEFAULT {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §4.6
+
+  set_encoder_edid_pro:
+    summary: Set a CHAZY Control Pro encoder's EDID
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      code: {type: int, min: 0, max: 102, required: true, label: EDID, description: 'As on CHAZY Control (0-23), plus 24 2560x1440, 25 2560x1080, 26 3440x1440, 27 3840x1600, and 101, 102 for user EDID 1, 2.'}
+    send: SET ENC {encoder} EDID DEFAULT {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET ENC EDID DEFAULT
+
+  set_encoder_audio_input:
+    summary: 'Choose a DARWIN encoder''s audio: HDMI or analog'
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      source: {type: enum, values: [HDMI, ANA], required: true, label: Audio input, description: Embedded HDMI audio or the analog input.}
+    send: SET ENC {encoder} AUDIO INPUT {source}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4.5
+
+  set_encoder_bitrate:
+    summary: Set a DARWIN encoder's stream bitrate
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      code: {type: int, min: 0, max: 4, required: true, label: Bitrate, description: '0 1 Mb/s, 1 4 Mb/s, 2 8 Mb/s, 3 16 Mb/s, 4 20 Mb/s.'}
+    send: SET ENC {encoder} STREAM BITRATE {code}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4.9
+
+  set_encoder_main_stream:
+    summary: Set a DARWIN encoder's main stream codec and audio
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+      codec: {type: int, min: 0, max: 1, required: true, label: Codec, description: '0 H.264, 1 H.265.'}
+      audio: {type: bool, required: true, label: Audio, description: On carries audio in the main stream.}
+    send: SET ENC {encoder} MAINSTREAM E {codec} A {audio:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4.10
+
+  apply_wall_preset:
+    summary: 'Apply a video wall preset: the wall''s layout and sources change at once'
+    params:
+      wall: {type: int, min: 1, max: 9, required: true, label: Video wall, description: 'Video wall handle, 1 to 9.'}
+      preset: {type: int, min: 1, max: 9, required: true, label: Preset, description: 'Video wall preset, 1 to 9.'}
+    send: APPLY WALL {wall} PRESET {preset}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §5.9, Chazy Control API Reference §7.9
+
+  apply_wall_preset_pro:
+    summary: Apply a video wall preset on CHAZY Control Pro (walls 1-256)
+    params:
+      wall: {type: int, min: 1, max: 256, required: true, label: Video wall, description: 'Video wall handle, 1 to 256.'}
+      preset: {type: int, min: 1, max: 9, required: true, label: Preset, description: 'Video wall preset, 1 to 9.'}
+    send: APPLY WALL {wall} PRESET {preset}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), APPLY WALL PRESET
+
+  set_wall_preset_source:
+    summary: Set the source of one screen group in a video wall preset
+    params:
+      wall: {type: int, min: 1, max: 9, required: true, label: Video wall, description: 'Video wall handle, 1 to 9.'}
+      preset: {type: int, min: 1, max: 9, required: true, label: Preset, description: 'Video wall preset, 1 to 9.'}
+      group: {type: enum, values: [A, B, C, D, E, F, G], required: true, label: Screen group, description: 'The preset''s screen group, A to G.'}
+      encoder: {type: int, min: 0, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762; 0 disconnects (or unlocks, for a single signal).'}
+    send: SET WALL {wall} PRESET {preset} CLASS {group} SOURCE {encoder}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §5.11, Chazy Control API Reference §7.11
+
+  set_gpio_direction:
+    summary: Set a controller GPIO pin as input or output
+    params:
+      gpio: {type: int, min: 1, max: 4, required: true, label: GPIO, description: 'Controller GPIO pin, 1 to 4.'}
+      direction: {type: enum, values: [IN, OUT], required: true, label: Direction, description: IN reads the pin; OUT drives it.}
+    send: SET GPIO {gpio} DIR {direction}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §2.3, Chazy Control API Reference §2.3
+
+  set_gpio_level:
+    summary: Drive a controller GPIO output low or high
+    params:
+      gpio: {type: int, min: 1, max: 4, required: true, label: GPIO, description: 'Controller GPIO pin set as output, 1 to 4.'}
+      level: {type: enum, values: [Low, High], required: true, label: Level, description: Low or High.}
+    send: SET GPIO {gpio} LEVEL {level}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §2.4, Chazy Control API Reference §2.4
+
+  set_relay:
+    summary: Open or close an endpoint's relay (CHAZY)
+    params:
+      type: {type: enum, values: [DEC, ENC], required: true, label: Endpoint type, description: 'DEC for a decoder (RX), ENC for an encoder (TX).'}
+      id: {type: int, min: 1, max: 762, required: true, label: Endpoint, description: 'The decoder or encoder ID, 1 to 762.'}
+      relay: {type: int, min: 1, max: 2, required: true, label: Relay, description: Relay 1 or 2.}
+      state: {type: enum, values: [OPEN, CLOSE], required: true, label: State, description: OPEN or CLOSE.}
+    send: SET {type} {id} RELAY {relay} {state}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §3.20, §4
+
+  set_io_output:
+    summary: Set an endpoint IO pin's output level (CHAZY)
+    params:
+      type: {type: enum, values: [DEC, ENC], required: true, label: Endpoint type, description: 'DEC for a decoder (RX), ENC for an encoder (TX).'}
+      id: {type: int, min: 1, max: 762, required: true, label: Endpoint, description: 'The decoder or encoder ID, 1 to 762.'}
+      pin: {type: int, min: 1, max: 2, required: true, label: IO pin, description: 'IO pin 1 or 2, set as output.'}
+      level: {type: int, min: 0, max: 1, required: true, label: Level, description: '0 low, 1 high.'}
+    send: SET {type} {id} IO {pin} OUT {level}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §3.19, §4
+
+  send_cec:
+    summary: Send CEC bytes from an endpoint to its display or source (CHAZY)
+    params:
+      type: {type: enum, values: [DEC, ENC], required: true, label: Endpoint type, description: 'DEC for a decoder (RX), ENC for an encoder (TX).'}
+      id: {type: int, min: 1, max: 762, required: true, label: Endpoint, description: 'The decoder or encoder ID, 1 to 762.'}
+      data: {type: string, pattern: '^[0-9A-Fa-f]{2}( [0-9A-Fa-f]{2}){0,15}$', required: true, label: CEC data, description: 'CEC bytes in hexadecimal separated by spaces, e.g. 4F 36.'}
+    send: SET {type} {id} CEC SEND {data}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference, CEC SEND
+
+  send_ir:
+    summary: Send an IR code from an endpoint (CHAZY)
+    params:
+      type: {type: enum, values: [DEC, ENC], required: true, label: Endpoint type, description: 'DEC for a decoder (RX), ENC for an encoder (TX).'}
+      id: {type: int, min: 1, max: 762, required: true, label: Endpoint, description: 'The decoder or encoder ID, 1 to 762.'}
+      data: {type: string, pattern: '^[0-9A-Fa-f ]{4,4096}$', required: true, label: IR data, description: The IR code in hexadecimal (CCF format).}
+    send: SET {type} {id} IR SEND {data}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference, IR SEND
+
+  reboot_decoder:
+    summary: Reboot a decoder; its output drops until it is back
+    params:
+      decoder: {type: int, min: 1, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762.'}
+    send: SET DEC {decoder} REBOOT
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §3.25, Chazy Control API Reference
+
+  reboot_encoder:
+    summary: Reboot an encoder; its stream drops until it is back
+    params:
+      encoder: {type: int, min: 1, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762.'}
+    send: SET ENC {encoder} REBOOT
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # DARWIN Control API Reference §4, Chazy Control API Reference
+
+  reboot_controller:
+    summary: Reboot the CHAZY controller; control stops until it is back
+    send: SET REBOOT
+    expect: {contains: restart}
+    returns: ack
+    # Chazy Control API Reference §2.6
+
+  dante_subscribe:
+    summary: Subscribe a Dante receive channel to a transmitter channel (CHAZY)
+    params:
+      device: {type: string, pattern: '^[A-Za-z0-9-]{1,31}$', required: true, label: Dante device, description: 'The receiving Dante device''s name, e.g. Decoder-001.'}
+      channel: {type: int, min: 1, max: 64, required: true, label: Receive channel, description: 'Receive channel number, from 1.'}
+      tx_device: {type: string, pattern: '^[A-Za-z0-9-]{1,31}$', required: true, label: Transmitter, description: 'The transmitting Dante device''s name, e.g. TX1.'}
+      tx_channel: {type: int, min: 1, max: 64, required: true, label: Transmit channel, description: 'Transmit channel number, from 1.'}
+    send: SET DANTE DEV {device} AUDIO RXCHN {channel} SOURCE {tx_device} CHN {tx_channel}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §5
+
+  set_dante_latency:
+    summary: Set a Dante device's receive latency in microseconds (CHAZY)
+    params:
+      device: {type: string, pattern: '^[A-Za-z0-9-]{1,31}$', required: true, label: Dante device, description: The Dante device's name.}
+      latency: {type: int, min: 250, max: 40000, required: true, label: Latency, description: 'Latency in microseconds, e.g. 1000, 2000 or 5000.'}
+    send: SET DANTE DEV {device} LATENCY {latency}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # Chazy Control API Reference §5
+
+  apply_config_preset:
+    summary: 'Apply a saved configuration preset: routing and settings change at once (CHAZY Control Pro)'
+    params:
+      preset: {type: int, min: 1, max: 10, required: true, label: Preset, description: 'Configuration preset, 1 to 10.'}
+    send: APPLY CONFIG PRESET {preset:02d}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), APPLY CONFIG PRESET
+
+  route_group:
+    summary: Route an encoder to every decoder in a group (CHAZY Control Pro)
+    params:
+      group: {type: int, min: 1, max: 256, required: true, label: Group, description: 'Decoder group handle, 1 to 256.'}
+      encoder: {type: int, min: 0, max: 762, required: true, label: Encoder, description: 'Encoder (TX) ID, 1 to 762; 0 disconnects (or unlocks, for a single signal).'}
+    send: SET GROUP {group} SWITCH {encoder} ALL
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET GROUP SWITCH
+
+  apply_dante_preset:
+    summary: Apply a Dante routing preset (CHAZY Control Pro)
+    params:
+      preset: {type: int, min: 1, max: 256, required: true, label: Dante preset, description: 'Dante preset handle, from 1.'}
+    send: APPLY DANTE PRESET {preset}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), APPLY DANTE PRESET
+
+  set_ultra_low_latency:
+    summary: Turn a decoder's ultra-low-latency mode on or off (CHAZY Control Pro)
+    params:
+      decoder: {type: int, min: 0, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762; 0 addresses every decoder.'}
+      enabled: {type: bool, required: true, label: Ultra-low latency, description: On lowers latency.}
+    send: SET DEC {decoder} ULL {enabled:on_off}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET DEC ULL
+
+  send_serial:
+    summary: Send text out of a decoder's RS-232 port without entering guest mode (CHAZY Control Pro)
+    params:
+      decoder: {type: int, min: 1, max: 762, required: true, label: Decoder, description: 'Decoder (RX) ID, 1 to 762.'}
+      message: {type: string, max_length: 256, required: true, label: Message, description: The ASCII text to send.}
+    send: SET DEC {decoder} SENDGUEST ASCII {message}
+    expect: {contains: '[SUCCESS]'}
+    returns: ack
+    # CHAZY Control Pro API commands (FW 1.10.08 help listing), SET DEC SENDGUEST
+
+telemetry:
+  updates:
+    - match: ^\[SUCCESS\]Set decoder (\d+) from encoder (\d+)\.$
+      state:
+        decoders.{1}.source: '{2}'
+    - match: ^\[SUCCESS\]Set decoder (\d+) (?:no source|VARSUC unselect encoder)\.$
+      state:
+        decoders.{1}.source: '0'
+    - match: ^\[SUCCESS\]Set decoder (\d+) output (on|off)\.$
+      state:
+        decoders.{1}.output: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: ^\[SUCCESS\]Set decoder (\d+) output mute (on|off)\.$
+      state:
+        decoders.{1}.mute: {value: '{2}', map: {'on': true, 'off': false}}
+    - match: ^\[SUCCESS\]Set decoder (\d+) rotate (\d+) degree\.$
+      state:
+        decoders.{1}.rotation: '{2}'
+    - match: '^\[SUCCESS\]Apply preset: (.+)\.$'
+      state:
+        walls.last_preset: '{1}'
+
+state:
+  decoders.*.source:    {type: int, description: 'Encoder routed to the decoder by this session''s last route, 0 for none, keyed by decoder ID'}
+  decoders.*.output:    {type: bool, description: 'Decoder HDMI output on, from this session''s last change'}
+  decoders.*.mute:      {type: bool, description: 'Decoder output muted (black), from this session''s last change'}
+  decoders.*.rotation:  {type: int, description: 'Decoder output rotation in degrees, from this session''s last change'}
+  walls.last_preset:    {type: string, description: 'The video wall preset last applied by this session, as the controller names it'}
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      route, route_group, apply_wall_preset, apply_config_preset and apply_dante_preset
+      change what displays show at once, and the reboot commands drop pictures until the
+      device is back. None asks for confirmation. Encoder 0 disconnects a decoder.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The status commands (GET STATUS, GET DEC STATUS ...) answer with blocks between
+      lines of = signs with no end the line framing can find, so state is not read from
+      them and they are not offered. State holds what this session's own commands changed,
+      from their [SUCCESS] replies; changes made from the web interface or another client
+      are not seen. Nothing is pushed.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The documents state no line ending and no Telnet login: commands end with CR LF, as
+      the community module does, and no login is sent. If the controller negotiates Telnet
+      options or asks for a login on port 23, the connection fails. Commands are written
+      in upper case as documented; decoder and encoder IDs are sent without leading zeros
+      as in the documents' examples, and the controller echoes them zero-padded (decoder
+      001).
+
+  - models: [chazy-control-pro]
+    severity: warning
+    text: >
+      The CHAZY Control Pro document gives syntax only. Its reply texts differ from CHAZY
+      Control's (Turtle's Q-SYS plugin change log), so whether its acknowledgements start
+      with [SUCCESS] is not documented; a command it accepts with another text times out
+      here.
+
+  - models: [darwin-control]
+    severity: info
+    text: >
+      Some DARWIN decoder replies say encoder where they mean decoder, and the encoder
+      FPLED example is written SET DEC (document errors); the commands here follow the
+      command syntax.
