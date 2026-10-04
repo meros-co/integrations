@@ -10,9 +10,10 @@ category: other
 # credential: it registers its own Twitch application, runs the sign-in (the
 # Device Code Grant for a public client, or the authorization code grant for
 # a confidential one), and passes the tokens as settings; the core keeps the
-# access token fresh with the refresh token and reports every new token, a
-# rotated refresh token included, as a credentials event. The core never runs
-# a sign-in and persists nothing.
+# access token fresh with the refresh token, validates it hourly at
+# id.twitch.tv as Twitch requires, and reports every new token, a rotated
+# refresh token included, as a credentials event. The core never runs a
+# sign-in and persists nothing.
 
 source:
   - title: Twitch API reference (Helix)
@@ -90,8 +91,11 @@ source:
     note: >
       Manufacturer document, retrieved 2026-10-04. An application that keeps
       an OAuth session validates its token at GET
-      https://id.twitch.tv/oauth2/validate on start and every hour; the
-      answer carries client_id, login, scopes, user_id and expires_in.
+      https://id.twitch.tv/oauth2/validate on start and every hour, with the
+      header Authorization OAuth (Bearer is accepted too); the answer
+      carries client_id, login, scopes, user_id and expires_in, and an
+      invalid token answers 401 "invalid access token". Twitch audits
+      applications and may revoke or throttle those that don't validate.
   - title: RFC 6749, The OAuth 2.0 Authorization Framework, section 6 (Refreshing an Access Token)
     author: IETF
     url: https://www.rfc-editor.org/rfc/rfc6749
@@ -111,6 +115,9 @@ transport:
     token_url: https://id.twitch.tv/oauth2/token
     refresh_ahead_s: 300
     client_auth: body
+    # Twitch requires the token validated on start and every hour; the core
+    # does it, monitored or not, and a 401 there is handled as for the API.
+    validate: { url: https://id.twitch.tv/oauth2/validate, every_s: 3600, scheme: OAuth }
   # Helix wants the application's client id beside every bearer token.
   headers:
     Client-Id: "{settings.client_id}"
@@ -147,7 +154,7 @@ settings:
                     description: "The numeric user ID of the channel acted on, which must be the signed-in user's own: user_id in the token validation answer, or id from get_user." }
 
 ports:
-  - { port: 443, protocol: https, role: control, note: "the cloud API at api.twitch.tv, opened by that host name; token refreshes go to id.twitch.tv:443" }
+  - { port: 443, protocol: https, role: control, note: "the cloud API at api.twitch.tv, opened by that host name; token refreshes and the hourly token validation go to id.twitch.tv:443" }
 
 models:
   - id: helix
@@ -577,10 +584,19 @@ quirks:
       Twitch requires an application that keeps a user's session to
       validate the token at https://id.twitch.tv/oauth2/validate when it
       starts and every hour after, and may revoke or throttle applications
-      that don't. That endpoint is on another host and is the consumer's to
-      call with the access token the latest credentials event carries; the
-      integration's idle probe (Get Users) checks the token against the API
-      but is not that validation.
+      that don't. The core does it for the consumer, which never calls that
+      endpoint itself: once the integration opens (after the first refresh
+      when there is no access token yet), after every refresh, and every
+      hour while it is open, monitored or not, with the header
+      "Authorization: OAuth <token>" and nothing else. Only the status is
+      read; the answer (client, login, user id, scopes) is neither kept in
+      state nor logged. A 401 there means the token was revoked or the user
+      disconnected the application: with a refresh token, the core refreshes
+      once and validates the new token, and a second 401, or a refresh
+      Twitch refuses, is the terminal unauthorized; without a refresh token
+      the first 401 is terminal. A network failure or any other status is
+      logged and tried again with backoff (1 s doubling to 60 s), and does
+      not change the connection.
 
   - models: [all]
     severity: info

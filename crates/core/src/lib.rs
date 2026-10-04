@@ -59,6 +59,8 @@ pub mod module;
 mod modules;
 #[cfg(test)]
 mod oauth_session_tests;
+#[cfg(test)]
+mod oauth_validate_session_tests;
 #[cfg(feature = "pjlink")]
 mod pjlink_discovery;
 mod session;

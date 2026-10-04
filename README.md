@@ -80,7 +80,8 @@ refreshes the access token before it expires and reports each new token in a
 (the user revoked access) the device reports `unauthorized` until the consumer
 signs the user in again and passes the new tokens with `update_settings`. A
 product that cannot ship its client secret points the `token_url` setting at
-its own token proxy.
+its own token proxy. Where a service requires the token to be checked on a
+schedule (Twitch: on start and hourly), the core does that too.
 
 **Events** come from one queue, the same JSON in every package (SPEC.md,
 Events). A listener such as `osc-listener`, which hears OSC from any control

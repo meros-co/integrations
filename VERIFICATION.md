@@ -1173,22 +1173,25 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## twitch — Twitch
 
-- [ ] Confirm a public client's refresh at https://id.twitch.tv/oauth2/token with client_id alone succeeds, answers a new refresh token every time, and that the old one then answers 400 "Invalid refresh token". ([specs/twitch.yaml:111](specs/twitch.yaml#L111))
-- [ ] Record the body Helix answers with a 401 (expired token, and a Client-Id that does not match the token), and confirm 403 is never used for a refused token. ([specs/twitch.yaml:119](specs/twitch.yaml#L119))
-- [ ] Confirm every Helix request is refused without the Client-Id header, and accepted with it beside the bearer token. ([specs/twitch.yaml:116](specs/twitch.yaml#L116))
-- [ ] Confirm GET /helix/users with no parameters answers the token's own user and costs one rate-limit point. ([specs/twitch.yaml:123](specs/twitch.yaml#L123))
-- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:724](specs/twitch.yaml#L724))
-- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:716](specs/twitch.yaml#L716))
-- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:388](specs/twitch.yaml#L388))
-- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:381](specs/twitch.yaml#L381))
-- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:476](specs/twitch.yaml#L476))
-- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:287](specs/twitch.yaml#L287))
-- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:307](specs/twitch.yaml#L307))
-- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:330](specs/twitch.yaml#L330))
-- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:363](specs/twitch.yaml#L363))
-- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:252](specs/twitch.yaml#L252))
-- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:230](specs/twitch.yaml#L230))
-- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:671](specs/twitch.yaml#L671))
+- [ ] Confirm a public client's refresh at https://id.twitch.tv/oauth2/token with client_id alone succeeds, answers a new refresh token every time, and that the old one then answers 400 "Invalid refresh token". ([specs/twitch.yaml:115](specs/twitch.yaml#L115))
+- [ ] Record the body Helix answers with a 401 (expired token, and a Client-Id that does not match the token), and confirm 403 is never used for a refused token. ([specs/twitch.yaml:126](specs/twitch.yaml#L126))
+- [ ] Confirm every Helix request is refused without the Client-Id header, and accepted with it beside the bearer token. ([specs/twitch.yaml:123](specs/twitch.yaml#L123))
+- [ ] Confirm GET /helix/users with no parameters answers the token's own user and costs one rate-limit point. ([specs/twitch.yaml:130](specs/twitch.yaml#L130))
+- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:740](specs/twitch.yaml#L740))
+- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:732](specs/twitch.yaml#L732))
+- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:395](specs/twitch.yaml#L395))
+- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:388](specs/twitch.yaml#L388))
+- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:483](specs/twitch.yaml#L483))
+- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:294](specs/twitch.yaml#L294))
+- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:314](specs/twitch.yaml#L314))
+- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:337](specs/twitch.yaml#L337))
+- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:370](specs/twitch.yaml#L370))
+- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:259](specs/twitch.yaml#L259))
+- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:237](specs/twitch.yaml#L237))
+- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:687](specs/twitch.yaml#L687))
+
+- [ ] Confirm https://id.twitch.tv/oauth2/validate answers 200 to "Authorization: OAuth <token>" without a Client-Id, and 401 with message "invalid access token" once the user disconnects the application or the token is revoked. ([specs/twitch.yaml:120](specs/twitch.yaml#L120))
+- [ ] Confirm validating when the integration opens, after each refresh and hourly satisfies Twitch's audit, and record whether validation counts against the Helix rate limit. ([specs/twitch.yaml:120](specs/twitch.yaml#L120))
 
 ## visca — VISCA over IP
 

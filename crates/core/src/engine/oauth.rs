@@ -6,6 +6,10 @@
 //! machine alone: when a refresh is due, the request that makes it, and what
 //! its answer means. The engine sends the request and applies the outcome,
 //! so every request of the device waits behind the one refresh in flight.
+//!
+//! `oauth.validate` adds the token check some services require of an
+//! application on a schedule (Twitch: on start and hourly), independent of
+//! the device's own traffic.
 
 use base64::Engine as _;
 use serde_json::{Map, Value};
@@ -31,6 +35,33 @@ pub(crate) enum ClientAuth {
     Body,
     /// HTTP Basic with the form-encoded `client_id` and `client_secret`.
     Basic,
+}
+
+/// `oauth.validate.every_s` when the spec gives none: hourly.
+const VALIDATE_EVERY_S: u64 = 3600;
+
+/// `oauth.validate`: an endpoint the service requires the access token to be
+/// checked at, once the device opens or the token is refreshed, then every
+/// `every`.
+#[derive(Debug, Clone)]
+pub(crate) struct Validate {
+    url: String,
+    pub(crate) every: Millis,
+    /// The `Authorization` scheme the token is sent with (Twitch documents
+    /// `OAuth`).
+    scheme: String,
+}
+
+/// What a finished token validation means.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Validated {
+    /// The token is valid.
+    Valid,
+    /// HTTP 401: the token is not valid.
+    Invalid,
+    /// The check did not happen (network, another status): tried again
+    /// after this long.
+    Failed(String, Millis),
 }
 
 /// What a finished refresh means.
@@ -63,6 +94,16 @@ pub(crate) struct OAuth {
     /// Why the last refresh failed, for the commands that cannot wait for
     /// the next.
     pub(crate) last_error: Option<String>,
+    /// `oauth.validate`, if the service requires it.
+    pub(crate) validate: Option<Validate>,
+    /// The validation in flight, if any.
+    pub(crate) validating: Option<RequestId>,
+    /// A validation is due once the refresh in flight (or due) is done.
+    pub(crate) validate_waits: bool,
+    /// The token was refreshed because validation refused it: a second
+    /// refusal is final. Cleared by a valid answer.
+    pub(crate) validate_refreshed: bool,
+    validate_backoff: Millis,
 }
 
 fn setting<'a>(settings: &'a Params, name: &str) -> &'a str {
@@ -124,6 +165,10 @@ impl OAuth {
             Some("basic") => ClientAuth::Basic,
             Some(other) => return Err(format!("oauth.client_auth '{other}' is not body or basic")),
         };
+        let validate = match oauth.get("validate") {
+            None => None,
+            Some(v) => Some(Validate::new(v)?),
+        };
         Ok(OAuth {
             token_url,
             refresh_ahead: ahead * 1000,
@@ -133,7 +178,64 @@ impl OAuth {
             retry_at: 0,
             backoff: RETRY_MIN,
             last_error: None,
+            validate,
+            validating: None,
+            validate_waits: false,
+            validate_refreshed: false,
+            validate_backoff: RETRY_MIN,
         })
+    }
+
+    /// The validation request: a GET carrying the access token, and nothing
+    /// else of the device's (no transport headers: it is another host).
+    /// None without `oauth.validate` or without an access token.
+    pub(crate) fn validate_request(
+        &self,
+        settings: &Params,
+        timeout: Millis,
+    ) -> Option<HttpRequest> {
+        let validate = self.validate.as_ref()?;
+        let token = setting(settings, "access_token");
+        if token.is_empty() {
+            return None;
+        }
+        Some(HttpRequest {
+            method: "GET",
+            url: validate.url.clone(),
+            headers: vec![
+                (
+                    "Authorization".to_string(),
+                    format!("{} {token}", validate.scheme),
+                ),
+                ("Accept".to_string(), "application/json".to_string()),
+            ],
+            body: None,
+            timeout: Some(timeout),
+            accept_invalid_certs: false,
+            digest: None,
+        })
+    }
+
+    /// Read the validation endpoint's answer. Nothing of its body is read:
+    /// it names the token's client, user and scopes.
+    pub(crate) fn validated(&mut self, result: Result<HttpResponse, String>) -> Validated {
+        self.validating = None;
+        let reason = match result {
+            Ok(response) if (200..300).contains(&response.status) => {
+                self.validate_backoff = RETRY_MIN;
+                self.validate_refreshed = false;
+                return Validated::Valid;
+            }
+            Ok(response) if response.status == 401 => {
+                self.validate_backoff = RETRY_MIN;
+                return Validated::Invalid;
+            }
+            Ok(response) => format!("HTTP {}", response.status),
+            Err(message) => message,
+        };
+        let wait = self.validate_backoff;
+        self.validate_backoff = (self.validate_backoff * 2).min(RETRY_MAX);
+        Validated::Failed(reason, wait)
     }
 
     /// The token endpoint: the `token_url` setting when set, else the spec's.
@@ -278,6 +380,37 @@ impl OAuth {
             }
         }
         outcome
+    }
+}
+
+impl Validate {
+    fn new(v: &Value) -> Result<Validate, String> {
+        let url = v
+            .get("url")
+            .and_then(Value::as_str)
+            .ok_or("oauth.validate needs a url")?
+            .to_string();
+        check_token_url(&url)?;
+        let every = match v.get("every_s") {
+            None => VALIDATE_EVERY_S,
+            Some(e) => e
+                .as_u64()
+                .filter(|&s| s > 0)
+                .ok_or("oauth.validate.every_s is a whole number of seconds above 0")?,
+        };
+        let scheme = match v.get("scheme") {
+            None => "Bearer".to_string(),
+            Some(s) => s
+                .as_str()
+                .filter(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric()))
+                .ok_or("oauth.validate.scheme is a word such as Bearer or OAuth")?
+                .to_string(),
+        };
+        Ok(Validate {
+            url,
+            every: every * 1000,
+            scheme,
+        })
     }
 }
 
@@ -539,6 +672,67 @@ mod tests {
             (o.retry_at, o.backoff, o.last_error.clone()),
             (0, RETRY_MIN, None)
         );
+    }
+
+    #[test]
+    fn validation_sends_the_token_alone_and_reads_only_the_status() {
+        let mut o = oauth(json!({"token_url": "https://id.twitch.tv/oauth2/token",
+            "validate": {"url": "https://id.twitch.tv/oauth2/validate", "every_s": 3600,
+                         "scheme": "OAuth"}}));
+        assert_eq!(o.validate.as_ref().unwrap().every, 3_600_000);
+        assert!(o.validate_request(&Params::new(), 1).is_none());
+        let request = o
+            .validate_request(&params(json!({"access_token": "abc", "client_id": "c"})), 7)
+            .unwrap();
+        assert_eq!(
+            (request.method, request.url.as_str()),
+            ("GET", "https://id.twitch.tv/oauth2/validate")
+        );
+        assert_eq!(
+            request.headers,
+            vec![
+                ("Authorization".to_string(), "OAuth abc".to_string()),
+                ("Accept".to_string(), "application/json".to_string())
+            ]
+        );
+        assert_eq!(
+            o.validated(answer(200, json!({"login": "x"}))),
+            Validated::Valid
+        );
+        assert_eq!(o.validated(answer(401, json!({}))), Validated::Invalid);
+        assert_eq!(
+            o.validated(answer(503, json!({}))),
+            Validated::Failed("HTTP 503".into(), 1_000)
+        );
+        assert_eq!(
+            o.validated(Err("timed out".into())),
+            Validated::Failed("timed out".into(), 2_000)
+        );
+        assert_eq!(o.validated(answer(200, json!({}))), Validated::Valid);
+        assert_eq!(o.validate_backoff, RETRY_MIN);
+        // Bearer and hourly by default.
+        let o = oauth(json!({"token_url": "https://x/t", "validate": {"url": "https://x/v"}}));
+        let v = o.validate.as_ref().unwrap();
+        assert_eq!((v.every, v.scheme.as_str()), (3_600_000, "Bearer"));
+    }
+
+    #[test]
+    fn the_validate_block_is_checked() {
+        for bad in [
+            json!({}),
+            json!({"url": "http://example.com/v"}),
+            json!({"url": "https://x/v", "every_s": 0}),
+            json!({"url": "https://x/v", "scheme": "OAuth x"}),
+        ] {
+            assert!(
+                OAuth::new(Some(&json!({"token_url": "https://x/t", "validate": bad}))).is_err(),
+                "{bad}"
+            );
+        }
+        assert!(OAuth::new(Some(
+            &json!({"token_url": "https://x/t", "validate": {"url": "http://127.0.0.1:9/v"}})
+        ))
+        .is_ok());
     }
 
     #[test]
