@@ -128,7 +128,8 @@ _ISSUES = [{"type": "bitrateLow", "severity": "warning", "reason": "Check video 
             "description": "The stream's current bitrate is lower than the recommended bitrate."}]
 telemetry(YT, "streams", settings=_YTS, inbound_http={
     "path": "/youtube/v3/liveStreams?" + _SPART + "&mine=true&maxResults=50",
-    "body": json.dumps({"kind": "youtube#liveStreamListResponse", "items": [{
+    "body": json.dumps({"kind": "youtube#liveStreamListResponse",
+                        "pageInfo": {"totalResults": 1, "resultsPerPage": 50}, "items": [{
         "kind": "youtube#liveStream", "id": "UCchannel1700000000000",
         "snippet": {"title": "Main encoder", "isDefaultStream": False},
         "cdn": {"ingestionType": "rtmp", "resolution": "1080p", "frameRate": "30fps",
@@ -136,10 +137,22 @@ telemetry(YT, "streams", settings=_YTS, inbound_http={
                                   "ingestionAddress": "rtmp://a.rtmp.youtube.com/live2"}},
         "status": {"streamStatus": "active", "healthStatus": {
             "status": "ok", "lastUpdateTimeSeconds": "1791216000", "configurationIssues": _ISSUES}}}]})},
+    # The whole list (its total fits the page): a deleted stream leaves.
+    state_before={"streams": {"UCdeleted": {"title": "Old encoder", "stream_status": "inactive"}}},
     expect_state={"streams": {"UCchannel1700000000000": {
         "title": "Main encoder", "stream_status": "active", "health": "ok", "health_updated": 1791216000,
         "configuration_issues": json.dumps(_ISSUES, separators=(",", ":")),
         "ingestion_type": "rtmp", "resolution": "1080p", "frame_rate": "30fps"}}})
+# get_stream (a lookup by id) lists one stream: it adds, nothing leaves.
+telemetry(YT, "stream-by-id", settings=_YTS, inbound_http={
+    "path": "/youtube/v3/liveStreams?" + _SPART + "&id=UCchannel1700000000000",
+    "body": json.dumps({"kind": "youtube#liveStreamListResponse",
+                        "pageInfo": {"totalResults": 1, "resultsPerPage": 5}, "items": [{
+                            "kind": "youtube#liveStream", "id": "UCchannel1700000000000",
+                            "snippet": {"title": "Main encoder"}, "status": {"streamStatus": "ready"}}]})},
+    state_before={"streams": {"UCother": {"title": "Backup encoder"}}},
+    expect_state={"streams": {"UCother": {"title": "Backup encoder"},
+                              "UCchannel1700000000000": {"title": "Main encoder", "stream_status": "ready"}}})
 telemetry(YT, "viewers", settings=_YTS, inbound_http={
     "path": "/youtube/v3/videos?part=liveStreamingDetails%2Cstatistics&id=abcDEF12345",
     "body": json.dumps({"kind": "youtube#videoListResponse", "items": [{

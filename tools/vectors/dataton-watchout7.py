@@ -66,4 +66,21 @@ telemetry(WO7, "countdowns", inbound_sse={"data": json.dumps({"kind": "timelineC
     {"timelineId": 1, "cueId": 42, "delta": 4200, "status": "Last5"}]})},
           expect_state={"countdowns": {"1": {"cue": 42, "delta_ms": 4200, "status": "Last5"}}})
 telemetry(WO7, "show-revision", inbound_sse={"data": json.dumps({"kind": "showRevision", "value": "17"})},
-          expect_state={"show": {"revision": "17"}})
+          expect_state={"show": {"revision": "17"}},
+          expect_then_send=[{"method": "GET", "target": "/v0/state"}])
+
+# ── Telemetry: /v0/state, the whole playback state ──
+# Timeline 3 was removed from the show: the read replaces the timelines.
+telemetry(WO7, "state", inbound_http={"path": "/v0/state", "body": json.dumps({
+    "clockTime": 1759400060000, "timelines": [{"id": 1, "playbackStatus": "pause"}]})},
+          state_before={"timelines": {"1": {"status": "run"}, "3": {"status": "pause"}}},
+          expect_state={"clock_time_ms": 1759400060000, "timelines": {"1": {"status": "pause"}}})
+telemetry(WO7, "state-under-value", inbound_http={"path": "/v0/state", "body": json.dumps({"value": {
+    "clockTime": 1759400060000, "timelines": [{"id": 1, "playbackStatus": "run"}]}})},
+          state_before={"timelines": {"1": {"status": "stop"}, "3": {"status": "pause"}}},
+          expect_state={"clock_time_ms": 1759400060000, "timelines": {"1": {"status": "run"}}})
+# A show without timelines empties the state.
+telemetry(WO7, "state-empty", inbound_http={"path": "/v0/state", "body": json.dumps({
+    "clockTime": 1759400060000, "timelines": []})},
+          state_before={"timelines": {"1": {"status": "run"}}},
+          expect_state={"clock_time_ms": 1759400060000})

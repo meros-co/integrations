@@ -630,6 +630,20 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         for path in [replace] if isinstance(replace, str) else replace:
             if not is_declared(path, prefix=True):
                 errors.append(f"{where}: replace '{path}' is not declared in 'state'")
+        # A rule that only replaces sits beside the plain rule writing the
+        # values for the same messages (SPEC.md §8, Lists).
+        if replace and not any(k in rule for k in ("state", "then_send", "fields")):
+            rules = telemetry.get("updates", [])
+            key = next((k for k in ("path", "header", "address", "match") if k in rule), "json_match")
+            targets = [replace] if isinstance(replace, str) else replace
+            beside = [rules[j] for j in (i - 1, i + 1) if 0 <= j < len(rules)]
+            if not any(
+                key in r
+                and any(p.startswith(t + ".") for p in (r.get("state") or {}) for t in targets)
+                for r in beside
+            ):
+                errors.append(f"{where}: a rule with only replace must sit beside a {key} rule "
+                              "that writes under what it replaces")
     return errors
 
 

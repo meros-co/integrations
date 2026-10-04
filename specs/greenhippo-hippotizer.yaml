@@ -537,7 +537,11 @@ telemetry:
         mixes.{index}.layer_count: "{layers}"
         mixes.{index}.has_layers: "{has_layers}"
         mixes.{index}.fxc_name: "{fxc}"
+    # The whole media map: each read replaces the last, so an emptied slot
+    # leaves the state.
     - path: "^/media/map$"
+      json_match: { "$.entries": "^\\[" }
+      replace: media_map
       json_each: "$.entries"
       json: { index: "$.index", media: "$.mediaID", name: "$.name" }
       state:
@@ -549,7 +553,10 @@ telemetry:
     - path: "^/mix/(\\d+)/layer/(\\d+)/level$"
       json: { level: "$" }
       state: { "mixes.{1}.layers.{2}.level": "{level}" }
+    # Every bank of one preset type, replacing that type's last read.
     - path: "^/presets/(layer|mix|viewport|notch|touchengine)$"
+      json_match: { "$.banks": "^\\[" }
+      replace: preset_banks.{1}
       json_each: "$.banks"
       json: { index: "$.index", name: "$.name", has_presets: "$.hasPresets" }
       state:

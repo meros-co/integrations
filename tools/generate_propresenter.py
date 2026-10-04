@@ -366,7 +366,9 @@ telemetry:
         layers.props: "{{props}}"
         layers.messages: "{{messages}}"
         layers.audio: "{{audio}}"
+    # Every configured timer: each read replaces the last, so a deleted timer leaves.
     - path: "^/v1/timers/current$"
+      replace: timers
       json_each: "$"
       json: {{ uuid: "$.id.uuid", name: "$.id.name", time: "$.time", state: "$.state" }}
       state:

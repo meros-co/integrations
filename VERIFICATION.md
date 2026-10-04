@@ -165,6 +165,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which licences answer the WebAPI (consoles, Titan PC with T2/T3/TNP, Titan Go) and that T1 and Titan One do not. ([specs/avolites-titan.yaml:1345](specs/avolites-titan.yaml#L1345))
 - [ ] Measure the /titan/handles reply size and time on a large show, to judge the 5 s poll. ([specs/avolites-titan.yaml:1369](specs/avolites-titan.yaml#L1369))
 - [ ] Find the handle group name of the playback faders for set_group_page (Playbacks, PlaybackWindow or other). ([specs/avolites-titan.yaml:1210](specs/avolites-titan.yaml#L1210))
+- [ ] Confirm /titan/handles lists every programmed handle on the console in one answer: each poll replaces the handles state. ([specs/avolites-titan.yaml:1459](specs/avolites-titan.yaml#L1459))
 
 ## avstumpfl-pixera — AV Stumpfl PIXERA
 
@@ -182,15 +183,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## barco-eventmaster — Barco Event Master
 
-- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1257](specs/barco-eventmaster.yaml#L1257))
-- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1307](specs/barco-eventmaster.yaml#L1307))
-- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1314](specs/barco-eventmaster.yaml#L1314))
-- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1323](specs/barco-eventmaster.yaml#L1323))
-- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1326](specs/barco-eventmaster.yaml#L1326))
-- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1409](specs/barco-eventmaster.yaml#L1409))
-- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1380](specs/barco-eventmaster.yaml#L1380))
-- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1273](specs/barco-eventmaster.yaml#L1273))
-- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1359](specs/barco-eventmaster.yaml#L1359))
+- [ ] Confirm JSON-RPC requests are accepted at the root path / on port 9999, since the documents give no request path. ([specs/barco-eventmaster.yaml:1289](specs/barco-eventmaster.yaml#L1289))
+- [ ] Check which key activateDestGroup by name accepts, destGrpName (sent) or destGrName. ([specs/barco-eventmaster.yaml:1339](specs/barco-eventmaster.yaml#L1339))
+- [ ] Confirm the user key list method is listUserKeys (not listUserKey), what it returns, and that recallUserKey accepts the key userkeyName. ([specs/barco-eventmaster.yaml:1346](specs/barco-eventmaster.yaml#L1346))
+- [ ] Record the actual reply shape of powerStatus and of listCues, which the documents leave open. ([specs/barco-eventmaster.yaml:1355](specs/barco-eventmaster.yaml#L1355))
+- [ ] Check which test pattern numbers exist beyond 0 (off), 3 (colour bars) and 5 (grid). ([specs/barco-eventmaster.yaml:1358](specs/barco-eventmaster.yaml#L1358))
+- [ ] Check what cue_transport (pause or stop with type alone and no cue id) applies to. ([specs/barco-eventmaster.yaml:1441](specs/barco-eventmaster.yaml#L1441))
+- [ ] On Encore3, check what the ApiExtControl flag in getFrameSettings means and whether it blocks API calls. ([specs/barco-eventmaster.yaml:1412](specs/barco-eventmaster.yaml#L1412))
+- [ ] Check what error codes and messages come back in result.success and the JSON-RPC error member, since none are documented. ([specs/barco-eventmaster.yaml:1305](specs/barco-eventmaster.yaml#L1305))
+- [ ] Confirm the subscribe command is accepted with the port sent as a string. ([specs/barco-eventmaster.yaml:1391](specs/barco-eventmaster.yaml#L1391))
+- [ ] Confirm getFrameSettings lists every slot of the frame, and listSources, listInputs, listStill and listOperators with no parameters list every one: each such answer replaces cards, sources, inputs, stills or operators. ([specs/barco-eventmaster.yaml:1208](specs/barco-eventmaster.yaml#L1208))
 
 ## behringer-wing — Behringer WING
 
@@ -278,17 +280,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-camera — Blackmagic cameras
 
-- [ ] Find the event websocket URL, which the document does not give, so telemetry can use pushes instead of polling. ([specs/blackmagic-camera.yaml:2814](specs/blackmagic-camera.yaml#L2814))
-- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2780](specs/blackmagic-camera.yaml#L2780))
-- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2786](specs/blackmagic-camera.yaml#L2786))
-- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2804](specs/blackmagic-camera.yaml#L2804))
-- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2801](specs/blackmagic-camera.yaml#L2801))
-- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2839](specs/blackmagic-camera.yaml#L2839))
-- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2848](specs/blackmagic-camera.yaml#L2848))
-- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2861](specs/blackmagic-camera.yaml#L2861))
-- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2862](specs/blackmagic-camera.yaml#L2862))
-- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2871](specs/blackmagic-camera.yaml#L2871))
+- [ ] Find the event websocket URL, which the document does not give, so telemetry can use pushes instead of polling. ([specs/blackmagic-camera.yaml:2818](specs/blackmagic-camera.yaml#L2818))
+- [ ] Confirm the login scheme with "Enabled with security" (Basic sent, Digest answered if challenged). ([specs/blackmagic-camera.yaml:2784](specs/blackmagic-camera.yaml#L2784))
+- [ ] Check which API groups each camera model implements and whether missing ones answer 501 or 404. ([specs/blackmagic-camera.yaml:2790](specs/blackmagic-camera.yaml#L2790))
+- [ ] Check that 0.0-1.0 is the range for normalised values beyond audio level. ([specs/blackmagic-camera.yaml:2808](specs/blackmagic-camera.yaml#L2808))
+- [ ] Check the ranges the camera accepts for colour correction, playback speed, focus distance and aperture number, which are not limited here. ([specs/blackmagic-camera.yaml:2805](specs/blackmagic-camera.yaml#L2805))
+- [ ] Confirm the format filesystem path spelling (doformatSupportedFilesystems or doFormatSupportedFilesystems). ([specs/blackmagic-camera.yaml:2843](specs/blackmagic-camera.yaml#L2843))
+- [ ] Check what body PUT /monitoring/{displayName}/focusAssist accepts ({enabled} or mode, color and intensity). ([specs/blackmagic-camera.yaml:2852](specs/blackmagic-camera.yaml#L2852))
+- [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2865](specs/blackmagic-camera.yaml#L2865))
+- [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2866](specs/blackmagic-camera.yaml#L2866))
+- [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2875](specs/blackmagic-camera.yaml#L2875))
 - [ ] Record what the camera advertises over mDNS besides its `<name>.local` host name (service types, TXT `class`). No public source names it, so mDNS discovery does not identify cameras. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
+- [ ] Confirm GET /media/workingset lists every slot, an empty one as null, so a card or drive taken out leaves media.devices at the next poll. ([specs/blackmagic-camera.yaml:2555](specs/blackmagic-camera.yaml#L2555))
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
 
@@ -436,10 +439,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the status codes Create, Add Platform and the platform PATCH answer (the reference says 200; the guide's create example does not say) and confirm Create answers the stream with _id. ([specs/castr.yaml:154](specs/castr.yaml#L154))
 - [ ] Confirm DELETE of a stream and of a platform answers 200 with success true. ([specs/castr.yaml:268](specs/castr.yaml#L268))
 - [ ] Confirm GET .../stats answers 404 while the stream is offline, and record its bitrate's unit (kbps assumed) and whether opened_at is Unix milliseconds. ([specs/castr.yaml:365](specs/castr.yaml#L365))
-- [ ] Confirm broadcasting_status is reported for the stream and each platform in GET /v2/live_streams/{id}, and how soon it follows the encoder starting and stopping. ([specs/castr.yaml:535](specs/castr.yaml#L535))
+- [ ] Confirm broadcasting_status is reported for the stream and each platform in GET /v2/live_streams/{id}, and how soon it follows the encoder starting and stopping. ([specs/castr.yaml:539](specs/castr.yaml#L539))
 - [ ] Confirm the add_platform body (template custom, name, server, key, enabled) is accepted and the target's id is a 24-character hexadecimal id. ([specs/castr.yaml:276](specs/castr.yaml#L276))
 - [ ] Record what Convert Live-to-VOD answers, and confirm from takes an ISO 8601 UTC time inside the recording. ([specs/castr.yaml:376](specs/castr.yaml#L376))
 - [ ] Confirm list_streams' page and limit parameters and the largest limit Castr accepts (100 assumed). ([specs/castr.yaml:110](specs/castr.yaml#L110))
+- [ ] Confirm the stream's platforms list holds every multistream target, and that adding or changing a platform answers the whole stream: each such answer replaces the stream's platforms. ([specs/castr.yaml:538](specs/castr.yaml#L538))
 
 ## chamsys-magicq — ChamSys MagicQ (OSC)
 
@@ -498,12 +502,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## dataton-watchout7 — Dataton WATCHOUT 7
 
-- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:347](specs/dataton-watchout7.yaml#L347))
-- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:355](specs/dataton-watchout7.yaml#L355))
-- [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:154](specs/dataton-watchout7.yaml#L154))
-- [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:33](specs/dataton-watchout7.yaml#L33))
-- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:322](specs/dataton-watchout7.yaml#L322))
-- [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:237](specs/dataton-watchout7.yaml#L237))
+- [ ] Capture /api-docs/openapi.json from a node and check success statuses (200 assumed), error bodies, and the response shapes of /info, /v0/state, /v0/timelines, /v0/cues and /v0/inputs. ([specs/dataton-watchout7.yaml:389](specs/dataton-watchout7.yaml#L389))
+- [ ] Confirm the /v2/sse event shape {"kind", "value"} without event names (from Bitfocus's Companion module), and the playbackState, timelineCountdowns and showRevision value shapes. ([specs/dataton-watchout7.yaml:397](specs/dataton-watchout7.yaml#L397))
+- [ ] Check whether /v0/play needs a JSON body (current guide) or plays every timeline with none (older page). ([specs/dataton-watchout7.yaml:165](specs/dataton-watchout7.yaml#L165))
+- [ ] Check the node restart path on port 3017: /v0/services/restart (Dataton) or /v0/restart (Companion module). ([specs/dataton-watchout7.yaml:35](specs/dataton-watchout7.yaml#L35))
+- [ ] Check the type of showRevision's value (a string is assumed). ([specs/dataton-watchout7.yaml:372](specs/dataton-watchout7.yaml#L372))
+- [ ] Check how names with spaces or non-ASCII characters are encoded in /v0/cue-group-state/by-name/{group}/{variant}. ([specs/dataton-watchout7.yaml:248](specs/dataton-watchout7.yaml#L248))
+- [ ] Record the shape of GET /v0/state ({clockTime, timelines: [{id, playbackStatus}]} bare, or under value as in the event stream, are both read) and confirm it lists every timeline of the show, stopped ones included: each read replaces the timelines state. ([specs/dataton-watchout7.yaml:319](specs/dataton-watchout7.yaml#L319))
+- [ ] Confirm showRevision is sent when a timeline is added to or removed from the show (it triggers the re-read of /v0/state), and whether /v2/sse sends the whole playback state when it opens. ([specs/dataton-watchout7.yaml:362](specs/dataton-watchout7.yaml#L362))
 
 ## digico-sd — DiGiCo SD and Quantum consoles
 
@@ -519,13 +525,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## disguise — disguise Designer
 
-- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:608](specs/disguise.yaml#L608))
-- [ ] Check that a Locator with only a name (no uid key) is accepted by every transport and failover command. ([specs/disguise.yaml:573](specs/disguise.yaml#L573))
-- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:582](specs/disguise.yaml#L582))
+- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:614](specs/disguise.yaml#L614))
+- [ ] Check that a Locator with only a name (no uid key) is accepted by every transport and failover command. ([specs/disguise.yaml:575](specs/disguise.yaml#L575))
+- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:586](specs/disguise.yaml#L586))
 - [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:568](specs/disguise.yaml#L568))
-- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:584](specs/disguise.yaml#L584))
+- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:588](specs/disguise.yaml#L588))
 - [ ] Check which Designer release added each endpoint used here; the Swagger documents carry no version markers. ([specs/disguise.yaml:107](specs/disguise.yaml#L107))
 - [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:540](specs/disguise.yaml#L540))
+- [ ] Confirm /api/session/transport/transports lists every transport and /api/session/status/health every machine of the session: each poll replaces transports and machines. ([specs/disguise.yaml:577](specs/disguise.yaml#L577))
 
 ## emberplus — Ember+
 
@@ -676,16 +683,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## greenhippo-hippotizer — Green Hippo Hippotizer
 
-- [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:656](specs/greenhippo-hippotizer.yaml#L656))
-- [ ] Check the single preset number of load_mix_preset and load_layer_preset (bank * 256 + slot per the Companion module). ([specs/greenhippo-hippotizer.yaml:654](specs/greenhippo-hippotizer.yaml#L654))
+- [ ] Check whether mix, layer and timeline indexes start at 0 or 1 (mix and layer from 1, timeline by iD are assumed). ([specs/greenhippo-hippotizer.yaml:663](specs/greenhippo-hippotizer.yaml#L663))
+- [ ] Check the single preset number of load_mix_preset and load_layer_preset (bank * 256 + slot per the Companion module). ([specs/greenhippo-hippotizer.yaml:661](specs/greenhippo-hippotizer.yaml#L661))
 - [ ] Check the body of a level reply (a bare integer is assumed) and of the action endpoints. ([specs/greenhippo-hippotizer.yaml:240](specs/greenhippo-hippotizer.yaml#L240))
-- [ ] Capture the JSON wrapper of GET /timelines, which the Swagger document leaves empty. ([specs/greenhippo-hippotizer.yaml:672](specs/greenhippo-hippotizer.yaml#L672))
+- [ ] Capture the JSON wrapper of GET /timelines, which the Swagger document leaves empty. ([specs/greenhippo-hippotizer.yaml:679](specs/greenhippo-hippotizer.yaml#L679))
 - [ ] Check that the Web Callbacks websocket on 40513 accepts the subscription array sent on opening, with the path /, and whether it acknowledges it. ([specs/greenhippo-hippotizer.yaml:492](specs/greenhippo-hippotizer.yaml#L492))
-- [ ] Check whether the presets-reset event is PRESETS_RESET or PRESES_RESET (the manual's example). ([specs/greenhippo-hippotizer.yaml:685](specs/greenhippo-hippotizer.yaml#L685))
-- [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:626](specs/greenhippo-hippotizer.yaml#L626))
-- [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:649](specs/greenhippo-hippotizer.yaml#L649))
-- [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:663](specs/greenhippo-hippotizer.yaml#L663))
+- [ ] Check whether the presets-reset event is PRESETS_RESET or PRESES_RESET (the manual's example). ([specs/greenhippo-hippotizer.yaml:692](specs/greenhippo-hippotizer.yaml#L692))
+- [ ] Check that DELETE /media/delete/{id}, DELETE /media/deletemapentry/{index} and PUT /media/addmapentry/... behave as their GET forms. ([specs/greenhippo-hippotizer.yaml:633](specs/greenhippo-hippotizer.yaml#L633))
+- [ ] Check how a pin name containing an underscore is written in a REST pin path. ([specs/greenhippo-hippotizer.yaml:656](specs/greenhippo-hippotizer.yaml#L656))
+- [ ] Check whether the media id and preset id path forms are told apart from map indexes and preset numbers by the segment being a number. ([specs/greenhippo-hippotizer.yaml:670](specs/greenhippo-hippotizer.yaml#L670))
 - [ ] Capture the 4.9.x REST additions (media encoding settings, strata folder, user name and colour) from the API help served at port 40512. ([specs/greenhippo-hippotizer.yaml:57](specs/greenhippo-hippotizer.yaml#L57))
+- [ ] Confirm /media/map lists every filled slot (and leaves out empty ones), and /presets/<type> every bank of the type: each read replaces media_map or that type's preset_banks. ([specs/greenhippo-hippotizer.yaml:544](specs/greenhippo-hippotizer.yaml#L544))
 
 ## h2r-graphics — H2R Graphics
 
@@ -816,6 +824,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm identify_controller takes a JSON body (the OpenAPI page names application/xml). ([specs/novastar-coex.yaml:625](specs/novastar-coex.yaml#L625))
 - [ ] Check whether set_working_mode to all-in-one (3) works through the API. ([specs/novastar-coex.yaml:700](specs/novastar-coex.yaml#L700))
 - [ ] Confirm MX30 and MX20 answer the same API as the MX40 Pro. ([specs/novastar-coex.yaml:65](specs/novastar-coex.yaml#L65))
+- [ ] Confirm /api/v1/screen/output/display/state lists every canvas: each poll replaces canvases. ([specs/novastar-coex.yaml:1261](specs/novastar-coex.yaml#L1261))
 
 ## novastar-h — NovaStar H series
 
@@ -891,16 +900,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## planningcenter-services — Planning Center Services LIVE
 
-- [ ] Confirm the LIVE actions are POSTs to /service_types/{id}/plans/{id}/live/<action> without a live id (the documentation graph prints them under a series path with one). ([specs/planningcenter-services.yaml:145](specs/planningcenter-services.yaml#L145))
-- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honour include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:148](specs/planningcenter-services.yaml#L148))
-- [ ] Confirm toggle_control takes control from another user who holds it, rather than failing, and what it answers when it gives control up. ([specs/planningcenter-services.yaml:159](specs/planningcenter-services.yaml#L159))
-- [ ] Record what the Live resource's relationships hold (the documentation's example has none): current_item_time, next_item_time and controller ids, and what they are when LIVE is not running. ([specs/planningcenter-services.yaml:488](specs/planningcenter-services.yaml#L488))
-- [ ] Check that a move without control answers 403 and not another status. ([specs/planningcenter-services.yaml:85](specs/planningcenter-services.yaml#L85))
-- [ ] Confirm GET /services/v2 answers any valid credential, and 401 for an expired OAuth token or a revoked Personal Access Token. ([specs/planningcenter-services.yaml:89](specs/planningcenter-services.yaml#L89))
-- [ ] Record the format of LIVE times (ItemTime live_start_at and live_end_at, PlanTime live_starts_at): ISO 8601 as documented, or 2026/06/16 11:24:29 -0500 as seen. ([specs/planningcenter-services.yaml:403](specs/planningcenter-services.yaml#L403))
-- [ ] Confirm per_page=100 is accepted on items, plan_times, item_notes and live_controllers, and how a plan with more than 100 items is paged. ([specs/planningcenter-services.yaml:388](specs/planningcenter-services.yaml#L388))
-- [ ] Confirm the OAuth token endpoint is https://api.planningcenteronline.com/oauth/token (taken from Planning Center's example app and its OAuth library's default path, not from a documented URL) and that it accepts the refresh token grant with client_id and client_secret in the form body. ([specs/planningcenter-services.yaml:81](specs/planningcenter-services.yaml#L81))
-- [ ] Record whether a refresh returns a new refresh token (rotation) and whether the old one then stops working, and what a revoked or expired refresh token answers (400 invalid_grant expected). ([specs/planningcenter-services.yaml:336](specs/planningcenter-services.yaml#L336))
+- [ ] Confirm the LIVE actions are POSTs to /service_types/{id}/plans/{id}/live/<action> without a live id (the documentation graph prints them under a series path with one). ([specs/planningcenter-services.yaml:153](specs/planningcenter-services.yaml#L153))
+- [ ] Confirm go_to_next_item, go_to_previous_item and toggle_control answer 200 with the Live resource, and honour include=current_item_time,next_item_time. ([specs/planningcenter-services.yaml:156](specs/planningcenter-services.yaml#L156))
+- [ ] Confirm toggle_control takes control from another user who holds it, rather than failing, and what it answers when it gives control up. ([specs/planningcenter-services.yaml:167](specs/planningcenter-services.yaml#L167))
+- [ ] Record what the Live resource's relationships hold (the documentation's example has none): current_item_time, next_item_time and controller ids, and what they are when LIVE is not running. ([specs/planningcenter-services.yaml:500](specs/planningcenter-services.yaml#L500))
+- [ ] Check that a move without control answers 403 and not another status. ([specs/planningcenter-services.yaml:93](specs/planningcenter-services.yaml#L93))
+- [ ] Confirm GET /services/v2 answers any valid credential, and 401 for an expired OAuth token or a revoked Personal Access Token. ([specs/planningcenter-services.yaml:97](specs/planningcenter-services.yaml#L97))
+- [ ] Record the format of LIVE times (ItemTime live_start_at and live_end_at, PlanTime live_starts_at): ISO 8601 as documented, or 2026/06/16 11:24:29 -0500 as seen. ([specs/planningcenter-services.yaml:417](specs/planningcenter-services.yaml#L417))
+- [ ] Confirm per_page=100 is accepted on items, plan_times, item_notes and live_controllers, and how a plan with more than 100 items is paged. ([specs/planningcenter-services.yaml:399](specs/planningcenter-services.yaml#L399))
+- [ ] Confirm the OAuth token endpoint is https://api.planningcenteronline.com/oauth/token (taken from Planning Center's example app and its OAuth library's default path, not from a documented URL) and that it accepts the refresh token grant with client_id and client_secret in the form body. ([specs/planningcenter-services.yaml:89](specs/planningcenter-services.yaml#L89))
+- [ ] Record whether a refresh returns a new refresh token (rotation) and whether the old one then stops working, and what a revoked or expired refresh token answers (400 invalid_grant expected). ([specs/planningcenter-services.yaml:344](specs/planningcenter-services.yaml#L344))
+- [ ] Confirm a list that fits on one page has top-level links with self and no next, and a longer one links.next (taken from Planning Center's pco_api_ruby README): only a list without next replaces a plan's items, its plan times or the service types. ([specs/planningcenter-services.yaml:613](specs/planningcenter-services.yaml#L613))
+- [ ] Confirm the Live resource's included array holds only the current and next item times, and is empty or absent when LIVE is not running: each Live reply replaces plans.<plan_id>.item_times. ([specs/planningcenter-services.yaml:521](specs/planningcenter-services.yaml#L521))
 
 ## probel-swp08 — Probel / Grass Valley SW-P-08 routers
 
@@ -919,6 +930,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## propresenter — ProPresenter
 
 - [ ] Confirm the network API port in use (50001 assumed). ([specs/propresenter.yaml:1534](specs/propresenter.yaml#L1534))
+- [ ] Confirm /v1/timers/current lists every configured timer: each poll replaces timers, so a deleted timer leaves. ([specs/propresenter.yaml:1788](specs/propresenter.yaml#L1788))
 
 ## ptzoptics — PTZOptics
 
@@ -967,6 +979,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check which body the transition POST accepts ({"transition": {...}} or {"value": uuid}). ([specs/renewedvision-pvp.yaml:930](specs/renewedvision-pvp.yaml#L930))
 - [ ] Confirm the opacity range is 0.0 to 1.0. ([specs/renewedvision-pvp.yaml:934](specs/renewedvision-pvp.yaml#L934))
 - [ ] On the PVP version in use, check whether negative layer or cue indexes still crash it. ([specs/renewedvision-pvp.yaml:903](specs/renewedvision-pvp.yaml#L903))
+- [ ] Confirm /api/0/data/playlists holds every top-level playlist and group under playlist.children: each poll replaces playlists. ([specs/renewedvision-pvp.yaml:974](specs/renewedvision-pvp.yaml#L974))
 
 ## resolume — Resolume Arena / Avenue
 
@@ -1262,7 +1275,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the live endpoints accept Accept application/vnd.vimeo.*+json;version=3.4 and JSON request bodies with Content-Type application/json. ([specs/vimeo-live.yaml:86](specs/vimeo-live.yaml#L86))
 - [ ] Confirm GET /me?fields=uri as the idle probe, and record the X-RateLimit figures against the 30-second poll of three requests. ([specs/vimeo-live.yaml:94](specs/vimeo-live.yaml#L94))
 - [ ] Confirm GET /me/live_events answers a page object with data (the reference shows an array), and that type, sort, direction, per_page and page are honoured. ([specs/vimeo-live.yaml:127](specs/vimeo-live.yaml#L127))
-- [ ] Confirm GET /me/live_events/{id}/destinations answers a page object with data or a plain array, as the two rules expect. ([specs/vimeo-live.yaml:661](specs/vimeo-live.yaml#L661))
+- [ ] Confirm GET /me/live_events/{id}/destinations answers a page object with data or a plain array, as the two rules expect. ([specs/vimeo-live.yaml:666](specs/vimeo-live.yaml#L666))
 - [ ] Confirm fields= filtering works on GET /me/live_events/{id} for stream_key, backup_stream_key, rtmp_link, rtmps_link, srt_link and srt_passphrase. ([specs/vimeo-live.yaml:154](specs/vimeo-live.yaml#L154))
 - [ ] Confirm Create an event answers 200 (not 201) with the event, its uri /live_events/{id}. ([specs/vimeo-live.yaml:196](specs/vimeo-live.yaml#L196))
 - [ ] Confirm Activate an event accepts an empty JSON body, answers 200, and what it answers once already activated (400 error 2428). ([specs/vimeo-live.yaml:373](specs/vimeo-live.yaml#L373))
@@ -1274,6 +1287,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm PATCH /destination/{id} with is_enabled alone toggles a simulcast destination while live. ([specs/vimeo-live.yaml:465](specs/vimeo-live.yaml#L465))
 - [ ] Record what Get an M3U8 playback URL answers (the reference gives no schema). ([specs/vimeo-live.yaml:401](specs/vimeo-live.yaml#L401))
 - [ ] Record which ingest.status values occur in practice through a stream's life (0 to 5 documented). ([specs/vimeo-live.yaml:578](specs/vimeo-live.yaml#L578))
+- [ ] Record whether GET /me/live_events/{id}/destinations answers a bare array or a page {total, page, per_page, data}: a bare array, or a first page of 25 whose total fits on it, replaces the event's destinations. ([specs/vimeo-live.yaml:664](specs/vimeo-live.yaml#L664))
 
 ## visca — VISCA over IP
 
@@ -1358,6 +1372,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a refresh at https://oauth2.googleapis.com/token with client_id alone (an installed-app client, no client_secret) succeeds, and that Google never rotates the refresh token on refresh. ([specs/youtube-live.yaml:117](specs/youtube-live.yaml#L117))
 - [ ] Confirm a refresh token from a project in publishing status Testing fails with 400 invalid_grant after 7 days, and that a revoked one answers the same. ([specs/youtube-live.yaml:485](specs/youtube-live.yaml#L485))
 - [ ] Record the access token lifetime Google gives (expires_in, about 3599 s expected), so the 300 s refresh margin is right. ([specs/youtube-live.yaml:118](specs/youtube-live.yaml#L118))
+- [ ] Confirm pageInfo.totalResults on liveStreams.list with mine=true counts every stream of the channel: when it is 50 or fewer, the poll's page replaces streams. ([specs/youtube-live.yaml:672](specs/youtube-live.yaml#L672))
 
 ## Integrations with no open items
 

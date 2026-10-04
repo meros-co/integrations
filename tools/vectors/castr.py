@@ -104,6 +104,8 @@ _CSSTATE = {"streams": {_CSI: {
     "platforms": {_CSP: {"name": "YouTube", "template": "custom", "enabled": True,
                          "broadcasting_status": "online"}}}}}
 telemetry(CS, "stream", settings=_CSS, inbound_http={"path": _CSL, "body": json.dumps(_CSSTREAM)},
+          # A target deleted elsewhere leaves: the stream lists every platform.
+          state_before={"streams": {_CSI: {"platforms": {"a" * 24: {"name": "Deleted", "enabled": False}}}}},
           expect_state=_CSSTATE)
 # Add Platform answers the whole stream.
 telemetry(CS, "platform-added", settings=_CSS, inbound_http={"path": _CSL + "/platforms", "body": json.dumps(_CSSTREAM)},
@@ -120,6 +122,8 @@ telemetry(CS, "stats", settings=_CSS, inbound_http={
              "sample_rate": 44100}]},
         "pull_urls": {"rtmp": "rtmp://sg-1.castr.com/static/live_xx",
                       "srt": "srt://sg-1.castr.com:9998/?streamid=#!::r=xx,m=request"}})},
+    # The track a2 is gone from the ingest: each answer replaces the tracks.
+    state_before={"streams": {_CSI: {"tracks": {"a2": {"content": "audio", "codec": "opus"}}}}},
     expect_state={"streams": {_CSI: {
         "stats_status": "running", "stats_alive": True, "stats_bitrate": 1333,
         "stats_opened_at": 1749711734724, "stats_retry_count": 0,

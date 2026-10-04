@@ -570,7 +570,11 @@ telemetry:
       - >-
         {"subscribe":{"object":"transportmanager:{settings.live_transport}","properties":["{'playing': object.player.playing, 'time': object.player.tRender, 'mode': str(object.player.playMode.state), 'track': str(object.player.track.description), 'engaged': object.engaged, 'volume': object.volume, 'brightness': object.brightness}"],"configuration":{"updateFrequencyMs":{settings.live_update_ms}}}}
   updates:
+    # Every transport, and below every machine of the session: each read
+    # replaces the last, so a removed transport or machine leaves.
     - path: "^/api/session/transport/transports$"
+      json_match: { "$.transports": "^\\[" }
+      replace: transports
       json_each: "$.transports"
       json:
         uid: "$.uid"
@@ -592,6 +596,8 @@ telemetry:
         transports.{uid}.receiving_timecode: "{timecode}"
         transports.{uid}.setlist: "{setlist}"
     - path: "^/api/session/status/health$"
+      json_match: { "$.result": "^\\[" }
+      replace: machines
       json_each: "$.result"
       json:
         machine: "$.machine.name"

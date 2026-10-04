@@ -175,6 +175,8 @@ telemetry(AV, "handles-lower-case", inbound_http={"path": "/titan/handles", "bod
     {"handleLocation": {"group": "PlaybackWindow", "index": 2, "page": 0}, "titanId": 1895,
      "type": "playbackHandle", "legend": "Intro", "active": True,
      "userNumber": {"hashCode": "6", "userNumbers": [6]}}])},
+    # Handle 1689 was deleted on the console: the list replaces the handles.
+    state_before={"handles": {"1689": {"legend": "", "active": False, "type": "fixtureHandle"}}},
     expect_state={"handles": {"1895": {"legend": "Intro", "active": True, "type": "playbackHandle",
                                        "group": "PlaybackWindow", "page": 0, "index": 2, "user_number": "6"}}})
 telemetry(AV, "software-version", inbound_http={"path": "/titan/get/2/System/SoftwareVersion", "body": '"19.2"'},

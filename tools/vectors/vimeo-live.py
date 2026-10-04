@@ -137,8 +137,23 @@ _VMD = [{"id": 1234, "display_name": "Overflow", "is_enabled": True, "service_na
 _VMDS = {"events": {"12345": {"destinations": {"1234": {
     "name": "Overflow", "service": "custom_rtmp", "enabled": True, "state": 1,
     "state_message": "Couldn't connect to rtmp://1.2.3.4/live"}}}}}
+# The whole list replaces the event's destinations: 99, deleted, leaves.
+_VMGONE = {"events": {"12345": {"title": "Sunday", "destinations": {"99": {"name": "Deleted", "enabled": False}}}}}
+_VMKEPT = {"events": {"12345": {"title": "Sunday", **_VMDS["events"]["12345"]}}}
 telemetry(VM, "destinations", settings=_VMS, inbound_http={
-    "path": _VME + "/destinations", "body": json.dumps(_VMD)}, expect_state=_VMDS)
+    "path": _VME + "/destinations", "body": json.dumps(_VMD)},
+    state_before=_VMGONE, expect_state=_VMKEPT)
 telemetry(VM, "destinations-paged", settings=_VMS, inbound_http={
     "path": _VME + "/destinations", "body": json.dumps({"total": 1, "page": 1, "per_page": 25, "data": _VMD})},
-    expect_state=_VMDS)
+    state_before=_VMGONE, expect_state=_VMKEPT)
+# More destinations than one page holds: the page adds, nothing leaves.
+telemetry(VM, "destinations-page-of-several", settings=_VMS, inbound_http={
+    "path": _VME + "/destinations", "body": json.dumps({"total": 30, "page": 1, "per_page": 25, "data": _VMD})},
+    state_before=_VMGONE,
+    expect_state={"events": {"12345": {"title": "Sunday", "destinations": {
+        "99": {"name": "Deleted", "enabled": False}, **_VMDS["events"]["12345"]["destinations"]}}}})
+# Adding a destination answers it alone, not a list: nothing leaves (it
+# shows at the next poll).
+telemetry(VM, "destination-added", settings=_VMS, inbound_http={
+    "path": _VME + "/destinations", "body": json.dumps(_VMD[0])},
+    state_before=_VMGONE, expect_state=_VMGONE)

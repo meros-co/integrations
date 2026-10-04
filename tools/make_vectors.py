@@ -161,6 +161,8 @@ telemetry(PP, "slide", inbound_http={"path": "/v1/status/slide", "body": json.du
 telemetry(PP, "timers", inbound_http={"path": "/v1/timers/current", "body": json.dumps([
     {"id": {"uuid": "a1", "name": "Countdown", "index": 0}, "time": "00:00:01", "state": "stopped"},
     {"id": {"uuid": "b2", "name": "Elapsed", "index": 1}, "time": "00:21:43", "state": "running"}])},
+    # Timer c3 was deleted in ProPresenter: the read replaces the timers.
+    state_before={"timers": {"c3": {"name": "Deleted", "time": "00:05:00", "state": "stopped"}}},
     expect_state={"timers": {"a1": {"name": "Countdown", "time": "00:00:01", "state": "stopped"},
                              "b2": {"name": "Elapsed", "time": "00:21:43", "state": "running"}}})
 

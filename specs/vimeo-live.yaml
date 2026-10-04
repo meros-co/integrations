@@ -656,8 +656,13 @@ telemetry:
         events.{1}.stream_ended_reason: "{reason}"
         events.{1}.seconds_remaining: "{remaining}"
     # The reference gives the destination list as an array; Vimeo's lists
-    # are usually wrapped in a page with data, so both are read.
+    # are usually wrapped in a page with data, so both are read. A bare array
+    # is the whole list and replaces the event's destinations, so a deleted
+    # destination leaves the state (adding one answers the destination alone,
+    # not a list, which changes nothing until the next poll).
     - path: '^/me/live_events/(\d+)/destinations$'
+      json_match: { "$": '^\[' }
+      replace: events.{1}.destinations
       json_each: "$"
       json: &destination { id: "$.id", name: "$.display_name", service: "$.service_name", enabled: "$.is_enabled",
                            state: "$.state", message: "$.state_message" }
@@ -671,3 +676,9 @@ telemetry:
       json_each: "$.data"
       json: *destination
       state: *destination_state
+    # A page is the whole list only when it is the first of 25 and the total
+    # fits on it (an event may have 30 destinations): then it replaces them.
+    - path: '^/me/live_events/(\d+)/destinations$'
+      json_match: { "$.page": '^1$', "$.per_page": '^25$', "$.total": '^(?:[0-9]|1[0-9]|2[0-5])$', "$.data": '^\[' }
+      json: {}
+      replace: events.{1}.destinations

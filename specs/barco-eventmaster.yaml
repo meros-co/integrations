@@ -1151,6 +1151,14 @@ telemetry:
       state:
         "cards.{card}.status": "{status}"
         "cards.{card}.type": "{type}"
+    # getFrameSettings lists every slot of the frame: it replaces cards, so a
+    # card taken out leaves the state. (The rule above writes the same values
+    # from any reply that holds slots; this one only adds the replacement.)
+    - path: "^/$"
+      request_match: { "$.method": "^getFrameSettings$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response.System.FrameCollection.Frame.Slot": "^\\[" }
+      json: {}
+      replace: cards
 
     # listDestinations: screen destinations.
     - path: "^/$"
@@ -1192,6 +1200,12 @@ telemetry:
           map: { "0": invalid, "1": valid, "2": format_mismatch, "3": out_of_range, "4": no_sync }
         "sources.{id}.frozen": { value: "{freeze}", map: { "0": false, "1": true } }
         "sources.{id}.type": { value: "{src_type}", map: { "0": input, "1": still } }
+    # listSources with no parameters lists every one: it replaces sources.
+    - path: "^/$"
+      request_match: { "$.method": "^listSources$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      json: {}
+      replace: sources
 
     # listInputs (Doc 8.2, Encore3): the only list whose elements hold SyncStatus.
     - path: "^/$"
@@ -1199,6 +1213,12 @@ telemetry:
       json: { id: "$.id", sync: "$.SyncStatus" }
       state:
         "inputs.{id}.sync_status": "{sync}"
+    # listInputs with no parameters lists every one: it replaces inputs.
+    - path: "^/$"
+      request_match: { "$.method": "^listInputs$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      json: {}
+      replace: inputs
 
     # listStill: the only list whose elements hold StillState and FileSize.
     - path: "^/$"
@@ -1209,6 +1229,12 @@ telemetry:
         "stills.{id}.file_size_kb": "{size}"
         "stills.{id}.width": "{width}"
         "stills.{id}.height": "{height}"
+    # listStill with no parameters lists every one: it replaces stills.
+    - path: "^/$"
+      request_match: { "$.method": "^listStill$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      json: {}
+      replace: stills
 
     # listOperators: the only list whose elements hold Enable, StartRange, EndRange.
     - path: "^/$"
@@ -1218,6 +1244,12 @@ telemetry:
         "operators.{id}.enabled": { value: "{enable}", map: { "0": false, "1": true } }
         "operators.{id}.preset_start": "{start}"
         "operators.{id}.preset_end": "{end}"
+    # listOperators with no parameters lists every one: it replaces operators.
+    - path: "^/$"
+      request_match: { "$.method": "^listOperators$", "$.params": "^\\{\\}$" }
+      json_match: { "$.result.response": "^\\[" }
+      json: {}
+      replace: operators
 
 state:
   frame.name: { type: string, description: "Frame name (getFrameSettings Frame.Name)" }

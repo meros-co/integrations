@@ -262,6 +262,8 @@ telemetry(PV, "playlists", inbound_http={"path": "/api/0/data/playlists", "body"
          "uuid": "D62AFD1D-59B5-46FC-A33B-6F7E1AC7C5A0"},
         {"items": [], "name": "Video Input", "children": [], "uuid": "5F34B21B-76F7-4837-A337-92F13CF6F856"}],
     "uuid": "C0E4E090-F969-4B60-9526-D44EBC5C52ED"}})},
+    # A deleted playlist leaves: the read replaces the playlists.
+    state_before={"playlists": {"11111111-2222-3333-4444-555555555555": {"name": "Deleted"}}},
     expect_state={"playlists": {
         "9EE5DFC3-7EE2-47F8-B932-765CEBBA8245": {"name": "Playlist 1"},
         "D62AFD1D-59B5-46FC-A33B-6F7E1AC7C5A0": {"name": "Group A"},

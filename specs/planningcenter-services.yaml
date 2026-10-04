@@ -69,6 +69,14 @@ source:
       prints them under a series path with a live id), that their reply is the
       Live resource, that include=current_item_time works on them, and that a
       plan can only be moved by the person in control (toggle_control).
+  - title: pco_api_ruby (README.md), MIT licence
+    author: Planning Center (Ministry Centered Technologies)
+    url: https://github.com/planningcenter/pco_api_ruby
+    note: >
+      Planning Center's own API client, read for corroboration only. Its
+      README shows a paged list response: top-level links with self and, when
+      another page follows, next (with the offset), and meta with total_count,
+      count and next. A list without a next link is taken to be complete.
 
 transport:
   type: http
@@ -378,14 +386,20 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      State is a cache keyed by Planning Center ids: plans, items, item times
-      and plan times. The plan's current and next item times are named in
-      plans.<plan_id>.live, and each item time names its item, so the current
-      item is items.<item_times.<current_item_time_id>.item_id>. Countdowns
-      are computed by the consumer from live_start_at and length; Planning
-      Center reports times, not a running clock. An item deleted from the
-      plan stays in state until the integration is opened again. Only the
-      first 100 items and plan times of the plan are polled.
+      State is keyed by Planning Center ids: plans, and under each plan its
+      items, plan times and item times. The plan's current and next item
+      times are named in plans.<plan_id>.live, and each item time names its
+      item, so the current item is
+      plans.<plan_id>.items.<plans.<plan_id>.item_times.<current_item_time_id>.item_id>.
+      Countdowns are computed by the consumer from live_start_at and length;
+      Planning Center reports times, not a running clock. Each read of a
+      plan's items or times that holds the whole list (no next link) replaces
+      the last, so an item deleted from the plan leaves the state; each Live
+      reply replaces the plan's item times with the current and next ones.
+      Only the first 100 items and plan times of the plan are read: for a
+      plan with more, nothing is replaced and a deleted item stays until the
+      integration is opened again. Plans read with list_plans are added to
+      plans and never removed, since a list of plans is filtered and paged.
 
   - models: [all]
     severity: info
@@ -434,28 +448,26 @@ state:
   plans.*.live.current_item_time_id: { type: string, description: "Id of the item time now live (Live relationship current_item_time)" }
   plans.*.live.next_item_time_id: { type: string, description: "Id of the item time that goes live next (Live relationship next_item_time)" }
   plans.*.live.controller_id: { type: string, description: "Id of the person in control of the LIVE session (Live relationship controller)" }
-  item_times.*.item_id:     { type: string, description: "Id of the item this time is for, keyed by item time id (ItemTime relationship item)" }
-  item_times.*.plan_time_id: { type: string, description: "Id of the plan time (service) this item time belongs to (ItemTime relationship plan_time)" }
-  item_times.*.live_start_at: { type: string, description: "When LIVE started this item (ItemTime.live_start_at)" }
-  item_times.*.live_end_at: { type: string, description: "When LIVE ended this item (ItemTime.live_end_at)" }
-  item_times.*.length:      { type: int, unit: s, description: "Item length for this time (ItemTime.length)" }
-  item_times.*.length_offset: { type: int, unit: s, description: "Length offset for this time (ItemTime.length_offset)" }
-  item_times.*.exclude:     { type: bool, description: "The item is excluded from this time (ItemTime.exclude)" }
-  items.*.plan_id:          { type: string, description: "Id of the item's plan, keyed by item id" }
-  items.*.title:            { type: string, description: "Item title (Item.title)" }
-  items.*.sequence:         { type: int, description: "Item position in the plan, ascending (Item.sequence)" }
-  items.*.length:           { type: int, unit: s, description: "Item length (Item.length)" }
-  items.*.item_type:        { type: string, description: "song, header, media or item (Item.item_type)" }
-  items.*.service_position: { type: string, description: "pre, during or post: before, during or after the service (Item.service_position)" }
-  items.*.description:      { type: string, description: "Item description (Item.description)" }
-  items.*.key_name:         { type: string, description: "Song key (Item.key_name)" }
-  plan_times.*.plan_id:     { type: string, description: "Id of the time's plan, keyed by plan time id" }
-  plan_times.*.name:        { type: string, description: "Plan time name (PlanTime.name)" }
-  plan_times.*.time_type:   { type: string, description: "service, rehearsal or other (PlanTime.time_type)" }
-  plan_times.*.starts_at:   { type: string, description: "Planned start (PlanTime.starts_at)" }
-  plan_times.*.ends_at:     { type: string, description: "Planned end (PlanTime.ends_at)" }
-  plan_times.*.live_starts_at: { type: string, description: "Start as recorded by LIVE (PlanTime.live_starts_at)" }
-  plan_times.*.live_ends_at: { type: string, description: "End as recorded by LIVE (PlanTime.live_ends_at)" }
+  plans.*.item_times.*.item_id:     { type: string, description: "Id of the item this time is for, keyed by plan id and item time id; only the current and next item times (ItemTime relationship item)" }
+  plans.*.item_times.*.plan_time_id: { type: string, description: "Id of the plan time (service) this item time belongs to (ItemTime relationship plan_time)" }
+  plans.*.item_times.*.live_start_at: { type: string, description: "When LIVE started this item (ItemTime.live_start_at)" }
+  plans.*.item_times.*.live_end_at: { type: string, description: "When LIVE ended this item (ItemTime.live_end_at)" }
+  plans.*.item_times.*.length:      { type: int, unit: s, description: "Item length for this time (ItemTime.length)" }
+  plans.*.item_times.*.length_offset: { type: int, unit: s, description: "Length offset for this time (ItemTime.length_offset)" }
+  plans.*.item_times.*.exclude:     { type: bool, description: "The item is excluded from this time (ItemTime.exclude)" }
+  plans.*.items.*.title:            { type: string, description: "Item title, keyed by plan id and item id (Item.title)" }
+  plans.*.items.*.sequence:         { type: int, description: "Item position in the plan, ascending (Item.sequence)" }
+  plans.*.items.*.length:           { type: int, unit: s, description: "Item length (Item.length)" }
+  plans.*.items.*.item_type:        { type: string, description: "song, header, media or item (Item.item_type)" }
+  plans.*.items.*.service_position: { type: string, description: "pre, during or post: before, during or after the service (Item.service_position)" }
+  plans.*.items.*.description:      { type: string, description: "Item description (Item.description)" }
+  plans.*.items.*.key_name:         { type: string, description: "Song key (Item.key_name)" }
+  plans.*.plan_times.*.name:        { type: string, description: "Plan time name, keyed by plan id and plan time id (PlanTime.name)" }
+  plans.*.plan_times.*.time_type:   { type: string, description: "service, rehearsal or other (PlanTime.time_type)" }
+  plans.*.plan_times.*.starts_at:   { type: string, description: "Planned start (PlanTime.starts_at)" }
+  plans.*.plan_times.*.ends_at:     { type: string, description: "Planned end (PlanTime.ends_at)" }
+  plans.*.plan_times.*.live_starts_at: { type: string, description: "Start as recorded by LIVE (PlanTime.live_starts_at)" }
+  plans.*.plan_times.*.live_ends_at: { type: string, description: "End as recorded by LIVE (PlanTime.live_ends_at)" }
   service_types.*.name:     { type: string, description: "Service type name, keyed by service type id (ServiceType.name)" }
 
 telemetry:
@@ -501,9 +513,12 @@ telemetry:
         plans.{1}.live.current_item_time_id: "{current}"
         plans.{1}.live.next_item_time_id: "{next}"
         plans.{1}.live.controller_id: "{controller}"
-    # The current and next item times, included with the Live resource.
-    - path: '^/services/v2/service_types/\d+/plans/\d+/live(/(go_to_next_item|go_to_previous_item|toggle_control))?(\?.*)?$'
+    # The current and next item times, included with the Live resource: each
+    # Live reply holds them all, so it replaces the last one's, and an item
+    # time that is no longer current or next leaves the state.
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/live(/(go_to_next_item|go_to_previous_item|toggle_control))?(\?.*)?$'
       json_each: "$.included"
+      replace: plans.{1}.item_times
       json:
         id: "$.id"
         item: "$.relationships.item.data.id"
@@ -514,13 +529,13 @@ telemetry:
         length_offset: "$.attributes.length_offset"
         exclude: "$.attributes.exclude"
       state:
-        item_times.{id}.item_id: "{item}"
-        item_times.{id}.plan_time_id: "{plan_time}"
-        item_times.{id}.live_start_at: "{live_start_at}"
-        item_times.{id}.live_end_at: "{live_end_at}"
-        item_times.{id}.length: "{length}"
-        item_times.{id}.length_offset: "{length_offset}"
-        item_times.{id}.exclude: "{exclude}"
+        plans.{1}.item_times.{id}.item_id: "{item}"
+        plans.{1}.item_times.{id}.plan_time_id: "{plan_time}"
+        plans.{1}.item_times.{id}.live_start_at: "{live_start_at}"
+        plans.{1}.item_times.{id}.live_end_at: "{live_end_at}"
+        plans.{1}.item_times.{id}.length: "{length}"
+        plans.{1}.item_times.{id}.length_offset: "{length_offset}"
+        plans.{1}.item_times.{id}.exclude: "{exclude}"
     - path: '^/services/v2/service_types/(\d+)/plans/(\d+)(\?.*)?$'
       json:
         title: "$.data.attributes.title"
@@ -543,6 +558,9 @@ telemetry:
         plans.{2}.total_length: "{total_length}"
         plans.{2}.items_count: "{items_count}"
         plans.{2}.planning_center_url: "{url}"
+    # A list of plans is filtered (future, past, no dates) and one page of up
+    # to 100, never every plan, and plans.<id> also holds the followed plan's
+    # LIVE session, items and times: it adds to plans and never replaces them.
     - path: '^/services/v2/service_types/(\d+)/plans(\?.*)?$'
       json_each: "$.data"
       json:
@@ -567,6 +585,11 @@ telemetry:
         plans.{id}.total_length: "{total_length}"
         plans.{id}.items_count: "{items_count}"
         plans.{id}.planning_center_url: "{url}"
+    # A plan's items. A list that is complete (top-level links with no next:
+    # the first page holds them all) also replaces the plan's items, by the
+    # rule after this one, so an item deleted from the plan leaves the
+    # state. A plan of more than 100 items is read one page deep: its items
+    # are added to, never replaced.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
       json_each: "$.data"
       json:
@@ -579,14 +602,17 @@ telemetry:
         description: "$.attributes.description"
         key_name: "$.attributes.key_name"
       state:
-        items.{id}.plan_id: "{1}"
-        items.{id}.title: "{title}"
-        items.{id}.sequence: "{sequence}"
-        items.{id}.length: "{length}"
-        items.{id}.item_type: "{item_type}"
-        items.{id}.service_position: "{service_position}"
-        items.{id}.description: "{description}"
-        items.{id}.key_name: "{key_name}"
+        plans.{1}.items.{id}.title: "{title}"
+        plans.{1}.items.{id}.sequence: "{sequence}"
+        plans.{1}.items.{id}.length: "{length}"
+        plans.{1}.items.{id}.item_type: "{item_type}"
+        plans.{1}.items.{id}.service_position: "{service_position}"
+        plans.{1}.items.{id}.description: "{description}"
+        plans.{1}.items.{id}.key_name: "{key_name}"
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/items(\?.*)?$'
+      json_match: { "$.links": '^\{(?:"(?:[^n"]|n[^e"]|ne[^x"]|nex[^t"]|next[^"])[^"]*":"[^"]*",?)*\}$' }
+      json: {}
+      replace: plans.{1}.items
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/items/\d+(\?.*)?$'
       json:
         id: "$.data.id"
@@ -598,14 +624,15 @@ telemetry:
         description: "$.data.attributes.description"
         key_name: "$.data.attributes.key_name"
       state:
-        items.{id}.plan_id: "{1}"
-        items.{id}.title: "{title}"
-        items.{id}.sequence: "{sequence}"
-        items.{id}.length: "{length}"
-        items.{id}.item_type: "{item_type}"
-        items.{id}.service_position: "{service_position}"
-        items.{id}.description: "{description}"
-        items.{id}.key_name: "{key_name}"
+        plans.{1}.items.{id}.title: "{title}"
+        plans.{1}.items.{id}.sequence: "{sequence}"
+        plans.{1}.items.{id}.length: "{length}"
+        plans.{1}.items.{id}.item_type: "{item_type}"
+        plans.{1}.items.{id}.service_position: "{service_position}"
+        plans.{1}.items.{id}.description: "{description}"
+        plans.{1}.items.{id}.key_name: "{key_name}"
+    # A plan's times; a complete list (no next link) replaces the last, by
+    # the rule after this one.
     - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
       json_each: "$.data"
       json:
@@ -617,13 +644,18 @@ telemetry:
         live_starts_at: "$.attributes.live_starts_at"
         live_ends_at: "$.attributes.live_ends_at"
       state:
-        plan_times.{id}.plan_id: "{1}"
-        plan_times.{id}.name: "{name}"
-        plan_times.{id}.time_type: "{time_type}"
-        plan_times.{id}.starts_at: "{starts_at}"
-        plan_times.{id}.ends_at: "{ends_at}"
-        plan_times.{id}.live_starts_at: "{live_starts_at}"
-        plan_times.{id}.live_ends_at: "{live_ends_at}"
+        plans.{1}.plan_times.{id}.name: "{name}"
+        plans.{1}.plan_times.{id}.time_type: "{time_type}"
+        plans.{1}.plan_times.{id}.starts_at: "{starts_at}"
+        plans.{1}.plan_times.{id}.ends_at: "{ends_at}"
+        plans.{1}.plan_times.{id}.live_starts_at: "{live_starts_at}"
+        plans.{1}.plan_times.{id}.live_ends_at: "{live_ends_at}"
+    - path: '^/services/v2/service_types/\d+/plans/(\d+)/plan_times(\?.*)?$'
+      json_match: { "$.links": '^\{(?:"(?:[^n"]|n[^e"]|ne[^x"]|nex[^t"]|next[^"])[^"]*":"[^"]*",?)*\}$' }
+      json: {}
+      replace: plans.{1}.plan_times
+    # The service types; a complete list (no next link) replaces the last,
+    # by the rule after this one.
     - path: '^/services/v2/service_types(\?.*)?$'
       json_each: "$.data"
       json:
@@ -631,3 +663,7 @@ telemetry:
         name: "$.attributes.name"
       state:
         service_types.{id}.name: "{name}"
+    - path: '^/services/v2/service_types(\?.*)?$'
+      json_match: { "$.links": '^\{(?:"(?:[^n"]|n[^e"]|ne[^x"]|nex[^t"]|next[^"])[^"]*":"[^"]*",?)*\}$' }
+      json: {}
+      replace: service_types
