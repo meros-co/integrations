@@ -1,0 +1,550 @@
+spec: 1
+id: magewell-proconvert
+name: Magewell Pro Convert
+vendor: Magewell
+category: other
+implementation: native
+reason: >
+  Every request needs a session: a login whose session ID comes back only in a
+  Set-Cookie header and must be sent as a cookie on each later request, and
+  renewed when the device answers "not logged in". The encoders and NDI
+  decoders take a hashed password in a GET query (MD5), the IP decoders a
+  JSON login (SHA-256) with a cookie named after the serial number. The spec
+  format's HTTP transport has no cookie session, so the module speaks HTTP/1.1
+  itself.
+
+source:
+  - title: "Magewell Pro Convert Encoder API (unversioned; examples from firmware 1.1.72)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/pro-convert-encoder-api/"
+    note: >
+      Manufacturer-documented, public. GET http://IP/mwapi?method=<name>&...,
+      JSON replies with an integer status, 0 for success, and the status code
+      table (sections 1.2-1.3); ping, get-caps, reboot (section 2); login with
+      id and the MD5 of the password, the sid cookie, logout (section 4);
+      get-summary-info with device, ethernet and ndi objects including
+      input-state and the NDI tally-preview and tally-program (section 5.1);
+      get-signal-info (6.1); get-video-config and set-video-config with
+      brightness, contrast, hue, saturation, deinterlace, out-flip,
+      out-mirror, out-cx, out-cy, out-raw-resolution and bit-rate-ratio
+      (section 7); get-ndi-config and set-ndi-config with enable,
+      source-name, group-name, enable-web-control, enable-ptz-control,
+      fail-over, the four transport flags of which at most one may be true,
+      the multicast address, mask and TTL, discovery server and
+      reference-level 20 (SMPTE) or 14 (EBU) (sections 9.1-9.2);
+      get-ndi-sources; get-tally and set-tally ext-tally (9.4-9.5).
+  - title: "Magewell Pro Convert Decoder API V1.3 (firmware V1.3), and v1.1"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/pro-convert-decoder-api/v1.3/"
+    note: >
+      Manufacturer-documented, public. The same transport, login and status
+      codes 0-55 (sections 1.3-1.4, 4.1); get-summary-info with the decoded
+      source's ndi object, url and tally (5.1); get-signal-info for the
+      decoded source (6.1); get-video-config and set-video-config with
+      show-title, show-tally, show-vu-meter, show-center-cross, h-flip,
+      v-flip, switch-mode, ar-convert-mode, deinterlace-mode (7.1-7.3);
+      get-supported-video-modes and set-video-mode (7.5-7.6); get-hdmi-output
+      and set-hdmi-output (7.9-7.10); get-audio-config and set-audio-config
+      gain -100.00 to 20.00 dB (8.1-8.2); list-channels, get-ndi-sources,
+      get-channel and set-channel with ndi-name true (a discovered source) or
+      false (a preset), add-channel, del-channel, get-playback-config and
+      set-playback-config buffer-duration (sections 10-11); get-ndi-config
+      and set-ndi-config with enable-discovery, discovery-server and
+      group-name (11.1-11.2). v1.1 adds Pro Convert for NDI to HDMI 4K to the
+      product list.
+  - title: "Magewell Pro Convert IP Decoder API V1.2 (firmware V1.2)"
+    author: Magewell
+    url: "https://www.magewell.com/api-docs/pro-convert-ip-decoder-api/latest/"
+    note: >
+      Manufacturer-documented, public. JSON requests under /api with a status
+      in every reply (1.2-1.3); POST /api/user/login with the SHA-256 of the
+      password, the reply's sid and the sid-<serial number> cookie, valid
+      until the device restarts (section 15); GET /api/system/summary (2);
+      GET /api/source/list, POST /api/source/select (simple mode only) and
+      /api/source/restart (3); /api/audio/config/set gain (5); profile list,
+      select and screen select (6); PTZ move, zoom, focus, auto focus and
+      preset recall and store through the decoded NDI source (7);
+      GET /api/signal/info (10); /api/ping without login and /api/reboot
+      (12).
+  - title: "Pro Convert Decoder User Manual, and the Pro Convert knowledge base"
+    author: Magewell
+    url: "https://www.magewell.com/files/documents/User_Manual/ProConvert_Decoder-UserManual_en_US.pdf"
+    note: >
+      Default credentials Admin / Admin, case sensitive; the web interface
+      signs out after ten minutes idle; USB address 192.168.66.1 and DHCP on
+      Ethernet by default; HTTPS on decoders after uploading a certificate.
+  - title: "companion-module-magewell-proconvert-decoder (Bitfocus Companion module)"
+    author: Bitfocus
+    url: "https://github.com/bitfocus/companion-module-magewell-proconvert-decoder"
+    note: >
+      Community source (MIT licence), read as corroboration only: it logs in
+      with GET login and the MD5 of the password, sends the session cookie it
+      received on every request, logs in again on status 37, and polls; there
+      is no push.
+
+settings:
+  username:
+    type: string
+    default: Admin
+    max_length: 64
+    label: User name
+    description: "The user the core logs in as; Admin by default."
+  password:
+    type: string
+    secret: true
+    default: Admin
+    max_length: 64
+    label: Password
+    description: "That user's password; the core sends only its MD5 (encoders, NDI decoders) or SHA-256 (IP decoders) hash."
+  scheme:
+    type: enum
+    values: [http, https]
+    default: http
+    label: Scheme
+    description: "http, or https once a certificate is installed on a decoder; the certificate is not checked."
+
+ports:
+  - { port: 80, protocol: http, role: control, note: "the documents state no port; the web interface's standard port is assumed", when: "scheme http" }
+  - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
+
+models:
+  - id: hdmi-4k-plus
+    name: "Magewell Pro Convert HDMI 4K Plus (and Module)"
+    supports: &encoder
+      [ping, reboot, get_summary, get_caps, get_signal_info, get_video_config, get_ndi_config, get_ndi_sources,
+       get_tally_config, set_ndi_enabled, set_ndi_source_name, set_ndi_groups, set_ndi_transport,
+       set_ndi_multicast, set_ndi_discovery, set_ndi_failover, set_ndi_web_control, set_ndi_ptz_control,
+       set_reference_level, set_bitrate_ratio, set_brightness, set_contrast, set_hue, set_saturation,
+       set_deinterlace, set_output_flip, set_output_mirror, set_output_resolution, set_output_follows_input,
+       set_ext_tally]
+    verification: none
+    notes: >
+      HDMI to full-bandwidth NDI encoder (Encoder API). The Module variant has
+      the same API.
+  - id: hdmi-plus
+    name: "Magewell Pro Convert HDMI Plus (and Module)"
+    supports: *encoder
+    verification: none
+  - id: hdmi-tx
+    name: "Magewell Pro Convert HDMI TX"
+    supports: *encoder
+    verification: none
+    notes: "Encoder without loop-through."
+  - id: 12g-sdi-4k-plus
+    name: "Magewell Pro Convert 12G SDI 4K Plus (and Module)"
+    supports: *encoder
+    verification: none
+  - id: sdi-4k-plus
+    name: "Magewell Pro Convert SDI 4K Plus"
+    supports: *encoder
+    verification: none
+  - id: sdi-plus
+    name: "Magewell Pro Convert SDI Plus (and Module)"
+    supports: *encoder
+    verification: none
+  - id: sdi-tx
+    name: "Magewell Pro Convert SDI TX"
+    supports: *encoder
+    verification: none
+  - id: ndi-to-hdmi
+    name: "Magewell Pro Convert for NDI to HDMI (and Module)"
+    supports: &decoder
+      [ping, reboot, get_summary, get_caps, get_signal_info, get_video_config, get_ndi_config, get_ndi_sources,
+       list_presets, get_current_source, select_ndi_source, select_preset, add_preset, delete_preset,
+       set_hdmi_output, get_video_modes, set_video_mode, get_audio_config, set_audio_gain, set_overlay,
+       set_switch_mode, set_aspect_conversion, set_decoder_flip, set_buffer_duration,
+       set_decoder_ndi_discovery, set_decoder_ndi_group]
+    verification: none
+    notes: "First-generation NDI decoder (Decoder API V1.3)."
+  - id: ndi-to-sdi
+    name: "Magewell Pro Convert for NDI to SDI"
+    supports: *decoder
+    verification: none
+  - id: ndi-to-aio
+    name: "Magewell Pro Convert for NDI to AIO (and Module)"
+    supports: *decoder
+    verification: none
+    notes: "HDMI and SDI outputs (Decoder API V1.3)."
+  - id: ndi-to-hdmi-4k
+    name: "Magewell Pro Convert for NDI to HDMI 4K (and Module)"
+    supports: *decoder
+    verification: none
+    notes: "Listed in Decoder API v1.1 only; whether it has firmware V1.3 is not documented."
+  - id: ip-to-hdmi
+    name: "Magewell Pro Convert IP to HDMI"
+    supports: &ipdecoder
+      [ping, reboot, get_summary, get_signal_info, get_sources, select_source, restart_source,
+       list_profiles, select_profile, select_screen_source, set_audio_gain, ptz_move, ptz_zoom, ptz_focus,
+       ptz_auto_focus, ptz_recall_preset, ptz_store_preset]
+    verification: none
+    notes: >
+      Second-generation decoder for NDI, SRT, RIST, Zixi, RTMP, RTSP, HLS,
+      UDP and RTP (IP Decoder API V1.2).
+  - id: ip-to-hdmi-4k
+    name: "Magewell Pro Convert IP to HDMI 4K"
+    supports: *ipdecoder
+    verification: none
+  - id: ip-to-aio-4k
+    name: "Magewell Pro Convert IP to AIO 4K"
+    supports: *ipdecoder
+    verification: none
+
+commands:
+  ping:
+    summary: "Check the device is ready; needs no login (ping)"
+    returns: ack
+  reboot:
+    summary: "Restart the device; its output stops until it is back (reboot)"
+    returns: ack
+  get_summary:
+    summary: "Device, network and NDI status: model, firmware, input or output state, temperature, NDI stream and tally (get-summary-info, or /api/system/summary)"
+    returns: value
+  get_caps:
+    summary: "Capabilities: maximum input and output size, loop-through, fan, SD card, PTZ (get-caps)"
+    returns: value
+  get_signal_info:
+    summary: "The input signal (encoders) or decoded source (decoders): format, colour, audio (get-signal-info, or /api/signal/info)"
+    returns: value
+  get_video_config:
+    summary: "Video settings (get-video-config)"
+    returns: value
+  get_ndi_config:
+    summary: "NDI settings (get-ndi-config)"
+    returns: value
+  get_ndi_sources:
+    summary: "NDI sources discovered on the network, each with ndi-name and ip-addr (get-ndi-sources)"
+    returns: value
+  get_tally_config:
+    summary: "Whether the tally lights are user-controlled (get-tally)"
+    returns: value
+
+  set_ndi_enabled:
+    summary: "Turn the encoder's NDI output on or off (set-ndi-config enable)"
+    params:
+      enabled: { type: bool, required: true, label: NDI output, description: "On sends the input as an NDI source; off stops it." }
+    returns: ack
+  set_ndi_source_name:
+    summary: "Set the NDI source name template (set-ndi-config source-name)"
+    params:
+      name: { type: string, required: true, max_length: 63, label: Source name,
+        description: "The NDI source name; %board-id% and %serial-no% are replaced, and the default is #%board-id% (%serial-no%)." }
+    returns: ack
+  set_ndi_groups:
+    summary: "NDI groups the source is published in (set-ndi-config group-name)"
+    params:
+      groups: { type: string, required: true, max_length: 255, label: NDI groups, description: "Group names separated by commas; public is the default group." }
+    returns: ack
+  set_ndi_transport:
+    summary: "NDI transport: TCP (all flags off), multi-TCP, UDP, reliable UDP or multicast (set-ndi-config enable-tcp, enable-udp, enable-rudp, enable-mcast)"
+    params:
+      transport: { type: enum, values: [tcp, multi-tcp, udp, rudp, multicast], required: true, label: Transport,
+        description: "How receivers are sent the stream; tcp is the single-connection default with every transport flag off." }
+    returns: ack
+  set_ndi_multicast:
+    summary: "Multicast address, netmask and TTL (set-ndi-config mcast-addr, mcast-mask, mcast-ttl)"
+    params:
+      address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Multicast address, description: "Multicast base address, e.g. 239.255.0.0." }
+      netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Netmask, description: "Multicast netmask, e.g. 255.255.0.0." }
+      ttl: { type: int, min: 1, max: 255, required: true, label: TTL, description: "Multicast time-to-live in router hops, 1 to 255." }
+    returns: ack
+  set_ndi_discovery:
+    summary: "Use NDI discovery servers, or not (set-ndi-config enable-discovery, discovery-server)"
+    params:
+      enabled: { type: bool, required: true, label: Discovery server, description: "On registers with the discovery servers given." }
+      servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server IP addresses separated by commas; needed when on." }
+    returns: ack
+  set_ndi_failover:
+    summary: "NDI failover source receivers switch to when this one stops (set-ndi-config enable-fail-over, fail-over-ndi-name, fail-over-ip-addr)"
+    params:
+      enabled: { type: bool, required: true, label: Failover, description: "On names a failover source." }
+      ndi_name: { type: string, default: "", max_length: 255, label: Failover source, description: "The failover NDI source's name, as get_ndi_sources lists it." }
+      ip_address: { type: string, default: "", max_length: 64, label: Failover address, description: "The failover source's ip-addr as get_ndi_sources lists it, e.g. 192.168.1.192:5963." }
+    returns: ack
+  set_ndi_web_control:
+    summary: "Allow web control from NDI tools (set-ndi-config enable-web-control)"
+    params:
+      enabled: { type: bool, required: true, label: Web control, description: "On lets NDI receivers open the device's web control." }
+    returns: ack
+  set_ndi_ptz_control:
+    summary: "Allow PTZ control from NDI receivers such as Studio Monitor (set-ndi-config enable-ptz-control)"
+    params:
+      enabled: { type: bool, required: true, label: PTZ control, description: "On passes NDI PTZ commands to the camera on the device's PTZ port." }
+    returns: ack
+  set_reference_level:
+    summary: "Audio reference level, SMPTE (20) or EBU (14) (set-ndi-config reference-level)"
+    params:
+      level: { type: enum, values: [smpte, ebu], required: true, label: Reference level, description: "SMPTE (+4 dBu = -20 dBFS) or EBU (-14 dBFS) audio alignment." }
+    returns: ack
+  set_bitrate_ratio:
+    summary: "NDI bitrate as a percentage of the standard rate, 50-200 (set-video-config bit-rate-ratio)"
+    params:
+      percent: { type: int, min: 50, max: 200, required: true, label: Bitrate, description: "Bitrate as a percentage of NDI's standard rate; 100 is the default." }
+    returns: ack
+  set_brightness:
+    summary: "Picture brightness, -100 to 100 (set-video-config brightness)"
+    params:
+      value: { type: int, min: -100, max: 100, required: true, label: Brightness, description: "Brightness from -100 to 100, 0 unchanged." }
+    returns: ack
+  set_contrast:
+    summary: "Picture contrast, 50 to 200 (set-video-config contrast)"
+    params:
+      value: { type: int, min: 50, max: 200, required: true, label: Contrast, description: "Contrast from 50 to 200, 100 unchanged." }
+    returns: ack
+  set_hue:
+    summary: "Picture hue, -90 to 90 (set-video-config hue)"
+    params:
+      value: { type: int, min: -90, max: 90, required: true, label: Hue, description: "Hue rotation from -90 to 90, 0 unchanged." }
+    returns: ack
+  set_saturation:
+    summary: "Picture saturation, 0 to 200 (set-video-config saturation)"
+    params:
+      value: { type: int, min: 0, max: 200, required: true, label: Saturation, description: "Saturation from 0 (black and white) to 200, 100 unchanged." }
+    returns: ack
+  set_deinterlace:
+    summary: "Deinterlacing of an interlaced input (set-video-config deinterlace)"
+    params:
+      mode: { type: enum, values: [none, top-field, bottom-field], required: true, label: Deinterlace, description: "Keep interlaced (none), or deinterlace from the top or bottom field." }
+    returns: ack
+  set_output_flip:
+    summary: "Flip the encoded picture vertically (set-video-config out-flip)"
+    params:
+      enabled: { type: bool, required: true, label: Vertical flip, description: "On flips the picture upside down." }
+    returns: ack
+  set_output_mirror:
+    summary: "Mirror the encoded picture horizontally (set-video-config out-mirror)"
+    params:
+      enabled: { type: bool, required: true, label: Mirror, description: "On mirrors the picture left to right." }
+    returns: ack
+  set_output_resolution:
+    summary: "Fixed NDI output resolution (set-video-config out-raw-resolution false, out-cx, out-cy)"
+    params:
+      width: { type: int, min: 64, max: 4096, required: true, label: Width, description: "Output width in pixels, a multiple of 4." }
+      height: { type: int, min: 64, max: 2160, required: true, label: Height, description: "Output height in lines, a multiple of 2." }
+    returns: ack
+  set_output_follows_input:
+    summary: "NDI output resolution follows the input (set-video-config out-raw-resolution)"
+    params:
+      enabled: { type: bool, required: true, label: Follow input, description: "On encodes at the input's resolution; off uses the set output resolution." }
+    returns: ack
+  set_ext_tally:
+    summary: "User-controlled tally lights (set-tally ext-tally)"
+    params:
+      enabled: { type: bool, required: true, label: User tally, description: "On lets the user control the tally lights rather than NDI tally." }
+    returns: ack
+
+  list_presets:
+    summary: "Preset sources, each with name and url (list-channels)"
+    returns: value
+  get_current_source:
+    summary: "The source being decoded: name, and ndi-name true for a discovered NDI source or false for a preset (get-channel)"
+    returns: value
+  select_ndi_source:
+    summary: "Decode a discovered NDI source by name; the output switches at once (set-channel ndi-name=true)"
+    params:
+      name: { type: string, required: true, max_length: 255, label: NDI source, description: "The source's full NDI name as get_ndi_sources lists it, e.g. STUDIO (Camera 1)." }
+    returns: ack
+  select_preset:
+    summary: "Decode a preset source by name; the output switches at once (set-channel ndi-name=false)"
+    params:
+      name: { type: string, required: true, max_length: 120, label: Preset, description: "The preset's name as list_presets lists it." }
+    returns: ack
+  add_preset:
+    summary: "Add a preset source (add-channel)"
+    params:
+      name: { type: string, required: true, max_length: 120, label: Name, description: "A unique preset name, 1 to 120 characters." }
+      url: { type: string, required: true, max_length: 1024, label: URL,
+        description: "Source URL: ntkndi://ndi?name=..., rtsp://, http://, rtmp://, rtmps://, udp://, srt:// or rtp:// with the options the API documents." }
+    returns: ack
+  delete_preset:
+    summary: "Delete a preset source (del-channel)"
+    params:
+      name: { type: string, required: true, max_length: 120, label: Name, description: "The preset to delete." }
+    returns: ack
+  set_hdmi_output:
+    summary: "Send the decoded picture to the output, or not (set-hdmi-output)"
+    params:
+      enabled: { type: bool, required: true, label: Output, description: "On outputs the decoded picture; off stops the output." }
+    returns: ack
+  get_video_modes:
+    summary: "Video modes the connected display supports, with the current and preferred (get-supported-video-modes)"
+    returns: value
+  set_video_mode:
+    summary: "Set the output video mode to one get_video_modes lists (set-video-mode)"
+    params:
+      width: { type: int, min: 1, max: 4096, required: true, label: Width, description: "Width in pixels, from the supported modes." }
+      height: { type: int, min: 1, max: 2160, required: true, label: Height, description: "Height in lines, from the supported modes." }
+      interlaced: { type: bool, default: false, label: Interlaced, description: "On for an interlaced mode." }
+      field_rate: { type: int, min: 1, max: 24000, required: true, label: Field rate, description: "Field rate times 100, as the modes list gives it, e.g. 5994 for 59.94." }
+      aspect_ratio: { type: float, min: 0.1, max: 10.0, required: true, label: Aspect ratio, description: "Aspect ratio as the modes list gives it, e.g. 1.78." }
+    returns: ack
+  get_audio_config:
+    summary: "Audio output settings: gain, sample rate, channels and mapping (get-audio-config)"
+    returns: value
+  set_audio_gain:
+    summary: "Audio output gain in dB, -100 to +20 (set-audio-config gain, or /api/audio/config/set)"
+    params:
+      gain: { type: float, min: -100.0, max: 20.0, required: true, label: Gain, description: "Audio gain in dB, -100.00 to +20.00." }
+    returns: ack
+  set_overlay:
+    summary: "Show or hide an overlay on the decoded output: title, tally, VU meter or centre cross (set-video-config)"
+    params:
+      overlay: { type: enum, values: [title, tally, vu-meter, center-cross], required: true, label: Overlay, description: "The source title, a tally border, audio meters, or a centre cross." }
+      visible: { type: bool, required: true, label: Visible, description: "On shows the overlay." }
+    returns: ack
+  set_switch_mode:
+    summary: "What the output shows while the source changes (set-video-config switch-mode)"
+    params:
+      mode: { type: enum, values: [blank, keep-last], required: true, label: Switch mode, description: "Blank the output, or hold the last frame, while switching." }
+    returns: ack
+  set_aspect_conversion:
+    summary: "How a source of another aspect ratio is fitted (set-video-config ar-convert-mode)"
+    params:
+      mode: { type: enum, values: [windowbox, full, zoom], required: true, label: Aspect conversion, description: "Letterbox or pillarbox (windowbox), stretch (full), or crop (zoom)." }
+    returns: ack
+  set_decoder_flip:
+    summary: "Flip the decoded output horizontally or vertically (set-video-config h-flip, v-flip)"
+    params:
+      horizontal: { type: bool, default: false, label: Horizontal flip, description: "On mirrors left to right." }
+      vertical: { type: bool, default: false, label: Vertical flip, description: "On flips upside down." }
+    returns: ack
+  set_buffer_duration:
+    summary: "Decoder buffer in milliseconds, 20-120 (set-playback-config buffer-duration)"
+    params:
+      ms: { type: int, min: 20, max: 120, required: true, label: Buffer, description: "Buffer length in milliseconds; shorter is lower latency and less tolerant of jitter." }
+    returns: ack
+  set_decoder_ndi_discovery:
+    summary: "Use NDI discovery servers for finding sources (set-ndi-config enable-discovery, discovery-server)"
+    params:
+      enabled: { type: bool, required: true, label: Discovery server, description: "On finds sources through the discovery servers given." }
+      servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server IP addresses separated by commas; needed when on." }
+    returns: ack
+  set_decoder_ndi_group:
+    summary: "NDI group the decoder finds sources in (set-ndi-config group-name)"
+    params:
+      group: { type: string, required: true, max_length: 255, label: NDI group, description: "NDI group name; public is the default." }
+    returns: ack
+
+  get_sources:
+    summary: "Static and discovered NDI sources with their ids (GET /api/source/list?type=all)"
+    returns: value
+  select_source:
+    summary: "Decode a source by id, in simple mode; the output switches at once (POST /api/source/select)"
+    params:
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
+    returns: ack
+  restart_source:
+    summary: "Reconnect the active source (POST /api/source/restart)"
+    returns: ack
+  list_profiles:
+    summary: "Profiles (single, picture-in-picture or four-way layouts) and the current one (GET /api/profile/list)"
+    returns: value
+  select_profile:
+    summary: "Switch to a profile, in profile mode; the output layout changes at once (POST /api/profile/select)"
+    params:
+      id: { type: int, min: 0, max: 2147483647, required: true, label: Profile, description: "The profile id from list_profiles." }
+    returns: ack
+  select_screen_source:
+    summary: "Put a source on one screen of a profile (POST /api/profile/screen/select)"
+    params:
+      profile: { type: int, min: 0, max: 2147483647, required: true, label: Profile, description: "The profile id from list_profiles." }
+      screen: { type: int, min: 0, max: 3, required: true, label: Screen, description: "Screen index in the profile's layout, from 0." }
+      source: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
+    returns: ack
+  ptz_move:
+    summary: "Pan and tilt the decoded NDI camera; 0 and 0 stop (POST /api/ptz/move)"
+    params:
+      pan: { type: float, min: -1.0, max: 1.0, required: true, label: Pan speed, description: "Pan speed from -1 (left) to 1 (right); 0 stops." }
+      tilt: { type: float, min: -1.0, max: 1.0, required: true, label: Tilt speed, description: "Tilt speed from -1 (down) to 1 (up); 0 stops." }
+    returns: ack
+  ptz_zoom:
+    summary: "Zoom the decoded NDI camera at a speed; 0 stops (POST /api/ptz/zoom/set)"
+    params:
+      speed: { type: float, min: -1.0, max: 1.0, required: true, label: Zoom speed, description: "Zoom speed from -1 (out) to 1 (in); 0 stops." }
+    returns: ack
+  ptz_focus:
+    summary: "Focus the decoded NDI camera at a speed; 0 stops (POST /api/ptz/focus/set)"
+    params:
+      speed: { type: float, min: -1.0, max: 1.0, required: true, label: Focus speed, description: "Focus speed from -1 (near) to 1 (far); 0 stops." }
+    returns: ack
+  ptz_auto_focus:
+    summary: "Return the decoded NDI camera to auto focus (POST /api/ptz/focus/auto)"
+    returns: ack
+  ptz_recall_preset:
+    summary: "Recall a preset on the decoded NDI camera; it moves at once (POST /api/ptz/preset/recall)"
+    params:
+      number: { type: int, min: 1, max: 255, required: true, label: Preset, description: "Camera preset number, 1 to 255." }
+    returns: ack
+  ptz_store_preset:
+    summary: "Store the decoded NDI camera's position as a preset, overwriting it (POST /api/ptz/preset/store)"
+    params:
+      number: { type: int, min: 1, max: 255, required: true, label: Preset, description: "Camera preset number to overwrite, 1 to 255." }
+    returns: ack
+
+state:
+  device.model:          { type: string, description: "Model, e.g. HDMI 4K Plus, NDI to HDMI or Pro Convert IP to HDMI" }
+  device.name:           { type: string, description: "Device name" }
+  device.serial:         { type: string, description: "Serial number" }
+  device.firmware:       { type: string, description: "Firmware version" }
+  device.temperature:    { type: float, description: "Core temperature, degrees Celsius" }
+  device.uptime:         { type: int, description: "Seconds since start" }
+  device.input_state:    { type: string, description: "Encoder input: no-signal, locking, unsupported, or the format, e.g. 1920x1080p60" }
+  device.output_state:   { type: string, description: "Output connection: e.g. connected, unconnected, active, or the IP decoder's HDMI state 0 disconnected, 1 working, 10 not supported" }
+  ndi.name:              { type: string, description: "Encoder: the NDI source name sent; decoder: the NDI source decoded" }
+  ndi.url:               { type: string, description: "Decoder: the current preset's URL, empty for a discovered source" }
+  ndi.clients:           { type: int, description: "Encoder: receivers connected to the stream" }
+  ndi.video:             { type: string, description: "Stream video as width x height, scan and field rate, e.g. 1920x1080 progressive 59.94" }
+  ndi.video_kbps:        { type: int, description: "Stream video bitrate over the last second, kbit/s" }
+  tally.preview:         { type: bool, description: "NDI tally: on preview at some receiver (encoder) or at the source (decoder)" }
+  tally.program:         { type: bool, description: "NDI tally: on program" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      select_ndi_source, select_preset, select_source, select_profile and
+      select_screen_source switch the decoded picture at once, and
+      ptz_recall_preset moves the camera at once; ptz_store_preset overwrites
+      a camera preset and reboot stops the output until the device is back.
+      None asks for confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no push: state comes from polling the summary every 2
+      seconds. Opened for commands only, the core polls nothing and checks
+      the device with ping (which needs no login) every 10 seconds. The core
+      logs in when the device is opened and again whenever the device answers
+      not logged in (status 37); a refused login (status 36) is final until
+      the device is opened again with corrected settings.
+
+  - models: [all]
+    severity: info
+    text: >
+      The documents state no port; port 80 (443 over HTTPS) is assumed. The
+      session ID arrives only in a Set-Cookie header, so the core speaks
+      HTTP/1.1 itself, one request at a time with Connection close.
+
+  - models: [ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k]
+    severity: info
+    text: >
+      Decoder API V1.3 and v1.1 differ in places (set-net-access names,
+      the cloud API port); the commands here use only methods both share.
+      The output flip, overlays and switch mode are set with
+      set-video-config, which takes any subset of its fields.
+
+  - models: [hdmi-4k-plus, hdmi-plus, hdmi-tx, 12g-sdi-4k-plus, sdi-4k-plus, sdi-plus, sdi-tx]
+    severity: info
+    text: >
+      At most one NDI transport flag may be on; set_ndi_transport sends all
+      four, with only the chosen one true (tcp: all false). The encoders send
+      full-bandwidth NDI only: bit-rate-ratio is the only bitrate control,
+      and there is no codec or H.26x setting.
+
+  - models: [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k]
+    severity: warning
+    text: >
+      select_source works only in simple mode and select_profile only in
+      profile mode (IP Decoder API section 3 and 6). The PTZ commands reach a
+      camera only when the decoded source is an NDI source that accepts PTZ.
+      The document does not give the IP decoders' default credentials;
+      Admin / Admin is assumed as on the other Pro Convert models.

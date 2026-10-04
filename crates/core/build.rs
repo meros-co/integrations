@@ -95,6 +95,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-lawo", &["emberplus"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
+    ("vendor-magewell", &["magewell-proconvert"]),
     ("vendor-megapixel", &["megapixel-helios"]),
     ("vendor-newtek", &["newtek-tricaster"]),
     (

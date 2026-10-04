@@ -43,6 +43,7 @@ NATIVE = {
     "generic-osc": "OSC over UDP or TCP",
     "generic-tcp-udp": "Text or bytes over TCP or UDP",
     "http-snapshot": "HTTP JPEG snapshots",
+    "magewell-proconvert": "HTTP/1.1 with a session cookie (80, or 443 over HTTPS)",
     "novastar-central-control": "Binary frames over TCP 5200",
     "novastar-h": "Signed JSON over HTTP 8000",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",

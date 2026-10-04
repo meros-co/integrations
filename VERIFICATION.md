@@ -619,6 +619,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2615](specs/lightware-lw3.yaml#L2615))
 - [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2564](specs/lightware-lw3.yaml#L2564))
 
+## magewell-proconvert — Magewell Pro Convert
+
+- [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
+- [ ] Confirm the session cookie arrives in Set-Cookie on login for the encoders, the NDI decoders and the IP decoders, and that status 37 is returned when it has expired. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
+- [ ] Check the IP decoders' default credentials (Admin / Admin assumed). ([specs/magewell-proconvert.yaml:549](specs/magewell-proconvert.yaml#L549))
+- [ ] Check whether Pro Convert for NDI to HDMI 4K runs Decoder API V1.3 or v1.1, and that the methods used here behave the same on both. ([specs/magewell-proconvert.yaml:172](specs/magewell-proconvert.yaml#L172))
+- [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:538](specs/magewell-proconvert.yaml#L538))
+
 ## megapixel-helios — Megapixel HELIOS
 
 - [ ] Confirm that the JSON-RPC websocket answers {"jsonrpc":"2.0","id":1,"method":"state"} with the whole tree under result, then pushes updates without a subscription, and that it takes the web application's credentials when authentication is on. ([specs/megapixel-helios.yaml:520](specs/megapixel-helios.yaml#L520))
