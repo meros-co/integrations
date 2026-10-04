@@ -146,10 +146,19 @@ async fn main() {
     let snapshot_listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind snapshot");
+    // A port nobody holds, for the core's OSC listener to take: it sends to
+    // itself there, standing in for a control surface.
+    let osc = std::net::UdpSocket::bind("127.0.0.1:0")
+        .expect("bind osc")
+        .local_addr()
+        .unwrap()
+        .port();
     let ports = json!({
         "kramer": kramer_listener.local_addr().unwrap().port(),
         "d6000": d6000_socket.local_addr().unwrap().port(),
         "snapshot": snapshot_listener.local_addr().unwrap().port(),
+        "osc": osc,
+        "osc_address": format!("127.0.0.1:{osc}"),
     });
     println!("{ports}");
 

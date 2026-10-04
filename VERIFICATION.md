@@ -797,6 +797,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:253](specs/openlp.yaml#L253))
 - [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:151](specs/openlp.yaml#L151))
 
+## osc-listener — OSC received from any sender
+
+- [ ] Check which TCP framing TouchOSC and Lemur send when set to TCP (SLIP as in OSC 1.1 is the default here, an int32 length prefix the alternative). ([specs/osc-listener.yaml:31](specs/osc-listener.yaml#L31))
+- [ ] Check where TouchOSC and Lemur accept feedback over UDP: at the port they send from, or only at their configured receive port. ([specs/osc-listener.yaml:47](specs/osc-listener.yaml#L47))
+- [ ] Check that a surface's press and release, and a repeated press, each arrive as a message event, including surfaces that send bundles. ([specs/osc-listener.yaml:70](specs/osc-listener.yaml#L70))
+- [ ] Check that 64 simultaneous TCP senders is enough for a busy show. ([specs/osc-listener.yaml:87](specs/osc-listener.yaml#L87))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))

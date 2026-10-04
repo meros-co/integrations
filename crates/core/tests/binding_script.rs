@@ -147,6 +147,23 @@ async fn the_shared_binding_script() {
                     }
                 }
             }
+            "event" => {
+                let wanted = step.get("count").and_then(Value::as_u64).unwrap_or(1);
+                let fields = step["match"].as_object().unwrap();
+                let deadline = Instant::now() + Duration::from_secs(5);
+                let mut found = 0;
+                while found < wanted {
+                    assert!(Instant::now() < deadline, "{label}: {found} found");
+                    let events = api::events(&core.poll_events(256));
+                    found += events
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|e| fields.iter().all(|(k, v)| &e[k] == v))
+                        .count() as u64;
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                }
+            }
             "close" => core.close(device).await,
             other => panic!("unknown op {other}"),
         }

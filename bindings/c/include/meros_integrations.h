@@ -43,7 +43,8 @@ char *mi_catalog(const MiCore *core);
 /* request: {"device":"<spec id>","model":"<model id>","host":"<ip or name>",
  *           "port":<optional>,"settings":{...},"monitor":<optional bool>}
  * "monitor":false opens the device for commands only: no subscription,
- * connect-time read or poll.
+ * connect-time read or poll. "host" may be left out for an integration on
+ * which only the core listens (osc-listener).
  * returns: {"device":<id>} or {"error":{...}} */
 char *mi_open(const MiCore *core, const char *request);
 
@@ -60,8 +61,10 @@ char *mi_execute(const MiCore *core, uint64_t device, const char *command, const
 /* {"connection":{...},"state":{...}}, or null if the device is not open. */
 char *mi_snapshot(const MiCore *core, uint64_t device);
 
-/* A JSON array of events. mi_poll_events never waits; mi_wait_events waits up
- * to timeout_ms and returns [] on timeout or after mi_interrupt_events. */
+/* A JSON array of events, each {"event":"connection"|"state"|"alive"|"log"|
+ * "closed"|"message"|"dropped"|"discovered"|"discovery",...} (SPEC.md,
+ * Events). mi_poll_events never waits; mi_wait_events waits up to timeout_ms
+ * and returns [] on timeout or after mi_interrupt_events. */
 char *mi_poll_events(const MiCore *core, uint32_t max);
 char *mi_wait_events(const MiCore *core, uint32_t max, uint32_t timeout_ms);
 void mi_interrupt_events(const MiCore *core);

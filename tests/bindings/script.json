@@ -1,7 +1,22 @@
 {
-  "about": "Played through every delivery against integrations-sim. Each step's result, with every 'message' field removed, must equal 'expect' exactly. '$name' is replaced by a simulator port or a saved device id. A 'stream' step watches a stream: with 'expect', opening it must fail with that error; otherwise 'frames' frames must arrive within 5 s, each of 'format', starting with the JPEG marker FF D8, with rising sequence numbers, and the stream is then closed.",
+  "about": "Played through every delivery against integrations-sim. Each step's result, with every 'message' field removed, must equal 'expect' exactly. '$name' is replaced by a simulator port or a saved device id. A 'stream' step watches a stream: with 'expect', opening it must fail with that error; otherwise 'frames' frames must arrive within 5 s, each of 'format', starting with the JPEG marker FF D8, with rising sequence numbers, and the stream is then closed. An 'event' step takes queued events, discarding others, until 'count' (1 if absent) of them have every field of 'match' equal, within 5 s.",
   "steps": [
     { "op": "catalog", "path": "devices.kramer-p3000.vendor", "expect": "Kramer Electronics" },
+
+    { "op": "open", "save": "o",
+      "request": { "device": "osc-listener", "model": "generic", "port": "$osc",
+                   "settings": { "bind_address": "127.0.0.1" } } },
+    { "op": "wait", "device": "$o", "path": "connection.status", "equals": "connected" },
+    { "op": "execute", "device": "$o", "command": "send",
+      "params": { "to": "$osc_address", "address": "/script/press", "args": [1] },
+      "expect": { "ok": { "kind": "unverified" } } },
+    { "op": "execute", "device": "$o", "command": "send",
+      "params": { "to": "$osc_address", "address": "/script/press", "args": [1] },
+      "expect": { "ok": { "kind": "unverified" } } },
+    { "op": "event", "count": 2,
+      "match": { "event": "message", "device": "$o", "address": "/script/press", "types": "i", "args": [1],
+                 "source": "$osc_address" } },
+    { "op": "close", "device": "$o" },
 
     { "op": "open", "save": "k",
       "request": { "device": "kramer-p3000", "model": "p3000-generic", "host": "127.0.0.1", "port": "$kramer" } },

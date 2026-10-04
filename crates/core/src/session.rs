@@ -87,6 +87,22 @@ pub(crate) enum Inbound {
         socket: Key,
         stream: tokio::net::TcpStream,
     },
+    /// A connection any peer opened to a port this session serves.
+    Client {
+        socket: Key,
+        peer: SocketAddr,
+        stream: tokio::net::TcpStream,
+    },
+}
+
+/// Connections one `TcpServe` port holds at once; more are closed on arrival,
+/// so a misbehaving peer cannot exhaust descriptors.
+const MAX_CLIENTS: usize = 64;
+
+/// A port served by `TcpServe` and the connections accepted on it.
+struct Server {
+    task: JoinHandle<()>,
+    clients: HashMap<SocketAddr, crate::tcp::Connection>,
 }
 
 /// What every session shares.
@@ -154,6 +170,8 @@ pub(crate) struct Session {
     ws: HashMap<Key, crate::ws::Connection>,
     /// TCP ports this session listens on, by key.
     listening: HashMap<Key, u16>,
+    /// TCP ports this session serves to any peer, by key.
+    servers: HashMap<Key, Server>,
     next_generation: u64,
     pending: HashMap<CommandId, Pending>,
     next_command: CommandId,
@@ -193,6 +211,7 @@ impl Session {
             reads: HashMap::new(),
             ws: HashMap::new(),
             listening: HashMap::new(),
+            servers: HashMap::new(),
             next_generation: 1,
             pending: HashMap::new(),
             next_command: 1,
@@ -268,6 +287,23 @@ impl Session {
                         Inbound::Tcp { socket, generation, input } => {
                             let current = self.tcp.get(socket).map(|c| c.generation);
                             if current != Some(generation) {
+                                // One of the connections a served port holds?
+                                let Some(server) = self.servers.get_mut(socket) else {
+                                    continue;
+                                };
+                                let Some(peer) = server
+                                    .clients
+                                    .iter()
+                                    .find(|(_, c)| c.generation == generation)
+                                    .map(|(peer, _)| *peer)
+                                else {
+                                    continue;
+                                };
+                                if matches!(input, TcpInput::Closed { .. }) {
+                                    server.clients.remove(&peer);
+                                }
+                                self.module.tcp_client(&mut cx, socket, peer, input);
+                                self.apply(cx.take()).await;
                                 continue;
                             }
                             if matches!(input, TcpInput::Closed { .. }) {
@@ -301,6 +337,34 @@ impl Session {
                                 self.inbound_tx.clone(),
                             );
                             self.tcp.insert(socket, connection);
+                        }
+                        Inbound::Client { socket, peer, stream } => {
+                            let generation = self.next_generation;
+                            let Some(server) = self.servers.get_mut(socket) else {
+                                continue;
+                            };
+                            if server.clients.len() >= MAX_CLIENTS {
+                                cx.log(
+                                    Level::Warning,
+                                    format!(
+                                        "connection from {peer} refused: \
+                                         {MAX_CLIENTS} connections already open"
+                                    ),
+                                );
+                            } else {
+                                self.next_generation += 1;
+                                let connection = crate::tcp::adopt(
+                                    socket,
+                                    generation,
+                                    stream,
+                                    self.inbound_tx.clone(),
+                                );
+                                // A peer reusing an address replaces its old
+                                // connection.
+                                if let Some(old) = server.clients.insert(peer, connection) {
+                                    old.task.abort();
+                                }
+                            }
                         }
                         Inbound::Ws { socket, generation, input } => {
                             let current = self.ws.get(socket).map(|c| c.generation);
@@ -507,6 +571,44 @@ impl Session {
                         }
                     }
                 }
+                Action::TcpServe {
+                    socket,
+                    address,
+                    port,
+                } => {
+                    self.close_tcp(socket);
+                    let address = address.unwrap_or(self.services.bind_address);
+                    match serve(socket, address, port, self.inbound_tx.clone()) {
+                        Ok(task) => {
+                            self.servers.insert(
+                                socket,
+                                Server {
+                                    task,
+                                    clients: HashMap::new(),
+                                },
+                            );
+                        }
+                        Err(message) => {
+                            let mut cx = self.cx();
+                            self.module.socket_error(&mut cx, socket, &message);
+                            Box::pin(self.apply(cx.take())).await;
+                        }
+                    }
+                }
+                Action::TcpClientSend { socket, peer, data } => {
+                    if let Some(c) = self.servers.get(socket).and_then(|s| s.clients.get(&peer)) {
+                        let _ = c.writer.send(data);
+                    }
+                }
+                Action::TcpClientClose { socket, peer } => {
+                    if let Some(c) = self
+                        .servers
+                        .get_mut(socket)
+                        .and_then(|s| s.clients.remove(&peer))
+                    {
+                        c.task.abort();
+                    }
+                }
                 Action::WsOpen { socket, request } => {
                     self.close_ws(socket);
                     let generation = self.next_generation;
@@ -559,6 +661,20 @@ impl Session {
                     self.services.events.push(Event::State {
                         device: self.device,
                         patch,
+                    });
+                }
+                Action::Message {
+                    address,
+                    types,
+                    args,
+                    source,
+                } => {
+                    self.services.events.push(Event::Message {
+                        device: self.device,
+                        address,
+                        types,
+                        args,
+                        source: source.to_string(),
                     });
                 }
                 Action::Connection(connection) => {
@@ -638,7 +754,19 @@ impl Session {
                     .await
                     .map_err(|e| format!("bind: {e}"))?;
                 let socket = Arc::new(socket);
-                let reader = spawn_reader(key, socket.clone(), self.host, self.inbound_tx.clone());
+                let reader = spawn_reader(
+                    key,
+                    socket.clone(),
+                    Some(self.host),
+                    self.inbound_tx.clone(),
+                );
+                self.sockets.insert(key, Socket::Own { socket, reader });
+            }
+            Bind::Any { address, port } => {
+                let address = address.unwrap_or(self.services.bind_address);
+                let socket = bind_any(address, port).map_err(|e| format!("bind :{port}: {e}"))?;
+                let socket = Arc::new(socket);
+                let reader = spawn_reader(key, socket.clone(), None, self.inbound_tx.clone());
                 self.sockets.insert(key, Socket::Own { socket, reader });
             }
             Bind::Shared(port) => {
@@ -680,6 +808,12 @@ impl Session {
     fn close_tcp(&mut self, key: Key) {
         if let Some(c) = self.tcp.remove(key) {
             c.task.abort();
+        }
+        if let Some(server) = self.servers.remove(key) {
+            server.task.abort();
+            for (_, c) in server.clients {
+                c.task.abort();
+            }
         }
     }
 
@@ -772,6 +906,10 @@ impl Session {
         for key in ws {
             self.close_ws(key);
         }
+        let served: Vec<Key> = self.servers.keys().copied().collect();
+        for key in served {
+            self.close_tcp(key);
+        }
         for (_, port) in self.listening.drain() {
             self.services.shared_tcp.unregister(port, self.host);
         }
@@ -789,12 +927,61 @@ async fn sleep_until(at: Option<Instant>) {
     }
 }
 
-/// Reads an owned socket, passing on only datagrams from the device's own
-/// address: anything else arriving on the port is not this device's.
+/// A UDP socket on a fixed port for one session, with the large receive
+/// buffer the shared ports have, since a listener's senders can burst too.
+fn bind_any(address: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    let domain = if address.is_ipv6() {
+        Domain::IPV6
+    } else {
+        Domain::IPV4
+    };
+    let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
+    let _ = socket.set_recv_buffer_size(RECV_BUFFER);
+    socket.set_nonblocking(true)?;
+    socket.bind(&SocketAddr::new(address, port).into())?;
+    UdpSocket::from_std(socket.into())
+}
+
+/// Listen on a TCP port for one session, handing it every connection.
+fn serve(
+    key: Key,
+    address: IpAddr,
+    port: u16,
+    inbound: mpsc::Sender<Inbound>,
+) -> Result<JoinHandle<()>, String> {
+    let listener = std::net::TcpListener::bind(SocketAddr::new(address, port))
+        .and_then(|l| {
+            l.set_nonblocking(true)?;
+            tokio::net::TcpListener::from_std(l)
+        })
+        .map_err(|e| format!("listen :{port}: {e}"))?;
+    Ok(tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((stream, peer)) => {
+                    let accepted = Inbound::Client {
+                        socket: key,
+                        peer,
+                        stream,
+                    };
+                    if inbound.send(accepted).await.is_err() {
+                        return;
+                    }
+                }
+                // Out of descriptors and the like: wait rather than spin.
+                Err(_) => tokio::time::sleep(Duration::from_millis(100)).await,
+            }
+        }
+    }))
+}
+
+/// Reads an owned socket, passing on only datagrams from `host` when given:
+/// anything else arriving on the port is not this device's.
 fn spawn_reader(
     key: Key,
     socket: Arc<UdpSocket>,
-    host: IpAddr,
+    host: Option<IpAddr>,
     inbound: mpsc::Sender<Inbound>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -802,7 +989,7 @@ fn spawn_reader(
         loop {
             match socket.recv_from(&mut buf).await {
                 Ok((n, from)) => {
-                    if from.ip() != host {
+                    if host.is_some_and(|h| from.ip() != h) {
                         continue;
                     }
                     let msg = Inbound::Datagram {

@@ -65,7 +65,8 @@ class Stream extends EventEmitter {
 
 /**
  * Emits 'event' for every core event, and also the event under its own name:
- * 'connection', 'state', 'alive', 'log', 'closed', 'dropped'.
+ * 'connection', 'state', 'alive', 'log', 'closed', 'message', 'dropped',
+ * 'discovered', 'discovery'.
  */
 class Core extends EventEmitter {
   #native;

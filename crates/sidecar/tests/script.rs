@@ -241,6 +241,22 @@ async fn the_shared_binding_script() {
                     tokio::time::sleep(Duration::from_millis(20)).await;
                 }
             }
+            "event" => {
+                let wanted = step.get("count").and_then(Value::as_u64).unwrap_or(1);
+                let fields = step["match"].as_object().unwrap();
+                let deadline = Instant::now() + Duration::from_secs(5);
+                let mut found = 0;
+                while found < wanted {
+                    assert!(Instant::now() < deadline, "{label}: {found} found");
+                    let events = client.get("/v1/events?max=256&wait_ms=100").await;
+                    found += events
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|e| fields.iter().all(|(k, v)| &e[k] == v))
+                        .count() as u64;
+                }
+            }
             "execute" => {
                 let body =
                     json!({"device": device, "command": step["command"], "params": step["params"]});

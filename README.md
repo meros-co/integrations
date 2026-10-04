@@ -68,6 +68,12 @@ doesn't take a subscription slot the device has few of (a Behringer WING has
 one). Each device's most recent request-to-reply time is reported as
 `latency_ms` on its snapshot and `alive` events.
 
+**Events** come from one queue, the same JSON in every package (SPEC.md,
+Events). A listener such as `osc-listener`, which hears OSC from any control
+surface and is opened with no host, reports each message it receives as a
+`message` event, even when it repeats the last, so a button pressed twice
+arrives twice; a slow consumer loses state patches before it loses those.
+
 **When shutting down**, call `close_all` (`closeAll` in Node, `mi_close_all`
 in C) before the process exits. The core refuses new work, gives commands in
 flight a few seconds, then closes every device so each ends what it started

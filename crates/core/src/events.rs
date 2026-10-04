@@ -38,9 +38,29 @@ pub enum Event {
     },
     /// The device's session has ended after `close`.
     Closed { device: DeviceId },
-    /// State patches were discarded because the consumer fell behind. Read
-    /// each affected device's snapshot to resynchronise.
-    Dropped { count: u64 },
+    /// One message a listener received (an OSC control surface's button or
+    /// fader), reported every time, even when it repeats the last one: a
+    /// button pressed twice is two events. `source` is the sender as
+    /// `ip:port`; `args` is a JSON array; `types` is the protocol's own type
+    /// description where it has one (OSC type tags without the comma). Kept
+    /// on overflow, unlike state patches.
+    Message {
+        device: DeviceId,
+        address: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        types: Option<String>,
+        args: Value,
+        source: String,
+    },
+    /// Events were discarded because the consumer fell behind: `count` state
+    /// patches (read each affected device's snapshot to resynchronise) and,
+    /// only past a ceiling of [`MESSAGE_CEILING`] queued events, `messages`
+    /// message events, which cannot be recovered.
+    Dropped {
+        count: u64,
+        #[serde(skip_serializing_if = "is_zero")]
+        messages: u64,
+    },
     /// Discovery found a device, or learned more about one (its name, or
     /// whether it is a receiver or a transmitter). `models` are the models it
     /// can be; more than one when the protocol cannot tell them apart.
@@ -60,14 +80,27 @@ pub enum Event {
     Discovery { protocol: String, message: String },
 }
 
+fn is_zero(n: &u64) -> bool {
+    *n == 0
+}
+
+/// Queued events beyond which a new `Message` event is discarded and counted,
+/// so a control surface streaming to a stalled consumer cannot grow memory
+/// without limit: ten times the core's normal capacity.
+pub const MESSAGE_CEILING: usize = 100_000;
+
 /// Bounded so a stalled consumer cannot grow memory without limit. On
 /// overflow, state patches are discarded oldest first and counted; every other
 /// event is kept, because a missed connection change cannot be recovered from a
-/// snapshot's history.
+/// snapshot's history, nor a missed button press from anywhere. Message events
+/// alone are discarded, and counted, once [`MESSAGE_CEILING`] events are
+/// queued.
 pub struct EventQueue {
     queue: Mutex<VecDeque<Event>>,
     notify: Notify,
     dropped: AtomicU64,
+    dropped_messages: AtomicU64,
+    message_ceiling: usize,
     interrupted: AtomicBool,
     capacity: usize,
     /// The specs `Discovered` events may name; every spec when absent.
@@ -80,6 +113,8 @@ impl EventQueue {
             queue: Mutex::new(VecDeque::new()),
             notify: Notify::new(),
             dropped: AtomicU64::new(0),
+            dropped_messages: AtomicU64::new(0),
+            message_ceiling: MESSAGE_CEILING.max(capacity),
             interrupted: AtomicBool::new(false),
             capacity,
             discoverable: None,
@@ -101,6 +136,10 @@ impl EventQueue {
         }
         {
             let mut q = self.queue.lock().unwrap();
+            if matches!(event, Event::Message { .. }) && q.len() >= self.message_ceiling {
+                self.dropped_messages.fetch_add(1, Ordering::Relaxed);
+                return;
+            }
             if q.len() >= self.capacity {
                 if let Some(pos) = q.iter().position(|e| matches!(e, Event::State { .. })) {
                     q.remove(pos);
@@ -116,8 +155,12 @@ impl EventQueue {
     pub fn drain(&self, max: usize) -> Vec<Event> {
         let mut out = Vec::new();
         let dropped = self.dropped.swap(0, Ordering::Relaxed);
-        if dropped > 0 {
-            out.push(Event::Dropped { count: dropped });
+        let messages = self.dropped_messages.swap(0, Ordering::Relaxed);
+        if dropped > 0 || messages > 0 {
+            out.push(Event::Dropped {
+                count: dropped,
+                messages,
+            });
         }
         let mut q = self.queue.lock().unwrap();
         let n = max.min(q.len());
@@ -195,7 +238,13 @@ mod tests {
             patch: json!({"a": 2}),
         });
         let events = q.drain(10);
-        assert_eq!(events[0], Event::Dropped { count: 1 });
+        assert_eq!(
+            events[0],
+            Event::Dropped {
+                count: 1,
+                messages: 0
+            }
+        );
         assert!(matches!(events[1], Event::Connection { .. }));
         assert_eq!(
             events[2],
@@ -203,6 +252,75 @@ mod tests {
                 device: 1,
                 patch: json!({"a": 2})
             }
+        );
+    }
+
+    fn message(n: i64) -> Event {
+        Event::Message {
+            device: 1,
+            address: "/1/push1".into(),
+            types: Some("f".into()),
+            args: json!([n]),
+            source: "127.0.0.1:9000".into(),
+        }
+    }
+
+    #[test]
+    fn overflow_keeps_repeated_messages_and_drops_state_patches() {
+        let q = EventQueue::new(2);
+        q.push(Event::State {
+            device: 1,
+            patch: json!({"a": 1}),
+        });
+        q.push(message(1));
+        q.push(message(1));
+        q.push(message(2));
+        assert_eq!(
+            q.drain(10),
+            [
+                Event::Dropped {
+                    count: 1,
+                    messages: 0
+                },
+                message(1),
+                message(1),
+                message(2)
+            ]
+        );
+    }
+
+    #[test]
+    fn messages_past_the_ceiling_are_counted_not_queued() {
+        let mut q = EventQueue::new(2);
+        q.message_ceiling = 3;
+        for n in 0..5 {
+            q.push(message(n));
+        }
+        // Other events are still kept.
+        q.push(Event::Closed { device: 1 });
+        let events = q.drain(10);
+        assert_eq!(
+            events[0],
+            Event::Dropped {
+                count: 0,
+                messages: 2
+            }
+        );
+        assert_eq!(&events[1..4], [message(0), message(1), message(2)]);
+        assert_eq!(events[4], Event::Closed { device: 1 });
+        assert_eq!(
+            serde_json::to_value(&events[1]).unwrap(),
+            json!({"event": "message", "device": 1, "address": "/1/push1", "types": "f",
+                   "args": [0], "source": "127.0.0.1:9000"})
+        );
+        // As before for state patches alone.
+        assert_eq!(
+            serde_json::to_value(Event::Dropped {
+                count: 3,
+                messages: 0
+            })
+            .unwrap(),
+            json!({"event": "dropped", "count": 3})
         );
     }
 }

@@ -75,6 +75,14 @@ class SharedScript(unittest.TestCase):
                 while at(json.loads(native.snapshot(step["device"])), step["path"]) != step["equals"]:
                     self.assertLess(time.monotonic(), deadline, f"{label}: timed out")
                     time.sleep(0.02)
+            elif op == "event":
+                wanted = step.get("count", 1)
+                deadline = time.monotonic() + 5
+                found = 0
+                while found < wanted:
+                    self.assertLess(time.monotonic(), deadline, f"{label}: {found} found")
+                    events = json.loads(native.wait_events(256, 100))
+                    found += sum(all(e.get(k) == v for k, v in step["match"].items()) for e in events)
             elif op == "execute":
                 result = json.loads(native.execute(step["device"], step["command"], json.dumps(step["params"])))
                 self.assertEqual(strip_messages(result), step["expect"], label)

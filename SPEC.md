@@ -336,6 +336,34 @@ entry naming its setting, and a push channel needs a `push` entry;
 `tools/validate.py` checks this. A test checks that each native module,
 opened without a port, uses its unconditional control default.
 
+An integration whose every port is `listener: core` reaches out to no device,
+so it may be opened with the host empty or left out (it is then `0.0.0.0`).
+Its module decides whether it can do without one: `osc-listener` hears any
+sender and needs none, while `tsl-umd-listener` is one switcher per device,
+told apart by address, and refuses to open without it.
+
+### Events
+
+Every delivery drains one queue of JSON events, each with an `event` field:
+`connection`, `state` (an RFC 7386 merge patch), `alive`, `log`, `closed`,
+`message`, `dropped`, `discovered` and `discovery`. A listener reports what it
+receives as `message` events, one per message, even when one repeats the
+last exactly, since a state patch with an equal value is no change:
+
+```json
+{"event": "message", "device": 3, "address": "/1/push1", "types": "f",
+ "args": [1.0], "source": "192.168.1.40:9000"}
+```
+
+`source` is the sender's `ip:port`; `types` is the protocol's own type
+description where it has one (OSC type tags without the comma) and is
+otherwise absent. When the consumer falls behind and the queue is full, state
+patches are discarded first, oldest first, and counted in a `dropped` event's
+`count`; every other event is kept. Message events alone are discarded past a
+hard ceiling of 100,000 queued events, counted in `dropped`'s `messages`
+(present only when not zero), so a stalled consumer cannot grow memory without
+limit.
+
 ### Settings and connection setup
 
 Per-installation values that are not command parameters — credentials, ports,

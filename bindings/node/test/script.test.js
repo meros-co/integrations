@@ -74,6 +74,20 @@ test('the shared binding script', async () => {
           }
           break;
         }
+        case 'event': {
+          const wanted = step.count ?? 1;
+          const deadline = Date.now() + 5000;
+          let found = 0;
+          while (found < wanted) {
+            assert.ok(Date.now() < deadline, `${label}: ${found} found`);
+            const events = core.pollEvents(256);
+            found += events.filter((e) =>
+              Object.entries(step.match).every(([k, v]) => JSON.stringify(e[k]) === JSON.stringify(v)),
+            ).length;
+            if (found < wanted) await new Promise((r) => setTimeout(r, 20));
+          }
+          break;
+        }
         case 'execute': {
           const result = await core.execute(step.device, step.command, step.params);
           assert.deepStrictEqual(stripMessages(result), step.expect, label);
