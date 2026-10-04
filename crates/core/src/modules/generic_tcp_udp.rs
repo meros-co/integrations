@@ -529,6 +529,7 @@ mod tests {
     fn module(settings: Value) -> GenericTcpUdp {
         GenericTcpUdp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)),
+            host_name: None,
             port: Some(5000),
             model: "generic".into(),
             channels: None,
@@ -616,6 +617,7 @@ mod tests {
         let open = |settings: Value| {
             GenericTcpUdp::new(OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: Some(1),
                 model: "generic".into(),
                 channels: None,
@@ -630,6 +632,7 @@ mod tests {
         assert_eq!(m.send_terminator, vec![3]);
         let no_port = GenericTcpUdp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
             port: None,
             model: "generic".into(),
             channels: None,
@@ -643,6 +646,7 @@ mod tests {
     fn opened_for_commands_only_it_still_asks_nothing_and_times_requests() {
         let mut m = GenericTcpUdp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)),
+            host_name: None,
             port: Some(5000),
             model: "generic".into(),
             channels: None,

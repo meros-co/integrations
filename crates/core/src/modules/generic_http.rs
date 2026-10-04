@@ -520,6 +520,7 @@ mod tests {
     fn module(settings: Value) -> GenericHttp {
         GenericHttp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 30)),
+            host_name: None,
             port: None,
             model: "http".into(),
             channels: None,
@@ -603,6 +604,7 @@ mod tests {
 
         let m = GenericHttp::new(OpenContext {
             host: IpAddr::V6(Ipv6Addr::LOCALHOST),
+            host_name: None,
             port: Some(8080),
             model: "http".into(),
             channels: None,
@@ -634,6 +636,7 @@ mod tests {
         ));
         assert!(GenericHttp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
             port: None,
             model: "http".into(),
             channels: None,
@@ -773,6 +776,7 @@ mod tests {
     fn opened_for_commands_only_it_polls_only_when_asked() {
         let mut m = GenericHttp::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 30)),
+            host_name: None,
             port: None,
             model: "http".into(),
             channels: None,

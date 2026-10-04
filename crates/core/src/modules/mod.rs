@@ -297,6 +297,7 @@ mod tests {
             }
             let context = OpenContext {
                 host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)),
+                host_name: None,
                 port: None,
                 model: model.id.clone(),
                 channels: model.channels,

@@ -697,6 +697,7 @@ mod tests {
     fn london(settings: Value, monitor: bool) -> London {
         London::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 50)),
+            host_name: None,
             port: None,
             model: "blu-100".into(),
             channels: None,

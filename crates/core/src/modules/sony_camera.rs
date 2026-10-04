@@ -3823,6 +3823,7 @@ mod tests {
         s.entry("session_mode").or_insert(json!("remote"));
         SonyCamera::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
+            host_name: None,
             port: None,
             model: model.into(),
             channels: None,
@@ -4284,6 +4285,7 @@ mod tests {
         // Without credentials the device cannot be opened in this mode.
         assert!(SonyCamera::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
             port: None,
             model: "x".into(),
             channels: None,
@@ -6180,6 +6182,7 @@ mod tests {
         let open = |v: Value| {
             SonyCamera::new(OpenContext {
                 host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
+                host_name: None,
                 port: None,
                 model: "ilce-7sm3".into(),
                 channels: None,
@@ -6204,6 +6207,7 @@ mod tests {
         s.insert("session_mode".into(), json!("remote"));
         let mut m = SonyCamera::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
+            host_name: None,
             port: None,
             model: "ilce-7sm3".into(),
             channels: None,

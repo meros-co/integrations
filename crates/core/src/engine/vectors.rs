@@ -138,10 +138,17 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         .device(spec_id)
         .ok_or(format!("unknown spec {spec_id}"))?;
     let model = &spec.models[0];
-    let settings =
-        validate(&spec.settings, &Default::default()).map_err(|e| format!("settings: {e}"))?;
+    // Optional device settings, as for a command vector: a spec whose
+    // telemetry names a required setting (the plan to follow) needs them.
+    let settings = v
+        .get("settings")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let settings = validate(&spec.settings, &settings).map_err(|e| format!("settings: {e}"))?;
     let ctx = OpenContext {
         host: HOST,
+        host_name: None,
         port: None,
         model: model.id.clone(),
         channels: model.channels,
@@ -359,6 +366,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
 
     let ctx = OpenContext {
         host: HOST,
+        host_name: None,
         port: None,
         model: model.id.clone(),
         channels: model.channels,
@@ -391,15 +399,20 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     }) {
         engine.ws(&mut cx, "device", WsInput::Opened);
     }
-    for id in http_ids(&started) {
+    // HTTP polls and the probe go one at a time: each answered request lets
+    // the next go.
+    let mut pending = http_ids(&started);
+    while let Some(id) = pending.pop() {
+        let mut step = Cx::new(1);
         engine.http_response(
-            &mut cx,
+            &mut step,
             id,
             Ok(HttpResponse {
                 status: 200,
                 body: b"{}".to_vec(),
             }),
         );
+        pending.extend(http_ids(&step.take()));
     }
     if started.iter().any(|a| matches!(a, Action::UdpSend { .. })) && engine.current.is_some() {
         let probe_reply = super::osc::encode("/probe-reply", &[]);
@@ -657,6 +670,7 @@ fn every_spec_with_telemetry_has_a_telemetry_vector_and_constructs() {
         let model = &spec.models[0];
         let ctx = OpenContext {
             host: HOST,
+            host_name: None,
             port: None,
             model: model.id.clone(),
             channels: model.channels,

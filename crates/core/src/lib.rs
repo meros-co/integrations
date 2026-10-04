@@ -96,7 +96,9 @@ pub struct OpenRequest {
     pub device: String,
     /// Model id within the spec.
     pub model: String,
-    /// IP address or hostname. A hostname is resolved once, when opened.
+    /// IP address or hostname. A hostname is resolved once, when opened, for
+    /// TCP and UDP; the spec engine's HTTP, websocket and event-stream URLs
+    /// keep the name, so a TLS certificate is checked against it.
     pub host: String,
     /// The device's port, when it is not the protocol's default: many devices
     /// let an operator change it.
@@ -342,6 +344,7 @@ impl Core {
 
         let context = module::OpenContext {
             host,
+            host_name: host_name(&request.host),
             port: request.port,
             model: model.id.clone(),
             channels: model.channels,
@@ -545,6 +548,12 @@ impl Drop for Core {
             rt.shutdown_background();
         }
     }
+}
+
+/// The host as a name, when it is not an address.
+fn host_name(host: &str) -> Option<String> {
+    let host = host.trim();
+    (!host.is_empty() && host.parse::<IpAddr>().is_err()).then(|| host.to_string())
 }
 
 fn resolve(host: &str) -> Result<IpAddr, OpenError> {

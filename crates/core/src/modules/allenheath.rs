@@ -1079,6 +1079,7 @@ mod tests {
             "allenheath-dlive",
             OpenContext {
                 host: "10.0.0.20".parse().unwrap(),
+                host_name: None,
                 port: None,
                 model: model.into(),
                 channels: None,

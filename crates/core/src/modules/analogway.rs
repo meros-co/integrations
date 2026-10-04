@@ -2504,6 +2504,7 @@ mod tests {
     fn ctx(d: &str) -> OpenContext {
         OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 20)),
+            host_name: None,
             port: None,
             model: d.into(),
             channels: None,

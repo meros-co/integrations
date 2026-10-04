@@ -324,6 +324,28 @@ fn scheme_of(
     Ok(scheme)
 }
 
+/// An HTTP transport's `auth`, or `{setting: name}` naming the operator's
+/// choice, for a service taking more than one kind of credential (Planning
+/// Center: a personal access token as Basic, or an OAuth token as Bearer).
+fn auth_of(t: &Value, settings: &Params) -> Result<String, String> {
+    match t.get("auth") {
+        None => Ok("none".into()),
+        Some(Value::String(s)) => Ok(s.clone()),
+        Some(Value::Object(o)) => {
+            let name = o
+                .get("setting")
+                .and_then(Value::as_str)
+                .ok_or("auth needs a method or {setting: name}")?;
+            Ok(settings
+                .get(name)
+                .and_then(Value::as_str)
+                .unwrap_or("none")
+                .to_string())
+        }
+        Some(_) => Err("auth needs a method or {setting: name}".into()),
+    }
+}
+
 /// `Authorization` for Basic and Bearer, from the `username`, `password` and
 /// `token` settings; nothing for a bearer token left empty.
 fn auth_headers(auth: HttpAuth, settings: &Params) -> Vec<(String, String)> {
@@ -363,11 +385,17 @@ fn host_text(host: IpAddr) -> String {
     }
 }
 
+/// The host as a URL names it: the name the device was opened with, so TLS
+/// checks the certificate against it, or else its address.
+fn url_host(ctx: &OpenContext) -> String {
+    ctx.host_name.clone().unwrap_or_else(|| host_text(ctx.host))
+}
+
 /// A websocket's opening request: `scheme://host:port/path`, the subprotocol
 /// and any credential.
 fn ws_request(
     t: &Value,
-    host: IpAddr,
+    host: &str,
     port: u16,
     settings: &Params,
     auth: HttpAuth,
@@ -382,7 +410,7 @@ fn ws_request(
         headers.push(("Sec-WebSocket-Protocol".to_string(), p.to_string()));
     }
     Ok(WsRequest {
-        url: format!("{scheme}://{}:{port}{path}", host_text(host)),
+        url: format!("{scheme}://{host}:{port}{path}"),
         headers,
         accept_invalid_certs: t
             .get("accept_invalid_certs")
@@ -515,7 +543,7 @@ impl SpecEngine {
                 };
                 Transport::Ws {
                     port,
-                    request: ws_request(&t, ctx.host, port, &ctx.settings, auth)?,
+                    request: ws_request(&t, &url_host(&ctx), port, &ctx.settings, auth)?,
                     auth,
                     replies: str_field(&t, "reply") != Some("none"),
                     reply_match,
@@ -523,14 +551,14 @@ impl SpecEngine {
             }
             "http" => {
                 let scheme = scheme_of(&t, &ctx.settings, "http", "https")?;
-                let auth = match str_field(&t, "auth").unwrap_or("none") {
+                let auth = match auth_of(&t, &ctx.settings)?.as_str() {
                     "none" => HttpAuth::None,
                     "basic" => HttpAuth::Basic,
                     "digest" => HttpAuth::Digest,
                     "bearer" => HttpAuth::Bearer,
                     other => return Err(format!("http auth '{other}' is not implemented")),
                 };
-                let host = host_text(ctx.host);
+                let host = url_host(&ctx);
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
                     auth,
@@ -598,7 +626,7 @@ impl SpecEngine {
                         return Err("telemetry.websocket.socketio is true or an object".into())
                     }
                 };
-                let mut request = ws_request(w, ctx.host, push_port, &ctx.settings, auth)?;
+                let mut request = ws_request(w, &url_host(&ctx), push_port, &ctx.settings, auth)?;
                 if let Some(sio) = &socketio {
                     // Engine.IO's query.
                     let sep = if request.url.contains('?') { '&' } else { '?' };
@@ -1164,6 +1192,9 @@ impl SpecEngine {
                 cx.set_timer(PROBE, PROBE_WHEN_IDLE);
             }
             Transport::Http { .. } => {
+                // No connection to wait for: the polls go now, queued like
+                // commands, each reply offered to the rules.
+                self.start_telemetry(cx);
                 if self.probe.is_some() {
                     self.enqueue_probe(cx);
                 } else {
@@ -2088,6 +2119,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "propresenter-7".into(),
                 channels: None,
@@ -2113,6 +2145,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "p3000-generic".into(),
                 channels: None,
@@ -2154,6 +2187,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "propresenter-7".into(),
                 channels: None,
@@ -2185,6 +2219,91 @@ mod tests {
     }
 
     #[test]
+    fn a_host_opened_by_name_keeps_its_name_in_urls() {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        let t = spec.transport.as_mut().unwrap();
+        t["scheme"] = json!("https");
+        t["port"] = json!(443);
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)),
+                host_name: Some("api.example.com".into()),
+                port: None,
+                model: "propresenter-7".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: true,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let request = cx
+            .take()
+            .into_iter()
+            .find_map(|a| match a {
+                Action::Http { request, .. } => Some(request),
+                _ => None,
+            })
+            .expect("the probe");
+        assert!(
+            request.url.starts_with("https://api.example.com:443/"),
+            "{}",
+            request.url
+        );
+    }
+
+    #[test]
+    fn the_operator_chooses_basic_or_bearer() {
+        let probe_auth = |settings: Value| {
+            let mut spec = Catalog::source_tree()
+                .device("propresenter")
+                .unwrap()
+                .clone();
+            spec.transport.as_mut().unwrap()["auth"] = json!({"setting": "auth"});
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "propresenter-7".into(),
+                    channels: None,
+                    settings: settings.as_object().unwrap().clone(),
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            cx.take()
+                .into_iter()
+                .find_map(|a| match a {
+                    Action::Http { request, .. } => Some(request),
+                    _ => None,
+                })
+                .expect("the probe")
+                .headers
+                .into_iter()
+                .find(|(k, _)| k == "Authorization")
+                .map(|(_, v)| v)
+        };
+        assert_eq!(
+            probe_auth(json!({"auth": "bearer", "token": "t0k"})).as_deref(),
+            Some("Bearer t0k")
+        );
+        assert_eq!(
+            probe_auth(json!({"auth": "basic", "username": "a", "password": "b"})).as_deref(),
+            Some("Basic YTpi")
+        );
+        assert_eq!(probe_auth(json!({})), None);
+    }
+
+    #[test]
     fn line_udp_sends_one_message_per_datagram() {
         let mut spec = Catalog::source_tree().device("rosstalk").unwrap().clone();
         spec.transport = Some(json!({"type": "line-udp", "port": 6553, "terminator": "none"}));
@@ -2193,6 +2312,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "carbonite".into(),
                 channels: None,
@@ -2243,6 +2363,7 @@ mod tests {
                 Arc::new(spec),
                 OpenContext {
                     host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
                     port: None,
                     model: "x32".into(),
                     channels: Some(32),
@@ -2319,6 +2440,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "p3000-generic".into(),
                 channels: None,
@@ -2396,6 +2518,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "x32".into(),
                 channels: Some(32),
@@ -2481,6 +2604,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: model.into(),
                 channels: None,
@@ -2905,6 +3029,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "x32".into(),
                 channels: Some(32),
@@ -2960,6 +3085,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "p3000-generic".into(),
                 channels: None,
@@ -3003,6 +3129,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "propresenter-7".into(),
                 channels: None,
@@ -3011,6 +3138,47 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn an_http_device_is_polled_from_the_start() {
+        let telemetry = json!({
+            "poll": {"send": [{"method": "GET", "path": "/polled"}], "every_ms": 5000},
+            "updates": [{"path": "^/polled$", "json": {"v": "$.v"}, "state": {"x": "{v}"}}],
+        });
+        let state = json!({"x": {"type": "int", "description": "x"}});
+        let mut e = http_with(telemetry.clone(), state.clone(), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert!(a.contains(&Action::SetTimer {
+            key: POLL,
+            after: 5000
+        }));
+        // The poll goes first, then the probe; their replies in turn.
+        let poll = http_ids(&a)[0];
+        let mut cx = Cx::new(5);
+        e.http_response(
+            &mut cx,
+            poll,
+            Ok(HttpResponse {
+                status: 200,
+                body: br#"{"v": 7}"#.to_vec(),
+            }),
+        );
+        let a = cx.take();
+        assert!(a.contains(&Action::State(json!({"x": 7}))));
+        assert_eq!(http_ids(&a).len(), 1, "then the probe");
+
+        // Commands only: no poll.
+        let mut e = http_with(telemetry, state, false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert_eq!(http_ids(&a).len(), 1, "the probe alone");
+        assert!(!a
+            .iter()
+            .any(|x| matches!(x, Action::SetTimer { key: POLL, .. })));
     }
 
     #[test]
@@ -3096,6 +3264,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "p3000-generic".into(),
                 channels: None,
@@ -3211,6 +3380,7 @@ mod tests {
             Arc::new(spec),
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
                 port: None,
                 model: "p3000-generic".into(),
                 channels: None,

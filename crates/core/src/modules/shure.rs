@@ -997,6 +997,7 @@ mod tests {
     fn opened_for_commands_only_it_neither_meters_nor_reads() {
         let mut m = Shure::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 30)),
+            host_name: None,
             port: None,
             model: "ad4d".into(),
             channels: Some(2),

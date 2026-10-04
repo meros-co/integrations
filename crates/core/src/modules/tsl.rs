@@ -810,6 +810,7 @@ mod tests {
     fn the_sender_encodes_per_model() {
         let ctx = |model: &str| OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            host_name: None,
             port: Some(8900),
             model: model.into(),
             channels: None,
@@ -872,6 +873,7 @@ mod tests {
     fn opened_for_commands_only_the_sender_is_unchanged() {
         let ctx = OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            host_name: None,
             port: Some(8900),
             model: "tsl-5-0".into(),
             channels: None,

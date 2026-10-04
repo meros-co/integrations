@@ -1996,6 +1996,7 @@ mod tests {
             &spec,
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::new(192, 0, 2, 8)),
+                host_name: None,
                 port: None,
                 model: model.into(),
                 channels: None,

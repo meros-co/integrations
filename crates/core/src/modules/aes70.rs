@@ -1796,6 +1796,7 @@ mod tests {
         Aes70::new(
             OpenContext {
                 host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 70)),
+                host_name: None,
                 port: Some(50000),
                 model: "aes70-device".into(),
                 channels: None,

@@ -2127,6 +2127,7 @@ mod tests {
     fn module(settings: Value) -> Qsys {
         Qsys::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 30)),
+            host_name: None,
             port: None,
             model: "core".into(),
             channels: None,

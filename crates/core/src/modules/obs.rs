@@ -666,6 +666,7 @@ mod tests {
     fn obs_with(password: &str, monitor: bool) -> Obs {
         Obs::new(OpenContext {
             host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 7)),
+            host_name: None,
             port: None,
             model: "obs-studio-28".into(),
             channels: None,
