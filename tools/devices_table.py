@@ -53,6 +53,7 @@ NATIVE = {
     "sennheiser-digital-6000": "SSC over UDP 45",
     "sennheiser-ew-dx": "HTTPS + SSE (SSCv2)",
     "sennheiser-ew-g3-g4": "MCP over UDP 53212",
+    "sennheiser-spectera": "HTTPS + SSE (SSCv2)",
     "shure-wireless": "Command strings over TCP 2202",
     "sony-camera": "PTP-IP over TCP 15740, or through SSH",
     "tsl-umd-display": "TSL UMD over UDP, or TCP for V5.0; sends",

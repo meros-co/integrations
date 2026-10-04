@@ -4,84 +4,33 @@
 //! RFDeck exercised on real EW-DX receivers (OpenAPI 1.7): /api/channel/{id},
 //! its signalQualityIndicator, level and warnings, /api/rf/channels/{id} and
 //! /api/transmitters/{id}/battery. Only mute is writable: see the spec's quirks.
+//! The SSCv2 session itself (probe, authentication, subscriptions, liveness)
+//! is the shared client in [`super::sscv2`].
 //!
 //! Opened for commands only, it opens no subscription stream (so takes none of
 //! the device's subscription sessions) and reads nothing on connecting: the
 //! version request that finds the device, repeated whenever it has been quiet
 //! for 3 s, is the liveness check.
 
-use std::collections::HashMap;
 use std::net::IpAddr;
 
-use base64::Engine;
 use serde_json::{json, Map, Value};
 
+use super::sscv2::{object, Call, SscDevice, Sscv2};
 use crate::catalog::Params;
-use crate::module::{
-    CommandError, CommandId, Connection, Cx, HttpRequest, HttpResponse, Key, Level, Millis, Module,
-    OpenContext, Outcome, RequestId, SseInput,
-};
+use crate::module::{CommandError, Cx, Level, Millis, OpenContext};
 
-const STREAM: Key = "subscriptions";
-
-const REQUEST_TIMEOUT: Millis = 2_000;
-const SUBSCRIBE_TIMEOUT: Millis = 5_000;
 const MUTE_TIMEOUT: Millis = 3_000;
-/// Retry after an unreachable device or a dropped stream.
-const RETRY_AFTER: Millis = 1_000;
-/// Liveness: a stream quiet this long is checked with a request.
-const QUIET_AFTER: Millis = 3_000;
-const LIVENESS_CHECK_EVERY: Millis = 1_000;
-const LIVENESS_STRIKES: u32 = 2;
-/// RFDeck subscribes in batches of four, which is what was tested on hardware.
-const SUBSCRIBE_BATCH: usize = 4;
 
-const RETRY: Key = "retry";
-const LIVENESS: Key = "liveness";
-
-#[derive(Debug)]
-enum Purpose {
-    Probe,
-    Identity,
-    Subscribe { remaining: Vec<Vec<String>> },
-    Initial { path: String },
-    Liveness,
-    Mute { command: CommandId },
-}
-
-#[derive(Debug, PartialEq)]
-enum Phase {
-    Idle,
-    Probing,
-    /// The device answered: streaming, or for commands only, ready.
-    Ready,
-}
-
-pub(crate) struct Ewdx {
-    base: String,
-    authorization: String,
+/// The EW-DX receiver's resources, state and commands.
+pub(crate) struct EwdxDevice {
     channels: u32,
-    /// Stream and read state; false for commands only.
-    monitor: bool,
-    phase: Phase,
-    connected: bool,
-    session: Option<String>,
-    next_request: RequestId,
-    /// Requests in flight: why each was made and when it went.
-    requests: HashMap<RequestId, (Purpose, Millis)>,
-    last_activity: Millis,
-    liveness_in_flight: bool,
-    strikes: u32,
-    /// Set once the device refuses the credential. Terminal: nothing is sent
-    /// again. A refused password is never retried on any schedule, because
-    /// repeated failed authentications have locked an EW-DX out until it was
-    /// re-adopted in Control Cockpit (RFDeck review item O). The host
-    /// re-opens the device with a corrected password.
-    refused: Option<String>,
 }
 
-impl Ewdx {
-    pub(crate) fn new(ctx: OpenContext) -> Ewdx {
+pub(crate) type Ewdx = Sscv2<EwdxDevice>;
+
+impl Sscv2<EwdxDevice> {
+    pub(crate) fn from_context(ctx: OpenContext) -> Ewdx {
         let password = ctx
             .settings
             .get("password")
@@ -94,111 +43,11 @@ impl Ewdx {
     }
 
     fn for_device(host: IpAddr, port: u16, password: &str, channels: u32) -> Ewdx {
-        let host = match host {
-            IpAddr::V6(v6) => format!("[{v6}]"),
-            v4 => v4.to_string(),
-        };
-        let credentials =
-            base64::engine::general_purpose::STANDARD.encode(format!("api:{password}"));
-        Ewdx {
-            base: format!("https://{host}:{port}"),
-            authorization: format!("Basic {credentials}"),
-            channels,
-            monitor: true,
-            phase: Phase::Idle,
-            connected: false,
-            session: None,
-            next_request: 1,
-            requests: HashMap::new(),
-            last_activity: 0,
-            liveness_in_flight: false,
-            strikes: 0,
-            refused: None,
-        }
+        Sscv2::new(host, port, password, EwdxDevice { channels })
     }
+}
 
-    fn request(
-        &self,
-        method: &'static str,
-        path: &str,
-        body: Option<Value>,
-        timeout: Option<Millis>,
-    ) -> HttpRequest {
-        let mut headers = vec![("Authorization".to_string(), self.authorization.clone())];
-        if body.is_some() {
-            headers.push(("Content-Type".into(), "application/json".into()));
-        }
-        HttpRequest {
-            method,
-            url: format!("{}{}", self.base, path),
-            headers,
-            body: body.map(|b| b.to_string().into_bytes()),
-            timeout,
-            accept_invalid_certs: true,
-            digest: None,
-        }
-    }
-
-    fn send(&mut self, cx: &mut Cx, purpose: Purpose, request: HttpRequest) {
-        let id = self.next_request;
-        self.next_request += 1;
-        self.requests.insert(id, (purpose, cx.now()));
-        cx.http(id, request);
-    }
-
-    fn probe(&mut self, cx: &mut Cx) {
-        self.phase = Phase::Probing;
-        let request = self.request("GET", "/api/ssc/version", None, Some(REQUEST_TIMEOUT));
-        self.send(cx, Purpose::Probe, request);
-    }
-
-    fn stop_everything(&mut self, cx: &mut Cx) {
-        if self.monitor {
-            cx.sse_close(STREAM);
-        }
-        cx.cancel_timer(LIVENESS);
-        cx.cancel_timer(RETRY);
-        self.phase = Phase::Idle;
-        self.connected = false;
-        self.session = None;
-        self.strikes = 0;
-        self.liveness_in_flight = false;
-    }
-
-    /// The device is unreachable or the stream dropped: try again shortly.
-    fn lost(&mut self, cx: &mut Cx, reason: String) {
-        self.stop_everything(cx);
-        cx.connection(Connection::Disconnected { reason });
-        cx.set_timer(RETRY, RETRY_AFTER);
-    }
-
-    /// The device refused the credential: stop, and never present it again.
-    fn refuse(&mut self, cx: &mut Cx, reason: &str) {
-        if self.refused.is_some() {
-            return;
-        }
-        self.stop_everything(cx);
-        self.refused = Some(reason.to_string());
-        cx.log(
-            Level::Warning,
-            format!("{reason}; no further requests until the device is opened again with a corrected password"),
-        );
-        cx.connection(Connection::Unauthorized {
-            reason: reason.into(),
-        });
-    }
-
-    fn open_stream(&mut self, cx: &mut Cx) {
-        let mut request = self.request("GET", "/api/ssc/state/subscriptions", None, None);
-        request
-            .headers
-            .push(("Accept".into(), "text/event-stream".into()));
-        request
-            .headers
-            .push(("Cache-Control".into(), "no-cache".into()));
-        cx.sse_open(STREAM, request);
-    }
-
+impl SscDevice for EwdxDevice {
     fn resources(&self) -> Vec<String> {
         let mut paths = Vec::new();
         for id in 0..self.channels {
@@ -212,79 +61,66 @@ impl Ewdx {
         paths
     }
 
-    fn subscribe_next(&mut self, cx: &mut Cx, mut remaining: Vec<Vec<String>>) {
-        let Some(session) = self.session.clone() else {
-            return;
-        };
-        if remaining.is_empty() {
-            return;
-        }
-        let batch = remaining.remove(0);
-        let path = format!("/api/ssc/state/subscriptions/{session}/add");
-        let request = self.request("PUT", &path, Some(json!(batch)), Some(SUBSCRIBE_TIMEOUT));
-        self.send(cx, Purpose::Subscribe { remaining }, request);
+    fn initial_reads(&self) -> Vec<String> {
+        self.resources()
+            .into_iter()
+            .filter(|p| !p.ends_with("/warnings"))
+            .collect()
     }
 
-    fn fetch_initial(&mut self, cx: &mut Cx) {
-        for path in self.resources() {
-            if path.ends_with("/warnings") {
-                continue;
-            }
-            let request = self.request("GET", &path, None, Some(REQUEST_TIMEOUT));
-            self.send(cx, Purpose::Initial { path }, request);
-        }
+    fn apply_resource(&self, path: &str, value: &Value, patch: &mut Map<String, Value>) {
+        apply_resource(path, value, patch);
     }
 
-    fn heard(&mut self, cx: &mut Cx) {
-        self.last_activity = cx.now();
-        self.strikes = 0;
-        cx.alive();
-    }
-
-    /// Apply one notification: `{"<resource path>": {...}}` per SSCv2 §3.4.8,
-    /// or the `{"path": ..., "value": ...}` form RFDeck also handles.
-    fn apply(&self, cx: &mut Cx, data: &Value) {
-        let mut channels = Map::new();
-        let mut device = Map::new();
-        let mut take = |path: &str, value: &Value| {
-            apply_resource(path, value, &mut channels, &mut device);
-        };
-        match data {
-            Value::Object(map) if map.contains_key("path") && map.contains_key("value") => {
-                if let Some(path) = map["path"].as_str() {
-                    take(path, &map["value"]);
-                }
+    fn read_failed(&self, cx: &mut Cx, path: &str, status: u16) {
+        match status {
+            // No transmitter linked: the battery resource answers 422.
+            422 if path.contains("/transmitters/") => {
+                let id: u32 = path
+                    .split('/')
+                    .nth(3)
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
+                cx.state(json!({"channels": {(id + 1).to_string(): {"transmitter": null}}}));
             }
-            Value::Object(map) => {
-                for (path, value) in map {
-                    take(path, value);
-                }
-            }
+            404 if path.starts_with("/api/channel/") => cx.log(
+                Level::Warning,
+                format!("{path} does not exist; the device has fewer channels than this model"),
+            ),
             _ => {}
         }
-        let mut patch = Map::new();
-        if !channels.is_empty() {
-            patch.insert("channels".into(), Value::Object(channels));
-        }
-        if !device.is_empty() {
-            patch.insert("device".into(), Value::Object(device));
-        }
-        if !patch.is_empty() {
-            cx.state(Value::Object(patch));
+    }
+
+    fn command(&self, name: &str, params: &Params) -> Result<Call, CommandError> {
+        match name {
+            "mute" => {
+                let channel = params.get("channel").and_then(Value::as_i64).unwrap_or(1);
+                if channel > self.channels as i64 {
+                    return Err(CommandError::InvalidParams {
+                        message: format!("this model has {} channels", self.channels),
+                    });
+                }
+                let muted = params.get("muted").and_then(Value::as_bool).unwrap_or(true);
+                // "Per SSCv2, a write is a PUT of that resource carrying only the
+                // properties to change" (RFDeck, verified on OpenAPI 1.7).
+                Ok(Call::put(
+                    format!("/api/channel/{}", channel - 1),
+                    json!({"mute": muted}),
+                    MUTE_TIMEOUT,
+                ))
+            }
+            other => Err(CommandError::UnknownCommand {
+                command: other.into(),
+            }),
         }
     }
 }
 
 /// Map one resource onto the state tree. Channels are 1-based in the state and
 /// 0-based in the API.
-fn apply_resource(
-    path: &str,
-    value: &Value,
-    channels: &mut Map<String, Value>,
-    device: &mut Map<String, Value>,
-) {
+fn apply_resource(path: &str, value: &Value, patch: &mut Map<String, Value>) {
     if path == "/api/device/identity" {
-        device.insert("identity".into(), value.clone());
+        object(patch, "device").insert("identity".into(), value.clone());
         return;
     }
     let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
@@ -296,11 +132,7 @@ fn apply_resource(
         _ => (None, None),
     };
     let Some(id) = id else { return };
-    let channel = channels
-        .entry((id + 1).to_string())
-        .or_insert_with(|| json!({}))
-        .as_object_mut()
-        .unwrap();
+    let channel = object(object(patch, "channels"), &(id + 1).to_string());
 
     match field {
         None => {
@@ -338,280 +170,14 @@ fn apply_resource(
     }
 }
 
-fn is_success(status: u16) -> bool {
-    (200..300).contains(&status)
-}
-
-/// A credential refusal, from any request or the stream. 403 is a refusal too:
-/// the password authenticated but is not allowed to do what the core needs.
-fn refusal(status: Option<u16>) -> Option<&'static str> {
-    match status {
-        Some(401) => Some("the device rejected the third-party password"),
-        Some(403) => Some("the third-party password is not allowed to use this API"),
-        _ => None,
-    }
-}
-
-impl Module for Ewdx {
-    fn start(&mut self, cx: &mut Cx) {
-        cx.connection(Connection::Connecting);
-        self.probe(cx);
-    }
-
-    fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
-        if let Some(reason) = &self.refused {
-            cx.complete(
-                id,
-                Err(CommandError::Auth {
-                    message: reason.clone(),
-                }),
-            );
-            return;
-        }
-        if !self.connected {
-            cx.complete(id, Err(CommandError::NotConnected));
-            return;
-        }
-        match name {
-            "mute" => {
-                let channel = params.get("channel").and_then(Value::as_i64).unwrap_or(1);
-                if channel > self.channels as i64 {
-                    cx.complete(
-                        id,
-                        Err(CommandError::InvalidParams {
-                            message: format!("this model has {} channels", self.channels),
-                        }),
-                    );
-                    return;
-                }
-                let muted = params.get("muted").and_then(Value::as_bool).unwrap_or(true);
-                // "Per SSCv2, a write is a PUT of that resource carrying only the
-                // properties to change" (RFDeck, verified on OpenAPI 1.7).
-                let path = format!("/api/channel/{}", channel - 1);
-                let request = self.request(
-                    "PUT",
-                    &path,
-                    Some(json!({"mute": muted})),
-                    Some(MUTE_TIMEOUT),
-                );
-                self.send(cx, Purpose::Mute { command: id }, request);
-            }
-            other => cx.complete(
-                id,
-                Err(CommandError::UnknownCommand {
-                    command: other.into(),
-                }),
-            ),
-        }
-    }
-
-    fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
-        let Some((purpose, sent)) = self.requests.remove(&id) else {
-            return;
-        };
-        if self.refused.is_some() {
-            if let Purpose::Mute { command } = purpose {
-                let message = self.refused.clone().unwrap_or_default();
-                cx.complete(command, Err(CommandError::Auth { message }));
-            }
-            return;
-        }
-        // Every request is answered directly; a transport failure is no answer.
-        if result.is_ok() {
-            cx.round_trip(cx.now().saturating_sub(sent));
-        }
-        let status = result.as_ref().ok().map(|r| r.status);
-        if let Some(reason) = refusal(status) {
-            if let Purpose::Mute { command } = purpose {
-                cx.complete(
-                    command,
-                    Err(CommandError::Auth {
-                        message: reason.into(),
-                    }),
-                );
-            }
-            self.refuse(cx, reason);
-            return;
-        }
-        let body = result
-            .as_ref()
-            .ok()
-            .and_then(|r| serde_json::from_slice::<Value>(&r.body).ok());
-
-        match purpose {
-            Purpose::Probe => {
-                if self.phase != Phase::Probing {
-                    return;
-                }
-                match (status, &body) {
-                    // A JSON body is what separates an SSCv2 device from any
-                    // other HTTPS server at the address.
-                    (Some(s), Some(Value::Object(_))) if is_success(s) && !self.monitor => {
-                        // Commands only: no stream, no reads. The liveness
-                        // check keeps asking the version while it is quiet.
-                        self.phase = Phase::Ready;
-                        self.heard(cx);
-                        self.connected = true;
-                        cx.connection(Connection::Connected);
-                        cx.set_timer(LIVENESS, LIVENESS_CHECK_EVERY);
-                    }
-                    (Some(s), Some(Value::Object(_))) if is_success(s) => {
-                        self.phase = Phase::Ready;
-                        self.last_activity = cx.now();
-                        let request = self.request(
-                            "GET",
-                            "/api/device/identity",
-                            None,
-                            Some(REQUEST_TIMEOUT),
-                        );
-                        self.send(cx, Purpose::Identity, request);
-                        self.open_stream(cx);
-                    }
-                    (Some(s), _) => self.lost(cx, format!("not an SSCv2 device (HTTP {s})")),
-                    (None, _) => {
-                        let reason = result.err().unwrap_or_default();
-                        self.lost(cx, reason);
-                    }
-                }
-            }
-            Purpose::Identity => {
-                if let (Some(s), Some(identity)) = (status, body) {
-                    if is_success(s) {
-                        self.apply(cx, &json!({"/api/device/identity": identity}));
-                    }
-                }
-            }
-            Purpose::Subscribe { remaining } => match status {
-                Some(s) if is_success(s) => self.subscribe_next(cx, remaining),
-                _ => {
-                    let detail = status
-                        .map(|s| format!("HTTP {s}"))
-                        .unwrap_or_else(|| result.err().unwrap_or_default());
-                    cx.log(Level::Warning, format!("subscription refused: {detail}"));
-                }
-            },
-            Purpose::Initial { path } => match (status, body) {
-                (Some(s), Some(value)) if is_success(s) => self.apply(cx, &json!({ path: value })),
-                // No transmitter linked: the battery resource answers 422.
-                (Some(422), _) if path.contains("/transmitters/") => {
-                    let id: u32 = path
-                        .split('/')
-                        .nth(3)
-                        .and_then(|v| v.parse().ok())
-                        .unwrap_or(0);
-                    cx.state(json!({"channels": {(id + 1).to_string(): {"transmitter": null}}}));
-                }
-                (Some(404), _) if path.starts_with("/api/channel/") => cx.log(
-                    Level::Warning,
-                    format!("{path} does not exist; the device has fewer channels than this model"),
-                ),
-                _ => {}
-            },
-            Purpose::Liveness => {
-                self.liveness_in_flight = false;
-                // Any answer proves the device is there; a refusal never
-                // reaches this point.
-                if status.is_some() {
-                    self.heard(cx);
-                } else {
-                    self.strikes += 1;
-                    if self.strikes >= LIVENESS_STRIKES {
-                        self.lost(cx, "unreachable behind a silent stream".into());
-                    }
-                }
-            }
-            Purpose::Mute { command } => {
-                let outcome = match (status, result) {
-                    (Some(s), _) if is_success(s) => Ok(Outcome::Ack),
-                    (Some(s), Ok(response)) => Err(CommandError::DeviceError {
-                        code: Some(s.to_string()),
-                        message: String::from_utf8_lossy(&response.body).into_owned(),
-                    }),
-                    (_, Err(message)) => Err(CommandError::Transport { message }),
-                    (None, Ok(_)) => unreachable!("a response always has a status"),
-                };
-                cx.complete(command, outcome);
-            }
-        }
-    }
-
-    fn sse(&mut self, cx: &mut Cx, _stream: Key, input: SseInput) {
-        if self.refused.is_some() {
-            return;
-        }
-        match input {
-            SseInput::Opened => {
-                self.heard(cx);
-                if !self.connected {
-                    self.connected = true;
-                    cx.connection(Connection::Connected);
-                }
-                cx.set_timer(LIVENESS, LIVENESS_CHECK_EVERY);
-            }
-            SseInput::Activity => self.heard(cx),
-            SseInput::Event(event) => {
-                let Ok(data) = serde_json::from_str::<Value>(&event.data) else {
-                    return;
-                };
-                if self.session.is_none() {
-                    let uuid = data
-                        .get("sessionUUID")
-                        .or_else(|| data.get("session_uuid"))
-                        .and_then(Value::as_str);
-                    if let Some(uuid) = uuid {
-                        self.session = Some(uuid.to_string());
-                        let batches = self
-                            .resources()
-                            .chunks(SUBSCRIBE_BATCH)
-                            .map(|c| c.to_vec())
-                            .collect();
-                        self.subscribe_next(cx, batches);
-                        self.fetch_initial(cx);
-                        return;
-                    }
-                }
-                if event.event != "open" && event.event != "close" {
-                    self.apply(cx, &data);
-                }
-            }
-            SseInput::Closed { status, reason } => match refusal(status) {
-                Some(refused) => self.refuse(cx, refused),
-                None => self.lost(cx, format!("subscription stream: {reason}")),
-            },
-        }
-    }
-
-    fn timer(&mut self, cx: &mut Cx, key: Key) {
-        match key {
-            RETRY if self.refused.is_none() => self.probe(cx),
-            LIVENESS => {
-                if self.phase != Phase::Ready {
-                    return;
-                }
-                let quiet = cx.now().saturating_sub(self.last_activity);
-                if quiet >= QUIET_AFTER && !self.liveness_in_flight {
-                    self.liveness_in_flight = true;
-                    let request =
-                        self.request("GET", "/api/ssc/version", None, Some(REQUEST_TIMEOUT));
-                    self.send(cx, Purpose::Liveness, request);
-                }
-                cx.set_timer(LIVENESS, LIVENESS_CHECK_EVERY);
-            }
-            _ => {}
-        }
-    }
-
-    fn stop(&mut self, cx: &mut Cx) {
-        if self.monitor {
-            cx.sse_close(STREAM);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::super::sscv2::{LIVENESS, QUIET_AFTER, RETRY, RETRY_AFTER, STREAM};
     use super::*;
-    use crate::module::{Action, CommandResult};
+    use crate::module::{
+        Action, CommandId, CommandResult, Connection, HttpRequest, HttpResponse, Module, Outcome,
+        RequestId, SseInput,
+    };
     use crate::sse::SseEvent;
     use std::net::Ipv4Addr;
 

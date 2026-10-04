@@ -849,6 +849,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On a G3 receiver, confirm squelch, AF out, equalizer, RfConfig and FirmwareRevision behave as on G4 (no G3 document has been found). ([specs/sennheiser-ew-g3-g4.yaml:205](specs/sennheiser-ew-g3-g4.yaml#L205))
 - [ ] Opened for commands only, confirm a receiver with no Push subscription answers a bare `Name`, the liveness check. ([crates/core/src/modules/sennheiser_mcp.rs:31](crates/core/src/modules/sennheiser_mcp.rs#L31))
 
+## sennheiser-spectera — Sennheiser Spectera
+
+- [ ] Confirm the API accepts controlSennheiser with the device password on firmware 1.4.x, and whether the user api works on any firmware yet. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))
+- [ ] Note how long the Base Station blocks an address after bad credentials, so the terminal refusal can be weighed against it. ([specs/sennheiser-spectera.yaml:539](specs/sennheiser-spectera.yaml#L539))
+- [ ] Confirm the first notification of each collection after it is added is the whole list, and that later ones are the changed item alone on the collection's path (fixed lists) or on the item's path (links, mobile devices). ([specs/sennheiser-spectera.yaml:591](specs/sennheiser-spectera.yaml#L591))
+- [ ] Confirm a created audio link is notified as {} and then in full, and a deleted one as null. ([specs/sennheiser-spectera.yaml:591](specs/sennheiser-spectera.yaml#L591))
+- [ ] Check the Base Station sends nothing on an idle stream, and that a version check after 3 s of quiet never counts against its connection limit or trips a 503. ([specs/sennheiser-spectera.yaml:612](specs/sennheiser-spectera.yaml#L612))
+- [ ] Confirm a PUT to a mobile device without its type is refused, and that one naming the type with only the changed field is applied. ([specs/sennheiser-spectera.yaml:605](specs/sennheiser-spectera.yaml#L605))
+- [ ] Check how long an open WebUI waits before deleting an audio link no mobile device uses (documented as about 5 s). ([specs/sennheiser-spectera.yaml:578](specs/sennheiser-spectera.yaml#L578))
+- [ ] Check polling /api/audio/metering at the chosen interval while subscribed elsewhere does not disturb the stream. ([specs/sennheiser-spectera.yaml:599](specs/sennheiser-spectera.yaml#L599))
+- [ ] On firmware 1.3.x (API 17.0), check which subscriptions are refused (the aoip status, metering) and whether the rest still subscribe in their batch. ([specs/sennheiser-spectera.yaml:619](specs/sennheiser-spectera.yaml#L619))
+- [ ] Confirm bandwidthMode 10000 is accepted but never transmits, as the release notes say, which is why set_rf_bandwidth offers 6000 and 8000 only. ([specs/sennheiser-spectera.yaml:559](specs/sennheiser-spectera.yaml#L559))
+
 ## shure-ani — Shure ANI4IN, ANI4OUT, ANIUSB-MATRIX, ANI22
 
 - [ ] Check that the ANI4IN and ANI4OUT accept two-digit channel numbers (01), which the session sends, though their documents write one digit. ([specs/shure-ani.yaml:443](specs/shure-ani.yaml#L443))

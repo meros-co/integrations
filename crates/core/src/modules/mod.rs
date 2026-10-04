@@ -78,6 +78,8 @@ mod sennheiser_d6000;
 mod sennheiser_ewdx;
 #[cfg(feature = "sennheiser-ew-g3-g4")]
 mod sennheiser_mcp;
+#[cfg(feature = "sennheiser-spectera")]
+mod sennheiser_spectera;
 #[cfg(feature = "shure-wireless")]
 mod shure;
 #[cfg(feature = "sony-camera")]
@@ -94,6 +96,8 @@ mod sony_camera_http;
 mod sony_camera_props;
 #[cfg(feature = "sony-camera")]
 mod sony_camera_ptpip;
+#[cfg(any(feature = "sennheiser-ew-dx", feature = "sennheiser-spectera"))]
+mod sscv2;
 #[cfg(feature = "probel-swp08")]
 mod swp08;
 #[cfg(feature = "biamp-tesira")]
@@ -211,7 +215,11 @@ pub(crate) fn construct(
         #[cfg(feature = "http-snapshot")]
         "http-snapshot" => Ok(Box::new(http_snapshot::HttpSnapshot::new(context)?)),
         #[cfg(feature = "sennheiser-ew-dx")]
-        "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::new(context))),
+        "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::from_context(context))),
+        #[cfg(feature = "sennheiser-spectera")]
+        "sennheiser-spectera" => Ok(Box::new(sennheiser_spectera::Spectera::from_context(
+            context,
+        ))),
         #[cfg(any(
             feature = "allenheath-ahm",
             feature = "allenheath-cq",
