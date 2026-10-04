@@ -242,6 +242,42 @@ terminal: pending and later commands fail with `auth`, the connection reports
 again or changes its settings (`update_settings`). A credential is never retried on a schedule, because repeated failed
 logins can lock a device out.
 
+A service that names a refused token in its error body rather than its
+status lists JSON paths and regexes in `refusal_json`: an error answer (4xx or
+5xx) whose JSON body matches every one is a refusal too, whatever its status.
+Meta's Graph API answers an invalid or expired token with HTTP 400 and
+`error.code` 190, and other errors (a bad parameter, a missing permission, a
+rate limit) with the same status and other codes:
+
+```yaml
+transport:
+  type: http
+  auth: bearer
+  refusal_status: [401]
+  refusal_json: { "$.error.code": "^190$" }
+```
+
+A service that wants a header of its own on every request, beside the
+credential, lists it in `headers`, each name mapped to a template over
+settings. Twitch's Helix API takes the application's client id in
+`Client-Id` with every bearer token:
+
+```yaml
+transport:
+  type: http
+  auth: oauth2
+  headers:
+    Client-Id: "{settings.client_id}"
+```
+
+The headers go on every HTTP request (commands, polls, the probe, and a
+request repeated after a token refresh), on the push websocket's opening
+request and on the event stream, rendered from the settings current at the
+time, so `update_settings` changes them too. A header that renders empty, or
+names a setting with no value, is left out. `Authorization`, `Content-Type` and `Host` are the core's and may
+not be named. Only `{settings.*}` placeholders apply: there are no command
+parameters in a transport.
+
 A service taking more than one kind of credential names a setting instead,
 as for `scheme` below: `auth: { setting: auth }` with `auth: { type: enum,
 values: [basic, oauth2] }`. Planning Center takes a personal access token as

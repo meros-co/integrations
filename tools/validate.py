@@ -334,6 +334,13 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
     for method in sorted(methods & {"bearer", "header"}):
         if "token" not in settings:
             errors.append(f"auth: {method} needs a 'token' setting")
+    for path, pattern in (transport.get("refusal_json") or {}).items():
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            errors.append(f"transport.refusal_json.{path} does not compile: {e}")
+    for name, text in (transport.get("headers") or {}).items():
+        errors += check_template("text", text, {}, settings, f"transport.headers.{name}")
     if ("header" in methods) != bool(transport.get("auth_header")):
         errors.append("auth: header and auth_header go together")
     sio = (websocket or {}).get("socketio")

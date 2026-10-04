@@ -104,6 +104,13 @@ enum Transport {
         accept_invalid_certs: bool,
         /// Statuses that mean the credential was refused.
         refusal: Vec<u16>,
+        /// `transport.headers`: each header's name and its template over
+        /// settings, sent on every request (Twitch's `Client-Id`).
+        headers: Vec<(String, String)>,
+        /// `transport.refusal_json`: JSON paths to regexes; an error answer
+        /// whose body matches them all is a refusal too, whatever its status
+        /// (the Graph API's `error.code` 190 under HTTP 400).
+        refusal_json: Vec<(String, Regex)>,
     },
     /// Text messages over a websocket, usually JSON.
     Ws {
@@ -436,6 +443,94 @@ fn auth_headers(auth: HttpAuth, header: &str, settings: &Params) -> Vec<(String,
     }
 }
 
+/// `transport.headers`: a map of header names to templates over settings.
+fn header_templates(t: &Value) -> Result<Vec<(String, String)>, String> {
+    let Some(map) = t.get("headers") else {
+        return Ok(Vec::new());
+    };
+    let map = map
+        .as_object()
+        .ok_or("transport.headers maps header names to templates")?;
+    let mut out = Vec::new();
+    for (name, template) in map {
+        let valid =
+            !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-');
+        if !valid {
+            return Err(format!("transport.headers: '{name}' is not a header name"));
+        }
+        if ["authorization", "content-type", "host"].contains(&name.to_ascii_lowercase().as_str()) {
+            return Err(format!(
+                "transport.headers: '{name}' is set by the core, not by the spec"
+            ));
+        }
+        let template = template
+            .as_str()
+            .ok_or_else(|| format!("transport.headers.{name} is a template string"))?;
+        out.push((name.clone(), template.to_string()));
+    }
+    Ok(out)
+}
+
+/// `transport.refusal_json`: JSON paths to regexes.
+fn refusal_json(t: &Value) -> Result<Vec<(String, Regex)>, String> {
+    let Some(map) = t.get("refusal_json") else {
+        return Ok(Vec::new());
+    };
+    let map = map
+        .as_object()
+        .ok_or("transport.refusal_json maps JSON paths to regexes")?;
+    let mut out = Vec::new();
+    for (path, re) in map {
+        let re = re
+            .as_str()
+            .ok_or_else(|| format!("transport.refusal_json.{path} is a regex"))?;
+        let re = Regex::new(re).map_err(|e| format!("transport.refusal_json.{path}: {e}"))?;
+        out.push((path.clone(), re));
+    }
+    Ok(out)
+}
+
+/// An error answer (4xx or 5xx) whose JSON body matches every
+/// `refusal_json` selector.
+fn refused_by_body(selectors: &[(String, Regex)], status: u16, body: &[u8]) -> bool {
+    if selectors.is_empty() || status < 400 {
+        return false;
+    }
+    let Ok(doc) = serde_json::from_slice::<Value>(body) else {
+        return false;
+    };
+    selectors.iter().all(|(path, re)| {
+        let text = match expect::json_path(&doc, path) {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Null) | None => return false,
+            Some(other) => other.to_string(),
+        };
+        re.is_match(&text)
+    })
+}
+
+/// The `transport.headers` rendered: a header that renders empty, or names
+/// a setting with no value, is left out, and one that would break the
+/// request line is an error.
+fn render_headers(
+    templates: &[(String, String)],
+    values: &Values,
+) -> Result<Vec<(String, String)>, String> {
+    let mut out = Vec::new();
+    for (name, template) in templates {
+        let Ok(value) = render(template, values, no_escape) else {
+            continue;
+        };
+        if value.contains(['\r', '\n']) {
+            return Err(format!("header {name} contains a line break"));
+        }
+        if !value.is_empty() {
+            out.push((name.clone(), value));
+        }
+    }
+    Ok(out)
+}
+
 fn host_text(host: IpAddr) -> String {
     match host {
         IpAddr::V6(v6) => format!("[{v6}]"),
@@ -501,6 +596,12 @@ impl SpecEngine {
 
         // `auth: header`: the header the `token` setting goes in.
         let auth_header = str_field(&t, "auth_header").unwrap_or("").to_string();
+        if kind != "http" && t.get("headers").is_some() {
+            return Err("transport.headers is for the http transport".into());
+        }
+        if kind != "http" && t.get("refusal_json").is_some() {
+            return Err("transport.refusal_json is for the http transport".into());
+        }
         let transport = match kind {
             "line-tcp" => {
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
@@ -628,6 +729,8 @@ impl SpecEngine {
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
                     auth,
+                    headers: header_templates(&t)?,
+                    refusal_json: refusal_json(&t)?,
                     accept_invalid_certs: t
                         .get("accept_invalid_certs")
                         .and_then(Value::as_bool)
@@ -652,6 +755,24 @@ impl SpecEngine {
             spec.conversions.as_ref(),
         )?;
         let conversions = template::conversions(spec.conversions.as_ref())?;
+        // `transport.headers` over the settings, for the push websocket and
+        // the event stream, which are opened from them alone.
+        let side_headers = match &transport {
+            Transport::Http { headers, .. } => {
+                let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+                render_headers(
+                    headers,
+                    &Values {
+                        params: &no_params,
+                        param_specs: &no_specs,
+                        settings: &ctx.settings,
+                        setting_specs: &spec.settings,
+                        conversions: &conversions,
+                    },
+                )?
+            }
+            _ => Vec::new(),
+        };
         let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
             Some(w) => {
@@ -702,6 +823,7 @@ impl SpecEngine {
                     auth,
                     &auth_header,
                 )?;
+                request.headers.extend(side_headers.iter().cloned());
                 if let Some(sio) = &socketio {
                     // Engine.IO's query.
                     let sep = if request.url.contains('?') { '&' } else { '?' };
@@ -762,6 +884,7 @@ impl SpecEngine {
                 };
                 let path = str_field(e, "path").ok_or("telemetry.sse needs a path")?;
                 let mut headers = auth_headers(*auth, &auth_header, &ctx.settings);
+                headers.extend(side_headers.iter().cloned());
                 headers.push(("Accept".into(), "text/event-stream".into()));
                 let setting = |name: &str| {
                     ctx.settings
@@ -896,6 +1019,7 @@ impl SpecEngine {
                 base,
                 auth,
                 accept_invalid_certs,
+                headers: extra,
                 ..
             } => {
                 let method = str_field(item, "method").unwrap_or("GET");
@@ -926,6 +1050,7 @@ impl SpecEngine {
                     url.push_str(&pairs.join("&"));
                 }
                 let mut headers = auth_headers(*auth, &self.auth_header, &self.settings);
+                headers.extend(render_headers(extra, values)?);
                 let setting = |name: &str| {
                     self.settings
                         .get(name)
@@ -2285,8 +2410,18 @@ impl Module for SpecEngine {
         }
         // Any credential the device can refuse: Basic, Digest or a token.
         let refused = match (&self.transport, &result) {
-            (Transport::Http { auth, refusal, .. }, Ok(response)) => {
-                *auth != HttpAuth::None && refusal.contains(&response.status)
+            (
+                Transport::Http {
+                    auth,
+                    refusal,
+                    refusal_json,
+                    ..
+                },
+                Ok(response),
+            ) => {
+                *auth != HttpAuth::None
+                    && (refusal.contains(&response.status)
+                        || refused_by_body(refusal_json, response.status, &response.body))
             }
             _ => false,
         };
@@ -4065,6 +4200,169 @@ mod tests {
             .take()
             .iter()
             .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+    }
+
+    #[test]
+    fn an_error_body_matching_refusal_json_is_a_refusal() {
+        let mut spec = Catalog::source_tree()
+            .device("propresenter")
+            .unwrap()
+            .clone();
+        let t = spec.transport.as_mut().unwrap();
+        t["auth"] = json!("bearer");
+        t["refusal_status"] = json!([401]);
+        t["refusal_json"] = json!({"$.error.code": "^190$"});
+        spec.telemetry = None;
+        let answer = |status: u16, body: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "propresenter-7".into(),
+                    channels: None,
+                    settings: json!({"token": "t"}).as_object().unwrap().clone(),
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let id = cx
+                .take()
+                .into_iter()
+                .find_map(|a| match a {
+                    Action::Http { id, .. } => Some(id),
+                    _ => None,
+                })
+                .unwrap();
+            let mut cx = Cx::new(1);
+            e.http_response(
+                &mut cx,
+                id,
+                Ok(HttpResponse {
+                    status,
+                    body: body.as_bytes().to_vec(),
+                }),
+            );
+            cx.take()
+                .iter()
+                .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. })))
+        };
+        let expired = r#"{"error":{"type":"OAuthException","code":190,"error_subcode":463}}"#;
+        assert!(answer(400, expired));
+        // Another error code, a success, or a body that is no JSON: not a
+        // refusal.
+        assert!(!answer(
+            400,
+            r#"{"error":{"type":"OAuthException","code":100}}"#
+        ));
+        assert!(!answer(200, expired));
+        assert!(!answer(400, "Bad Request"));
+        // The status list still applies.
+        assert!(answer(401, ""));
+    }
+
+    #[test]
+    fn transport_headers_are_rendered_from_settings_on_every_request() {
+        let mut spec = Catalog::source_tree()
+            .device("youtube-live")
+            .unwrap()
+            .clone();
+        spec.transport.as_mut().unwrap()["headers"] = json!({"Client-Id": "{settings.client_id}"});
+        let open = |client_id: &str| {
+            let mut e = SpecEngine::new(
+                Arc::new(spec.clone()),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: Some("www.googleapis.com".into()),
+                    port: None,
+                    model: "data-api-v3".into(),
+                    channels: None,
+                    settings: json!({"client_id": client_id, "access_token": "t0k",
+                                     "broadcast_id": "b1"})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+                    monitor: false,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            let (id, probe) = cx
+                .take()
+                .into_iter()
+                .find_map(|a| match a {
+                    Action::Http { id, request } => Some((id, request.headers)),
+                    _ => None,
+                })
+                .expect("the probe");
+            (e, id, probe)
+        };
+        let header = |headers: &[(String, String)]| {
+            headers
+                .iter()
+                .find(|(k, _)| k == "Client-Id")
+                .map(|(_, v)| v.clone())
+        };
+        let (_, _, probe) = open("abc");
+        assert_eq!(header(&probe).as_deref(), Some("abc"));
+        assert!(probe.contains(&("Authorization".into(), "Bearer t0k".into())));
+        // Empty: left out.
+        let (mut e, probe_id, probe) = open("");
+        assert_eq!(header(&probe), None);
+        // New settings: later requests carry the new value.
+        let mut cx = Cx::new(1);
+        let settings = json!({"client_id": "xyz", "access_token": "t0k", "broadcast_id": "b1"});
+        assert!(matches!(
+            e.update_settings(&mut cx, settings.as_object().unwrap()),
+            SettingsUpdate::Applied
+        ));
+        let mut cx = Cx::new(2);
+        let mut params = Params::new();
+        params.insert("broadcast_id".into(), json!("b1"));
+        e.command(&mut cx, 1, "get_broadcast", &params);
+        e.http_response(
+            &mut cx,
+            probe_id,
+            Ok(HttpResponse {
+                status: 404,
+                body: Vec::new(),
+            }),
+        );
+        let sent: Vec<_> = cx
+            .take()
+            .into_iter()
+            .filter_map(|a| match a {
+                Action::Http { request, .. } => Some(request.headers),
+                _ => None,
+            })
+            .collect();
+        assert!(!sent.is_empty());
+        assert!(sent.iter().all(|h| header(h).as_deref() == Some("xyz")));
+
+        // The core's own headers can't be named, nor a header on another
+        // transport.
+        let mut bad = spec.clone();
+        bad.transport.as_mut().unwrap()["headers"] = json!({"Authorization": "x"});
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
+            port: None,
+            model: "data-api-v3".into(),
+            channels: None,
+            settings: Params::new(),
+            monitor: false,
+        };
+        assert!(SpecEngine::new(Arc::new(bad), ctx.clone()).is_err());
+        let mut udp = Catalog::source_tree().device("rosstalk").unwrap().clone();
+        udp.transport = Some(
+            json!({"type": "line-udp", "port": 6553, "terminator": "none",
+                                    "headers": {"X-A": "b"}}),
+        );
+        assert!(SpecEngine::new(Arc::new(udp), ctx).is_err());
     }
 
     #[test]
