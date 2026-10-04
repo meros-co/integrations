@@ -87,6 +87,18 @@ async fn tsl_sent_by_one_core_is_received_by_another() {
             monitor: true,
         })
         .is_err());
+
+    // Nor without the switcher's address: each switcher is its own device.
+    assert!(receiver
+        .open(OpenRequest {
+            device: "tsl-umd-listener".into(),
+            model: "tsl-umd".into(),
+            host: String::new(),
+            port: Some(port),
+            settings: Default::default(),
+            monitor: true,
+        })
+        .is_err());
 }
 
 #[tokio::test(flavor = "multi_thread")]

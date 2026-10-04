@@ -98,7 +98,11 @@ pub struct OpenRequest {
     pub model: String,
     /// IP address or hostname. A hostname is resolved once, when opened, for
     /// TCP and UDP; the spec engine's HTTP, websocket and event-stream URLs
-    /// keep the name, so a TLS certificate is checked against it.
+    /// keep the name, so a TLS certificate is checked against it. May be
+    /// empty or left out for an integration on which only the core listens
+    /// (every one of its `ports` is `listener: core`), such as `osc-listener`,
+    /// which hears any sender; it is then `0.0.0.0`.
+    #[serde(default)]
     pub host: String,
     /// The device's port, when it is not the protocol's default: many devices
     /// let an operator change it.
@@ -340,7 +344,11 @@ impl Core {
             })?;
         let settings = catalog::validate(&spec.settings, &request.settings)
             .map_err(|message| OpenError::InvalidSettings { message })?;
-        let host = resolve(&request.host)?;
+        let host = if request.host.trim().is_empty() && spec.core_listens_only() {
+            IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
+        } else {
+            resolve(&request.host)?
+        };
 
         let context = module::OpenContext {
             host,

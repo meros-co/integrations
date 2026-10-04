@@ -215,6 +215,12 @@ pub struct Quirk {
 }
 
 impl DeviceSpec {
+    /// Whether the core only listens, on every port the integration uses, so
+    /// it reaches out to no device and can be opened without a host.
+    pub fn core_listens_only(&self) -> bool {
+        !self.ports.is_empty() && self.ports.iter().all(|p| p.listener == "core")
+    }
+
     pub fn model(&self, id: &str) -> Option<&ModelSpec> {
         self.models.iter().find(|m| m.id == id)
     }

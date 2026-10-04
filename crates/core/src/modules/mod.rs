@@ -164,6 +164,11 @@ pub(crate) fn construct(
         "bss-london" => Ok(Box::new(bss_london::London::new(context))),
         #[cfg(feature = "sony-camera")]
         "sony-camera" => Ok(Box::new(sony_camera::SonyCamera::new(context)?)),
+        // One switcher per device, told apart by address: a host is needed.
+        #[cfg(feature = "tsl-umd-listener")]
+        "tsl-umd-listener" if context.host.is_unspecified() => {
+            Err("give the switcher's address as host: each switcher is its own device".into())
+        }
         // TSL defines no port, so the host must give one.
         #[cfg(feature = "tsl-umd-listener")]
         "tsl-umd-listener" => match context.port {

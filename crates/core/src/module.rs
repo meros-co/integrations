@@ -226,6 +226,14 @@ pub enum Bind {
     /// datagrams routed by source address. For protocols whose devices reply to
     /// a fixed port rather than the sender's (Sennheiser MCP on 53212).
     Shared(u16),
+    /// A fixed port owned by this session alone, hearing every sender rather
+    /// than only the device's address: for a listener that serves whoever
+    /// sends (OSC from any control surface). `address` is the local address
+    /// to bind, the core's bind address when absent.
+    Any {
+        address: Option<std::net::IpAddr>,
+        port: u16,
+    },
 }
 
 /// Whether the device is reachable, as the module judges it.
@@ -333,6 +341,30 @@ pub enum Action {
         socket: Key,
         port: u16,
     },
+    /// Listen on a local TCP port owned by this session alone, accepting any
+    /// number of connections from any peer at once (up to a limit the session
+    /// sets). Each is reported through [`Module::tcp_client`] with its peer's
+    /// address. A port that cannot be bound is reported to
+    /// [`Module::socket_error`]. `TcpClose` on the key stops listening and
+    /// closes every connection. `address` is the local address to bind, the
+    /// core's bind address when absent.
+    TcpServe {
+        socket: Key,
+        address: Option<std::net::IpAddr>,
+        port: u16,
+    },
+    /// Write to one connection accepted by `TcpServe`; nothing if it is gone.
+    TcpClientSend {
+        socket: Key,
+        peer: SocketAddr,
+        data: Vec<u8>,
+    },
+    /// Close one connection accepted by `TcpServe`. Not reported back: the
+    /// module knows.
+    TcpClientClose {
+        socket: Key,
+        peer: SocketAddr,
+    },
     /// Open a WebSocket, replacing any open under this key.
     WsOpen {
         socket: Key,
@@ -372,6 +404,15 @@ pub enum Action {
     },
     /// Merge into the device state (RFC 7386 JSON merge patch).
     State(Value),
+    /// Report one received message as an `Event::Message`, every time, even
+    /// when it repeats the last: for what state cannot carry, such as a
+    /// button pressed twice.
+    Message {
+        address: String,
+        types: Option<String>,
+        args: Value,
+        source: SocketAddr,
+    },
     Connection(Connection),
     /// Heard from the device, whether or not it carried telemetry.
     Alive,
@@ -500,6 +541,27 @@ impl Cx {
         self.push(Action::TcpListen { socket, port });
     }
 
+    /// Accept connections from any peer; see [`Action::TcpServe`].
+    pub fn tcp_serve(&mut self, socket: Key, address: Option<std::net::IpAddr>, port: u16) {
+        self.push(Action::TcpServe {
+            socket,
+            address,
+            port,
+        });
+    }
+
+    pub fn tcp_client_send(&mut self, socket: Key, peer: SocketAddr, data: impl Into<Vec<u8>>) {
+        self.push(Action::TcpClientSend {
+            socket,
+            peer,
+            data: data.into(),
+        });
+    }
+
+    pub fn tcp_client_close(&mut self, socket: Key, peer: SocketAddr) {
+        self.push(Action::TcpClientClose { socket, peer });
+    }
+
     pub fn ws_open(&mut self, socket: Key, request: WsRequest) {
         self.push(Action::WsOpen { socket, request });
     }
@@ -541,6 +603,22 @@ impl Cx {
 
     pub fn state(&mut self, patch: Value) {
         self.push(Action::State(patch));
+    }
+
+    /// Report one received message; see [`Action::Message`].
+    pub fn message(
+        &mut self,
+        address: impl Into<String>,
+        types: Option<String>,
+        args: Value,
+        source: SocketAddr,
+    ) {
+        self.push(Action::Message {
+            address: address.into(),
+            types,
+            args,
+            source,
+        });
     }
 
     pub fn connection(&mut self, connection: Connection) {
@@ -600,6 +678,12 @@ pub trait Module: Send + 'static {
 
     fn tcp(&mut self, cx: &mut Cx, socket: Key, input: TcpInput) {
         let _ = (cx, socket, input);
+    }
+
+    /// Something happened on one connection accepted by `TcpServe`, told
+    /// apart from the others by its peer's address.
+    fn tcp_client(&mut self, cx: &mut Cx, socket: Key, peer: SocketAddr, input: TcpInput) {
+        let _ = (cx, socket, peer, input);
     }
 
     fn ws(&mut self, cx: &mut Cx, socket: Key, input: WsInput) {
