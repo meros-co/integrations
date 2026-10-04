@@ -33,7 +33,7 @@ use expect::Reply;
 use framing::{Framer, PacketFraming, PacketReader, ReplyFraming, SendFraming};
 use oauth::{OAuth, Refreshed, Validated};
 use template::{
-    no_escape, percent_encode, render, sole_converted, sole_value, Conversions, Values,
+    no_escape, percent_encode, render, sole_converted, sole_value, Conversions, Maps, Values,
 };
 
 const SOCKET: Key = "device";
@@ -45,6 +45,8 @@ const PUSH_RECONNECT: Key = "push-reconnect";
 const PUSH_PING: Key = "push-ping";
 /// `telemetry.websocket.every_ms`: the push websocket's messages again.
 const PUSH_RENEW: Key = "push-renew";
+/// `telemetry.websocket.idle_ms`: the push websocket gone quiet.
+const PUSH_IDLE: Key = "push-idle";
 /// The server-sent event stream (`telemetry.sse`).
 const EVENTS: Key = "events";
 const EVENTS_RECONNECT: Key = "events-reconnect";
@@ -126,6 +128,145 @@ enum Transport {
     },
 }
 
+/// `transport.session`: a login whose answer carries a session (a cookie or a
+/// header) that later requests send back, renewed when the device says it
+/// has ended (Magewell's status 37).
+#[derive(Debug)]
+struct SessionSpec {
+    /// The login request for the device's model.
+    login: Value,
+    capture: Capture,
+    /// An answer to any request meaning the session ended: log in again and
+    /// send the request once more.
+    relogin_status: Vec<u16>,
+    relogin_json: Vec<(String, Regex)>,
+    /// An answer to the login refusing the credential: terminal.
+    refused_status: Vec<u16>,
+    refused_json: Vec<(String, Regex)>,
+}
+
+/// What of the login's answer is the session.
+#[derive(Debug, Clone, PartialEq)]
+enum Capture {
+    /// The `name=value` of every `Set-Cookie` (`None`), or of the one named,
+    /// sent back as `Cookie`.
+    Cookie(Option<String>),
+    /// A response header's value, sent back in a header of the same name.
+    Header(String),
+}
+
+impl SessionSpec {
+    fn parse(v: &Value, model: &str) -> Result<SessionSpec, String> {
+        let login = match v.get("login") {
+            Some(Value::Array(items)) => items.iter().find(|i| for_model(i, model)).cloned(),
+            Some(one) if for_model(one, model) => Some(one.clone()),
+            _ => None,
+        }
+        .ok_or(format!("transport.session has no login for model {model}"))?;
+        let capture = match v.get("capture") {
+            Some(c) => match (c.get("cookie"), c.get("header")) {
+                (Some(Value::String(name)), None) if name == "*" => Capture::Cookie(None),
+                (Some(Value::String(name)), None) => Capture::Cookie(Some(name.clone())),
+                (None, Some(Value::String(h))) => Capture::Header(h.clone()),
+                _ => {
+                    return Err(
+                        "transport.session.capture is {cookie: name} or {header: name}".into(),
+                    )
+                }
+            },
+            None => Capture::Cookie(None),
+        };
+        let statuses = |key: &str| -> Vec<u16> {
+            v.get(key)
+                .and_then(|m| m.get("status"))
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_u64)
+                .map(|s| s as u16)
+                .collect()
+        };
+        let json = |key: &str| -> Result<Vec<(String, Regex)>, String> {
+            let mut out = Vec::new();
+            for (path, re) in v
+                .get(key)
+                .and_then(|m| m.get("json"))
+                .and_then(Value::as_object)
+                .into_iter()
+                .flatten()
+            {
+                let re = re
+                    .as_str()
+                    .ok_or(format!("transport.session.{key}.json values are regexes"))?;
+                out.push((
+                    path.clone(),
+                    Regex::new(re).map_err(|e| format!("transport.session.{key}: {e}"))?,
+                ));
+            }
+            Ok(out)
+        };
+        Ok(SessionSpec {
+            login,
+            capture,
+            relogin_status: statuses("relogin"),
+            relogin_json: json("relogin")?,
+            refused_status: statuses("refused"),
+            refused_json: json("refused")?,
+        })
+    }
+
+    /// The session in a login's answer, as the header to send it in.
+    fn captured(&self, response: &HttpResponse) -> Option<(String, String)> {
+        match &self.capture {
+            Capture::Cookie(name) => {
+                let cookies: Vec<&str> = response
+                    .header_values("set-cookie")
+                    .filter_map(|v| v.split(';').next())
+                    .map(str::trim)
+                    .filter(|c| {
+                        c.split_once('=').is_some_and(|(n, _)| {
+                            name.as_deref().is_none_or(|want| n.trim() == want)
+                        })
+                    })
+                    .collect();
+                (!cookies.is_empty()).then(|| ("Cookie".to_string(), cookies.join("; ")))
+            }
+            Capture::Header(h) => response
+                .header_values(h)
+                .next()
+                .filter(|v| !v.is_empty())
+                .map(|v| (h.clone(), v.to_string())),
+        }
+    }
+}
+
+/// Whether every selector matches the JSON body (at least one selector).
+fn body_matches(selectors: &[(String, Regex)], body: &[u8]) -> bool {
+    if selectors.is_empty() {
+        return false;
+    }
+    let Ok(doc) = serde_json::from_slice::<Value>(body) else {
+        return false;
+    };
+    selectors.iter().all(|(path, re)| {
+        let text = match expect::json_path(&doc, path) {
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Null) | None => return false,
+            Some(other) => other.to_string(),
+        };
+        re.is_match(&text)
+    })
+}
+
+/// Whether a `send` item, probe or login applies to the device's model: one
+/// naming `models` applies only to those (SPEC.md §4, "Messages per model").
+fn for_model(item: &Value, model: &str) -> bool {
+    match item.get("models").and_then(Value::as_array) {
+        Some(models) => models.iter().any(|m| m.as_str() == Some(model)),
+        None => true,
+    }
+}
+
 /// The websocket a spec on another transport takes pushed state from.
 #[derive(Debug)]
 struct Push {
@@ -136,10 +277,53 @@ struct Push {
     /// open, for a device that drops a client gone quiet (mimoLive's
     /// keepalive) or answers state only when asked (FreeShow's variables).
     every: Option<Millis>,
-    /// Whether its opening request carries the transport's credential.
+    /// Whether its opening request carries the transport's credential, or
+    /// its URL a setting (a token in the query).
     credentialed: bool,
     /// Socket.IO over Engine.IO, when the device speaks it.
     socketio: Option<SocketIo>,
+    /// `url`: an absolute URL on any host, a template over settings
+    /// rendered at each opening, so a refreshed token in it is the current
+    /// one (Restream's `?accessToken=`).
+    url: Option<String>,
+    /// `idle_ms`: reopened when nothing arrives for this long (a service
+    /// that sends keepalives, so silence means a dead connection).
+    idle: Option<Millis>,
+}
+
+/// Engine.IO's query, after a URL with or without one.
+fn engine_io_query(url: &str, sio: &SocketIo) -> String {
+    let sep = if url.contains('?') { '&' } else { '?' };
+    format!("{sep}EIO={}&transport=websocket", sio.version)
+}
+
+/// A push websocket URL a spec renders: `wss`, or `ws` only to this machine.
+/// The URL may hold a token, so an error never shows it.
+fn check_push_url(url: &str) -> Result<(), String> {
+    let authority = |rest: &str| rest.split(['/', '?']).next().unwrap_or("").to_string();
+    if let Some(rest) = url.strip_prefix("wss://") {
+        if !authority(rest).is_empty() {
+            return Ok(());
+        }
+    }
+    if let Some(rest) = url.strip_prefix("ws://") {
+        let authority = authority(rest);
+        let host = if authority.starts_with('[') {
+            authority.split(']').next().map(|h| format!("{h}]"))
+        } else {
+            authority.split(':').next().map(str::to_string)
+        }
+        .unwrap_or_default();
+        let loopback = host == "localhost"
+            || host == "[::1]"
+            || host
+                .parse::<std::net::Ipv4Addr>()
+                .is_ok_and(|ip| ip.is_loopback());
+        if loopback {
+            return Ok(());
+        }
+    }
+    Err("telemetry.websocket.url must be wss, or ws to this machine (localhost, 127.0.0.1 or [::1])".into())
 }
 
 /// `telemetry.websocket.socketio`: Socket.IO's framing over the websocket.
@@ -256,11 +440,15 @@ impl Await {
 struct InFlight {
     /// `None` for a liveness probe.
     id: Option<CommandId>,
-    messages: VecDeque<(Outgoing, Option<OscReply>)>,
+    /// Each message, the OSC reply it waits for, and on a line transport
+    /// its text without framing (what a reply's `request_match` reads).
+    messages: VecDeque<(Outgoing, Option<OscReply>, Option<String>)>,
     /// Over a websocket: what identifies the reply (`expect.reply_json`).
     ws_reply: Option<Vec<(String, String)>>,
     /// On a line transport: text the reply holds (`expect.reply_contains`).
     text_reply: Option<String>,
+    /// The text of the line message now awaiting its reply.
+    request_text: Option<String>,
     expect: Map<String, Value>,
     returns: String,
     awaiting: Option<Await>,
@@ -273,8 +461,12 @@ struct InFlight {
     retry: Option<HttpRequest>,
     /// The token was refreshed for this request: a second refusal is final.
     refreshed: bool,
+    /// The job, kept to send again after a fresh login
+    /// (`transport.session.relogin`).
+    job: Job,
 }
 
+#[derive(Debug, Clone)]
 struct Job {
     id: Option<CommandId>,
     name: String,
@@ -285,6 +477,28 @@ struct Job {
     /// A connection step that waits for its reply (`on_connect` with
     /// `await_reply`): commands do not go ahead of it.
     setup: bool,
+    /// The session login (`transport.session`), its item the login request.
+    login: bool,
+    /// Sent once more after a fresh login: a second "session ended" stands.
+    relogged: bool,
+    /// A `then_send` item's captures: the types of `params`, which hold
+    /// them.
+    specs: Option<Arc<BTreeMap<String, ParamSpec>>>,
+}
+
+impl Job {
+    fn internal(item: Option<Value>, setup: bool) -> Job {
+        Job {
+            id: None,
+            name: String::new(),
+            params: Params::new(),
+            item,
+            setup,
+            login: false,
+            relogged: false,
+            specs: None,
+        }
+    }
 }
 
 pub(crate) struct SpecEngine {
@@ -331,6 +545,13 @@ pub(crate) struct SpecEngine {
     refusals: Vec<(Regex, Option<Regex>)>,
     /// The spec's conversions, for templates.
     conversions: Conversions,
+    /// The spec's value tables, for templates.
+    maps: Maps,
+    /// `transport.session`: the login and what of its answer is the session.
+    session: Option<SessionSpec>,
+    /// The session held: the header it is sent in and its value. A secret,
+    /// never logged, offered to the rules or kept in state.
+    session_token: Option<(String, String)>,
     /// `telemetry.websocket`: a push channel beside the transport.
     push: Option<Push>,
     push_backoff: Millis,
@@ -590,7 +811,21 @@ impl SpecEngine {
             .get("port")
             .and_then(Value::as_u64)
             .ok_or("transport has no port")? as u16;
-        let port = ctx.port.unwrap_or(spec_port);
+        // `https_port`: the default port when the operator chooses HTTPS.
+        let https_port = match t.get("https_port") {
+            None => None,
+            Some(v) => match v.as_u64() {
+                Some(p @ 1..=65535) => Some(p as u16),
+                _ => return Err("transport.https_port is not a port".into()),
+            },
+        };
+        let secure = kind == "http"
+            && https_port.is_some()
+            && scheme_of(&t, &ctx.settings, "http", "https")? == "https";
+        let port = ctx.port.unwrap_or(match https_port {
+            Some(p) if secure => p,
+            _ => spec_port,
+        });
         let timeout = t
             .get("timeout_ms")
             .and_then(Value::as_u64)
@@ -750,7 +985,20 @@ impl SpecEngine {
             other => return Err(format!("transport '{other}' is not implemented")),
         };
 
-        let probe = t.get("probe").cloned();
+        // A list of probes, each for some models: the first for this one.
+        let probe = match t.get("probe") {
+            Some(Value::Array(items)) => items.iter().find(|i| for_model(i, &ctx.model)).cloned(),
+            Some(one) if for_model(one, &ctx.model) => Some(one.clone()),
+            _ => None,
+        };
+        let maps = template::maps(spec.maps.as_ref())?;
+        let session = match t.get("session") {
+            None => None,
+            Some(_) if kind != "http" => {
+                return Err("transport.session is for the http transport".into())
+            }
+            Some(s) => Some(SessionSpec::parse(s, &ctx.model)?),
+        };
         let telemetry = telemetry::Telemetry::shared(
             spec.telemetry.as_ref(),
             &spec.state,
@@ -770,6 +1018,7 @@ impl SpecEngine {
                         settings: &ctx.settings,
                         setting_specs: &spec.settings,
                         conversions: &conversions,
+                        maps: &maps,
                     },
                 )?
             }
@@ -778,10 +1027,49 @@ impl SpecEngine {
         let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
             Some(w) => {
-                let push_port = match w.get("port").and_then(Value::as_u64) {
-                    Some(p @ 1..=65535) => p as u16,
-                    Some(_) => return Err("telemetry.websocket.port is not a port".into()),
+                // A port, or `{setting: name}` naming the operator's (an
+                // empty setting is the transport's port).
+                let push_port = match w.get("port") {
                     None => port,
+                    Some(Value::Object(o)) => {
+                        let name = o
+                            .get("setting")
+                            .and_then(Value::as_str)
+                            .ok_or("telemetry.websocket.port is a port or {setting: name}")?;
+                        match ctx.settings.get(name) {
+                            None | Some(Value::Null) => port,
+                            Some(v) => match v.as_u64() {
+                                Some(p @ 1..=65535) => p as u16,
+                                _ => return Err(format!("setting {name} is not a port")),
+                            },
+                        }
+                    }
+                    Some(v) => match v.as_u64() {
+                        Some(p @ 1..=65535) => p as u16,
+                        _ => return Err("telemetry.websocket.port is not a port".into()),
+                    },
+                };
+                let url = match w.get("url") {
+                    None => None,
+                    Some(Value::String(u)) => {
+                        if w.get("path").is_some()
+                            || w.get("port").is_some()
+                            || w.get("scheme").is_some()
+                        {
+                            return Err(
+                                "telemetry.websocket.url replaces path, port and scheme".into()
+                            );
+                        }
+                        // The scheme and host are the spec's: checked now, and
+                        // the rendered URL again at each opening.
+                        if !(u.starts_with("wss://") || u.starts_with("ws://")) {
+                            return Err(
+                                "telemetry.websocket.url starts with wss:// or ws://".into()
+                            );
+                        }
+                        Some(u.clone())
+                    }
+                    Some(_) => return Err("telemetry.websocket.url is a template".into()),
                 };
                 // The transport's credential goes on the websocket's opening
                 // request too.
@@ -817,38 +1105,64 @@ impl SpecEngine {
                         return Err("telemetry.websocket.socketio is true or an object".into())
                     }
                 };
-                let mut request = ws_request(
-                    w,
-                    &url_host(&ctx),
-                    push_port,
-                    &ctx.settings,
-                    auth,
-                    &auth_header,
-                )?;
-                request.headers.extend(side_headers.iter().cloned());
-                if let Some(sio) = &socketio {
-                    // Engine.IO's query.
-                    let sep = if request.url.contains('?') { '&' } else { '?' };
-                    request
-                        .url
-                        .push_str(&format!("{sep}EIO={}&transport=websocket", sio.version));
+                let mut request = match &url {
+                    // Another host: neither the transport's credential nor
+                    // its headers go there; the URL carries what it needs.
+                    Some(_) => WsRequest {
+                        url: String::new(),
+                        headers: str_field(w, "subprotocol")
+                            .map(|p| vec![("Sec-WebSocket-Protocol".to_string(), p.to_string())])
+                            .unwrap_or_default(),
+                        accept_invalid_certs: w
+                            .get("accept_invalid_certs")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    },
+                    None => {
+                        let mut request = ws_request(
+                            w,
+                            &url_host(&ctx),
+                            push_port,
+                            &ctx.settings,
+                            auth,
+                            &auth_header,
+                        )?;
+                        request.headers.extend(side_headers.iter().cloned());
+                        request
+                    }
+                };
+                if let (Some(sio), None) = (&socketio, &url) {
+                    request.url.push_str(&engine_io_query(&request.url, sio));
                 }
                 // A device serving HTTPS with a self-signed certificate
                 // serves wss with it too, unless the websocket says otherwise.
                 if let (
                     None,
+                    None,
                     Transport::Http {
                         accept_invalid_certs: true,
                         ..
                     },
-                ) = (w.get("accept_invalid_certs"), &transport)
+                ) = (w.get("accept_invalid_certs"), &url, &transport)
                 {
                     request.accept_invalid_certs = true;
                 }
                 let credentialed = request
                     .headers
                     .iter()
-                    .any(|(name, _)| name != "Sec-WebSocket-Protocol");
+                    .any(|(name, _)| name != "Sec-WebSocket-Protocol")
+                    || url.as_deref().is_some_and(|u| u.contains("{settings."));
+                let idle = match w.get("idle_ms") {
+                    None => None,
+                    Some(v) => match v.as_u64() {
+                        Some(ms @ 1..) => Some(ms),
+                        _ => {
+                            return Err(
+                                "telemetry.websocket.idle_ms is not a positive integer".into()
+                            )
+                        }
+                    },
+                };
                 Some(Push {
                     request,
                     send: match w.get("send") {
@@ -869,6 +1183,8 @@ impl SpecEngine {
                     },
                     credentialed,
                     socketio,
+                    url,
+                    idle,
                 })
             }
         };
@@ -949,6 +1265,9 @@ impl SpecEngine {
             prompt_wait: None,
             refusals: Vec::new(),
             conversions,
+            maps,
+            session,
+            session_token: None,
             push,
             push_backoff: RECONNECT_MIN,
             events,
@@ -985,6 +1304,7 @@ impl SpecEngine {
             settings: &self.settings,
             setting_specs: &self.spec.settings,
             conversions: &self.conversions,
+            maps: &self.maps,
         }
     }
 
@@ -1053,6 +1373,13 @@ impl SpecEngine {
                 }
                 let mut headers = auth_headers(*auth, &self.auth_header, &self.settings);
                 headers.extend(render_headers(extra, values)?);
+                // The session held (`transport.session`), on every request
+                // but one sent without it.
+                if let Some((name, value)) = &self.session_token {
+                    if item.get("session") != Some(&Value::Bool(false)) {
+                        headers.push((name.clone(), value.clone()));
+                    }
+                }
                 let setting = |name: &str| {
                     self.settings
                         .get(name)
@@ -1103,15 +1430,12 @@ impl SpecEngine {
                     Some(item) => item.clone(),
                     None => self.probe.clone().ok_or("no probe")?,
                 };
-                (vec![item], Map::new(), "ack".into(), &empty_specs)
+                let specs = job.specs.as_deref().unwrap_or(&empty_specs);
+                (vec![item], Map::new(), "ack".into(), specs)
             }
             Some(_) => {
                 let command = spec.commands.get(&job.name).ok_or("unknown command")?;
-                let send = command.send.clone().ok_or("command has no send")?;
-                let items = match send {
-                    Value::Array(items) => items,
-                    one => vec![one],
-                };
+                let items = self.command_items(&job.name)?;
                 let expect = command
                     .expect
                     .as_ref()
@@ -1162,13 +1486,21 @@ impl SpecEngine {
                 _ => item.clone(),
             };
             let outgoing = self.build(&item, &values)?;
-            messages.push_back((outgoing, awaited_address.clone()));
+            let text = match (&self.transport, &item) {
+                (
+                    Transport::LineTcp { .. } | Transport::LineUdp { .. },
+                    Value::String(template),
+                ) => Some(render(template, &values, no_escape)?),
+                _ => None,
+            };
+            messages.push_back((outgoing, awaited_address.clone(), text));
         }
         Ok(InFlight {
             id: job.id,
             messages,
             ws_reply,
             text_reply,
+            request_text: None,
             expect,
             returns,
             awaiting: None,
@@ -1176,7 +1508,44 @@ impl SpecEngine {
             last_http: None,
             retry: None,
             refreshed: false,
+            job: job.clone(),
         })
+    }
+
+    /// A command's `send` items for the device's model.
+    fn command_items(&self, name: &str) -> Result<Vec<Value>, String> {
+        let command = self.spec.commands.get(name).ok_or("unknown command")?;
+        let send = command.send.clone().ok_or("command has no send")?;
+        let items: Vec<Value> = match send {
+            Value::Array(items) => items,
+            one => vec![one],
+        }
+        .into_iter()
+        .filter(|i| for_model(i, &self.ctx.model))
+        .collect();
+        if items.is_empty() {
+            return Err(format!(
+                "command {name} has no message for model {}",
+                self.ctx.model
+            ));
+        }
+        Ok(items)
+    }
+
+    /// Whether a job's requests carry the session (`transport.session`):
+    /// all but the login, the probe and items sent without it.
+    fn needs_session(&self, job: &Job) -> bool {
+        if self.session.is_none() || job.login {
+            return false;
+        }
+        let items = match (&job.id, &job.item) {
+            (None, None) => return false,
+            (None, Some(item)) => vec![item.clone()],
+            (Some(_), _) => self.command_items(&job.name).unwrap_or_default(),
+        };
+        items
+            .iter()
+            .any(|i| i.get("session") != Some(&Value::Bool(false)))
     }
 
     // ── Running commands ─────────────────────────────────────────────────
@@ -1204,6 +1573,16 @@ impl SpecEngine {
             let Some(job) = self.queue.pop_front() else {
                 return;
             };
+            // No session yet: the login goes first.
+            if self.session_token.is_none() && self.needs_session(&job) {
+                let login = self.session.as_ref().map(|s| s.login.clone());
+                self.queue.push_front(job);
+                self.queue.push_front(Job {
+                    login: true,
+                    ..Job::internal(login, true)
+                });
+                continue;
+            }
             match self.prepare(&job) {
                 Ok(flight) => {
                     self.current = Some(flight);
@@ -1226,7 +1605,7 @@ impl SpecEngine {
                 return;
             };
             let waits = replies && (flight.returns != "none" || flight.id.is_none());
-            let Some((outgoing, address)) = flight.messages.pop_front() else {
+            let Some((outgoing, address, text)) = flight.messages.pop_front() else {
                 // Everything sent and, where the protocol replies, answered.
                 let flight = self.current.take().unwrap();
                 if let Some(id) = flight.id {
@@ -1234,6 +1613,7 @@ impl SpecEngine {
                 }
                 return;
             };
+            flight.request_text = text;
             let awaiting = match outgoing {
                 Outgoing::Ws(text) => {
                     cx.ws_send(SOCKET, text);
@@ -1655,6 +2035,83 @@ impl SpecEngine {
         self.refused = Some(reason);
     }
 
+    /// The session login (`transport.session`) answered, or failed. A refusal
+    /// is terminal; an answer holding the session lets the queue go on; any
+    /// other fails what waits for a session, and the next request needing
+    /// one logs in again.
+    fn logged_in(&mut self, cx: &mut Cx, result: Result<HttpResponse, String>) {
+        cx.cancel_timer(REPLY);
+        let Some(flight) = self.current.take() else {
+            return;
+        };
+        cx.round_trip(cx.now().saturating_sub(flight.sent_at));
+        let Some(session) = &self.session else {
+            return;
+        };
+        let failure = match result {
+            // Not the error's text: it can name the login's URL, whose query
+            // may hold a hashed password.
+            Err(_) => CommandError::Transport {
+                message: "the login request failed".into(),
+            },
+            Ok(response) => {
+                if session.refused_status.contains(&response.status)
+                    || body_matches(&session.refused_json, &response.body)
+                {
+                    let detail = serde_json::from_slice::<Value>(&response.body)
+                        .ok()
+                        .filter(|_| !session.refused_json.is_empty())
+                        .and_then(|doc| {
+                            session
+                                .refused_json
+                                .iter()
+                                .filter_map(|(path, _)| {
+                                    expect::json_path(&doc, path).map(|v| format!("{path} {v}"))
+                                })
+                                .next()
+                        })
+                        .unwrap_or_else(|| format!("HTTP {}", response.status));
+                    self.refuse(cx, format!("the device refused the login ({detail})"));
+                    return;
+                }
+                let captured = (200..300)
+                    .contains(&response.status)
+                    .then(|| session.captured(&response))
+                    .flatten();
+                if let Some(token) = captured {
+                    self.session_token = Some(token);
+                    self.heard(cx);
+                    self.pump(cx);
+                    return;
+                }
+                CommandError::DeviceError {
+                    code: Some(response.status.to_string()),
+                    message: format!(
+                        "the login was not accepted (HTTP {}, no session in the answer)",
+                        response.status
+                    ),
+                }
+            }
+        };
+        cx.log(Level::Warning, format!("login failed: {failure:?}"));
+        // What waits for a session fails with the login, rather than each
+        // logging in again in turn.
+        let queue = std::mem::take(&mut self.queue);
+        for job in queue {
+            if self.needs_session(&job) {
+                if let Some(id) = job.id {
+                    cx.complete(id, Err(failure.clone()));
+                }
+            } else {
+                self.queue.push_back(job);
+            }
+        }
+        if let CommandError::Transport { message } = failure {
+            self.set_link(cx, Connection::Disconnected { reason: message });
+        }
+        self.pump(cx);
+    }
+
     fn heard(&mut self, cx: &mut Cx) {
         self.last_heard = cx.now();
         cx.alive();
@@ -1744,6 +2201,9 @@ impl SpecEngine {
         let empty_specs = BTreeMap::new();
         let steps = self.spec.on_connect.clone();
         for (index, step) in steps.iter().enumerate().skip(from) {
+            if !for_model(step, &self.ctx.model) {
+                continue;
+            }
             let (item, when_set, prompt, refused, accepted, await_reply) = match step {
                 Value::Object(m) if m.contains_key("send") => (
                     m.get("send").cloned().unwrap_or(Value::Null),
@@ -1787,13 +2247,7 @@ impl SpecEngine {
             if await_reply && self.transport.replies() {
                 // Queued like a query: sent in turn, its reply consumed, and
                 // nothing else goes ahead of it.
-                self.queue.push_back(Job {
-                    id: None,
-                    name: String::new(),
-                    params: Params::new(),
-                    item: Some(item),
-                    setup: true,
-                });
+                self.queue.push_back(Job::internal(Some(item), true));
                 continue;
             }
             let values = self.values(&empty, &empty_specs);
@@ -1844,13 +2298,7 @@ impl SpecEngine {
         if self.probe.is_none() || self.queue.iter().any(|j| j.id.is_none()) {
             return;
         }
-        self.queue.push_back(Job {
-            id: None,
-            name: String::new(),
-            params: Params::new(),
-            item: None,
-            setup: false,
-        });
+        self.queue.push_back(Job::internal(None, false));
         self.pump(cx);
     }
 
@@ -1858,6 +2306,24 @@ impl SpecEngine {
     /// goes through the command queue so its reply is not mistaken for a
     /// command's; otherwise it is sent straight away, like `on_connect`.
     fn send_telemetry(&mut self, cx: &mut Cx, items: Vec<Value>, poll: bool) {
+        let items = items
+            .into_iter()
+            .map(|item| telemetry::Triggered {
+                item,
+                params: Params::new(),
+                specs: BTreeMap::new(),
+            })
+            .collect();
+        self.send_items(cx, items, poll);
+    }
+
+    /// Telemetry messages, each rendered from its own values: none for a
+    /// subscription or a poll, a rule's captures for `then_send`.
+    fn send_items(&mut self, cx: &mut Cx, items: Vec<telemetry::Triggered>, poll: bool) {
+        let items: Vec<telemetry::Triggered> = items
+            .into_iter()
+            .filter(|t| for_model(&t.item, &self.ctx.model))
+            .collect();
         // HTTP requests are always queued: each reply is matched to its
         // request. Poll items are queries, so on any transport that answers
         // they go one at a time, which also paces a long list.
@@ -1872,24 +2338,27 @@ impl SpecEngine {
             // subscription goes to the rules like anything else.
             Transport::Ws { .. } => false,
         };
-        for item in items {
+        for telemetry::Triggered {
+            item,
+            params,
+            specs,
+        } in items
+        {
             if queued {
                 // A slow device must not fall behind: a poll item still
-                // waiting from the last round is not queued again.
+                // waiting from the last round is not queued again, and a
+                // re-read already waiting serves a second push too.
                 if poll
-                    && self
-                        .queue
-                        .iter()
-                        .any(|j| j.id.is_none() && j.item.as_ref() == Some(&item))
+                    && self.queue.iter().any(|j| {
+                        j.id.is_none() && j.item.as_ref() == Some(&item) && j.params == params
+                    })
                 {
                     continue;
                 }
                 self.queue.push_back(Job {
-                    id: None,
-                    name: String::new(),
-                    params: Params::new(),
-                    item: Some(item),
-                    setup: false,
+                    params,
+                    specs: (!specs.is_empty()).then(|| Arc::new(specs)),
+                    ..Job::internal(Some(item), false)
                 });
                 continue;
             }
@@ -1899,9 +2368,7 @@ impl SpecEngine {
                 }
                 _ => item,
             };
-            let empty = Params::new();
-            let empty_specs = BTreeMap::new();
-            let values = self.values(&empty, &empty_specs);
+            let values = self.values(&params, &specs);
             match self.build(&item, &values) {
                 Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
                 Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
@@ -1912,6 +2379,27 @@ impl SpecEngine {
             }
         }
         self.pump(cx);
+    }
+
+    /// Offer a message to the telemetry rules: the state it changes, and
+    /// the `then_send` items of the rules it matches, queued like polls
+    /// (only while monitored).
+    fn offer(&mut self, cx: &mut Cx, message: &telemetry::Inbound) {
+        let mut triggered = Vec::new();
+        let mut cleared = Value::Object(Map::new());
+        let patch = self
+            .telemetry
+            .apply_into(message, &mut triggered, &mut cleared);
+        // What the message replaces leaves state first.
+        if cleared.as_object().is_some_and(|c| !c.is_empty()) {
+            cx.state(cleared);
+        }
+        if let Some(patch) = patch {
+            cx.state(patch);
+        }
+        if !triggered.is_empty() && self.monitor && self.refused.is_none() {
+            self.send_items(cx, triggered, true);
+        }
     }
 
     /// After connecting: subscribe, poll once, and schedule both.
@@ -1934,14 +2422,12 @@ impl SpecEngine {
     /// Offer a text message to the telemetry rules: a line or block from the
     /// device, a text HTTP reply, or a notification a native extension
     /// received on the spec's behalf.
-    pub(crate) fn apply_text(&self, cx: &mut Cx, text: &str) {
+    pub(crate) fn apply_text(&mut self, cx: &mut Cx, text: &str) {
         let text = text.trim();
         if text.is_empty() {
             return;
         }
-        if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Text(text)) {
-            cx.state(patch);
-        }
+        self.offer(cx, &telemetry::Inbound::Text(text));
     }
 
     fn inbound_text(&mut self, cx: &mut Cx, message: String) {
@@ -1953,7 +2439,6 @@ impl SpecEngine {
         // text that happens to match is not about the login.
         self.refusals
             .retain(|(_, accepted)| !accepted.as_ref().is_some_and(|a| a.is_match(&message)));
-        self.apply_message(cx, &message);
         let waiting = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
             Some(Await::Text(None)) => true,
             // `expect.reply_contains`: a message that does not hold the text
@@ -1975,10 +2460,22 @@ impl SpecEngine {
         {
             if !re.is_match(&message) {
                 // Unsolicited: status the device pushes on its own.
+                self.apply_message(cx, &message);
                 self.last_heard = cx.now();
                 cx.alive();
                 return;
             }
+        }
+        // The reply to the message in flight is offered with that message's
+        // text, for a rule that needs to know what it answers.
+        let request = waiting
+            .then(|| self.current.as_ref().and_then(|f| f.request_text.clone()))
+            .flatten();
+        match request {
+            Some(request) => {
+                self.offer_answer(cx, &message, &request);
+            }
+            None => self.apply_message(cx, &message),
         }
         if waiting {
             self.reply(cx, Reply::Text(message));
@@ -1988,13 +2485,23 @@ impl SpecEngine {
         }
     }
 
+    /// A line reply, offered with the text of the message it answers: as
+    /// JSON where it parses, and as text.
+    fn offer_answer(&mut self, cx: &mut Cx, message: &str, request: &str) {
+        if let Ok(doc) = serde_json::from_str::<Value>(message) {
+            self.offer(cx, &telemetry::Inbound::Json(&doc));
+        }
+        let text = message.trim();
+        if !text.is_empty() {
+            self.offer(cx, &telemetry::Inbound::Answer { text, request });
+        }
+    }
+
     /// Offer a message to the telemetry rules: as JSON where it parses (a
     /// websocket message, a line or block of a JSON protocol), and as text.
-    fn apply_message(&self, cx: &mut Cx, text: &str) {
+    fn apply_message(&mut self, cx: &mut Cx, text: &str) {
         if let Ok(doc) = serde_json::from_str::<Value>(text) {
-            if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
-                cx.state(patch);
-            }
+            self.offer(cx, &telemetry::Inbound::Json(&doc));
         }
         self.apply_text(cx, text);
     }
@@ -2039,10 +2546,41 @@ impl SpecEngine {
         if !self.monitor {
             return;
         }
-        if let Some(push) = &self.push {
-            let mut request = push.request.clone();
+        let Some(push) = &self.push else {
+            return;
+        };
+        let mut request = push.request.clone();
+        if let Some(template) = &push.url {
+            // Rendered from the settings now, so a refreshed token is used;
+            // each value percent-encoded, as in a query.
+            let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+            let rendered = render(
+                template,
+                &self.values(&no_params, &no_specs),
+                percent_encode,
+            )
+            .and_then(|url| check_push_url(&url).map(|()| url));
+            match rendered {
+                Ok(url) => request.url = url,
+                Err(e) => {
+                    cx.log(Level::Warning, format!("push websocket not opened: {e}"));
+                    return;
+                }
+            }
+            if let Some(sio) = &push.socketio {
+                request.url.push_str(&engine_io_query(&request.url, sio));
+            }
+        } else {
             self.current_auth(&mut request.headers);
-            cx.ws_open(PUSH, request);
+        }
+        cx.ws_open(PUSH, request);
+    }
+
+    /// `idle_ms`: the push websocket heard from; reopened if it then goes
+    /// quiet for that long.
+    fn push_heard(&mut self, cx: &mut Cx) {
+        if let Some(idle) = self.push.as_ref().and_then(|p| p.idle) {
+            cx.set_timer(PUSH_IDLE, idle);
         }
     }
 
@@ -2075,9 +2613,7 @@ impl SpecEngine {
                 let data = serde_json::from_str::<Value>(&event.data)
                     .unwrap_or_else(|_| Value::String(event.data.clone()));
                 let doc = serde_json::json!({"event": event.event, "data": data});
-                if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Json(&doc)) {
-                    cx.state(patch);
-                }
+                self.offer(cx, &telemetry::Inbound::Json(&doc));
                 self.apply_text(cx, &event.data);
                 self.last_heard = cx.now();
                 cx.alive();
@@ -2128,6 +2664,7 @@ impl SpecEngine {
                     self.send_push_items(cx, "");
                 }
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             // Text pushed in binary frames (OpenLP's state): offered to the
@@ -2139,6 +2676,7 @@ impl SpecEngine {
                     None => self.apply_message(cx, &text),
                 }
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             WsInput::Text(text) => {
@@ -2147,15 +2685,18 @@ impl SpecEngine {
                     None => self.apply_message(cx, &text),
                 }
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             WsInput::Binary(_) | WsInput::Activity => {
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             WsInput::Closed { reason, .. } => {
                 cx.cancel_timer(PUSH_PING);
                 cx.cancel_timer(PUSH_RENEW);
+                cx.cancel_timer(PUSH_IDLE);
                 let credentialed = !auth_headers_empty(&self.push);
                 if credentialed && handshake_refused(&reason) && self.side_refresh(cx) {
                     cx.set_timer(PUSH_RECONNECT, RECONNECT_MIN);
@@ -2254,11 +2795,7 @@ impl SpecEngine {
                                 "data": data,
                                 "args": args.get(1..).map(<[Value]>::to_vec).unwrap_or_default(),
                             });
-                            if let Some(patch) =
-                                self.telemetry.apply(&telemetry::Inbound::Json(&doc))
-                            {
-                                cx.state(patch);
-                            }
+                            self.offer(cx, &telemetry::Inbound::Json(&doc));
                         }
                     }
                     "4" => cx.log(
@@ -2274,13 +2811,14 @@ impl SpecEngine {
 
     fn inbound_osc(&mut self, cx: &mut Cx, packet: &[u8]) {
         for message in osc::decode(packet) {
-            if let Some(patch) = self.telemetry.apply(&telemetry::Inbound::Osc {
-                address: &message.address,
-                types: &message.types,
-                args: &message.args,
-            }) {
-                cx.state(patch);
-            }
+            self.offer(
+                cx,
+                &telemetry::Inbound::Osc {
+                    address: &message.address,
+                    types: &message.types,
+                    args: &message.args,
+                },
+            );
             let matches = match self.current.as_ref().and_then(|f| f.awaiting.as_ref()) {
                 Some(Await::Osc(None)) => true,
                 Some(Await::Osc(Some(reply))) => reply.matches(&message.address),
@@ -2373,8 +2911,7 @@ impl Module for SpecEngine {
                 id: Some(id),
                 name: name.to_string(),
                 params: params.clone(),
-                item: None,
-                setup: false,
+                ..Job::internal(None, false)
             },
         );
         self.pump(cx);
@@ -2483,16 +3020,27 @@ impl Module for SpecEngine {
             }
             return;
         }
+        let ours = matches!(
+            self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
+            Some(Await::Http(r)) if *r == id
+        );
+        // The login's answer holds the session: never offered to the rules.
+        if ours && self.current.as_ref().is_some_and(|f| f.job.login) {
+            self.request_paths.remove(&id);
+            if self.refused.is_none() {
+                self.logged_in(cx, result);
+            }
+            return;
+        }
         if let (Some((path, request)), Ok(response)) = (self.request_paths.remove(&id), &result) {
             if (200..300).contains(&response.status) {
                 let inbound = telemetry::Inbound::Http {
                     path: &path,
+                    headers: &response.headers,
                     body: &response.body,
                     request: request.as_ref(),
                 };
-                if let Some(patch) = self.telemetry.apply(&inbound) {
-                    cx.state(patch);
-                }
+                self.offer(cx, &inbound);
                 // A text reply ("p1" from a Panasonic camera) is also offered to
                 // the rules for text messages.
                 if let Ok(text) = std::str::from_utf8(&response.body) {
@@ -2500,10 +3048,6 @@ impl Module for SpecEngine {
                 }
             }
         }
-        let ours = matches!(
-            self.current.as_ref().and_then(|f| f.awaiting.as_ref()),
-            Some(Await::Http(r)) if *r == id
-        );
         if !ours {
             return;
         }
@@ -2528,6 +3072,28 @@ impl Module for SpecEngine {
         if refused && self.retry_after_refresh(cx) {
             return;
         }
+        // The device says the session ended: log in again and send the
+        // request once more.
+        if let (Some(session), Ok(response)) = (&self.session, &result) {
+            let ended = session.relogin_status.contains(&response.status)
+                || body_matches(&session.relogin_json, &response.body);
+            let flight = self.current.as_ref().unwrap();
+            if ended && !refused && !flight.job.relogged && self.needs_session(&flight.job) {
+                cx.cancel_timer(REPLY);
+                let flight = self.current.take().unwrap();
+                cx.log(
+                    Level::Info,
+                    "the device ended the session: logging in again",
+                );
+                self.session_token = None;
+                self.queue.push_front(Job {
+                    relogged: true,
+                    ..flight.job
+                });
+                self.pump(cx);
+                return;
+            }
+        }
         match result {
             Ok(response) if refused => self.refuse(
                 cx,
@@ -2540,6 +3106,7 @@ impl Module for SpecEngine {
                 cx,
                 Reply::Http {
                     status: response.status,
+                    headers: response.headers,
                     body: response.body,
                 },
             ),
@@ -2601,6 +3168,15 @@ impl Module for SpecEngine {
             }
             RECONNECT => self.connect(cx),
             PUSH_RECONNECT => self.open_push(cx),
+            // `idle_ms`: nothing heard, so the connection is dead.
+            PUSH_IDLE => {
+                cx.log(Level::Info, "push websocket silent too long; reopening");
+                cx.cancel_timer(PUSH_PING);
+                cx.cancel_timer(PUSH_RENEW);
+                cx.ws_close(PUSH);
+                cx.set_timer(PUSH_RECONNECT, self.push_backoff);
+                self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
+            }
             // `every_ms`: the push websocket's messages again.
             PUSH_RENEW => {
                 let prefix = match self.push.as_ref().and_then(|p| p.socketio.as_ref()) {
@@ -2691,6 +3267,10 @@ impl Module for SpecEngine {
         self.settings = fresh.settings;
         self.transport = fresh.transport;
         self.events = fresh.events;
+        // A session was opened with the old credential: the next request
+        // logs in with the new one.
+        self.session = fresh.session;
+        self.session_token = None;
         if let (Some(push), Some(new)) = (self.push.as_mut(), fresh.push) {
             push.request = new.request;
             push.credentialed = new.credentialed;
@@ -3302,6 +3882,7 @@ mod tests {
             &mut cx,
             probe,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 401,
                 body: Vec::new(),
             }),
@@ -3893,6 +4474,7 @@ mod tests {
             &mut cx,
             poll,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 200,
                 body: br#"{"v": 7}"#.to_vec(),
             }),
@@ -4295,6 +4877,7 @@ mod tests {
             &mut cx,
             id,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 401,
                 body: Vec::new(),
             }),
@@ -4345,6 +4928,7 @@ mod tests {
                 &mut cx,
                 id,
                 Ok(HttpResponse {
+                    headers: Vec::new(),
                     status,
                     body: body.as_bytes().to_vec(),
                 }),
@@ -4431,6 +5015,7 @@ mod tests {
             &mut cx,
             probe_id,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 404,
                 body: Vec::new(),
             }),
@@ -4555,5 +5140,420 @@ mod tests {
             .filter(|j| j.item.as_ref().and_then(|i| i.get("path")) == Some(&json!("/status")))
             .count();
         assert!(waiting <= 1, "{waiting} polls queued");
+    }
+
+    /// Magewell's spec, its settings' defaults applied.
+    fn magewell(model: &str, settings: Value) -> SpecEngine {
+        let spec = Catalog::source_tree()
+            .device("magewell-proconvert")
+            .unwrap()
+            .clone();
+        let settings =
+            crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: model.into(),
+                channels: None,
+                settings,
+                monitor: false,
+            },
+        )
+        .unwrap()
+    }
+
+    fn requests(actions: &[Action]) -> Vec<(RequestId, HttpRequest)> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::Http { id, request } => Some((*id, request.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn answer(body: &str, cookie: Option<&str>) -> Result<HttpResponse, String> {
+        Ok(HttpResponse {
+            status: 200,
+            headers: cookie
+                .map(|c| vec![("set-cookie".to_string(), format!("{c}; path=/"))])
+                .unwrap_or_default(),
+            body: body.as_bytes().to_vec(),
+        })
+    }
+
+    fn cookie_of(r: &HttpRequest) -> Option<&str> {
+        r.headers
+            .iter()
+            .find(|(k, _)| k == "Cookie")
+            .map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn a_session_logs_in_first_and_again_when_it_ends() {
+        let mut e = magewell("ndi-to-hdmi", json!({"scheme": "https"}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        // The probe is ping, which needs no session; over HTTPS on 443.
+        let (probe, request) = requests(&cx.take()).remove(0);
+        assert_eq!(request.url, "https://127.0.0.1:443/mwapi?method=ping");
+        assert_eq!(cookie_of(&request), None);
+        let mut cx = Cx::new(1);
+        e.http_response(&mut cx, probe, answer(r#"{"status":0}"#, None));
+        cx.take();
+
+        let name = json!({"name": "STUDIO (Camera 1)"})
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "select_ndi_source", &name);
+        let (login, request) = requests(&cx.take()).remove(0);
+        assert_eq!(
+            request.url,
+            "https://127.0.0.1:443/mwapi?method=login&id=Admin&pass=e3afed0047b08059d0fada10f400c1e5"
+        );
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, login, answer(r#"{"status":0}"#, Some("sid=a")));
+        let a = cx.take();
+        // The login's answer is never state.
+        assert!(!a.iter().any(|a| matches!(a, Action::State(_))));
+        let (first, request) = requests(&a).remove(0);
+        assert!(request
+            .url
+            .ends_with("/mwapi?method=set-channel&ndi-name=true&name=STUDIO%20%28Camera%201%29"));
+        assert_eq!(cookie_of(&request), Some("sid=a"));
+
+        // "Not logged in": a fresh login, and the request once more.
+        let mut cx = Cx::new(4);
+        e.http_response(&mut cx, first, answer(r#"{"status":37}"#, None));
+        let (relogin, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.contains("method=login"));
+        let mut cx = Cx::new(5);
+        e.http_response(&mut cx, relogin, answer(r#"{"status":0}"#, Some("sid=b")));
+        let (again, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.contains("method=set-channel"));
+        assert_eq!(cookie_of(&request), Some("sid=b"));
+        let mut cx = Cx::new(6);
+        e.http_response(&mut cx, again, answer(r#"{"status":0}"#, None));
+        assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+
+        // A second "not logged in" for the same request stands.
+        let mut cx = Cx::new(7);
+        e.command(&mut cx, 2, "reboot", &Params::new());
+        let (reboot, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(8);
+        e.http_response(&mut cx, reboot, answer(r#"{"status":37}"#, None));
+        let (relogin, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(9);
+        e.http_response(&mut cx, relogin, answer(r#"{"status":0}"#, Some("sid=c")));
+        let (again, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(10);
+        e.http_response(&mut cx, again, answer(r#"{"status":37}"#, None));
+        let done = completed(&cx.take());
+        assert!(
+            matches!(&done[..], [(2, Err(CommandError::DeviceError { code: Some(c), message }))]
+                if c == "37" && message == "not logged in"),
+            "{done:?}"
+        );
+    }
+
+    #[test]
+    fn a_refused_session_login_is_terminal() {
+        let mut e = magewell("ip-to-hdmi", json!({"password": "wrong"}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let (probe, request) = requests(&cx.take()).remove(0);
+        assert_eq!(request.url, "http://127.0.0.1:80/api/ping");
+        let mut cx = Cx::new(1);
+        e.http_response(&mut cx, probe, answer(r#"{"status":0}"#, None));
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "restart_source", &Params::new());
+        let (login, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.ends_with("/api/user/login"));
+        // SHA-256("wrong").
+        assert_eq!(
+            request.body.as_deref(),
+            Some(&br#"{"username":"Admin","password":"8810ad581e59f2bc3928b261707a71308f7e139eb04820366dc4d5c18d980225"}"#[..])
+        );
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, login, answer(r#"{"status":16}"#, None));
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+        assert!(matches!(
+            &completed(&a)[..],
+            [(1, Err(CommandError::Auth { .. }))]
+        ));
+        let mut cx = Cx::new(4);
+        e.command(&mut cx, 2, "reboot", &Params::new());
+        let a = cx.take();
+        assert!(requests(&a).is_empty());
+        assert!(matches!(
+            &completed(&a)[..],
+            [(2, Err(CommandError::Auth { .. }))]
+        ));
+    }
+
+    #[test]
+    fn a_login_answer_without_a_session_fails_what_waits_for_it() {
+        let mut e = magewell("sdi-plus", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let (probe, _) = requests(&cx.take()).remove(0);
+        e.http_response(&mut Cx::new(1), probe, answer(r#"{"status":0}"#, None));
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "get_caps", &Params::new());
+        e.command(&mut cx, 2, "ping", &Params::new());
+        let (login, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, login, answer(r#"{"status":0}"#, None));
+        let a = cx.take();
+        assert!(matches!(
+            &completed(&a)[..],
+            [(1, Err(CommandError::DeviceError { .. }))]
+        ));
+        // ping needs no session: it goes on, without a cookie.
+        let sent = requests(&a);
+        assert_eq!(sent.len(), 1);
+        assert!(sent[0].1.url.ends_with("method=ping"));
+        assert_eq!(cookie_of(&sent[0].1), None);
+    }
+
+    fn push_opened(actions: &[Action]) -> Option<WsRequest> {
+        actions.iter().find_map(|a| match a {
+            Action::WsOpen {
+                socket: PUSH,
+                request,
+            } => Some(request.clone()),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn a_push_websocket_on_another_host_takes_the_current_token_in_its_url() {
+        let spec = Catalog::source_tree().device("restream").unwrap().clone();
+        let mut e = open_spec(
+            spec,
+            "api-v2",
+            json!({"access_token": "t/1+a", "refresh_token": "r", "client_id": "c",
+                   "expires_at": 4_000_000_000u64}),
+        );
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let request = push_opened(&cx.take()).expect("the push channel opens");
+        // The token percent-encoded in the query; neither the transport's
+        // credential nor its headers go to the other host.
+        assert_eq!(
+            request.url,
+            "wss://streaming.api.restream.io/ws?accessToken=t%2F1%2Ba"
+        );
+        assert!(request.headers.is_empty(), "{:?}", request.headers);
+
+        // A refreshed token: the next opening uses it.
+        e.settings.insert("access_token".into(), json!("fresh"));
+        let mut cx = Cx::new(1);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Closed {
+                code: None,
+                reason: "closed".into(),
+            },
+        );
+        cx.take();
+        let mut cx = Cx::new(2_000);
+        e.timer(&mut cx, PUSH_RECONNECT);
+        assert_eq!(
+            push_opened(&cx.take()).unwrap().url,
+            "wss://streaming.api.restream.io/ws?accessToken=fresh"
+        );
+    }
+
+    #[test]
+    fn a_push_url_must_be_secure_and_a_push_port_may_be_a_setting() {
+        let mut spec = with_push_websocket();
+        let w = &mut spec.telemetry.as_mut().unwrap()["websocket"];
+        *w = json!({"url": "ws://example.com/ws?k={settings.k}"});
+        spec.settings.insert(
+            "k".into(),
+            serde_json::from_value(json!({"type": "string", "default": ""})).unwrap(),
+        );
+        let mut e = open_spec(spec, "arena", json!({"k": "x"}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert!(push_opened(&a).is_none(), "plain ws to another host");
+        assert!(a.iter().any(|a| matches!(a, Action::Log { message, .. }
+            if message.contains("wss") && !message.contains("k=x"))));
+
+        // Loopback may be plain ws.
+        let mut spec = with_push_websocket();
+        spec.telemetry.as_mut().unwrap()["websocket"] = json!({"url": "ws://127.0.0.1:9000/ws"});
+        let mut e = open_spec(spec, "arena", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        assert_eq!(
+            push_opened(&cx.take()).unwrap().url,
+            "ws://127.0.0.1:9000/ws"
+        );
+
+        // OpenLP's websocket port, a setting.
+        let open = |settings: Value| {
+            let spec = Catalog::source_tree().device("openlp").unwrap().clone();
+            let settings =
+                crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "openlp-3".into(),
+                    channels: None,
+                    settings,
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            push_opened(&cx.take()).unwrap().url
+        };
+        assert_eq!(open(json!({})), "ws://127.0.0.1:4317/");
+        assert_eq!(
+            open(json!({"websocket_port": 5000})),
+            "ws://127.0.0.1:5000/"
+        );
+    }
+
+    #[test]
+    fn a_quiet_push_websocket_is_reopened() {
+        let mut spec = with_push_websocket();
+        spec.telemetry.as_mut().unwrap()["websocket"]["idle_ms"] = json!(30_000);
+        let mut e = open_spec(spec, "arena", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        assert!(cx.take().iter().any(|a| matches!(a,
+            Action::SetTimer { key: PUSH_IDLE, after } if *after == 30_000)));
+        let mut cx = Cx::new(30_001);
+        e.timer(&mut cx, PUSH_IDLE);
+        let a = cx.take();
+        assert!(a.contains(&Action::WsClose { socket: PUSH }));
+        assert!(a.iter().any(|a| matches!(
+            a,
+            Action::SetTimer {
+                key: PUSH_RECONNECT,
+                ..
+            }
+        )));
+    }
+
+    fn openlp(monitor: bool) -> SpecEngine {
+        let spec = Catalog::source_tree().device("openlp").unwrap().clone();
+        let settings = crate::catalog::validate(&spec.settings, &Params::new()).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "openlp-3".into(),
+                channels: None,
+                settings,
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_push_queues_its_re_reads_once() {
+        let mut e = openlp(true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        // The first poll is in flight; the rest of the start waits.
+        let (first, _) = requests(&cx.take()).remove(0);
+        e.queue.clear();
+        let push = r#"{"results":{"counter":5,"service":2,"slide":0,"item":"a1"}}"#;
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Binary(push.as_bytes().to_vec()));
+        e.ws(&mut cx, PUSH, WsInput::Binary(push.as_bytes().to_vec()));
+        let waiting: Vec<&str> = e
+            .queue
+            .iter()
+            .filter_map(|j| j.item.as_ref()?.get("path")?.as_str())
+            .collect();
+        // Two pushes, one re-read of each waiting.
+        assert_eq!(
+            waiting,
+            ["/api/v2/controller/live-item", "/api/v2/service/items"]
+        );
+        // They go in turn once the request in flight is answered.
+        let mut cx = Cx::new(2);
+        e.http_response(&mut cx, first, answer("{}", None));
+        let sent = requests(&cx.take());
+        assert!(sent[0].1.url.ends_with("/api/v2/controller/live-item"));
+
+        // Opened for commands only, a push queues nothing.
+        let mut e = openlp(false);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Binary(push.as_bytes().to_vec()));
+        assert!(
+            e.queue.iter().all(|j| j.item.is_none()),
+            "{:?}",
+            e.queue.len()
+        );
+        assert!(requests(&cx.take()).is_empty());
+    }
+
+    #[test]
+    fn a_line_reply_updates_the_state_of_what_was_asked() {
+        let spec = Catalog::source_tree()
+            .device("labgruppen-nlb60e")
+            .unwrap()
+            .clone();
+        let mut e = SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port: None,
+                model: "nlb-60e".into(),
+                channels: None,
+                settings: Params::new(),
+                monitor: false,
+            },
+        )
+        .unwrap();
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        e.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        let params = json!({"vdn": "amp1"}).as_object().unwrap().clone();
+        let mut cx = Cx::new(1);
+        e.command(&mut cx, 3, "get_mute_status", &params);
+        assert_eq!(tcp_sent(&cx.take()), vec!["amp1.MuteStatus ?\r\n"]);
+        let mut cx = Cx::new(2);
+        e.tcp(&mut cx, SOCKET, TcpInput::Data(b"01\r\n".to_vec()));
+        let a = cx.take();
+        assert!(
+            a.contains(&Action::State(json!({"amps": {"AMP1": {"channels":
+            {"A": {"mute": false}, "B": {"mute": true}}}}})))
+        );
+        assert_eq!(
+            completed(&a),
+            vec![(3, Ok(Outcome::Value { value: json!("01") }))]
+        );
     }
 }

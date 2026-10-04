@@ -140,10 +140,23 @@ pub struct Credentials {
     pub password: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct HttpResponse {
     pub status: u16,
+    /// The response's headers in the order received, names lowercased; a
+    /// header sent more than once (`Set-Cookie`) appears once per value.
+    pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+}
+
+impl HttpResponse {
+    /// Every value of a header, by name in any case.
+    pub fn header_values<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a str> + 'a {
+        self.headers
+            .iter()
+            .filter(move |(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.as_str())
+    }
 }
 
 /// What happens on a server-sent event stream.

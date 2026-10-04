@@ -33,10 +33,13 @@ DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^\.\d+f$"), {"float"}),               # fixed decimals
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
     (re.compile(r"^(upper|lower|json|url)$"), {"string", "enum"}),
+    (re.compile(r"^(md5|sha256)$"), {"string"}),         # a hashed password, lowercase hex
     (re.compile(r"^(to|from)\.[a-z0-9_]+$"), {"int", "float"}),  # a named conversion
+    (re.compile(r"^map\.[a-z0-9_]+$"), {"enum", "bool", "int", "string"}),  # a value table
 ]
 
 CONVERSION = re.compile(r"^(to|from)\.([a-z0-9_]+)$")
+MAP = re.compile(r"^map\.([a-z0-9_]+)$")
 
 # Types that cannot carry characters needing escaping, so they are safe in a
 # raw_query, which is sent without encoding.
@@ -77,6 +80,7 @@ def check_template(
     where: str,
     conditional_setting: str | None = None,
     conversions: dict | None = None,
+    maps: dict | None = None,
 ) -> list[str]:
     """Placeholder rules from SPEC.md §4: every reference resolves, is always
     present, and uses directives valid for its type."""
@@ -116,6 +120,24 @@ def check_template(
                 errors.append(
                     f"{where}: directive ':{directive}' does not apply to {ptype} '{name}'"
                 )
+
+        # A value table names a declared map, is the only directive, and lists
+        # every value an enum or a bool can take, so none is refused at run time.
+        tables = [MAP.match(d).group(1) for d in directives if MAP.match(d)]
+        if tables:
+            if len(directives) != 1:
+                errors.append(f"{where}: ':map.{tables[0]}' on '{name}' takes no other directive")
+            table = (maps or {}).get(tables[0])
+            if table is None:
+                errors.append(f"{where}: ':map.{tables[0]}' names undeclared map '{tables[0]}'")
+            else:
+                keys = {str(k) for k in table}
+                needed = {"enum": [str(v) for v in decl.get("values", [])],
+                          "bool": ["true", "false"]}.get(ptype, [])
+                missing = [v for v in needed if v not in keys]
+                if missing:
+                    errors.append(f"{where}: map '{tables[0]}' does not list {missing} of '{name}'")
+            continue
 
         # Conversions come first, name a declared conversion, and make a
         # float: as text it needs exactly one ':.Nf' after them.
@@ -259,7 +281,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         params = command.get("params") or {}
         for context, text in template_strings(command.get("send", [])):
             errors += check_template(context, text, params, settings, f"commands.{name}",
-                                     conversions=conversions)
+                                     conversions=conversions, maps=doc.get("maps") or {})
         expect_ = command.get("expect") or {}
         if "reply_json" in expect_:
             if transport_type != "ws":
@@ -313,6 +335,24 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http"):
             errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https or a setting)")
     if websocket:
+        url = websocket.get("url")
+        if url is not None:
+            errors += check_template("text", url, {}, settings, "telemetry.websocket.url")
+            # The scheme and host are literal; only the path and query may
+            # hold placeholders.
+            m = re.match(r"^(wss?)://(\[[^\]]*\]|[^/?:{]+)", url)
+            host = m.group(2) if m else ""
+            if not m or not host:
+                errors.append("telemetry.websocket.url needs a literal wss:// or ws:// host")
+            elif m.group(1) == "ws" and host not in ("localhost", "127.0.0.1", "[::1]"):
+                errors.append("telemetry.websocket.url: ws only to this machine; use wss")
+        port = websocket.get("port")
+        if isinstance(port, dict):
+            decl = settings.get(port.get("setting"))
+            if decl is None:
+                errors.append(f"telemetry.websocket.port names unknown setting '{port.get('setting')}'")
+            elif decl.get("type") != "int":
+                errors.append("telemetry.websocket.port's setting must be an int")
         for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
             errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")
@@ -404,6 +444,85 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         for context, text in template_strings(probe):
             errors += check_template(context, text, {}, settings, "transport.probe")
 
+    errors += per_model_checks(doc, model_ids)
+    errors += session_checks(doc)
+    return errors
+
+
+def items_of(send) -> list:
+    return send if isinstance(send, list) else [send] if send is not None else []
+
+
+def per_model_checks(doc: dict, model_ids: set) -> list[str]:
+    """Messages naming `models` (SPEC.md §4, Messages per model): the models
+    exist, and every model a command supports has a message."""
+    errors: list[str] = []
+    transport = doc.get("transport") or {}
+    telemetry = doc.get("telemetry") or {}
+    places = [(f"commands.{n}.send", c.get("send")) for n, c in (doc.get("commands") or {}).items()]
+    places += [("transport.probe", transport.get("probe")),
+               ("transport.session.login", (transport.get("session") or {}).get("login")),
+               ("telemetry.poll.send", (telemetry.get("poll") or {}).get("send")),
+               ("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send")),
+               ("on_connect", doc.get("on_connect"))]
+    for where, send in places:
+        for i, item in enumerate(items_of(send)):
+            if isinstance(item, dict) and "models" in item:
+                bad = set(item["models"]) - model_ids
+                if bad:
+                    errors.append(f"{where}[{i}]: models names unknown model(s) {sorted(bad)}")
+            if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
+                errors.append(f"{where}[{i}]: session applies to http requests")
+    for model in doc.get("models", []):
+        for name in model.get("supports", []):
+            send = ((doc.get("commands") or {}).get(name) or {}).get("send")
+            if send is None:
+                continue
+            if not any(not isinstance(i, dict) or model["id"] in i.get("models", [model["id"]])
+                       for i in items_of(send)):
+                errors.append(f"commands.{name}: no message for model '{model['id']}', which supports it")
+        login = (transport.get("session") or {}).get("login")
+        if login is not None and not any(model["id"] in i.get("models", [model["id"]]) for i in items_of(login)):
+            errors.append(f"transport.session.login: no login for model '{model['id']}'")
+    return errors
+
+
+def session_checks(doc: dict) -> list[str]:
+    """`transport.session`, `https_port`, `expect.header` and `code_path`."""
+    errors: list[str] = []
+    transport = doc.get("transport") or {}
+    settings = doc.get("settings") or {}
+    is_http = transport.get("type") == "http"
+    session = transport.get("session")
+    if session is not None:
+        if not is_http:
+            errors.append("transport.session is for the http transport")
+        for i, item in enumerate(items_of(session.get("login"))):
+            for context, text in template_strings(item):
+                errors += check_template(context, text, {}, settings, f"transport.session.login[{i}]")
+        for key in ("relogin", "refused"):
+            for jpath, pattern in ((session.get(key) or {}).get("json") or {}).items():
+                if not jpath.startswith("$"):
+                    errors.append(f"transport.session.{key}.json: '{jpath}' is not a JSON path")
+                try:
+                    re.compile(pattern)
+                except re.error as e:
+                    errors.append(f"transport.session.{key}.json: {e}")
+    if "https_port" in transport:
+        if not isinstance(transport.get("scheme"), dict):
+            errors.append("transport.https_port needs scheme: {setting: name}")
+        if not any(e["port"] == transport["https_port"] and e["role"] == "control"
+                   for e in doc.get("ports") or []):
+            errors.append(f"ports: no control entry for https_port {transport['https_port']}")
+    for name, command in (doc.get("commands") or {}).items():
+        expect = command.get("expect") or {}
+        if "header" in expect and not is_http:
+            errors.append(f"commands.{name}: expect.header needs an http transport")
+        if "code_path" in expect:
+            if not str(expect["code_path"]).startswith("$"):
+                errors.append(f"commands.{name}: expect.code_path is not a JSON path")
+            if "code_range" not in expect:
+                errors.append(f"commands.{name}: expect.code_path is read by code_range")
     return errors
 
 
@@ -433,14 +552,16 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         errors.append("telemetry.sse needs an http transport")
     declared = [key.split(".") for key in (doc.get("state") or {})]
 
-    def is_declared(path: str) -> bool:
+    def is_declared(path: str, prefix: bool = False) -> bool:
         # As the engine reads it: a templated segment may stand for any
         # declared segment (mimoLive's '{type}.{id}.name' writes layers.<id>.name
         # and sources.<id>.name), and a concrete path no declaration matches is
-        # not assigned at run time.
+        # not assigned at run time. A deletion may remove a whole subtree, so
+        # for it a prefix of declared paths will do.
         parts = ["*" if "{" in seg else seg for seg in path.split(".")]
         return any(
-            len(d) == len(parts) and all(a == "*" or b == "*" or a == b for a, b in zip(d, parts))
+            (len(d) >= len(parts) if prefix else len(d) == len(parts))
+            and all(a == "*" or b == "*" or a == b for a, b in zip(d, parts))
             for d in declared
         )
 
@@ -452,7 +573,18 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     re.compile(rule[key])
                 except re.error as e:
                     errors.append(f"{where}.{key}: {e}")
+        asked = rule.get("request_match")
+        if isinstance(asked, str):
+            # The text of the line message a reply answers (SPEC.md §8).
+            try:
+                re.compile(asked)
+            except re.error as e:
+                errors.append(f"{where}.request_match: {e}")
+            if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
+                errors.append(f"{where}: a request_match regex goes with match, on a line transport")
         for key in ("json_match", "request_match"):
+            if not isinstance(rule.get(key) or {}, dict):
+                continue
             for jpath, pattern in (rule.get(key) or {}).items():
                 if not jpath.startswith("$"):
                     errors.append(f"{where}.{key}: '{jpath}' is not a JSON path")
@@ -463,8 +595,20 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
         if "json_match" in rule and "path" not in rule and not has_json:
             errors.append(f"{where}: json_match reads JSON messages; the spec has no websocket, "
                           "event stream or line transport")
-        if "request_match" in rule and "path" not in rule:
+        if isinstance(asked, dict) and "path" not in rule:
             errors.append(f"{where}: request_match applies to a path rule")
+        if "headers" in rule and "path" not in rule:
+            errors.append(f"{where}: headers applies to a path rule (an HTTP reply)")
+        # then_send: templates over the rule's captures and the settings.
+        captures = set(rule.get("json") or {}) | set(rule.get("headers") or {})
+        settings = doc.get("settings") or {}
+        for context, text in template_strings(rule.get("then_send") or []):
+            for m in PLACEHOLDER.finditer(text):
+                name = m.group(1)
+                if name.startswith("settings."):
+                    errors += check_template(context, m.group(0), {}, settings, f"{where}.then_send")
+                elif not (name.isdigit() or name in captures or name.startswith("arg")):
+                    errors.append(f"{where}.then_send: '{{{name}}}' is not one of the rule's captures")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
         for value in (rule.get("state") or {}).values():
@@ -474,12 +618,18 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     c = CONVERSION.match(d)
                     if c and c.group(2) not in (conversions or {}):
                         errors.append(f"{where}: ':{d}' names undeclared conversion '{c.group(2)}'")
+        deletions = {p for p, v in (rule.get("state") or {}).items()
+                     if isinstance(v, dict) and v.get("delete") is True}
         paths = list((rule.get("state") or {}).keys())
         for field in (rule.get("fields") or {}).values():
             paths.append(field if isinstance(field, str) else field.get("path", ""))
         for path in paths:
-            if not is_declared(path):
+            if not is_declared(path, prefix=path in deletions):
                 errors.append(f"{where}: '{path}' is not declared in 'state'")
+        replace = rule.get("replace") or []
+        for path in [replace] if isinstance(replace, str) else replace:
+            if not is_declared(path, prefix=True):
+                errors.append(f"{where}: replace '{path}' is not declared in 'state'")
     return errors
 
 

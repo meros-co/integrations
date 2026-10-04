@@ -564,10 +564,11 @@ quirks:
       becoming LIVE_STOPPED or VOD. get_live_video, list_live_videos and
       list_live_videos_by_status update state from their replies at once.
       Ingest health is Facebook's measurement, refreshed every 2 seconds,
-      and is kept as the JSON of the ingest streams (each with id, is_master
-      and stream_health: video_bitrate and audio_bitrate in bits per second,
-      video_framerate, video_gop_size in milliseconds, video_width,
-      video_height); get_ingest_streams reads it on demand. The current
+      and is kept per ingest stream under the live video, keyed by the
+      stream's id (is_master, and stream_health's video and audio bitrates
+      in bits per second, frame rate, GOP length in milliseconds, width and
+      height); get_ingest_streams reads it on demand and updates it too. An
+      ingest stream Facebook stops listing keeps its last values. The current
       reference no longer documents reading the Page's live_videos edge
       (Meta's scheduling guide still does), so the poll is kept on its v19.0
       description until confirmed.
@@ -601,7 +602,13 @@ state:
   live_videos.*.broadcast_start_time: { type: string, description: "When the live video was first published, ISO 8601 (broadcast_start_time)" }
   live_videos.*.seconds_left:         { type: int, unit: s, description: "Seconds left before the broadcast reaches its maximum length (seconds_left)" }
   live_videos.*.permalink_url:        { type: string, description: "The live video's link on Facebook (permalink_url)" }
-  live_videos.*.ingest_streams:       { type: string, description: "The ingest streams as JSON: each with id, is_master and stream_health (video_bitrate and audio_bitrate in bit/s, video_framerate, video_gop_size in ms, video_width, video_height); no stream URLs" }
+  live_videos.*.ingest_streams.*.is_master:       { type: bool, description: "This ingest stream, keyed by its id, is the primary (is_master); no stream URLs are kept" }
+  live_videos.*.ingest_streams.*.video_bitrate:   { type: int, unit: bit/s, description: "The video bitrate Facebook measures (stream_health.video_bitrate)" }
+  live_videos.*.ingest_streams.*.audio_bitrate:   { type: float, unit: bit/s, description: "The audio bitrate Facebook measures (stream_health.audio_bitrate)" }
+  live_videos.*.ingest_streams.*.video_framerate: { type: float, unit: fps, description: "The frame rate Facebook measures (stream_health.video_framerate)" }
+  live_videos.*.ingest_streams.*.video_gop_size:  { type: int, unit: ms, description: "The GOP length Facebook measures (stream_health.video_gop_size)" }
+  live_videos.*.ingest_streams.*.video_width:     { type: int, unit: px, description: "The video width received (stream_health.video_width)" }
+  live_videos.*.ingest_streams.*.video_height:    { type: int, unit: px, description: "The video height received (stream_health.video_height)" }
 
 telemetry:
   # Facebook pushes nothing to a Page token holder (webhooks need a public
@@ -625,7 +632,6 @@ telemetry:
         started: "$.broadcast_start_time"
         left: "$.seconds_left"
         link: "$.permalink_url"
-        ingest: "$.ingest_streams"
       state: &video_state
         live_videos.{id}.title: "{title}"
         live_videos.{id}.description: "{description}"
@@ -634,8 +640,42 @@ telemetry:
         live_videos.{id}.broadcast_start_time: "{started}"
         live_videos.{id}.seconds_left: "{left}"
         live_videos.{id}.permalink_url: "{link}"
-        live_videos.{id}.ingest_streams: "{ingest}"
+    # Each live video's ingest streams, keyed by the video and stream ids.
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+/live_videos\?fields=id%2Ctitle'
+      json_each: "$.data[*].ingest_streams"
+      json: &ingest
+        video: "$^.id"
+        stream: "$.id"
+        master: "$.is_master"
+        video_bitrate: "$.stream_health.video_bitrate"
+        audio_bitrate: "$.stream_health.audio_bitrate"
+        framerate: "$.stream_health.video_framerate"
+        gop: "$.stream_health.video_gop_size"
+        width: "$.stream_health.video_width"
+        height: "$.stream_health.video_height"
+      state: &ingest_state
+        live_videos.{video}.ingest_streams.{stream}.is_master: "{master}"
+        live_videos.{video}.ingest_streams.{stream}.video_bitrate: "{video_bitrate}"
+        live_videos.{video}.ingest_streams.{stream}.audio_bitrate: "{audio_bitrate}"
+        live_videos.{video}.ingest_streams.{stream}.video_framerate: "{framerate}"
+        live_videos.{video}.ingest_streams.{stream}.video_gop_size: "{gop}"
+        live_videos.{video}.ingest_streams.{stream}.video_width: "{width}"
+        live_videos.{video}.ingest_streams.{stream}.video_height: "{height}"
+    # The same, should the expansion come as an edge ({"data": [...]}).
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+/live_videos\?fields=id%2Ctitle'
+      json_each: "$.data[*].ingest_streams.data"
+      json: *ingest
+      state: *ingest_state
     # get_live_video: one live video.
     - path: '^/v[0-9]+\.[0-9]+/[0-9]+\?fields=id%2Ctitle'
       json: *video
       state: *video_state
+    # get_live_video and get_ingest_streams: one live video's ingest streams.
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+\?fields=(id%2Ctitle|ingest_streams)'
+      json_each: "$.ingest_streams"
+      json: *ingest
+      state: *ingest_state
+    - path: '^/v[0-9]+\.[0-9]+/[0-9]+\?fields=(id%2Ctitle|ingest_streams)'
+      json_each: "$.ingest_streams.data"
+      json: *ingest
+      state: *ingest_state

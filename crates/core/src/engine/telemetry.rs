@@ -24,12 +24,17 @@ struct Assign {
     /// Wire text to state value, for enumerations and booleans spelled in the
     /// device's own words. A wire value missing from the map is not assigned.
     map: Option<Map<String, Value>>,
+    /// `{delete: true}`: the path, a value or a whole subtree, is removed
+    /// from state (a JSON merge patch null).
+    delete: bool,
 }
 
 #[derive(Debug)]
 enum Matcher {
-    /// The whole message matches; captures are `{1}`, `{2}`, ...
-    Message(Regex),
+    /// The whole message matches; captures are `{1}`, `{2}`, ... With
+    /// `request` (`request_match`), only a reply whose request's text
+    /// matches it too, its captures numbered on after the message's.
+    Message { re: Regex, request: Option<Regex> },
     /// The first line matches `header`; `line` is applied to every other line.
     Lines { header: Regex, line: Regex },
     /// The first line matches `header`; the other lines are `name: value`.
@@ -69,10 +74,106 @@ enum Matcher {
         /// A JSON path to an array: the rule matches once per element, and
         /// `json` paths are taken from the element.
         each: Option<String>,
+        /// `headers`: capture names to response header names. A rule with
+        /// only these reads no body, so the body need not be JSON.
+        headers: BTreeMap<String, String>,
     },
     /// The XML reply to an HTTP request whose path matches; every element
     /// named `element` is one match, its attributes the captures.
     HttpXml { path: Regex, element: String },
+}
+
+/// One element `json_each` reaches: the element, its index in its array,
+/// and the elements it lies in, outermost first (the document, then each
+/// `[*]` level's element).
+struct EachItem<'a> {
+    item: &'a Value,
+    index: usize,
+    outer: Vec<&'a Value>,
+}
+
+/// The elements of the array at `each`, through every `[*]` in it:
+/// `$.data[*].ingest_streams` is each ingest stream of each live video.
+fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
+    let parts: Vec<&str> = each.split("[*]").collect();
+    // Elements reached so far, each with the elements it lies in.
+    let mut level: Vec<(&Value, Vec<&Value>)> = vec![(doc, Vec::new())];
+    let last = parts.len() - 1;
+    let mut out = Vec::new();
+    for (i, part) in parts.iter().enumerate() {
+        let path = if i == 0 {
+            part.to_string()
+        } else {
+            format!("${part}")
+        };
+        let mut next = Vec::new();
+        for (node, outer) in level {
+            let Some(array) = super::expect::json_path(node, &path).and_then(Value::as_array)
+            else {
+                continue;
+            };
+            let mut within = outer.clone();
+            within.push(node);
+            for (index, item) in array.iter().enumerate() {
+                if i == last {
+                    out.push(EachItem {
+                        item,
+                        index,
+                        outer: within.clone(),
+                    });
+                } else {
+                    next.push((item, within.clone()));
+                }
+            }
+        }
+        level = next;
+    }
+    out
+}
+
+/// The captures of each match of a JSON rule: `base` (the path's and the
+/// selectors'), then its `json` names. With `json_each`, once per element:
+/// `json` paths are the element's, `$^.` names the element one level out
+/// (`$^^.` two), and `{index}` is the element's index in its array.
+fn each_values(
+    doc: &Value,
+    each: Option<&str>,
+    json: &BTreeMap<String, String>,
+    base: &[(String, Value)],
+) -> Vec<Vec<(String, Value)>> {
+    let items = match each {
+        Some(each) => each_items(doc, each),
+        None => vec![EachItem {
+            item: doc,
+            index: 0,
+            outer: Vec::new(),
+        }],
+    };
+    items
+        .into_iter()
+        .map(|e| {
+            let mut values = base.to_vec();
+            if each.is_some() {
+                values.push(("index".to_string(), Value::from(e.index)));
+            }
+            for (name, path) in json {
+                let up = path
+                    .strip_prefix('$')
+                    .map_or(0, |rest| rest.len() - rest.trim_start_matches('^').len());
+                let (node, path) = match up {
+                    0 => (Some(e.item), path.clone()),
+                    n => (
+                        e.outer.len().checked_sub(n).map(|i| e.outer[i]),
+                        format!("${}", &path[1 + n..]),
+                    ),
+                };
+                if let Some(v) = present(node.and_then(|n| super::expect::json_path(n, &path))) {
+                    values.push((name.clone(), v.clone()));
+                }
+            }
+            values
+        })
+        .collect()
 }
 
 /// A rule's `json:` names and JSON paths; empty when it has none.
@@ -137,11 +238,59 @@ fn json_paths(rule: &Value) -> Result<BTreeMap<String, String>, String> {
 struct Rule {
     matcher: Matcher,
     assign: Vec<Assign>,
+    /// `then_send`: requests queued when the rule matches, templates over
+    /// its captures and the settings (a re-read the push only announces).
+    then_send: Vec<Value>,
+    /// `replace`: state subtrees (templates over the captures before
+    /// `json_each`) the rule's values replace: removed whenever the rule's
+    /// message arrives, before its values are applied.
+    replace: Vec<String>,
+}
+
+/// A `then_send` item a matching rule queued, with the captures it is
+/// rendered from.
+#[derive(Debug, Clone)]
+pub(crate) struct Triggered {
+    pub(crate) item: Value,
+    pub(crate) params: Params,
+    pub(crate) specs: BTreeMap<String, ParamSpec>,
+}
+
+/// Captures as template parameters: a number or a numeric string is an
+/// integer, a JSON number a float, a JSON boolean a bool, anything else a
+/// string.
+pub(crate) fn capture_params(values: &[(String, Value)]) -> (Params, BTreeMap<String, ParamSpec>) {
+    let mut params = Params::new();
+    let mut specs = BTreeMap::new();
+    for (name, v) in values {
+        let kind = match v {
+            Value::Number(n) if n.is_i64() => ParamType::Int,
+            Value::Number(_) => ParamType::Float,
+            Value::Bool(_) => ParamType::Bool,
+            Value::String(s) if s.parse::<i64>().is_ok() => ParamType::Int,
+            _ => ParamType::String,
+        };
+        let value = match (kind, v) {
+            (ParamType::Int, Value::String(s)) => Value::from(s.parse::<i64>().unwrap()),
+            // An object or array: its JSON text, as a string.
+            (ParamType::String, Value::Object(_) | Value::Array(_)) => Value::String(v.to_string()),
+            _ => v.clone(),
+        };
+        params.insert(name.clone(), value);
+        specs.insert(name.clone(), spec_of(kind));
+    }
+    (params, specs)
 }
 
 /// An inbound message, as the rules see it.
 pub(crate) enum Inbound<'a> {
     Text(&'a str),
+    /// A line transport's reply, with the text of the message it answers:
+    /// text to every text rule, and to a `match` rule's `request_match`.
+    Answer {
+        text: &'a str,
+        request: &'a str,
+    },
     Osc {
         address: &'a str,
         /// The type tags, without the leading comma.
@@ -154,6 +303,8 @@ pub(crate) enum Inbound<'a> {
     /// body where that was JSON.
     Http {
         path: &'a str,
+        /// The response's headers, names lowercased.
+        headers: &'a [(String, String)],
         body: &'a [u8],
         request: Option<&'a Value>,
     },
@@ -185,6 +336,13 @@ fn assign(path: &str, v: &Value) -> Result<Assign, String> {
             path: path.into(),
             value: value.clone(),
             map: None,
+            delete: false,
+        },
+        Value::Object(o) if o.get("delete") == Some(&Value::Bool(true)) => Assign {
+            path: path.into(),
+            value: String::new(),
+            map: None,
+            delete: true,
         },
         Value::Object(o) => Assign {
             path: path.into(),
@@ -194,10 +352,11 @@ fn assign(path: &str, v: &Value) -> Result<Assign, String> {
                 .ok_or(format!("telemetry: '{path}' needs a value"))?
                 .into(),
             map: o.get("map").and_then(Value::as_object).cloned(),
+            delete: false,
         },
         _ => {
             return Err(format!(
-                "telemetry: '{path}' must be a template or {{value, map}}"
+                "telemetry: '{path}' must be a template, {{value, map}} or {{delete: true}}"
             ))
         }
     })
@@ -294,7 +453,13 @@ impl Telemetry {
                 assigns.push(assign(path, v)?);
             }
             let matcher = if let Some(m) = rule.get("match") {
-                Matcher::Message(regex(m, "match")?)
+                Matcher::Message {
+                    re: regex(m, "match")?,
+                    request: match rule.get("request_match") {
+                        Some(r @ Value::String(_)) => Some(regex(r, "request_match")?),
+                        _ => None,
+                    },
+                }
             } else if let Some(a) = rule.get("address") {
                 Matcher::Osc {
                     address: regex(a, "address")?,
@@ -307,7 +472,19 @@ impl Telemetry {
                 }
             } else if let Some(p) = rule.get("path") {
                 let path = regex(p, "path")?;
-                if rule.get("json").is_some() {
+                if rule.get("json").is_some() || rule.get("headers").is_some() {
+                    let mut headers = BTreeMap::new();
+                    for (name, header) in rule
+                        .get("headers")
+                        .and_then(Value::as_object)
+                        .into_iter()
+                        .flatten()
+                    {
+                        let header = header
+                            .as_str()
+                            .ok_or(format!("telemetry: headers '{name}' must be a header name"))?;
+                        headers.insert(name.clone(), header.to_ascii_lowercase());
+                    }
                     let json = json_paths(rule)?;
                     let each = rule
                         .get("json_each")
@@ -319,6 +496,7 @@ impl Telemetry {
                         request: selectors(rule.get("request_match"), "request_match")?,
                         json,
                         each,
+                        headers,
                     }
                 } else if let Some(e) = rule.get("xml_each").and_then(Value::as_str) {
                     Matcher::HttpXml {
@@ -326,7 +504,7 @@ impl Telemetry {
                         element: e.to_string(),
                     }
                 } else {
-                    return Err("telemetry: a path rule needs json or xml_each".into());
+                    return Err("telemetry: a path rule needs json, headers or xml_each".into());
                 }
             } else if rule.get("json_match").is_some() {
                 Matcher::Json {
@@ -352,6 +530,7 @@ impl Telemetry {
                                 path: path.clone(),
                                 value: "{value}".into(),
                                 map: None,
+                                delete: false,
                             },
                             Value::Object(o) => Assign {
                                 path: o
@@ -361,6 +540,7 @@ impl Telemetry {
                                     .into(),
                                 value: "{value}".into(),
                                 map: o.get("map").and_then(Value::as_object).cloned(),
+                                delete: false,
                             },
                             _ => return Err(format!("telemetry: field '{name}' is malformed")),
                         };
@@ -381,19 +561,38 @@ impl Telemetry {
             t.rules.push(Rule {
                 matcher,
                 assign: assigns,
+                then_send: items(rule.get("then_send")),
+                replace: items(rule.get("replace"))
+                    .iter()
+                    .map(|v| {
+                        v.as_str()
+                            .map(str::to_string)
+                            .ok_or("telemetry: replace lists state paths".to_string())
+                    })
+                    .collect::<Result<_, _>>()?,
             });
         }
         // Every path a rule writes must be declared, so its type is known.
         for rule in &t.rules {
-            let paths: Vec<&str> = match &rule.matcher {
-                Matcher::Fields { fields, .. } => {
-                    fields.values().map(|a| a.path.as_str()).collect()
+            for path in &rule.replace {
+                if !t.declares(&placeholder_to_star(path)) {
+                    return Err(format!(
+                        "telemetry: replace '{path}' is not declared in the spec's state"
+                    ));
                 }
-                _ => rule.assign.iter().map(|a| a.path.as_str()).collect(),
+            }
+            let paths: Vec<&Assign> = match &rule.matcher {
+                Matcher::Fields { fields, .. } => fields.values().collect(),
+                _ => rule.assign.iter().collect(),
             };
-            for path in paths {
+            for Assign { path, delete, .. } in paths {
                 let shape = placeholder_to_star(path);
-                if t.kind_of(&shape).is_none() {
+                // A deletion may remove a declared value or a subtree of them.
+                let declared = match delete {
+                    true => t.declares(&shape),
+                    false => t.kind_of(&shape).is_some(),
+                };
+                if !declared {
                     return Err(format!(
                         "telemetry: '{path}' is not declared in the spec's state"
                     ));
@@ -405,6 +604,19 @@ impl Telemetry {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.rules.is_empty() && self.subscribe.is_empty() && self.poll.is_empty()
+    }
+
+    /// Whether a concrete or starred path is declared, or is a prefix of
+    /// declared paths: what a deletion may remove.
+    fn declares(&self, path: &str) -> bool {
+        let parts: Vec<&str> = path.split('.').collect();
+        self.types.iter().any(|(pattern, _)| {
+            pattern.len() >= parts.len()
+                && pattern
+                    .iter()
+                    .zip(&parts)
+                    .all(|(p, s)| p == "*" || p == s || *s == "*")
+        })
     }
 
     /// The declared type of a concrete or starred path.
@@ -423,24 +635,74 @@ impl Telemetry {
     }
 
     /// The state patch this message produces, if any rule matches.
+    #[cfg(test)]
     pub(crate) fn apply(&self, message: &Inbound) -> Option<Value> {
+        let mut cleared = Value::Object(Map::new());
+        let patch = self.apply_into(message, &mut Vec::new(), &mut cleared);
+        match (cleared.as_object().is_some_and(|c| !c.is_empty()), patch) {
+            (false, patch) => patch,
+            // The two patches in order, as one, for a test to compare.
+            (true, patch) => {
+                let mut both = cleared;
+                if let Some(p) = patch {
+                    crate::session::merge_patch(&mut both, &p);
+                }
+                Some(both)
+            }
+        }
+    }
+
+    /// As `apply`, adding to `triggers` the `then_send` items of every rule
+    /// that matched, once per match, with its captures, and to `cleared` the
+    /// `replace` subtrees of the rules whose message this is: a patch of
+    /// removals to apply before the one returned.
+    pub(crate) fn apply_into(
+        &self,
+        message: &Inbound,
+        triggers: &mut Vec<Triggered>,
+        cleared: &mut Value,
+    ) -> Option<Value> {
+        // A reply is text to the text rules; its request is for request_match.
+        let (message, request) = match message {
+            Inbound::Answer { text, request } => (&Inbound::Text(text), Some(*request)),
+            other => (other, None),
+        };
         let mut patch = Value::Object(Map::new());
         let mut any = false;
         for rule in &self.rules {
             match (&rule.matcher, message) {
-                (Matcher::Message(re), Inbound::Text(text)) => {
-                    if let Some(caps) = re.captures(text.trim_end()) {
-                        any |= self.assign_all(&rule.assign, &captures(&caps), &mut patch);
+                (Matcher::Message { re, request: asked }, Inbound::Text(text)) => {
+                    let Some(caps) = re.captures(text.trim_end()) else {
+                        continue;
+                    };
+                    let mut values = captures(&caps);
+                    if let Some(asked) = asked {
+                        let Some(request_caps) = request.and_then(|r| asked.captures(r)) else {
+                            continue;
+                        };
+                        let offset = caps.len() - 1;
+                        for (i, v) in captures(&request_caps) {
+                            let n: usize = i.parse().unwrap_or(0);
+                            values.push(((n + offset).to_string(), v));
+                        }
                     }
+                    self.clear(rule, &values, cleared);
+                    any |= self.matched(rule, &values, &mut patch, triggers);
                 }
                 (Matcher::Lines { header, line }, Inbound::Text(text)) => {
                     let mut lines = text.lines();
                     if !lines.next().is_some_and(|h| header.is_match(h.trim_end())) {
                         continue;
                     }
+                    self.clear(rule, &[], cleared);
+                    // `{index}`: the line's place among those matching, from 0.
+                    let mut index = 0;
                     for l in lines {
                         if let Some(caps) = line.captures(l.trim_end()) {
-                            any |= self.assign_all(&rule.assign, &captures(&caps), &mut patch);
+                            let mut values = captures(&caps);
+                            values.push(("index".to_string(), Value::from(index)));
+                            index += 1;
+                            any |= self.matched(rule, &values, &mut patch, triggers);
                         }
                     }
                 }
@@ -449,6 +711,8 @@ impl Telemetry {
                     if !lines.next().is_some_and(|h| header.is_match(h.trim_end())) {
                         continue;
                     }
+                    self.trigger(rule, &[], triggers);
+                    self.clear(rule, &[], cleared);
                     for l in lines {
                         let Some((name, value)) = l.split_once(':') else {
                             continue;
@@ -468,9 +732,11 @@ impl Telemetry {
                         request: request_select,
                         json,
                         each,
+                        headers: header_names,
                     },
                     Inbound::Http {
                         path,
+                        headers,
                         body,
                         request,
                     },
@@ -478,10 +744,18 @@ impl Telemetry {
                     let Some(caps) = re.captures(path) else {
                         continue;
                     };
-                    let Ok(doc) = serde_json::from_slice::<Value>(body) else {
-                        continue;
+                    let reads_body = !json.is_empty() || !reply_select.is_empty() || each.is_some();
+                    let doc = match serde_json::from_slice::<Value>(body) {
+                        Ok(doc) => doc,
+                        Err(_) if !reads_body => Value::Null,
+                        Err(_) => continue,
                     };
                     let mut base = captures(&caps);
+                    for (name, header) in header_names {
+                        if let Some((_, v)) = headers.iter().find(|(k, _)| k == header) {
+                            base.push((name.clone(), Value::String(v.clone())));
+                        }
+                    }
                     if !request_select.is_empty()
                         && !request.is_some_and(|r| select(r, request_select, &mut base))
                     {
@@ -490,21 +764,9 @@ impl Telemetry {
                     if !select(&doc, reply_select, &mut base) {
                         continue;
                     }
-                    let items: Vec<&Value> = match each {
-                        Some(each) => super::expect::json_path(&doc, each)
-                            .and_then(Value::as_array)
-                            .map(|a| a.iter().collect())
-                            .unwrap_or_default(),
-                        None => vec![&doc],
-                    };
-                    for item in items {
-                        let mut values = base.clone();
-                        for (name, json_path) in json {
-                            if let Some(v) = present(super::expect::json_path(item, json_path)) {
-                                values.push((name.clone(), v.clone()));
-                            }
-                        }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                    self.clear(rule, &base, cleared);
+                    for values in each_values(&doc, each.as_deref(), json, &base) {
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 (Matcher::HttpXml { path: re, element }, Inbound::Http { path, body, .. }) => {
@@ -519,6 +781,7 @@ impl Telemetry {
                         continue;
                     };
                     let base = captures(&caps);
+                    self.clear(rule, &base, cleared);
                     for node in doc
                         .descendants()
                         .filter(|n| n.has_tag_name(element.as_str()))
@@ -527,7 +790,7 @@ impl Telemetry {
                         for a in node.attributes() {
                             values.push((a.name().to_string(), Value::String(a.value().into())));
                         }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 (
@@ -542,21 +805,9 @@ impl Telemetry {
                     if !select(doc, selectors, &mut base) {
                         continue;
                     }
-                    let items: Vec<&Value> = match each {
-                        Some(each) => super::expect::json_path(doc, each)
-                            .and_then(Value::as_array)
-                            .map(|a| a.iter().collect())
-                            .unwrap_or_default(),
-                        None => vec![*doc],
-                    };
-                    for item in items {
-                        let mut values = base.clone();
-                        for (name, json_path) in json {
-                            if let Some(v) = present(super::expect::json_path(item, json_path)) {
-                                values.push((name.clone(), v.clone()));
-                            }
-                        }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                    self.clear(rule, &base, cleared);
+                    for values in each_values(doc, each.as_deref(), json, &base) {
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 (
@@ -594,13 +845,76 @@ impl Telemetry {
                                 }
                             }
                         }
-                        any |= self.assign_all(&rule.assign, &values, &mut patch);
+                        any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
                 _ => {}
             }
         }
         any.then_some(patch)
+    }
+
+    /// A rule matched with these captures: its assignments, and its
+    /// `then_send` items queued.
+    fn matched(
+        &self,
+        rule: &Rule,
+        values: &[(String, Value)],
+        patch: &mut Value,
+        triggers: &mut Vec<Triggered>,
+    ) -> bool {
+        self.trigger(rule, values, triggers);
+        self.assign_all(&rule.assign, values, patch)
+    }
+
+    /// `replace`: the subtrees the rule's values replace, removed first.
+    fn clear(&self, rule: &Rule, values: &[(String, Value)], cleared: &mut Value) {
+        if rule.replace.is_empty() {
+            return;
+        }
+        let (params, specs) = capture_params(values);
+        let ctx = Values {
+            params: &params,
+            param_specs: &specs,
+            settings: &Params::new(),
+            setting_specs: &BTreeMap::new(),
+            conversions: &self.conversions,
+            maps: &Default::default(),
+        };
+        for template in &rule.replace {
+            let Ok(path) = render(template, &ctx, |s| s.to_string()) else {
+                continue;
+            };
+            if path.split('.').any(str::is_empty)
+                || path.split('.').count() != template.split('.').count()
+                || !self.declares(&path)
+            {
+                continue;
+            }
+            set_path(cleared, &path, Value::Null);
+        }
+    }
+
+    fn trigger(&self, rule: &Rule, values: &[(String, Value)], triggers: &mut Vec<Triggered>) {
+        if rule.then_send.is_empty() {
+            return;
+        }
+        let (params, specs) = capture_params(values);
+        for item in &rule.then_send {
+            let t = Triggered {
+                item: item.clone(),
+                params: params.clone(),
+                specs: specs.clone(),
+            };
+            // Once per message: a rule matching every element of a list
+            // asks for the same re-read once.
+            if !triggers
+                .iter()
+                .any(|x| x.item == t.item && x.params == t.params)
+            {
+                triggers.push(t);
+            }
+        }
     }
 
     fn assign_all(
@@ -640,12 +954,26 @@ impl Telemetry {
             settings: &empty,
             setting_specs: &empty_specs,
             conversions: &self.conversions,
+            maps: &Default::default(),
         };
         let mut any = false;
         for a in assigns {
             let Ok(path) = render(&a.path, &ctx, |s| s.to_string()) else {
                 continue;
             };
+            if a.delete {
+                // A segment rendered empty, or holding a dot, would delete
+                // something other than what the rule names.
+                if path.split('.').any(str::is_empty)
+                    || path.split('.').count() != a.path.split('.').count()
+                    || !self.declares(&path)
+                {
+                    continue;
+                }
+                set_path(patch, &path, Value::Null);
+                any = true;
+                continue;
+            }
             let Some(kind) = self.kind_of(&path) else {
                 continue;
             };
@@ -1051,6 +1379,230 @@ mod tests {
     }
 
     #[test]
+    fn a_rule_can_delete_a_value_or_a_subtree() {
+        let state_decl = state(json!({
+            "layers.*.name": {"type": "string", "description": "x"},
+            "layers.*.live": {"type": "bool", "description": "x"},
+            "sources.*.name": {"type": "string", "description": "x"},
+            "clip": {"type": "string", "description": "x"},
+        }));
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"json_match": {"$.event": "^removed$", "$.type": "^(layers|sources)$", "$.id": "^(.+)$"},
+                 "state": {"{1}.{2}": {"delete": true}}},
+                {"match": "^CLEAR$", "state": {"clip": {"delete": true}}},
+                {"json_match": {"$.event": "^renamed$", "$.id": "^(.+)$"},
+                 "json": {"name": "$.name"},
+                 "state": {"layers.{1}.name": "{name}", "layers.{1}.live": {"delete": true}}},
+            ]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap();
+        let removed = json!({"event": "removed", "type": "layers", "id": "A1"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&removed)),
+            Some(json!({"layers": {"A1": null}}))
+        );
+        assert_eq!(
+            t.apply(&Inbound::Text("CLEAR")),
+            Some(json!({"clip": null}))
+        );
+        let renamed = json!({"event": "renamed", "id": "A2", "name": "Lower third"});
+        assert_eq!(
+            t.apply(&Inbound::Json(&renamed)),
+            Some(json!({"layers": {"A2": {"name": "Lower third", "live": null}}}))
+        );
+        // Applied as a merge patch, the deletion removes the whole subtree.
+        let mut s = json!({"layers": {"A1": {"name": "Bg", "live": true}, "A2": {"name": "x", "live": false}}});
+        crate::session::merge_patch(&mut s, &t.apply(&Inbound::Json(&removed)).unwrap());
+        crate::session::merge_patch(&mut s, &t.apply(&Inbound::Json(&renamed)).unwrap());
+        assert_eq!(s, json!({"layers": {"A2": {"name": "Lower third"}}}));
+        // A path that does not lead to declared state is refused at load.
+        let e = Telemetry::parse(
+            Some(&json!({"updates": [{"match": "^X$", "state": {"nope.{1}": {"delete": true}}}]})),
+            &state_decl,
+            Conversions::new(),
+        )
+        .unwrap_err();
+        assert!(e.contains("not declared"), "{e}");
+        // An id that would reach elsewhere ("a.b") deletes nothing.
+        let dotted = json!({"event": "removed", "type": "layers", "id": "A1.name"});
+        assert_eq!(t.apply(&Inbound::Json(&dotted)), None);
+    }
+
+    #[test]
+    fn a_line_reply_is_read_with_the_message_it_answers() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"match": "^([01])$", "request_match": "^([A-Z0-9]+)\\.Mute([A-H]) \\?$",
+                 "state": {"amps.{2}.mute.{3}": {"value": "{1}", "map": {"0": false, "1": true}}}},
+                {"match": "^([01])$", "request_match": "^([A-Z0-9]+)\\.Power \\?$",
+                 "state": {"amps.{2}.power": {"value": "{1}", "map": {"0": false, "1": true}}},
+                 "then_send": ["{2}.Status ?"]},
+            ]})),
+            &state(json!({
+                "amps.*.mute.*": {"type": "bool", "description": "x"},
+                "amps.*.power": {"type": "bool", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let answer = |text, request| {
+            let mut triggers = Vec::new();
+            let patch = t.apply_into(
+                &Inbound::Answer { text, request },
+                &mut triggers,
+                &mut json!({}),
+            );
+            (patch, triggers)
+        };
+        let (patch, triggers) = answer("1", "AMP2.MuteC ?");
+        assert_eq!(
+            patch,
+            Some(json!({"amps": {"AMP2": {"mute": {"C": true}}}}))
+        );
+        assert!(triggers.is_empty());
+        let (patch, triggers) = answer("0", "AMP2.Power ?");
+        assert_eq!(patch, Some(json!({"amps": {"AMP2": {"power": false}}})));
+        assert_eq!(triggers.len(), 1);
+        assert_eq!(triggers[0].params["2"], json!("AMP2"));
+        // Without its request, a bare value is nothing.
+        assert_eq!(t.apply(&Inbound::Text("1")), None);
+        assert_eq!(answer("1", "Subnet.Status ?").0, None);
+    }
+
+    #[test]
+    fn a_list_replaces_the_last_one() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"header": "^FILE LIST:$", "each_line": "^([^:]+)$", "replace": "files",
+                 "state": {"files.{index}": "{1}"}},
+                {"path": "^/service/items$", "json_each": "$", "json": {"id": "$.id", "title": "$.title"},
+                 "replace": ["service.items"], "state": {"service.items.{id}.title": "{title}"}},
+            ]})),
+            &state(json!({
+                "files.*": {"type": "string", "description": "x"},
+                "service.items.*.title": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let apply = |m: &Inbound| {
+            let mut cleared = json!({});
+            let patch = t.apply_into(m, &mut Vec::new(), &mut cleared);
+            (cleared, patch)
+        };
+        let (cleared, patch) = apply(&Inbound::Text("FILE LIST:\nCount: 2\nA.ult\nB.ult\n"));
+        assert_eq!(cleared, json!({"files": null}));
+        assert_eq!(patch, Some(json!({"files": {"0": "A.ult", "1": "B.ult"}})));
+        // An empty list clears what was there.
+        let (cleared, patch) = apply(&Inbound::Http {
+            path: "/service/items",
+            headers: &[],
+            body: b"[]",
+            request: None,
+        });
+        assert_eq!(cleared, json!({"service": {"items": null}}));
+        assert_eq!(patch, None);
+        // As the session applies them: the removal, then the new list.
+        let mut s = json!({"files": {"0": "Old.ult", "1": "B.ult", "2": "C.ult"}});
+        let (cleared, patch) = apply(&Inbound::Text("FILE LIST:\nB.ult\n"));
+        crate::session::merge_patch(&mut s, &cleared);
+        crate::session::merge_patch(&mut s, &patch.unwrap());
+        assert_eq!(s, json!({"files": {"0": "B.ult"}}));
+    }
+
+    #[test]
+    fn nested_arrays_keyed_by_a_field_or_an_index() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/live_videos$", "json_each": "$.data[*].ingest_streams",
+                 "json": {"video": "$^.id", "stream": "$.id", "kbps": "$.stream_health.video_bitrate",
+                          "page": "$^^.page"},
+                 "state": {"videos.{video}.ingest.{stream}.bitrate": "{kbps}",
+                           "videos.{video}.ingest.{stream}.position": "{index}",
+                           "videos.{video}.page": "{page}"}},
+                {"json_match": {"$.type": "^tags$"}, "json_each": "$.tags",
+                 "json": {"tag": "$"}, "state": {"tags.{index}": "{tag}"}},
+            ]})),
+            &state(json!({
+                "videos.*.ingest.*.bitrate": {"type": "int", "description": "x"},
+                "videos.*.ingest.*.position": {"type": "int", "description": "x"},
+                "videos.*.page": {"type": "string", "description": "x"},
+                "tags.*": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = json!({"page": "P1", "data": [
+            {"id": "V1", "ingest_streams": [
+                {"id": "S1", "stream_health": {"video_bitrate": 4000}},
+                {"id": "S2", "stream_health": {"video_bitrate": 3900}}]},
+            {"id": "V2", "ingest_streams": []},
+            {"id": "V3"}]})
+        .to_string();
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/live_videos",
+                headers: &[],
+                body: body.as_bytes(),
+                request: None
+            }),
+            Some(json!({"videos": {"V1": {"page": "P1", "ingest": {
+                "S1": {"bitrate": 4000, "position": 0},
+                "S2": {"bitrate": 3900, "position": 1}}}}}))
+        );
+        let tags = json!({"type": "tags", "tags": ["English", "Music"]});
+        assert_eq!(
+            t.apply(&Inbound::Json(&tags)),
+            Some(json!({"tags": {"0": "English", "1": "Music"}}))
+        );
+    }
+
+    #[test]
+    fn response_headers_and_array_elements() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/clip$", "headers": {"etag": "ETag"}, "state": {"clip.etag": "{etag}"}},
+                {"path": "^/summary$", "json": {"name": "$.streams[0].name"},
+                 "headers": {"rate": "X-Rate-Remaining"},
+                 "state": {"stream.name": "{name}", "rate": "{rate}"}},
+            ]})),
+            &state(json!({
+                "clip.etag": {"type": "string", "description": "x"},
+                "stream.name": {"type": "string", "description": "x"},
+                "rate": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let headers = vec![
+            ("etag".to_string(), "\"abc\"".to_string()),
+            ("x-rate-remaining".to_string(), "42".to_string()),
+        ];
+        // A headers-only rule reads no body, so the body need not be JSON.
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/clip",
+                headers: &headers,
+                body: b"\xff\xd8 not json",
+                request: None
+            }),
+            Some(json!({"clip": {"etag": "\"abc\""}}))
+        );
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/summary",
+                headers: &headers,
+                body: br#"{"streams":[{"name":"CAM (1)"},{"name":"CAM (2)"}]}"#,
+                request: None
+            }),
+            Some(json!({"stream": {"name": "CAM (1)"}, "rate": 42}))
+        );
+    }
+
+    #[test]
     fn replies_sharing_a_path_are_told_apart_by_their_request() {
         // JSON-RPC: every request goes to one path, and the reply names
         // neither the method nor what it answers.
@@ -1086,6 +1638,7 @@ mod tests {
         assert_eq!(
             t.apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: reply,
                 request: Some(&time)
             }),
@@ -1094,6 +1647,7 @@ mod tests {
         assert_eq!(
             t.apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: reply,
                 request: Some(&revision)
             }),
@@ -1103,6 +1657,7 @@ mod tests {
         assert!(t
             .apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: reply,
                 request: None
             })
@@ -1112,6 +1667,7 @@ mod tests {
         assert!(t
             .apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: error,
                 request: Some(&time)
             })

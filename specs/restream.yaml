@@ -163,6 +163,7 @@ settings:
 
 ports:
   - { port: 443, protocol: https, role: control, note: "the cloud API at api.restream.io, opened by that host name; token refreshes go to the same host (or the token_url proxy)" }
+  - { port: 443, protocol: wss, role: push, note: "the streaming-updates websocket at streaming.api.restream.io, with the access token in its URL" }
 
 models:
   - id: api-v2
@@ -838,19 +839,18 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Restream pushes streaming updates (the encoder's incoming bitrate, fps
-      and codecs, each destination's CONNECTING, CONNECTED or DISCONNECTED
-      status and outgoing bitrate, and each platform's viewers) over a
-      websocket at wss://streaming.api.restream.io/ws, and chat over
-      wss://chat.api.restream.io/ws, both with the access token in the URL's
-      query. The format's push websocket opens on the transport's own host
-      and cannot carry a rotating OAuth token in its URL, so neither is
-      used: state is polled every 30 seconds (in-progress, upcoming and
-      recent events, channels and the selected ingest), and ingest health,
-      per-destination status and live viewer counts are not in state. A
-      consumer wanting them opens those websockets itself with the access
-      token from the latest credentials event. The documents state no rate
-      limits.
+      Restream pushes streaming updates over a websocket at
+      wss://streaming.api.restream.io/ws, with the access token in the URL's
+      query: the core opens it with the current token each time it connects,
+      so a refreshed token is used. It keeps incoming (the encoder's stream,
+      keyed by its streaming session id: fps, bitrates, codecs, size, loss
+      rate) and each channel's outgoing status, bitrate and buffered bytes and
+      platform status (online, viewers, followers, title) current; a deleted
+      incoming or outgoing stream leaves state. On connecting Restream replays
+      about a minute of updates. Events, channels and the selected ingest,
+      which the websocket does not carry, are polled every 30 seconds. Chat,
+      on a second websocket (wss://chat.api.restream.io/ws), is not read: a
+      spec has one push websocket. The documents state no rate limits.
 
   - models: [all]
     severity: warning
@@ -913,11 +913,40 @@ state:
   events.*.started_at:      { type: int, unit: s, description: "When the event started, Unix seconds (startedAt)" }
   events.*.finished_at:     { type: int, unit: s, description: "When the event finished, Unix seconds (finishedAt)" }
   events.*.record_only:     { type: bool, description: "The event is streamed in record-only mode (isRecordOnly)" }
+  incoming.*.event_id:      { type: string, description: "The event the encoder's stream belongs to, keyed by streaming session id (updateIncoming suid; eventId)" }
+  incoming.*.started_at:    { type: int, unit: s, description: "When the encoder's stream started, Unix seconds (createdAt)" }
+  incoming.*.fps:           { type: float, unit: fps, description: "The incoming stream's frame rate (streaming.fps)" }
+  incoming.*.keyframe_interval: { type: float, unit: s, description: "The incoming stream's keyframe interval (streaming.keyframeInterval)" }
+  incoming.*.loss_rate:     { type: float, description: "The incoming stream's loss rate (streaming.lossRate)" }
+  incoming.*.bitrate:       { type: int, unit: bit/s, description: "The incoming stream's total bitrate (streaming.bitrate.total)" }
+  incoming.*.video_bitrate: { type: int, unit: bit/s, description: "Its video bitrate (streaming.bitrate.video)" }
+  incoming.*.audio_bitrate: { type: int, unit: bit/s, description: "Its audio bitrate (streaming.bitrate.audio)" }
+  incoming.*.video_codec:   { type: string, description: "Its video codec (streaming.codec.video)" }
+  incoming.*.audio_codec:   { type: string, description: "Its audio codec (streaming.codec.audio)" }
+  incoming.*.profile:       { type: string, description: "Its codec profile and level (streaming.profileAndLevel)" }
+  incoming.*.width:         { type: int, unit: px, description: "Its width (streaming.width)" }
+  incoming.*.height:        { type: int, unit: px, description: "Its height (streaming.height)" }
+  channels.*.outgoing.status: { type: string, description: "The stream to this channel: CONNECTING, CONNECTED or DISCONNECTED (updateOutgoing streaming.status); absent once deleted" }
+  channels.*.outgoing.bitrate: { type: int, unit: bit/s, description: "The outgoing bitrate to this channel (streaming.bitrate)" }
+  channels.*.outgoing.buffered_bytes: { type: int, unit: bytes, description: "Bytes buffered for this channel (streaming.bufferedBytes)" }
+  channels.*.outgoing.started_at: { type: int, unit: s, description: "When the outgoing stream started, Unix seconds (createdAt)" }
+  channels.*.outgoing.event_id: { type: string, description: "The event the outgoing stream belongs to (eventId)" }
+  channels.*.platform.online: { type: bool, description: "The platform reports the channel live (updateStatuses online)" }
+  channels.*.platform.viewers: { type: int, description: "Live viewers on the platform (viewers)" }
+  channels.*.platform.stream_views: { type: int, description: "Views of this stream on the platform (streamViews)" }
+  channels.*.platform.channel_views: { type: int, description: "Views of the channel on the platform (channelViews)" }
+  channels.*.platform.followers: { type: int, description: "The channel's followers on the platform (followers)" }
+  channels.*.platform.title: { type: string, description: "The stream's title on the platform (title)" }
+  channels.*.platform.game_title: { type: string, description: "The stream's game or category on the platform (gameTitle)" }
+  channels.*.platform.updated_at: { type: int, unit: s, description: "When the platform data was read, Unix seconds; may be cached (updatedAt)" }
 
 telemetry:
-  # The streaming-updates websocket is on another host with the token in its
-  # URL (see quirks): events, channels and the selected ingest are polled
-  # every 30 seconds (6 requests).
+  # Streaming Updates: the encoder's stream, each destination's stream and
+  # platform status, pushed (Private API, Streaming Updates).
+  websocket:
+    url: "wss://streaming.api.restream.io/ws?accessToken={settings.access_token}"
+  # What the websocket does not carry: events, channels and the selected
+  # ingest, polled every 30 seconds (6 requests).
   poll:
     every_ms: 30000
     send:
@@ -1001,3 +1030,71 @@ telemetry:
       json: { id: "$.id", enabled: "$.enabled" }
       state:
         channels.{id}.enabled: "{enabled}"
+    # Pushed (Streaming Updates): created or updated, and deleted, streams.
+    - json_match: { "$.action": "^updateIncoming$", "$.suid": "^([^.]+)$" }
+      json:
+        event: "$.eventId"
+        created: "$.createdAt"
+        fps: "$.streaming.fps"
+        keyframe: "$.streaming.keyframeInterval"
+        loss: "$.streaming.lossRate"
+        total: "$.streaming.bitrate.total"
+        video: "$.streaming.bitrate.video"
+        audio: "$.streaming.bitrate.audio"
+        vcodec: "$.streaming.codec.video"
+        acodec: "$.streaming.codec.audio"
+        profile: "$.streaming.profileAndLevel"
+        width: "$.streaming.width"
+        height: "$.streaming.height"
+      state:
+        incoming.{1}.event_id: "{event}"
+        incoming.{1}.started_at: "{created}"
+        incoming.{1}.fps: "{fps}"
+        incoming.{1}.keyframe_interval: "{keyframe}"
+        incoming.{1}.loss_rate: "{loss}"
+        incoming.{1}.bitrate: "{total}"
+        incoming.{1}.video_bitrate: "{video}"
+        incoming.{1}.audio_bitrate: "{audio}"
+        incoming.{1}.video_codec: "{vcodec}"
+        incoming.{1}.audio_codec: "{acodec}"
+        incoming.{1}.profile: "{profile}"
+        incoming.{1}.width: "{width}"
+        incoming.{1}.height: "{height}"
+    - json_match: { "$.action": "^deleteIncoming$", "$.suid": "^([^.]+)$" }
+      json: {}
+      state: { "incoming.{1}": { delete: true } }
+    - json_match: { "$.action": "^updateOutgoing$", "$.channelId": "^(\\d+)$" }
+      json:
+        status: "$.streaming.status"
+        bitrate: "$.streaming.bitrate"
+        buffered: "$.streaming.bufferedBytes"
+        created: "$.createdAt"
+        event: "$.eventId"
+      state:
+        channels.{1}.outgoing.status: "{status}"
+        channels.{1}.outgoing.bitrate: "{bitrate}"
+        channels.{1}.outgoing.buffered_bytes: "{buffered}"
+        channels.{1}.outgoing.started_at: "{created}"
+        channels.{1}.outgoing.event_id: "{event}"
+    - json_match: { "$.action": "^deleteOutgoing$", "$.channelId": "^(\\d+)$" }
+      json: {}
+      state: { "channels.{1}.outgoing": { delete: true } }
+    - json_match: { "$.action": "^updateStatuses$", "$.channelId": "^(\\d+)$" }
+      json:
+        online: "$.online"
+        viewers: "$.viewers"
+        stream_views: "$.streamViews"
+        channel_views: "$.channelViews"
+        followers: "$.followers"
+        title: "$.title"
+        game: "$.gameTitle"
+        updated: "$.updatedAt"
+      state:
+        channels.{1}.platform.online: "{online}"
+        channels.{1}.platform.viewers: "{viewers}"
+        channels.{1}.platform.stream_views: "{stream_views}"
+        channels.{1}.platform.channel_views: "{channel_views}"
+        channels.{1}.platform.followers: "{followers}"
+        channels.{1}.platform.title: "{title}"
+        channels.{1}.platform.game_title: "{game}"
+        channels.{1}.platform.updated_at: "{updated}"

@@ -51,3 +51,34 @@ telemetry(NLB, "subnet-status-no-faults", inbound="3 4 1 1 0 1 0 3 0\r\n",
                                    "gpi1": False, "gpi2": True, "gpi3": False, "power": 3, "faults": False,
                                    "faulty_devices": ""}})
 telemetry(NLB, "bare-value-is-not-state", inbound="1\r\n", expect_state={})
+
+# Replies read with the message they answer (request): the bridge answers in
+# order with the value only (section 4); values as section 5 gives them.
+telemetry(NLB, "subnet-power", inbound="3\r\n", request="Subnet.Power = 1",
+          expect_state={"subnet": {"power": 3}})
+telemetry(NLB, "subnet-mute", inbound="1\r\n", request="Subnet.Mute ?", expect_state={"subnet": {"mute": True}})
+telemetry(NLB, "subnet-status-ok", inbound="0\r\n", request="Subnet.StatusOk ?",
+          expect_state={"subnet": {"status_ok": False}})
+telemetry(NLB, "amp-power", inbound="1\r\n", request="b01.z01.Power ?", expect_state={})
+telemetry(NLB, "amp-power-named", inbound="0\r\n", request="amp-3.Power = 0",
+          expect_state={"amps": {"AMP-3": {"power": False}}})
+# The Subnet context in any case is the subnet, never an amplifier.
+telemetry(NLB, "subnet-is-not-an-amp", inbound="1\r\n", request="SUBNET.Power ?",
+          expect_state={"subnet": {"power": 1}})
+telemetry(NLB, "amp-channel-mute", inbound="1\r\n", request="AMP1.MuteC = 1",
+          expect_state={"amps": {"AMP1": {"channels": {"C": {"mute": True}}}}})
+telemetry(NLB, "amp-mute-status", inbound="0110\r\n", request="AMP1.MuteStatus ?",
+          expect_state={"amps": {"AMP1": {"channels": {"A": {"mute": False}, "B": {"mute": True},
+                                                        "C": {"mute": True}, "D": {"mute": False}}}}})
+_NLBF = ["vpl", "cpl", "vhf_fault", "dc_fault", "load_shorted", "temperature_fault", "high_impedance",
+         "temperature_warning"]
+telemetry(NLB, "amp-status", inbound="1 0 1 -29 1 0 0 0 0 0 0 0 -100 0 0 0 0 0 0 1 0\r\n", request="AMP1.Status ?",
+          expect_state={"amps": {"AMP1": {
+              "fault": True, "power_state": 0, "pal": True, "channels": {
+                  "A": {"attenuation": -29, **{f: i == 0 for i, f in enumerate(_NLBF)}},
+                  "B": {"attenuation": -100, **{f: i == 6 for i, f in enumerate(_NLBF)}}}}}})
+telemetry(NLB, "vdn-slot", inbound="AMP1 123456789\r\n", request="Subnet.VDN7 ?",
+          expect_state={"vdn": {"7": {"name": "AMP1", "serial": "123456789"}}},
+          expect_then_send=["AMP1.Status ?\r\n", "AMP1.Power ?\r\n", "AMP1.MuteStatus ?\r\n"])
+telemetry(NLB, "vdn-slot-empty", inbound="*\r\n", request="Subnet.VDN7 ?",
+          state_before={"vdn": {"7": {"name": "AMP1", "serial": "1"}}}, expect_state={"vdn": {}})

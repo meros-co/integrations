@@ -78,10 +78,13 @@ settings:
   token: { type: string, secret: true, default: "",
     label: API password,
     description: "The API password set in FreeShow's Settings > Connections, sent as a bearer token; leave empty when none is set." }
+  socket_port: { type: int, min: 1, max: 65535, default: 5505,
+    label: WebSocket port,
+    description: "The port of FreeShow's WebSocket (Socket.IO) API, 5505 unless changed in Settings > Connections; state is read there." }
 
 ports:
   - { port: 5506, protocol: http, role: control }
-  - { port: 5505, protocol: ws, role: push, note: "FreeShow's Socket.IO server (Engine.IO 4), where its variables are read" }
+  - { port: 5505, protocol: ws, role: push, setting: socket_port, note: "FreeShow's Socket.IO server (Engine.IO 4), where its variables are read" }
 
 models:
   - id: freeshow
@@ -1689,7 +1692,7 @@ telemetry:
   # Socket.IO handshake's auth as FreeShow's API page shows (auth: {token}).
   websocket:
     path: /socket.io/
-    port: 5505
+    port: { setting: socket_port }
     socketio: { auth: '{"token":{settings.token:json}}' }
     send: '["data","{\"isVariable\":true,\"keys\":[\"show_name\",\"show_name_next\",\"layout_slides\",\"layout_notes\",\"slide_number\",\"slide_group\",\"slide_group_next\",\"slide_notes\",\"slide_notes_next\",\"slide_text_previous\",\"slide_text_current\",\"slide_text_next\",\"video_time\",\"video_countdown\",\"video_duration\",\"audio_title\",\"audio_time\",\"audio_countdown\",\"audio_duration\",\"audio_volume\",\"active_project_name\",\"timer_status\",\"active_layers\",\"active_styles\",\"output_windows_active\",\"outputs_locked\",\"stage_output_layout\",\"log_song_usage\"]}"]'
     every_ms: 1000

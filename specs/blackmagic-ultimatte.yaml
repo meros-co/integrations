@@ -948,6 +948,25 @@ telemetry:
     - header: ^MESSAGE:$
       fields:
         Warning: message.warning
+    # The lists: plain lines (names) after the header, kept by position. A
+    # list block carries the whole list, which replaces the last (p.88-90).
+    - header: ^VIDEO FORMATS:$
+      each_line: ^([^:]+)$
+      replace: video_formats
+      state: {'video_formats.{index}': '{1}'}
+    - header: ^FILE LIST:$
+      each_line: ^([^:]+)$
+      replace: files
+      state: {'files.{index}': '{1}'}
+    - header: ^GPI LIST:$
+      each_line: ^([^:]+)$
+      replace: gpi.events
+      state: {'gpi.events.{index}': '{1}'}
+    # IMAGE LIST also reports the media pool's space, which may change alone:
+    # its names are not replaced.
+    - header: ^IMAGE LIST:$
+      each_line: ^([^:]+)$
+      state: {'media.images.{index}': '{1}'}
 
 state:
   device.protocol_version:                {type: string, description: 'Protocol version, e.g. 2.3'}
@@ -1271,6 +1290,10 @@ state:
   gpi.list_id:                            {type: int, description: ID of the GPI list last reported}
   gpi.index:                              {type: int, description: Current event index of the GPI list last reported}
   message.warning:                        {type: string, description: 'Last warning the unit reported, e.g. Event limit exceeded'}
+  video_formats.*:                        {type: string, description: 'A video format the unit takes, by position from 0 (VIDEO FORMATS)'}
+  files.*:                                {type: string, description: 'A setup file on the unit, by position from 0 (FILE LIST)'}
+  gpi.events.*:                           {type: string, description: 'The file of each event of the GPI list last reported, by event index from 0 (GPI LIST)'}
+  media.images.*:                         {type: string, description: 'An image in the media pool, by position from 0 (IMAGE LIST)'}
 
 quirks:
   - models: [all]
@@ -1345,10 +1368,11 @@ quirks:
     severity: info
     text: >
       The status dump on connecting ends with an END PRELUDE block (p.89). VIDEO FORMATS,
-      FILE LIST, GPI LIST and IMAGE LIST carry plain lines (names) after their header; the
-      spec format keys state by fixed field names, so those lists are not kept in state
-      (request_status asks for them, and the raw block reaches the consumer's log only).
-      CONTROL DEFAULT holds each control's default value and is not kept in state either.
+      FILE LIST, GPI LIST and IMAGE LIST carry plain lines (names) after their header; they
+      are kept by position from 0 (video_formats, files, gpi.events, media.images), each
+      block replacing the list it carries, except IMAGE LIST, whose names are only added to,
+      since an update may carry the media pool's space alone. CONTROL DEFAULT holds each
+      control's default value and is not kept in state.
 
   - models: [ultimatte-12-hd-mini]
     severity: info

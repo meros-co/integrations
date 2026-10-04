@@ -227,10 +227,10 @@ telemetry(ML, "documents-with-layers", expect_connect_ws=['{"event":"ping"}'], i
     expect_state={
         "documents": {_ML_DOC: {"name": "Show.tvshow", "live_state": "live", "duration": 125,
                                 "show_start": 1759572000, "program_volume": 0.9, "show_title": "Sunday",
-                                "width": 1920, "height": 1080, "framerate": 29.97, "removed": False}},
+                                "width": 1920, "height": 1080, "framerate": 29.97}},
         "layers": {_ML_LAYER: {"name": "Lower Third", "live_state": "live", "index": 5,
                                "composition_id": "com.boinx.layer.lowerThird", "document": _ML_DOC,
-                               "active_variant": _ML_VAR, "live_variant": _ML_VAR, "removed": False}}})
+                               "active_variant": _ML_VAR, "live_variant": _ML_VAR}}})
 telemetry(ML, "sources-included", inbound_http={
     "path": "/api/v1/documents?include=sources",
     "body": json.dumps({"data": [], "included": [{"type": "sources", "id": _ML_SRC, "attributes": {
@@ -241,7 +241,7 @@ telemetry(ML, "sources-included", inbound_http={
     expect_state={"sources": {_ML_SRC: {
         "name": "Camera 1", "tally_state": "program", "gain": 1.0, "video": True, "audio": False,
         "video_connected": True, "summary": "MacBook Air Camera",
-        "source_type": "com.boinx.mimoLive.sources.deviceVideoSource", "document": _ML_DOC, "removed": False}}})
+        "source_type": "com.boinx.mimoLive.sources.deviceVideoSource", "document": _ML_DOC}}})
 telemetry(ML, "output-destination-reply", inbound_http={
     "path": _ML_O + "/setLive",
     "body": json.dumps({"data": {"type": "output-destinations", "id": _ML_OUT, "attributes": {
@@ -251,14 +251,14 @@ telemetry(ML, "output-destination-reply", inbound_http={
     expect_state={"output-destinations": {_ML_OUT: {
         "title": "File Recording", "kind": "File Recording", "live_state": "startup", "ready": True,
         "starts_with_show": True, "stops_with_show": True, "summary": "~/Movies, Program Output (H.264)",
-        "document": _ML_DOC, "removed": False}}})
+        "document": _ML_DOC}}})
 telemetry(ML, "builtin-outputs", inbound_http={
     "path": _ML_D,
     "body": json.dumps({"data": {"type": "documents", "id": _ML_DOC, "attributes": {
         "name": "Show.tvshow", "live-state": "off",
         "outputs": [{"id": "record", "type": "record", "live-state": "live"},
                     {"id": "stream", "type": "stream", "live-state": "off"}]}}})},
-    expect_state={"documents": {_ML_DOC: {"name": "Show.tvshow", "live_state": "off", "removed": False,
+    expect_state={"documents": {_ML_DOC: {"name": "Show.tvshow", "live_state": "off",
                                           "outputs": {"record": {"live_state": "live"},
                                                       "stream": {"live_state": "off"}}}}})
 # Pushed on the websocket (Boinx's reference; the Companion module's handler).
@@ -269,21 +269,20 @@ telemetry(ML, "pushed-layer-change", inbound_ws=json.dumps({
              "relationships": {"document": {"data": {"type": "documents", "id": _ML_DOC}},
                                "active-variant": {"data": {"type": "variants", "id": _ML_VAR}}}}}),
     expect_state={"layers": {_ML_LAYER: {"name": "Lower Third", "live_state": "shutdown", "index": 2,
-                                         "volume": 0.5, "document": _ML_DOC, "active_variant": _ML_VAR,
-                                         "removed": False}}})
+                                         "volume": 0.5, "document": _ML_DOC, "active_variant": _ML_VAR}}})
 telemetry(ML, "pushed-layer-set", inbound_ws=json.dumps({
     "event": "added", "type": "layer-sets", "id": _ML_SET,
     "data": {"type": "layer-sets", "id": _ML_SET, "attributes": {"name": "Intro Scene", "active": True},
              "relationships": {"document": {"data": {"type": "documents", "id": _ML_DOC}}}}}),
-    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "active": True, "document": _ML_DOC,
-                                           "removed": False}}})
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "active": True, "document": _ML_DOC}}})
 telemetry(ML, "pushed-document-outputs", inbound_ws=json.dumps({
     "event": "changed", "type": "documents", "id": _ML_DOC,
     "data": {"type": "documents", "id": _ML_DOC, "attributes": {
         "name": "Show.tvshow", "live-state": "live",
         "outputs": [{"id": "record", "type": "record", "live-state": "live"}]}}}),
-    expect_state={"documents": {_ML_DOC: {"name": "Show.tvshow", "live_state": "live", "removed": False,
+    expect_state={"documents": {_ML_DOC: {"name": "Show.tvshow", "live_state": "live",
                                           "outputs": {"record": {"live_state": "live"}}}}})
 telemetry(ML, "pushed-removal", inbound_ws=json.dumps({"event": "removed", "type": "variants", "id": _ML_VAR}),
-          expect_state={"variants": {_ML_VAR: {"removed": True}}})
+          state_before={"variants": {_ML_VAR: {"name": "Lower third", "layer": "L1"}, "V2": {"name": "Other"}}},
+          expect_state={"variants": {"V2": {"name": "Other"}}})
 telemetry(ML, "pong-is-not-state", inbound_ws='{"event":"pong"}', expect_state={})

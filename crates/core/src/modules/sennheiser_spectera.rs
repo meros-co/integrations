@@ -884,6 +884,7 @@ mod tests {
 
     fn ok(body: Value) -> Result<HttpResponse, String> {
         Ok(HttpResponse {
+            headers: Vec::new(),
             status: 200,
             body: body.to_string().into_bytes(),
         })
@@ -891,6 +892,7 @@ mod tests {
 
     fn status(code: u16) -> Result<HttpResponse, String> {
         Ok(HttpResponse {
+            headers: Vec::new(),
             status: code,
             body: Vec::new(),
         })
@@ -1233,6 +1235,7 @@ mod tests {
             &mut cx,
             id,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 201,
                 body: br#"{"audiolinkId":12,"rfChannelId":0,"modeId":4}"#.to_vec(),
             }),

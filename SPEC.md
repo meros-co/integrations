@@ -377,9 +377,53 @@ one itself.
 
 Where the operator chooses HTTP or HTTPS on the device, `scheme` names a
 setting instead: `scheme: { setting: scheme }` with `scheme: { type: enum,
-values: [http, https], default: http }`. Devices that serve HTTPS with a
+values: [http, https], default: http }`. A device serving HTTPS on another
+port declares it as `https_port` (Magewell: `port: 80`, `https_port: 443`),
+the default when the setting chooses `https`; a port given when opening the
+device still wins. Devices that serve HTTPS with a
 self-signed certificate declare `accept_invalid_certs: true`: the connection is
 encrypted, but the device's identity is not checked.
+
+#### Sessions
+
+A device that answers a login with a session, which every later request
+must carry, declares `transport.session`. Magewell's Pro Convert answers its
+login with the session ID in a `Set-Cookie` header only, ends the session on
+a restart, and says so with status 37:
+
+```yaml
+transport:
+  type: http
+  session:
+    login: { method: GET, path: /mwapi,
+             query: { method: login, id: "{settings.username}", pass: "{settings.password:md5}" } }
+    capture: { cookie: "*" }         # or { cookie: sid }, or { header: X-Session }
+    relogin: { status: [401], json: { "$.status": "^37$" } }
+    refused: { status: [401, 403], json: { "$.status": "^(36|16)$" } }
+```
+
+Before the first request that needs a session, the core sends `login` (a
+request like a command's, a template over settings) and takes the session
+from its answer: with `capture: { cookie: name }` the named cookie of its
+`Set-Cookie` headers, with `"*"` (the default) every cookie, sent back as
+`Cookie: name=value; ...`; with `capture: { header: name }` that header's
+value, sent back in a header of the same name. Every later request carries
+it, except the probe and a request marked `session: false` (Magewell's ping),
+which need none and never log in. Requests go one at a time, so nothing is
+sent while the login is answered.
+
+| The answer | What the core does |
+|---|---|
+| To the login, matching `refused` (any of its statuses, or a JSON body matching every one of its JSON paths) | The terminal refusal of the credential (§2, HTTP): commands fail with `auth`, the device reports `unauthorized`, nothing is sent until the settings change. |
+| To the login, 2xx with the session | The session is held; the queue goes on. |
+| To the login, anything else, or no answer | Logged; commands waiting for a session fail. The next request needing one logs in again. |
+| To any other request, matching `relogin` | The session is dropped, the core logs in again and sends that request once more. A second match for the same request is its answer. |
+
+The session is a secret: the login's answer is never offered to the
+telemetry rules, and the session is never logged or kept in state.
+`update_settings` drops it, so the next request logs in with the new
+credential. A login that is the same for every model is one request; a list
+names each request's `models` (§4, "Messages per model").
 
 A device opened by host name rather than address keeps the name in its HTTP,
 websocket and event-stream URLs, so the certificate is checked against the
@@ -739,10 +783,11 @@ The directive set is closed.
 | `url` | String percent-encoded, RFC 3986 unreserved characters kept: `{name:url}` → `Cam%201`. For free text in a `raw_query` |
 | `-1`, `+1`, … | Integer offset applied before formatting; combines as `{preset:-1:02d}` |
 | `signed` | Integer with an explicit leading sign: `7` → `+7`, `-7` → `-7` |
-| `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75` |
-
+| `.1f`, `.2f`, … | Float with a fixed number of decimals, rounded half away from zero: `{level:.2f}` → `0.75`. In a telemetry value, a whole number a device sends where it means a decimal is shown the same way (`60` → `60.00`) |
+| `md5`, `sha256` | String hashed, as lowercase hex: `{settings.password:md5}` → `e3afed0047b08059d0fada10f400c1e5` for `Admin`. For a device that takes a password hashed (Magewell's login) |
 | `to.<name>` | A number converted to the wire by the named conversion (below): `{level_db:to.x32_fader}` |
 | `from.<name>` | A wire number converted back to the operator's value: `{arg0:from.x32_fader:.1f}` |
+| `map.<name>` | A value replaced by its wire text from the named value table (below): `{level:map.reference_level}`. The only directive on the placeholder |
 
 Offsets apply before formatting, and directives apply left to right.
 
@@ -779,6 +824,55 @@ an OSC `float` argument, or the whole value of a state assignment, it is a
 number and needs none. `expect.convert: <name>` converts a command's returned
 value from the wire (§5). A documented formula made of linear segments is
 written as its segment ends; a curved law has no exact form here.
+
+### Value tables
+
+A value the operator chooses by name may be several things on the wire.
+Magewell's NDI transport is one enumeration for the operator and four flags
+in the request, at most one of them true; its reference level is `smpte` or
+`ebu` for the operator and `20` or `14` on the wire. A spec declares each
+table once under `maps`, from the value's plain text (an enum value, `true`
+or `false`, a decimal integer) to the wire text:
+
+```yaml
+maps:
+  reference_level: { smpte: "20", ebu: "14" }
+  ndi_udp: { tcp: "false", multi-tcp: "false", udp: "true", rudp: "false", multicast: "false" }
+commands:
+  set_reference_level:
+    params: { level: { type: enum, values: [smpte, ebu], required: true } }
+    send: { method: GET, path: /mwapi, query: { method: set-ndi-config, reference-level: "{level:map.reference_level}" } }
+```
+
+A value the table does not list is rejected before transmission; for an
+enum or a bool, `tools/validate.py` requires every value to be listed. The
+wire text is spec-authored, so in a `raw_query` it may name a query key
+(`raw_query: "method=set-video-config&{overlay:map.overlay_field}={visible}"`).
+A table is a lookup, not a conditional: the same value always gives the same
+text.
+
+### Messages per model
+
+A family whose models speak different dialects (Magewell's encoders take
+`GET /mwapi?method=reboot`, its IP decoders `POST /api/reboot`) keeps one
+command, with one message per dialect, each naming the `models` it is for:
+
+```yaml
+commands:
+  reboot:
+    send:
+      - { models: [hdmi-plus, sdi-plus], method: GET, path: /mwapi, query: { method: reboot } }
+      - { models: [ip-to-hdmi], method: POST, path: /api/reboot }
+```
+
+A message naming `models` is sent only to those models; one without is sent
+to every model. This is decided from the model the device was opened as,
+before anything is sent, like `when_set` (§2), never from what the device
+says. It applies to the object messages of `send` (HTTP requests and OSC
+messages), telemetry `poll` and `subscribe` items, `on_connect` steps, the
+`probe` (a list whose first message for the model is used) and a session's
+`login`. `tools/validate.py` checks that every model a command `supports`
+has a message.
 
 ### OSC commands
 
@@ -860,6 +954,8 @@ expect:
   json_path: "$.transport.status"   # JSON: the HTTP body, or the OSC argument at `arg`
   json_equals: { "$.status": "ok" } # JSON values the reply must hold
   code_range: [200, 299]    # leading numeric response code
+  code_path: "$.status"     # with code_range: the code is this JSON number instead
+  header: Location          # HTTP only: this response header's value is returned
   address: /ch/01/config/name       # OSC only: the reply's address
   arg: 0                    # OSC only: argument returned as the value
   reply_json: { "$.id": "{id}" }    # ws only: what identifies the reply (§2)
@@ -896,6 +992,11 @@ A code outside `code_range` fails the command. A code present in `codes`
 supplies the failure message; one absent from it is reported as an unexpected
 response carrying the raw code. This is the Blackmagic HyperDeck shape.
 
+A JSON API that answers every request with a status number in its body
+(Magewell's `{"status": 37}`, 0 for success) names it with `code_path`, and
+`code_range` and `codes` then apply to that number. An HTTP `status` in
+`expect` is checked first, so an HTTP error is reported as such.
+
 `returns` declares the result type:
 
 | Value | Result |
@@ -907,6 +1008,11 @@ response carrying the raw code. This is the Blackmagic HyperDeck shape.
 | `none` | No acknowledgement available. The core reports `unverified` |
 
 `json_path: "$"` returns the whole JSON body.
+
+A JSON path is `$`, then member names after `.` and array indexes in
+brackets, counted from 0: `$.profile.streams[0].video.kbps`. A path that
+names something the JSON does not hold has no value. JSON paths in `expect`,
+telemetry rules and `refusal_json` are all read this way.
 
 ## 6. Quirks
 
@@ -1019,6 +1125,54 @@ and a wire value the map does not list is not assigned:
         single clip: { path: transport.single_clip, map: { "true": true, "false": false } }
 ```
 
+A rule can also remove what the device says is gone. `{delete: true}` in
+place of a value removes the path from state: one declared value, or a whole
+subtree of them (`layers.<id>` and everything under it). mimoLive pushes
+`{"event": "removed", "type": "layers", "id": "..."}` when a layer is
+deleted:
+
+```yaml
+    - json_match: { "$.event": "^removed$", "$.type": "^(layers|sources)$", "$.id": "^([^.]+)$" }
+      json: {}
+      state: { "{1}.{2}": { delete: true } }
+```
+
+The state patch carries `null` there, which RFC 7386 reads as a removal:
+the snapshot loses the subtree, and the `state` event tells consumers so.
+The path must be declared, or lead to declared paths; a captured segment
+that renders empty or holds a `.` removes nothing, so a device can never
+name something else. Within one message a removal wins over a value the same
+message assigns under it. A telemetry vector for a removal gives
+`state_before`, the state the message arrives on.
+
+#### Lists
+
+A device that reports a list whole each time (a file list, a service's
+items) declares the subtree each such message replaces with `replace`:
+whenever the rule's message arrives (its path, header or selectors match,
+even with no element at all), the subtree is removed first, in a patch of
+its own, and the values the message gives are applied after it, so a list
+that shrinks or empties leaves nothing behind. In a `header` + `each_line`
+rule, `{index}` is the line's place among the lines that match, from 0, for
+lists of plain lines (Ultimatte's FILE LIST):
+
+```yaml
+    - header: ^FILE LIST:$
+      each_line: ^([^:]+)$
+      replace: files
+      state: { "files.{index}": "{1}" }
+    - path: "^/api/v2/service/items$"
+      json_each: "$"
+      json: { id: "$.id", title: "$.title" }
+      replace: service.items
+      state: { "service.items.{id}.title": "{title}" }
+```
+
+`replace` is a path or a list of them, templates over the captures before
+`json_each` (the path's, the selectors'), each declared or leading to
+declared paths. Consumers see the removal and the new list as two `state`
+events in a row.
+
 Over HTTP, `poll` requests and command requests alike have their replies
 offered to `path` rules, which match the request's path and query:
 
@@ -1029,6 +1183,7 @@ offered to `path` rules, which match the request's path and query:
 | `path` + `xml_each` | An XML reply | once per element of that name; its attributes |
 | `path` + `json` + `json_match` | A JSON reply whose value at each JSON path matches its regex | the path's, then `json_match`'s, in order |
 | `path` + `json` + `request_match` | A JSON reply to a request whose JSON body matches | the path's, then `request_match`'s, then `json_match`'s |
+| `path` + `headers` | Any reply, JSON or not | `headers` names response header values, by header name in any case; with `json` too, both |
 
 `request_match` is for protocols whose replies all arrive on one path and
 don't say what they answer, such as JSON-RPC: the rule looks at the request
@@ -1053,8 +1208,54 @@ that the reply answers.
         "tally.{name}.program": { value: "{on_pgm}", map: { "true": true, "false": false } }
 ```
 
+`json_each` names an array, and may reach it through arrays: `[*]` in its
+path goes through every element of an array on the way, so
+`$.data[*].ingest_streams` is each ingest stream of each of the Page's live
+videos. In each match, `json` paths are the element's; `$^.` names the
+element one level out (the live video, or the whole reply for an array
+without `[*]`), `$^^.` two; and `{index}` is the element's index in its
+array, for state keyed by position where the elements have no id:
+
+```yaml
+    - path: '^/v[0-9.]+/[0-9]+/live_videos\?'
+      json_each: "$.data[*].ingest_streams"
+      json: { video: "$^.id", stream: "$.id", bitrate: "$.stream_health.video_bitrate" }
+      state: { "live_videos.{video}.ingest_streams.{stream}.video_bitrate": "{bitrate}" }
+```
+
+A JSON path anywhere may also index an array, `$.streams[0].name` (§5).
+State keyed this way keeps what a later reply no longer lists, so a list
+that shrinks (a tag list) is better kept whole, as JSON text.
+
 A telemetry vector for HTTP gives `inbound_http: { path, body }` in place of
-`inbound`, plus `request` (the JSON request body) for a `request_match` rule.
+`inbound`, plus `request` (the JSON request body) for a `request_match` rule
+and `headers` (name to value) for a `headers` rule.
+
+#### Replies and what they answer
+
+Some line devices answer with the value alone: Lab.gruppen's NLB 60E
+answers `AMP1.Power ?` with `1`, and `Subnet.Mute ?` with `1` too. A device
+that answers one message at a time, in order, still says what it answers:
+the message in flight. A `match` rule names the text of that message with
+`request_match`, an RE2-safe regex; its captures are numbered on after the
+reply's:
+
+```yaml
+    - match: "^([01])$"
+      request_match: '^([A-Z0-9@-]+)\.Mute([A-H]) (?:= [01]|\?)$'
+      state: { "amps.{2}.channels.{3}.mute": { value: "{1}", map: { "0": false, "1": true } } }
+```
+
+The rule then matches only a message taken as the reply to a command, a
+query or a probe, and only when the text sent (the template rendered,
+without framing) matches `request_match`: a reply to a set and to a get
+alike, and never a message the device pushes. Rules without
+`request_match` see replies as before. A telemetry vector for such a rule
+gives `request`, the text of the message the `inbound` reply answers.
+
+With `then_send` (below, "Re-reads on a push"), a reply can have more read: the NLB's VDN table
+names each amplifier, and each name has that amplifier's status, power and
+mutes read in turn.
 
 #### Poll replies on another address
 
@@ -1116,8 +1317,8 @@ and does not decide whether the device is connected; the transport does.
 ```yaml
 telemetry:
   websocket:
-    path: /api/v1             # required
-    port: 8080                # defaults to the transport's port
+    path: /api/v1             # required, unless url (below)
+    port: 8080                # defaults to the transport's port; or {setting: name}
     scheme: ws                # ws | wss | {setting: name}
     subprotocol: v1           # optional
     accept_invalid_certs: false # over wss; defaults to the http transport's
@@ -1125,6 +1326,34 @@ telemetry:
       - '{"action":"subscribe","parameter":"/composition/master"}'
     every_ms: 5000            # optional: send them again at this interval
 ```
+
+`port` may name an integer setting, `port: { setting: websocket_port }`, for
+a device whose push port the operator can move (OpenLP, FreeShow); an empty
+setting means the transport's port.
+
+A service that pushes on another host, with its token in the URL, gives an
+absolute `url` in place of `path`, `port` and `scheme`. Restream's streaming
+updates:
+
+```yaml
+telemetry:
+  websocket:
+    url: "wss://streaming.api.restream.io/ws?accessToken={settings.access_token}"
+```
+
+The URL is a template over settings, each value percent-encoded, rendered
+each time the websocket opens or reopens, so a token the core has refreshed
+since (`auth: oauth2`) is the one sent. Its scheme and host are written in
+the spec: `wss`, or `ws` only to this machine (`localhost`, `127.0.0.1`,
+`[::1]`), checked again on the rendered URL; a URL that fails is not opened
+and never logged, since it may hold a token. The transport's credential and
+`headers` do not go to the other host. When the URL names a setting, a 401
+or 403 answer to its opening is a refusal of that token: refreshed once if it
+can be, as on the transport, and otherwise the terminal refusal of §2.
+
+`idle_ms` reopens the websocket when nothing at all has arrived on it for
+that long, for a service that sends keepalives, where silence means a dead
+connection.
 
 `every_ms` sends the `send` items again at that interval while the websocket
 is open: a keepalive a device requires of a client (mimoLive closes a socket
@@ -1162,6 +1391,46 @@ over settings. Its messages go through the rules like any other.
 
 A telemetry vector for a websocket gives `inbound_ws` (the message text), and
 optionally `expect_connect_ws`, the messages sent when it opens.
+
+#### Re-reads on a push
+
+A push that only says something changed (OpenLP's websocket counts changes
+to the live item and the service, without their content) has the rule that
+matches it ask for the rest with `then_send`: messages, like poll items,
+queued when the rule matches.
+
+```yaml
+  updates:
+    - json_match: { "$.results.counter": "^\\d+$" }
+      json: { counter: "$.results.counter" }
+      state: { live.counter: "{counter}" }
+      then_send:
+        - { method: GET, path: /api/v2/controller/live-item }
+        - { method: GET, path: /api/v2/service/items }
+```
+
+They go through the command queue as poll items do, behind commands, and
+their replies go to the rules. A message still waiting in the queue is not
+queued again, so a burst of pushes asks for one re-read; one already sent is
+answered before the next is sent, so a change that arrives meanwhile is read
+too. A rule with `then_send` may have no `state`. The messages are templates
+over the rule's captures (`{1}`, its `json` and `headers` names) and the
+settings, so a push can name what to read or a request can carry what the
+push gave. Twitch's EventSub websocket welcomes each connection with a
+session id, and subscriptions for that session must be created within ten
+seconds:
+
+```yaml
+    - json_match: { "$.metadata.message_type": "^session_welcome$", "$.payload.session.id": "^(.+)$" }
+      json: {}
+      then_send:
+        - { method: POST, path: /helix/eventsub/subscriptions, content_type: application/json,
+            body: '{"type":"stream.online","version":"1","condition":{"broadcaster_user_id":"{settings.broadcaster_id}"},"transport":{"method":"websocket","session_id":{1:json}}}' }
+```
+
+Nothing is queued while the device is open for commands only. A telemetry
+vector names what a message queues with `expect_then_send`, a list of
+requests as `expect_request` gives them.
 
 #### An event stream beside an HTTP transport
 

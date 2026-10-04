@@ -344,12 +344,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-ultimatte — Blackmagic Ultimatte 12
 
-- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1297](specs/blackmagic-ultimatte.yaml#L1297))
-- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1307](specs/blackmagic-ultimatte.yaml#L1307))
-- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1329](specs/blackmagic-ultimatte.yaml#L1329))
-- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
-- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1339](specs/blackmagic-ultimatte.yaml#L1339))
-- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1322](specs/blackmagic-ultimatte.yaml#L1322))
+- [ ] Confirm the Controls table is read correctly with its ranges two rows below their controls (for example Matte Correct Horizontal Size 0-6 and Vertical Size 0-3, Transition Rate 1-120, Output Offset -1500 to +1500). ([specs/blackmagic-ultimatte.yaml:1320](specs/blackmagic-ultimatte.yaml#L1320))
+- [ ] Check how the unit answers a control it does not have (HD and HD Mini) and a value out of range. ([specs/blackmagic-ultimatte.yaml:1330](specs/blackmagic-ultimatte.yaml#L1330))
+- [ ] Check that PING: is answered with ACK. ([specs/blackmagic-ultimatte.yaml:1352](specs/blackmagic-ultimatte.yaml#L1352))
+- [ ] Confirm BG 2 Frame Buffer Index and Enable, and the command names of the layer and matte frame buffers. ([specs/blackmagic-ultimatte.yaml:1353](specs/blackmagic-ultimatte.yaml#L1353))
+- [ ] Check whether Input Source and Output Enable are set in an IP VIDEO block or a CONTROL block, and in which case (SDI/IP2110, On/Off, or ip2110, on). ([specs/blackmagic-ultimatte.yaml:1362](specs/blackmagic-ultimatte.yaml#L1362))
+- [ ] Check that Quickload n: On and Quicksave n: On load and save the quick memories (the Companion module writes Quick Load n). ([specs/blackmagic-ultimatte.yaml:1345](specs/blackmagic-ultimatte.yaml#L1345))
+
+- [ ] Confirm that a VIDEO FORMATS, FILE LIST or GPI LIST block always carries the whole list (an update replaces the list kept), that list lines never hold a colon, and whether an IMAGE LIST update can carry Capacity or Available alone. ([specs/blackmagic-ultimatte.yaml:957](specs/blackmagic-ultimatte.yaml#L957))
+- [ ] Record the GPI LIST block's event lines (the file of each event, in event order, assumed). ([specs/blackmagic-ultimatte.yaml:961](specs/blackmagic-ultimatte.yaml#L961))
 
 ## blackmagic-videohub — Blackmagic Videohub
 
@@ -367,19 +370,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## boinx-mimolive — Boinx mimoLive
 
-- [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:1240](specs/boinx-mimolive.yaml#L1240))
+- [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:1233](specs/boinx-mimolive.yaml#L1233))
 - [ ] Check the body shape PUT /documents/(DocumentID) takes for programOutputMasterVolume (a plain object assumed, as for layers). ([specs/boinx-mimolive.yaml:168](specs/boinx-mimolive.yaml#L168))
-- [ ] Check which body POST /documents/(DocumentID)/layers takes: the manual's layer-identifier, name and index, or the reference's data.attributes.composition-id. ([specs/boinx-mimolive.yaml:1251](specs/boinx-mimolive.yaml#L1251))
-- [ ] Confirm that GET /documents?include=layers (and sources, output-destinations, layer-sets) sideloads every document's objects in included, as the poll reads them. ([specs/boinx-mimolive.yaml:1052](specs/boinx-mimolive.yaml#L1052))
-- [ ] Record the websocket's added, changed and removed messages: that data is the whole object as the HTTP API returns it, and that a removed message carries type and id at the top level. ([specs/boinx-mimolive.yaml:1187](specs/boinx-mimolive.yaml#L1187))
-- [ ] Confirm that the websocket closes a client that sends nothing for 15 seconds and that {"event":"ping"} every 5 seconds keeps it open. ([specs/boinx-mimolive.yaml:1044](specs/boinx-mimolive.yaml#L1044))
+- [ ] Check which body POST /documents/(DocumentID)/layers takes: the manual's layer-identifier, name and index, or the reference's data.attributes.composition-id. ([specs/boinx-mimolive.yaml:1244](specs/boinx-mimolive.yaml#L1244))
+- [ ] Confirm that GET /documents?include=layers (and sources, output-destinations, layer-sets) sideloads every document's objects in included, as the poll reads them. ([specs/boinx-mimolive.yaml:1046](specs/boinx-mimolive.yaml#L1046))
+- [ ] Record the websocket's added, changed and removed messages: that data is the whole object as the HTTP API returns it, and that a removed message carries type and id at the top level. ([specs/boinx-mimolive.yaml:1180](specs/boinx-mimolive.yaml#L1180))
+- [ ] Check whether closing a document also pushes the removal of its layers, variants and sources; only what mimoLive reports removed leaves state. ([specs/boinx-mimolive.yaml:1180](specs/boinx-mimolive.yaml#L1180))
+- [ ] Confirm that the websocket closes a client that sends nothing for 15 seconds and that {"event":"ping"} every 5 seconds keeps it open. ([specs/boinx-mimolive.yaml:1038](specs/boinx-mimolive.yaml#L1038))
 - [ ] With a remote control password set, confirm that the X-MimoLive-Password-SHA256 header is accepted on the websocket's opening request, and that a wrong key answers 401 on HTTP. ([specs/boinx-mimolive.yaml:88](specs/boinx-mimolive.yaml#L88))
 - [ ] Check that output destination PATCH bodies are accepted with type and id, and layer set PATCH bodies without them. ([specs/boinx-mimolive.yaml:680](specs/boinx-mimolive.yaml#L680))
 - [ ] Check that layer set PATCH and POST bodies take the JSON:API data.attributes form shown in the manual. ([specs/boinx-mimolive.yaml:777](specs/boinx-mimolive.yaml#L777))
 - [ ] Check that a number input accepts four decimals and that set_layer_flag's JSON true and false are taken for a bool input. ([specs/boinx-mimolive.yaml:307](specs/boinx-mimolive.yaml#L307))
 - [ ] Confirm the built-in outputs record, stream, playout and fullscreen in the document's outputs attribute, and their live-state values. ([specs/boinx-mimolive.yaml:177](specs/boinx-mimolive.yaml#L177))
 - [ ] Check that comments/new takes its parameters in the query of a POST. ([specs/boinx-mimolive.yaml:883](specs/boinx-mimolive.yaml#L883))
-- [ ] Check what a layer's live-variant relationship holds while the layer is off (null assumed, which leaves live_variant as it was). ([specs/boinx-mimolive.yaml:1009](specs/boinx-mimolive.yaml#L1009))
+- [ ] Check what a layer's live-variant relationship holds while the layer is off (null assumed, which leaves live_variant as it was). ([specs/boinx-mimolive.yaml:1008](specs/boinx-mimolive.yaml#L1008))
 
 ## brompton-tessera — Brompton Tessera
 
@@ -601,7 +605,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm an invalid or expired Page token answers HTTP 400 with error code 190 (and which subcodes), that a 401 is never used for other errors, and that permission and rate-limit errors carry other codes. ([specs/facebook-live.yaml:157](specs/facebook-live.yaml#L164))
 - [ ] Confirm GET /{api_version}/me with a Page token answers the Page's id, so the idle probe checks the token. ([specs/facebook-live.yaml:160](specs/facebook-live.yaml#L167))
 - [ ] Confirm reading GET /{page-id}/live_videos still works on v26.0 (the current reference says reading is not supported; the v19.0 reference and the scheduling guide document it), and that source=owner includes UNPUBLISHED and scheduled live videos. ([specs/facebook-live.yaml:603](specs/facebook-live.yaml#L615))
-- [ ] Record the shape of ingest_streams in a field expansion (a plain array, or an object with data), and the stream_health fields Facebook actually returns, including while the encoder is not sending. ([specs/facebook-live.yaml:616](specs/facebook-live.yaml#L628))
+- [ ] Record the shape of ingest_streams in a field expansion (a plain array, or an object with data), and the stream_health fields Facebook actually returns, including while the encoder is not sending. ([specs/facebook-live.yaml:645](specs/facebook-live.yaml#L645))
 - [ ] Confirm the Graph API takes a JSON request body (Content-Type application/json) for creating and updating live videos, as it takes form-encoded parameters. ([specs/facebook-live.yaml:277](specs/facebook-live.yaml#L284))
 - [ ] Confirm scheduling with status SCHEDULED_UNPUBLISHED and event_params start_time, and record the earliest and latest start times accepted. ([specs/facebook-live.yaml:295](specs/facebook-live.yaml#L302))
 - [ ] Record which privacy values a Page's live video accepts, and whether privacy can be changed while live. ([specs/facebook-live.yaml:339](specs/facebook-live.yaml#L346))
@@ -631,19 +635,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## freeshow — FreeShow
 
-- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1489](specs/freeshow.yaml#L1489))
-- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1497](specs/freeshow.yaml#L1497))
+- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1492](specs/freeshow.yaml#L1492))
+- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1500](specs/freeshow.yaml#L1500))
 - [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:65](specs/freeshow.yaml#L65))
-- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1481](specs/freeshow.yaml#L1481))
-- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:321](specs/freeshow.yaml#L321))
-- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:768](specs/freeshow.yaml#L768))
-- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:215](specs/freeshow.yaml#L215))
-- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1205](specs/freeshow.yaml#L1205))
-- [ ] Confirm that FreeShow's Socket.IO server on 5505 (Engine.IO 4 assumed) answers the variable request {"isVariable": true, "keys": [...]} on the "data" event with {isVariable: true, values: {...}}, as the Companion module receives it. ([specs/freeshow.yaml:1697](specs/freeshow.yaml#L1697))
-- [ ] Record the type each variable arrives as: whether slide_number and layout_slides are numbers, and whether output_windows_active, outputs_locked and log_song_usage are true/false or text. ([specs/freeshow.yaml:1752](specs/freeshow.yaml#L1752))
-- [ ] Check what slide_number counts from (1 assumed for the slide shown) and what it holds with nothing on output. ([specs/freeshow.yaml:1660](specs/freeshow.yaml#L1660))
-- [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1693](specs/freeshow.yaml#L1693))
-- [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1695](specs/freeshow.yaml#L1695))
+- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1484](specs/freeshow.yaml#L1484))
+- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:324](specs/freeshow.yaml#L324))
+- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:771](specs/freeshow.yaml#L771))
+- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:218](specs/freeshow.yaml#L218))
+- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1208](specs/freeshow.yaml#L1208))
+- [ ] Confirm that FreeShow's Socket.IO server on 5505 (Engine.IO 4 assumed) answers the variable request {"isVariable": true, "keys": [...]} on the "data" event with {isVariable: true, values: {...}}, as the Companion module receives it. ([specs/freeshow.yaml:1700](specs/freeshow.yaml#L1700))
+- [ ] Record the type each variable arrives as: whether slide_number and layout_slides are numbers, and whether output_windows_active, outputs_locked and log_song_usage are true/false or text. ([specs/freeshow.yaml:1755](specs/freeshow.yaml#L1755))
+- [ ] Check what slide_number counts from (1 assumed for the slide shown) and what it holds with nothing on output. ([specs/freeshow.yaml:1663](specs/freeshow.yaml#L1663))
+- [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1696](specs/freeshow.yaml#L1696))
+- [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1698](specs/freeshow.yaml#L1698))
 
 ## grandma2 — MA Lighting grandMA2
 
@@ -727,10 +731,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## labgruppen-nlb60e — Lab.gruppen NLB 60E (NomadLink)
 
-- [ ] Confirm the bridge accepts the operator with spaces around it (`Subnet.Mute = 1`, `Subnet.Mute ?`), as the examples write it, and answers with the value alone. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
-- [ ] Check virtual device names with dots (the document's examples) are accepted, as its character rules exclude them. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
-- [ ] Check what `Subnet.Status ?` answers with no faulty amplifier (nothing after the faults flag, or a trailing space). ([specs/labgruppen-nlb60e.yaml:222](specs/labgruppen-nlb60e.yaml#L222))
-- [ ] Note whether polling `Subnet.Status ?` every 2 s is acceptable to the bridge, and whether the third-party port still works on firmware newer than 2.1.0. ([specs/labgruppen-nlb60e.yaml:216](specs/labgruppen-nlb60e.yaml#L216))
+- [ ] Confirm the bridge accepts the operator with spaces around it (`Subnet.Mute = 1`, `Subnet.Mute ?`), as the examples write it, and answers with the value alone. ([specs/labgruppen-nlb60e.yaml:375](specs/labgruppen-nlb60e.yaml#L375))
+- [ ] Check virtual device names with dots (the document's examples) are accepted, as its character rules exclude them; such names are not kept in state. ([specs/labgruppen-nlb60e.yaml:375](specs/labgruppen-nlb60e.yaml#L375))
+- [ ] Check what `Subnet.Status ?` answers with no faulty amplifier (nothing after the faults flag, or a trailing space). ([specs/labgruppen-nlb60e.yaml:221](specs/labgruppen-nlb60e.yaml#L221))
+- [ ] Note whether polling `Subnet.Status ?` and the 60 VDN slots every 5 s, with three reads per named amplifier, is acceptable to the bridge, and whether the third-party port still works on firmware newer than 2.1.0. ([specs/labgruppen-nlb60e.yaml:219](specs/labgruppen-nlb60e.yaml#L219))
+- [ ] Confirm the bridge answers strictly one message at a time and in order, so a value is the answer to the message in flight, as the state per amplifier assumes (document section 2). ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
+- [ ] Record what `Subnet.VDN<n> ?` answers for a named slot (name and serial separated by one space assumed) and an empty one (* assumed). ([specs/labgruppen-nlb60e.yaml:246](specs/labgruppen-nlb60e.yaml#L246))
+- [ ] Record an amplifier's `Status ?` answer for 2-, 4- and 8-channel models: three values, then nine per channel from A. ([specs/labgruppen-nlb60e.yaml:275](specs/labgruppen-nlb60e.yaml#L275))
 
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
@@ -751,11 +758,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## magewell-proconvert — Magewell Pro Convert
 
-- [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
-- [ ] Confirm the session cookie arrives in Set-Cookie on login for the encoders, the NDI decoders and the IP decoders, and that status 37 is returned when it has expired. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
-- [ ] Check the IP decoders' default credentials (Admin / Admin assumed). ([specs/magewell-proconvert.yaml:549](specs/magewell-proconvert.yaml#L549))
-- [ ] Check whether Pro Convert for NDI to HDMI 4K runs Decoder API V1.3 or v1.1, and that the methods used here behave the same on both. ([specs/magewell-proconvert.yaml:172](specs/magewell-proconvert.yaml#L172))
-- [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:538](specs/magewell-proconvert.yaml#L538))
+- [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([specs/magewell-proconvert.yaml:108](specs/magewell-proconvert.yaml#L108))
+- [ ] Confirm the session cookie arrives in Set-Cookie on login for the encoders, the NDI decoders and the IP decoders (the IP decoder's reply also names it as sid, which the core no longer reads), and that every cookie the login sets may be sent back. ([specs/magewell-proconvert.yaml:129](specs/magewell-proconvert.yaml#L129))
+- [ ] Confirm status 37 is returned once the session has expired or the device restarted, and whether an expired session is ever answered with HTTP 401 instead (taken as an ended session too). ([specs/magewell-proconvert.yaml:131](specs/magewell-proconvert.yaml#L131))
+- [ ] Confirm a wrong password is answered with status 36 (16 for an unknown user on the IP decoders) and not with HTTP 401 or 403, which are taken as refusals too. ([specs/magewell-proconvert.yaml:134](specs/magewell-proconvert.yaml#L134))
+- [ ] Check the IP decoders' default credentials (Admin / Admin assumed). ([specs/magewell-proconvert.yaml:853](specs/magewell-proconvert.yaml#L853))
+- [ ] Check whether Pro Convert for NDI to HDMI 4K runs Decoder API V1.3 or v1.1, and that the methods used here behave the same on both. ([specs/magewell-proconvert.yaml:263](specs/magewell-proconvert.yaml#L263))
+- [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:842](specs/magewell-proconvert.yaml#L842))
+- [ ] Confirm the IP decoder's summary reports hdmi-state as a number and the first stream of the current profile under profile.streams, as the document's example shows. ([specs/magewell-proconvert.yaml:782](specs/magewell-proconvert.yaml#L782))
 
 ## megapixel-helios — Megapixel HELIOS
 
@@ -846,15 +856,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## openlp — OpenLP
 
-- [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:88](specs/openlp.yaml#L88))
+- [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:91](specs/openlp.yaml#L91))
 - [ ] Confirm that the login token goes in the Authorization header with nothing before it, whether it stays valid across OpenLP restarts, and that a missing or wrong token answers 401. ([specs/openlp.yaml:49](specs/openlp.yaml#L49))
-- [ ] Confirm that the websocket on 4317 sends its state in binary frames, sends the current state when a client connects, and needs no message from the client. ([specs/openlp.yaml:373](specs/openlp.yaml#L373))
-- [ ] Confirm that the websocket's slide field is the selected slide's index from 0 (its documentation repeats the service field's words). ([specs/openlp.yaml:343](specs/openlp.yaml#L343))
-- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:383](specs/openlp.yaml#L383))
-- [ ] Check how /service/show tells a position from an id, and whether positions count from 0 or 1. ([specs/openlp.yaml:313](specs/openlp.yaml#L313))
-- [ ] Check which method /controller/clear/<controller> takes (POST assumed). ([specs/openlp.yaml:160](specs/openlp.yaml#L160))
-- [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:253](specs/openlp.yaml#L253))
-- [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:151](specs/openlp.yaml#L151))
+- [ ] Confirm that the websocket on 4317 sends its state in binary frames, sends the current state when a client connects, and needs no message from the client. ([specs/openlp.yaml:376](specs/openlp.yaml#L376))
+- [ ] Confirm that the websocket's slide field is the selected slide's index from 0 (its documentation repeats the service field's words). ([specs/openlp.yaml:346](specs/openlp.yaml#L346))
+- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:387](specs/openlp.yaml#L387))
+- [ ] Check how /service/show tells a position from an id, and whether positions count from 0 or 1. ([specs/openlp.yaml:316](specs/openlp.yaml#L316))
+- [ ] Check which method /controller/clear/<controller> takes (POST assumed). ([specs/openlp.yaml:163](specs/openlp.yaml#L163))
+- [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:256](specs/openlp.yaml#L256))
+- [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:154](specs/openlp.yaml#L154))
+
+- [ ] Confirm the websocket sends a message for every change of the live item, slide and service, so re-reading on each one keeps the live item and service list current, and that the one-minute safety poll is enough for anything it misses. ([specs/openlp.yaml:388](specs/openlp.yaml#L388))
+- [ ] Confirm live-item answers {} (status 200) while nothing is live, the case that removes live_item from state. ([specs/openlp.yaml:416](specs/openlp.yaml#L416))
 
 ## osc-listener — OSC received from any sender
 
@@ -971,16 +984,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a refresh extends the refresh token's one-year life (refreshTokenExpiresIn) or keeps the original grant's. ([specs/restream.yaml:135](specs/restream.yaml#L135))
 - [ ] Confirm an expired or revoked access token answers 401 invalid_token on every endpoint, and that 403 is used only for a missing scope or plan feature. ([specs/restream.yaml:138](specs/restream.yaml#L138))
 - [ ] Confirm GET /v2/user/profile as the idle probe needs only profile.read and is not rate limited at that rate. ([specs/restream.yaml:141](specs/restream.yaml#L141))
-- [ ] Confirm the legacy PATCH /v2/user/channel/{id} with {"active": true|false} still exists, what it answers (200 assumed), and that it switches the channel for the next stream. ([specs/restream.yaml:283](specs/restream.yaml#L283))
-- [ ] Confirm the legacy GET /v2/user/channel/all still exists and answers an array of channels with id and enabled. ([specs/restream.yaml:999](specs/restream.yaml#L999))
-- [ ] Confirm the legacy GET and PATCH /v2/user/channel-meta/{id} still exist, take title and description, and answer 200. ([specs/restream.yaml:321](specs/restream.yaml#L321))
-- [ ] Confirm get_channel_meta works for the platforms that have metadata (YouTube, Facebook, Twitch) and record what it answers for others. ([specs/restream.yaml:297](specs/restream.yaml#L297))
-- [ ] Confirm In Progress Events answers [] when nothing is live, and record how soon an event appears there after the encoder starts. ([specs/restream.yaml:963](specs/restream.yaml#L963))
-- [ ] Confirm an event that ends leaves In Progress and shows in Events History with status finished on the first page. ([specs/restream.yaml:926](specs/restream.yaml#L926))
-- [ ] Record the status codes Create Ticker, Create Caption, Create QR Code and the Recording and Chat History Download URL methods answer (the reference does not say), and what Update Caption and Update QR Code answer. ([specs/restream.yaml:594](specs/restream.yaml#L594))
-- [ ] Confirm Create Caption accepts an empty secondaryText, and Update Caption with an empty one clears the second line. ([specs/restream.yaml:648](specs/restream.yaml#L648))
-- [ ] Confirm Add Event Destination for a YouTube channel without title is refused, so add_event_destination_custom is needed there. ([specs/restream.yaml:423](specs/restream.yaml#L423))
-- [ ] Record Restream's API rate limits, which the reference does not state, against the 30-second poll of six requests. ([specs/restream.yaml:926](specs/restream.yaml#L926))
+- [ ] Confirm the legacy PATCH /v2/user/channel/{id} with {"active": true|false} still exists, what it answers (200 assumed), and that it switches the channel for the next stream. ([specs/restream.yaml:284](specs/restream.yaml#L284))
+- [ ] Confirm the legacy GET /v2/user/channel/all still exists and answers an array of channels with id and enabled. ([specs/restream.yaml:1028](specs/restream.yaml#L1028))
+- [ ] Confirm the legacy GET and PATCH /v2/user/channel-meta/{id} still exist, take title and description, and answer 200. ([specs/restream.yaml:322](specs/restream.yaml#L322))
+- [ ] Confirm get_channel_meta works for the platforms that have metadata (YouTube, Facebook, Twitch) and record what it answers for others. ([specs/restream.yaml:298](specs/restream.yaml#L298))
+- [ ] Confirm In Progress Events answers [] when nothing is live, and record how soon an event appears there after the encoder starts. ([specs/restream.yaml:992](specs/restream.yaml#L992))
+- [ ] Confirm an event that ends leaves In Progress and shows in Events History with status finished on the first page. ([specs/restream.yaml:955](specs/restream.yaml#L955))
+- [ ] Record the status codes Create Ticker, Create Caption, Create QR Code and the Recording and Chat History Download URL methods answer (the reference does not say), and what Update Caption and Update QR Code answer. ([specs/restream.yaml:595](specs/restream.yaml#L595))
+- [ ] Confirm Create Caption accepts an empty secondaryText, and Update Caption with an empty one clears the second line. ([specs/restream.yaml:649](specs/restream.yaml#L649))
+- [ ] Confirm Add Event Destination for a YouTube channel without title is refused, so add_event_destination_custom is needed there. ([specs/restream.yaml:424](specs/restream.yaml#L424))
+- [ ] Record Restream's API rate limits, which the reference does not state, against the 30-second poll of six requests. ([specs/restream.yaml:955](specs/restream.yaml#L955))
+- [ ] Confirm the streaming-updates websocket accepts the OAuth access token in accessToken, which scope it needs (stream.read assumed; the page names none), and that an expired token is refused at the handshake with 401. ([specs/restream.yaml:947](specs/restream.yaml#L947))
+- [ ] Record real streaming updates: that suid is stable for one encoder session, channelId matches the channel list's id, and deleteIncoming and deleteOutgoing arrive when the encoder and destinations stop. ([specs/restream.yaml:1034](specs/restream.yaml#L1034))
+- [ ] Record which updateStatuses fields each platform fills (viewers, followers, streamViews), and how often they arrive. ([specs/restream.yaml:1082](specs/restream.yaml#L1082))
 
 ## roland-p20hd — Roland P-20HD
 
@@ -1221,21 +1237,24 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the body Helix answers with a 401 (expired token, and a Client-Id that does not match the token), and confirm 403 is never used for a refused token. ([specs/twitch.yaml:126](specs/twitch.yaml#L126))
 - [ ] Confirm every Helix request is refused without the Client-Id header, and accepted with it beside the bearer token. ([specs/twitch.yaml:123](specs/twitch.yaml#L123))
 - [ ] Confirm GET /helix/users with no parameters answers the token's own user and costs one rate-limit point. ([specs/twitch.yaml:130](specs/twitch.yaml#L130))
-- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:740](specs/twitch.yaml#L740))
-- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:732](specs/twitch.yaml#L732))
-- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:395](specs/twitch.yaml#L395))
-- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:388](specs/twitch.yaml#L388))
-- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:483](specs/twitch.yaml#L483))
-- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:294](specs/twitch.yaml#L294))
-- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:314](specs/twitch.yaml#L314))
-- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:337](specs/twitch.yaml#L337))
-- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:370](specs/twitch.yaml#L370))
-- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:259](specs/twitch.yaml#L259))
-- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:237](specs/twitch.yaml#L237))
-- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:687](specs/twitch.yaml#L687))
+- [ ] Confirm Get Streams answers an empty data list while the channel is offline, and record how soon after the encoder starts and stops it changes. ([specs/twitch.yaml:759](specs/twitch.yaml#L759))
+- [ ] Record how far Get Streams' viewer_count lags the viewers Twitch shows. ([specs/twitch.yaml:751](specs/twitch.yaml#L751))
+- [ ] Confirm Update Chat Settings answers 200 with the new settings (the reference also implies 204). ([specs/twitch.yaml:396](specs/twitch.yaml#L396))
+- [ ] Confirm Get Chat Settings returns the non-moderator chat delay to the broadcaster's own token with moderator_id set. ([specs/twitch.yaml:389](specs/twitch.yaml#L389))
+- [ ] Confirm the non-moderator chat delay duration is accepted as a JSON number (2, 4 or 6). ([specs/twitch.yaml:484](specs/twitch.yaml#L484))
+- [ ] Confirm the follower count's total is returned with a token lacking moderator:read:followers. ([specs/twitch.yaml:295](specs/twitch.yaml#L295))
+- [ ] Confirm a stream marker with an empty description is accepted. ([specs/twitch.yaml:315](specs/twitch.yaml#L315))
+- [ ] Confirm Create Clip answers 202 with the clip's id and edit URL while live, and 404 while offline. ([specs/twitch.yaml:338](specs/twitch.yaml#L338))
+- [ ] Confirm Start a raid answers 200 with created_at, and Cancel a raid 204. ([specs/twitch.yaml:371](specs/twitch.yaml#L371))
+- [ ] Record what Twitch answers for a delay change on a channel that is not a Partner (400 expected). ([specs/twitch.yaml:260](specs/twitch.yaml#L260))
+- [ ] Confirm tags are refused with a 400 when one has a space or more than 25 characters, and that [] removes them all. ([specs/twitch.yaml:238](specs/twitch.yaml#L238))
+- [ ] Record the Ratelimit-Limit Twitch gives a user token (800 points a minute expected), so the 30-second poll is known to be well within it. ([specs/twitch.yaml:706](specs/twitch.yaml#L706))
 
 - [ ] Confirm https://id.twitch.tv/oauth2/validate answers 200 to "Authorization: OAuth <token>" without a Client-Id, and 401 with message "invalid access token" once the user disconnects the application or the token is revoked. ([specs/twitch.yaml:120](specs/twitch.yaml#L120))
 - [ ] Confirm validating when the integration opens, after each refresh and hourly satisfies Twitch's audit, and record whether validation counts against the Helix rate limit. ([specs/twitch.yaml:120](specs/twitch.yaml#L120))
+- [ ] Confirm the four EventSub subscriptions are created (202) within the 10 seconds after the welcome when they wait behind the poll, and that the welcome's session id is accepted as sent. ([specs/twitch.yaml:792](specs/twitch.yaml#L792))
+- [ ] Confirm that not following session_reconnect costs only the events between Twitch's close (4004) and the new session's subscriptions, and that the disabled subscriptions of old sessions do not count against the limit of three websockets or the total cost. ([specs/twitch.yaml:701](specs/twitch.yaml#L701))
+- [ ] Confirm channel.follow v2 is refused with 403 without moderator:read:followers and accepted with the broadcaster as moderator_user_id. ([specs/twitch.yaml:832](specs/twitch.yaml#L832))
 
 ## vimeo-live — Vimeo Live
 

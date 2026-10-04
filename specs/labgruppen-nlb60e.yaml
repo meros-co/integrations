@@ -193,13 +193,33 @@ state:
   subnet.power:           { type: int, description: "Subnet power: 0 all off, 1 all on, 2 mixed, 3 in transition" }
   subnet.faults:          { type: bool, description: "One or more amplifiers have faults" }
   subnet.faulty_devices:  { type: string, description: "Names of the amplifiers with faults, separated by spaces; empty when none" }
+  subnet.status_ok:       { type: bool, description: "No amplifier has a fault (Subnet.StatusOk)" }
+  vdn.*.name:             { type: string, description: "The virtual device name in VDN table slot 1-60; the slot is absent while empty" }
+  vdn.*.serial:           { type: string, description: "The serial number of the amplifier the slot names" }
+  amps.*.power:           { type: bool, description: "The amplifier's desired power state, keyed by its virtual device name in capitals (<VDN>.Power)" }
+  amps.*.fault:           { type: bool, description: "The amplifier reports a fault (<VDN>.Status)" }
+  amps.*.power_state:     { type: int, description: "Power as desired (0), on but should be off (1), or off but should be on (2)" }
+  amps.*.pal:             { type: bool, description: "The power average limiter is active" }
+  amps.*.channels.*.mute: { type: bool, description: "The output channel, A to H, is muted (<VDN>.Mute<X>, <VDN>.MuteStatus)" }
+  amps.*.channels.*.attenuation: { type: int, unit: dB, description: "Output level below clip: -100 silent, -44, then -29 to 0 at VPL clip" }
+  amps.*.channels.*.vpl:  { type: bool, description: "The voltage peak limiter is active" }
+  amps.*.channels.*.cpl:  { type: bool, description: "The current peak limiter is active" }
+  amps.*.channels.*.vhf_fault: { type: bool, description: "Very high frequency protection fault" }
+  amps.*.channels.*.dc_fault: { type: bool, description: "DC protection fault" }
+  amps.*.channels.*.load_shorted: { type: bool, description: "The load is shorted" }
+  amps.*.channels.*.temperature_fault: { type: bool, description: "Temperature fault" }
+  amps.*.channels.*.high_impedance: { type: bool, description: "High impedance warning (open load)" }
+  amps.*.channels.*.temperature_warning: { type: bool, description: "Temperature warning" }
 
 telemetry:
+  # The subnet's status, and the VDN table, whose names have each amplifier
+  # read in turn (then_send below): about 60 + 3 per amplifier queries.
   poll:
-    send: ["Subnet.Status ?"]
-    every_ms: 2000
+    send: ["Subnet.Status ?", "Subnet.VDN1 ?", "Subnet.VDN2 ?", "Subnet.VDN3 ?", "Subnet.VDN4 ?", "Subnet.VDN5 ?", "Subnet.VDN6 ?", "Subnet.VDN7 ?", "Subnet.VDN8 ?", "Subnet.VDN9 ?", "Subnet.VDN10 ?", "Subnet.VDN11 ?", "Subnet.VDN12 ?", "Subnet.VDN13 ?", "Subnet.VDN14 ?", "Subnet.VDN15 ?", "Subnet.VDN16 ?", "Subnet.VDN17 ?", "Subnet.VDN18 ?", "Subnet.VDN19 ?", "Subnet.VDN20 ?", "Subnet.VDN21 ?", "Subnet.VDN22 ?", "Subnet.VDN23 ?", "Subnet.VDN24 ?", "Subnet.VDN25 ?", "Subnet.VDN26 ?", "Subnet.VDN27 ?", "Subnet.VDN28 ?", "Subnet.VDN29 ?", "Subnet.VDN30 ?", "Subnet.VDN31 ?", "Subnet.VDN32 ?", "Subnet.VDN33 ?", "Subnet.VDN34 ?", "Subnet.VDN35 ?", "Subnet.VDN36 ?", "Subnet.VDN37 ?", "Subnet.VDN38 ?", "Subnet.VDN39 ?", "Subnet.VDN40 ?", "Subnet.VDN41 ?", "Subnet.VDN42 ?", "Subnet.VDN43 ?", "Subnet.VDN44 ?", "Subnet.VDN45 ?", "Subnet.VDN46 ?", "Subnet.VDN47 ?", "Subnet.VDN48 ?", "Subnet.VDN49 ?", "Subnet.VDN50 ?", "Subnet.VDN51 ?", "Subnet.VDN52 ?", "Subnet.VDN53 ?", "Subnet.VDN54 ?", "Subnet.VDN55 ?", "Subnet.VDN56 ?", "Subnet.VDN57 ?", "Subnet.VDN58 ?", "Subnet.VDN59 ?", "Subnet.VDN60 ?"]
+    every_ms: 5000
   updates:
     - match: "^(\\d+) (\\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([0-3]) ([01]) ?(.*)$"
+      request_match: '^(?i:Subnet\.Status) \?$'
       state:
         subnet.number: "{1}"
         subnet.devices: "{2}"
@@ -211,6 +231,124 @@ telemetry:
         subnet.power: "{8}"
         subnet.faults: { value: "{9}", map: { "0": false, "1": true } }
         subnet.faulty_devices: "{10}"
+    # Replies tied to the message they answer (request_match): the bridge
+    # answers with the value only, in the order asked (section 4).
+    - match: "^([0-3])$"
+      request_match: '^(?i:Subnet\.Power) (?:= [01]|\?)$'
+      state: { subnet.power: "{1}" }
+    - match: "^([01])$"
+      request_match: '^(?i:Subnet\.Mute) (?:= [01]|\?)$'
+      state: { subnet.mute: { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^([01])$"
+      request_match: '^(?i:Subnet\.StatusOk) \?$'
+      state: { subnet.status_ok: { value: "{1}", map: { "0": false, "1": true } } }
+    # The VDN table (section 5.4): a name and serial number, or * for an
+    # empty slot. Each amplifier named there is read in turn.
+    - match: "^(\\S+) (\\d+)$"
+      request_match: '^(?i:Subnet\.VDN)(\d+) (?:\?|=.*)$'
+      state:
+        vdn.{3}.name: "{1}"
+        vdn.{3}.serial: "{2}"
+      then_send: ["{1}.Status ?", "{1}.Power ?", "{1}.MuteStatus ?"]
+    - match: "^\\*+$"
+      request_match: '^(?i:Subnet\.VDN)(\d+) (?:\?|=.*)$'
+      state: { "vdn.{1}": { delete: true } }
+    # An amplifier, by the name asked (stored in capitals, as the bridge does).
+    - match: "^([01])$"
+      request_match: '^((?i:[a-z0-9@-]{1,5}|[a-z0-9@-]{7,10}|[a-rt-z0-9@-][a-z0-9@-]{5}|s[a-tv-z0-9@-][a-z0-9@-]{4}|su[ac-z0-9@-][a-z0-9@-]{3}|sub[a-mo-z0-9@-][a-z0-9@-]{2}|subn[a-df-z0-9@-][a-z0-9@-]|subne[a-su-z0-9@-]))\.(?i:Power) (?:= [01]|\?)$'
+      state: { "amps.{2:upper}.power": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^([01])$"
+      request_match: '^((?i:[a-z0-9@-]{1,5}|[a-z0-9@-]{7,10}|[a-rt-z0-9@-][a-z0-9@-]{5}|s[a-tv-z0-9@-][a-z0-9@-]{4}|su[ac-z0-9@-][a-z0-9@-]{3}|sub[a-mo-z0-9@-][a-z0-9@-]{2}|subn[a-df-z0-9@-][a-z0-9@-]|subne[a-su-z0-9@-]))\.(?i:Mute)([A-Ha-h]) (?:= [01]|\?)$'
+      state: { "amps.{2:upper}.channels.{3:upper}.mute": { value: "{1}", map: { "0": false, "1": true } } }
+    - match: "^([01])([01])?([01])?([01])?([01])?([01])?([01])?([01])?$"
+      request_match: '^((?i:[a-z0-9@-]{1,5}|[a-z0-9@-]{7,10}|[a-rt-z0-9@-][a-z0-9@-]{5}|s[a-tv-z0-9@-][a-z0-9@-]{4}|su[ac-z0-9@-][a-z0-9@-]{3}|sub[a-mo-z0-9@-][a-z0-9@-]{2}|subn[a-df-z0-9@-][a-z0-9@-]|subne[a-su-z0-9@-]))\.(?i:MuteStatus) \?$'
+      state:
+        "amps.{9:upper}.channels.A.mute": { value: "{1}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.B.mute": { value: "{2}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.C.mute": { value: "{3}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.D.mute": { value: "{4}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.E.mute": { value: "{5}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.F.mute": { value: "{6}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.G.mute": { value: "{7}", map: { "0": false, "1": true } }
+        "amps.{9:upper}.channels.H.mute": { value: "{8}", map: { "0": false, "1": true } }
+    - match: '^([01]) ([0-2]) ([01])(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?(?: (-?\d+) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]) ([01]))?$'
+      request_match: '^((?i:[a-z0-9@-]{1,5}|[a-z0-9@-]{7,10}|[a-rt-z0-9@-][a-z0-9@-]{5}|s[a-tv-z0-9@-][a-z0-9@-]{4}|su[ac-z0-9@-][a-z0-9@-]{3}|sub[a-mo-z0-9@-][a-z0-9@-]{2}|subn[a-df-z0-9@-][a-z0-9@-]|subne[a-su-z0-9@-]))\.(?i:Status) \?$'
+      state:
+        "amps.{76:upper}.fault": { value: "{1}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.power_state": "{2}"
+        "amps.{76:upper}.pal": { value: "{3}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.attenuation": "{4}"
+        "amps.{76:upper}.channels.A.vpl": { value: "{5}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.cpl": { value: "{6}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.vhf_fault": { value: "{7}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.dc_fault": { value: "{8}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.load_shorted": { value: "{9}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.temperature_fault": { value: "{10}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.high_impedance": { value: "{11}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.A.temperature_warning": { value: "{12}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.attenuation": "{13}"
+        "amps.{76:upper}.channels.B.vpl": { value: "{14}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.cpl": { value: "{15}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.vhf_fault": { value: "{16}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.dc_fault": { value: "{17}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.load_shorted": { value: "{18}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.temperature_fault": { value: "{19}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.high_impedance": { value: "{20}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.B.temperature_warning": { value: "{21}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.attenuation": "{22}"
+        "amps.{76:upper}.channels.C.vpl": { value: "{23}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.cpl": { value: "{24}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.vhf_fault": { value: "{25}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.dc_fault": { value: "{26}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.load_shorted": { value: "{27}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.temperature_fault": { value: "{28}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.high_impedance": { value: "{29}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.C.temperature_warning": { value: "{30}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.attenuation": "{31}"
+        "amps.{76:upper}.channels.D.vpl": { value: "{32}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.cpl": { value: "{33}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.vhf_fault": { value: "{34}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.dc_fault": { value: "{35}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.load_shorted": { value: "{36}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.temperature_fault": { value: "{37}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.high_impedance": { value: "{38}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.D.temperature_warning": { value: "{39}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.attenuation": "{40}"
+        "amps.{76:upper}.channels.E.vpl": { value: "{41}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.cpl": { value: "{42}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.vhf_fault": { value: "{43}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.dc_fault": { value: "{44}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.load_shorted": { value: "{45}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.temperature_fault": { value: "{46}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.high_impedance": { value: "{47}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.E.temperature_warning": { value: "{48}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.attenuation": "{49}"
+        "amps.{76:upper}.channels.F.vpl": { value: "{50}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.cpl": { value: "{51}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.vhf_fault": { value: "{52}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.dc_fault": { value: "{53}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.load_shorted": { value: "{54}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.temperature_fault": { value: "{55}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.high_impedance": { value: "{56}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.F.temperature_warning": { value: "{57}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.attenuation": "{58}"
+        "amps.{76:upper}.channels.G.vpl": { value: "{59}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.cpl": { value: "{60}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.vhf_fault": { value: "{61}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.dc_fault": { value: "{62}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.load_shorted": { value: "{63}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.temperature_fault": { value: "{64}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.high_impedance": { value: "{65}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.G.temperature_warning": { value: "{66}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.attenuation": "{67}"
+        "amps.{76:upper}.channels.H.vpl": { value: "{68}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.cpl": { value: "{69}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.vhf_fault": { value: "{70}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.dc_fault": { value: "{71}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.load_shorted": { value: "{72}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.temperature_fault": { value: "{73}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.high_impedance": { value: "{74}", map: { "0": false, "1": true } }
+        "amps.{76:upper}.channels.H.temperature_warning": { value: "{75}", map: { "0": false, "1": true } }
 
 quirks:
   - models: [all]
@@ -222,9 +360,12 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      Answers carry only the value, not what was asked, so only the subnet status (whose shape is its own) is kept
-      in state by polling every 2 s. An amplifier's power, mutes and status are read with get_power, get_mute_status
-      and get_status, which return the answer; the spec format cannot attribute a bare value to the amplifier asked.
+      Answers carry only the value, not what was asked; the bridge answers in order, so each answer is read with
+      the message it answers (the amplifier and channel asked). Every 5 seconds the core reads the subnet status and
+      the VDN table's 60 slots, and each amplifier named there is read (status, power and mutes), so state holds
+      every named amplifier by its name in capitals; sets and reads by the commands update it too. A name with a dot,
+      only digits or SUBNET is not kept in state. A slot read as empty leaves state; an amplifier removed from the
+      table keeps its last values.
   - models: [all]
     severity: info
     text: >

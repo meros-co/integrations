@@ -64,6 +64,10 @@ pub struct DeviceSpec {
     /// template directives; kept verbatim for the spec engine.
     #[serde(default, skip_serializing)]
     pub conversions: Option<Value>,
+    /// Named value tables (an enumeration's wire words), used by the `map.`
+    /// template directive; kept verbatim for the spec engine.
+    #[serde(default, skip_serializing)]
+    pub maps: Option<Value>,
 }
 
 /// One port an integration uses (SPEC.md §2, Ports).

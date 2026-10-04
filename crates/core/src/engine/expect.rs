@@ -11,8 +11,15 @@ use crate::module::{CommandError, CommandResult, Outcome};
 #[derive(Debug, Clone)]
 pub(crate) enum Reply {
     Text(String),
-    Http { status: u16, body: Vec<u8> },
-    Osc { args: Vec<Value> },
+    Http {
+        status: u16,
+        /// Names lowercased, as `HttpResponse` gives them.
+        headers: Vec<(String, String)>,
+        body: Vec<u8>,
+    },
+    Osc {
+        args: Vec<Value>,
+    },
 }
 
 impl Reply {
@@ -40,11 +47,18 @@ pub(crate) fn evaluate(
     headed: bool,
 ) -> CommandResult {
     let text = reply.text();
-    let leading_code = text
-        .split_whitespace()
-        .next()
-        .filter(|t| t.len() == 3 && t.bytes().all(|b| b.is_ascii_digit()))
-        .and_then(|t| t.parse::<i64>().ok());
+    // The status code: the reply's leading three digits, or with
+    // `code_path` a number in its JSON (Magewell's `status`).
+    let leading_code = match expect.get("code_path").and_then(Value::as_str) {
+        Some(path) => serde_json::from_str::<Value>(&text)
+            .ok()
+            .and_then(|doc| json_path(&doc, path).and_then(Value::as_i64)),
+        None => text
+            .split_whitespace()
+            .next()
+            .filter(|t| t.len() == 3 && t.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|t| t.parse::<i64>().ok()),
+    };
 
     let fail = |message: String| -> CommandResult {
         let code = leading_code.map(|c| c.to_string());
@@ -56,16 +70,6 @@ pub(crate) fn evaluate(
         Err(CommandError::DeviceError { code, message })
     };
 
-    if let Some(range) = expect.get("code_range").and_then(Value::as_array) {
-        let (lo, hi) = (
-            range[0].as_i64().unwrap_or(0),
-            range[1].as_i64().unwrap_or(0),
-        );
-        match leading_code {
-            Some(c) if (lo..=hi).contains(&c) => {}
-            _ => return fail(format!("unexpected reply: {}", first_line(&text))),
-        }
-    }
     if let Some(want) = expect.get("status").and_then(Value::as_u64) {
         let status = match reply {
             Reply::Http { status, .. } => *status as u64,
@@ -76,6 +80,16 @@ pub(crate) fn evaluate(
                 code: Some(status.to_string()),
                 message: format!("HTTP {status}, expected {want}"),
             });
+        }
+    }
+    if let Some(range) = expect.get("code_range").and_then(Value::as_array) {
+        let (lo, hi) = (
+            range[0].as_i64().unwrap_or(0),
+            range[1].as_i64().unwrap_or(0),
+        );
+        match leading_code {
+            Some(c) if (lo..=hi).contains(&c) => {}
+            _ => return fail(format!("unexpected reply: {}", first_line(&text))),
         }
     }
     if let Some(needle) = expect.get("contains").and_then(Value::as_str) {
@@ -142,6 +156,20 @@ pub(crate) fn evaluate(
     } else if let Reply::Osc { args } = reply {
         value = args.get(arg).cloned();
     }
+    // `header`: an HTTP response header's value (a Location, an ETag).
+    if let Some(name) = expect.get("header").and_then(Value::as_str) {
+        let found = match reply {
+            Reply::Http { headers, .. } => headers
+                .iter()
+                .find(|(k, _)| k.eq_ignore_ascii_case(name))
+                .map(|(_, v)| v.clone()),
+            _ => None,
+        };
+        match found {
+            Some(v) => value = Some(json!(v)),
+            None => return fail(format!("reply has no {name} header")),
+        }
+    }
 
     match returns {
         "none" => Ok(Outcome::Unverified),
@@ -192,13 +220,22 @@ fn fields(body: &str) -> Value {
 
 /// `$` or `$.a.b`: the subset of JSONPath the specs use.
 pub(crate) fn json_path<'a>(json: &'a Value, path: &str) -> Option<&'a Value> {
-    let rest = path.strip_prefix('$')?;
-    if rest.is_empty() {
-        return Some(json);
+    let mut rest = path.strip_prefix('$')?;
+    let mut node = json;
+    while !rest.is_empty() {
+        if let Some(after) = rest.strip_prefix('[') {
+            // `[n]`: the array element at n, from 0.
+            let (index, tail) = after.split_once(']')?;
+            node = node.get(index.parse::<usize>().ok()?)?;
+            rest = tail;
+        } else {
+            let after = rest.strip_prefix('.')?;
+            let end = after.find(['.', '[']).unwrap_or(after.len());
+            node = node.get(&after[..end])?;
+            rest = &after[end..];
+        }
     }
-    rest.strip_prefix('.')?
-        .split('.')
-        .try_fold(json, |node, key| node.get(key))
+    Some(node)
 }
 
 #[cfg(test)]
@@ -251,6 +288,7 @@ mod tests {
     fn only_a_headed_block_drops_its_first_line() {
         let r = Reply::Http {
             status: 200,
+            headers: Vec::new(),
             body: b"focus_mode=\"1\"\nfocus_zone=\"1\"\n".to_vec(),
         };
         assert_eq!(
@@ -329,6 +367,7 @@ mod tests {
         let e = expect(json!({"status": 200, "json_path": "$.value_name"}));
         let r = Reply::Http {
             status: 200,
+            headers: Vec::new(),
             body: br#"{"value":"1","value_name":"Playing"}"#.to_vec(),
         };
         assert_eq!(
@@ -337,5 +376,61 @@ mod tests {
                 value: json!("Playing")
             })
         );
+    }
+
+    #[test]
+    fn json_array_elements() {
+        let doc = json!({"profile": {"streams": [{"name": "A", "video": {"kbps": 900}}, {"name": "B"}]},
+                         "m": [[1, 2], [3, 4]]});
+        assert_eq!(
+            json_path(&doc, "$.profile.streams[0].video.kbps"),
+            Some(&json!(900))
+        );
+        assert_eq!(
+            json_path(&doc, "$.profile.streams[1].name"),
+            Some(&json!("B"))
+        );
+        assert_eq!(json_path(&doc, "$.m[1][0]"), Some(&json!(3)));
+        assert_eq!(json_path(&doc, "$.profile.streams[2]"), None);
+        assert_eq!(json_path(&doc, "$.profile[0]"), None);
+        assert_eq!(json_path(&doc, "$.profile.streams[x]"), None);
+        assert_eq!(json_path(&doc, "$"), Some(&doc));
+    }
+
+    #[test]
+    fn a_status_code_in_json_and_a_header_value() {
+        let codes: BTreeMap<String, String> =
+            [("7".to_string(), "invalid argument".to_string())].into();
+        let e = expect(json!({"status": 200, "code_path": "$.status", "code_range": [0, 0]}));
+        let http = |status: u16, body: &str| Reply::Http {
+            status,
+            headers: vec![("location".into(), "/api/x/7".into())],
+            body: body.as_bytes().to_vec(),
+        };
+        assert_eq!(
+            evaluate(&e, "ack", &codes, &http(200, r#"{"status":0}"#), false),
+            Ok(Outcome::Ack)
+        );
+        assert_eq!(
+            evaluate(&e, "ack", &codes, &http(200, r#"{"status":7}"#), false),
+            Err(CommandError::DeviceError {
+                code: Some("7".into()),
+                message: "invalid argument".into()
+            })
+        );
+        // The HTTP status is checked first.
+        assert!(matches!(
+            evaluate(&e, "ack", &codes, &http(500, "oops"), false),
+            Err(CommandError::DeviceError { code: Some(c), .. }) if c == "500"
+        ));
+        let h = expect(json!({"header": "Location"}));
+        assert_eq!(
+            evaluate(&h, "value", &codes, &http(201, ""), false),
+            Ok(Outcome::Value {
+                value: json!("/api/x/7")
+            })
+        );
+        let missing = expect(json!({"header": "ETag"}));
+        assert!(evaluate(&missing, "value", &codes, &http(201, ""), false).is_err());
     }
 }

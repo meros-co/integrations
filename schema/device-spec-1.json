@@ -201,6 +201,14 @@
               "accepted": {
                 "type": "string",
                 "description": "With refused: regex over reply lines. Once a line matches, the device has accepted the login and refused no longer applies."
+              },
+              "models": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
               }
             }
           }
@@ -259,6 +267,24 @@
               }
             }
           }
+        }
+      }
+    },
+    "maps": {
+      "type": "object",
+      "description": "Named value tables: a parameter's plain text (an enum value, true or false, a decimal integer) to the wire text, used in templates as {x:map.<name>}. A value the table does not list is rejected before transmission (SPEC.md §4, Value tables).",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
         }
       }
     },
@@ -446,7 +472,7 @@
               },
               "each_line": {
                 "type": "string",
-                "description": "With header: regex applied to every following line."
+                "description": "With header: regex applied to every following line; {index} is the line's place among those matching, from 0."
               },
               "fields": {
                 "type": "object",
@@ -508,10 +534,23 @@
                           "description": "Wire text to state value; wire values not listed are not assigned."
                         }
                       }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "delete"
+                      ],
+                      "properties": {
+                        "delete": {
+                          "const": true
+                        }
+                      },
+                      "description": "Remove the path from state: a declared value, or a whole subtree of declared values (a JSON merge patch null)."
                     }
                   ]
                 },
-                "description": "State path template to value."
+                "description": "State path template to value, or to {delete: true} to remove it."
               },
               "path": {
                 "type": "string",
@@ -524,13 +563,20 @@
                 },
                 "description": "With path: names for values taken from a JSON reply, by JSON path. With address: from the JSON in the string argument at json_arg. With json_match alone: from the JSON message."
               },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "With path: names for response header values, by header name in any case (SPEC.md §8)."
+              },
               "xml_each": {
                 "type": "string",
                 "description": "With path: an XML element name; each such element in the reply is a match, its attributes the captures."
               },
               "json_each": {
                 "type": "string",
-                "description": "With path or json_match, and json: a JSON path to an array; the rule matches once per element, json paths relative to it."
+                "description": "With path or json_match, and json: a JSON path to an array; the rule matches once per element, json paths relative to it. [*] in the path goes through every element of an array on the way ($.data[*].ingest_streams); $^. names the element one level out, $^^. two, and {index} is the element's index in its array (SPEC.md §8)."
               },
               "arg_types": {
                 "type": "string",
@@ -546,32 +592,69 @@
                 "description": "JSON path to an RE2-safe regex its value must match (a string as is, anything else as compact JSON). Alone: a JSON message on a websocket, an event stream, or a line of a line transport. With path: the JSON reply must match too. Captures are {1}, {2}, ... across the regexes in order, after the path's."
               },
               "request_match": {
-                "type": "object",
-                "minProperties": 1,
-                "additionalProperties": {
-                  "type": "string"
+                "description": "With path: JSON path to an RE2-safe regex the JSON body of the request the reply answers must match, so replies sharing one path (JSON-RPC) can be told apart. Its captures come after the path's and before json_match's. With match, on a line transport: an RE2-safe regex over the text of the message the reply answers (the device answers one message at a time, in order), its captures numbered on after match's (SPEC.md §8, Replies and what they answer).",
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              },
+              "then_send": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/$defs/oscPollSend"
+                    },
+                    {
+                      "$ref": "#/$defs/httpSend"
+                    }
+                  ]
                 },
-                "description": "With path: JSON path to an RE2-safe regex the JSON body of the request the reply answers must match, so replies sharing one path (JSON-RPC) can be told apart. Its captures come after the path's and before json_match's."
+                "description": "Messages queued when the rule matches, as poll items are: templates over the rule's captures ({1}, json and headers names) and settings. A message already waiting is not queued again. For a push that only says something changed (SPEC.md §8, Re-reads on a push)."
+              },
+              "replace": {
+                "description": "State subtrees the rule's values replace: removed whenever the rule's message arrives (its path, header or selectors match, even with no element), before its values are applied, so a list that shrinks or empties leaves nothing behind. Templates over the captures before json_each (SPEC.md §8, Lists).",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
               }
             },
             "oneOf": [
               {
                 "required": [
-                  "match",
-                  "state"
+                  "match"
                 ]
               },
               {
                 "required": [
-                  "address",
-                  "state"
+                  "address"
                 ]
               },
               {
                 "required": [
                   "header",
-                  "each_line",
-                  "state"
+                  "each_line"
                 ]
               },
               {
@@ -583,21 +666,29 @@
               {
                 "required": [
                   "path",
-                  "json",
-                  "state"
+                  "json"
                 ]
               },
               {
                 "required": [
                   "path",
-                  "xml_each",
-                  "state"
+                  "headers"
+                ],
+                "not": {
+                  "required": [
+                    "json"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "path",
+                  "xml_each"
                 ]
               },
               {
                 "required": [
-                  "json_match",
-                  "state"
+                  "json_match"
                 ],
                 "not": {
                   "required": [
@@ -605,26 +696,61 @@
                   ]
                 }
               }
+            ],
+            "anyOf": [
+              {
+                "required": [
+                  "state"
+                ]
+              },
+              {
+                "required": [
+                  "then_send"
+                ]
+              },
+              {
+                "required": [
+                  "fields"
+                ]
+              }
             ]
           }
         },
         "websocket": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "path"
-          ],
           "description": "A websocket opened beside the transport, for a device that takes commands one way (REST) and pushes state on a websocket. Its messages go through the update rules; it is reopened with backoff when it closes.",
           "properties": {
             "path": {
               "type": "string",
               "pattern": "^/"
             },
+            "url": {
+              "type": "string",
+              "pattern": "^wss?://",
+              "description": "In place of path, port and scheme: an absolute URL on any host, a template over settings rendered (values percent-encoded) at each opening, so a refreshed token in it is the current one. wss, or ws only to this machine. The transport's credential and headers are not sent there (SPEC.md §8)."
+            },
             "port": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65535,
-              "description": "Defaults to the transport's port."
+              "description": "Defaults to the transport's port; or {setting: name} naming an integer setting (empty: the transport's port).",
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "setting"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "setting": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
             },
             "scheme": {
               "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss.",
@@ -707,8 +833,44 @@
                   }
                 }
               ]
+            },
+            "idle_ms": {
+              "type": "integer",
+              "minimum": 1000,
+              "description": "Reopen the websocket when nothing has arrived for this long: for a service that sends keepalives, so silence means a dead connection."
             }
-          }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "url"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "path"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "port"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "scheme"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
         },
         "sse": {
           "type": "object",
@@ -1057,6 +1219,12 @@
               "minimum": 1,
               "maximum": 65535
             },
+            "https_port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "With scheme {setting: name}: the default port when the setting chooses https (Magewell: 80, or 443)."
+            },
             "scheme": {
               "description": "http or https, or {setting: name} naming an enum setting whose values are http and https, for devices the operator can switch.",
               "oneOf": [
@@ -1214,7 +1382,83 @@
               "minimum": 1
             },
             "probe": {
-              "$ref": "#/$defs/httpSend"
+              "description": "Liveness check, any answer meaning reachable: one request, or a list of requests each naming its models, the first for the device's model used.",
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/httpSend"
+                },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/httpSend"
+                  }
+                }
+              ]
+            },
+            "session": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "login"
+              ],
+              "description": "A login whose answer carries a session (a cookie or a header) sent back on every later request; renewed when the device says it ended (SPEC.md §2, Sessions).",
+              "properties": {
+                "login": {
+                  "description": "The login request (templates over settings), or a list of them each naming its models.",
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/httpSend"
+                    },
+                    {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "$ref": "#/$defs/httpSend"
+                      }
+                    }
+                  ]
+                },
+                "capture": {
+                  "description": "What of the login's answer is the session: {cookie: name} the named Set-Cookie, or every one with \"*\" (the default), sent back as Cookie; {header: name} a response header, sent back in a header of that name.",
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "cookie"
+                      ],
+                      "properties": {
+                        "cookie": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "header"
+                      ],
+                      "properties": {
+                        "header": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9-]+$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "relogin": {
+                  "$ref": "#/$defs/sessionMatch",
+                  "description": "An answer to any request meaning the session ended: the core logs in again and sends that request once more."
+                },
+                "refused": {
+                  "$ref": "#/$defs/sessionMatch",
+                  "description": "An answer to the login refusing the credential: terminal, as any refusal."
+                }
+              }
             }
           },
           "required": [
@@ -1500,6 +1744,14 @@
               }
             }
           }
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
         }
       }
     },
@@ -1541,6 +1793,14 @@
         "reply_address": {
           "type": "string",
           "description": "Telemetry poll only: RE2-safe regex over the address the device answers on, for a query answered on another address (ETC Eos: /eos/get/... on /eos/out/get/...)."
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
         }
       }
     },
@@ -1580,6 +1840,18 @@
         },
         "content_type": {
           "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
+        },
+        "session": {
+          "type": "boolean",
+          "description": "false: sent without the session of transport.session, and needing none, so it does not log in first (a ping)."
         }
       },
       "not": {
@@ -1618,6 +1890,10 @@
           "minProperties": 1,
           "description": "JSON path to the value it must hold, in the same JSON as json_path; any other value fails the command."
         },
+        "header": {
+          "type": "string",
+          "description": "HTTP only. A response header whose value is returned (a Location, an ETag); the command fails without it."
+        },
         "code_range": {
           "type": "array",
           "minItems": 2,
@@ -1626,6 +1902,10 @@
             "type": "integer"
           },
           "description": "Inclusive success range for a leading numeric response code."
+        },
+        "code_path": {
+          "type": "string",
+          "description": "JSON path to the reply's numeric status code, used in place of a leading code by code_range and codes (Magewell's $.status)."
         },
         "address": {
           "type": "string",
@@ -1684,6 +1964,30 @@
         "text": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "sessionMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "status": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "description": "HTTP statuses."
+        },
+        "json": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "JSON paths to RE2-safe regexes the answer's body must all match."
         }
       }
     }
