@@ -592,6 +592,27 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Record the exact X-SIGNAL and X-AFV reply forms, which are matched leniently because the guide has typing errors. ([specs/kramer-p3000.yaml:1187](specs/kramer-p3000.yaml#L1187))
 - [ ] Confirm VMUTE flag 2 (blank picture) is unsupported. ([specs/kramer-p3000.yaml:1162](specs/kramer-p3000.yaml#L1162))
 
+## labgruppen-lake — Lab.gruppen Lake (DLM)
+
+- [ ] Confirm a frame answers `Dev.Network.ID?` sent to its address with the broadcast id and class 0, and that the answer's source id is its frame id. ([specs/labgruppen-lake.yaml:701](specs/labgruppen-lake.yaml#L701))
+- [ ] Confirm dynamic port mode: a packet to UDP 6016 is answered to the sending port, so the core works beside Lake Controller. ([specs/labgruppen-lake.yaml:696](specs/labgruppen-lake.yaml#L696))
+- [ ] Record the exact text of a get's answer (the value alone, or the command echoed) for one-value and several-value gets, such as `Mod.Out.Gain?A 1` and `Dev.LoadPilot.Readings?1`. ([specs/labgruppen-lake.yaml:715](specs/labgruppen-lake.yaml#L715))
+- [ ] Check labels and preset names with spaces are accepted as the last argument (`Mod.Out.Label=A 1 Main Left`, `Dev.Preset.Store!1 Show A`). ([specs/labgruppen-lake.yaml:676](specs/labgruppen-lake.yaml#L676))
+- [ ] Check the acknowledgement codes a frame really sends for a bad parameter and an unknown path (-3 to -6 in the document's misaligned table). ([specs/labgruppen-lake.yaml:728](specs/labgruppen-lake.yaml#L728))
+- [ ] Check `Dev.MD.FullBin?3` answers with the 108-byte version 3 structure as the payload alone, with no text before it, and the same for `?2` on a PLM and the LM structure. ([specs/labgruppen-lake.yaml:721](specs/labgruppen-lake.yaml#L721))
+- [ ] Check the RMS gain reduction scale (0.1 dB a step, as read here, or 0.5 dB as one table says). ([specs/labgruppen-lake.yaml:721](specs/labgruppen-lake.yaml#L721))
+- [ ] Confirm the D 10:4L, D 20:4L and D 40:4L answer DLM as the other D Series, and note their model names from `Dev.ModelName?`. ([specs/labgruppen-lake.yaml:747](specs/labgruppen-lake.yaml#L747))
+- [ ] Check whether `Dev.NetworkIPConf?` (as the document spells it) or `Dev.Network.IPConf?` answers, and whether the PLM 20000Q takes `Dev.PTG2.Active` (the example) or `Dev.PTG.Active` (the heading). ([specs/labgruppen-lake.yaml:741](specs/labgruppen-lake.yaml#L741))
+- [ ] Note how many polled requests a second a frame takes before it falls behind, and whether a full parameter round every 5 s disturbs Lake Controller. ([specs/labgruppen-lake.yaml:707](specs/labgruppen-lake.yaml#L707))
+- [ ] Confirm a frame does not reset on any typed command on firmware before 2.50 (the Lake Controller 8 known issue about invalid DLM messages). ([specs/labgruppen-lake.yaml:683](specs/labgruppen-lake.yaml#L683))
+
+## labgruppen-nlb60e — Lab.gruppen NLB 60E (NomadLink)
+
+- [ ] Confirm the bridge accepts the operator with spaces around it (`Subnet.Mute = 1`, `Subnet.Mute ?`), as the examples write it, and answers with the value alone. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
+- [ ] Check virtual device names with dots (the document's examples) are accepted, as its character rules exclude them. ([specs/labgruppen-nlb60e.yaml:234](specs/labgruppen-nlb60e.yaml#L234))
+- [ ] Check what `Subnet.Status ?` answers with no faulty amplifier (nothing after the faults flag, or a trailing space). ([specs/labgruppen-nlb60e.yaml:222](specs/labgruppen-nlb60e.yaml#L222))
+- [ ] Note whether polling `Subnet.Status ?` every 2 s is acceptable to the bridge, and whether the third-party port still works on firmware newer than 2.1.0. ([specs/labgruppen-nlb60e.yaml:216](specs/labgruppen-nlb60e.yaml#L216))
+
 ## lightware-lw2 — Lightware LW2 (bracket protocol) matrices and switchers
 
 - [ ] Confirm that a CR LF after the closing bracket is accepted (Companion's module sends it; the manuals give no terminator). ([specs/lightware-lw2.yaml:463](specs/lightware-lw2.yaml#L463))

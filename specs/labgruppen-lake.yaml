@@ -1,0 +1,752 @@
+spec: 1
+id: labgruppen-lake
+name: Lab.gruppen Lake amplifiers and processors (Direct Lake Messaging)
+vendor: Lab.gruppen
+category: other
+implementation: native
+reason: >
+  DLM is a binary UDP envelope (a little-endian header with 64-bit source and destination ids, classes, a length,
+  a packet type and a message id that must rise per packet) around text commands. Answers are matched to requests
+  by message id and come as either an acknowledgement code or a text, the device has to be found by its frame id
+  first, and meters arrive as a binary structure that differs per product family. Nothing is pushed, so state is
+  kept by paced polling.
+
+source:
+  - title: "Lab.gruppen AB, Direct Lake Messaging v3.4: 3rd party protocol for Lake enabled products (PLM and LM 3rd party protocol v3_4 PUBLIC - APPROVED v1A), 2015-06-09"
+    author: Lab.gruppen AB
+    url: "https://beetech-inc.com/wp/wp-content/uploads/DLM-Lake-3rd-party-protocol-v3_4.pdf"
+    note: >
+      Marked PUBLIC by Lab.gruppen; mirrored by a distributor, as Lab.gruppen no longer hosts it (the Lake
+      Controller manual, 25.2, has integrators ask for it by email). Version requirements (2: DLM 3 from D Series
+      and PLM+ firmware 2.36, DLM 1 and 2 from PLM 2.58 and 2.74, DLM 2 from LM 0.32), UDP ports (4.1 fixed 6015
+      with answers to 6004, 4.2 dynamic 6016 with answers to the sender's port), the packet format (5: header
+      fields, classes 6, 5 and 0, broadcast ids -2/-3, length up to 560, types 701 and 2, message id, footer,
+      little-endian), messages and acknowledgement codes (6.1, 6.2), addressing by frame id (7), every command
+      with its operations, parameters, ranges and supported families (8.1-8.4), the meter structures of versions
+      1, 2, 3 and LM (Appendix B), the FAQ (10: source id, footer, alignment, result codes, active preset unknown,
+      a recall mutes audio for about a second), the example application (Appendix C: answers matched by message
+      id, broadcasts ignored, the frame id from the answer's source) and the example packets (Appendix D).
+  - title: "Lake Controller v8.0.0 release notes (Installer 140, 2023-07-07)"
+    author: Music Tribe Brands Sweden AB
+    url: "https://beetech-inc.com/wp/wp-content/uploads/Lake_Controller_v8-Release-Notes.pdf"
+    note: >
+      Current firmware bundles stay compatible with DLM v3.4; known issue that invalid DLM messages can reset a
+      device, with D Series and PLM+ firmware 2.50 recommended for third-party control.
+
+settings:
+  frame_id: { type: string, max_length: 17, pattern: "^([0-9A-Fa-f]{8}:[0-9A-Fa-f]{8})?$", label: Frame ID,
+              description: "The frame's hardware id as Lake Controller or the front panel (MENU, Frame, Network) shows it, e.g. 3d000011:d6ed9201; asked of the device when empty." }
+  response_port: { type: enum, values: [dynamic, fixed], default: dynamic, label: Answer port,
+                   description: "dynamic sends to UDP 6016 and the device answers the sending port; fixed sends to 6015 and the device answers on 6004, which Lake Controller must not hold on this computer." }
+  meter_poll_ms: { type: int, min: 0, max: 60000, default: 1000, label: Meter interval,
+                   description: "Milliseconds between meter and fault reads while monitored; 0 reads none." }
+  parameter_poll_ms: { type: int, min: 0, max: 600000, default: 5000, label: Parameter interval,
+                       description: "Milliseconds between rounds of parameter reads (power, mutes, gains, labels) while monitored; 0 reads them once." }
+
+ports:
+  - { port: 6016, protocol: udp, role: control, note: "dynamic answer port mode: the device answers the sender's port" }
+  - { port: 6015, protocol: udp, role: control, setting: response_port, when: "response_port fixed" }
+  - { port: 6004, protocol: udp, role: feedback, listener: core, setting: response_port, when: "response_port fixed" }
+
+models:
+  - id: d-200-4l
+    name: Lab.gruppen D 200:4L
+    supports: &plus
+      [set_power, get_power, get_model_name, get_bundle_version, get_hardware_id, get_preset_name, recall_preset,
+      store_preset, set_frame_label, set_redundancy, factory_reset, soft_reset, set_iso_float, set_breaker_current,
+      set_breaker_type, set_latency_match, get_latency, get_route, get_bridge_mode, set_load_speakers,
+      set_power_channel_attenuation, set_power_channel_mute, set_dante_break_in, set_router_input, get_router_input,
+      force_input_priority, set_router_input_mute, get_input_sample_rate, get_meters, get_no_faults, set_load_pilot,
+      get_load_pilot_readings, set_load_pilot_signal, set_load_pilot_thresholds, set_output_mute, set_output_gain,
+      set_output_delay, set_output_polarity, set_output_label, set_output_max_rms_level, set_output_max_rms_corner,
+      set_output_max_rms_attack, set_output_max_rms_release, set_output_max_peak_level, set_output_amp_gain,
+      set_output_vpl, set_output_vpl_profile, get_output_parameter, get_output_channels, set_input_mute,
+      set_input_gain, set_input_delay, set_input_polarity, set_input_label, set_input_mixer_gain, set_module_label,
+      set_module_selected, query, send_message]
+    verification: none
+    notes: D Series, DLM version 3 (firmware 2.36 and later); modules A-D, power channels 1-4.
+  - id: d-120-4l
+    name: Lab.gruppen D 120:4L
+    supports: *plus
+    verification: none
+    notes: D Series, DLM version 3 (firmware 2.36 and later); modules A-D, power channels 1-4.
+  - id: d-80-4l
+    name: Lab.gruppen D 80:4L
+    supports: *plus
+    verification: none
+    notes: D Series, DLM version 3 (firmware 2.36 and later); modules A-D, power channels 1-4.
+  - id: d-40-4l
+    name: Lab.gruppen D 40:4L
+    supports: *plus
+    verification: none
+    notes: >
+      D Series Slimline. DLM v3.4 predates it and lists no product code for it; it runs the same Lake platform
+      and is assumed to answer as the other D Series.
+  - id: d-20-4l
+    name: Lab.gruppen D 20:4L
+    supports: *plus
+    verification: none
+    notes: D Series Slimline; assumed to answer DLM as the other D Series (see d-40-4l).
+  - id: d-10-4l
+    name: Lab.gruppen D 10:4L
+    supports: *plus
+    verification: none
+    notes: D Series Slimline; assumed to answer DLM as the other D Series (see d-40-4l).
+  - id: plm-20k44
+    name: Lab.gruppen PLM 20K44 (PLM+)
+    supports: &plm_plus
+      [set_power, get_power, get_model_name, get_bundle_version, get_hardware_id, get_preset_name, recall_preset,
+      store_preset, set_frame_label, set_redundancy, factory_reset, soft_reset, set_iso_float, set_aes_termination,
+      set_breaker_current, set_breaker_type, set_latency_match, get_latency, get_route, get_bridge_mode,
+      set_load_speakers, set_power_channel_attenuation, set_power_channel_mute, set_dante_break_in, set_router_input,
+      get_router_input, force_input_priority, set_router_input_mute, get_input_sample_rate, get_meters, get_no_faults,
+      set_load_pilot, get_load_pilot_readings, set_load_pilot_signal, set_load_pilot_thresholds, set_output_mute,
+      set_output_gain, set_output_delay, set_output_polarity, set_output_label, set_output_max_rms_level,
+      set_output_max_rms_corner, set_output_max_rms_attack, set_output_max_rms_release, set_output_max_peak_level,
+      set_output_amp_gain, set_output_vpl, set_output_vpl_profile, get_output_parameter, get_output_channels,
+      set_input_mute, set_input_gain, set_input_delay, set_input_polarity, set_input_label, set_input_mixer_gain,
+      set_module_label, set_module_selected, query, send_message]
+    verification: none
+    notes: PLM+, DLM version 3 (firmware 2.36 and later); modules A-D, power channels 1-4; AES loop termination.
+  - id: plm-12k44
+    name: Lab.gruppen PLM 12K44 (PLM+)
+    supports: *plm_plus
+    verification: none
+    notes: PLM+, DLM version 3 (firmware 2.36 and later); modules A-D, power channels 1-4; AES loop termination.
+  - id: plm-20000q
+    name: Lab.gruppen PLM 20000Q
+    supports: &plm_20000q
+      [set_power, get_power, get_bundle_version, get_hardware_id, get_preset_name, recall_preset, store_preset,
+      set_frame_label, set_redundancy, factory_reset, soft_reset, set_iso_float, set_aes_termination,
+      set_breaker_current, set_breaker_type, set_latency_match, get_latency, get_route, get_bridge_mode,
+      set_load_speakers, set_power_channel_attenuation, set_power_channel_mute, set_dante_break_in, set_router_input,
+      get_router_input, force_input_priority, set_router_input_mute, get_input_sample_rate, get_meters, get_no_faults,
+      set_pilot_tone, get_pilot_tone_impedance, set_output_mute, set_output_gain, set_output_delay,
+      set_output_polarity, set_output_label, set_output_max_rms_level, set_output_max_rms_corner,
+      set_output_max_rms_attack, set_output_max_rms_release, set_output_max_peak_level, set_output_amp_gain,
+      set_output_vpl, set_output_vpl_profile, get_output_parameter, get_output_channels, set_input_mute,
+      set_input_gain, set_input_delay, set_input_polarity, set_input_label, set_module_label, set_module_selected,
+      query, send_message]
+    verification: none
+    notes: >
+      PLM Series, DLM versions 1 and 2 (meters need firmware 2.74 or later); modules A-B, power channels 1-4;
+      breaker emulation and mains monitoring are the 20000Q's own; pilot tone through PTG2 (firmware 2.99).
+  - id: plm-14000
+    name: Lab.gruppen PLM 14000
+    supports: &plm
+      [set_power, get_power, get_bundle_version, get_hardware_id, get_preset_name, recall_preset, store_preset,
+      set_frame_label, set_redundancy, factory_reset, soft_reset, set_iso_float, set_aes_termination,
+      set_latency_match, get_latency, get_route, get_bridge_mode, set_load_speakers, set_power_channel_attenuation,
+      set_power_channel_mute, set_dante_break_in, set_router_input, get_router_input, force_input_priority,
+      set_router_input_mute, get_input_sample_rate, get_meters, get_no_faults, set_pilot_tone,
+      get_pilot_tone_impedance, set_output_mute, set_output_gain, set_output_delay, set_output_polarity,
+      set_output_label, set_output_max_rms_level, set_output_max_rms_corner, set_output_max_rms_attack,
+      set_output_max_rms_release, set_output_max_peak_level, set_output_amp_gain, set_output_vpl,
+      set_output_vpl_profile, get_output_parameter, get_output_channels, set_input_mute, set_input_gain,
+      set_input_delay, set_input_polarity, set_input_label, set_module_label, set_module_selected, query,
+      send_message]
+    verification: none
+    notes: PLM Series, DLM versions 1 and 2 (meters need firmware 2.74 or later); modules A-B, power channels 1-4.
+  - id: plm-10000q
+    name: Lab.gruppen PLM 10000Q
+    supports: *plm
+    verification: none
+    notes: PLM Series, DLM versions 1 and 2 (meters need firmware 2.74 or later); modules A-B, power channels 1-4.
+  - id: lm-44
+    name: Lake LM 44
+    supports: &lm
+      [set_power, get_power, get_bundle_version, get_hardware_id, get_preset_name, recall_preset, store_preset,
+      set_frame_label, set_redundancy, factory_reset, soft_reset, reset_to_contour, reset_to_mesa,
+      set_iso_float_inputs, set_iso_float_outputs, set_aes_termination, set_latency_match, set_gpi_config,
+      get_gpi_state, set_gpo_config, get_gpo_state, set_router_input, get_router_input, force_input_priority,
+      set_router_input_mute, get_input_sample_rate, get_meters, get_no_faults, set_output_mute, set_output_gain,
+      set_output_delay, set_output_polarity, set_output_label, set_output_max_rms_level, set_output_max_rms_corner,
+      set_output_max_rms_attack, set_output_max_rms_release, set_output_max_peak_level, get_output_parameter,
+      get_output_channels, set_input_mute, set_input_gain, set_input_delay, set_input_polarity, set_input_label,
+      set_input_mixer_gain, set_module_label, set_module_selected, query, send_message]
+    verification: none
+    notes: LM Series processor, DLM version 2 (firmware 0.32 and later); modules A-B, no amplifier.
+  - id: lm-26
+    name: Lake LM 26
+    supports: *lm
+    verification: none
+    notes: LM Series processor, DLM version 2 (firmware 0.32 and later); modules A-B, no amplifier.
+
+commands:
+  set_power:
+    summary: "Switch the frame on or to standby (Dev.Power=1 or 0); a frame already in that state is success too"
+    params:
+      powered: { type: bool, required: true, label: Power, description: "On powers the frame up, off puts it in standby." }
+    returns: ack
+  get_power:
+    summary: "Read the desired power state (Dev.Power?): 1 on, 0 standby"
+    returns: value
+  get_model_name:
+    summary: "Read the frame's model name (Dev.ModelName?), e.g. D80:4L or 20K44"
+    returns: value
+  get_bundle_version:
+    summary: "Read the firmware bundle (.lkc) version (Dev.BundleVer?)"
+    returns: value
+  get_hardware_id:
+    summary: "Read the frame id (Dev.Network.ID?), xxxxxxxx:xxxxxxxx"
+    returns: value
+  get_preset_name:
+    summary: "Read a stored frame preset's name (Dev.Preset.Name?)"
+    params:
+      preset: &preset { type: int, min: 1, max: 100, required: true, label: Preset,
+                        description: "Frame preset number, 1 to 100." }
+    returns: value
+  recall_preset:
+    summary: "Recall a frame preset (Dev.Preset.Recall!); answered once every DSP parameter is set"
+    params:
+      preset: *preset
+    returns: ack
+  store_preset:
+    summary: "Store the current configuration as a frame preset (Dev.Preset.Store!), overwriting what is there"
+    params:
+      preset: *preset
+      name: { type: string, required: true, max_length: 64, pattern: "^[ -~]+$", label: Name,
+              description: "Preset name, up to 64 printable ASCII characters." }
+    returns: ack
+  set_frame_label:
+    summary: "Set the frame label (Dev.FrameLabel=)"
+    params:
+      label: { type: string, required: true, max_length: 30, pattern: "^[ -~]*$", label: Label,
+               description: "Frame label, up to 30 printable ASCII characters." }
+    returns: ack
+  set_redundancy:
+    summary: "Switch dual network redundancy (Dev.Network.Redund=)"
+    params:
+      enabled: &enabled { type: bool, required: true, label: Enabled, description: "On enables it, off disables it." }
+    returns: ack
+  factory_reset:
+    summary: "Reset the frame to factory settings (Dev.Reset.Factory!)"
+    returns: ack
+  soft_reset:
+    summary: "Reset the processing to defaults (Dev.Reset.Soft!)"
+    returns: ack
+  reset_to_contour:
+    summary: "Reset the processing to Contour mode (Dev.Reset.Contour!, LM firmware 1.00)"
+    returns: ack
+  reset_to_mesa:
+    summary: "Reset the processing to Mesa mode (Dev.Reset.Mesa!, LM firmware 1.00)"
+    returns: ack
+  set_iso_float:
+    summary: "Set the ISO-float setting (Dev.IsoFloat=): floating or grounded"
+    params:
+      grounded: &grounded { type: bool, required: true, label: Grounded, description: "On grounds, off floats." }
+    returns: ack
+  set_iso_float_inputs:
+    summary: "Set the inputs floating or grounded (Dev.IsoFloatInputs=)"
+    params:
+      grounded: *grounded
+    returns: ack
+  set_iso_float_outputs:
+    summary: "Set the outputs floating or grounded (Dev.IsoFloatOutputs=)"
+    params:
+      grounded: *grounded
+    returns: ack
+  set_aes_termination:
+    summary: "Terminate the AES loop or leave it unterminated (Dev.AesLoopTermination=)"
+    params:
+      terminated: { type: bool, required: true, label: Terminated, description: "On terminates the AES loop, off leaves it unterminated." }
+    returns: ack
+  set_breaker_current:
+    summary: "Set the breaker emulation's nominal mains current (Dev.Fuse.NominalCurrent=)"
+    params:
+      current_a: { type: float, min: 1, max: 32, required: true, label: Current,
+                   description: "Nominal mains breaker current in A, one decimal; 5-32 in DLM v3.4, 1-32 from Lake Controller 7 on D Series and PLM+." }
+    returns: ack
+  set_breaker_type:
+    summary: "Set the breaker emulation type (Dev.Fuse.Type=)"
+    params:
+      type: { type: enum, values: [conservative, fast, universal], required: true, label: Breaker type,
+              description: "Conservative, fast or universal breaker emulation." }
+    returns: ack
+  set_latency_match:
+    summary: "Switch latency match mode (Dev.LatencyMatch=)"
+    params:
+      enabled: *enabled
+    returns: ack
+  get_latency:
+    summary: "Read a power channel's total latency, amplifier and Lake (Dev.Latency?), in ms"
+    params:
+      power_channel: &power_channel { type: int, min: 1, max: 4, required: true, label: Power channel,
+                                      description: "Amplifier output channel, 1 to 4." }
+    returns: value
+  get_route:
+    summary: "Read which power outputs a module's processing channel feeds (Dev.Route?): X for routed, per output"
+    params:
+      module: &module_req { type: enum, values: [A, B, C, D], required: true, label: Module,
+                            description: "Lake module: A-D on D Series and PLM+, A-B on PLM and LM." }
+      channel: &channel_req { type: int, min: 1, max: 6, required: true, label: Channel,
+                              description: "Module output (processing) channel, 1 to 6." }
+    returns: value
+  get_bridge_mode:
+    summary: "Read whether a channel pair is bridged (Dev.BridgeMode?)"
+    params:
+      pair: { type: int, min: 1, max: 2, required: true, label: Channel pair, description: "Power channel pair, 1 (channels 1-2) or 2 (3-4)." }
+    returns: value
+  set_load_speakers:
+    summary: "Set the number of loudspeakers on a power channel, for load monitoring (Dev.Load.Speakers=)"
+    params:
+      power_channel: *power_channel
+      count: { type: int, min: 1, max: 4, required: true, label: Speakers, description: "Loudspeakers connected to the channel, 1 to 4." }
+    returns: ack
+  set_power_channel_attenuation:
+    summary: "Set a power channel's attenuation (Dev.Pwr.Attenuation=)"
+    params:
+      power_channel: *power_channel
+      attenuation_db: { type: float, min: -100, max: 0, required: true, label: Attenuation,
+                        description: "Attenuation in dB, -100 to 0 in 0.25 dB steps." }
+    returns: ack
+  set_power_channel_mute:
+    summary: "Mute or unmute a power channel (Dev.Pwr.Mute=)"
+    params:
+      power_channel: *power_channel
+      muted: &muted { type: bool, required: true, label: Mute, description: "On mutes, off unmutes." }
+    returns: ack
+  set_gpi_config:
+    summary: "Set what a GPI does when closed and opened (Dev.GPI.Config=); both actions of one kind"
+    params:
+      gpi: &gpi { type: int, min: 1, max: 2, required: true, label: GPI, description: "General purpose input, 1 or 2." }
+      closed_action: &gpi_action { type: enum, required: true, label: Action when closed,
+                                   values: [ToggleMute, Mute, Unmute, ToggleStandby, Standby, "On", Recall99, Recall100, NoAction],
+                                   description: "Protective mute (ToggleMute, Mute, Unmute), standby (ToggleStandby, Standby, On), preset recall (Recall99, Recall100), or NoAction." }
+      opened_action: { type: enum, required: true, label: Action when opened,
+                       values: [ToggleMute, Mute, Unmute, ToggleStandby, Standby, "On", Recall99, Recall100, NoAction],
+                       description: "As the closed action, and of the same kind." }
+    returns: ack
+  get_gpi_state:
+    summary: "Read a GPI (Dev.GPI.State?): Open or Closed"
+    params:
+      gpi: *gpi
+    returns: value
+  set_gpo_config:
+    summary: "Set what a GPO indicates when closed (Dev.GPO.Config=)"
+    params:
+      gpo: &gpo { type: int, min: 1, max: 2, required: true, label: GPO, description: "General purpose output, 1 or 2." }
+      indication: { type: enum, required: true, label: Indication,
+                    values: [Muted, Unmuted, Standby, "On", NoFault, Fault, NotReady, Ready, NoInd],
+                    description: "The state the output closes on: muted or unmuted, standby or on, fault or none, ready or not, or no indication." }
+    returns: ack
+  get_gpo_state:
+    summary: "Read a GPO (Dev.GPO.State?): Open or Closed"
+    params:
+      gpo: *gpo
+    returns: value
+  set_dante_break_in:
+    summary: "Send an input or a voltage or current probe out on a Dante transmitter channel (Dev.Dante.BreakIn=)"
+    params:
+      transmitter: { type: int, min: 1, max: 2, required: true, label: Dante transmitter, description: "Dante transmit channel, 1 or 2." }
+      source: { type: enum, values: [Analog, AES, Probe, Empty], required: true, label: Source,
+                description: "An analog or AES input, an amplifier probe, or nothing." }
+      channel: { type: int, min: 1, max: 2, default: 1, label: Channel, description: "Input or probe channel, 1 or 2." }
+      probe: { type: enum, values: [U, I], default: U, label: Probe, description: "For a probe: U for voltage, I for current." }
+      power_channel: { type: int, min: 1, max: 4, default: 1, label: Power channel, description: "For a probe: the amplifier channel probed, 1 to 4." }
+    returns: ack
+  set_router_input:
+    summary: >
+      Set one priority of an input router (Dev.Router.InputTypSel=): the source type, its channel and optionally its
+      sensitivity; an analog source at a priority needs every lower priority Empty
+    params:
+      input: &router_input { type: int, min: 1, max: 8, required: true, label: Router input,
+                             description: "Input router: 1-2 on PLM, 1-4 on D Series and PLM+, 1-8 on LM." }
+      priority: { type: int, min: 1, max: 4, required: true, label: Priority, description: "Priority slot, 1 (highest) to 4." }
+      type: { type: enum, values: [Analog, AES, Dante, Empty], required: true, label: Source type,
+              description: "Analog, AES or Dante input, or Empty." }
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel,
+                 description: "Source channel: analog 1-2, AES 1-4, Dante 1-8 (D Series and PLM+)." }
+      sensitivity: { type: float, min: -100, max: 26, label: Sensitivity,
+                     description: "12 or 26 dBu for analog, -100 to 15 dB for AES and Dante; 26 dBu and 0 dB when not given." }
+    returns: ack
+  get_router_input:
+    summary: "Read one priority of an input router (Dev.Router.InputTypSel?): type, channel, sensitivity and Dante name"
+    params:
+      input: *router_input
+      priority: { type: int, min: 1, max: 4, required: true, label: Priority, description: "Priority slot, 1 (highest) to 4." }
+    returns: value
+  force_input_priority:
+    summary: "Force an input router to one priority, or back to automatic selection (Dev.Router.ForceInputPriority=)"
+    params:
+      input: *router_input
+      priority: { type: int, min: 0, max: 4, required: true, label: Priority, description: "0 selects automatically by priority, 1-4 forces that priority." }
+    returns: ack
+  set_router_input_mute:
+    summary: "Mute or unmute an input router (Dev.Router.InputMute=)"
+    params:
+      input: *router_input
+      muted: *muted
+    returns: ack
+  get_input_sample_rate:
+    summary: "Read an AES (or on LM, Dante) input's sample rate (Dev.Route.InputSR?), in kHz; 00.0 without input"
+    params:
+      type: { type: enum, values: [AES, Dante], required: true, label: Input type, description: "AES, or Dante on LM." }
+      channel: { type: int, min: 1, max: 8, required: true, label: Channel, description: "Input channel: 1-2 on PLM, 1-4 on D Series and PLM+ and LM, 1-8 for AES on LM 44." }
+    returns: value
+  get_meters:
+    summary: "Read the full meter data now (Dev.MD.FullBin), decoded as under state meters; the frame must be on"
+    returns: value
+  get_no_faults:
+    summary: "Read whether any fault is present (Dev.MD.NoFaults?): 1 none, 0 faults; the frame must be on"
+    returns: value
+  set_load_pilot:
+    summary: "Switch LoadPilot's pilot tones on a power channel (Dev.LoadPilot.Enable=)"
+    params:
+      power_channel: *power_channel
+      enabled: *enabled
+    returns: ack
+  get_load_pilot_readings:
+    summary: "Read LoadPilot's last impedances (ohm) and currents (mA) of both tones on a power channel (Dev.LoadPilot.Readings?)"
+    params:
+      power_channel: *power_channel
+    returns: value
+  set_load_pilot_signal:
+    summary: "Set LoadPilot's tone amplitudes on a power channel (Dev.LoadPilot.Signal=); the tones are fixed at 10 Hz and 24 kHz"
+    params:
+      power_channel: *power_channel
+      tone_1_amplitude_v: { type: float, min: 0, max: 2, required: true, label: Tone 1 amplitude, description: "10 Hz tone amplitude in V, 0 to 2, three decimals." }
+      tone_2_amplitude_v: { type: float, min: 0, max: 2, required: true, label: Tone 2 amplitude, description: "24 kHz tone amplitude in V, 0 to 2, three decimals." }
+    returns: ack
+  set_load_pilot_thresholds:
+    summary: "Set LoadPilot's impedance thresholds on a power channel (Dev.LoadPilot.Threshold=)"
+    params:
+      power_channel: *power_channel
+      tone_1_lower_ohm: &ohm { type: float, min: 0, max: 10000, required: true, label: Tone 1 lower threshold, description: "Impedance in ohm, 0 to 10000, two decimals." }
+      tone_2_lower_ohm: { type: float, min: 0, max: 10000, required: true, label: Tone 2 lower threshold, description: "Impedance in ohm, 0 to 10000, two decimals." }
+      tone_1_upper_ohm: { type: float, min: 0, max: 10000, required: true, label: Tone 1 upper threshold, description: "Impedance in ohm, 0 to 10000, two decimals." }
+      tone_2_upper_ohm: { type: float, min: 0, max: 10000, required: true, label: Tone 2 upper threshold, description: "Impedance in ohm, 0 to 10000, two decimals." }
+    returns: ack
+  set_pilot_tone:
+    summary: "Switch pilot tone generation on a power channel (Dev.PTG.Active=, Dev.PTG2.Active= on the PLM 20000Q)"
+    params:
+      power_channel: *power_channel
+      active: { type: bool, required: true, label: Active, description: "On generates the pilot tone, off stops it; configure it first." }
+    returns: ack
+  get_pilot_tone_impedance:
+    summary: "Read a power channel's measured load impedance (Dev.PTG.Impedance?), in ohm, ? when not measured"
+    params:
+      power_channel: *power_channel
+    returns: value
+  set_output_mute:
+    summary: "Mute or unmute a module output channel (Mod.Out.Mute=)"
+    params:
+      module: &module { type: enum, values: [A, B, C, D], label: Module,
+                        description: "Lake module: A-D on D Series and PLM+, A-B on PLM and LM; give it with channel, or give power_channel." }
+      channel: &channel { type: int, min: 1, max: 6, label: Channel,
+                          description: "Module output channel, 1 to 6; give it with module, or give power_channel." }
+      power_channel: &by_power { type: int, min: 1, max: 4, label: Power channel,
+                                 description: "On D Series and PLM+, the output routed to this power channel, in place of module and channel." }
+      muted: *muted
+    returns: ack
+  set_output_gain:
+    summary: "Set a module output channel's gain (Mod.Out.Gain=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      gain_db: { type: float, min: -100, max: 20, required: true, label: Gain, description: "Gain in dB, -100 to +20, two decimals." }
+    returns: ack
+  set_output_delay:
+    summary: "Set a module output channel's delay (Mod.Out.Delay=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      delay_ms: { type: float, min: 0, max: 100, required: true, label: Delay, description: "Delay in ms, 0 to 100, two decimals." }
+    returns: ack
+  set_output_polarity:
+    summary: "Set a module output channel's polarity (Mod.Out.Phase=: 1 positive, 0 negative)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      inverted: &inverted { type: bool, required: true, label: Invert, description: "On inverts the polarity (negative), off is positive." }
+    returns: ack
+  set_output_label:
+    summary: "Set a module output channel's label (Mod.Out.Label=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      label: &label32 { type: string, required: true, max_length: 32, pattern: "^[ -~]*$", label: Label,
+                        description: "Label, up to 32 printable ASCII characters." }
+    returns: ack
+  set_output_max_rms_level:
+    summary: "Set a module output channel's MaxRMS limiter level (Mod.Out.MaxRMSLvl=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      level_db: { type: float, min: -30, max: 30, required: true, label: Level, description: "MaxRMS level in dB, -30 to +30." }
+    returns: ack
+  set_output_max_rms_corner:
+    summary: "Set a module output channel's MaxRMS corner (Mod.Out.MaxRMSCor=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      corner_db: { type: float, min: -100, max: 0, required: true, label: Corner, description: "MaxRMS corner in dB, -100 to 0." }
+    returns: ack
+  set_output_max_rms_attack:
+    summary: "Set a module output channel's MaxRMS attack time (Mod.Out.MaxRMSAtk=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      attack_ms: { type: float, min: 1, max: 500, required: true, label: Attack, description: "Attack time in ms, 1 to 500." }
+    returns: ack
+  set_output_max_rms_release:
+    summary: "Set a module output channel's MaxRMS release time (Mod.Out.MaxRMSRel=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      release_ms: { type: float, min: 1, max: 500, required: true, label: Release, description: "Release time in ms, 1 to 500." }
+    returns: ack
+  set_output_max_peak_level:
+    summary: "Set a module output channel's MaxPeak limiter level (Mod.Out.MaxPeakLvl=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      level_db: { type: float, min: -30, max: 30, required: true, label: Level, description: "MaxPeak level in dB, -30 to +30." }
+    returns: ack
+  set_output_amp_gain:
+    summary: "Set the amplifier gain of a module output channel (Mod.Out.AmpGain=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      gain_db: { type: int, min: 22, max: 44, required: true, label: Amplifier gain, description: "Amplifier gain in whole dB, 22 to 44." }
+    returns: ack
+  set_output_vpl:
+    summary: "Set the voltage peak limit of a module output channel (Mod.Out.AmpVPL=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      vpl_v: { type: float, min: 17.8, max: 193, required: true, label: VPL, description: "Desired voltage peak limit in V, 17.8 to 193.0, one decimal." }
+    returns: ack
+  set_output_vpl_profile:
+    summary: "Set the voltage peak limit profile of a module output channel (Mod.Out.VPLProfile=)"
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      profile: { type: enum, values: [universal, sub_lf, sub, lf, mf, hf], required: true, label: VPL profile,
+                 description: "Universal, Sub/LF, Sub, LF, MF or HF." }
+    returns: ack
+  get_output_parameter:
+    summary: >
+      Read one parameter of a module output channel (Mod.Out.<parameter>?); levels and times answer with their group
+      sum and limits after the value, AmpVPL with its limits and the actual VPL, Phase with its lock
+    params:
+      module: *module
+      channel: *channel
+      power_channel: *by_power
+      parameter: { type: enum, required: true, label: Parameter,
+                   values: [Mute, Gain, Delay, MaxRMSLvl, MaxRMSCor, MaxRMSAtk, MaxRMSRel, MaxPeakLvl, Phase, Label, AmpGain, AmpVPL, VPLProfile],
+                   description: "The output parameter to read, by its DLM name." }
+    returns: value
+  get_output_channels:
+    summary: "Read how many output channels a module has (Mod.Out.Chans?)"
+    params:
+      module: *module_req
+    returns: value
+  set_input_mute:
+    summary: "Mute or unmute a module input (Mod.In.Mute=)"
+    params:
+      module: &in_module { type: enum, values: [A, B, C, D], label: Module,
+                           description: "Lake module: A-D on D Series and PLM+, A-B on PLM and LM; or give power_channel." }
+      power_channel: *by_power
+      muted: *muted
+    returns: ack
+  set_input_gain:
+    summary: "Set a module input's gain (Mod.In.Gain=)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      gain_db: { type: float, min: -100, max: 15, required: true, label: Gain, description: "Gain in dB, -100 to +15, two decimals." }
+    returns: ack
+  set_input_delay:
+    summary: "Set a module input's delay (Mod.In.Delay=)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      delay_ms: { type: float, min: 0, max: 1800, required: true, label: Delay, description: "Delay in ms, 0 to 1800, two decimals." }
+    returns: ack
+  set_input_polarity:
+    summary: "Set a module input's polarity (Mod.In.Phase=: 1 positive, 0 negative)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      inverted: *inverted
+    returns: ack
+  set_input_label:
+    summary: "Set a module input's label (Mod.In.Label=)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      label: *label32
+    returns: ack
+  set_input_mixer_gain:
+    summary: "Set the gain of an input router into a module's input mixer (Mod.In.MixerGain=)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      router: { type: int, min: 1, max: 4, required: true, label: Router, description: "Input router feeding the mixer, 1 to 4." }
+      gain_db: { type: float, min: -100, max: 15, required: true, label: Gain, description: "Mixer gain in dB, -100 to +15, two decimals." }
+    returns: ack
+  set_module_label:
+    summary: "Set a module's label (Mod.Mod.Label=)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      label: *label32
+    returns: ack
+  set_module_selected:
+    summary: "Mark a module selected, as Lake Controller and the front panel show it (Mod.Mod.Selected=)"
+    params:
+      module: *in_module
+      power_channel: *by_power
+      selected: { type: bool, required: true, label: Selected, description: "On marks the module selected, off clears it." }
+    returns: ack
+  query:
+    summary: "Read anything DLM documents by its path and arguments (<path>?<args>); returns the answer text"
+    params:
+      path: { type: string, required: true, max_length: 64, pattern: "^(Dev|Mod)\\.[A-Za-z0-9.]+$", label: Path,
+              description: "The DLM path, e.g. Dev.Out.Route or Mod.In.Delay." }
+      args: { type: string, default: "", max_length: 100, pattern: "^[A-Za-z0-9#. -]*$", label: Arguments,
+              description: "Arguments as the document gives them, separated by single spaces, e.g. PC 1 Analog." }
+    returns: value
+  send_message:
+    summary: >
+      Send any DLM command text as written (Path?args, Path=args or Path!args); a get returns the answer text, a set
+      or do is acknowledged
+    params:
+      message: { type: string, required: true, max_length: 500, pattern: "^(Dev|Mod)\\.[ -~]+$", label: Message,
+                 description: "The command text, e.g. Dev.Out.Route=PC 1 Analog XX----." }
+    returns: value
+
+state:
+  device.frame_id:                  { type: string, description: "Frame id, xxxxxxxx:xxxxxxxx" }
+  device.model_name:                { type: string, description: "Model name (Dev.ModelName, D Series and PLM+)" }
+  device.bundle_version:            { type: string, description: "Firmware bundle version" }
+  device.ip_address:                { type: string, description: "IP address" }
+  device.mac_address:               { type: string, description: "MAC address" }
+  device.dante_enabled:             { type: bool, description: "Dante is enabled" }
+  device.power:                     { type: bool, description: "Desired power state: true on, false standby" }
+  device.frame_label:               { type: string, description: "Frame label" }
+  device.latency_match:             { type: bool, description: "Latency match mode on" }
+  device.no_faults:                 { type: bool, description: "No fault is present (Dev.MD.NoFaults; valid while the frame is on)" }
+  power_channels.*.mute:            { type: bool, description: "Power channel 1-4 muted" }
+  power_channels.*.attenuation_db:  { type: float, unit: dB, description: "Power channel attenuation, -100 to 0" }
+  router_inputs.*.mute:             { type: bool, description: "Input router muted" }
+  router_inputs.*.active_priority:  { type: int, description: "Input router's active priority, 1-4" }
+  modules.*.output_channels:        { type: int, description: "Module output channels, 1-6 (module A-D)" }
+  modules.*.label:                  { type: string, description: "Module label" }
+  modules.*.input.mute:             { type: bool, description: "Module input muted" }
+  modules.*.input.gain_db:          { type: float, unit: dB, description: "Module input gain, -100 to 15" }
+  modules.*.input.delay_ms:         { type: float, unit: ms, description: "Module input delay, 0 to 1800" }
+  modules.*.input.polarity_positive: { type: bool, description: "Module input polarity positive, after a set" }
+  modules.*.input.label:            { type: string, description: "Module input label, after a set" }
+  modules.*.outputs.*.mute:         { type: bool, description: "Module output channel muted" }
+  modules.*.outputs.*.gain_db:      { type: float, unit: dB, description: "Module output channel gain, -100 to 20" }
+  modules.*.outputs.*.delay_ms:     { type: float, unit: ms, description: "Module output channel delay, 0 to 100" }
+  modules.*.outputs.*.label:        { type: string, description: "Module output channel label" }
+  modules.*.outputs.*.polarity_positive: { type: bool, description: "Output polarity positive, after a set" }
+  modules.*.outputs.*.max_rms_level_db: { type: float, unit: dB, description: "MaxRMS level, after a set" }
+  modules.*.outputs.*.max_rms_corner_db: { type: float, unit: dB, description: "MaxRMS corner, after a set" }
+  modules.*.outputs.*.max_rms_attack_ms: { type: float, unit: ms, description: "MaxRMS attack, after a set" }
+  modules.*.outputs.*.max_rms_release_ms: { type: float, unit: ms, description: "MaxRMS release, after a set" }
+  modules.*.outputs.*.max_peak_level_db: { type: float, unit: dB, description: "MaxPeak level, after a set" }
+  modules.*.outputs.*.amp_gain_db:  { type: int, unit: dB, description: "Amplifier gain, after a set" }
+  modules.*.outputs.*.vpl_v:        { type: float, unit: V, description: "Desired voltage peak limit, after a set" }
+  modules.*.outputs.*.vpl_profile:  { type: int, description: "VPL profile 0-5 (universal, sub/LF, sub, LF, MF, HF), after a set" }
+  meters.amp:                       { type: object, description: "Amp status (Appendix B 9.2.2.2): power_on, psu_failure, pal, audio_in_fault, psu_temperature and dsp_temperature (ok, warning, fault), load_monitor_active, protect, sense_warning" }
+  meters.power_channels.*:          { type: object, description: "Per power channel 1-4: status flags (service, vhf, short_circuit, temperature, open_load, voltage_clip, current_clip, load_correct, load_wrong, load_not_verified, cal_active), voltage_rms_db, power_db, voltage_db and current_db relative to the channel's maximum, gain_reduction_db; peak and hold since the last read" }
+  meters.status:                    { type: object, description: "The frame's status bits: network links, controller present, clock slips, Dante leader and Dante module faults (D Series and PLM+), protective mute, fan and temperature (LM)" }
+  meters.inputs.*:                  { type: object, description: "Physical input peak_dbfs and rms_dbfs (1-4 on D Series and PLM+, 1-2 on PLM); -128 means below -127 dBFS" }
+  meters.modules.*:                 { type: object, description: "Per module: input_meter (peak_dbfs, rms_dbfs), and on D Series and PLM+ router_connected and clip (outputs, router, input), on PLM inputs_connected and clip.outputs" }
+  meters.outputs.*:                 { type: object, description: "Output channel meters as the structure numbers them: peak_dbfs and rms_dbfs (D Series, PLM+, LM), gain_reduction_peak_db and gain_reduction_rms_db" }
+  meters.router_outputs.*:          { type: object, description: "LM: input router outputs 1-4, peak_dbfs and rms_dbfs" }
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      recall_preset mutes the audio for about a second while every DSP parameter is set, every time, even when the
+      same preset is recalled again (DLM FAQ 11); the frame does not know which preset is active (FAQ 9). store_preset
+      overwrites the stored preset, factory_reset and soft_reset discard the frame's configuration, and
+      reset_to_contour and reset_to_mesa change the LM's processing mode. None can be undone from here.
+  - models: [all]
+    severity: critical
+    text: >
+      Lake Controller 8's release notes list a known issue: invalid DLM messages can reset the device. D Series and
+      PLM+ firmware 2.50 or later is recommended for third-party control. The typed commands check their parameters
+      before sending, but query and send_message send what they are given, and DLM itself accepts out-of-range
+      values (its disclaimer, 1.2): use them with care on a live system.
+  - models: [all]
+    severity: warning
+    text: >
+      Any host on the subnet can control the frame: DLM has no authentication, and the controller must be on the
+      same subnet (FAQ 17). Frames default to link-local addressing (Zero-Conf), so their IP address can change at
+      each start; the frame id stays.
+  - models: [all]
+    severity: warning
+    text: >
+      Fixed answer port mode answers on UDP 6004 of this computer, which only one program can hold, and Lake
+      Controller itself uses it; the default, dynamic mode (6016), works beside Lake Controller.
+  - models: [all]
+    severity: info
+    text: >
+      Without the frame_id setting, the module asks the device at the given address for its frame id
+      (Dev.Network.ID?, sent to that address with the broadcast id and class) and takes the id from the answer's
+      source, as the document's example application does, then addresses the frame by it.
+  - models: [all]
+    severity: info
+    text: >
+      Nothing is pushed. While monitored the module reads the meters and the fault flag every meter_poll_ms, and every
+      parameter_poll_ms the power state, frame label, power channel mutes and attenuations, input router mutes and
+      active priorities, and each module's label, input mute, gain and delay and each output channel's mute, gain,
+      delay and label (for the channel count Mod.Out.Chans gives). One request is in flight at a time, commands
+      ahead of polls; a round is not started while the last is still being read.
+  - models: [all]
+    severity: info
+    text: >
+      The document gives a get's answer as the value or values alone (levels and times add their group sum and
+      limits after the value). The module takes the first word for numbers and switches; if a device answers with
+      the command echoed (path, operator and arguments), they are removed first. Text values (labels) are taken whole.
+  - models: [all]
+    severity: info
+    text: >
+      Meters are peak and hold (the worst value since the last read). Levels are 0.5 dB steps from full scale; a
+      level of -128 means below -127 dBFS. Amplifier power, voltage and current are relative to the channel's
+      maximum and read -127 dB from -127 to -60 dB (Appendix B). Gain reduction is read at 0.1 dB a step, as the
+      version 1 table and the peak values give it; the document's RMS gain reduction text says 0.5 dB a step.
+  - models: [all]
+    severity: info
+    text: >
+      Acknowledgement results other than -2 (success) fail the command with the code: -3 not master, -4 invalid
+      packet, -5 DSP error, -6 bad parameters (6.2, read in the order the table's columns give, which are
+      misaligned in the document); Dev.Power's -20 (already on) and -21 (already in standby) count as success. The
+      document's FAQ 7 calls the codes other than -2 internal and advises sending again; the module does not resend.
+  - models: [all]
+    severity: info
+    text: >
+      Three requests in a row without an answer (1 s each; 5 s for a preset recall or store) are taken as a lost
+      device, which is probed again every 2 s. Opened for commands only, the module reads nothing but asks
+      Dev.Power? after 3 s without traffic, as DLM has no presence signal.
+  - models: [plm-20000q, plm-14000, plm-10000q]
+    severity: info
+    text: >
+      PLM Series meters use the version 2 structure (Dev.MD.FullBin?2), which needs firmware 2.74; older firmware
+      answers only version 1, which the module does not request. Power channel attenuation and mute need firmware
+      2.98, the load speaker count 2.94, Dante break-in 2.79 and redundancy 4.33.
+  - models: [d-40-4l, d-20-4l, d-10-4l]
+    severity: warning
+    text: >
+      DLM v3.4 lists no product code for the D Series Slimline models (D 10:4L, D 20:4L, D 40:4L), which came later;
+      they run the same Lake platform and are assumed to answer as the D Series. Lake Controller 7's notes refer to
+      a later DLM document for up to eight Dante probes on some models, which is not public.

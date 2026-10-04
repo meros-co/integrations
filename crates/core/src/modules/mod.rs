@@ -56,6 +56,8 @@ mod generic_osc;
 mod generic_tcp_udp;
 #[cfg(feature = "http-snapshot")]
 mod http_snapshot;
+#[cfg(feature = "labgruppen-lake")]
+mod lake_dlm;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
 #[cfg(feature = "novastar-h")]
@@ -211,6 +213,8 @@ pub(crate) fn construct(
                     .into(),
             ),
         },
+        #[cfg(feature = "labgruppen-lake")]
+        "labgruppen-lake" => Ok(Box::new(lake_dlm::LakeDlm::new(context)?)),
         #[cfg(feature = "emberplus")]
         "emberplus" => Ok(Box::new(emberplus::EmberPlus::new(context))),
         #[cfg(feature = "probel-swp08")]

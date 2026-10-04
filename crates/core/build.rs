@@ -94,6 +94,10 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
     ("vendor-h2r", &["h2r-graphics"]),
     ("vendor-highend", &["highend-hog4"]),
     ("vendor-kramer", &["kramer-p3000"]),
+    (
+        "vendor-labgruppen",
+        &["labgruppen-lake", "labgruppen-nlb60e"],
+    ),
     ("vendor-lawo", &["emberplus"]),
     ("vendor-lightware", &["lightware-lw2", "lightware-lw3"]),
     ("vendor-ma-lighting", &["grandma2", "grandma3"]),
