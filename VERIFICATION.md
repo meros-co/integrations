@@ -270,8 +270,11 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-atem — Blackmagic ATEM
 
-- [ ] Check how many simultaneous connections the switcher accepts and how long a dropped connection holds its place. ([specs/blackmagic-atem.yaml:1150](specs/blackmagic-atem.yaml#L1150))
-- [ ] Confirm camera commands are acknowledged with no camera connected and that cameras.* reflects what a connected camera applied. ([specs/blackmagic-atem.yaml:1204](specs/blackmagic-atem.yaml#L1204))
+- [ ] Check how many simultaneous connections the switcher accepts and how long a dropped connection holds its place. ([specs/blackmagic-atem.yaml:1151](specs/blackmagic-atem.yaml#L1151))
+- [ ] Confirm camera commands are acknowledged with no camera connected and that cameras.* reflects what a connected camera applied. ([specs/blackmagic-atem.yaml:1205](specs/blackmagic-atem.yaml#L1205))
+- [ ] Confirm the switcher advertises `_blackmagic._tcp` with TXT `class=AtemSwitcher` ([crates/core/src/mdns.rs:118](crates/core/src/mdns.rs#L118)) and `_switcher_ctrl._udp` ([crates/core/src/mdns.rs:123](crates/core/src/mdns.rs#L123)), as Companion's ATEM module browses for, and from which firmware on; record which models (Mini, Television Studio, Constellation) do.
+- [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
+- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
 ## blackmagic-camera — Blackmagic cameras
 
@@ -285,34 +288,42 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether a clip path in a folder must be sent with "/" encoded as %2F. ([specs/blackmagic-camera.yaml:2861](specs/blackmagic-camera.yaml#L2861))
 - [ ] Check whether preset names for save_preset and delete_preset include the .cset extension. ([specs/blackmagic-camera.yaml:2862](specs/blackmagic-camera.yaml#L2862))
 - [ ] Confirm set_custom_platform is accepted with application/xml and the XML on one line. ([specs/blackmagic-camera.yaml:2871](specs/blackmagic-camera.yaml#L2871))
+- [ ] Record what the camera advertises over mDNS besides its `<name>.local` host name (service types, TXT `class`). No public source names it, so mDNS discovery does not identify cameras. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
 
 ## blackmagic-hyperdeck — Blackmagic HyperDeck
 
-- [ ] Record the reply shape that carries the format token after format_prepare. ([specs/blackmagic-hyperdeck.yaml:2206](specs/blackmagic-hyperdeck.yaml#L2206))
-- [ ] Record the fields of the asynchronous notifications documented only by their notify switch (dropped frames, display timecode, timeline position, playrange, cache, dynamic range, slate, device info, nas). ([specs/blackmagic-hyperdeck.yaml:2145](specs/blackmagic-hyperdeck.yaml#L2145))
-- [ ] Check how protocol secure mode is reached, so credentials need not travel in plain text on 9993. ([specs/blackmagic-hyperdeck.yaml:2231](specs/blackmagic-hyperdeck.yaml#L2231))
-- [ ] Check which dynamic range spelling the deck accepts and reports (ST2084 or ST2048). ([specs/blackmagic-hyperdeck.yaml:2254](specs/blackmagic-hyperdeck.yaml#L2254))
-- [ ] Check whether "slate clips:" needs the colon (the table prints it without). ([specs/blackmagic-hyperdeck.yaml:2220](specs/blackmagic-hyperdeck.yaml#L2220))
-- [ ] Check what the combined goto forms with relative offsets are relative to. ([specs/blackmagic-hyperdeck.yaml:2169](specs/blackmagic-hyperdeck.yaml#L2169))
-- [ ] On protocol 1.8 and 1.11 decks, check which other documented commands work. ([specs/blackmagic-hyperdeck.yaml:2261](specs/blackmagic-hyperdeck.yaml#L2261))
-- [ ] Check how many clients may connect at once. ([specs/blackmagic-hyperdeck.yaml:2190](specs/blackmagic-hyperdeck.yaml#L2190))
+- [ ] Record the reply shape that carries the format token after format_prepare. ([specs/blackmagic-hyperdeck.yaml:2207](specs/blackmagic-hyperdeck.yaml#L2207))
+- [ ] Record the fields of the asynchronous notifications documented only by their notify switch (dropped frames, display timecode, timeline position, playrange, cache, dynamic range, slate, device info, nas). ([specs/blackmagic-hyperdeck.yaml:2146](specs/blackmagic-hyperdeck.yaml#L2146))
+- [ ] Check how protocol secure mode is reached, so credentials need not travel in plain text on 9993. ([specs/blackmagic-hyperdeck.yaml:2232](specs/blackmagic-hyperdeck.yaml#L2232))
+- [ ] Check which dynamic range spelling the deck accepts and reports (ST2084 or ST2048). ([specs/blackmagic-hyperdeck.yaml:2255](specs/blackmagic-hyperdeck.yaml#L2255))
+- [ ] Check whether "slate clips:" needs the colon (the table prints it without). ([specs/blackmagic-hyperdeck.yaml:2221](specs/blackmagic-hyperdeck.yaml#L2221))
+- [ ] Check what the combined goto forms with relative offsets are relative to. ([specs/blackmagic-hyperdeck.yaml:2170](specs/blackmagic-hyperdeck.yaml#L2170))
+- [ ] On protocol 1.8 and 1.11 decks, check which other documented commands work. ([specs/blackmagic-hyperdeck.yaml:2262](specs/blackmagic-hyperdeck.yaml#L2262))
+- [ ] Check how many clients may connect at once. ([specs/blackmagic-hyperdeck.yaml:2191](specs/blackmagic-hyperdeck.yaml#L2191))
+- [ ] Confirm the deck advertises `_hyperdeck_ctrl._tcp` (Companion's HyperDeck module browses it), that its SRV port is 9993, and whether it also advertises `_blackmagic._tcp` and with which TXT `class`. ([crates/core/src/mdns.rs:135](crates/core/src/mdns.rs#L135))
+- [ ] Record the TXT keys `_hyperdeck_ctrl._tcp` carries; if one names the model, discovery could narrow `models`, which it now never does for a HyperDeck. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
 ## blackmagic-multiview — Blackmagic MultiView 16 / MultiView 4
 
-- [ ] On MultiView 4, check which routing output is the solo source (wire 4 assumed) and whether its solo source can be set over Ethernet at all. ([specs/blackmagic-multiview.yaml:420](specs/blackmagic-multiview.yaml#L420))
-- [ ] Check that every CONFIGURATION line can be set by sending the block (the manual shows only Solo enabled being sent), and the boolean case the unit reports. ([specs/blackmagic-multiview.yaml:439](specs/blackmagic-multiview.yaml#L439))
-- [ ] Check how Output format values map on MultiView 4. ([specs/blackmagic-multiview.yaml:451](specs/blackmagic-multiview.yaml#L451))
-- [ ] Check whether the MultiView accepts F (force unlock) on VIDEO OUTPUT LOCKS. ([specs/blackmagic-multiview.yaml:460](specs/blackmagic-multiview.yaml#L460))
-- [ ] Confirm the MULTIVIEW DEVICE output count (16 in the manual's example, with 18 routing outputs). ([specs/blackmagic-multiview.yaml:393](specs/blackmagic-multiview.yaml#L393))
+- [ ] On MultiView 4, check which routing output is the solo source (wire 4 assumed) and whether its solo source can be set over Ethernet at all. ([specs/blackmagic-multiview.yaml:421](specs/blackmagic-multiview.yaml#L421))
+- [ ] Check that every CONFIGURATION line can be set by sending the block (the manual shows only Solo enabled being sent), and the boolean case the unit reports. ([specs/blackmagic-multiview.yaml:440](specs/blackmagic-multiview.yaml#L440))
+- [ ] Check how Output format values map on MultiView 4. ([specs/blackmagic-multiview.yaml:452](specs/blackmagic-multiview.yaml#L452))
+- [ ] Check whether the MultiView accepts F (force unlock) on VIDEO OUTPUT LOCKS. ([specs/blackmagic-multiview.yaml:461](specs/blackmagic-multiview.yaml#L461))
+- [ ] Confirm the MULTIVIEW DEVICE output count (16 in the manual's example, with 18 routing outputs). ([specs/blackmagic-multiview.yaml:394](specs/blackmagic-multiview.yaml#L394))
+- [ ] Confirm MultiView 4 advertises `_blackmagic._tcp` with TXT `class=MultiView` and `name=Blackmagic MultiView 4` (Companion's MultiView 4 module), and whether MultiView 16 uses the same class with `name=Blackmagic MultiView 16`. ([crates/core/src/mdns.rs:154](crates/core/src/mdns.rs#L154))
+- [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
 
 ## blackmagic-smartview — Blackmagic SmartView / SmartScope
 
-- [ ] Check that the monitor answers commands with ACK/NAK, answers header-only status requests and PING, as the Videohub protocol does. ([specs/blackmagic-smartview.yaml:389](specs/blackmagic-smartview.yaml#L389))
-- [ ] Check how the name is set (Name in the SMARTVIEW DEVICE block assumed). ([specs/blackmagic-smartview.yaml:389](specs/blackmagic-smartview.yaml#L389))
-- [ ] Record how WidescreenSD and Border are reported (case, ON/OFF or true/false). ([specs/blackmagic-smartview.yaml:418](specs/blackmagic-smartview.yaml#L418))
-- [ ] Check how a single-monitor model answers a MONITOR B block. ([specs/blackmagic-smartview.yaml:426](specs/blackmagic-smartview.yaml#L426))
-- [ ] On SmartView 4K, check MonitorInput (community-observed), and whether SmartView 4K G3 has it. ([specs/blackmagic-smartview.yaml:439](specs/blackmagic-smartview.yaml#L439))
-- [ ] Check whether SmartView 4K accepts contrast and saturation. ([specs/blackmagic-smartview.yaml:447](specs/blackmagic-smartview.yaml#L447))
+- [ ] Check that the monitor answers commands with ACK/NAK, answers header-only status requests and PING, as the Videohub protocol does. ([specs/blackmagic-smartview.yaml:390](specs/blackmagic-smartview.yaml#L390))
+- [ ] Check how the name is set (Name in the SMARTVIEW DEVICE block assumed). ([specs/blackmagic-smartview.yaml:390](specs/blackmagic-smartview.yaml#L390))
+- [ ] Record how WidescreenSD and Border are reported (case, ON/OFF or true/false). ([specs/blackmagic-smartview.yaml:419](specs/blackmagic-smartview.yaml#L419))
+- [ ] Check how a single-monitor model answers a MONITOR B block. ([specs/blackmagic-smartview.yaml:427](specs/blackmagic-smartview.yaml#L427))
+- [ ] On SmartView 4K, check MonitorInput (community-observed), and whether SmartView 4K G3 has it. ([specs/blackmagic-smartview.yaml:440](specs/blackmagic-smartview.yaml#L440))
+- [ ] Check whether SmartView 4K accepts contrast and saturation. ([specs/blackmagic-smartview.yaml:448](specs/blackmagic-smartview.yaml#L448))
+- [ ] Confirm current monitors advertise `_blackmagic._tcp` with TXT `class=SmartView` (Companion's SmartView module) ([crates/core/src/mdns.rs:142](crates/core/src/mdns.rs#L142)), whether SmartScope uses the same class, and whether older firmware advertises `_smartview._tcp` (smartview-client browses it) ([crates/core/src/mdns.rs:147](crates/core/src/mdns.rs#L147)).
+- [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
+- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
 ## blackmagic-streaming — Blackmagic Web Presenter / Streaming
 
@@ -321,6 +332,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check whether a unit can report more than two network interfaces. ([specs/blackmagic-streaming.yaml:657](specs/blackmagic-streaming.yaml#L657))
 - [ ] Check the length limits for label, stream key, password and URL. ([specs/blackmagic-streaming.yaml:715](specs/blackmagic-streaming.yaml#L715))
 - [ ] Check which firmware release introduced protocol 1.2 (and what earlier units report). ([specs/blackmagic-streaming.yaml:706](specs/blackmagic-streaming.yaml#L706))
+- [ ] Record what Web Presenter and Streaming Encoder units advertise over mDNS (service types, and TXT `class` under `_blackmagic._tcp`). No public source names it, so mDNS discovery does not identify them; an unknown class is reported as a discovery message naming it. ([crates/core/src/mdns.rs:751](crates/core/src/mdns.rs#L751))
 
 ## blackmagic-teranex — Blackmagic Teranex
 
@@ -341,14 +353,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## blackmagic-videohub — Blackmagic Videohub
 
-- [ ] Check how the router answers a port number beyond its count. ([specs/blackmagic-videohub.yaml:1053](specs/blackmagic-videohub.yaml#L1053))
-- [ ] Record the exact spelling of the device block's needs-update value. ([specs/blackmagic-videohub.yaml:1063](specs/blackmagic-videohub.yaml#L1063))
-- [ ] Check whether SERIAL PORT DIRECTIONS can be set by sending the block. ([specs/blackmagic-videohub.yaml:1095](specs/blackmagic-videohub.yaml#L1095))
-- [ ] On Workgroup Videohub, confirm what the two numbers in PROCESSING UNIT ROUTING and FRAME BUFFER ROUTING index. ([specs/blackmagic-videohub.yaml:1104](specs/blackmagic-videohub.yaml#L1104))
-- [ ] On 12G routers, check whether CONFIGURATION (Take Mode) and TAKE MODE can be set by a client and how the two relate. ([specs/blackmagic-videohub.yaml:1113](specs/blackmagic-videohub.yaml#L1113))
-- [ ] Check whether a 12G router reports more than one network interface. ([specs/blackmagic-videohub.yaml:1124](specs/blackmagic-videohub.yaml#L1124))
-- [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1131](specs/blackmagic-videohub.yaml#L1131))
-- [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1074](specs/blackmagic-videohub.yaml#L1074))
+- [ ] Check how the router answers a port number beyond its count. ([specs/blackmagic-videohub.yaml:1054](specs/blackmagic-videohub.yaml#L1054))
+- [ ] Record the exact spelling of the device block's needs-update value. ([specs/blackmagic-videohub.yaml:1064](specs/blackmagic-videohub.yaml#L1064))
+- [ ] Check whether SERIAL PORT DIRECTIONS can be set by sending the block. ([specs/blackmagic-videohub.yaml:1096](specs/blackmagic-videohub.yaml#L1096))
+- [ ] On Workgroup Videohub, confirm what the two numbers in PROCESSING UNIT ROUTING and FRAME BUFFER ROUTING index. ([specs/blackmagic-videohub.yaml:1105](specs/blackmagic-videohub.yaml#L1105))
+- [ ] On 12G routers, check whether CONFIGURATION (Take Mode) and TAKE MODE can be set by a client and how the two relate. ([specs/blackmagic-videohub.yaml:1114](specs/blackmagic-videohub.yaml#L1114))
+- [ ] Check whether a 12G router reports more than one network interface. ([specs/blackmagic-videohub.yaml:1125](specs/blackmagic-videohub.yaml#L1125))
+- [ ] On Universal Videohubs, check whether ALARM STATUS is sent and what names it uses. ([specs/blackmagic-videohub.yaml:1132](specs/blackmagic-videohub.yaml#L1132))
+- [ ] Check that routers documented only for v2.3 do or do not send the v2.8 blocks. ([specs/blackmagic-videohub.yaml:1075](specs/blackmagic-videohub.yaml#L1075))
+- [ ] Confirm routers advertise `_blackmagic._tcp` with TXT `class=Videohub` (Companion's Videohub module) ([crates/core/src/mdns.rs:130](crates/core/src/mdns.rs#L130)), and whether any also advertise `_videohub._tcp`, which no public source confirms and discovery does not ask for.
+- [ ] Record what the unit advertises over mDNS (`dns-sd -B _blackmagic._tcp` and `dns-sd -L <instance> _blackmagic._tcp`, or `avahi-browse -rt _blackmagic._tcp`): every service type, the SRV port and the TXT keys and values. Only the service type and TXT `class` come from a public source (Bitfocus Companion's module manifests); the SRV port and the other TXT keys are not documented anywhere. ([crates/core/src/mdns.rs:115](crates/core/src/mdns.rs#L115))
+- [ ] Confirm TXT `name` is the product name (as Companion's MultiView 4 filter relies on), not a label the user sets: discovery narrows `models` to the catalogue model with that name. ([crates/core/src/mdns.rs:471](crates/core/src/mdns.rs#L471))
 
 ## boinx-mimolive — Boinx mimoLive
 

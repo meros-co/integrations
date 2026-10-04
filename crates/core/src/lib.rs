@@ -47,6 +47,14 @@ mod http;
 pub mod json;
 #[cfg(feature = "sennheiser-ew-g3-g4")]
 mod mcp_discovery;
+#[cfg(any(
+    feature = "blackmagic-atem",
+    feature = "blackmagic-hyperdeck",
+    feature = "blackmagic-multiview",
+    feature = "blackmagic-smartview",
+    feature = "blackmagic-videohub"
+))]
+mod mdns;
 pub mod module;
 mod modules;
 #[cfg(feature = "pjlink")]

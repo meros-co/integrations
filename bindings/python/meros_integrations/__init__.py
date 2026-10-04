@@ -132,7 +132,12 @@ class Core:
     def discover(self, request: dict[str, Any]) -> None:
         """Listen for devices, scan for them now, or stop:
         {"action": "listen" | "scan" | "stop", "protocols": [...], "hints": [...]}.
-        Found devices arrive as {"event": "discovered", ...} events."""
+        Protocols: "mcp" (Sennheiser G3/G4), "ssdp" (Sony cameras), "pjlink"
+        (PJLink projectors), "mdns" (Blackmagic ATEM, Videohub, HyperDeck,
+        SmartView and MultiView); none means every protocol that finds a
+        device in this core's catalogue. Hints are addresses where devices
+        were last seen. Found devices arrive as {"event": "discovered", ...}
+        events."""
         result = json.loads(self._native.discover(json.dumps(request)))
         if "error" in result:
             raise IntegrationsError(result["error"])
