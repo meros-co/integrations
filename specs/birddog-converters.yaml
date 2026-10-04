@@ -1,0 +1,1107 @@
+spec: 1
+id: birddog-converters
+name: BirdDog converters and decoders
+vendor: BirdDog
+category: other
+
+source:
+  - title: BirdDog RESTful API 2.0, API and SDK Documentation (P-Series & Converters), version 2.0.0
+    author: BirdDog
+    url: https://birddog.tv/AV/API/index.html
+    note: >
+      Manufacturer-documented, and the source of every endpoint here. One HTML page with a
+      DEVICE SUPPORT table per method whose converter columns are Studio, Mini, Flex
+      Encode, Flex Decode, WP Encode, WP Decode, 4KHDMI/SDI, QUAD and PLAY; each model's
+      supports list follows those cells. Sections Basic Device Information (/about,
+      /hostname, /version, /reboot, /restart), DEVICE SETTINGS (/operationmode,
+      /videooutputinterface, /analogaudiosetup), NDI ENCODE (/encodesetup with per-column
+      values, /encodeTransport, /capture), NDI DECODE (/connectTo, /decodestatus,
+      /decodesetup, /decodeTransport, /capture) and NDI FINDER (/List, /refresh, /reset,
+      /NDIDisServer, /NDIGrpName, /NDIOffSnSrc). The PTZ and image tables have no
+      converter cells, so no PTZ or picture commands are offered. Port 8080, no
+      authentication.
+  - title: BirdDog Pod User Guide 2026
+    author: BirdDog
+    url: https://birddog.tv/wp-content/uploads/2026/09/POD-User-Guide-Manual.pdf
+    note: >
+      p.9 Controlling Sources via API: POST :8080/connectTo with
+      {"sourceName":"BIRDDOG-0B710 (CAM)"}, the body connect_source sends.
+  - title: BirdDog API landing page and API 2.0 knowledge base article
+    author: BirdDog
+    url: https://birddog.tv/api/
+    note: >
+      The P-Series & Converters RESTful API is the one for converters; the KB article
+      (https://desk.birddog.tv/portal/en/kb/articles/api-2-0) says devices need LTS
+      firmware for API 2.0. Older Studio and Mini firmware uses API 1.0 (BirdDog RESTful
+      API v1.0, /enc-settings, /dec-settings, /av-settings), which this spec does not
+      cover.
+  - title: companion-module-birddog-converters (Bitfocus Companion module)
+    author: Bitfocus
+    url: https://github.com/bitfocus/companion-module-birddog-converters
+    note: >
+      Community source (MIT licence), read as corroboration only. It reads the model from
+      /about's Format field (Studio, Mini, Flex Encode, Flex Decode, WP Encode, WP Decode,
+      4KHDMI/SDI, QUAD, PLAY), offers operation mode only on Studio, Mini, 4KHDMI/SDI and
+      QUAD, and connects sources with POST /connectTo {"sourceName": ...}. It also opens
+      an undocumented websocket on port 6790 for decode status, not used here.
+
+transport:
+  type: http
+  port: 8080
+  scheme: http
+  auth: none
+  timeout_ms: 4000
+  probe:
+    method: GET
+    path: /version
+
+ports:
+  - {port: 8080, protocol: http, role: control}
+
+models:
+  - id: studio
+    name: BirdDog Studio NDI
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_operation_mode,
+       set_operation_mode, get_analog_audio, set_audio_in_gain, set_audio_out_gain,
+       set_audio_output_select, get_encode_setup, set_stream_name, set_video_format,
+       set_ndi_audio, set_screensaver_mode, set_bandwidth_mode, set_bandwidth,
+       set_tally_mode, set_loop_tally, set_video_csc, set_ndi_group, set_ndi_group_name,
+       get_encode_transport, set_ndi_transmit_method, set_ndi_multicast_prefix,
+       set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_encode_screensaver,
+       get_connected_source, connect_source, get_decode_status, get_decode_setup,
+       set_decode_audio, set_decode_screensaver, set_decode_tally_mode,
+       set_decode_color_space, get_decode_transport, set_ndi_receive_method,
+       capture_decode_screensaver, get_ndi_sources, ndi_finder_refresh, ndi_finder_reset,
+       get_ndi_discovery_server, set_ndi_discovery_server, set_ndi_discovery_server_ip,
+       get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      HD SDI and HDMI encoder/decoder, switchable; no longer sold, still supported. API
+      column Studio. Earlier firmware speaks API 1.0 (see quirks).
+  - id: mini
+    name: BirdDog Mini
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_operation_mode,
+       set_operation_mode, get_analog_audio, set_audio_in_gain, set_audio_out_gain,
+       set_audio_output_select, get_encode_setup, set_stream_name, set_video_format,
+       set_ndi_audio, set_screensaver_mode, set_bandwidth_mode, set_bandwidth,
+       set_tally_mode, set_loop_tally, set_video_csc, set_ndi_group, set_ndi_group_name,
+       get_encode_transport, set_ndi_transmit_method, set_ndi_multicast_prefix,
+       set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_encode_screensaver,
+       get_connected_source, connect_source, get_decode_status, get_decode_setup,
+       set_decode_audio, set_decode_screensaver, set_decode_tally_mode,
+       set_decode_color_space, get_decode_transport, set_ndi_receive_method,
+       capture_decode_screensaver, get_ndi_sources, ndi_finder_refresh, ndi_finder_reset,
+       get_ndi_discovery_server, set_ndi_discovery_server, set_ndi_discovery_server_ip,
+       get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      HDMI encoder/decoder, switchable. API column Mini. Earlier firmware speaks API 1.0.
+  - id: flex-4k-in
+    name: BirdDog Flex 4K IN
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, get_encode_setup, set_stream_name,
+       set_video_format, set_ndi_audio, set_screensaver_mode, set_bandwidth_mode,
+       set_bandwidth, set_tally_mode, set_video_csc, set_video_sample_rate, set_ndi_group,
+       set_ndi_group_name, get_encode_transport, set_ndi_transmit_method,
+       set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl,
+       capture_encode_screensaver, get_connected_source, connect_source, get_ndi_sources,
+       ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      HDMI 2.0 to NDI encoder. API column Flex Encode.
+  - id: flex-4k-backpack
+    name: BirdDog Flex 4K BACKPACK
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, get_encode_setup, set_stream_name,
+       set_video_format, set_ndi_audio, set_screensaver_mode, set_bandwidth_mode,
+       set_bandwidth, set_tally_mode, set_video_csc, set_video_sample_rate, set_ndi_group,
+       set_ndi_group_name, get_encode_transport, set_ndi_transmit_method,
+       set_ndi_multicast_prefix, set_ndi_multicast_netmask, set_ndi_multicast_ttl,
+       capture_encode_screensaver, get_connected_source, connect_source, get_ndi_sources,
+       ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      Flex encoder with an NP battery output; taken as the Flex Encode column, which the
+      document does not say.
+  - id: flex-4k-out
+    name: BirdDog Flex 4K OUT
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, set_audio_output_select,
+       get_encode_transport, set_ndi_transmit_method, set_ndi_multicast_prefix,
+       set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_encode_screensaver,
+       get_connected_source, connect_source, get_decode_status, get_decode_setup,
+       set_decode_audio, set_decode_screensaver, set_decode_tally_mode,
+       set_decode_color_space, get_decode_transport, set_ndi_receive_method,
+       capture_decode_screensaver, get_ndi_sources, ndi_finder_refresh, ndi_finder_reset,
+       get_ndi_discovery_server, set_ndi_discovery_server, set_ndi_discovery_server_ip,
+       get_ndi_group_names, set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      NDI to HDMI 2.0 decoder. API column Flex Decode.
+  - id: wallplate-input
+    name: BirdDog Wallplate Input
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, get_encode_setup, set_video_format,
+       set_ndi_audio, set_screensaver_mode, set_bandwidth_mode, set_bandwidth,
+       set_tally_mode, set_video_csc, set_video_sample_rate, set_ndi_group_name,
+       get_encode_transport, set_ndi_transmit_method, set_ndi_multicast_prefix,
+       set_ndi_multicast_netmask, set_ndi_multicast_ttl, capture_encode_screensaver,
+       get_connected_source, connect_source, get_ndi_sources, ndi_finder_refresh,
+       ndi_finder_reset, get_ndi_discovery_server, set_ndi_discovery_server,
+       set_ndi_discovery_server_ip, get_ndi_group_names, set_ndi_group_names,
+       get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      Wall plate encoder. API column WP Encode.
+  - id: wallplate-output
+    name: BirdDog Wallplate Output
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, set_audio_output_select,
+       get_connected_source, connect_source, get_decode_status, get_decode_setup,
+       set_decode_screensaver, set_decode_tally_mode, set_decode_color_space,
+       get_decode_transport, set_ndi_receive_method, capture_decode_screensaver,
+       get_ndi_sources, ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      Wall plate decoder. API column WP Decode.
+  - id: 4k-hdmi
+    name: BirdDog 4K HDMI
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_operation_mode,
+       set_operation_mode, get_video_output, set_video_output, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, set_audio_output_select, get_encode_setup,
+       set_stream_name, set_video_format, set_screensaver_mode, set_bandwidth_mode,
+       set_bandwidth_4k, set_tally_mode, set_loop_tally, set_video_sample_rate,
+       set_color_bit_depth, set_ndi_group, set_ndi_group_name, get_encode_transport,
+       set_ndi_transmit_method, set_ndi_multicast_prefix, set_ndi_multicast_netmask,
+       set_ndi_multicast_ttl, capture_encode_screensaver, get_connected_source,
+       connect_source, get_decode_status, get_decode_setup, set_decode_screensaver,
+       get_decode_transport, set_ndi_receive_method, capture_decode_screensaver,
+       get_ndi_sources, ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      4K HDMI and 12G-SDI encoder/decoder, switchable, with an SDI/HDMI output choice. API
+      column 4KHDMI/SDI.
+  - id: 4k-sdi
+    name: BirdDog 4K SDI
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_operation_mode,
+       set_operation_mode, get_video_output, set_video_output, get_analog_audio,
+       set_audio_in_gain, set_audio_out_gain, set_audio_output_select, get_encode_setup,
+       set_stream_name, set_video_format, set_screensaver_mode, set_bandwidth_mode,
+       set_bandwidth_4k, set_tally_mode, set_loop_tally, set_video_sample_rate,
+       set_color_bit_depth, set_ndi_group, set_ndi_group_name, get_encode_transport,
+       set_ndi_transmit_method, set_ndi_multicast_prefix, set_ndi_multicast_netmask,
+       set_ndi_multicast_ttl, capture_encode_screensaver, get_connected_source,
+       connect_source, get_decode_status, get_decode_setup, set_decode_screensaver,
+       get_decode_transport, set_ndi_receive_method, capture_decode_screensaver,
+       get_ndi_sources, ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      4K 12G-SDI encoder/decoder with HDMI out, switchable. API column 4KHDMI/SDI.
+  - id: 4k-quad
+    name: BirdDog 4K QUAD
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_operation_mode,
+       set_operation_mode, get_analog_audio, set_audio_in_gain, set_audio_out_gain,
+       get_encode_setup, set_stream_name, set_video_format, set_screensaver_mode,
+       set_bandwidth_mode, set_bandwidth_4k, set_tally_mode, set_video_sample_rate,
+       set_ndi_group, set_ndi_group_name, get_connected_source, connect_source,
+       get_decode_status, get_decode_setup, set_decode_audio, set_decode_screensaver,
+       get_decode_transport, set_ndi_receive_method, capture_decode_screensaver,
+       get_ndi_sources, ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      Four-channel 12G-SDI encoder/decoder; channels chosen with ChNum 1-4. API column
+      QUAD.
+  - id: play
+    name: BirdDog PLAY
+    supports:
+      [get_about, get_hostname, get_version, reboot, restart_video, get_connected_source,
+       connect_source, get_decode_status, get_decode_setup, get_decode_transport,
+       set_ndi_receive_method, capture_decode_screensaver, get_ndi_sources,
+       ndi_finder_refresh, ndi_finder_reset, get_ndi_discovery_server,
+       set_ndi_discovery_server, set_ndi_discovery_server_ip, get_ndi_group_names,
+       set_ndi_group_names, get_ndi_off_subnet, set_ndi_off_subnet]
+    verification: none
+    notes: >
+      NDI decoder and player. API column PLAY: decode status and settings can be read but
+      not set.
+  - id: pod
+    name: BirdDog Pod
+    supports:
+      [connect_source]
+    verification: none
+    notes: >
+      Desktop NDI receiver; its guide documents only source selection over the API (Pod
+      User Guide p.9).
+
+commands:
+  get_about:
+    summary: Firmware, stream name (Format), host name, address, serial and status (GET /about)
+    send: {method: GET, path: /about}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, Basic Device Information, /about
+    # (all converter columns)
+
+  get_hostname:
+    summary: Host name, plain text (GET /hostname)
+    send: {method: GET, path: /hostname}
+    expect: {status: 200, matches: ^(.+)$}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, Basic Device Information, /hostname
+
+  get_version:
+    summary: Model and hardware version, plain text, e.g. BirdDog P200A4_A5 (GET /version)
+    send: {method: GET, path: /version}
+    expect: {status: 200, matches: ^(.+)$}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, Basic Device Information, /version
+
+  reboot:
+    summary: Reboot the unit; its NDI output or decoded picture stops until it is back (POST /reboot)
+    send: {method: POST, path: /reboot}
+    expect: {status: 200}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, Basic Device Information, /reboot
+
+  restart_video:
+    summary: Restart the video subsystem; the picture drops briefly (POST /restart)
+    send: {method: POST, path: /restart}
+    expect: {status: 200}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, Basic Device Information, /restart
+
+  get_operation_mode:
+    summary: Operation mode, encode or decode, plain text (GET /operationmode)
+    send: {method: GET, path: /operationmode}
+    expect: {status: 200, matches: ^(encode|decode)}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS, /operationmode
+
+  set_operation_mode:
+    summary: Switch the unit between NDI encoding and decoding; plain-text body (POST /operationmode)
+    params:
+      mode: {type: enum, values: [encode, decode], required: true, label: Operation mode, description: encode turns the baseband input into an NDI source; decode outputs an NDI source on the baseband outputs.}
+    send: {method: POST, path: /operationmode, body: '{mode}', content_type: text/plain}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS, /operationmode
+    # (Studio, Mini, 4KHDMI/SDI, QUAD: encode, decode)
+
+  get_video_output:
+    summary: Baseband output interface, sdi or hdmi, plain text (GET /videooutputinterface)
+    send: {method: GET, path: /videooutputinterface}
+    expect: {status: 200, matches: ^(\S+)}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS,
+    # /videooutputinterface (4KHDMI/SDI: sdi, hdmi)
+
+  set_video_output:
+    summary: Choose the SDI or HDMI baseband output; plain-text body (POST /videooutputinterface)
+    params:
+      output: {type: enum, values: [sdi, hdmi], required: true, label: Output, description: Which baseband connector carries the output.}
+    send: {method: POST, path: /videooutputinterface, body: '{output}', content_type: text/plain}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS,
+    # /videooutputinterface (4KHDMI/SDI: sdi, hdmi)
+
+  get_analog_audio:
+    summary: Analog audio gains and output source (GET /analogaudiosetup)
+    send: {method: GET, path: /analogaudiosetup}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS, /analogaudiosetup
+
+  set_audio_in_gain:
+    summary: Analog audio input gain, 0-100 (POST /analogaudiosetup)
+    params:
+      gain: {type: int, min: 0, max: 100, required: true, label: Input gain, description: 'Analog (3.5 mm) audio input gain, 0 to 100.'}
+    send:
+      method: POST
+      path: /analogaudiosetup
+      body: '{"AnalogAudioInGain":"{gain}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS, /analogaudiosetup,
+    # AnalogAudioInGain Range 0 to 100
+
+  set_audio_out_gain:
+    summary: Analog audio output gain, 0-100 (POST /analogaudiosetup)
+    params:
+      gain: {type: int, min: 0, max: 100, required: true, label: Output gain, description: 'Analog (3.5 mm) audio output gain, 0 to 100.'}
+    send:
+      method: POST
+      path: /analogaudiosetup
+      body: '{"AnalogAudioOutGain":"{gain}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS, /analogaudiosetup,
+    # AnalogAudioOutGain Range 0 to 100
+
+  set_audio_output_select:
+    summary: 'What the analog audio output carries: the decoded NDI audio or Comms (POST /analogaudiosetup)'
+    params:
+      source: {type: enum, values: [DecodeMain, DecodeComms], required: true, label: Audio output, description: DecodeMain plays the decoded NDI audio; DecodeComms plays the Comms audio.}
+    send:
+      method: POST
+      path: /analogaudiosetup
+      body: '{"AnalogAudiooutputselect":"{source}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, DEVICE SETTINGS, /analogaudiosetup,
+    # AnalogAudiooutputselect DecodeMain, DecodeComms
+
+  get_encode_setup:
+    summary: Encoder settings of a channel (GET /encodesetup?ChNum=)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+    send: {method: GET, path: /encodesetup, raw_query: 'ChNum={channel}'}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup
+
+  set_stream_name:
+    summary: NDI stream name (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      name: {type: string, max_length: 64, required: true, label: Stream name, description: 'The stream part of the NDI source name, as in BIRDDOG-12345 (CAM).'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","StreamName":{name:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup, StreamName
+    # (WP Encode N/A)
+
+  set_video_format:
+    summary: Encoder input video format, as the unit names it (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      format: {type: string, max_length: 32, required: true, label: Video format, description: Input video format in the unit's own words (the document does not list them); read it back with get_encode_setup.}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","VideoFormat":{format:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # VideoFormat (values not listed)
+
+  set_ndi_audio:
+    summary: Audio carried in the NDI stream (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      source: {type: enum, values: [NDIAudioMain, NDIAudioAnalog, NDIAudioMute], required: true, label: NDI audio, description: 'Embedded audio (NDIAudioMain), the analog input (NDIAudioAnalog), or none (NDIAudioMute, Flex and Wallplate).'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","NDIAudio":"{source}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup, NDIAudio
+    # (Studio, Mini: Main, Analog; Flex: Main, Analog, Mute; WP: Main, Mute; 4K and QUAD N/A)
+
+  set_screensaver_mode:
+    summary: What the encoder sends with no input (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mode: {type: enum, values: [BirdDogSS, BlackSS, CaptureSS], required: true, label: Screensaver, description: 'BirdDog logo, black, or the last captured frame (CaptureSS).'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","ScreenSaverMode":"{mode}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # ScreenSaverMode BirdDogSS, BlackSS, CaptureSS
+
+  set_bandwidth_mode:
+    summary: NDI bandwidth managed by NDI or set by hand (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mode: {type: enum, values: [NDIManaged, Manual], required: true, label: Bandwidth mode, description: NDIManaged lets NDI pick the bandwidth; Manual uses the set bandwidth.}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","BandwidthMode":"{mode}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # BandwidthMode Manual, NDIManaged
+
+  set_bandwidth:
+    summary: Manual NDI bandwidth, 80-250 Mbps (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mbps: {type: int, min: 80, max: 250, required: true, label: Bandwidth, description: 'Manual NDI bandwidth in Mbps, 80 to 250.'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","BandwidthSelect":"{mbps}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # BandwidthSelect Range (80 to 250)
+
+  set_bandwidth_4k:
+    summary: Manual NDI bandwidth, 60-360 Mbps (4K family) (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mbps: {type: int, min: 60, max: 360, required: true, label: Bandwidth, description: 'Manual NDI bandwidth in Mbps, 60 to 360.'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","BandwidthSelect":"{mbps}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # BandwidthSelect Range (60 to 360)
+
+  set_tally_mode:
+    summary: Encoder tally light behaviour (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mode: {type: enum, values: [TallyOn, TallyOff, VideoMode], required: true, label: Tally mode, description: 'TallyOn lights the unit''s tally from NDI tally, TallyOff does not, VideoMode (not Studio or Mini) also marks the video.'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","TallyMode":"{mode}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup, TallyMode
+    # TallyOn, TallyOff, VideoMode
+
+  set_loop_tally:
+    summary: Tally border on the loop output (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      state: {type: enum, values: [LoopTallyEn, LoopTallyDis], required: true, label: Loop tally, description: LoopTallyEn shows tally on the loop output; LoopTallyDis does not.}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","LoopTally":"{state}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup, LoopTally
+    # LoopTallyEn, LoopTallyDis
+
+  set_video_csc:
+    summary: Encoder colour space conversion (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      csc: {type: enum, values: [YVU, YUV, RGB], required: true, label: Colour conversion, description: 'Colour space conversion applied to the input: YVU, YUV, or RGB (Studio and Mini).'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","VideoCSC":"{csc}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup, VideoCSC
+    # YVU, YUV, RGB
+
+  set_video_sample_rate:
+    summary: Encoder chroma sampling, 4:2:0 or 4:2:2 (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      sampling: {type: enum, values: ['420', '422'], required: true, label: Chroma sampling, description: 'Chroma sampling of the encoded stream: 420 or 422.'}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","VideoSampleRate":"{sampling}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # VideoSampleRate 420, 422
+
+  set_color_bit_depth:
+    summary: Encoder bit depth, 8 or 10 bit (4K HDMI/SDI) (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      depth: {type: enum, values: [8Bit, 10Bit], required: true, label: Bit depth, description: Bit depth of the encoded stream.}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","ColorBitDepth":"{depth}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # ColorBitDepth 8Bit, 10Bit
+
+  set_ndi_group:
+    summary: Publish the stream in an NDI group, or not (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      state: {type: enum, values: [NDIGroupEn, NDIGroupDis], required: true, label: NDI group, description: NDIGroupEn publishes in the named group; NDIGroupDis in the public group.}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","NDIGroup":"{state}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup, NDIGroup
+    # NDIGroupEn, NDIGroupDis (WP Encode N/A)
+
+  set_ndi_group_name:
+    summary: NDI group the stream is published in (POST /encodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      name: {type: string, max_length: 64, required: true, label: Group name, description: NDI group name used when the NDI group is enabled.}
+    send:
+      method: POST
+      path: /encodesetup
+      body: '{"ChNum":"{channel}","NDIGroupName":{name:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodesetup,
+    # NDIGroupName
+
+  get_encode_transport:
+    summary: NDI transmit method and multicast settings (GET /encodeTransport)
+    send: {method: GET, path: /encodeTransport}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodeTransport
+
+  set_ndi_transmit_method:
+    summary: NDI transmit method (POST /encodeTransport)
+    params:
+      method: {type: enum, values: [Multicast, TCP, Multi-TCP, UDP], required: true, label: Transmit method, description: 'How receivers are sent the stream: multicast, TCP, multi-TCP or UDP.'}
+    send: {method: POST, path: /encodeTransport, body: '{"Txpm":"{method}"}', content_type: application/json}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodeTransport, Txpm
+    # Multicast, TCP, Multi-TCP, UDP
+
+  set_ndi_multicast_prefix:
+    summary: NDI multicast address prefix (POST /encodeTransport)
+    params:
+      prefix: {type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true, label: Multicast prefix, description: 'Multicast address prefix, an IPv4 address such as 239.255.0.0.'}
+    send:
+      method: POST
+      path: /encodeTransport
+      body: '{"Txnetprefix":{prefix:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodeTransport,
+    # Txnetprefix
+
+  set_ndi_multicast_netmask:
+    summary: NDI multicast netmask (POST /encodeTransport)
+    params:
+      mask: {type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true, label: Multicast netmask, description: 'Multicast netmask, e.g. 255.255.0.0.'}
+    send:
+      method: POST
+      path: /encodeTransport
+      body: '{"Txnetmask":{mask:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodeTransport,
+    # Txnetmask
+
+  set_ndi_multicast_ttl:
+    summary: NDI multicast time-to-live (POST /encodeTransport)
+    params:
+      ttl: {type: int, min: 1, max: 255, required: true, label: Multicast TTL, description: 'Multicast time-to-live in router hops, 1 to 255.'}
+    send: {method: POST, path: /encodeTransport, body: '{"Txmcttl":"{ttl}"}', content_type: application/json}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /encodeTransport,
+    # Txmcttl
+
+  capture_encode_screensaver:
+    summary: Capture the current encoder frame as the CaptureSS screensaver (GET /capture?status=Encode)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+    send: {method: GET, path: /capture, raw_query: 'ChNum={channel}&status=Encode'}
+    expect: {status: 200, contains: Capture Success}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI ENCODE, /capture
+
+  get_connected_source:
+    summary: The NDI source the decoder is connected to; None when none (GET /connectTo)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+    send: {method: GET, path: /connectTo, raw_query: 'ChNum={channel}'}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /connectTo GET
+
+  connect_source:
+    summary: Decode an NDI source by its full name; the output switches to it at once (POST /connectTo)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      source: {type: string, max_length: 256, required: true, label: NDI source, description: 'Full NDI source name as the finder lists it, e.g. BIRDDOG-0B710 (CAM); None disconnects.'}
+    send:
+      method: POST
+      path: /connectTo
+      raw_query: ChNum={channel}
+      body: '{"sourceName":{source:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /connectTo POST; Pod
+    # User Guide 2026 p.9
+
+  get_decode_status:
+    summary: 'Decoded stream status: resolution, frame rate, sampling, audio and bitrate (GET /decodestatus)'
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+    send: {method: GET, path: /decodestatus, raw_query: 'ChNum={channel}'}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodestatus
+
+  get_decode_setup:
+    summary: Decoder settings of a channel (GET /decodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+    send: {method: GET, path: /decodesetup, raw_query: 'ChNum={channel}'}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodesetup GET
+
+  set_decode_audio:
+    summary: Play the decoded NDI audio, or not (POST /decodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      state: {type: enum, values: [NDIAudioEn, NDIAudioDis], required: true, label: Decode audio, description: NDIAudioEn outputs the source's audio; NDIAudioDis mutes it.}
+    send:
+      method: POST
+      path: /decodesetup
+      raw_query: ChNum={channel}
+      body: '{"ChNum":"{channel}","NDIAudio":"{state}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodesetup POST,
+    # NDIAudio NDIAudioEn, NDIAudioDis
+
+  set_decode_screensaver:
+    summary: What the decoder shows with no source (POST /decodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mode: {type: enum, values: [BirdDogSS, BlackSS, CaptureSS], required: true, label: Screensaver, description: 'BirdDog logo, black, or the last captured frame (CaptureSS).'}
+    send:
+      method: POST
+      path: /decodesetup
+      raw_query: ChNum={channel}
+      body: '{"ChNum":"{channel}","ScreenSaverMode":"{mode}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodesetup POST,
+    # ScreenSaverMode BirdDogSS, BlackSS, CaptureSS
+
+  set_decode_tally_mode:
+    summary: Decoder tally behaviour (POST /decodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      mode: {type: enum, values: [TallyOn, TallyOff, VideoMode], required: true, label: Tally mode, description: 'TallyOn shows the source''s tally, TallyOff does not, VideoMode (Flex and Wallplate) marks the video.'}
+    send:
+      method: POST
+      path: /decodesetup
+      raw_query: ChNum={channel}
+      body: '{"ChNum":"{channel}","TallyMode":"{mode}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodesetup POST,
+    # TallyMode TallyOn, TallyOff, VideoMode
+
+  set_decode_color_space:
+    summary: Decoder output colour space (POST /decodesetup)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+      space: {type: enum, values: [RGB, YUV], required: true, label: Colour space, description: 'Output colour space: RGB or YUV.'}
+    send:
+      method: POST
+      path: /decodesetup
+      raw_query: ChNum={channel}
+      body: '{"ChNum":"{channel}","ColorSpace":"{space}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodesetup POST,
+    # ColorSpace RGB, YUV
+
+  get_decode_transport:
+    summary: NDI receive method (GET /decodeTransport)
+    send: {method: GET, path: /decodeTransport}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodeTransport
+
+  set_ndi_receive_method:
+    summary: NDI receive method (POST /decodeTransport)
+    params:
+      method: {type: enum, values: [Multicast, TCP, Multi-TCP, UDP], required: true, label: Receive method, description: 'How the decoder asks for the stream: multicast, TCP, multi-TCP or UDP.'}
+    send: {method: POST, path: /decodeTransport, body: '{"rxpm":"{method}"}', content_type: application/json}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /decodeTransport, rxpm
+    # Multicast, TCP, Multi-TCP, UDP
+
+  capture_decode_screensaver:
+    summary: Capture the current decoded frame as the CaptureSS screensaver (GET /capture?status=Decode)
+    params:
+      channel: {type: int, min: 1, max: 4, default: 1, label: Channel, description: 'Channel on a multi-channel unit (4K QUAD, dual-channel 4K HDMI/SDI), 1 to 4; 1 on single-channel units.'}
+    send: {method: GET, path: /capture, raw_query: 'ChNum={channel}&status=Decode'}
+    expect: {status: 200, contains: Capture Success}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI DECODE, /capture
+
+  get_ndi_sources:
+    summary: NDI sources the finder sees, keyed by name; {"None":"None"} when empty (GET /List)
+    send: {method: GET, path: /List}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /List
+
+  ndi_finder_refresh:
+    summary: Refresh the NDI finder list, adding new sources (POST /refresh)
+    send: {method: POST, path: /refresh}
+    expect: {status: 200}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /refresh
+
+  ndi_finder_reset:
+    summary: Reset the NDI finder list, removing old sources and adding new ones (POST /reset)
+    send: {method: POST, path: /reset}
+    expect: {status: 200}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /reset
+
+  get_ndi_discovery_server:
+    summary: NDI discovery server use and address (GET /NDIDisServer)
+    send: {method: GET, path: /NDIDisServer}
+    expect: {status: 200, json_path: $}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIDisServer
+
+  set_ndi_discovery_server:
+    summary: Use an NDI discovery server, or not (POST /NDIDisServer)
+    params:
+      state: {type: enum, values: [NDIDisServEn, NDIDisServDis], required: true, label: Discovery server, description: NDIDisServEn uses an NDI discovery server; NDIDisServDis does not.}
+    send:
+      method: POST
+      path: /NDIDisServer
+      body: '{"NDIDisServ":"{state}"}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIDisServer,
+    # NDIDisServEn, NDIDisServDis
+
+  set_ndi_discovery_server_ip:
+    summary: NDI discovery server address (POST /NDIDisServer)
+    params:
+      address: {type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true, label: Discovery server address, description: IPv4 address of the NDI discovery server.}
+    send:
+      method: POST
+      path: /NDIDisServer
+      body: '{"NDIDisServIP":{address:json}}'
+      content_type: application/json
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIDisServer,
+    # NDIDisServIP
+
+  get_ndi_group_names:
+    summary: NDI groups the finder subscribes to, plain text (GET /NDIGrpName)
+    send: {method: GET, path: /NDIGrpName}
+    expect: {status: 200, matches: ^(.*)$}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIGrpName
+
+  set_ndi_group_names:
+    summary: NDI groups the finder subscribes to, comma separated; plain-text body (POST /NDIGrpName)
+    params:
+      groups: {type: string, max_length: 256, required: true, label: NDI groups, description: 'NDI groups the finder subscribes to, separated by commas.'}
+    send: {method: POST, path: /NDIGrpName, body: '{groups}', content_type: text/plain}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIGrpName
+
+  get_ndi_off_subnet:
+    summary: Off-subnet NDI source address the finder also looks at, plain text (GET /NDIOffSnSrc)
+    send: {method: GET, path: /NDIOffSnSrc}
+    expect: {status: 200, matches: ^(.*)$}
+    returns: value
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIOffSnSrc
+
+  set_ndi_off_subnet:
+    summary: Off-subnet NDI source address; plain-text body (POST /NDIOffSnSrc)
+    params:
+      address: {type: string, pattern: '^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$', required: true, label: Off-subnet address, description: IPv4 address of an NDI source on another subnet.}
+    send: {method: POST, path: /NDIOffSnSrc, body: '{address}', content_type: text/plain}
+    expect: {status: 200, not_contains: Invalid}
+    returns: ack
+    # BirdDog RESTful API 2.0 (P-Series & Converters), version 2.0.0, NDI FINDER, /NDIOffSnSrc
+
+telemetry:
+  poll:
+    every_ms: 5000
+    send:
+    - method: GET
+      path: /about
+    - method: GET
+      path: /connectTo
+      raw_query: ChNum=1
+  updates:
+    - path: ^/about$
+      json:
+        fw: $.FirmwareVersion
+        format: $.Format
+        host: $.HostName
+        ip: $.IPAddress
+        mask: $.NetworkMask
+        method: $.NetworkConfigMethod
+        serial: $.SerialNumber
+        status: $.Status
+      state:
+        device.firmware: '{fw}'
+        device.format: '{format}'
+        device.hostname: '{host}'
+        device.ip_address: '{ip}'
+        device.netmask: '{mask}'
+        device.network_method: '{method}'
+        device.serial: '{serial}'
+        device.status: '{status}'
+    - path: ^/connectTo\?ChNum=1$
+      json:
+        source: $.sourceName
+      state:
+        decoder.source: '{source}'
+    - path: ^/decodestatus\?ChNum=1$
+      json:
+        res: $.Videoresolution
+        fr: $.VideoFramerate
+        sr: $.VideoSamplerate
+        ach: $.Audiochannels
+        asr: $.AudioSamplerate
+        br: $.AverageBitrate
+      state:
+        decoder.resolution: '{res}'
+        decoder.frame_rate: '{fr}'
+        decoder.sampling: '{sr}'
+        decoder.audio_channels: '{ach}'
+        decoder.audio_sample_rate: '{asr}'
+        decoder.bitrate: '{br}'
+    - path: ^/decodesetup\?ChNum=1$
+      json:
+        audio: $.NDIAudio
+        ss: $.ScreenSaverMode
+        tally: $.TallyMode
+        cs: $.ColorSpace
+      state:
+        decoder.audio: '{audio}'
+        decoder.screensaver: '{ss}'
+        decoder.tally_mode: '{tally}'
+        decoder.color_space: '{cs}'
+    - path: ^/decodeTransport$
+      json:
+        rx: $.rxpm
+      state:
+        decoder.receive_method: '{rx}'
+    - path: ^/encodesetup\?ChNum=1$
+      json:
+        vf: $.VideoFormat
+        name: $.StreamName
+        audio: $.NDIAudio
+        ss: $.ScreenSaverMode
+        bwm: $.BandwidthMode
+        bw: $.BandwidthSelect
+        tally: $.TallyMode
+        loop: $.LoopTally
+        csc: $.VideoCSC
+        sr: $.VideoSampleRate
+        depth: $.ColorBitDepth
+        grp: $.NDIGroup
+        grpname: $.NDIGroupName
+      state:
+        encoder.video_format: '{vf}'
+        encoder.stream_name: '{name}'
+        encoder.ndi_audio: '{audio}'
+        encoder.screensaver: '{ss}'
+        encoder.bandwidth_mode: '{bwm}'
+        encoder.bandwidth: '{bw}'
+        encoder.tally_mode: '{tally}'
+        encoder.loop_tally: {value: '{loop}', map: {LoopTallyEn: true, LoopTallyDis: false}}
+        encoder.video_csc: '{csc}'
+        encoder.sample_rate: '{sr}'
+        encoder.bit_depth: '{depth}'
+        encoder.ndi_group: {value: '{grp}', map: {NDIGroupEn: true, NDIGroupDis: false}}
+        encoder.ndi_group_name: '{grpname}'
+    - path: ^/encodeTransport$
+      json:
+        pm: $.Txpm
+        prefix: $.Txnetprefix
+        mask: $.Txnetmask
+        ttl: $.Txmcttl
+      state:
+        encoder.transmit_method: '{pm}'
+        encoder.multicast_prefix: '{prefix}'
+        encoder.multicast_netmask: '{mask}'
+        encoder.multicast_ttl: '{ttl}'
+    - path: ^/analogaudiosetup$
+      json:
+        in: $.AnalogAudioInGain
+        out: $.AnalogAudioOutGain
+        sel: $.AnalogAudiooutputselect
+      state:
+        audio.in_gain: '{in}'
+        audio.out_gain: '{out}'
+        audio.output_select: '{sel}'
+    - path: ^/NDIDisServer$
+      json:
+        en: $.NDIDisServ
+        ip: $.NDIDisServIP
+      state:
+        finder.discovery_server: {value: '{en}', map: {NDIDisServEn: true, NDIDisServDis: false}}
+        finder.discovery_server_ip: '{ip}'
+
+state:
+  device.firmware:             {type: string, description: Firmware version}
+  device.format:               {type: string, description: 'Format field of /about; the Companion module reads the converter model from it (Studio, Mini, Flex Encode, 4KHDMI/SDI, QUAD, PLAY ...)'}
+  device.hostname:             {type: string, description: Host name}
+  device.ip_address:           {type: string, description: IP address}
+  device.netmask:              {type: string, description: Netmask}
+  device.network_method:       {type: string, description: dhcp or static}
+  device.serial:               {type: string, description: Serial number}
+  device.status:               {type: string, description: 'Unit status, e.g. ONLINE, OFFLINE, NO VIDEO'}
+  decoder.source:              {type: string, description: NDI source being decoded on channel 1; None when none}
+  decoder.resolution:          {type: string, description: 'Decoded video resolution, e.g. 1920x1080'}
+  decoder.frame_rate:          {type: string, description: 'Decoded frame rate, e.g. 59.94p'}
+  decoder.sampling:            {type: string, description: 'Decoded chroma sampling, e.g. 4:2:2'}
+  decoder.audio_channels:      {type: int, description: Decoded audio channels}
+  decoder.audio_sample_rate:   {type: int, description: 'Decoded audio sample rate, Hz'}
+  decoder.bitrate:             {type: string, description: 'Average decoded bitrate, as the unit reports it'}
+  decoder.audio:               {type: string, description: 'Decoder audio: NDIAudioEn or NDIAudioDis'}
+  decoder.screensaver:         {type: string, description: 'Decoder screensaver: BirdDogSS, BlackSS or CaptureSS'}
+  decoder.tally_mode:          {type: string, description: Decoder tally mode}
+  decoder.color_space:         {type: string, description: 'Decoder output colour space: RGB or YUV'}
+  decoder.receive_method:      {type: string, description: NDI receive method}
+  encoder.video_format:        {type: string, description: Encoder input video format}
+  encoder.stream_name:         {type: string, description: NDI stream name}
+  encoder.ndi_audio:           {type: string, description: Audio in the NDI stream}
+  encoder.screensaver:         {type: string, description: Encoder screensaver}
+  encoder.bandwidth_mode:      {type: string, description: NDIManaged or Manual}
+  encoder.bandwidth:           {type: int, description: 'Manual NDI bandwidth, Mbps'}
+  encoder.tally_mode:          {type: string, description: Encoder tally mode}
+  encoder.loop_tally:          {type: bool, description: Tally shown on the loop output}
+  encoder.video_csc:           {type: string, description: Encoder colour space conversion}
+  encoder.sample_rate:         {type: string, description: 'Encoder chroma sampling: 420 or 422'}
+  encoder.bit_depth:           {type: string, description: 'Encoder bit depth, e.g. 8Bit'}
+  encoder.ndi_group:           {type: bool, description: Published in a named NDI group}
+  encoder.ndi_group_name:      {type: string, description: NDI group name}
+  encoder.transmit_method:     {type: string, description: NDI transmit method}
+  encoder.multicast_prefix:    {type: string, description: Multicast address prefix}
+  encoder.multicast_netmask:   {type: string, description: Multicast netmask}
+  encoder.multicast_ttl:       {type: int, description: Multicast time-to-live}
+  audio.in_gain:               {type: int, description: 'Analog audio input gain, 0-100'}
+  audio.out_gain:              {type: int, description: 'Analog audio output gain, 0-100'}
+  audio.output_select:         {type: string, description: 'Analog audio output source: DecodeMain or DecodeComms'}
+  finder.discovery_server:     {type: bool, description: An NDI discovery server is in use}
+  finder.discovery_server_ip:  {type: string, description: NDI discovery server address}
+
+quirks:
+  - models: [all]
+    severity: critical
+    text: >
+      connect_source switches the decoded picture at once (a FastSwitch unit without a
+      pause, others after a reconnect), and set_operation_mode turns an encoder into a
+      decoder or back, replacing what the baseband outputs carry. reboot and restart_video
+      drop the stream until the unit is back. None asks for confirmation.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The API has no push: state comes from polling /about and the decoder's source every
+      5 seconds, and from the reply to each get_ and set_ command (POST replies carry the
+      endpoint's object). The poll asks every model for /connectTo, which every column
+      supports. Encoder, decoder and audio state updates when its get_ command is sent.
+      Telemetry keeps channel 1; other channels' replies are returned by their get_
+      commands only.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Several DEVICE SUPPORT cells look wrong but are followed as printed:
+      /encodeTransport is YES on Flex Decode and N/A on QUAD; decode NDIAudio is N/A on
+      Wallplate Output and 4K HDMI/SDI but present on QUAD; StreamName and NDIGroup are
+      N/A on Wallplate Input. /decodestatus's example reply keys (Videoresolution,
+      VideoFramerate ...) differ from its parameter table (ConnectionStatus, SourceName,
+      VideoResolution ...); the state rule reads the example's keys.
+
+  - models: [all]
+    severity: info
+    text: >
+      Every value in the JSON bodies is a string, as the document's examples show.
+      Single-key bodies (plus ChNum for encode and decode settings) are sent; whether a
+      unit needs the whole object is not documented. ChNum selects the channel of a 4K
+      QUAD or a dual-channel 4K HDMI/SDI; single-channel units are sent ChNum=1. The API
+      2.1 connectTo form the camera spec uses (location, sourceHostname, sourceStreamName)
+      is not the converters'.
+
+  - models: [studio, mini]
+    severity: warning
+    text: >
+      Studio and Mini units on firmware older than the LTS release answer with BirdDog API
+      1.0 (/about returns {"Version":"1.0", ...}) and need a firmware update for these
+      commands.
+
+  - models: [flex-4k-backpack, pod]
+    severity: info
+    text: >
+      Neither has a column in the API 2.0 tables. The Flex 4K BACKPACK is taken as the
+      Flex Encode column. The Pod guide documents only connect_source. PLAY PRO, OG4 and
+      SDM claim a RESTful API but have no column or endpoint list, so they are not
+      modelled.
+
+  - models: [4k-quad]
+    severity: info
+    text: >
+      The product page describes three operation modes (4x encode, 4x decode, 2x2), while
+      /operationmode lists only encode and decode; the 2x2 mode's value is not documented.

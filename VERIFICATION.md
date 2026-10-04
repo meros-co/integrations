@@ -257,6 +257,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the API needs no authentication on the firmware in use. ([specs/birddog.yaml:3143](specs/birddog.yaml#L3143))
 - [ ] On X5 Ultra and X4 Ultra, check the firmware version and which 2.1 endpoints it lacks. ([specs/birddog.yaml:3271](specs/birddog.yaml#L3271))
 
+## birddog-converters — BirdDog converters and decoders
+
+- [ ] Which converter firmware first serves API 2.0, and whether Studio and Mini units on older firmware answer /about with API 1.0's {"Version":"1.0"}. ([specs/birddog-converters.yaml:1091](specs/birddog-converters.yaml#L1091))
+- [ ] Check /about's Format value on each converter (Studio, Mini, Flex Encode, Flex Decode, WP Encode, WP Decode, 4KHDMI/SDI, QUAD, PLAY) and what Flex 4K BACKPACK and Pod report. ([specs/birddog-converters.yaml:1098](specs/birddog-converters.yaml#L1098))
+- [ ] Confirm POST /connectTo with only {"sourceName": ...} switches the decoder on every converter, and whether ChNum in the query selects the channel on QUAD and dual-channel 4K HDMI/SDI. ([specs/birddog-converters.yaml:1081](specs/birddog-converters.yaml#L1081))
+- [ ] Check which keys /decodestatus returns (the document's example and parameter table differ), and its reply in encode mode. ([specs/birddog-converters.yaml:1074](specs/birddog-converters.yaml#L1074))
+- [ ] Check the odd DEVICE SUPPORT cells: /encodeTransport on Flex Decode and QUAD, decode NDIAudio on Wallplate Output and 4K HDMI/SDI, StreamName and NDIGroup on Wallplate Input. ([specs/birddog-converters.yaml:1071](specs/birddog-converters.yaml#L1071))
+- [ ] Check whether single-key POST bodies with ChNum are accepted on /encodesetup and /decodesetup, or the whole object must be sent. ([specs/birddog-converters.yaml:1082](specs/birddog-converters.yaml#L1082))
+- [ ] Check /operationmode's values on 4K QUAD with the 2x2 mode. ([specs/birddog-converters.yaml:1106](specs/birddog-converters.yaml#L1106))
+
 ## blackmagic-atem — Blackmagic ATEM
 
 - [ ] Check how many simultaneous connections the switcher accepts and how long a dropped connection holds its place. ([specs/blackmagic-atem.yaml:1150](specs/blackmagic-atem.yaml#L1150))
