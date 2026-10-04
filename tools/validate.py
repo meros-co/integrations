@@ -335,6 +335,24 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         if obj.get("accept_invalid_certs") is True and scheme in ("ws", "http"):
             errors.append(f"{where_}.accept_invalid_certs needs a TLS scheme (wss, https or a setting)")
     if websocket:
+        url = websocket.get("url")
+        if url is not None:
+            errors += check_template("text", url, {}, settings, "telemetry.websocket.url")
+            # The scheme and host are literal; only the path and query may
+            # hold placeholders.
+            m = re.match(r"^(wss?)://(\[[^\]]*\]|[^/?:{]+)", url)
+            host = m.group(2) if m else ""
+            if not m or not host:
+                errors.append("telemetry.websocket.url needs a literal wss:// or ws:// host")
+            elif m.group(1) == "ws" and host not in ("localhost", "127.0.0.1", "[::1]"):
+                errors.append("telemetry.websocket.url: ws only to this machine; use wss")
+        port = websocket.get("port")
+        if isinstance(port, dict):
+            decl = settings.get(port.get("setting"))
+            if decl is None:
+                errors.append(f"telemetry.websocket.port names unknown setting '{port.get('setting')}'")
+            elif decl.get("type") != "int":
+                errors.append("telemetry.websocket.port's setting must be an int")
         for i, text in enumerate(websocket.get("send", []) if isinstance(websocket.get("send"), list)
                                  else [websocket.get("send")] if websocket.get("send") else []):
             errors += check_template("text", text, {}, settings, f"telemetry.websocket.send[{i}]")

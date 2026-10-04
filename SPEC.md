@@ -1244,8 +1244,8 @@ and does not decide whether the device is connected; the transport does.
 ```yaml
 telemetry:
   websocket:
-    path: /api/v1             # required
-    port: 8080                # defaults to the transport's port
+    path: /api/v1             # required, unless url (below)
+    port: 8080                # defaults to the transport's port; or {setting: name}
     scheme: ws                # ws | wss | {setting: name}
     subprotocol: v1           # optional
     accept_invalid_certs: false # over wss; defaults to the http transport's
@@ -1253,6 +1253,34 @@ telemetry:
       - '{"action":"subscribe","parameter":"/composition/master"}'
     every_ms: 5000            # optional: send them again at this interval
 ```
+
+`port` may name an integer setting, `port: { setting: websocket_port }`, for
+a device whose push port the operator can move (OpenLP, FreeShow); an empty
+setting means the transport's port.
+
+A service that pushes on another host, with its token in the URL, gives an
+absolute `url` in place of `path`, `port` and `scheme`. Restream's streaming
+updates:
+
+```yaml
+telemetry:
+  websocket:
+    url: "wss://streaming.api.restream.io/ws?accessToken={settings.access_token}"
+```
+
+The URL is a template over settings, each value percent-encoded, rendered
+each time the websocket opens or reopens, so a token the core has refreshed
+since (`auth: oauth2`) is the one sent. Its scheme and host are written in
+the spec: `wss`, or `ws` only to this machine (`localhost`, `127.0.0.1`,
+`[::1]`), checked again on the rendered URL; a URL that fails is not opened
+and never logged, since it may hold a token. The transport's credential and
+`headers` do not go to the other host. When the URL names a setting, a 401
+or 403 answer to its opening is a refusal of that token: refreshed once if it
+can be, as on the transport, and otherwise the terminal refusal of §2.
+
+`idle_ms` reopens the websocket when nothing at all has arrived on it for
+that long, for a service that sends keepalives, where silence means a dead
+connection.
 
 `every_ms` sends the `send` items again at that interval while the websocket
 is open: a keepalive a device requires of a client (mimoLive closes a socket

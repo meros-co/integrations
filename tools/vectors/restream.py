@@ -195,3 +195,39 @@ telemetry(RS, "channel-enabled-legacy", settings=_RSS, inbound_http={
     "body": json.dumps([{"id": 123456, "streamingPlatformId": 29, "displayName": "My Custom RTMP", "enabled": True},
                         {"id": 123457, "streamingPlatformId": 73, "displayName": "My Instagram", "enabled": False}])},
     expect_state={"channels": {"123456": {"enabled": True}, "123457": {"enabled": False}}})
+
+# Streaming Updates, pushed on the websocket (Private API, Streaming Updates);
+# the messages follow the reference's IUpdates types, values made up.
+_RSU = "f6b1c2d3e4"
+telemetry(RS, "update-incoming", settings=_RSS, inbound_ws=json.dumps({
+    "action": "updateIncoming", "userId": 1, "eventId": _RSE, "createdAt": 1791230000, "suid": _RSU,
+    "streaming": {"fps": 29.97, "keyframeInterval": 2, "lossRate": 0, "bitrate": {"total": 6128000, "audio": 128000,
+                  "video": 6000000}, "codec": {"audio": "aac", "video": "h264"}, "profileAndLevel": "High@4.1",
+                  "height": 1080, "width": 1920}}),
+    expect_state={"incoming": {_RSU: {"event_id": _RSE, "started_at": 1791230000, "fps": 29.97,
+                                      "keyframe_interval": 2.0, "loss_rate": 0.0, "bitrate": 6128000,
+                                      "video_bitrate": 6000000, "audio_bitrate": 128000, "video_codec": "h264",
+                                      "audio_codec": "aac", "profile": "High@4.1", "width": 1920, "height": 1080}}})
+telemetry(RS, "delete-incoming", settings=_RSS, inbound_ws=json.dumps({
+    "action": "deleteIncoming", "userId": 1, "eventId": _RSE, "createdAt": 1791230000, "suid": _RSU}),
+    state_before={"incoming": {_RSU: {"fps": 29.97}}}, expect_state={"incoming": {}})
+telemetry(RS, "update-outgoing", settings=_RSS, inbound_ws=json.dumps({
+    "action": "updateOutgoing", "userId": 1, "eventId": _RSE, "platformId": 5, "channelId": 123456,
+    "createdAt": 1791230005, "channelIdentifier": "x", "eventIdentifier": "y",
+    "streaming": {"status": "CONNECTED", "bitrate": 6100000, "bufferedBytes": 0}}),
+    expect_state={"channels": {"123456": {"outgoing": {"status": "CONNECTED", "bitrate": 6100000,
+                                                       "buffered_bytes": 0, "started_at": 1791230005,
+                                                       "event_id": _RSE}}}})
+telemetry(RS, "delete-outgoing", settings=_RSS, inbound_ws=json.dumps({
+    "action": "deleteOutgoing", "userId": 1, "eventId": _RSE, "platformId": 5, "channelId": 123456,
+    "createdAt": 1791230005}),
+    state_before={"channels": {"123456": {"display_name": "YouTube", "outgoing": {"status": "CONNECTED"}}}},
+    expect_state={"channels": {"123456": {"display_name": "YouTube"}}})
+telemetry(RS, "update-statuses", settings=_RSS, inbound_ws=json.dumps({
+    "action": "updateStatuses", "userId": 1, "eventId": _RSE, "platformId": 5, "channelId": 123456,
+    "createdAt": 1791230005, "updatedAt": 1791230060, "channelIdentifier": "x", "eventIdentifier": "y",
+    "channelViews": None, "followers": 1520, "gameTitle": None, "online": True, "streamViews": 88,
+    "title": "Sunday Service", "viewers": 42}),
+    expect_state={"channels": {"123456": {"platform": {"online": True, "viewers": 42, "stream_views": 88,
+                                                       "followers": 1520, "title": "Sunday Service",
+                                                       "updated_at": 1791230060}}}})

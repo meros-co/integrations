@@ -669,20 +669,38 @@
         "websocket": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "path"
-          ],
           "description": "A websocket opened beside the transport, for a device that takes commands one way (REST) and pushes state on a websocket. Its messages go through the update rules; it is reopened with backoff when it closes.",
           "properties": {
             "path": {
               "type": "string",
               "pattern": "^/"
             },
+            "url": {
+              "type": "string",
+              "pattern": "^wss?://",
+              "description": "In place of path, port and scheme: an absolute URL on any host, a template over settings rendered (values percent-encoded) at each opening, so a refreshed token in it is the current one. wss, or ws only to this machine. The transport's credential and headers are not sent there (SPEC.md §8)."
+            },
             "port": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65535,
-              "description": "Defaults to the transport's port."
+              "description": "Defaults to the transport's port; or {setting: name} naming an integer setting (empty: the transport's port).",
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "setting"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "setting": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
             },
             "scheme": {
               "description": "ws or wss, or {setting: name} naming an enum setting whose values are ws and wss.",
@@ -765,8 +783,44 @@
                   }
                 }
               ]
+            },
+            "idle_ms": {
+              "type": "integer",
+              "minimum": 1000,
+              "description": "Reopen the websocket when nothing has arrived for this long: for a service that sends keepalives, so silence means a dead connection."
             }
-          }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "url"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "path"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "port"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "scheme"
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
         },
         "sse": {
           "type": "object",

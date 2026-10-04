@@ -54,10 +54,13 @@ settings:
   token: { type: string, secret: true, default: "", max_length: 512,
     label: Login token,
     description: "The token OpenLP's login answers with (the login command returns it), for a remote that requires authentication; leave empty when it does not." }
+  websocket_port: { type: int, min: 1, max: 65535, default: 4317,
+    label: Websocket port,
+    description: "The port of OpenLP's websocket server, 4317 unless moved in OpenLP's remote settings (get_system reports it); state is pushed there." }
 
 ports:
   - { port: 4316, protocol: http, role: control }
-  - { port: 4317, protocol: ws, role: push, note: "OpenLP's websocket server, which pushes its state" }
+  - { port: 4317, protocol: ws, role: push, setting: websocket_port, note: "OpenLP's websocket server, which pushes its state" }
 
 models:
   - id: openlp-3
@@ -371,7 +374,7 @@ telemetry:
   # in binary frames.
   websocket:
     path: /
-    port: 4317
+    port: { setting: websocket_port }
   # What the websocket only counts: the live item's title and selected slide,
   # and the service list.
   poll:
@@ -462,7 +465,7 @@ quirks:
     severity: warning
     text: >
       State comes from OpenLP's websocket server on port 4317 (OpenLP's remote settings can move
-      it; get_system reports the port), which sends the live state each time it changes, as JSON
+      it; get_system reports the port, and the websocket_port setting follows it), which sends the live state each time it changes, as JSON
       in binary frames. The websocket only counts changes to the live item and the service, so the
       live item's title and selected slide text and the service list are read every 2 seconds.
       When nothing is live, live-item answers {}, which leaves the last title and slide text in the

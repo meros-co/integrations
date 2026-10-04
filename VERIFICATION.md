@@ -632,19 +632,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## freeshow — FreeShow
 
-- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1489](specs/freeshow.yaml#L1489))
-- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1497](specs/freeshow.yaml#L1497))
+- [ ] Record the status code and body FreeShow's REST API answers to an action (204 assumed) and to a get_ query (200 with JSON assumed), and to an unknown action. ([specs/freeshow.yaml:1492](specs/freeshow.yaml#L1492))
+- [ ] Check whether positions (index_select_slide, index_select_project, index_select_project_item, index_select_overlay) count from 1 or from 0. ([specs/freeshow.yaml:1500](specs/freeshow.yaml#L1500))
 - [ ] Check that a get_cleared POST is harmless and answered while nothing is on output, since it is the liveness probe. ([specs/freeshow.yaml:65](specs/freeshow.yaml#L65))
-- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1481](specs/freeshow.yaml#L1481))
-- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:321](specs/freeshow.yaml#L321))
-- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:768](specs/freeshow.yaml#L768))
-- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:215](specs/freeshow.yaml#L215))
-- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1205](specs/freeshow.yaml#L1205))
-- [ ] Confirm that FreeShow's Socket.IO server on 5505 (Engine.IO 4 assumed) answers the variable request {"isVariable": true, "keys": [...]} on the "data" event with {isVariable: true, values: {...}}, as the Companion module receives it. ([specs/freeshow.yaml:1697](specs/freeshow.yaml#L1697))
-- [ ] Record the type each variable arrives as: whether slide_number and layout_slides are numbers, and whether output_windows_active, outputs_locked and log_song_usage are true/false or text. ([specs/freeshow.yaml:1752](specs/freeshow.yaml#L1752))
-- [ ] Check what slide_number counts from (1 assumed for the slide shown) and what it holds with nothing on output. ([specs/freeshow.yaml:1660](specs/freeshow.yaml#L1660))
-- [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1693](specs/freeshow.yaml#L1693))
-- [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1695](specs/freeshow.yaml#L1695))
+- [ ] With an API password set, confirm a wrong or missing Bearer token gets 401 on REST, and that versions before 1.6.6-beta.4 ignore the header. ([specs/freeshow.yaml:1484](specs/freeshow.yaml#L1484))
+- [ ] Check that numbers sent as JSON numbers are accepted (the Companion module sends every number and boolean as a string). ([specs/freeshow.yaml:324](specs/freeshow.yaml#L324))
+- [ ] Check the change_volume range (0-1 assumed, from the Companion module) and the transition types and easing names. ([specs/freeshow.yaml:771](specs/freeshow.yaml#L771))
+- [ ] Check that set_plain_text and create_show take line breaks in the text and split slides on a blank line. ([specs/freeshow.yaml:218](specs/freeshow.yaml#L218))
+- [ ] Record what get_shows, get_output, get_slide, get_timers and get_cleared return, so state rules can be written for them. ([specs/freeshow.yaml:1208](specs/freeshow.yaml#L1208))
+- [ ] Confirm that FreeShow's Socket.IO server on 5505 (Engine.IO 4 assumed) answers the variable request {"isVariable": true, "keys": [...]} on the "data" event with {isVariable: true, values: {...}}, as the Companion module receives it. ([specs/freeshow.yaml:1700](specs/freeshow.yaml#L1700))
+- [ ] Record the type each variable arrives as: whether slide_number and layout_slides are numbers, and whether output_windows_active, outputs_locked and log_song_usage are true/false or text. ([specs/freeshow.yaml:1755](specs/freeshow.yaml#L1755))
+- [ ] Check what slide_number counts from (1 assumed for the slide shown) and what it holds with nothing on output. ([specs/freeshow.yaml:1663](specs/freeshow.yaml#L1663))
+- [ ] With an API password set, confirm the socket takes it as the handshake auth {"token": key}, refuses the namespace without it, and accepts {"token": ""} when no password is set. ([specs/freeshow.yaml:1696](specs/freeshow.yaml#L1696))
+- [ ] Check whether FreeShow pushes changes unasked on the socket, which would let the once-a-second variable request go slower. ([specs/freeshow.yaml:1698](specs/freeshow.yaml#L1698))
 
 ## grandma2 — MA Lighting grandMA2
 
@@ -850,15 +850,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## openlp — OpenLP
 
-- [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:88](specs/openlp.yaml#L88))
+- [ ] Confirm that POST endpoints take their arguments as a JSON body with Content-Type application/json. ([specs/openlp.yaml:91](specs/openlp.yaml#L91))
 - [ ] Confirm that the login token goes in the Authorization header with nothing before it, whether it stays valid across OpenLP restarts, and that a missing or wrong token answers 401. ([specs/openlp.yaml:49](specs/openlp.yaml#L49))
-- [ ] Confirm that the websocket on 4317 sends its state in binary frames, sends the current state when a client connects, and needs no message from the client. ([specs/openlp.yaml:373](specs/openlp.yaml#L373))
-- [ ] Confirm that the websocket's slide field is the selected slide's index from 0 (its documentation repeats the service field's words). ([specs/openlp.yaml:343](specs/openlp.yaml#L343))
-- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:383](specs/openlp.yaml#L383))
-- [ ] Check how /service/show tells a position from an id, and whether positions count from 0 or 1. ([specs/openlp.yaml:313](specs/openlp.yaml#L313))
-- [ ] Check which method /controller/clear/<controller> takes (POST assumed). ([specs/openlp.yaml:160](specs/openlp.yaml#L160))
-- [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:253](specs/openlp.yaml#L253))
-- [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:151](specs/openlp.yaml#L151))
+- [ ] Confirm that the websocket on 4317 sends its state in binary frames, sends the current state when a client connects, and needs no message from the client. ([specs/openlp.yaml:376](specs/openlp.yaml#L376))
+- [ ] Confirm that the websocket's slide field is the selected slide's index from 0 (its documentation repeats the service field's words). ([specs/openlp.yaml:346](specs/openlp.yaml#L346))
+- [ ] Check what the websocket's display, theme and blank fields hold for each display mode (desktop assumed for display). ([specs/openlp.yaml:386](specs/openlp.yaml#L386))
+- [ ] Check how /service/show tells a position from an id, and whether positions count from 0 or 1. ([specs/openlp.yaml:316](specs/openlp.yaml#L316))
+- [ ] Check which method /controller/clear/<controller> takes (POST assumed). ([specs/openlp.yaml:163](specs/openlp.yaml#L163))
+- [ ] Check whether plugin item ids sent as JSON strings are accepted for songs, whose search results may give numbers. ([specs/openlp.yaml:256](specs/openlp.yaml#L256))
+- [ ] Check what set_theme answers (200 with the name assumed from the documentation) and the bible search option names set_search_option takes. ([specs/openlp.yaml:154](specs/openlp.yaml#L154))
 
 ## osc-listener — OSC received from any sender
 
@@ -975,16 +975,19 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm a refresh extends the refresh token's one-year life (refreshTokenExpiresIn) or keeps the original grant's. ([specs/restream.yaml:135](specs/restream.yaml#L135))
 - [ ] Confirm an expired or revoked access token answers 401 invalid_token on every endpoint, and that 403 is used only for a missing scope or plan feature. ([specs/restream.yaml:138](specs/restream.yaml#L138))
 - [ ] Confirm GET /v2/user/profile as the idle probe needs only profile.read and is not rate limited at that rate. ([specs/restream.yaml:141](specs/restream.yaml#L141))
-- [ ] Confirm the legacy PATCH /v2/user/channel/{id} with {"active": true|false} still exists, what it answers (200 assumed), and that it switches the channel for the next stream. ([specs/restream.yaml:283](specs/restream.yaml#L283))
-- [ ] Confirm the legacy GET /v2/user/channel/all still exists and answers an array of channels with id and enabled. ([specs/restream.yaml:999](specs/restream.yaml#L999))
-- [ ] Confirm the legacy GET and PATCH /v2/user/channel-meta/{id} still exist, take title and description, and answer 200. ([specs/restream.yaml:321](specs/restream.yaml#L321))
-- [ ] Confirm get_channel_meta works for the platforms that have metadata (YouTube, Facebook, Twitch) and record what it answers for others. ([specs/restream.yaml:297](specs/restream.yaml#L297))
-- [ ] Confirm In Progress Events answers [] when nothing is live, and record how soon an event appears there after the encoder starts. ([specs/restream.yaml:963](specs/restream.yaml#L963))
-- [ ] Confirm an event that ends leaves In Progress and shows in Events History with status finished on the first page. ([specs/restream.yaml:926](specs/restream.yaml#L926))
-- [ ] Record the status codes Create Ticker, Create Caption, Create QR Code and the Recording and Chat History Download URL methods answer (the reference does not say), and what Update Caption and Update QR Code answer. ([specs/restream.yaml:594](specs/restream.yaml#L594))
-- [ ] Confirm Create Caption accepts an empty secondaryText, and Update Caption with an empty one clears the second line. ([specs/restream.yaml:648](specs/restream.yaml#L648))
-- [ ] Confirm Add Event Destination for a YouTube channel without title is refused, so add_event_destination_custom is needed there. ([specs/restream.yaml:423](specs/restream.yaml#L423))
-- [ ] Record Restream's API rate limits, which the reference does not state, against the 30-second poll of six requests. ([specs/restream.yaml:926](specs/restream.yaml#L926))
+- [ ] Confirm the legacy PATCH /v2/user/channel/{id} with {"active": true|false} still exists, what it answers (200 assumed), and that it switches the channel for the next stream. ([specs/restream.yaml:284](specs/restream.yaml#L284))
+- [ ] Confirm the legacy GET /v2/user/channel/all still exists and answers an array of channels with id and enabled. ([specs/restream.yaml:1028](specs/restream.yaml#L1028))
+- [ ] Confirm the legacy GET and PATCH /v2/user/channel-meta/{id} still exist, take title and description, and answer 200. ([specs/restream.yaml:322](specs/restream.yaml#L322))
+- [ ] Confirm get_channel_meta works for the platforms that have metadata (YouTube, Facebook, Twitch) and record what it answers for others. ([specs/restream.yaml:298](specs/restream.yaml#L298))
+- [ ] Confirm In Progress Events answers [] when nothing is live, and record how soon an event appears there after the encoder starts. ([specs/restream.yaml:992](specs/restream.yaml#L992))
+- [ ] Confirm an event that ends leaves In Progress and shows in Events History with status finished on the first page. ([specs/restream.yaml:955](specs/restream.yaml#L955))
+- [ ] Record the status codes Create Ticker, Create Caption, Create QR Code and the Recording and Chat History Download URL methods answer (the reference does not say), and what Update Caption and Update QR Code answer. ([specs/restream.yaml:595](specs/restream.yaml#L595))
+- [ ] Confirm Create Caption accepts an empty secondaryText, and Update Caption with an empty one clears the second line. ([specs/restream.yaml:649](specs/restream.yaml#L649))
+- [ ] Confirm Add Event Destination for a YouTube channel without title is refused, so add_event_destination_custom is needed there. ([specs/restream.yaml:424](specs/restream.yaml#L424))
+- [ ] Record Restream's API rate limits, which the reference does not state, against the 30-second poll of six requests. ([specs/restream.yaml:955](specs/restream.yaml#L955))
+- [ ] Confirm the streaming-updates websocket accepts the OAuth access token in accessToken, which scope it needs (stream.read assumed; the page names none), and that an expired token is refused at the handshake with 401. ([specs/restream.yaml:947](specs/restream.yaml#L947))
+- [ ] Record real streaming updates: that suid is stable for one encoder session, channelId matches the channel list's id, and deleteIncoming and deleteOutgoing arrive when the encoder and destinations stop. ([specs/restream.yaml:1034](specs/restream.yaml#L1034))
+- [ ] Record which updateStatuses fields each platform fills (viewers, followers, streamViews), and how often they arrive. ([specs/restream.yaml:1082](specs/restream.yaml#L1082))
 
 ## roland-p20hd — Roland P-20HD
 

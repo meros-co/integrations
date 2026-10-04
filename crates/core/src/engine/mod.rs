@@ -45,6 +45,8 @@ const PUSH_RECONNECT: Key = "push-reconnect";
 const PUSH_PING: Key = "push-ping";
 /// `telemetry.websocket.every_ms`: the push websocket's messages again.
 const PUSH_RENEW: Key = "push-renew";
+/// `telemetry.websocket.idle_ms`: the push websocket gone quiet.
+const PUSH_IDLE: Key = "push-idle";
 /// The server-sent event stream (`telemetry.sse`).
 const EVENTS: Key = "events";
 const EVENTS_RECONNECT: Key = "events-reconnect";
@@ -275,10 +277,53 @@ struct Push {
     /// open, for a device that drops a client gone quiet (mimoLive's
     /// keepalive) or answers state only when asked (FreeShow's variables).
     every: Option<Millis>,
-    /// Whether its opening request carries the transport's credential.
+    /// Whether its opening request carries the transport's credential, or
+    /// its URL a setting (a token in the query).
     credentialed: bool,
     /// Socket.IO over Engine.IO, when the device speaks it.
     socketio: Option<SocketIo>,
+    /// `url`: an absolute URL on any host, a template over settings
+    /// rendered at each opening, so a refreshed token in it is the current
+    /// one (Restream's `?accessToken=`).
+    url: Option<String>,
+    /// `idle_ms`: reopened when nothing arrives for this long (a service
+    /// that sends keepalives, so silence means a dead connection).
+    idle: Option<Millis>,
+}
+
+/// Engine.IO's query, after a URL with or without one.
+fn engine_io_query(url: &str, sio: &SocketIo) -> String {
+    let sep = if url.contains('?') { '&' } else { '?' };
+    format!("{sep}EIO={}&transport=websocket", sio.version)
+}
+
+/// A push websocket URL a spec renders: `wss`, or `ws` only to this machine.
+/// The URL may hold a token, so an error never shows it.
+fn check_push_url(url: &str) -> Result<(), String> {
+    let authority = |rest: &str| rest.split(['/', '?']).next().unwrap_or("").to_string();
+    if let Some(rest) = url.strip_prefix("wss://") {
+        if !authority(rest).is_empty() {
+            return Ok(());
+        }
+    }
+    if let Some(rest) = url.strip_prefix("ws://") {
+        let authority = authority(rest);
+        let host = if authority.starts_with('[') {
+            authority.split(']').next().map(|h| format!("{h}]"))
+        } else {
+            authority.split(':').next().map(str::to_string)
+        }
+        .unwrap_or_default();
+        let loopback = host == "localhost"
+            || host == "[::1]"
+            || host
+                .parse::<std::net::Ipv4Addr>()
+                .is_ok_and(|ip| ip.is_loopback());
+        if loopback {
+            return Ok(());
+        }
+    }
+    Err("telemetry.websocket.url must be wss, or ws to this machine (localhost, 127.0.0.1 or [::1])".into())
 }
 
 /// `telemetry.websocket.socketio`: Socket.IO's framing over the websocket.
@@ -974,10 +1019,49 @@ impl SpecEngine {
         let push = match spec.telemetry.as_ref().and_then(|t| t.get("websocket")) {
             None => None,
             Some(w) => {
-                let push_port = match w.get("port").and_then(Value::as_u64) {
-                    Some(p @ 1..=65535) => p as u16,
-                    Some(_) => return Err("telemetry.websocket.port is not a port".into()),
+                // A port, or `{setting: name}` naming the operator's (an
+                // empty setting is the transport's port).
+                let push_port = match w.get("port") {
                     None => port,
+                    Some(Value::Object(o)) => {
+                        let name = o
+                            .get("setting")
+                            .and_then(Value::as_str)
+                            .ok_or("telemetry.websocket.port is a port or {setting: name}")?;
+                        match ctx.settings.get(name) {
+                            None | Some(Value::Null) => port,
+                            Some(v) => match v.as_u64() {
+                                Some(p @ 1..=65535) => p as u16,
+                                _ => return Err(format!("setting {name} is not a port")),
+                            },
+                        }
+                    }
+                    Some(v) => match v.as_u64() {
+                        Some(p @ 1..=65535) => p as u16,
+                        _ => return Err("telemetry.websocket.port is not a port".into()),
+                    },
+                };
+                let url = match w.get("url") {
+                    None => None,
+                    Some(Value::String(u)) => {
+                        if w.get("path").is_some()
+                            || w.get("port").is_some()
+                            || w.get("scheme").is_some()
+                        {
+                            return Err(
+                                "telemetry.websocket.url replaces path, port and scheme".into()
+                            );
+                        }
+                        // The scheme and host are the spec's: checked now, and
+                        // the rendered URL again at each opening.
+                        if !(u.starts_with("wss://") || u.starts_with("ws://")) {
+                            return Err(
+                                "telemetry.websocket.url starts with wss:// or ws://".into()
+                            );
+                        }
+                        Some(u.clone())
+                    }
+                    Some(_) => return Err("telemetry.websocket.url is a template".into()),
                 };
                 // The transport's credential goes on the websocket's opening
                 // request too.
@@ -1013,38 +1097,64 @@ impl SpecEngine {
                         return Err("telemetry.websocket.socketio is true or an object".into())
                     }
                 };
-                let mut request = ws_request(
-                    w,
-                    &url_host(&ctx),
-                    push_port,
-                    &ctx.settings,
-                    auth,
-                    &auth_header,
-                )?;
-                request.headers.extend(side_headers.iter().cloned());
-                if let Some(sio) = &socketio {
-                    // Engine.IO's query.
-                    let sep = if request.url.contains('?') { '&' } else { '?' };
-                    request
-                        .url
-                        .push_str(&format!("{sep}EIO={}&transport=websocket", sio.version));
+                let mut request = match &url {
+                    // Another host: neither the transport's credential nor
+                    // its headers go there; the URL carries what it needs.
+                    Some(_) => WsRequest {
+                        url: String::new(),
+                        headers: str_field(w, "subprotocol")
+                            .map(|p| vec![("Sec-WebSocket-Protocol".to_string(), p.to_string())])
+                            .unwrap_or_default(),
+                        accept_invalid_certs: w
+                            .get("accept_invalid_certs")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    },
+                    None => {
+                        let mut request = ws_request(
+                            w,
+                            &url_host(&ctx),
+                            push_port,
+                            &ctx.settings,
+                            auth,
+                            &auth_header,
+                        )?;
+                        request.headers.extend(side_headers.iter().cloned());
+                        request
+                    }
+                };
+                if let (Some(sio), None) = (&socketio, &url) {
+                    request.url.push_str(&engine_io_query(&request.url, sio));
                 }
                 // A device serving HTTPS with a self-signed certificate
                 // serves wss with it too, unless the websocket says otherwise.
                 if let (
                     None,
+                    None,
                     Transport::Http {
                         accept_invalid_certs: true,
                         ..
                     },
-                ) = (w.get("accept_invalid_certs"), &transport)
+                ) = (w.get("accept_invalid_certs"), &url, &transport)
                 {
                     request.accept_invalid_certs = true;
                 }
                 let credentialed = request
                     .headers
                     .iter()
-                    .any(|(name, _)| name != "Sec-WebSocket-Protocol");
+                    .any(|(name, _)| name != "Sec-WebSocket-Protocol")
+                    || url.as_deref().is_some_and(|u| u.contains("{settings."));
+                let idle = match w.get("idle_ms") {
+                    None => None,
+                    Some(v) => match v.as_u64() {
+                        Some(ms @ 1..) => Some(ms),
+                        _ => {
+                            return Err(
+                                "telemetry.websocket.idle_ms is not a positive integer".into()
+                            )
+                        }
+                    },
+                };
                 Some(Push {
                     request,
                     send: match w.get("send") {
@@ -1065,6 +1175,8 @@ impl SpecEngine {
                     },
                     credentialed,
                     socketio,
+                    url,
+                    idle,
                 })
             }
         };
@@ -2355,10 +2467,41 @@ impl SpecEngine {
         if !self.monitor {
             return;
         }
-        if let Some(push) = &self.push {
-            let mut request = push.request.clone();
+        let Some(push) = &self.push else {
+            return;
+        };
+        let mut request = push.request.clone();
+        if let Some(template) = &push.url {
+            // Rendered from the settings now, so a refreshed token is used;
+            // each value percent-encoded, as in a query.
+            let (no_params, no_specs) = (Params::new(), BTreeMap::new());
+            let rendered = render(
+                template,
+                &self.values(&no_params, &no_specs),
+                percent_encode,
+            )
+            .and_then(|url| check_push_url(&url).map(|()| url));
+            match rendered {
+                Ok(url) => request.url = url,
+                Err(e) => {
+                    cx.log(Level::Warning, format!("push websocket not opened: {e}"));
+                    return;
+                }
+            }
+            if let Some(sio) = &push.socketio {
+                request.url.push_str(&engine_io_query(&request.url, sio));
+            }
+        } else {
             self.current_auth(&mut request.headers);
-            cx.ws_open(PUSH, request);
+        }
+        cx.ws_open(PUSH, request);
+    }
+
+    /// `idle_ms`: the push websocket heard from; reopened if it then goes
+    /// quiet for that long.
+    fn push_heard(&mut self, cx: &mut Cx) {
+        if let Some(idle) = self.push.as_ref().and_then(|p| p.idle) {
+            cx.set_timer(PUSH_IDLE, idle);
         }
     }
 
@@ -2444,6 +2587,7 @@ impl SpecEngine {
                     self.send_push_items(cx, "");
                 }
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             // Text pushed in binary frames (OpenLP's state): offered to the
@@ -2455,6 +2599,7 @@ impl SpecEngine {
                     None => self.apply_message(cx, &text),
                 }
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             WsInput::Text(text) => {
@@ -2463,15 +2608,18 @@ impl SpecEngine {
                     None => self.apply_message(cx, &text),
                 }
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             WsInput::Binary(_) | WsInput::Activity => {
                 self.last_heard = cx.now();
+                self.push_heard(cx);
                 cx.alive();
             }
             WsInput::Closed { reason, .. } => {
                 cx.cancel_timer(PUSH_PING);
                 cx.cancel_timer(PUSH_RENEW);
+                cx.cancel_timer(PUSH_IDLE);
                 let credentialed = !auth_headers_empty(&self.push);
                 if credentialed && handshake_refused(&reason) && self.side_refresh(cx) {
                     cx.set_timer(PUSH_RECONNECT, RECONNECT_MIN);
@@ -2948,6 +3096,15 @@ impl Module for SpecEngine {
             }
             RECONNECT => self.connect(cx),
             PUSH_RECONNECT => self.open_push(cx),
+            // `idle_ms`: nothing heard, so the connection is dead.
+            PUSH_IDLE => {
+                cx.log(Level::Info, "push websocket silent too long; reopening");
+                cx.cancel_timer(PUSH_PING);
+                cx.cancel_timer(PUSH_RENEW);
+                cx.ws_close(PUSH);
+                cx.set_timer(PUSH_RECONNECT, self.push_backoff);
+                self.push_backoff = (self.push_backoff * 2).min(RECONNECT_MAX);
+            }
             // `every_ms`: the push websocket's messages again.
             PUSH_RENEW => {
                 let prefix = match self.push.as_ref().and_then(|p| p.socketio.as_ref()) {
@@ -5093,5 +5250,137 @@ mod tests {
         assert_eq!(sent.len(), 1);
         assert!(sent[0].1.url.ends_with("method=ping"));
         assert_eq!(cookie_of(&sent[0].1), None);
+    }
+
+    fn push_opened(actions: &[Action]) -> Option<WsRequest> {
+        actions.iter().find_map(|a| match a {
+            Action::WsOpen {
+                socket: PUSH,
+                request,
+            } => Some(request.clone()),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn a_push_websocket_on_another_host_takes_the_current_token_in_its_url() {
+        let spec = Catalog::source_tree().device("restream").unwrap().clone();
+        let mut e = open_spec(
+            spec,
+            "api-v2",
+            json!({"access_token": "t/1+a", "refresh_token": "r", "client_id": "c",
+                   "expires_at": 4_000_000_000u64}),
+        );
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let request = push_opened(&cx.take()).expect("the push channel opens");
+        // The token percent-encoded in the query; neither the transport's
+        // credential nor its headers go to the other host.
+        assert_eq!(
+            request.url,
+            "wss://streaming.api.restream.io/ws?accessToken=t%2F1%2Ba"
+        );
+        assert!(request.headers.is_empty(), "{:?}", request.headers);
+
+        // A refreshed token: the next opening uses it.
+        e.settings.insert("access_token".into(), json!("fresh"));
+        let mut cx = Cx::new(1);
+        e.ws(
+            &mut cx,
+            PUSH,
+            WsInput::Closed {
+                code: None,
+                reason: "closed".into(),
+            },
+        );
+        cx.take();
+        let mut cx = Cx::new(2_000);
+        e.timer(&mut cx, PUSH_RECONNECT);
+        assert_eq!(
+            push_opened(&cx.take()).unwrap().url,
+            "wss://streaming.api.restream.io/ws?accessToken=fresh"
+        );
+    }
+
+    #[test]
+    fn a_push_url_must_be_secure_and_a_push_port_may_be_a_setting() {
+        let mut spec = with_push_websocket();
+        let w = &mut spec.telemetry.as_mut().unwrap()["websocket"];
+        *w = json!({"url": "ws://example.com/ws?k={settings.k}"});
+        spec.settings.insert(
+            "k".into(),
+            serde_json::from_value(json!({"type": "string", "default": ""})).unwrap(),
+        );
+        let mut e = open_spec(spec, "arena", json!({"k": "x"}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let a = cx.take();
+        assert!(push_opened(&a).is_none(), "plain ws to another host");
+        assert!(a.iter().any(|a| matches!(a, Action::Log { message, .. }
+            if message.contains("wss") && !message.contains("k=x"))));
+
+        // Loopback may be plain ws.
+        let mut spec = with_push_websocket();
+        spec.telemetry.as_mut().unwrap()["websocket"] = json!({"url": "ws://127.0.0.1:9000/ws"});
+        let mut e = open_spec(spec, "arena", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        assert_eq!(
+            push_opened(&cx.take()).unwrap().url,
+            "ws://127.0.0.1:9000/ws"
+        );
+
+        // OpenLP's websocket port, a setting.
+        let open = |settings: Value| {
+            let spec = Catalog::source_tree().device("openlp").unwrap().clone();
+            let settings =
+                crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+            let mut e = SpecEngine::new(
+                Arc::new(spec),
+                OpenContext {
+                    host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    host_name: None,
+                    port: None,
+                    model: "openlp-3".into(),
+                    channels: None,
+                    settings,
+                    monitor: true,
+                },
+            )
+            .unwrap();
+            let mut cx = Cx::new(0);
+            e.start(&mut cx);
+            push_opened(&cx.take()).unwrap().url
+        };
+        assert_eq!(open(json!({})), "ws://127.0.0.1:4317/");
+        assert_eq!(
+            open(json!({"websocket_port": 5000})),
+            "ws://127.0.0.1:5000/"
+        );
+    }
+
+    #[test]
+    fn a_quiet_push_websocket_is_reopened() {
+        let mut spec = with_push_websocket();
+        spec.telemetry.as_mut().unwrap()["websocket"]["idle_ms"] = json!(30_000);
+        let mut e = open_spec(spec, "arena", json!({}));
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        cx.take();
+        let mut cx = Cx::new(1);
+        e.ws(&mut cx, PUSH, WsInput::Opened);
+        assert!(cx.take().iter().any(|a| matches!(a,
+            Action::SetTimer { key: PUSH_IDLE, after } if *after == 30_000)));
+        let mut cx = Cx::new(30_001);
+        e.timer(&mut cx, PUSH_IDLE);
+        let a = cx.take();
+        assert!(a.contains(&Action::WsClose { socket: PUSH }));
+        assert!(a.iter().any(|a| matches!(
+            a,
+            Action::SetTimer {
+                key: PUSH_RECONNECT,
+                ..
+            }
+        )));
     }
 }
