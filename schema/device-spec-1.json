@@ -201,6 +201,14 @@
               "accepted": {
                 "type": "string",
                 "description": "With refused: regex over reply lines. Once a line matches, the device has accepted the login and refused no longer applies."
+              },
+              "models": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
               }
             }
           }
@@ -259,6 +267,24 @@
               }
             }
           }
+        }
+      }
+    },
+    "maps": {
+      "type": "object",
+      "description": "Named value tables: a parameter's plain text (an enum value, true or false, a decimal integer) to the wire text, used in templates as {x:map.<name>}. A value the table does not list is rejected before transmission (SPEC.md §4, Value tables).",
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
         }
       }
     },
@@ -524,6 +550,13 @@
                 },
                 "description": "With path: names for values taken from a JSON reply, by JSON path. With address: from the JSON in the string argument at json_arg. With json_match alone: from the JSON message."
               },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "With path: names for response header values, by header name in any case (SPEC.md §8)."
+              },
               "xml_each": {
                 "type": "string",
                 "description": "With path: an XML element name; each such element in the reply is a match, its attributes the captures."
@@ -586,6 +619,18 @@
                   "json",
                   "state"
                 ]
+              },
+              {
+                "required": [
+                  "path",
+                  "headers",
+                  "state"
+                ],
+                "not": {
+                  "required": [
+                    "json"
+                  ]
+                }
               },
               {
                 "required": [
@@ -1057,6 +1102,12 @@
               "minimum": 1,
               "maximum": 65535
             },
+            "https_port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "With scheme {setting: name}: the default port when the setting chooses https (Magewell: 80, or 443)."
+            },
             "scheme": {
               "description": "http or https, or {setting: name} naming an enum setting whose values are http and https, for devices the operator can switch.",
               "oneOf": [
@@ -1214,7 +1265,83 @@
               "minimum": 1
             },
             "probe": {
-              "$ref": "#/$defs/httpSend"
+              "description": "Liveness check, any answer meaning reachable: one request, or a list of requests each naming its models, the first for the device's model used.",
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/httpSend"
+                },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/httpSend"
+                  }
+                }
+              ]
+            },
+            "session": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "login"
+              ],
+              "description": "A login whose answer carries a session (a cookie or a header) sent back on every later request; renewed when the device says it ended (SPEC.md §2, Sessions).",
+              "properties": {
+                "login": {
+                  "description": "The login request (templates over settings), or a list of them each naming its models.",
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/httpSend"
+                    },
+                    {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "$ref": "#/$defs/httpSend"
+                      }
+                    }
+                  ]
+                },
+                "capture": {
+                  "description": "What of the login's answer is the session: {cookie: name} the named Set-Cookie, or every one with \"*\" (the default), sent back as Cookie; {header: name} a response header, sent back in a header of that name.",
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "cookie"
+                      ],
+                      "properties": {
+                        "cookie": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "header"
+                      ],
+                      "properties": {
+                        "header": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9-]+$"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "relogin": {
+                  "$ref": "#/$defs/sessionMatch",
+                  "description": "An answer to any request meaning the session ended: the core logs in again and sends that request once more."
+                },
+                "refused": {
+                  "$ref": "#/$defs/sessionMatch",
+                  "description": "An answer to the login refusing the credential: terminal, as any refusal."
+                }
+              }
             }
           },
           "required": [
@@ -1500,6 +1627,14 @@
               }
             }
           }
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
         }
       }
     },
@@ -1541,6 +1676,14 @@
         "reply_address": {
           "type": "string",
           "description": "Telemetry poll only: RE2-safe regex over the address the device answers on, for a query answered on another address (ETC Eos: /eos/get/... on /eos/out/get/...)."
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
         }
       }
     },
@@ -1580,6 +1723,18 @@
         },
         "content_type": {
           "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "The model ids this message is for; it is skipped for any other model (SPEC.md §4, Messages per model)."
+        },
+        "session": {
+          "type": "boolean",
+          "description": "false: sent without the session of transport.session, and needing none, so it does not log in first (a ping)."
         }
       },
       "not": {
@@ -1618,6 +1773,10 @@
           "minProperties": 1,
           "description": "JSON path to the value it must hold, in the same JSON as json_path; any other value fails the command."
         },
+        "header": {
+          "type": "string",
+          "description": "HTTP only. A response header whose value is returned (a Location, an ETag); the command fails without it."
+        },
         "code_range": {
           "type": "array",
           "minItems": 2,
@@ -1626,6 +1785,10 @@
             "type": "integer"
           },
           "description": "Inclusive success range for a leading numeric response code."
+        },
+        "code_path": {
+          "type": "string",
+          "description": "JSON path to the reply's numeric status code, used in place of a leading code by code_range and codes (Magewell's $.status)."
         },
         "address": {
           "type": "string",
@@ -1684,6 +1847,30 @@
         "text": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "sessionMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "status": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "description": "HTTP statuses."
+        },
+        "json": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "JSON paths to RE2-safe regexes the answer's body must all match."
         }
       }
     }

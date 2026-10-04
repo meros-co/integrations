@@ -404,6 +404,7 @@ mod tests {
 
     fn reply(body: Value) -> Result<HttpResponse, String> {
         Ok(HttpResponse {
+            headers: Vec::new(),
             status: 200,
             body: body.to_string().into_bytes(),
         })

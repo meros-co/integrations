@@ -3,15 +3,6 @@ id: magewell-proconvert
 name: Magewell Pro Convert
 vendor: Magewell
 category: other
-implementation: native
-reason: >
-  Every request needs a session: a login whose session ID comes back only in a
-  Set-Cookie header and must be sent as a cookie on each later request, and
-  renewed when the device answers "not logged in". The encoders and NDI
-  decoders take a hashed password in a GET query (MD5), the IP decoders a
-  JSON login (SHA-256) with a cookie named after the serial number. The spec
-  format's HTTP transport has no cookie session, so the module speaks HTTP/1.1
-  itself.
 
 source:
   - title: "Magewell Pro Convert Encoder API (unversioned; examples from firmware 1.1.72)"
@@ -107,6 +98,110 @@ ports:
   - { port: 80, protocol: http, role: control, note: "the documents state no port; the web interface's standard port is assumed", when: "scheme http" }
   - { port: 443, protocol: https, role: control, setting: scheme, when: "scheme https" }
 
+# Two APIs: the encoders and first-generation NDI decoders take
+# GET /mwapi?method=<name> (Encoder API, Decoder API V1.3), the IP decoders
+# JSON under /api (IP Decoder API V1.2). Each message names the models it is
+# for. Every reply carries an integer status, 0 for success.
+transport:
+  type: http
+  port: 80
+  https_port: 443
+  scheme: { setting: scheme }
+  # HTTPS only after a certificate is uploaded to a decoder (user manual).
+  accept_invalid_certs: true
+  timeout_ms: 5000
+  # ping needs no login (Encoder API section 2, IP Decoder API section 12).
+  probe:
+    - { models: &mw [hdmi-4k-plus, hdmi-plus, hdmi-tx, 12g-sdi-4k-plus, sdi-4k-plus, sdi-plus, sdi-tx,
+                     ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k],
+        method: GET, path: /mwapi, query: { method: ping } }
+    - { models: &ip [ip-to-hdmi, ip-to-hdmi-4k, ip-to-aio-4k], method: GET, path: /api/ping }
+  # The session ID comes back only in Set-Cookie (sid, or sid-<serial number>
+  # on the IP decoders) and goes back as a cookie on every later request.
+  session:
+    login:
+      # Encoder API section 4: id and the MD5 of the password.
+      - { models: *mw, method: GET, path: /mwapi,
+          query: { method: login, id: "{settings.username}", pass: "{settings.password:md5}" } }
+      # IP Decoder API section 15: the SHA-256 of the password, as JSON.
+      - { models: *ip, method: POST, path: /api/user/login, content_type: application/json,
+          body: '{"username":{settings.username:json},"password":"{settings.password:sha256}"}' }
+    capture: { cookie: "*" }
+    # 37 "not logged in": the session ended (a restart, or idle).
+    relogin: { status: [401], json: { "$.status": "^37$" } }
+    # 36 "authentication failed"; 16 "does not exist" (an unknown user on
+    # the IP decoders).
+    refused: { status: [401, 403], json: { "$.status": "^(36|16)$" } }
+
+# The status codes of Encoder API section 1.3 and Decoder API V1.3 section 1.4.
+codes:
+  "1": pending
+  "2": timeout
+  "3": interrupted
+  "4": try again
+  "5": not implemented
+  "6": unknown error
+  "7": invalid argument
+  "8": no memory
+  "9": unsupported
+  "10": file busy
+  "11": device busy
+  "12": device lost
+  "13": I/O failed
+  "14": read failed
+  "15": write failed
+  "16": does not exist
+  "17": too many
+  "18": too large
+  "19": overflow
+  "20": underflow
+  "21": format error
+  "22": file exists
+  "23": file type error
+  "24": device type error
+  "25": is a directory
+  "26": read only
+  "27": range error
+  "28": broken pipe
+  "29": no space
+  "30": not a directory
+  "31": not permitted
+  "32": bad address
+  "33": seek error
+  "34": cross-device link
+  "35": not initialized
+  "36": authentication failed
+  "37": not logged in
+  "38": wrong state
+  "39": mismatch
+  "40": verify failed
+  "41": constraint violation
+  "42": canceled
+  "43": in progress
+  "44": connection refused
+  "45": connection reset
+  "46": address in use
+  "47": no response
+  "48": information changed
+  "49": invalid data
+  "50": need more data
+  "51": no buffer
+  "52": buffer too small
+  "53": buffer is empty
+  "54": buffer is full
+  "55": network unreachable
+
+maps:
+  # set-ndi-config's transport flags: at most one true (section 9.2); TCP
+  # is all four false.
+  ndi_mcast: { tcp: "false", multi-tcp: "false", udp: "false", rudp: "false", multicast: "true" }
+  ndi_rudp: { tcp: "false", multi-tcp: "false", udp: "false", rudp: "true", multicast: "false" }
+  ndi_multi_tcp: { tcp: "false", multi-tcp: "true", udp: "false", rudp: "false", multicast: "false" }
+  ndi_udp: { tcp: "false", multi-tcp: "false", udp: "true", rudp: "false", multicast: "false" }
+  reference_level: { smpte: "20", ebu: "14" }
+  # Decoder API V1.3 section 7.3: the overlay switches of set-video-config.
+  overlay_field: { title: show-title, tally: show-tally, vu-meter: show-vu-meter, center-cross: show-center-cross }
+
 models:
   - id: hdmi-4k-plus
     name: "Magewell Pro Convert HDMI 4K Plus (and Module)"
@@ -192,53 +287,88 @@ models:
 commands:
   ping:
     summary: "Check the device is ready; needs no login (ping)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: ping }, session: false }
+      - { models: *ip, method: GET, path: /api/ping, session: false }
+    # Every reply: HTTP 200 and status 0; any other status fails with its code.
+    expect: &ok { status: 200, code_path: "$.status", code_range: [0, 0] }
     returns: ack
   reboot:
     summary: "Restart the device; its output stops until it is back (reboot)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: reboot } }
+      - { models: *ip, method: POST, path: /api/reboot }
+    expect: *ok
     returns: ack
   get_summary:
     summary: "Device, network and NDI status: model, firmware, input or output state, temperature, NDI stream and tally (get-summary-info, or /api/system/summary)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-summary-info } }
+      - { models: *ip, method: GET, path: /api/system/summary }
+    expect: &value { status: 200, code_path: "$.status", code_range: [0, 0], json_path: "$" }
     returns: value
   get_caps:
     summary: "Capabilities: maximum input and output size, loop-through, fan, SD card, PTZ (get-caps)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-caps } }
+    expect: *value
     returns: value
   get_signal_info:
     summary: "The input signal (encoders) or decoded source (decoders): format, colour, audio (get-signal-info, or /api/signal/info)"
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-signal-info } }
+      - { models: *ip, method: GET, path: /api/signal/info }
+    expect: *value
     returns: value
   get_video_config:
     summary: "Video settings (get-video-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-video-config } }
+    expect: *value
     returns: value
   get_ndi_config:
     summary: "NDI settings (get-ndi-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-ndi-config } }
+    expect: *value
     returns: value
   get_ndi_sources:
     summary: "NDI sources discovered on the network, each with ndi-name and ip-addr (get-ndi-sources)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-ndi-sources } }
+    expect: *value
     returns: value
   get_tally_config:
     summary: "Whether the tally lights are user-controlled (get-tally)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-tally } }
+    expect: *value
     returns: value
 
   set_ndi_enabled:
     summary: "Turn the encoder's NDI output on or off (set-ndi-config enable)"
     params:
       enabled: { type: bool, required: true, label: NDI output, description: "On sends the input as an NDI source; off stops it." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable: "{enabled}" } }
+    expect: *ok
     returns: ack
   set_ndi_source_name:
     summary: "Set the NDI source name template (set-ndi-config source-name)"
     params:
       name: { type: string, required: true, max_length: 63, label: Source name,
         description: "The NDI source name; %board-id% and %serial-no% are replaced, and the default is #%board-id% (%serial-no%)." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, source-name: "{name}" } }
+    expect: *ok
     returns: ack
   set_ndi_groups:
     summary: "NDI groups the source is published in (set-ndi-config group-name)"
     params:
       groups: { type: string, required: true, max_length: 255, label: NDI groups, description: "Group names separated by commas; public is the default group." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, group-name: "{groups}" } }
+    expect: *ok
     returns: ack
   set_ndi_transport:
     summary: "NDI transport: TCP (all flags off), multi-TCP, UDP, reliable UDP or multicast (set-ndi-config enable-tcp, enable-udp, enable-rudp, enable-mcast)"
     params:
       transport: { type: enum, values: [tcp, multi-tcp, udp, rudp, multicast], required: true, label: Transport,
         description: "How receivers are sent the stream; tcp is the single-connection default with every transport flag off." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-mcast: "{transport:map.ndi_mcast}", enable-rudp: "{transport:map.ndi_rudp}", enable-tcp: "{transport:map.ndi_multi_tcp}", enable-udp: "{transport:map.ndi_udp}" } }
+    expect: *ok
     returns: ack
   set_ndi_multicast:
     summary: "Multicast address, netmask and TTL (set-ndi-config mcast-addr, mcast-mask, mcast-ttl)"
@@ -246,12 +376,16 @@ commands:
       address: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Multicast address, description: "Multicast base address, e.g. 239.255.0.0." }
       netmask: { type: string, required: true, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", label: Netmask, description: "Multicast netmask, e.g. 255.255.0.0." }
       ttl: { type: int, min: 1, max: 255, required: true, label: TTL, description: "Multicast time-to-live in router hops, 1 to 255." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, mcast-addr: "{address}", mcast-mask: "{netmask}", mcast-ttl: "{ttl}" } }
+    expect: *ok
     returns: ack
   set_ndi_discovery:
     summary: "Use NDI discovery servers, or not (set-ndi-config enable-discovery, discovery-server)"
     params:
       enabled: { type: bool, required: true, label: Discovery server, description: "On registers with the discovery servers given." }
       servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server IP addresses separated by commas; needed when on." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-discovery: "{enabled}", discovery-server: "{servers}" } }
+    expect: *ok
     returns: ack
   set_ndi_failover:
     summary: "NDI failover source receivers switch to when this one stops (set-ndi-config enable-fail-over, fail-over-ndi-name, fail-over-ip-addr)"
@@ -259,94 +393,132 @@ commands:
       enabled: { type: bool, required: true, label: Failover, description: "On names a failover source." }
       ndi_name: { type: string, default: "", max_length: 255, label: Failover source, description: "The failover NDI source's name, as get_ndi_sources lists it." }
       ip_address: { type: string, default: "", max_length: 64, label: Failover address, description: "The failover source's ip-addr as get_ndi_sources lists it, e.g. 192.168.1.192:5963." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-fail-over: "{enabled}", fail-over-ndi-name: "{ndi_name}", fail-over-ip-addr: "{ip_address}" } }
+    expect: *ok
     returns: ack
   set_ndi_web_control:
     summary: "Allow web control from NDI tools (set-ndi-config enable-web-control)"
     params:
       enabled: { type: bool, required: true, label: Web control, description: "On lets NDI receivers open the device's web control." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-web-control: "{enabled}" } }
+    expect: *ok
     returns: ack
   set_ndi_ptz_control:
     summary: "Allow PTZ control from NDI receivers such as Studio Monitor (set-ndi-config enable-ptz-control)"
     params:
       enabled: { type: bool, required: true, label: PTZ control, description: "On passes NDI PTZ commands to the camera on the device's PTZ port." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-ptz-control: "{enabled}" } }
+    expect: *ok
     returns: ack
   set_reference_level:
     summary: "Audio reference level, SMPTE (20) or EBU (14) (set-ndi-config reference-level)"
     params:
       level: { type: enum, values: [smpte, ebu], required: true, label: Reference level, description: "SMPTE (+4 dBu = -20 dBFS) or EBU (-14 dBFS) audio alignment." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, reference-level: "{level:map.reference_level}" } }
+    expect: *ok
     returns: ack
   set_bitrate_ratio:
     summary: "NDI bitrate as a percentage of the standard rate, 50-200 (set-video-config bit-rate-ratio)"
     params:
       percent: { type: int, min: 50, max: 200, required: true, label: Bitrate, description: "Bitrate as a percentage of NDI's standard rate; 100 is the default." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, bit-rate-ratio: "{percent}" } }
+    expect: *ok
     returns: ack
   set_brightness:
     summary: "Picture brightness, -100 to 100 (set-video-config brightness)"
     params:
       value: { type: int, min: -100, max: 100, required: true, label: Brightness, description: "Brightness from -100 to 100, 0 unchanged." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, brightness: "{value}" } }
+    expect: *ok
     returns: ack
   set_contrast:
     summary: "Picture contrast, 50 to 200 (set-video-config contrast)"
     params:
       value: { type: int, min: 50, max: 200, required: true, label: Contrast, description: "Contrast from 50 to 200, 100 unchanged." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, contrast: "{value}" } }
+    expect: *ok
     returns: ack
   set_hue:
     summary: "Picture hue, -90 to 90 (set-video-config hue)"
     params:
       value: { type: int, min: -90, max: 90, required: true, label: Hue, description: "Hue rotation from -90 to 90, 0 unchanged." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, hue: "{value}" } }
+    expect: *ok
     returns: ack
   set_saturation:
     summary: "Picture saturation, 0 to 200 (set-video-config saturation)"
     params:
       value: { type: int, min: 0, max: 200, required: true, label: Saturation, description: "Saturation from 0 (black and white) to 200, 100 unchanged." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, saturation: "{value}" } }
+    expect: *ok
     returns: ack
   set_deinterlace:
     summary: "Deinterlacing of an interlaced input (set-video-config deinterlace)"
     params:
       mode: { type: enum, values: [none, top-field, bottom-field], required: true, label: Deinterlace, description: "Keep interlaced (none), or deinterlace from the top or bottom field." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, deinterlace: "{mode}" } }
+    expect: *ok
     returns: ack
   set_output_flip:
     summary: "Flip the encoded picture vertically (set-video-config out-flip)"
     params:
       enabled: { type: bool, required: true, label: Vertical flip, description: "On flips the picture upside down." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-flip: "{enabled}" } }
+    expect: *ok
     returns: ack
   set_output_mirror:
     summary: "Mirror the encoded picture horizontally (set-video-config out-mirror)"
     params:
       enabled: { type: bool, required: true, label: Mirror, description: "On mirrors the picture left to right." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-mirror: "{enabled}" } }
+    expect: *ok
     returns: ack
   set_output_resolution:
     summary: "Fixed NDI output resolution (set-video-config out-raw-resolution false, out-cx, out-cy)"
     params:
       width: { type: int, min: 64, max: 4096, required: true, label: Width, description: "Output width in pixels, a multiple of 4." }
       height: { type: int, min: 64, max: 2160, required: true, label: Height, description: "Output height in lines, a multiple of 2." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-raw-resolution: "false", out-cx: "{width}", out-cy: "{height}" } }
+    expect: *ok
     returns: ack
   set_output_follows_input:
     summary: "NDI output resolution follows the input (set-video-config out-raw-resolution)"
     params:
       enabled: { type: bool, required: true, label: Follow input, description: "On encodes at the input's resolution; off uses the set output resolution." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, out-raw-resolution: "{enabled}" } }
+    expect: *ok
     returns: ack
   set_ext_tally:
     summary: "User-controlled tally lights (set-tally ext-tally)"
     params:
       enabled: { type: bool, required: true, label: User tally, description: "On lets the user control the tally lights rather than NDI tally." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-tally, ext-tally: "{enabled}" } }
+    expect: *ok
     returns: ack
 
   list_presets:
     summary: "Preset sources, each with name and url (list-channels)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: list-channels } }
+    expect: *value
     returns: value
   get_current_source:
     summary: "The source being decoded: name, and ndi-name true for a discovered NDI source or false for a preset (get-channel)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-channel } }
+    expect: *value
     returns: value
   select_ndi_source:
     summary: "Decode a discovered NDI source by name; the output switches at once (set-channel ndi-name=true)"
     params:
       name: { type: string, required: true, max_length: 255, label: NDI source, description: "The source's full NDI name as get_ndi_sources lists it, e.g. STUDIO (Camera 1)." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-channel, ndi-name: "true", name: "{name}" } }
+    expect: *ok
     returns: ack
   select_preset:
     summary: "Decode a preset source by name; the output switches at once (set-channel ndi-name=false)"
     params:
       name: { type: string, required: true, max_length: 120, label: Preset, description: "The preset's name as list_presets lists it." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-channel, ndi-name: "false", name: "{name}" } }
+    expect: *ok
     returns: ack
   add_preset:
     summary: "Add a preset source (add-channel)"
@@ -354,19 +526,27 @@ commands:
       name: { type: string, required: true, max_length: 120, label: Name, description: "A unique preset name, 1 to 120 characters." }
       url: { type: string, required: true, max_length: 1024, label: URL,
         description: "Source URL: ntkndi://ndi?name=..., rtsp://, http://, rtmp://, rtmps://, udp://, srt:// or rtp:// with the options the API documents." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: add-channel, name: "{name}", url: "{url}" } }
+    expect: *ok
     returns: ack
   delete_preset:
     summary: "Delete a preset source (del-channel)"
     params:
       name: { type: string, required: true, max_length: 120, label: Name, description: "The preset to delete." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: del-channel, name: "{name}" } }
+    expect: *ok
     returns: ack
   set_hdmi_output:
     summary: "Send the decoded picture to the output, or not (set-hdmi-output)"
     params:
       enabled: { type: bool, required: true, label: Output, description: "On outputs the decoded picture; off stops the output." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-hdmi-output, enabled: "{enabled}" } }
+    expect: *ok
     returns: ack
   get_video_modes:
     summary: "Video modes the connected display supports, with the current and preferred (get-supported-video-modes)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-supported-video-modes } }
+    expect: *value
     returns: value
   set_video_mode:
     summary: "Set the output video mode to one get_video_modes lists (set-video-mode)"
@@ -376,72 +556,104 @@ commands:
       interlaced: { type: bool, default: false, label: Interlaced, description: "On for an interlaced mode." }
       field_rate: { type: int, min: 1, max: 24000, required: true, label: Field rate, description: "Field rate times 100, as the modes list gives it, e.g. 5994 for 59.94." }
       aspect_ratio: { type: float, min: 0.1, max: 10.0, required: true, label: Aspect ratio, description: "Aspect ratio as the modes list gives it, e.g. 1.78." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-mode, width: "{width}", height: "{height}", interlaced: "{interlaced}", field-rate: "{field_rate}", aspect-ratio: "{aspect_ratio:.2f}" } }
+    expect: *ok
     returns: ack
   get_audio_config:
     summary: "Audio output settings: gain, sample rate, channels and mapping (get-audio-config)"
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: get-audio-config } }
+    expect: *value
     returns: value
   set_audio_gain:
     summary: "Audio output gain in dB, -100 to +20 (set-audio-config gain, or /api/audio/config/set)"
     params:
       gain: { type: float, min: -100.0, max: 20.0, required: true, label: Gain, description: "Audio gain in dB, -100.00 to +20.00." }
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: set-audio-config, gain: "{gain:.2f}" } }
+      - { models: *ip, method: POST, path: /api/audio/config/set, content_type: application/json, body: '{"gain":{gain:.2f}}' }
+    expect: *ok
     returns: ack
   set_overlay:
     summary: "Show or hide an overlay on the decoded output: title, tally, VU meter or centre cross (set-video-config)"
     params:
       overlay: { type: enum, values: [title, tally, vu-meter, center-cross], required: true, label: Overlay, description: "The source title, a tally border, audio meters, or a centre cross." }
       visible: { type: bool, required: true, label: Visible, description: "On shows the overlay." }
+    send: { models: *mw, method: GET, path: /mwapi, raw_query: "method=set-video-config&{overlay:map.overlay_field}={visible}" }
+    expect: *ok
     returns: ack
   set_switch_mode:
     summary: "What the output shows while the source changes (set-video-config switch-mode)"
     params:
       mode: { type: enum, values: [blank, keep-last], required: true, label: Switch mode, description: "Blank the output, or hold the last frame, while switching." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, switch-mode: "{mode}" } }
+    expect: *ok
     returns: ack
   set_aspect_conversion:
     summary: "How a source of another aspect ratio is fitted (set-video-config ar-convert-mode)"
     params:
       mode: { type: enum, values: [windowbox, full, zoom], required: true, label: Aspect conversion, description: "Letterbox or pillarbox (windowbox), stretch (full), or crop (zoom)." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, ar-convert-mode: "{mode}" } }
+    expect: *ok
     returns: ack
   set_decoder_flip:
     summary: "Flip the decoded output horizontally or vertically (set-video-config h-flip, v-flip)"
     params:
       horizontal: { type: bool, default: false, label: Horizontal flip, description: "On mirrors left to right." }
       vertical: { type: bool, default: false, label: Vertical flip, description: "On flips upside down." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-video-config, h-flip: "{horizontal}", v-flip: "{vertical}" } }
+    expect: *ok
     returns: ack
   set_buffer_duration:
     summary: "Decoder buffer in milliseconds, 20-120 (set-playback-config buffer-duration)"
     params:
       ms: { type: int, min: 20, max: 120, required: true, label: Buffer, description: "Buffer length in milliseconds; shorter is lower latency and less tolerant of jitter." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-playback-config, buffer-duration: "{ms}" } }
+    expect: *ok
     returns: ack
   set_decoder_ndi_discovery:
     summary: "Use NDI discovery servers for finding sources (set-ndi-config enable-discovery, discovery-server)"
     params:
       enabled: { type: bool, required: true, label: Discovery server, description: "On finds sources through the discovery servers given." }
       servers: { type: string, default: "", max_length: 255, label: Servers, description: "Discovery server IP addresses separated by commas; needed when on." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, enable-discovery: "{enabled}", discovery-server: "{servers}" } }
+    expect: *ok
     returns: ack
   set_decoder_ndi_group:
     summary: "NDI group the decoder finds sources in (set-ndi-config group-name)"
     params:
       group: { type: string, required: true, max_length: 255, label: NDI group, description: "NDI group name; public is the default." }
+    send: { models: *mw, method: GET, path: /mwapi, query: { method: set-ndi-config, group-name: "{group}" } }
+    expect: *ok
     returns: ack
 
   get_sources:
     summary: "Static and discovered NDI sources with their ids (GET /api/source/list?type=all)"
+    send: { models: *ip, method: GET, path: /api/source/list, query: { type: all } }
+    expect: *value
     returns: value
   select_source:
     summary: "Decode a source by id, in simple mode; the output switches at once (POST /api/source/select)"
     params:
       id: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
+    send: { models: *ip, method: POST, path: /api/source/select, content_type: application/json, body: '{"id":{id}}' }
+    expect: *ok
     returns: ack
   restart_source:
     summary: "Reconnect the active source (POST /api/source/restart)"
+    send: { models: *ip, method: POST, path: /api/source/restart, content_type: application/json, body: '{}' }
+    expect: *ok
     returns: ack
   list_profiles:
     summary: "Profiles (single, picture-in-picture or four-way layouts) and the current one (GET /api/profile/list)"
+    send: { models: *ip, method: GET, path: /api/profile/list }
+    expect: *value
     returns: value
   select_profile:
     summary: "Switch to a profile, in profile mode; the output layout changes at once (POST /api/profile/select)"
     params:
       id: { type: int, min: 0, max: 2147483647, required: true, label: Profile, description: "The profile id from list_profiles." }
+    send: { models: *ip, method: POST, path: /api/profile/select, content_type: application/json, body: '{"id":{id}}' }
+    expect: *ok
     returns: ack
   select_screen_source:
     summary: "Put a source on one screen of a profile (POST /api/profile/screen/select)"
@@ -449,35 +661,49 @@ commands:
       profile: { type: int, min: 0, max: 2147483647, required: true, label: Profile, description: "The profile id from list_profiles." }
       screen: { type: int, min: 0, max: 3, required: true, label: Screen, description: "Screen index in the profile's layout, from 0." }
       source: { type: int, min: 0, max: 2147483647, required: true, label: Source, description: "The source id from get_sources." }
+    send: { models: *ip, method: POST, path: /api/profile/screen/select, content_type: application/json, body: '{"id":{profile},"screen-index":{screen},"source-id":{source}}' }
+    expect: *ok
     returns: ack
   ptz_move:
     summary: "Pan and tilt the decoded NDI camera; 0 and 0 stop (POST /api/ptz/move)"
     params:
       pan: { type: float, min: -1.0, max: 1.0, required: true, label: Pan speed, description: "Pan speed from -1 (left) to 1 (right); 0 stops." }
       tilt: { type: float, min: -1.0, max: 1.0, required: true, label: Tilt speed, description: "Tilt speed from -1 (down) to 1 (up); 0 stops." }
+    send: { models: *ip, method: POST, path: /api/ptz/move, content_type: application/json, body: '{"pan":{pan:.2f},"tilt":{tilt:.2f}}' }
+    expect: *ok
     returns: ack
   ptz_zoom:
     summary: "Zoom the decoded NDI camera at a speed; 0 stops (POST /api/ptz/zoom/set)"
     params:
       speed: { type: float, min: -1.0, max: 1.0, required: true, label: Zoom speed, description: "Zoom speed from -1 (out) to 1 (in); 0 stops." }
+    send: { models: *ip, method: POST, path: /api/ptz/zoom/set, content_type: application/json, body: '{"speed":{speed:.2f}}' }
+    expect: *ok
     returns: ack
   ptz_focus:
     summary: "Focus the decoded NDI camera at a speed; 0 stops (POST /api/ptz/focus/set)"
     params:
       speed: { type: float, min: -1.0, max: 1.0, required: true, label: Focus speed, description: "Focus speed from -1 (near) to 1 (far); 0 stops." }
+    send: { models: *ip, method: POST, path: /api/ptz/focus/set, content_type: application/json, body: '{"speed":{speed:.2f}}' }
+    expect: *ok
     returns: ack
   ptz_auto_focus:
     summary: "Return the decoded NDI camera to auto focus (POST /api/ptz/focus/auto)"
+    send: { models: *ip, method: POST, path: /api/ptz/focus/auto, content_type: application/json, body: '{}' }
+    expect: *ok
     returns: ack
   ptz_recall_preset:
     summary: "Recall a preset on the decoded NDI camera; it moves at once (POST /api/ptz/preset/recall)"
     params:
       number: { type: int, min: 1, max: 255, required: true, label: Preset, description: "Camera preset number, 1 to 255." }
+    send: { models: *ip, method: POST, path: /api/ptz/preset/recall, content_type: application/json, body: '{"number":{number}}' }
+    expect: *ok
     returns: ack
   ptz_store_preset:
     summary: "Store the decoded NDI camera's position as a preset, overwriting it (POST /api/ptz/preset/store)"
     params:
       number: { type: int, min: 1, max: 255, required: true, label: Preset, description: "Camera preset number to overwrite, 1 to 255." }
+    send: { models: *ip, method: POST, path: /api/ptz/preset/store, content_type: application/json, body: '{"number":{number}}' }
+    expect: *ok
     returns: ack
 
 state:
@@ -497,6 +723,80 @@ state:
   tally.preview:         { type: bool, description: "NDI tally: on preview at some receiver (encoder) or at the source (decoder)" }
   tally.program:         { type: bool, description: "NDI tally: on program" }
 
+# Nothing is pushed: the summary is polled.
+telemetry:
+  poll:
+    send:
+      - { models: *mw, method: GET, path: /mwapi, query: { method: get-summary-info } }
+      - { models: *ip, method: GET, path: /api/system/summary }
+    every_ms: 2000
+  updates:
+    # Encoder API section 5.1, Decoder API V1.3 section 5.1.
+    - path: "^/mwapi\\?method=get-summary-info$"
+      json_match: { "$.status": "^0$" }
+      json:
+        model: "$.device.model"
+        name: "$.device.name"
+        serial: "$.device.serial-no"
+        firmware: "$.device.fw-version"
+        temperature: "$.device.core-temp"
+        uptime: "$.device.up-time"
+        input: "$.device.input-state"
+        output: "$.device.output-state"
+        ndi_name: "$.ndi.name"
+        url: "$.ndi.url"
+        clients: "$.ndi.num-clients"
+        kbps: "$.ndi.video-bit-rate"
+        width: "$.ndi.video-width"
+        height: "$.ndi.video-height"
+        scan: "$.ndi.video-scan"
+        rate: "$.ndi.video-field-rate"
+        preview: "$.ndi.tally-preview"
+        program: "$.ndi.tally-program"
+      state:
+        device.model: "{model}"
+        device.name: "{name}"
+        device.serial: "{serial}"
+        device.firmware: "{firmware}"
+        device.temperature: "{temperature}"
+        device.uptime: "{uptime}"
+        device.input_state: "{input}"
+        device.output_state: "{output}"
+        ndi.name: "{ndi_name}"
+        ndi.url: "{url}"
+        ndi.clients: "{clients}"
+        ndi.video_kbps: "{kbps}"
+        ndi.video: "{width}x{height} {scan} {rate:.2f}"
+        tally.preview: "{preview}"
+        tally.program: "{program}"
+    # IP Decoder API section 2: the first stream of the current profile.
+    - path: "^/api/system/summary$"
+      json_match: { "$.status": "^0$" }
+      json:
+        model: "$.product-name"
+        name: "$.device-name"
+        serial: "$.serial-number"
+        firmware: "$.firmware-ver"
+        temperature: "$.core-temp"
+        uptime: "$.uptime"
+        hdmi: "$.hdmi-state"
+        ndi_name: "$.profile.streams[0].name"
+        kbps: "$.profile.streams[0].video.kbps"
+        preview: "$.profile.streams[0].extra.tally-preview"
+        program: "$.profile.streams[0].extra.tally-program"
+      state:
+        device.model: "{model}"
+        device.name: "{name}"
+        device.serial: "{serial}"
+        device.firmware: "{firmware}"
+        device.temperature: "{temperature}"
+        device.uptime: "{uptime}"
+        device.output_state: "{hdmi}"
+        ndi.name: "{ndi_name}"
+        ndi.video_kbps: "{kbps}"
+        tally.preview: "{preview}"
+        tally.program: "{program}"
+
 quirks:
   - models: [all]
     severity: critical
@@ -512,17 +812,20 @@ quirks:
     text: >
       The API has no push: state comes from polling the summary every 2
       seconds. Opened for commands only, the core polls nothing and checks
-      the device with ping (which needs no login) every 10 seconds. The core
-      logs in when the device is opened and again whenever the device answers
-      not logged in (status 37); a refused login (status 36) is final until
-      the device is opened again with corrected settings.
+      the device with ping (which needs no login) when it has been quiet for 10
+      seconds. The core logs in before the first request that needs a session
+      and again whenever the device answers not logged in (status 37, or HTTP
+      401), repeating that request once; a refused login (status 36, 16 on the
+      IP decoders, or HTTP 401 or 403) is final until the settings are
+      corrected.
 
   - models: [all]
     severity: info
     text: >
       The documents state no port; port 80 (443 over HTTPS) is assumed. The
-      session ID arrives only in a Set-Cookie header, so the core speaks
-      HTTP/1.1 itself, one request at a time with Connection close.
+      session ID arrives only in a Set-Cookie header; the core sends every
+      cookie the login set back with each later request, one request at a
+      time. ndi.video gives the field rate with two decimals (60.00).
 
   - models: [ndi-to-hdmi, ndi-to-sdi, ndi-to-aio, ndi-to-hdmi-4k]
     severity: info

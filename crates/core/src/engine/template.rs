@@ -27,6 +27,39 @@ pub(crate) struct Values<'a> {
     pub(crate) settings: &'a Params,
     pub(crate) setting_specs: &'a BTreeMap<String, ParamSpec>,
     pub(crate) conversions: &'a Conversions,
+    /// The spec's value tables, for `map.<name>`.
+    pub(crate) maps: &'a Maps,
+}
+
+/// A spec's named value tables (SPEC.md §4, "Value tables"): a parameter's
+/// text, as it renders without directives, to the wire text.
+pub(crate) type Maps = BTreeMap<String, BTreeMap<String, String>>;
+
+/// The spec's `maps` section.
+pub(crate) fn maps(spec: Option<&Value>) -> Result<Maps, String> {
+    let mut out = Maps::new();
+    for (name, table) in spec.and_then(Value::as_object).into_iter().flatten() {
+        let table = table
+            .as_object()
+            .ok_or(format!("map '{name}' maps values to wire text"))?;
+        let mut entries = BTreeMap::new();
+        for (from, to) in table {
+            let to = match to {
+                Value::String(s) => s.clone(),
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                _ => return Err(format!("map '{name}': '{from}' maps to text")),
+            };
+            entries.insert(from.clone(), to);
+        }
+        out.insert(name.clone(), entries);
+    }
+    Ok(out)
+}
+
+/// Lowercase hex of a digest.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// A spec's named conversions: SPEC.md §4, "Conversions".
@@ -213,6 +246,25 @@ pub(crate) fn sole_converted(template: &str, values: &Values) -> Option<Result<f
 fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String, String> {
     let (value, kind) = values.lookup(name)?;
 
+    // A value table: the value's plain text looked up, and the wire text
+    // taken as it is. A value the table does not list is rejected.
+    if let Some(table) = directives.first().and_then(|d| d.strip_prefix("map.")) {
+        if directives.len() != 1 {
+            return Err(format!(
+                "':map.{table}' on '{name}' takes no other directive"
+            ));
+        }
+        let entries = values
+            .maps
+            .get(table)
+            .ok_or(format!("map '{table}' is not declared"))?;
+        let key = render_one(name, &[], values)?;
+        return entries
+            .get(&key)
+            .cloned()
+            .ok_or(format!("'{key}' is not in map '{table}'"));
+    }
+
     // Conversions come first and produce a float, which then needs `.Nf`.
     let converted = directives
         .iter()
@@ -253,6 +305,13 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     width = Some(w.parse().map_err(|_| format!("bad directive ':{d}'"))?);
                 } else if *d == "signed" {
                     signed = true;
+                } else if let Some(places) = d.strip_prefix('.').and_then(|r| r.strip_suffix('f')) {
+                    // A whole number a device sent where a decimal is shown
+                    // (60 for a 60.00 Hz field rate): fixed decimals too.
+                    let places: u32 = places
+                        .parse()
+                        .map_err(|_| format!("bad directive ':{d}'"))?;
+                    return Ok(fixed(n as f64, places));
                 } else {
                     return Err(format!("directive ':{d}' does not apply to an integer"));
                 }
@@ -340,6 +399,15 @@ fn render_one(name: &str, directives: &[&str], values: &Values) -> Result<String
                     "json" => Value::String(s).to_string(),
                     // Percent-encoded, for a raw_query.
                     "url" => percent_encode(&s),
+                    // A password a device takes hashed (Magewell's login).
+                    "md5" => {
+                        use md5::Digest;
+                        hex(&md5::Md5::digest(s.as_bytes()))
+                    }
+                    "sha256" => {
+                        use sha2::Digest;
+                        hex(&sha2::Sha256::digest(s.as_bytes()))
+                    }
                     _ => return Err(format!("directive ':{d}' does not apply to a string")),
                 };
             }
@@ -424,6 +492,10 @@ mod tests {
             settings: &empty,
             setting_specs: &empty_specs,
             conversions: &conversions,
+            maps: &maps(Some(
+                &json!({"level": {"smpte": "20", "ebu": 14}, "flag": {"true": "on"}}),
+            ))
+            .unwrap(),
         };
         render(template, &v, no_escape)
     }
@@ -514,5 +586,29 @@ mod tests {
             go("{s:url}", json!({"s": "Cam 1 & 2"}), "s: { type: string }").unwrap(),
             "Cam%201%20%26%202"
         );
+    }
+
+    #[test]
+    fn hashes_and_value_tables() {
+        let s = "s: { type: string }";
+        // The examples of Magewell's Encoder API and IP Decoder API.
+        assert_eq!(
+            go("{s:md5}", json!({"s": "Admin"}), s).unwrap(),
+            "e3afed0047b08059d0fada10f400c1e5"
+        );
+        assert_eq!(
+            go("{s:sha256}", json!({"s": "Admin"}), s).unwrap(),
+            "c1c224b03cd9bc7b6a86d77f5dace40191766c485cd55dc48caf9ac873335d6f"
+        );
+        let e = "l: { type: enum, values: [smpte, ebu, other] }";
+        assert_eq!(go("{l:map.level}", json!({"l": "ebu"}), e).unwrap(), "14");
+        assert!(go("{l:map.level}", json!({"l": "other"}), e).is_err());
+        assert!(go("{l:map.nope}", json!({"l": "ebu"}), e).is_err());
+        assert!(go("{l:map.level:upper}", json!({"l": "ebu"}), e).is_err());
+        let b = "b: { type: bool }";
+        assert_eq!(go("{b:map.flag}", json!({"b": true}), b).unwrap(), "on");
+        // A whole number shown with fixed decimals.
+        let i = "i: { type: int }";
+        assert_eq!(go("{i:.2f}", json!({"i": 60}), i).unwrap(), "60.00");
     }
 }

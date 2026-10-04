@@ -182,7 +182,10 @@ for extra in sorted((ROOT / "tools" / "vectors").glob("*.py")):
 def main() -> None:
     written = set()
     for v in V:
-        name = v["command"] if "command" in v else f"telemetry-{v['telemetry']}"
+        # `file` names a second vector of one command (the same command on
+        # another model); it is not part of the vector.
+        v = dict(v)
+        name = v.pop("file", None) or (v["command"] if "command" in v else f"telemetry-{v['telemetry']}")
         path = ROOT / "vectors" / v["spec"] / f"{name}.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
         body = yaml.safe_dump(v, sort_keys=False, allow_unicode=True, width=100)

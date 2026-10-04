@@ -33,10 +33,13 @@ DIRECTIVES: list[tuple[re.Pattern[str], set[str]]] = [
     (re.compile(r"^\.\d+f$"), {"float"}),               # fixed decimals
     (re.compile(r"^(on_off|bool01|bool10)$"), {"bool"}),
     (re.compile(r"^(upper|lower|json|url)$"), {"string", "enum"}),
+    (re.compile(r"^(md5|sha256)$"), {"string"}),         # a hashed password, lowercase hex
     (re.compile(r"^(to|from)\.[a-z0-9_]+$"), {"int", "float"}),  # a named conversion
+    (re.compile(r"^map\.[a-z0-9_]+$"), {"enum", "bool", "int", "string"}),  # a value table
 ]
 
 CONVERSION = re.compile(r"^(to|from)\.([a-z0-9_]+)$")
+MAP = re.compile(r"^map\.([a-z0-9_]+)$")
 
 # Types that cannot carry characters needing escaping, so they are safe in a
 # raw_query, which is sent without encoding.
@@ -77,6 +80,7 @@ def check_template(
     where: str,
     conditional_setting: str | None = None,
     conversions: dict | None = None,
+    maps: dict | None = None,
 ) -> list[str]:
     """Placeholder rules from SPEC.md §4: every reference resolves, is always
     present, and uses directives valid for its type."""
@@ -116,6 +120,24 @@ def check_template(
                 errors.append(
                     f"{where}: directive ':{directive}' does not apply to {ptype} '{name}'"
                 )
+
+        # A value table names a declared map, is the only directive, and lists
+        # every value an enum or a bool can take, so none is refused at run time.
+        tables = [MAP.match(d).group(1) for d in directives if MAP.match(d)]
+        if tables:
+            if len(directives) != 1:
+                errors.append(f"{where}: ':map.{tables[0]}' on '{name}' takes no other directive")
+            table = (maps or {}).get(tables[0])
+            if table is None:
+                errors.append(f"{where}: ':map.{tables[0]}' names undeclared map '{tables[0]}'")
+            else:
+                keys = {str(k) for k in table}
+                needed = {"enum": [str(v) for v in decl.get("values", [])],
+                          "bool": ["true", "false"]}.get(ptype, [])
+                missing = [v for v in needed if v not in keys]
+                if missing:
+                    errors.append(f"{where}: map '{tables[0]}' does not list {missing} of '{name}'")
+            continue
 
         # Conversions come first, name a declared conversion, and make a
         # float: as text it needs exactly one ':.Nf' after them.
@@ -259,7 +281,7 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         params = command.get("params") or {}
         for context, text in template_strings(command.get("send", [])):
             errors += check_template(context, text, params, settings, f"commands.{name}",
-                                     conversions=conversions)
+                                     conversions=conversions, maps=doc.get("maps") or {})
         expect_ = command.get("expect") or {}
         if "reply_json" in expect_:
             if transport_type != "ws":
@@ -404,6 +426,85 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
         for context, text in template_strings(probe):
             errors += check_template(context, text, {}, settings, "transport.probe")
 
+    errors += per_model_checks(doc, model_ids)
+    errors += session_checks(doc)
+    return errors
+
+
+def items_of(send) -> list:
+    return send if isinstance(send, list) else [send] if send is not None else []
+
+
+def per_model_checks(doc: dict, model_ids: set) -> list[str]:
+    """Messages naming `models` (SPEC.md §4, Messages per model): the models
+    exist, and every model a command supports has a message."""
+    errors: list[str] = []
+    transport = doc.get("transport") or {}
+    telemetry = doc.get("telemetry") or {}
+    places = [(f"commands.{n}.send", c.get("send")) for n, c in (doc.get("commands") or {}).items()]
+    places += [("transport.probe", transport.get("probe")),
+               ("transport.session.login", (transport.get("session") or {}).get("login")),
+               ("telemetry.poll.send", (telemetry.get("poll") or {}).get("send")),
+               ("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send")),
+               ("on_connect", doc.get("on_connect"))]
+    for where, send in places:
+        for i, item in enumerate(items_of(send)):
+            if isinstance(item, dict) and "models" in item:
+                bad = set(item["models"]) - model_ids
+                if bad:
+                    errors.append(f"{where}[{i}]: models names unknown model(s) {sorted(bad)}")
+            if isinstance(item, dict) and "session" in item and transport.get("type") != "http":
+                errors.append(f"{where}[{i}]: session applies to http requests")
+    for model in doc.get("models", []):
+        for name in model.get("supports", []):
+            send = ((doc.get("commands") or {}).get(name) or {}).get("send")
+            if send is None:
+                continue
+            if not any(not isinstance(i, dict) or model["id"] in i.get("models", [model["id"]])
+                       for i in items_of(send)):
+                errors.append(f"commands.{name}: no message for model '{model['id']}', which supports it")
+        login = (transport.get("session") or {}).get("login")
+        if login is not None and not any(model["id"] in i.get("models", [model["id"]]) for i in items_of(login)):
+            errors.append(f"transport.session.login: no login for model '{model['id']}'")
+    return errors
+
+
+def session_checks(doc: dict) -> list[str]:
+    """`transport.session`, `https_port`, `expect.header` and `code_path`."""
+    errors: list[str] = []
+    transport = doc.get("transport") or {}
+    settings = doc.get("settings") or {}
+    is_http = transport.get("type") == "http"
+    session = transport.get("session")
+    if session is not None:
+        if not is_http:
+            errors.append("transport.session is for the http transport")
+        for i, item in enumerate(items_of(session.get("login"))):
+            for context, text in template_strings(item):
+                errors += check_template(context, text, {}, settings, f"transport.session.login[{i}]")
+        for key in ("relogin", "refused"):
+            for jpath, pattern in ((session.get(key) or {}).get("json") or {}).items():
+                if not jpath.startswith("$"):
+                    errors.append(f"transport.session.{key}.json: '{jpath}' is not a JSON path")
+                try:
+                    re.compile(pattern)
+                except re.error as e:
+                    errors.append(f"transport.session.{key}.json: {e}")
+    if "https_port" in transport:
+        if not isinstance(transport.get("scheme"), dict):
+            errors.append("transport.https_port needs scheme: {setting: name}")
+        if not any(e["port"] == transport["https_port"] and e["role"] == "control"
+                   for e in doc.get("ports") or []):
+            errors.append(f"ports: no control entry for https_port {transport['https_port']}")
+    for name, command in (doc.get("commands") or {}).items():
+        expect = command.get("expect") or {}
+        if "header" in expect and not is_http:
+            errors.append(f"commands.{name}: expect.header needs an http transport")
+        if "code_path" in expect:
+            if not str(expect["code_path"]).startswith("$"):
+                errors.append(f"commands.{name}: expect.code_path is not a JSON path")
+            if "code_range" not in expect:
+                errors.append(f"commands.{name}: expect.code_path is read by code_range")
     return errors
 
 
@@ -465,6 +566,8 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                           "event stream or line transport")
         if "request_match" in rule and "path" not in rule:
             errors.append(f"{where}: request_match applies to a path rule")
+        if "headers" in rule and "path" not in rule:
+            errors.append(f"{where}: headers applies to a path rule (an HTTP reply)")
         if "arg_types" in rule and "address" not in rule:
             errors.append(f"{where}: arg_types applies to an address rule")
         for value in (rule.get("state") or {}).values():

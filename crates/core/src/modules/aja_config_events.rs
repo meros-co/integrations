@@ -521,6 +521,7 @@ mod tests {
 
     fn ok(body: &str) -> Result<HttpResponse, String> {
         Ok(HttpResponse {
+            headers: Vec::new(),
             status: 200,
             body: body.as_bytes().to_vec(),
         })
@@ -863,6 +864,7 @@ mod tests {
             &mut cx,
             connect,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 404,
                 body: b"<html>404</html>".to_vec(),
             }),

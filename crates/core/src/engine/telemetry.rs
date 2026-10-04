@@ -69,6 +69,9 @@ enum Matcher {
         /// A JSON path to an array: the rule matches once per element, and
         /// `json` paths are taken from the element.
         each: Option<String>,
+        /// `headers`: capture names to response header names. A rule with
+        /// only these reads no body, so the body need not be JSON.
+        headers: BTreeMap<String, String>,
     },
     /// The XML reply to an HTTP request whose path matches; every element
     /// named `element` is one match, its attributes the captures.
@@ -154,6 +157,8 @@ pub(crate) enum Inbound<'a> {
     /// body where that was JSON.
     Http {
         path: &'a str,
+        /// The response's headers, names lowercased.
+        headers: &'a [(String, String)],
         body: &'a [u8],
         request: Option<&'a Value>,
     },
@@ -307,7 +312,19 @@ impl Telemetry {
                 }
             } else if let Some(p) = rule.get("path") {
                 let path = regex(p, "path")?;
-                if rule.get("json").is_some() {
+                if rule.get("json").is_some() || rule.get("headers").is_some() {
+                    let mut headers = BTreeMap::new();
+                    for (name, header) in rule
+                        .get("headers")
+                        .and_then(Value::as_object)
+                        .into_iter()
+                        .flatten()
+                    {
+                        let header = header
+                            .as_str()
+                            .ok_or(format!("telemetry: headers '{name}' must be a header name"))?;
+                        headers.insert(name.clone(), header.to_ascii_lowercase());
+                    }
                     let json = json_paths(rule)?;
                     let each = rule
                         .get("json_each")
@@ -319,6 +336,7 @@ impl Telemetry {
                         request: selectors(rule.get("request_match"), "request_match")?,
                         json,
                         each,
+                        headers,
                     }
                 } else if let Some(e) = rule.get("xml_each").and_then(Value::as_str) {
                     Matcher::HttpXml {
@@ -326,7 +344,7 @@ impl Telemetry {
                         element: e.to_string(),
                     }
                 } else {
-                    return Err("telemetry: a path rule needs json or xml_each".into());
+                    return Err("telemetry: a path rule needs json, headers or xml_each".into());
                 }
             } else if rule.get("json_match").is_some() {
                 Matcher::Json {
@@ -468,9 +486,11 @@ impl Telemetry {
                         request: request_select,
                         json,
                         each,
+                        headers: header_names,
                     },
                     Inbound::Http {
                         path,
+                        headers,
                         body,
                         request,
                     },
@@ -478,10 +498,18 @@ impl Telemetry {
                     let Some(caps) = re.captures(path) else {
                         continue;
                     };
-                    let Ok(doc) = serde_json::from_slice::<Value>(body) else {
-                        continue;
+                    let reads_body = !json.is_empty() || !reply_select.is_empty() || each.is_some();
+                    let doc = match serde_json::from_slice::<Value>(body) {
+                        Ok(doc) => doc,
+                        Err(_) if !reads_body => Value::Null,
+                        Err(_) => continue,
                     };
                     let mut base = captures(&caps);
+                    for (name, header) in header_names {
+                        if let Some((_, v)) = headers.iter().find(|(k, _)| k == header) {
+                            base.push((name.clone(), Value::String(v.clone())));
+                        }
+                    }
                     if !request_select.is_empty()
                         && !request.is_some_and(|r| select(r, request_select, &mut base))
                     {
@@ -640,6 +668,7 @@ impl Telemetry {
             settings: &empty,
             setting_specs: &empty_specs,
             conversions: &self.conversions,
+            maps: &Default::default(),
         };
         let mut any = false;
         for a in assigns {
@@ -1051,6 +1080,48 @@ mod tests {
     }
 
     #[test]
+    fn response_headers_and_array_elements() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"path": "^/clip$", "headers": {"etag": "ETag"}, "state": {"clip.etag": "{etag}"}},
+                {"path": "^/summary$", "json": {"name": "$.streams[0].name"},
+                 "headers": {"rate": "X-Rate-Remaining"},
+                 "state": {"stream.name": "{name}", "rate": "{rate}"}},
+            ]})),
+            &state(json!({
+                "clip.etag": {"type": "string", "description": "x"},
+                "stream.name": {"type": "string", "description": "x"},
+                "rate": {"type": "int", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let headers = vec![
+            ("etag".to_string(), "\"abc\"".to_string()),
+            ("x-rate-remaining".to_string(), "42".to_string()),
+        ];
+        // A headers-only rule reads no body, so the body need not be JSON.
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/clip",
+                headers: &headers,
+                body: b"\xff\xd8 not json",
+                request: None
+            }),
+            Some(json!({"clip": {"etag": "\"abc\""}}))
+        );
+        assert_eq!(
+            t.apply(&Inbound::Http {
+                path: "/summary",
+                headers: &headers,
+                body: br#"{"streams":[{"name":"CAM (1)"},{"name":"CAM (2)"}]}"#,
+                request: None
+            }),
+            Some(json!({"stream": {"name": "CAM (1)"}, "rate": 42}))
+        );
+    }
+
+    #[test]
     fn replies_sharing_a_path_are_told_apart_by_their_request() {
         // JSON-RPC: every request goes to one path, and the reply names
         // neither the method nor what it answers.
@@ -1086,6 +1157,7 @@ mod tests {
         assert_eq!(
             t.apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: reply,
                 request: Some(&time)
             }),
@@ -1094,6 +1166,7 @@ mod tests {
         assert_eq!(
             t.apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: reply,
                 request: Some(&revision)
             }),
@@ -1103,6 +1176,7 @@ mod tests {
         assert!(t
             .apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: reply,
                 request: None
             })
@@ -1112,6 +1186,7 @@ mod tests {
         assert!(t
             .apply(&Inbound::Http {
                 path: "/",
+                headers: &[],
                 body: error,
                 request: Some(&time)
             })

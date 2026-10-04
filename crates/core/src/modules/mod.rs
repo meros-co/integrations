@@ -64,8 +64,6 @@ mod generic_tcp_udp;
 mod http_snapshot;
 #[cfg(feature = "labgruppen-lake")]
 mod lake_dlm;
-#[cfg(feature = "magewell-proconvert")]
-mod magewell;
 #[cfg(feature = "novastar-central-control")]
 mod novastar_ccp;
 #[cfg(feature = "novastar-h")]
@@ -174,8 +172,6 @@ pub(crate) fn construct(
         "novastar-h" => Ok(Box::new(novastar_h::NovastarH::new(context))),
         #[cfg(feature = "obs-studio")]
         "obs-studio" => Ok(Box::new(obs::Obs::new(context))),
-        #[cfg(feature = "magewell-proconvert")]
-        "magewell-proconvert" => Ok(Box::new(magewell::ProConvert::new(context))),
         #[cfg(feature = "omt")]
         "omt" => Ok(Box::new(omt::Sender::new(context))),
         #[cfg(feature = "omt-discovery")]

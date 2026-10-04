@@ -1304,6 +1304,7 @@ mod tests {
             &mut cx,
             id,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 200,
                 body: next.to_string().into_bytes(),
             }),
@@ -1336,6 +1337,7 @@ mod tests {
             &mut cx,
             1,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 200,
                 body: br#"{"name":"Arena","major":7,"minor":23,"micro":0,"revision":1}"#.to_vec(),
             }),
@@ -1352,6 +1354,7 @@ mod tests {
             &mut cx,
             request,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 204,
                 body: Vec::new(),
             }),
@@ -1380,6 +1383,7 @@ mod tests {
             &mut cx,
             request,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 404,
                 body: Vec::new(),
             }),
@@ -1393,6 +1397,7 @@ mod tests {
             &mut cx,
             request,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 204,
                 body: Vec::new(),
             }),

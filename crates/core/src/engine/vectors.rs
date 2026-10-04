@@ -257,8 +257,17 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         let body = r["body"].as_str().unwrap_or("").as_bytes();
         // The JSON body of the request it answers, for `request_match`.
         let request = r.get("request");
+        // Response headers, for a rule reading them.
+        let headers: Vec<(String, String)> = r
+            .get("headers")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .map(|(k, v)| (k.to_ascii_lowercase(), v.as_str().unwrap_or("").to_string()))
+            .collect();
         if let Some(patch) = engine.telemetry.apply(&super::telemetry::Inbound::Http {
             path,
+            headers: &headers,
             body,
             request,
         }) {
@@ -407,7 +416,10 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
         engine.http_response(
             &mut step,
             id,
+            // With a session cookie, for a spec whose requests need a
+            // session (`transport.session`): its login is answered too.
             Ok(HttpResponse {
+                headers: vec![("set-cookie".into(), "session=vector; path=/".into())],
                 status: 200,
                 body: b"{}".to_vec(),
             }),
@@ -568,6 +580,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
             &mut cx,
             id,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status,
                 body: body.unwrap_or_default(),
             }),

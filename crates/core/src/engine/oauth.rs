@@ -481,6 +481,7 @@ mod tests {
 
     fn answer(status: u16, body: Value) -> Result<HttpResponse, String> {
         Ok(HttpResponse {
+            headers: Vec::new(),
             status,
             body: body.to_string().into_bytes(),
         })

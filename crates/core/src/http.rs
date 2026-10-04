@@ -91,26 +91,26 @@ impl HttpClients {
     /// a refusal, so a wrong password costs at most two attempts.
     async fn execute(&self, request: &HttpRequest) -> Result<HttpResponse, String> {
         let Some(credentials) = &request.digest else {
-            let (status, _, body) = self.send(request, None).await?;
-            return Ok(HttpResponse { status, body });
+            let (response, _) = self.send(request, None).await?;
+            return Ok(response);
         };
         let (origin, uri) = split_url(&request.url);
         let key = (origin.to_string(), credentials.username.clone());
         let cached = self.answer(&key, credentials, request.method, uri);
-        let (status, challenges, body) = self.send(request, cached).await?;
-        if status != 401 {
-            return Ok(HttpResponse { status, body });
+        let (response, challenges) = self.send(request, cached).await?;
+        if response.status != 401 {
+            return Ok(response);
         }
         let Some(challenge) = digest::choose(challenges.iter().map(String::as_str)) else {
-            return Ok(HttpResponse { status, body });
+            return Ok(response);
         };
         self.challenges
             .lock()
             .unwrap()
             .insert(key.clone(), (challenge, 0));
         let fresh = self.answer(&key, credentials, request.method, uri);
-        let (status, _, body) = self.send(request, fresh).await?;
-        Ok(HttpResponse { status, body })
+        let (response, _) = self.send(request, fresh).await?;
+        Ok(response)
     }
 
     /// The Authorization header for the cached challenge, counting the use.
@@ -135,12 +135,12 @@ impl HttpClients {
         ))
     }
 
-    /// One request: status, any `WWW-Authenticate` values, and the body.
+    /// One request: the response, with any `WWW-Authenticate` values.
     async fn send(
         &self,
         request: &HttpRequest,
         authorization: Option<String>,
-    ) -> Result<(u16, Vec<String>, Vec<u8>), String> {
+    ) -> Result<(HttpResponse, Vec<String>), String> {
         let mut builder = self.build(request);
         if let Some(value) = authorization {
             builder = builder.header("Authorization", value);
@@ -153,8 +153,25 @@ impl HttpClients {
             .iter()
             .filter_map(|v| v.to_str().ok().map(String::from))
             .collect();
+        let headers = response
+            .headers()
+            .iter()
+            .filter_map(|(name, value)| {
+                value
+                    .to_str()
+                    .ok()
+                    .map(|v| (name.as_str().to_ascii_lowercase(), v.to_string()))
+            })
+            .collect();
         let body = response.bytes().await.map_err(describe)?.to_vec();
-        Ok((status, challenges, body))
+        Ok((
+            HttpResponse {
+                status,
+                headers,
+                body,
+            },
+            challenges,
+        ))
     }
 
     /// Open a server-sent event stream and report its events to the session.

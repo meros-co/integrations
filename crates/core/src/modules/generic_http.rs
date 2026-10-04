@@ -663,6 +663,7 @@ mod tests {
                 &mut cx,
                 rid,
                 Ok(HttpResponse {
+                    headers: Vec::new(),
                     status,
                     body: body.as_bytes().to_vec(),
                 }),
@@ -731,6 +732,7 @@ mod tests {
             &mut cx,
             rid,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 200,
                 body: br#"{"power":"on"}"#.to_vec(),
             }),
@@ -758,6 +760,7 @@ mod tests {
             &mut cx,
             rid,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 401,
                 body: Vec::new(),
             }),
@@ -800,6 +803,7 @@ mod tests {
             &mut cx,
             rid,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 200,
                 body: br#"{"power":"on"}"#.to_vec(),
             }),
@@ -827,6 +831,7 @@ mod tests {
             &mut cx,
             rid,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 404,
                 body: Vec::new(),
             }),

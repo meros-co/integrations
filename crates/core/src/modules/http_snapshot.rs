@@ -286,6 +286,7 @@ mod tests {
 
     fn jpeg(n: u8) -> HttpResponse {
         HttpResponse {
+            headers: Vec::new(),
             status: 200,
             body: vec![0xFF, 0xD8, n, 0xFF, 0xD9],
         }
@@ -396,6 +397,7 @@ mod tests {
             &mut cx,
             reqs[0].0,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 200,
                 body: b"<html>login</html>".to_vec(),
             }),
@@ -424,6 +426,7 @@ mod tests {
             &mut cx,
             reqs[0].0,
             Ok(HttpResponse {
+                headers: Vec::new(),
                 status: 401,
                 body: Vec::new(),
             }),

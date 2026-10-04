@@ -751,11 +751,14 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## magewell-proconvert — Magewell Pro Convert
 
-- [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
-- [ ] Confirm the session cookie arrives in Set-Cookie on login for the encoders, the NDI decoders and the IP decoders, and that status 37 is returned when it has expired. ([specs/magewell-proconvert.yaml:523](specs/magewell-proconvert.yaml#L523))
-- [ ] Check the IP decoders' default credentials (Admin / Admin assumed). ([specs/magewell-proconvert.yaml:549](specs/magewell-proconvert.yaml#L549))
-- [ ] Check whether Pro Convert for NDI to HDMI 4K runs Decoder API V1.3 or v1.1, and that the methods used here behave the same on both. ([specs/magewell-proconvert.yaml:172](specs/magewell-proconvert.yaml#L172))
-- [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:538](specs/magewell-proconvert.yaml#L538))
+- [ ] Confirm the HTTP port (80, or 443 with HTTPS), which no document states. ([specs/magewell-proconvert.yaml:108](specs/magewell-proconvert.yaml#L108))
+- [ ] Confirm the session cookie arrives in Set-Cookie on login for the encoders, the NDI decoders and the IP decoders (the IP decoder's reply also names it as sid, which the core no longer reads), and that every cookie the login sets may be sent back. ([specs/magewell-proconvert.yaml:129](specs/magewell-proconvert.yaml#L129))
+- [ ] Confirm status 37 is returned once the session has expired or the device restarted, and whether an expired session is ever answered with HTTP 401 instead (taken as an ended session too). ([specs/magewell-proconvert.yaml:131](specs/magewell-proconvert.yaml#L131))
+- [ ] Confirm a wrong password is answered with status 36 (16 for an unknown user on the IP decoders) and not with HTTP 401 or 403, which are taken as refusals too. ([specs/magewell-proconvert.yaml:134](specs/magewell-proconvert.yaml#L134))
+- [ ] Check the IP decoders' default credentials (Admin / Admin assumed). ([specs/magewell-proconvert.yaml:853](specs/magewell-proconvert.yaml#L853))
+- [ ] Check whether Pro Convert for NDI to HDMI 4K runs Decoder API V1.3 or v1.1, and that the methods used here behave the same on both. ([specs/magewell-proconvert.yaml:263](specs/magewell-proconvert.yaml#L263))
+- [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:842](specs/magewell-proconvert.yaml#L842))
+- [ ] Confirm the IP decoder's summary reports hdmi-state as a number and the first stream of the current profile under profile.streams, as the document's example shows. ([specs/magewell-proconvert.yaml:782](specs/magewell-proconvert.yaml#L782))
 
 ## megapixel-helios — Megapixel HELIOS
 
