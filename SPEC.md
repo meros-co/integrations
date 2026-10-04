@@ -773,7 +773,7 @@ Every spec with a `telemetry` section has at least one.
 writes must be declared in `state` (§1), whose `type` decides how each value
 is converted: `int`, `float`, `bool` (from `true` / `false`, or through a
 `map`) or `string`. A value that does not convert is not assigned; the core
-never guesses.
+never guesses. A JSON null is no value: the path keeps what it had.
 
 ```yaml
 telemetry:
