@@ -170,6 +170,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Video routers and matrix switchers
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Evertz MAGNUM / VIP-X / DreamCatcher / Symphony | REST / proprietary | On request |
 | Probel / Grass Valley SW-P-02 routers (SW-P-08 is built) | Binary router control, serial | Public |
@@ -186,6 +187,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Multiviewers and monitoring
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Blackmagic Audio Monitor | Ethernet protocol | Public |
 | Grass Valley Kaleido | Kaleido remote control protocol, TCP 13000 | Public |
@@ -197,6 +199,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Converters, gateways and video over IP
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Blackmagic Teranex (AV, Express, Mini) | Teranex protocol, TCP 9800 | Public |
 | Blackmagic Ultimatte 12 | Ultimatte protocol, TCP 9998 | Public |
@@ -212,6 +215,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Cameras and camera control
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Canon Cinema EOS (C70, C300 Mark III, C400, C500 Mark II) | Canon XC protocol / Browser Remote over HTTP | On request |
 | Canon EOS cameras | Canon Camera Control API (CCAPI) over HTTP | On request |
@@ -230,6 +234,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Audio consoles
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | DiGiCo SD and Quantum series: feedback (the DiGiCo Pad / iPad command set) | OSC over UDP | Community |
 | Soundcraft Ui12 / Ui16 / Ui24R | Text messages over WebSocket / TCP | Community |
@@ -247,6 +252,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Audio processing, networked audio and amplifiers
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | AES67 stream discovery | SAP and SDP | Public |
 | d&b audiotechnik amplifiers and DS processors: models and named controls (generic control already through `aes70`) | AES70 | Public |
@@ -262,6 +268,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Wireless microphones and IEMs
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Sennheiser Spectera | SSC over HTTPS | Public |
 | Sennheiser Digital 9000 | Proprietary | Closed |
@@ -276,6 +283,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Presentation, playback and worship software
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | FreeShow: state push (variables over the Socket.IO API) | Socket.IO over WebSocket | Community |
 | ProPresenter 6 and early 7 (legacy remote) | WebSocket JSON | Community |
@@ -299,6 +307,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Media servers
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Modulo Pi Kinetic / Player | TCP JSON | Public |
 | Ventuz Director | TCP | Public |
@@ -309,6 +318,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Recorders and replay
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Vizrt 3Play | TriCaster shortcut API | Public |
 | Sony 9-pin / VDCP decks and servers | 9-pin (BVW-75) / VDCP over TCP bridges | Public |
@@ -323,6 +333,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Streaming encoders and platforms
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Teradek VidiU / VidiU X / Prism | HTTP CGI (VidiU); REST (Prism) | Community |
 | Epiphan Pearl (Pearl-2, Mini, Nano, Nexus) | Pearl REST API v2 | Public |
@@ -338,6 +349,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Graphics and captions
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Singular.live | Control API (cloud REST) | Public |
 | SPX Graphics | HTTP API | Public |
@@ -350,6 +362,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Lighting
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Chroma-Q Vista consoles and Vista software | OSC (Vista 3 R5 and later) | On request (address list in the R5 release documents, behind the download registration form) |
 | ETC Echo (EchoTouch and Echo Access Point) | UDP text strings (E$ commands) | Public |
@@ -362,6 +375,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### LED and video processors
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | NovaStar VX and NovaPro all-in-one controllers | Binary protocol over TCP 5200 | On request (confidential) |
 | Barco Event Master: Telnet and XML, legacy Encore | Telnet 9878, XML 9876 | Public |
@@ -369,6 +383,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Tally and GPI
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Tally Arbiter | Socket.IO / REST | Public |
 | GPI over IP (Kiss-box, JNIOR, Raspberry Pi GPIO) | TCP | Public |
@@ -376,6 +391,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Intercom
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Clear-Com Arcadia / FreeSpeak / LQ / Eclipse HX | REST (Arcadia, LQ); EHX for Eclipse | Public (REST); on request (Eclipse) |
 | Riedel Artist / Bolero / SmartPanel | RRCS (XML-RPC over HTTP) / Ember+ | On request |
@@ -385,12 +401,14 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### KVM
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Adder Infinity AIM / XDIP / CCS | AIM HTTP API | Public |
 | IHSE Draco, Black Box Boxilla, PiKVM, G&D | TCP / HTTP | Unknown |
 
 ### Displays and projectors
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Panasonic projectors | NTCONTROL, TCP 1024 | Public |
 | Christie / Barco / Epson / NEC / Digital Projection projectors | Vendor TCP command sets | Public |
@@ -401,6 +419,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Timers, clocks and rundowns
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Ontime | WebSocket / REST / OSC | Public |
 | Stagetimer.io | HTTP API (cloud) | Public |
@@ -412,6 +431,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Generic protocols
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | Generic HTTP listener (receive requests) | HTTP | Public |
 | Generic serial device | RS-232 / RS-422 | Public |
@@ -426,6 +446,7 @@ hardware. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Power and network
 
+| Devices | Protocol | Documentation |
 |---|---|---|
 | APC / Eaton / CyberPower PDUs and UPS | SNMP / HTTP | Public |
 | SnapAV WattBox, Middle Atlantic RackLink, Lyntec | HTTP / TCP | Public |
