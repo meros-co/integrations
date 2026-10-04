@@ -668,6 +668,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check what the belt execute address /Mx/belt/<id>/ does. ([specs/obsidian-onyx-osc.yaml:1060](specs/obsidian-onyx-osc.yaml#L1060))
 - [ ] Check which commands work without a licence (FREE/NOVA modes and the playback licence note). ([specs/obsidian-onyx-osc.yaml:1034](specs/obsidian-onyx-osc.yaml#L1034))
 
+## osc-listener — OSC received from any sender
+
+- [ ] Check which TCP framing TouchOSC and Lemur send when set to TCP (SLIP as in OSC 1.1 is the default here, an int32 length prefix the alternative). ([specs/osc-listener.yaml:31](specs/osc-listener.yaml#L31))
+- [ ] Check where TouchOSC and Lemur accept feedback over UDP: at the port they send from, or only at their configured receive port. ([specs/osc-listener.yaml:47](specs/osc-listener.yaml#L47))
+- [ ] Check that a surface's press and release, and a repeated press, each arrive as a message event, including surfaces that send bundles. ([specs/osc-listener.yaml:70](specs/osc-listener.yaml#L70))
+- [ ] Check that 64 simultaneous TCP senders is enough for a busy show. ([specs/osc-listener.yaml:87](specs/osc-listener.yaml#L87))
+
 ## panasonic-ptz — Panasonic PTZ
 
 - [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))

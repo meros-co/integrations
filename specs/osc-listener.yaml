@@ -1,0 +1,95 @@
+spec: 1
+id: osc-listener
+name: OSC received from any sender
+vendor: Generic (any control surface or software sending Open Sound Control, such as TouchOSC or Lemur)
+category: other
+implementation: native
+reason: >
+  The core receives rather than sends, from whichever senders reach a port rather than from one device's
+  address, and reports every message as it arrives, repeats included, which state cannot carry. Over TCP it
+  accepts several senders at once, each framed on its own. Addresses and argument types are the sender's
+  choice, not declared in the spec.
+
+source:
+  - title: "The Open Sound Control 1.0 Specification"
+    author: "Matt Wright, CNMAT, UC Berkeley (2002-03-26)"
+    url: "https://opensoundcontrol.stanford.edu/spec-1_0.html"
+    note: >
+      Messages, type tags, bundles (#bundle, a time tag, then size-prefixed elements) and the int32 size
+      before each packet over a stream such as TCP; one packet per UDP datagram. The codec is generic-osc's.
+  - title: "Features and Future of Open Sound Control version 1.1 for NIME"
+    author: "Adrian Freed and Andy Schmeder, CNMAT (NIME 2009)"
+    url: "https://opensoundcontrol.stanford.edu/files/2009-NIME-OSC-1.1.pdf"
+    note: "Stream transports such as TCP frame packets with SLIP (RFC 1055), an END byte at both ends."
+  - title: "RFC 1055: A Nonstandard for Transmission of IP Datagrams over Serial Lines: SLIP"
+    author: "J. Romkey (1988)"
+    url: "https://www.rfc-editor.org/rfc/rfc1055"
+    note: "END 0xC0, ESC 0xDB, ESC_END 0xDC, ESC_ESC 0xDD."
+
+settings:
+  transport: { type: enum, values: [udp, tcp], default: udp, label: Transport, description: "udp hears datagrams from any sender; tcp accepts connections from any number of senders at once." }
+  tcp_framing: { type: enum, values: [slip, length-prefixed], default: slip, label: TCP framing, description: "How senders frame packets over TCP: slip as in OSC 1.1, length-prefixed (an int32 size before each packet) as in OSC 1.0; ignored over UDP." }
+  bind_address: { type: string, pattern: '^[0-9A-Fa-f.:]*$', max_length: 45, label: Bind address, description: "The local IP address to listen on, such as one network interface's; empty listens where the core binds (every interface unless the core was started with a bind address)." }
+  address_prefix: { type: string, pattern: '^(/[!-"$-~]*)?$', max_length: 1024, label: Address prefix, description: "Report only messages whose address begins with this text, such as /1/; empty reports every message." }
+
+ports:
+  - { port: null, protocol: udp, role: control, listener: core, note: "OSC has no standard port: the port to listen on is given when the integration is opened; TCP when the transport setting is tcp" }
+
+models:
+  - id: generic
+    name: "Any OSC 1.0/1.1 sender, over UDP or TCP (give the port to listen on; no host)"
+    supports: [send]
+    verification: none
+
+commands:
+  send:
+    summary: >
+      Send one OSC message to a sender, such as feedback to a TouchOSC control, from the listening port.
+      Over UDP to any ip:port (often not the port the sender sends from: TouchOSC receives on a port of its
+      own); over TCP only to a sender connected now, by the ip:port its message events give as source. args
+      as for generic-osc's send. Returns unverified: OSC has no acknowledgement
+    params:
+      to: { type: string, pattern: '^\S+:[0-9]{1,5}$', max_length: 64, required: true, label: Destination, description: "The sender to send to, as ip:port; over TCP the source of one of its message events." }
+      address: { type: string, pattern: '^/[!-"$-~]*$', max_length: 1024, required: true, label: Address, description: "OSC address to send to, starting with /, such as /1/fader1." }
+      args: { type: json, default: [], label: Arguments, description: "A list of arguments: bare values (integer as int32, other number as float32, string, true, false, null) or {type, value} objects for blob, int64, double, impulse and the rest." }
+    returns: none
+
+state:
+  transport: { type: string, description: "udp or tcp, as set" }
+  port: { type: int, description: "The port listened on" }
+  message_count: { type: int, description: "Messages reported since the integration was opened (after the address prefix filter)" }
+  connections: { type: int, description: "TCP only: senders connected now" }
+  senders.*.messages: { type: int, description: "Messages reported from a sender, keyed by its ip:port; the 256 most recently heard senders are kept" }
+  senders.*.last_address: { type: string, description: "Address of the sender's last message reported" }
+  senders.*.connected: { type: bool, description: "TCP only: whether the sender's connection is open" }
+
+quirks:
+  - models: [all]
+    severity: info
+    text: >
+      Every message received is a message event, {event: message, device, address, types, args, source}, even
+      when it repeats the last one exactly: a button pressed twice is two events. args are as generic-osc
+      keeps them in state (blob, RGBA and MIDI as hex, T/F as booleans, nil and impulse as null); types are
+      the type tags without the comma; source is the sender's ip:port. A bundle gives one event per message,
+      in order; time tags are not acted on. Message events are kept when the consumer falls behind and state
+      patches are dropped; only past 100,000 queued events are they dropped too, counted in the dropped
+      event's messages.
+  - models: [all]
+    severity: info
+    text: >
+      Opened with no host (empty or left out; 0.0.0.0 is the same), since it hears any sender. Connected means
+      listening; a port that cannot be bound (another program, or another integration of this core, holds it)
+      is reported disconnected and tried again after 1 s, doubling to 30 s. Opening for commands only
+      (monitor false) changes nothing: listening is the whole purpose, and nothing is asked of a sender.
+  - models: [all]
+    severity: info
+    text: >
+      Over TCP, up to 64 senders are connected at once; more are closed as they connect. A sender whose stream
+      cannot be framed as set (a SLIP packet over 1 MiB, or a length prefix over 1 MiB) has its connection
+      closed; the port and the other senders carry on. Data that is not an OSC packet is logged at debug and
+      skipped.
+  - models: [all]
+    severity: info
+    text: >
+      The address prefix is compared as text, not as an OSC address pattern: /1/ matches /1/push1 but not
+      /10/push1, while /1 matches both.

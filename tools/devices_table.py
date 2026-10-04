@@ -47,6 +47,7 @@ NATIVE = {
     "novastar-h": "Signed JSON over HTTP 8000",
     "obs-studio": "obs-websocket 5 over WebSocket 4455",
     "obsidian-onyx": "Telnet over TCP 2323",
+    "osc-listener": "OSC over UDP or TCP from any sender; receives",
     "pjlink": "PJLink over TCP 4352",
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default)",
     "qsys": "QRC JSON-RPC over TCP 1710",

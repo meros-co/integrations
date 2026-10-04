@@ -84,6 +84,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "generic-osc",
             "generic-tcp-udp",
             "http-snapshot",
+            "osc-listener",
         ],
     ),
     ("vendor-google", &["youtube-live"]),
