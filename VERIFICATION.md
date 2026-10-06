@@ -775,6 +775,29 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Check that set_ndi_transport's four flags are accepted in one request, with tcp as all four false. ([specs/magewell-proconvert.yaml:842](specs/magewell-proconvert.yaml#L842))
 - [ ] Confirm the IP decoder's summary reports hdmi-state as a number and the first stream of the current profile under profile.streams, as the document's example shows. ([specs/magewell-proconvert.yaml:782](specs/magewell-proconvert.yaml#L782))
 
+## mediamtx — MediaMTX
+
+- [ ] Confirm a wrong Basic user or password, or an invalid JWT, is answered 401 (not 403) by the Control API, so it is taken as the terminal refusal. ([specs/mediamtx.yaml:110](specs/mediamtx.yaml#L110))
+- [ ] Confirm the Control API takes a JWT as Authorization: Bearer (release notes 1.9.2) and, as the HTTP servers do, user:pass as a Bearer token. ([specs/mediamtx.yaml:110](specs/mediamtx.yaml#L110))
+- [ ] Confirm GET /v3/paths/list?itemsPerPage=1 as the probe answers a client allowed the api action and 401 to any other. ([specs/mediamtx.yaml:113](specs/mediamtx.yaml#L113))
+- [ ] Confirm apiEncryption: yes serves HTTPS on the same port 9997 with the configured certificate. ([specs/mediamtx.yaml:105](specs/mediamtx.yaml#L105))
+- [ ] Confirm a path name holding a slash (live/stage) is reached percent-encoded (live%2Fstage) in /v3/config/paths/*/{name}, /v3/paths/get/{name}, /v3/hls/muxers/get/{name} and /v3/recordings/get/{name}. ([specs/mediamtx.yaml:298](specs/mediamtx.yaml#L298))
+- [ ] Confirm configuration changes made through the API are not written to mediamtx.yml, are lost on restart, and are undone by a later edit of the file (not documented). ([specs/mediamtx.yaml:830](specs/mediamtx.yaml#L830))
+- [ ] Record what get_global_config and get_path_config return in place of passwords and passphrases from 1.20.1 (left out, empty or masked), and whether patching other fields keeps them. ([specs/mediamtx.yaml:855](specs/mediamtx.yaml#L855))
+- [ ] Confirm set_server_enabled turns a server on and off at runtime without restarting MediaMTX, and that releases before 1.19 answer 400 for moq. ([specs/mediamtx.yaml:228](specs/mediamtx.yaml#L228))
+- [ ] Confirm replace_path_config adds a path that does not exist (1.8.2) and resets the fields it leaves out to the path defaults. ([specs/mediamtx.yaml:349](specs/mediamtx.yaml#L349))
+- [ ] Confirm delete_path_config closes the path's source and disconnects its readers at once. ([specs/mediamtx.yaml:360](specs/mediamtx.yaml#L360))
+- [ ] Confirm kicking a publishing session or connection takes the path offline for its readers, and whether the client may reconnect at once. ([specs/mediamtx.yaml:543](specs/mediamtx.yaml#L543))
+- [ ] Confirm set_path_record_delete_after accepts the d unit (1d, 7d) as the configuration file does. ([specs/mediamtx.yaml:410](specs/mediamtx.yaml#L410))
+- [ ] Confirm delete_recording_segment needs the start exactly as the recordings list gives it (fraction and offset), and answers 404 for another time. ([specs/mediamtx.yaml:797](specs/mediamtx.yaml#L797))
+- [ ] Confirm get_static_source answers 404 for a path fed by a publisher. ([specs/mediamtx.yaml:496](specs/mediamtx.yaml#L496))
+- [ ] Confirm list and get endpoints answer {"status": "ok"}-style JSON on success from 1.15.5 (the then_send re-reads match it) and record what 1.2 to 1.15.4 answer to a successful patch or kick. ([specs/mediamtx.yaml:1404](specs/mediamtx.yaml#L1404))
+- [ ] Confirm pageCount is 0 for an empty list and 1 for a list on one page (whole-list replacement relies on it). ([specs/mediamtx.yaml:1211](specs/mediamtx.yaml#L1211))
+- [ ] Confirm what the session and connection lists answer while their server is disabled (rtsp: no and so on), and that releases before 1.18 answer 404 to /v3/hlssessions/list (before 1.19 to /v3/moqsessions/list) without other effect. ([specs/mediamtx.yaml:1052](specs/mediamtx.yaml#L1052))
+- [ ] Confirm 1.21 still answers the earlier endpoint names (release notes 1.21.0), and that the deprecated bytesReceived and bytesSent hold the same values as inboundBytes and outboundBytes from 1.17. ([specs/mediamtx.yaml:1177](specs/mediamtx.yaml#L1177))
+- [ ] Confirm /v3 is served from 1.2.0 (the OpenAPI files show /v2 at 1.1.0 and /v3 at 1.2.0) and that each endpoint first appears in the release this spec names. ([specs/mediamtx.yaml:161](specs/mediamtx.yaml#L161))
+- [ ] Record the transport strings an RTSP session reports (such as UDP, TCP, UDP-multicast). ([specs/mediamtx.yaml:965](specs/mediamtx.yaml#L965))
+
 ## megapixel-helios — Megapixel HELIOS
 
 - [ ] Confirm that the JSON-RPC websocket answers {"jsonrpc":"2.0","id":1,"method":"state"} with the whole tree under result, then pushes updates without a subscription, and that it takes the web application's credentials when authentication is on. ([specs/megapixel-helios.yaml:520](specs/megapixel-helios.yaml#L520))

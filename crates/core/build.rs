@@ -63,6 +63,7 @@ const VENDOR_GROUPS: &[(&str, &[&str])] = &[
             "blackmagic-videohub",
         ],
     ),
+    ("vendor-bluenviron", &["mediamtx"]),
     ("vendor-boinx", &["boinx-mimolive"]),
     ("vendor-brompton", &["brompton-tessera"]),
     ("vendor-canon", &["canon-ptz"]),

@@ -1,0 +1,1434 @@
+spec: 1
+id: mediamtx
+name: MediaMTX (Control API v3)
+vendor: bluenviron
+category: other
+
+# MediaMTX's Control API: HTTP and JSON on port 9997, enabled with `api: yes`
+# in mediamtx.yml (or MTX_API=yes). The media server routes streams between
+# SRT, WebRTC, RTSP, RTMP, LL-HLS, MPEG-TS, RTP and MoQ; the API reads and
+# changes its configuration (global, path defaults, path configurations),
+# lists live paths with their source, readers, tracks and byte counters, lists
+# and kicks each protocol's clients, and lists and deletes recordings.
+# MediaMTX pushes nothing to an API client: live paths are polled every
+# 3 seconds, and every protocol's sessions, the configuration and the
+# server's version every 10 seconds. Lists are read whole (1000 items a page)
+# and replace what state held, so removed paths and closed sessions leave it.
+#
+# Two models: MediaMTX 1.21 and later serve the endpoints grouped by
+# protocol (/v3/rtsp/sessions/list); 1.2 to 1.20 serve the same API under
+# the earlier names (/v3/rtspsessions/list), which 1.21 still answers.
+
+source:
+  - title: MediaMTX OpenAPI definition of the Control API (api/openapi.yaml, MediaMTX v1.21.1)
+    author: bluenviron (MediaMTX, MIT licence)
+    url: https://github.com/bluenviron/mediamtx/blob/v1.21.1/api/openapi.yaml
+    note: >
+      The project's own API definition, retrieved 2026-10-06 (v1.21.1 is the
+      latest release, 2026-09-20). /v3/info; /v3/auth/jwks/refresh (POST);
+      /v3/config/global/get and patch (PATCH, all fields optional);
+      /v3/config/path-defaults/get and patch; /v3/config/paths/list (page,
+      itemsPerPage: default 0 and 100), get/{name}, add/{name} (POST),
+      patch/{name} (PATCH), replace/{name} (POST, replaces all values),
+      delete/{name} (DELETE); /v3/paths/list and get/{name};
+      /v3/paths/forward-dests/list (path, page, itemsPerPage) and get (id,
+      path); /v3/paths/static-sources/get/{name}; list, get and (where
+      present) kick for /v3/hls/muxers (no kick), /v3/hls/sessions,
+      /v3/rtsp/conns (no kick), /v3/rtsp/sessions, /v3/rtsps/conns,
+      /v3/rtsps/sessions, /v3/rtmp/conns, /v3/rtmps/conns, /v3/srt/conns,
+      /v3/webrtc/sessions, /v3/moq/sessions (kick is POST); /v3/recordings/list,
+      get/{name}, and segments/delete (DELETE, path and start in the query).
+      Lists answer {itemCount, pageCount, items}; success answers
+      {"status": "ok"} and errors {"status": "error", "error": "..."} with
+      400, 404 or 500. Schemas Path (available, online, ready (deprecated),
+      confName, source {type, id}, readers [{type, id}], inboundBytes,
+      outboundBytes, inboundFramesInError, tracks (deprecated codec names),
+      tracks2 [{codec, codecProps}]), PathConf, GlobalConf, RTSPSession,
+      RTMPConn, SRTConn (libsrt statistics), WebRTCSession, HLSMuxer,
+      HLSSession, MoQSession, Recording {name, segments [{start}]},
+      ForwardDest, StaticSource, AuthInternalUser {user, pass, ips,
+      permissions [{action, path}]}, and their enums.
+  - title: MediaMTX OpenAPI definitions at v1.2.0, v1.5.0, v1.16.0, v1.19.0 and v1.20.0 (apidocs/openapi.yaml, later api/openapi.yaml)
+    author: bluenviron (MediaMTX, MIT licence)
+    url: https://github.com/bluenviron/mediamtx/blob/v1.20.0/api/openapi.yaml
+    note: >
+      The project's own API definitions at earlier tags, read to find which
+      releases serve which endpoint names. v1.0.0 and v1.1.0 serve /v2/;
+      v1.2.0 to v1.20.0 serve /v3/ with /v3/config/pathdefaults,
+      /v3/hlsmuxers, /v3/rtspconns, /v3/rtspsessions, /v3/rtspsconns,
+      /v3/rtspssessions, /v3/rtmpconns, /v3/rtmpsconns, /v3/srtconns,
+      /v3/webrtcsessions, /v3/recordings/deletesegment; /v3/recordings from
+      1.5.1, /v3/auth/jwks/refresh from 1.12.3, /v3/info from 1.15.2,
+      /v3/hlssessions from 1.18.0, /v3/moqsessions from 1.19.0,
+      /v3/paths/forward/list and get from 1.20.0. Byte counters are
+      bytesReceived and bytesSent until 1.16 and inboundBytes and
+      outboundBytes (beside the deprecated names) from 1.17; available and
+      online from 1.16; tracks2 from 1.17.
+  - title: MediaMTX documentation, Control API, Authentication, Configuration, Metrics, Playback recorded streams, Record streams to disk (docs/, v1.21.1)
+    author: bluenviron (MediaMTX)
+    url: https://mediamtx.org/docs/features/control-api
+    note: >
+      The project's documentation, retrieved 2026-10-06 from the repository's
+      docs folder at v1.21.1. The API is enabled with api: yes and answers on
+      127.0.0.1:9997 by default; by default it is accessible from localhost
+      only. Authentication: internal users in the configuration
+      (authInternalUsers, each with ips and permissions whose actions are
+      publish, read, playback, api, metrics and pprof; user any means anyone),
+      an external HTTP server, or JWTs from an identity server's JWKS. HTTP
+      servers take Basic credentials, or a Bearer token (a JWT, or user:pass).
+      The default configuration grants api, metrics and pprof to anyone from
+      127.0.0.1 and ::1. The configuration can be changed by editing the file
+      (hot reloading), environment variables or the Control API. Metrics are
+      served on :9998 in Prometheus format, pprof on :9999, the playback
+      server on :9996 (/list and /get of recorded time spans).
+  - title: MediaMTX mediamtx.yml (v1.21.1) and release notes v0.17.0 to v1.21.1
+    author: bluenviron (MediaMTX)
+    url: https://github.com/bluenviron/mediamtx/releases
+    note: >
+      The default configuration file (api false, apiAddress :9997,
+      apiEncryption false, the default users, every server's address, the
+      path defaults with source publisher, record false, recordFormat fmp4,
+      recordDeleteAfter 1d) and the release notes: pagination of every list
+      from 0.23.0; JWT in the Authorization header for the API from 1.9.2;
+      HTTPS for the API from 1.8.0; the new authentication system covering the
+      API from 1.6.0; replace made idempotent in 1.8.2; JSON answers with
+      status ok or error on every request from 1.15.5; passwords no longer
+      returned by the API from 1.20.1; the endpoint renaming in 1.21.0, with
+      the old names still served.
+
+transport:
+  type: http
+  port: 9997
+  # apiEncryption: yes serves HTTPS on the same port, usually with a
+  # certificate the operator generated.
+  scheme: { setting: scheme }
+  accept_invalid_certs: true
+  # None while the API is reached from the server itself (the default
+  # configuration grants it to 127.0.0.1); Basic for an internal user with
+  # the api permission; Bearer for a JWT.
+  auth: { setting: auth }
+  refusal_status: [401]
+  timeout_ms: 5000
+  # Every release from 1.2 serves it; one item keeps it small.
+  probe: { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1" } }
+
+settings:
+  scheme: { type: enum, values: [http, https], default: http,
+            label: Scheme,
+            description: "https when the server sets apiEncryption: yes, otherwise http; MediaMTX's own certificate is accepted without being checked." }
+  auth: { type: enum, values: [none, basic, bearer], default: none,
+          label: Credential type,
+          description: "none when the server lets this address use the API without credentials, basic for a user and password, bearer for a JWT." }
+  username: { type: string, max_length: 256, default: "",
+              label: User,
+              description: "An internal user with the api permission, sent as the HTTP Basic user when the credential type is basic." }
+  password: { type: string, secret: true, max_length: 256, default: "",
+              label: Password,
+              description: "That user's password, sent as the HTTP Basic password when the credential type is basic." }
+  token: { type: string, secret: true, max_length: 8192, default: "",
+           label: Token,
+           description: "A JWT from the identity server MediaMTX trusts, with the api action in its permissions claim, sent as a Bearer token when the credential type is bearer." }
+
+ports:
+  - { port: 9997, protocol: http, role: control, when: "scheme http" }
+  - { port: 9997, protocol: https, role: control, setting: scheme, when: "scheme https" }
+  - { port: 9996, protocol: http, role: control, note: "not used by this integration: MediaMTX's playback server (playback: yes), which lists and serves recorded time spans at /list and /get" }
+  - { port: 9998, protocol: http, role: control, note: "not used by this integration: MediaMTX's Prometheus metrics server (metrics: yes)" }
+  - { port: 9999, protocol: http, role: control, note: "not used by this integration: MediaMTX's pprof profiling server (pprof: yes)" }
+
+models:
+  - id: mediamtx-1-21
+    name: MediaMTX 1.21 and later
+    supports:
+      [get_info, refresh_jwks,
+       get_global_config, patch_global_config, set_log_level, set_server_enabled, set_auth_internal_users,
+       get_path_defaults, patch_path_defaults, set_default_record,
+       list_path_configs, get_path_config, add_path, add_path_config, patch_path_config, replace_path_config,
+       delete_path_config, set_path_source, set_source_on_demand, set_path_record, set_path_record_format,
+       set_path_record_delete_after, set_path_max_readers, set_path_override_publisher, set_path_forward_dests,
+       list_paths, get_path, list_forward_dests, get_forward_dest, get_static_source,
+       list_rtsp_conns, get_rtsp_conn, list_rtsp_sessions, get_rtsp_session, kick_rtsp_session,
+       list_rtsps_conns, get_rtsps_conn, list_rtsps_sessions, get_rtsps_session, kick_rtsps_session,
+       list_rtmp_conns, get_rtmp_conn, kick_rtmp_conn, list_rtmps_conns, get_rtmps_conn, kick_rtmps_conn,
+       list_srt_conns, get_srt_conn, kick_srt_conn,
+       list_webrtc_sessions, get_webrtc_session, kick_webrtc_session,
+       list_hls_muxers, get_hls_muxer, list_hls_sessions, get_hls_session, kick_hls_session,
+       list_moq_sessions, get_moq_session, kick_moq_session,
+       list_recordings, get_recordings, delete_recording_segment]
+    verification: none
+    notes: >
+      The endpoint names grouped by protocol, introduced in 1.21.0.
+  - id: mediamtx-1-2
+    name: MediaMTX 1.2 to 1.20
+    supports:
+      [get_info, refresh_jwks,
+       get_global_config, patch_global_config, set_log_level, set_server_enabled, set_auth_internal_users,
+       get_path_defaults, patch_path_defaults, set_default_record,
+       list_path_configs, get_path_config, add_path, add_path_config, patch_path_config, replace_path_config,
+       delete_path_config, set_path_source, set_source_on_demand, set_path_record, set_path_record_format,
+       set_path_record_delete_after, set_path_max_readers, set_path_override_publisher, set_path_forward_dests,
+       list_paths, get_path, list_forward_dests, get_forward_dest,
+       list_rtsp_conns, get_rtsp_conn, list_rtsp_sessions, get_rtsp_session, kick_rtsp_session,
+       list_rtsps_conns, get_rtsps_conn, list_rtsps_sessions, get_rtsps_session, kick_rtsps_session,
+       list_rtmp_conns, get_rtmp_conn, kick_rtmp_conn, list_rtmps_conns, get_rtmps_conn, kick_rtmps_conn,
+       list_srt_conns, get_srt_conn, kick_srt_conn,
+       list_webrtc_sessions, get_webrtc_session, kick_webrtc_session,
+       list_hls_muxers, get_hls_muxer, list_hls_sessions, get_hls_session, kick_hls_session,
+       list_moq_sessions, get_moq_session, kick_moq_session,
+       list_recordings, get_recordings, delete_recording_segment]
+    verification: none
+    notes: >
+      The Control API v3 under its earlier endpoint names. Some endpoints
+      arrived within the range: recordings from 1.5.1, refresh_jwks from
+      1.12.3, get_info from 1.15.2, HLS sessions from 1.18.0, MoQ sessions
+      from 1.19.0, forward destinations from 1.20.0; an older release answers
+      them 404. Releases before 1.2 (Control API v2 and v1) are not covered.
+
+commands:
+  # ── General ───────────────────────────────────────────────────────────────
+  get_info:
+    summary: The server's version and when it started (/v3/info, 1.15.2 and later)
+    send: { method: GET, path: /v3/info }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  refresh_jwks:
+    summary: Fetch the JWT key set again from authJWTJWKS, after the identity server rotated its keys (/v3/auth/jwks/refresh)
+    send: { method: POST, path: /v3/auth/jwks/refresh }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Global configuration ──────────────────────────────────────────────────
+  get_global_config:
+    summary: The global configuration, every GlobalConf field; passwords are left out from 1.20.1 (/v3/config/global/get)
+    send: { method: GET, path: /v3/config/global/get }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  patch_global_config:
+    summary: Change global settings with a GlobalConf object holding only the fields to change (/v3/config/global/patch)
+    params:
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of GlobalConf fields as MediaMTX's OpenAPI definition gives them, such as {\"logLevel\": \"debug\"}." }
+    send: { method: PATCH, path: /v3/config/global/patch, body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_log_level:
+    summary: Set the server's log verbosity (global logLevel)
+    params:
+      level: { type: enum, values: [error, warn, info, debug], required: true,
+               label: Log level,
+               description: "error logs least, debug most." }
+    send: { method: PATCH, path: /v3/config/global/patch, body: '{"logLevel":"{level}"}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_server_enabled:
+    summary: Turn one of MediaMTX's servers on or off (global rtsp, rtmp, hls, webrtc, srt, moq, playback, metrics or pprof); off disconnects every client of that server
+    params:
+      server: { type: enum, values: [rtsp, rtmp, hls, webrtc, srt, moq, playback, metrics, pprof], required: true,
+                label: Server,
+                description: "The server to change: a streaming protocol (moq from 1.19), the playback server, the metrics server or the pprof server." }
+      enabled: { type: bool, required: true,
+                 label: Enabled,
+                 description: "On to run the server, off to stop it." }
+    send: { method: PATCH, path: /v3/config/global/patch, body: '{"{server}":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_auth_internal_users:
+    summary: Replace the whole list of internal users and their permissions (global authInternalUsers)
+    params:
+      users: { type: json, required: true,
+               label: Users,
+               description: "A JSON array of users as MediaMTX documents them, each {\"user\", \"pass\", \"ips\", \"permissions\": [{\"action\", \"path\"}]}; it replaces every user." }
+    send: { method: PATCH, path: /v3/config/global/patch, body: '{"authInternalUsers":{users}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Path defaults ─────────────────────────────────────────────────────────
+  get_path_defaults:
+    summary: The settings every path takes unless its own configuration overrides them (pathDefaults)
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/config/path-defaults/get }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/config/pathdefaults/get }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  patch_path_defaults:
+    summary: Change the path defaults with a PathConf object holding only the fields to change
+    params:
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of PathConf fields as MediaMTX's OpenAPI definition gives them, such as {\"recordDeleteAfter\": \"7d\"}." }
+    send:
+      - { models: [mediamtx-1-21], method: PATCH, path: /v3/config/path-defaults/patch, body: '{changes}', content_type: application/json }
+      - { models: [mediamtx-1-2], method: PATCH, path: /v3/config/pathdefaults/patch, body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_default_record:
+    summary: Turn recording to disk on or off for every path that does not set it itself (pathDefaults record)
+    params:
+      enabled: { type: bool, required: true,
+                 label: Record,
+                 description: "On to record every such path's stream to disk, off to stop." }
+    send:
+      - { models: [mediamtx-1-21], method: PATCH, path: /v3/config/path-defaults/patch, body: '{"record":{enabled}}', content_type: application/json }
+      - { models: [mediamtx-1-2], method: PATCH, path: /v3/config/pathdefaults/patch, body: '{"record":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Path configurations ───────────────────────────────────────────────────
+  list_path_configs:
+    summary: The configured paths, a page at a time, each with every PathConf field ({itemCount, pageCount, items})
+    params:
+      page: &page { type: int, min: 0, default: 0,
+                    label: Page,
+                    description: "Which page of the list, from 0." }
+      items_per_page: &items_per_page { type: int, min: 1, default: 100,
+                                        label: Items per page,
+                                        description: "How many items each page holds; pageCount in the answer says how many pages there are." }
+    send: { method: GET, path: /v3/config/paths/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_path_config:
+    summary: One path's configuration, every PathConf field
+    params:
+      name: &conf_name { type: string, pattern: "^\\S+$", max_length: 256, required: true,
+                         label: Path,
+                         description: "The configured path's name as in mediamtx.yml, such as cam1 or live/stage; a name starting with ~ is a regular expression." }
+    send: { method: GET, path: "/v3/config/paths/get/{name}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  add_path:
+    summary: Add a path with a source, publisher (clients publish to it) or a URL to pull from, such as rtsp://camera/stream or srt://host:port?streamid=...
+    params:
+      name: *conf_name
+      source: &source { type: string, pattern: "^\\S+$", max_length: 2048, required: true,
+                        label: Source,
+                        description: "publisher, redirect, rpiCamera, or the URL to pull from (rtsp, rtsps, rtmp, rtmps, http(s) HLS, srt, udp+mpegts, udp+rtp, whep, wheps, moqt), credentials included in the URL." }
+      source_on_demand: { type: bool, default: false,
+                          label: On demand,
+                          description: "On to pull a URL source only while someone reads the path." }
+      record: { type: bool, default: false,
+                label: Record,
+                description: "On to record the path's stream to disk." }
+    send: { method: POST, path: "/v3/config/paths/add/{name}",
+            body: '{"source":{source:json},"sourceOnDemand":{source_on_demand},"record":{record}}',
+            content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  add_path_config:
+    summary: Add a path with a full PathConf object; fields left out take the path defaults
+    params:
+      name: *conf_name
+      config: { type: json, required: true,
+                label: Configuration,
+                description: "A JSON object of PathConf fields as MediaMTX's OpenAPI definition gives them, such as {\"source\": \"rtsp://10.0.0.20/main\", \"record\": true}." }
+    send: { method: POST, path: "/v3/config/paths/add/{name}", body: '{config}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  patch_path_config:
+    summary: Change a path's configuration with a PathConf object holding only the fields to change
+    params:
+      name: *conf_name
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "A JSON object of PathConf fields to change, such as {\"maxReaders\": 10}." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{changes}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  replace_path_config:
+    summary: Replace all of a path's configuration; fields left out go back to the path defaults, and a missing path is added (1.8.2 and later)
+    params:
+      name: *conf_name
+      config: { type: json, required: true,
+                label: Configuration,
+                description: "A JSON object of PathConf fields, the path's whole new configuration." }
+    send: { method: POST, path: "/v3/config/paths/replace/{name}", body: '{config}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  delete_path_config:
+    summary: Remove a path's configuration; its source closes and its readers are disconnected
+    params:
+      name: *conf_name
+    send: { method: DELETE, path: "/v3/config/paths/delete/{name}" }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_source:
+    summary: Change where a path's stream comes from (PathConf source)
+    params:
+      name: *conf_name
+      source: *source
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"source":{source:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_source_on_demand:
+    summary: Pull a path's URL source only while it has readers, or all the time (PathConf sourceOnDemand)
+    params:
+      name: *conf_name
+      enabled: { type: bool, required: true,
+                 label: On demand,
+                 description: "On to pull the source only while someone reads the path, off to pull it all the time." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"sourceOnDemand":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_record:
+    summary: Start or stop recording a path's stream to disk (PathConf record)
+    params:
+      name: *conf_name
+      enabled: { type: bool, required: true,
+                 label: Record,
+                 description: "On to record the path to recordPath, off to stop and close the segment." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"record":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_record_format:
+    summary: Choose the container of a path's recordings (PathConf recordFormat)
+    params:
+      name: *conf_name
+      format: { type: enum, values: [fmp4, mpegts], required: true,
+                label: Format,
+                description: "fmp4 for fragmented MP4, mpegts for MPEG-TS." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"recordFormat":"{format}"}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_record_delete_after:
+    summary: How long a path's recording segments are kept before MediaMTX deletes them (PathConf recordDeleteAfter)
+    params:
+      name: *conf_name
+      duration: { type: string, pattern: "^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$", max_length: 32, required: true,
+                  label: Keep for,
+                  description: "A duration such as 1d, 12h or 30m; 0s keeps segments forever." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"recordDeleteAfter":{duration:json}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_max_readers:
+    summary: Limit how many clients may read a path at once (PathConf maxReaders)
+    params:
+      name: *conf_name
+      max_readers: { type: int, min: 0, required: true,
+                     label: Readers,
+                     description: "The most readers the path accepts; 0 means no limit." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"maxReaders":{max_readers}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_override_publisher:
+    summary: Let a new publisher take over a path from the one publishing, or refuse it (PathConf overridePublisher)
+    params:
+      name: *conf_name
+      enabled: { type: bool, required: true,
+                 label: Allow takeover,
+                 description: "On to let another client disconnect the current publisher and publish in its place, off to refuse it." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"overridePublisher":{enabled}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  set_path_forward_dests:
+    summary: Replace the list of destinations a path's stream is forwarded to, such as rtmp, rtsp or srt URLs (PathConf forward, 1.20 and later)
+    params:
+      name: *conf_name
+      dests: { type: json, required: true,
+               label: Destinations,
+               description: "A JSON array of forward destinations, each {\"dest\": \"srt://host:port?streamid=...\"} with destFingerprint, whipBearerToken or moqTransport where needed; [] stops forwarding." }
+    send: { method: PATCH, path: "/v3/config/paths/patch/{name}", body: '{"forward":{dests}}', content_type: application/json }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Paths (live) ──────────────────────────────────────────────────────────
+  list_paths:
+    summary: The live paths, a page at a time, with online state, source, readers, tracks and byte counters ({itemCount, pageCount, items})
+    params: { page: *page, items_per_page: *items_per_page }
+    send: { method: GET, path: /v3/paths/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_path:
+    summary: One live path with online state, source, readers, tracks and byte counters
+    params:
+      name: &path_name { type: string, pattern: "^\\S+$", max_length: 256, required: true,
+                         label: Path,
+                         description: "The live path's name, such as cam1 or live/stage." }
+    send: { method: GET, path: "/v3/paths/get/{name}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_forward_dests:
+    summary: A path's forward destinations with state (idle, forwarding, error), last error and bytes sent, a page at a time (1.20 and later)
+    params: { path: *path_name, page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/paths/forward-dests/list,
+          query: { path: "{path}", page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/paths/forward/list,
+          query: { path: "{path}", page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_forward_dest:
+    summary: One forward destination of a path (1.20 and later)
+    params:
+      path: *path_name
+      id: &forward_id { type: string, pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", required: true,
+                        label: Destination ID,
+                        description: "The forward destination's id, a UUID from list_forward_dests." }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/paths/forward-dests/get, query: { id: "{id}", path: "{path}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/paths/forward/get, query: { id: "{id}", path: "{path}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_static_source:
+    summary: A path's pulled source with its state (idle, running, error), last error and protocol details; 404 for a path without one
+    params: { name: *path_name }
+    send: { method: GET, path: "/v3/paths/static-sources/get/{name}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  # ── RTSP and RTSPS ────────────────────────────────────────────────────────
+  list_rtsp_conns:
+    summary: The RTSP server's TCP connections, a page at a time
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtsp/conns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtspconns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtsp_conn:
+    summary: One RTSP connection, with its session and HTTP or WebSocket tunnel
+    params:
+      id: &conn_id { type: string, pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", required: true,
+                     label: ID,
+                     description: "The connection or session's id, a UUID from the matching list." }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/rtsp/conns/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/rtspconns/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_rtsp_sessions:
+    summary: The RTSP server's sessions (publishers and readers), a page at a time, with path, state, transport and RTP statistics
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtsp/sessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtspsessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtsp_session:
+    summary: One RTSP session
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/rtsp/sessions/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/rtspsessions/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_rtsp_session:
+    summary: Disconnect an RTSP session; a kicked publisher takes its path offline
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/rtsp/sessions/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/rtspsessions/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  list_rtsps_conns:
+    summary: The RTSPS server's TCP connections, a page at a time
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtsps/conns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtspsconns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtsps_conn:
+    summary: One RTSPS connection
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/rtsps/conns/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/rtspsconns/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_rtsps_sessions:
+    summary: The RTSPS server's sessions, a page at a time
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtsps/sessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtspssessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtsps_session:
+    summary: One RTSPS session
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/rtsps/sessions/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/rtspssessions/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_rtsps_session:
+    summary: Disconnect an RTSPS session; a kicked publisher takes its path offline
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/rtsps/sessions/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/rtspssessions/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── RTMP and RTMPS ────────────────────────────────────────────────────────
+  list_rtmp_conns:
+    summary: The RTMP server's connections (publishers and readers), a page at a time, with path, state and byte counters
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtmp/conns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpconns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmp_conn:
+    summary: One RTMP connection
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/rtmp/conns/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/rtmpconns/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_rtmp_conn:
+    summary: Disconnect an RTMP connection; a kicked publisher takes its path offline
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/rtmp/conns/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/rtmpconns/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  list_rtmps_conns:
+    summary: The RTMPS server's connections, a page at a time
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtmps/conns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpsconns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_rtmps_conn:
+    summary: One RTMPS connection
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/rtmps/conns/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/rtmpsconns/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_rtmps_conn:
+    summary: Disconnect an RTMPS connection; a kicked publisher takes its path offline
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/rtmps/conns/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/rtmpsconns/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── SRT ───────────────────────────────────────────────────────────────────
+  list_srt_conns:
+    summary: The SRT server's connections, a page at a time, with path, state and libsrt statistics (RTT, rates, loss, retransmissions, buffers)
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/srt/conns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/srtconns/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_srt_conn:
+    summary: One SRT connection with its libsrt statistics
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/srt/conns/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/srtconns/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_srt_conn:
+    summary: Disconnect an SRT connection; a kicked publisher takes its path offline
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/srt/conns/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/srtconns/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── WebRTC ────────────────────────────────────────────────────────────────
+  list_webrtc_sessions:
+    summary: The WebRTC server's sessions (WHIP publishers, WHEP readers), a page at a time, with ICE candidates and RTP statistics
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/webrtc/sessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/webrtcsessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_webrtc_session:
+    summary: One WebRTC session
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/webrtc/sessions/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/webrtcsessions/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_webrtc_session:
+    summary: Disconnect a WebRTC session; a kicked publisher takes its path offline
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/webrtc/sessions/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/webrtcsessions/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── HLS ───────────────────────────────────────────────────────────────────
+  list_hls_muxers:
+    summary: The HLS muxers, one per path being read over HLS, a page at a time, with last request and bytes sent
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/hls/muxers/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/hlsmuxers/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_hls_muxer:
+    summary: One path's HLS muxer
+    params: { name: *path_name }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/hls/muxers/get/{name}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/hlsmuxers/get/{name}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_hls_sessions:
+    summary: The HLS readers, tracked by cookie or query from 1.18, a page at a time
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/hls/sessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/hlssessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_hls_session:
+    summary: One HLS reader session (1.18 and later)
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/hls/sessions/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/hlssessions/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_hls_session:
+    summary: Disconnect an HLS reader session (1.18 and later)
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/hls/sessions/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/hlssessions/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Media over QUIC ───────────────────────────────────────────────────────
+  list_moq_sessions:
+    summary: The MoQ server's sessions, a page at a time (1.19 and later)
+    params: { page: *page, items_per_page: *items_per_page }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/moq/sessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/moqsessions/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_moq_session:
+    summary: One MoQ session (1.19 and later)
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: "/v3/moq/sessions/get/{id}" }
+      - { models: [mediamtx-1-2], method: GET, path: "/v3/moqsessions/get/{id}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  kick_moq_session:
+    summary: Disconnect a MoQ session; a kicked publisher takes its path offline (1.19 and later)
+    params: { id: *conn_id }
+    send:
+      - { models: [mediamtx-1-21], method: POST, path: "/v3/moq/sessions/kick/{id}" }
+      - { models: [mediamtx-1-2], method: POST, path: "/v3/moqsessions/kick/{id}" }
+    expect: { status: 200 }
+    returns: ack
+
+  # ── Recordings ────────────────────────────────────────────────────────────
+  list_recordings:
+    summary: The recordings on disk, by path, each with its segments' start times, a page at a time (1.5.1 and later)
+    params: { page: *page, items_per_page: *items_per_page }
+    send: { method: GET, path: /v3/recordings/list, query: { page: "{page}", itemsPerPage: "{items_per_page}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  get_recordings:
+    summary: One path's recording segments, each with its start time (1.5.1 and later)
+    params: { name: *path_name }
+    send: { method: GET, path: "/v3/recordings/get/{name}" }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  delete_recording_segment:
+    summary: Delete one recording segment from disk, named by its path and start time (1.5.1 and later)
+    params:
+      path: *path_name
+      start: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$", max_length: 64, required: true,
+               label: Segment start,
+               description: "The segment's start exactly as list_recordings or get_recordings gives it, an RFC 3339 time such as 2026-10-06T14:00:00.123456+01:00." }
+    send:
+      - { models: [mediamtx-1-21], method: DELETE, path: /v3/recordings/segments/delete, query: { path: "{path}", start: "{start}" } }
+      - { models: [mediamtx-1-2], method: DELETE, path: /v3/recordings/deletesegment, query: { path: "{path}", start: "{start}" } }
+    expect: { status: 200 }
+    returns: ack
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      The Control API is off by default: set api: yes in mediamtx.yml (or
+      MTX_API=yes). From 1.6 the API is an action of MediaMTX's
+      authentication, and the default configuration grants it only to
+      127.0.0.1 and ::1. To reach it from another machine, give an internal
+      user the api permission and choose basic with that user and password,
+      or, with authMethod jwt, choose bearer with a JWT whose permissions
+      include api; with authMethod http the external server decides. A
+      refused credential answers 401, which is terminal: nothing more is sent
+      until the settings change. Before 1.6 the API had no authentication at
+      all. apiAddress (default :9997) may bind one interface only, and
+      apiEncryption: yes serves HTTPS on the same port, usually with a
+      self-signed certificate, which is accepted without being checked.
+
+  - models: [all]
+    severity: warning
+    text: >
+      Configuration changes made through the API apply at once, but MediaMTX
+      keeps them in memory: they are not written to mediamtx.yml, are lost
+      when the server restarts, and editing the file afterwards (hot
+      reloading) puts the file's values back. A change that MediaMTX cannot
+      apply without it (an address, an encryption setting) restarts that
+      server, disconnecting its clients.
+
+  - models: [all]
+    severity: critical
+    text: >
+      These commands cannot be undone live. delete_path_config closes the
+      path's source and disconnects every reader; a pulled source is closed
+      and a publisher kicked. The kick commands disconnect a client at once;
+      kicking a publisher takes its path offline for every reader until the
+      publisher reconnects, which MediaMTX does not prevent.
+      set_server_enabled off stops that server and disconnects all its
+      clients. delete_recording_segment deletes the file from disk.
+      set_auth_internal_users replaces every user: a list without an api
+      permission for this integration's address or user locks it out of the
+      API until the file is edited. replace_path_config resets every field it
+      leaves out.
+
+  - models: [all]
+    severity: warning
+    text: >
+      From 1.20.1 the API never returns passwords (users' pass, SRT
+      passphrases and other secrets): they can be set but not read. A
+      configuration read with a get command and written back whole with
+      replace_path_config, add_path_config or patch_global_config therefore
+      loses them; send only the fields to change.
+
+  - models: [all]
+    severity: info
+    text: >
+      MediaMTX pushes nothing to an API client (its hooks run commands on the
+      server). Live paths are polled every 3 seconds; every protocol's
+      sessions and connections, the global configuration, the path defaults,
+      the configured paths and the server's version every 10 seconds. Each
+      list is asked for whole (itemsPerPage 1000) and replaces what state
+      held only when the answer has a single page (pageCount 0 or 1); a
+      longer list updates the entries it holds and leaves stale ones until
+      it fits a page. A configuration change or kick this integration makes
+      reads the affected list again at once, on 1.15.5 and later, whose
+      answers say {"status": "ok"}. RTSP and RTSPS connections are not
+      polled (their sessions are), and recordings are not kept in state.
+
+  - models: [all]
+    severity: info
+    text: >
+      A path whose name holds a dot is left out of state (state keys are
+      dotted paths); the commands still take it. Path names may hold
+      slashes (live/stage), sent percent-encoded in the request path. Sessions
+      and connections are keyed by their UUID, HLS muxers by their path.
+      Byte counters are totals since the path or session started.
+
+  - models: [mediamtx-1-2]
+    severity: info
+    text: >
+      1.2 to 1.20 serve the earlier endpoint names (/v3/rtspsessions/list,
+      /v3/config/pathdefaults/get, /v3/recordings/deletesegment,
+      /v3/paths/forward/list), which 1.21 still answers. Endpoints arrived
+      during that range: recordings in 1.5.1, refresh_jwks in 1.12.3,
+      get_info in 1.15.2, HLS sessions in 1.18.0, MoQ sessions in 1.19.0,
+      forward destinations in 1.20.0; an older release answers them 404, and
+      polls of the missing lists fail quietly every 10 seconds. Before 1.16 a
+      path reports ready but not online or available; before 1.17 the byte
+      counters are bytesReceived and bytesSent and tracks are codec names
+      only. Releases before 1.2 (the v2 and v1 APIs of 1.0, 1.1 and
+      rtsp-simple-server) are not covered.
+
+state:
+  server.version:                { type: string, description: "MediaMTX's version, such as v1.21.1 (/v3/info, 1.15.2 and later)" }
+  server.started:                { type: string, description: "When the server started, RFC 3339 (/v3/info)" }
+
+  config.log_level:              { type: string, description: "Log verbosity: error, warn, info or debug (logLevel)" }
+  config.auth_method:            { type: string, description: "How credentials are checked: internal, http or jwt (authMethod)" }
+  config.rtsp:                   { type: bool, description: "The RTSP and RTSPS server runs (rtsp)" }
+  config.rtmp:                   { type: bool, description: "The RTMP and RTMPS server runs (rtmp)" }
+  config.hls:                    { type: bool, description: "The HLS server runs (hls)" }
+  config.webrtc:                 { type: bool, description: "The WebRTC server runs (webrtc)" }
+  config.srt:                    { type: bool, description: "The SRT server runs (srt)" }
+  config.moq:                    { type: bool, description: "The Media over QUIC server runs (moq, 1.19 and later)" }
+  config.playback:               { type: bool, description: "The playback server runs (playback)" }
+  config.metrics:                { type: bool, description: "The metrics server runs (metrics)" }
+  config.rtsp_address:           { type: string, description: "The RTSP server's listen address, such as :8554 (rtspAddress)" }
+  config.rtsps_address:          { type: string, description: "The RTSPS server's listen address, such as :8322 (rtspsAddress)" }
+  config.rtmp_address:           { type: string, description: "The RTMP server's listen address, such as :1935 (rtmpAddress)" }
+  config.rtmps_address:          { type: string, description: "The RTMPS server's listen address, such as :1936 (rtmpsAddress)" }
+  config.hls_address:            { type: string, description: "The HLS server's listen address, such as :8888 (hlsAddress)" }
+  config.webrtc_address:         { type: string, description: "The WebRTC server's HTTP listen address, such as :8889 (webrtcAddress)" }
+  config.srt_address:            { type: string, description: "The SRT server's UDP listen address, such as :8890 (srtAddress)" }
+  config.playback_address:       { type: string, description: "The playback server's listen address, such as :9996 (playbackAddress)" }
+  config.metrics_address:        { type: string, description: "The metrics server's listen address, such as :9998 (metricsAddress)" }
+
+  path_defaults.record:          { type: bool, description: "Paths record to disk unless they say otherwise (pathDefaults record)" }
+  path_defaults.record_format:   { type: string, description: "Default recording container, fmp4 or mpegts (recordFormat)" }
+  path_defaults.record_delete_after: { type: string, description: "Default time recordings are kept, such as 1d; 0s keeps them (recordDeleteAfter)" }
+  path_defaults.source_on_demand: { type: bool, description: "URL sources are pulled only while read, by default (sourceOnDemand)" }
+  path_defaults.max_readers:     { type: int, description: "Default reader limit per path, 0 for none (maxReaders)" }
+
+  path_config_count:             { type: int, description: "How many paths are configured (config/paths/list itemCount)" }
+  path_configs.*.record:         { type: bool, description: "The configured path records to disk, keyed by path name (record)" }
+  path_configs.*.record_format:  { type: string, description: "The path's recording container, fmp4 or mpegts (recordFormat)" }
+  path_configs.*.record_delete_after: { type: string, description: "How long the path's recordings are kept, such as 1d (recordDeleteAfter)" }
+  path_configs.*.source_on_demand: { type: bool, description: "The path's URL source is pulled only while read (sourceOnDemand)" }
+  path_configs.*.max_readers:    { type: int, description: "The path's reader limit, 0 for none (maxReaders)" }
+  path_configs.*.override_publisher: { type: bool, description: "A new publisher may take over from the current one (overridePublisher)" }
+  path_configs.*.always_available: { type: bool, description: "The path stays readable with a placeholder while its source is offline (alwaysAvailable, 1.16 and later)" }
+
+  path_count:                    { type: int, description: "How many paths are live (paths/list itemCount)" }
+  paths.*.conf_name:             { type: string, description: "The configuration the live path follows, keyed by path name; a regular expression's name for a path it matched (confName)" }
+  paths.*.ready:                 { type: bool, description: "The path has a source and its tracks are known (ready; deprecated from 1.16 but still served)" }
+  paths.*.online:                { type: bool, description: "The path's source is online (online, 1.16 and later)" }
+  paths.*.available:             { type: bool, description: "The path can be read: online, or offline with alwaysAvailable (available, 1.16 and later)" }
+  paths.*.ready_time:            { type: string, description: "When the path became ready, RFC 3339 (readyTime)" }
+  paths.*.online_time:           { type: string, description: "When the source came online, RFC 3339 (onlineTime, 1.16 and later)" }
+  paths.*.source_type:           { type: string, description: "What feeds the path, such as rtspSession, rtmpConn, srtConn, webRTCSession or rtspSource (source.type)" }
+  paths.*.source_id:             { type: string, description: "The feeding session's or connection's id, for a publisher (source.id)" }
+  paths.*.readers:               { type: string, description: "The path's readers as JSON text, a list of {type, id} such as webRTCSession or hlsMuxer (readers)" }
+  paths.*.codecs:                { type: string, description: "The path's track codecs as JSON text, such as [\"H264\", \"MPEG-4 Audio\"] (tracks)" }
+  paths.*.inbound_bytes:         { type: int, unit: bytes, description: "Bytes received from the source (inboundBytes; bytesReceived before 1.17)" }
+  paths.*.outbound_bytes:        { type: int, unit: bytes, description: "Bytes sent to readers (outboundBytes; bytesSent before 1.17)" }
+  paths.*.inbound_frames_in_error: { type: int, description: "Frames received that could not be decoded (inboundFramesInError, 1.17 and later)" }
+  paths.*.tracks.*.codec:        { type: string, description: "The track's codec, keyed by track position from 0 (tracks2 codec, 1.17 and later)" }
+  paths.*.tracks.*.width:        { type: int, unit: px, description: "Video width (codecProps width)" }
+  paths.*.tracks.*.height:       { type: int, unit: px, description: "Video height (codecProps height)" }
+  paths.*.tracks.*.profile:      { type: string, description: "H.264 or H.265 profile (codecProps profile)" }
+  paths.*.tracks.*.level:        { type: string, description: "H.264 or H.265 level (codecProps level)" }
+  paths.*.tracks.*.sample_rate:  { type: int, unit: Hz, description: "Audio sample rate (codecProps sampleRate)" }
+  paths.*.tracks.*.channel_count: { type: int, description: "Audio channels (codecProps channelCount)" }
+
+  rtsp.session_count:            { type: int, description: "RTSP sessions open (itemCount)" }
+  rtsp.sessions.*.path:          { type: string, description: "The path the RTSP session publishes or reads, keyed by session id" }
+  rtsp.sessions.*.state:         { type: string, description: "idle, read or publish" }
+  rtsp.sessions.*.remote_addr:   { type: string, description: "The client's address and port (remoteAddr)" }
+  rtsp.sessions.*.transport:     { type: string, description: "How RTP travels, such as UDP, TCP or UDP-multicast (transport)" }
+  rtsp.sessions.*.user:          { type: string, description: "The user the client authenticated as (user, 1.17 and later)" }
+  rtsp.sessions.*.created:       { type: string, description: "When the session opened, RFC 3339" }
+  rtsp.sessions.*.inbound_bytes: { type: int, unit: bytes, description: "Bytes received from the client" }
+  rtsp.sessions.*.outbound_bytes: { type: int, unit: bytes, description: "Bytes sent to the client" }
+  rtsps.session_count:           { type: int, description: "RTSPS sessions open (itemCount)" }
+  rtsps.sessions.*.path:         { type: string, description: "The path the RTSPS session publishes or reads, keyed by session id" }
+  rtsps.sessions.*.state:        { type: string, description: "idle, read or publish" }
+  rtsps.sessions.*.remote_addr:  { type: string, description: "The client's address and port (remoteAddr)" }
+  rtsps.sessions.*.transport:    { type: string, description: "How RTP travels (transport)" }
+  rtsps.sessions.*.user:         { type: string, description: "The user the client authenticated as (user, 1.17 and later)" }
+  rtsps.sessions.*.created:      { type: string, description: "When the session opened, RFC 3339" }
+  rtsps.sessions.*.inbound_bytes: { type: int, unit: bytes, description: "Bytes received from the client" }
+  rtsps.sessions.*.outbound_bytes: { type: int, unit: bytes, description: "Bytes sent to the client" }
+
+  rtmp.conn_count:               { type: int, description: "RTMP connections open (itemCount)" }
+  rtmp.conns.*.path:             { type: string, description: "The path the RTMP connection publishes or reads, keyed by connection id" }
+  rtmp.conns.*.state:            { type: string, description: "idle, read or publish" }
+  rtmp.conns.*.remote_addr:      { type: string, description: "The client's address and port (remoteAddr)" }
+  rtmp.conns.*.user:             { type: string, description: "The user the client authenticated as (user, 1.17 and later)" }
+  rtmp.conns.*.created:          { type: string, description: "When the connection opened, RFC 3339" }
+  rtmp.conns.*.inbound_bytes:    { type: int, unit: bytes, description: "Bytes received from the client" }
+  rtmp.conns.*.outbound_bytes:   { type: int, unit: bytes, description: "Bytes sent to the client" }
+  rtmps.conn_count:              { type: int, description: "RTMPS connections open (itemCount)" }
+  rtmps.conns.*.path:            { type: string, description: "The path the RTMPS connection publishes or reads, keyed by connection id" }
+  rtmps.conns.*.state:           { type: string, description: "idle, read or publish" }
+  rtmps.conns.*.remote_addr:     { type: string, description: "The client's address and port (remoteAddr)" }
+  rtmps.conns.*.user:            { type: string, description: "The user the client authenticated as (user, 1.17 and later)" }
+  rtmps.conns.*.created:         { type: string, description: "When the connection opened, RFC 3339" }
+  rtmps.conns.*.inbound_bytes:   { type: int, unit: bytes, description: "Bytes received from the client" }
+  rtmps.conns.*.outbound_bytes:  { type: int, unit: bytes, description: "Bytes sent to the client" }
+
+  srt.conn_count:                { type: int, description: "SRT connections open (itemCount)" }
+  srt.conns.*.path:              { type: string, description: "The path the SRT connection publishes or reads, keyed by connection id" }
+  srt.conns.*.state:             { type: string, description: "idle, read or publish" }
+  srt.conns.*.remote_addr:       { type: string, description: "The client's address and port (remoteAddr)" }
+  srt.conns.*.user:              { type: string, description: "The user the client authenticated as (user, 1.17 and later)" }
+  srt.conns.*.created:           { type: string, description: "When the connection opened, RFC 3339" }
+  srt.conns.*.inbound_bytes:     { type: int, unit: bytes, description: "Bytes received, headers included (bytesReceived)" }
+  srt.conns.*.outbound_bytes:    { type: int, unit: bytes, description: "Bytes sent, headers included (bytesSent)" }
+  srt.conns.*.rtt:               { type: float, unit: ms, description: "Smoothed round-trip time (msRTT)" }
+  srt.conns.*.receive_rate:      { type: float, unit: Mbps, description: "Current receiving rate (mbpsReceiveRate)" }
+  srt.conns.*.send_rate:         { type: float, unit: Mbps, description: "Current sending rate (mbpsSendRate)" }
+  srt.conns.*.link_capacity:     { type: float, unit: Mbps, description: "Estimated link capacity (mbpsLinkCapacity)" }
+  srt.conns.*.packets_received_loss: { type: int, description: "Data packets detected missing at the receiver (packetsReceivedLoss)" }
+  srt.conns.*.packets_received_drop: { type: int, description: "Data packets dropped by the receiver as too late (packetsReceivedDrop)" }
+  srt.conns.*.packets_retrans:   { type: int, description: "Packets retransmitted by the sender (packetsRetrans)" }
+  srt.conns.*.packets_send_drop: { type: int, description: "Data packets the sender dropped as too late (packetsSendDrop)" }
+  srt.conns.*.receive_latency:   { type: int, unit: ms, description: "The receiver's TSBPD latency (msReceiveTsbPdDelay)" }
+
+  webrtc.session_count:          { type: int, description: "WebRTC sessions open (itemCount)" }
+  webrtc.sessions.*.path:        { type: string, description: "The path the WebRTC session publishes or reads, keyed by session id" }
+  webrtc.sessions.*.state:       { type: string, description: "read or publish" }
+  webrtc.sessions.*.remote_addr: { type: string, description: "The client's address and port (remoteAddr)" }
+  webrtc.sessions.*.user:        { type: string, description: "The user the client authenticated as (user, 1.17 and later)" }
+  webrtc.sessions.*.created:     { type: string, description: "When the session opened, RFC 3339" }
+  webrtc.sessions.*.peer_connection_established: { type: bool, description: "ICE and DTLS completed (peerConnectionEstablished)" }
+  webrtc.sessions.*.inbound_bytes: { type: int, unit: bytes, description: "Bytes received from the client" }
+  webrtc.sessions.*.outbound_bytes: { type: int, unit: bytes, description: "Bytes sent to the client" }
+
+  hls.muxer_count:               { type: int, description: "HLS muxers running (itemCount)" }
+  hls.muxers.*.created:          { type: string, description: "When the muxer started, keyed by path name, RFC 3339" }
+  hls.muxers.*.last_request:     { type: string, description: "When a reader last asked for a playlist or segment, RFC 3339 (lastRequest)" }
+  hls.muxers.*.outbound_bytes:   { type: int, unit: bytes, description: "Bytes sent to HLS readers (outboundBytes; bytesSent before 1.17)" }
+  hls.session_count:             { type: int, description: "HLS reader sessions (itemCount, 1.18 and later)" }
+  hls.sessions.*.path:           { type: string, description: "The path the HLS reader reads, keyed by session id" }
+  hls.sessions.*.remote_addr:    { type: string, description: "The reader's address and port (remoteAddr)" }
+  hls.sessions.*.user:           { type: string, description: "The user the reader authenticated as (user)" }
+  hls.sessions.*.created:        { type: string, description: "When the session opened, RFC 3339" }
+  hls.sessions.*.outbound_bytes: { type: int, unit: bytes, description: "Bytes sent to the reader" }
+
+  moq.session_count:             { type: int, description: "MoQ sessions open (itemCount, 1.19 and later)" }
+  moq.sessions.*.path:           { type: string, description: "The path the MoQ session publishes or reads, keyed by session id" }
+  moq.sessions.*.state:          { type: string, description: "idle, read or publish" }
+  moq.sessions.*.remote_addr:    { type: string, description: "The client's address and port (remoteAddr)" }
+  moq.sessions.*.created:        { type: string, description: "When the session opened, RFC 3339" }
+  moq.sessions.*.inbound_bytes:  { type: int, unit: bytes, description: "Bytes received from the client" }
+  moq.sessions.*.outbound_bytes: { type: int, unit: bytes, description: "Bytes sent to the client" }
+
+telemetry:
+  # MediaMTX pushes nothing to an API client. Live paths every 3 seconds.
+  poll:
+    every_ms: 3000
+    send:
+      - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+  # Sessions, connections and configuration every 10 seconds (sent on
+  # connecting too), each under the model's endpoint names.
+  subscribe:
+    every_ms: 10000
+    send:
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtsp/sessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtsps/sessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtmp/conns/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/rtmps/conns/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/srt/conns/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/webrtc/sessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/hls/muxers/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/hls/sessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/moq/sessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-21], method: GET, path: /v3/config/path-defaults/get }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtspsessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtspssessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpconns/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/rtmpsconns/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/srtconns/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/webrtcsessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/hlsmuxers/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/hlssessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/moqsessions/list, query: { itemsPerPage: "1000" } }
+      - { models: [mediamtx-1-2], method: GET, path: /v3/config/pathdefaults/get }
+      - { method: GET, path: /v3/config/global/get }
+      - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000" } }
+      - { method: GET, path: /v3/info }
+  updates:
+    # ── Server and configuration ────────────────────────────────────────────
+    - path: '^/v3/info$'
+      json: { version: "$.version", started: "$.started" }
+      state:
+        server.version: "{version}"
+        server.started: "{started}"
+    - path: '^/v3/config/global/get$'
+      json:
+        log_level: "$.logLevel"
+        auth_method: "$.authMethod"
+        rtsp: "$.rtsp"
+        rtmp: "$.rtmp"
+        hls: "$.hls"
+        webrtc: "$.webrtc"
+        srt: "$.srt"
+        moq: "$.moq"
+        playback: "$.playback"
+        metrics: "$.metrics"
+        rtsp_address: "$.rtspAddress"
+        rtsps_address: "$.rtspsAddress"
+        rtmp_address: "$.rtmpAddress"
+        rtmps_address: "$.rtmpsAddress"
+        hls_address: "$.hlsAddress"
+        webrtc_address: "$.webrtcAddress"
+        srt_address: "$.srtAddress"
+        playback_address: "$.playbackAddress"
+        metrics_address: "$.metricsAddress"
+      state:
+        config.log_level: "{log_level}"
+        config.auth_method: "{auth_method}"
+        config.rtsp: "{rtsp}"
+        config.rtmp: "{rtmp}"
+        config.hls: "{hls}"
+        config.webrtc: "{webrtc}"
+        config.srt: "{srt}"
+        config.moq: "{moq}"
+        config.playback: "{playback}"
+        config.metrics: "{metrics}"
+        config.rtsp_address: "{rtsp_address}"
+        config.rtsps_address: "{rtsps_address}"
+        config.rtmp_address: "{rtmp_address}"
+        config.rtmps_address: "{rtmps_address}"
+        config.hls_address: "{hls_address}"
+        config.webrtc_address: "{webrtc_address}"
+        config.srt_address: "{srt_address}"
+        config.playback_address: "{playback_address}"
+        config.metrics_address: "{metrics_address}"
+    - path: '^/v3/config/path-?defaults/get$'
+      json:
+        record: "$.record"
+        record_format: "$.recordFormat"
+        delete_after: "$.recordDeleteAfter"
+        on_demand: "$.sourceOnDemand"
+        max_readers: "$.maxReaders"
+      state:
+        path_defaults.record: "{record}"
+        path_defaults.record_format: "{record_format}"
+        path_defaults.record_delete_after: "{delete_after}"
+        path_defaults.source_on_demand: "{on_demand}"
+        path_defaults.max_readers: "{max_readers}"
+    # The configured paths. The count from every answer; the whole list
+    # replaces state when it fits one page.
+    - path: '^/v3/config/paths/list(?:\?|$)'
+      json: { count: "$.itemCount" }
+      state: { path_config_count: "{count}" }
+    - path: '^/v3/config/paths/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        name: "$.name"
+        record: "$.record"
+        record_format: "$.recordFormat"
+        delete_after: "$.recordDeleteAfter"
+        on_demand: "$.sourceOnDemand"
+        max_readers: "$.maxReaders"
+        override: "$.overridePublisher"
+        always: "$.alwaysAvailable"
+      state:
+        path_configs.{name}.record: "{record}"
+        path_configs.{name}.record_format: "{record_format}"
+        path_configs.{name}.record_delete_after: "{delete_after}"
+        path_configs.{name}.source_on_demand: "{on_demand}"
+        path_configs.{name}.max_readers: "{max_readers}"
+        path_configs.{name}.override_publisher: "{override}"
+        path_configs.{name}.always_available: "{always}"
+    - path: '^/v3/config/paths/list\?(?:page=0&)?itemsPerPage=\d+$'
+      json_match: { "$.pageCount": "^[01]$" }
+      json: {}
+      replace: path_configs
+
+    # ── Live paths ──────────────────────────────────────────────────────────
+    - path: '^/v3/paths/list(?:\?|$)'
+      json: { count: "$.itemCount" }
+      state: { path_count: "{count}" }
+    # Before 1.17 the counters are bytesReceived and bytesSent; later
+    # releases serve them too, with the same values, and the rule after this
+    # one writes inboundBytes and outboundBytes over them.
+    - path: '^/v3/paths/list(?:\?|$)'
+      json_each: "$.items"
+      json: { name: "$.name", received: "$.bytesReceived", sent: "$.bytesSent", codecs: "$.tracks" }
+      state:
+        paths.{name}.inbound_bytes: "{received}"
+        paths.{name}.outbound_bytes: "{sent}"
+        paths.{name}.codecs: "{codecs}"
+    - path: '^/v3/paths/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        name: "$.name"
+        conf: "$.confName"
+        ready: "$.ready"
+        online: "$.online"
+        available: "$.available"
+        ready_time: "$.readyTime"
+        online_time: "$.onlineTime"
+        source_type: "$.source.type"
+        source_id: "$.source.id"
+        readers: "$.readers"
+        inbound: "$.inboundBytes"
+        outbound: "$.outboundBytes"
+        frames_in_error: "$.inboundFramesInError"
+      state:
+        paths.{name}.conf_name: "{conf}"
+        paths.{name}.ready: "{ready}"
+        paths.{name}.online: "{online}"
+        paths.{name}.available: "{available}"
+        paths.{name}.ready_time: "{ready_time}"
+        paths.{name}.online_time: "{online_time}"
+        paths.{name}.source_type: "{source_type}"
+        paths.{name}.source_id: "{source_id}"
+        paths.{name}.readers: "{readers}"
+        paths.{name}.inbound_bytes: "{inbound}"
+        paths.{name}.outbound_bytes: "{outbound}"
+        paths.{name}.inbound_frames_in_error: "{frames_in_error}"
+    - path: '^/v3/paths/list\?(?:page=0&)?itemsPerPage=\d+$'
+      json_match: { "$.pageCount": "^[01]$" }
+      json: {}
+      replace: paths
+    - path: '^/v3/paths/list(?:\?|$)'
+      json_each: "$.items[*].tracks2"
+      json:
+        name: "$^.name"
+        codec: "$.codec"
+        width: "$.codecProps.width"
+        height: "$.codecProps.height"
+        profile: "$.codecProps.profile"
+        level: "$.codecProps.level"
+        sample_rate: "$.codecProps.sampleRate"
+        channels: "$.codecProps.channelCount"
+      state:
+        paths.{name}.tracks.{index}.codec: "{codec}"
+        paths.{name}.tracks.{index}.width: "{width}"
+        paths.{name}.tracks.{index}.height: "{height}"
+        paths.{name}.tracks.{index}.profile: "{profile}"
+        paths.{name}.tracks.{index}.level: "{level}"
+        paths.{name}.tracks.{index}.sample_rate: "{sample_rate}"
+        paths.{name}.tracks.{index}.channel_count: "{channels}"
+
+    # ── Sessions (RTSP, RTSPS, WebRTC, HLS, MoQ) ────────────────────────────
+    # Both forms of the names: /v3/rtsp/sessions/list (1.21) and
+    # /v3/rtspsessions/list (1.2 to 1.20).
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/?sessions/list(?:\?|$)'
+      json: { count: "$.itemCount" }
+      state: { "{1}.session_count": "{count}" }
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/sessions/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        path: "$.path"
+        state: "$.state"
+        remote: "$.remoteAddr"
+        transport: "$.transport"
+        user: "$.user"
+        created: "$.created"
+        established: "$.peerConnectionEstablished"
+        inbound: "$.inboundBytes"
+        outbound: "$.outboundBytes"
+      state:
+        "{1}.sessions.{id}.path": "{path}"
+        "{1}.sessions.{id}.state": "{state}"
+        "{1}.sessions.{id}.remote_addr": "{remote}"
+        "{1}.sessions.{id}.transport": "{transport}"
+        "{1}.sessions.{id}.user": "{user}"
+        "{1}.sessions.{id}.created": "{created}"
+        "{1}.sessions.{id}.peer_connection_established": "{established}"
+        "{1}.sessions.{id}.inbound_bytes": "{inbound}"
+        "{1}.sessions.{id}.outbound_bytes": "{outbound}"
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/?sessions/list\?(?:page=0&)?itemsPerPage=\d+$'
+      json_match: { "$.pageCount": "^[01]$" }
+      json: {}
+      replace: "{1}.sessions"
+    # The earlier names, whose counters are bytesReceived and bytesSent
+    # before 1.17 (and still served, with the same values, until 1.20).
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)sessions/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        path: "$.path"
+        state: "$.state"
+        remote: "$.remoteAddr"
+        transport: "$.transport"
+        user: "$.user"
+        created: "$.created"
+        established: "$.peerConnectionEstablished"
+        inbound: "$.bytesReceived"
+        outbound: "$.bytesSent"
+      state:
+        "{1}.sessions.{id}.path": "{path}"
+        "{1}.sessions.{id}.state": "{state}"
+        "{1}.sessions.{id}.remote_addr": "{remote}"
+        "{1}.sessions.{id}.transport": "{transport}"
+        "{1}.sessions.{id}.user": "{user}"
+        "{1}.sessions.{id}.created": "{created}"
+        "{1}.sessions.{id}.peer_connection_established": "{established}"
+        "{1}.sessions.{id}.inbound_bytes": "{inbound}"
+        "{1}.sessions.{id}.outbound_bytes": "{outbound}"
+
+    # ── Connections (RTMP, RTMPS) ───────────────────────────────────────────
+    - path: '^/v3/(rtmp|rtmps|srt)/?conns/list(?:\?|$)'
+      json: { count: "$.itemCount" }
+      state: { "{1}.conn_count": "{count}" }
+    - path: '^/v3/(rtmp|rtmps)/conns/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        path: "$.path"
+        state: "$.state"
+        remote: "$.remoteAddr"
+        user: "$.user"
+        created: "$.created"
+        inbound: "$.inboundBytes"
+        outbound: "$.outboundBytes"
+      state:
+        "{1}.conns.{id}.path": "{path}"
+        "{1}.conns.{id}.state": "{state}"
+        "{1}.conns.{id}.remote_addr": "{remote}"
+        "{1}.conns.{id}.user": "{user}"
+        "{1}.conns.{id}.created": "{created}"
+        "{1}.conns.{id}.inbound_bytes": "{inbound}"
+        "{1}.conns.{id}.outbound_bytes": "{outbound}"
+    - path: '^/v3/(rtmp|rtmps|srt)/?conns/list\?(?:page=0&)?itemsPerPage=\d+$'
+      json_match: { "$.pageCount": "^[01]$" }
+      json: {}
+      replace: "{1}.conns"
+    - path: '^/v3/(rtmp|rtmps)conns/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        path: "$.path"
+        state: "$.state"
+        remote: "$.remoteAddr"
+        user: "$.user"
+        created: "$.created"
+        inbound: "$.bytesReceived"
+        outbound: "$.bytesSent"
+      state:
+        "{1}.conns.{id}.path": "{path}"
+        "{1}.conns.{id}.state": "{state}"
+        "{1}.conns.{id}.remote_addr": "{remote}"
+        "{1}.conns.{id}.user": "{user}"
+        "{1}.conns.{id}.created": "{created}"
+        "{1}.conns.{id}.inbound_bytes": "{inbound}"
+        "{1}.conns.{id}.outbound_bytes": "{outbound}"
+    # SRT's counters are libsrt's, bytesReceived and bytesSent, in every
+    # release.
+    - path: '^/v3/(srt)/?conns/list(?:\?|$)'
+      json_each: "$.items"
+      json:
+        id: "$.id"
+        path: "$.path"
+        state: "$.state"
+        remote: "$.remoteAddr"
+        user: "$.user"
+        created: "$.created"
+        inbound: "$.bytesReceived"
+        outbound: "$.bytesSent"
+        rtt: "$.msRTT"
+        receive_rate: "$.mbpsReceiveRate"
+        send_rate: "$.mbpsSendRate"
+        capacity: "$.mbpsLinkCapacity"
+        loss: "$.packetsReceivedLoss"
+        drop: "$.packetsReceivedDrop"
+        retrans: "$.packetsRetrans"
+        send_drop: "$.packetsSendDrop"
+        latency: "$.msReceiveTsbPdDelay"
+      state:
+        "{1}.conns.{id}.path": "{path}"
+        "{1}.conns.{id}.state": "{state}"
+        "{1}.conns.{id}.remote_addr": "{remote}"
+        "{1}.conns.{id}.user": "{user}"
+        "{1}.conns.{id}.created": "{created}"
+        "{1}.conns.{id}.inbound_bytes": "{inbound}"
+        "{1}.conns.{id}.outbound_bytes": "{outbound}"
+        "{1}.conns.{id}.rtt": "{rtt}"
+        "{1}.conns.{id}.receive_rate": "{receive_rate}"
+        "{1}.conns.{id}.send_rate": "{send_rate}"
+        "{1}.conns.{id}.link_capacity": "{capacity}"
+        "{1}.conns.{id}.packets_received_loss": "{loss}"
+        "{1}.conns.{id}.packets_received_drop": "{drop}"
+        "{1}.conns.{id}.packets_retrans": "{retrans}"
+        "{1}.conns.{id}.packets_send_drop": "{send_drop}"
+        "{1}.conns.{id}.receive_latency": "{latency}"
+
+    # ── HLS muxers ──────────────────────────────────────────────────────────
+    - path: '^/v3/hls/?muxers/list(?:\?|$)'
+      json: { count: "$.itemCount" }
+      state: { hls.muxer_count: "{count}" }
+    - path: '^/v3/hls/muxers/list(?:\?|$)'
+      json_each: "$.items"
+      json: { path: "$.path", created: "$.created", last: "$.lastRequest", outbound: "$.outboundBytes" }
+      state:
+        hls.muxers.{path}.created: "{created}"
+        hls.muxers.{path}.last_request: "{last}"
+        hls.muxers.{path}.outbound_bytes: "{outbound}"
+    - path: '^/v3/hls/?muxers/list\?(?:page=0&)?itemsPerPage=\d+$'
+      json_match: { "$.pageCount": "^[01]$" }
+      json: {}
+      replace: hls.muxers
+    - path: '^/v3/hlsmuxers/list(?:\?|$)'
+      json_each: "$.items"
+      json: { path: "$.path", created: "$.created", last: "$.lastRequest", outbound: "$.bytesSent" }
+      state:
+        hls.muxers.{path}.created: "{created}"
+        hls.muxers.{path}.last_request: "{last}"
+        hls.muxers.{path}.outbound_bytes: "{outbound}"
+
+    # ── Re-reads after this integration's own changes (1.15.5 and later) ────
+    - path: '^/v3/config/(?:paths/(?:add|patch|replace|delete)/|path-?defaults/patch$|global/patch$)'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /v3/config/paths/list, query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/config/global/get }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)/sessions/kick/'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/v3/{1}/sessions/list", query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+    - path: '^/v3/(rtsp|rtsps|webrtc|hls|moq)sessions/kick/'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/v3/{1}sessions/list", query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+    - path: '^/v3/(rtmp|rtmps|srt)/conns/kick/'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/v3/{1}/conns/list", query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
+    - path: '^/v3/(rtmp|rtmps|srt)conns/kick/'
+      json_match: { "$.status": "^ok$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/v3/{1}conns/list", query: { itemsPerPage: "1000" } }
+        - { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1000" } }
