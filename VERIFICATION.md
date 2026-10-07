@@ -1380,6 +1380,9 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm that a list input reports its items as list/item elements in order, with selected="true" on the selected one. ([specs/vmix.yaml:5056](specs/vmix.yaml#L5056))
 - [ ] Confirm that layers are overlay elements with a 0-based index (layer number less 1) and the layer input's key, with position (panX, panY, zoomX, zoomY, x, y, width, height) and crop (X1, Y1, X2, Y2) children, and whether a layer turned off (LayerOff) is still listed. ([specs/vmix.yaml:5058](specs/vmix.yaml#L5058))
 - [ ] Confirm the input's own position, crop and cc (colour correction) elements and their attribute names, and which vMix version first reports them. ([specs/vmix.yaml:5064](specs/vmix.yaml#L5064))
+- [ ] Confirm the replay element's attributes and timecode children, and what events (the selected event list) holds. ([specs/vmix.yaml:5128](specs/vmix.yaml#L5128))
+- [ ] Confirm the replay activators: ReplayPlaying, ReplayLive, ReplayRecording, ReplayQuadMode, ReplayPlayForward, ReplayPlayBackward, ReplayChannelAB/A/B, ReplayCameraN (current channel), ReplayACameraN and ReplayBCameraN. ([specs/vmix.yaml:5132](specs/vmix.yaml#L5132))
+- [ ] Confirm the dynamic element's input1 to input4 and value1 to value4 children. ([specs/vmix.yaml:5120](specs/vmix.yaml#L5120))
 - [ ] Confirm the video call attributes (callPassword, callConnected, callVideoSource, callAudioSource) and the VideoCallAudioSourceX and VideoCallSourceOutputN activators. ([specs/vmix.yaml:5065](specs/vmix.yaml#L5065))
 
 ## yamaha-cl-ql — Yamaha CL / QL

@@ -364,6 +364,8 @@ fn read_xml(root: Node) -> (Map<String, Value>, BTreeMap<String, String>) {
     read_overlays(root, &mut tree);
     read_outputs(root, &mut tree);
     read_audio(root, &mut tree);
+    read_dynamic(root, &mut tree);
+    read_replay(root, &mut tree);
     let keys = read_inputs(root, &mut tree);
 
     // Anything else vMix reports as plain text, by element name.
@@ -514,6 +516,59 @@ fn read_outputs(root: Node, tree: &mut Map<String, Value>) {
             format!("{}{n}", kind.to_ascii_lowercase()),
             Value::Object(entry),
         );
+    }
+}
+
+/// `<dynamic><input1>Camera 1</input1>...<value1>Hello</value1>...</dynamic>`:
+/// what SetDynamicInputN and SetDynamicValueN set.
+fn read_dynamic(root: Node, tree: &mut Map<String, Value>) {
+    let Some(dynamic) = child(root, "dynamic") else {
+        return;
+    };
+    for node in dynamic.children().filter(Node::is_element) {
+        let name = node.tag_name().name();
+        for (prefix, key) in [("input", "inputs"), ("value", "values")] {
+            if let Some(n) = name
+                .strip_prefix(prefix)
+                .filter(|n| n.parse::<u32>().is_ok())
+            {
+                object(object(tree, "dynamic"), key)
+                    .insert(n.into(), json!(node.text().unwrap_or("")));
+            }
+        }
+    }
+}
+
+/// The replay input's `<replay live="False" recording="True"
+/// channelMode="AB" events="1" eventsA="1" eventsB="1" cameraA="1"
+/// cameraB="2" speed="1" speedA="1" speedB="1"><timecode>...</timecode>
+/// <timecodeA>...</timecodeA><timecodeB>...</timecodeB></replay>`.
+fn read_replay(root: Node, tree: &mut Map<String, Value>) {
+    let Some((input, node)) = child(root, "inputs").and_then(|list| {
+        list.children()
+            .filter(|n| n.attribute("type") == Some("Replay"))
+            .find_map(|n| Some((n.attribute("number")?, child(n, "replay")?)))
+    }) else {
+        return;
+    };
+    let replay = object(tree, "replay");
+    put(replay, "input", int(input));
+    for attribute in node.attributes() {
+        let value = attribute.value();
+        match attribute.name() {
+            "live" | "recording" => put(replay, attribute.name(), boolean(value)),
+            "channelMode" => put(replay, "channel_mode", string(value)),
+            "events" | "eventsA" | "eventsB" | "cameraA" | "cameraB" => {
+                put(replay, &snake(attribute.name()), int(value))
+            }
+            "speed" | "speedA" | "speedB" => put(replay, &snake(attribute.name()), float(value)),
+            other => put(object(replay, "attributes"), other, string(value)),
+        }
+    }
+    for element in ["timecode", "timecodeA", "timecodeB"] {
+        if let Some(found) = child(node, element) {
+            put(replay, &snake(element), string(&own_text(found)));
+        }
     }
 }
 
@@ -1065,6 +1120,32 @@ impl Vmix {
             [name, input, v] if on(v) && name.starts_with("VideoCallSourceOutput") => {
                 let output = &name["VideoCallSource".len()..];
                 json!({"inputs": {*input: {"call": {"video_source": output}}}})
+            }
+            ["ReplayPlaying", v] => json!({"replay": {"playing": on(v)}}),
+            ["ReplayLive", v] => json!({"replay": {"live": on(v)}}),
+            ["ReplayRecording", v] => json!({"replay": {"recording": on(v)}}),
+            ["ReplayQuadMode", v] => json!({"replay": {"quad_mode": on(v)}}),
+            ["ReplayPlayForward", v] if on(v) => json!({"replay": {"direction": "forward"}}),
+            ["ReplayPlayBackward", v] if on(v) => json!({"replay": {"direction": "backward"}}),
+            [name, v] if on(v) && name.starts_with("ReplayChannel") => {
+                let mode = &name["ReplayChannel".len()..];
+                if !["AB", "A", "B"].contains(&mode) {
+                    return;
+                }
+                json!({"replay": {"channel_mode": mode}})
+            }
+            [name, v] if on(v) && name.starts_with("Replay") && name.contains("Camera") => {
+                let (channel, camera) = name["Replay".len()..].split_once("Camera").unwrap();
+                let key = match channel {
+                    "" => "camera",
+                    "A" => "camera_a",
+                    "B" => "camera_b",
+                    _ => return,
+                };
+                let Ok(camera) = camera.parse::<u32>() else {
+                    return;
+                };
+                json!({"replay": {key: camera}})
             }
             ["MasterVolume", v] => json!({"master": {"volume": percent(v)}}),
             ["MasterHeadphones", v] => json!({"master": {"headphones_volume": percent(v)}}),
@@ -1764,6 +1845,10 @@ mod tests {
         let events =
             "ACTS OK VideoCallAudioSourceBusA 4 1\r\nACTS OK VideoCallSourceOutput3 4 1\r\n";
         leaves(&state(&feed(&mut m, 100, events)), Vec::new(), &mut paths);
+        let (mut m, s) = connected_to(REPLAY_XML);
+        leaves(&s, Vec::new(), &mut paths);
+        let events = "ACTS OK ReplayPlaying 1\r\nACTS OK ReplayPlayForward 1\r\nACTS OK ReplayQuadMode 1\r\nACTS OK ReplayCamera3 1\r\n";
+        leaves(&state(&feed(&mut m, 100, events)), Vec::new(), &mut paths);
         for path in paths {
             assert!(
                 declared.iter().any(|d| d.len() == path.len()
@@ -1986,5 +2071,52 @@ mod tests {
         assert_eq!(snake("X1"), "x1");
         assert_eq!(snake("liftR"), "lift_r");
         assert_eq!(snake("hue"), "hue");
+    }
+
+    /// A replay input and the dynamic inputs and values, in the shape
+    /// vMix 27 reports them.
+    const REPLAY_XML: &str = r#"<vmix><version>27.0.0.49</version><edition>4K</edition><inputs><input key="cam" number="1" type="Capture" title="Camera 1" state="Running" position="0" duration="0" loop="False">Camera 1</input><input key="rep" number="2" type="Replay" title="Replay" state="Running" position="0" duration="0" loop="False">Replay<replay live="True" recording="True" channelMode="AB" events="12" eventsA="12" eventsB="3" cameraA="1" cameraB="2" speed="0.5" speedA="0.5" speedB="1" quality="High"><timecode>2026-10-07T10:15:30.120</timecode><timecodeA>2026-10-07T10:15:30.120</timecodeA><timecodeB>2026-10-07T10:14:02.000</timecodeB></replay></input></inputs><preview>1</preview><active>2</active><dynamic><input1>Camera 1</input1><input2></input2><input3/><input4/><value1>Hello</value1><value2/><value3/><value4/></dynamic></vmix>"#;
+
+    #[test]
+    fn the_replay_and_the_dynamic_inputs_and_values_are_read() {
+        let (_, s) = connected_to(REPLAY_XML);
+        assert_eq!(
+            s["replay"],
+            json!({"input": 2, "live": true, "recording": true, "channel_mode": "AB",
+                   "events": 12, "events_a": 12, "events_b": 3, "camera_a": 1, "camera_b": 2,
+                   "speed": 0.5, "speed_a": 0.5, "speed_b": 1.0,
+                   "timecode": "2026-10-07T10:15:30.120",
+                   "timecode_a": "2026-10-07T10:15:30.120",
+                   "timecode_b": "2026-10-07T10:14:02.000",
+                   "attributes": {"quality": "High"}})
+        );
+        assert_eq!(
+            s["dynamic"],
+            json!({"inputs": {"1": "Camera 1", "2": "", "3": "", "4": ""},
+                   "values": {"1": "Hello", "2": "", "3": "", "4": ""}})
+        );
+    }
+
+    #[test]
+    fn replay_activators_update_the_replay() {
+        let (mut m, _) = connected_to(REPLAY_XML);
+        let s = state(&feed(
+            &mut m,
+            100,
+            "ACTS OK ReplayPlaying 1\r\nACTS OK ReplayLive 0\r\nACTS OK ReplayPlayBackward 1\r\nACTS OK ReplayChannelB 1\r\nACTS OK ReplayChannelA 0\r\nACTS OK ReplayQuadMode 1\r\nACTS OK ReplayCamera3 1\r\nACTS OK ReplayACamera4 1\r\nACTS OK ReplayBCamera5 1\r\nACTS OK ReplayBCamera2 0\r\nACTS OK ReplayRecording 0\r\n",
+        ));
+        assert_eq!(
+            s["replay"],
+            json!({"playing": true, "live": false, "direction": "backward", "channel_mode": "B",
+                   "quad_mode": true, "camera": 3, "camera_a": 4, "camera_b": 5,
+                   "recording": false})
+        );
+        // Without the replay input, the replay state goes.
+        let p = read(
+            &mut m,
+            1_000,
+            &REPLAY_XML.replace(r#"type="Replay""#, r#"type="Colour""#),
+        );
+        assert!(p[0].get("replay").is_some_and(Value::is_null));
     }
 }
