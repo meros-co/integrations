@@ -1,0 +1,335 @@
+spec: 1
+id: sennheiser-chg-70n
+name: Sennheiser CHG 70N network charger (SSC)
+vendor: Sennheiser
+category: wireless
+
+source:
+  - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for EW-DX, firmware 3.0.x, 03/2024
+    author: Sennheiser
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/resources/ew-dx-sound-control-protocol-3-0-x.pdf
+    note: >
+      Manufacturer document, linked from the Sennheiser 3rd Party API portal
+      (v6.2, 08/2026) for the CHG 70N and CHG 70N-C. §5 subscriptions
+      (/osc/state/subscribe, lifetime default 10 s, renewal by re-requesting,
+      310 on expiry), §6 UDP transport on port 45, §11 limitations (UDP only,
+      eight subscribing clients), §12 the method list: /device (identification,
+      identity, network, warnings, storage_mode, restore, restart, name,
+      location, cascade) and /bays (update progress, error and enable,
+      warnings, version, sync_settings, sync_error, state, serial, identify,
+      device_type, bat_timetofull, bat_health, bat_gauge, bat_cycles), §13
+      string characters, §14 error codes.
+  - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for EW-DX, 03/2023
+    author: Sennheiser
+    url: https://www.sennheiser.com/globalassets/digizuite/40838-en-ew-dx_sound_control_protocol_03_2023_en.pdf
+    note: The CHG 70N method list for firmware 1.0.6 (§10-12), a subset of the 3.0.x list.
+  - title: Sennheiser 3rd Party API, Sound Control Protocol v1
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/sound-control-protocol-sscv1.html
+    note: The CHG 70N is an SSCv1 device; it has no SSCv2 API.
+  - title: Bitfocus Companion, companion-module-sennheiser-ewdx (src/chg70n.ts)
+    url: https://github.com/bitfocus/companion-module-sennheiser-ewdx
+    note: >
+      MIT-licensed; read as corroboration only. Identifies one bay by writing
+      the two-bay identify array with null for the other bay, and subscribes
+      the device and bay methods in two address trees.
+
+transport:
+  type: line-udp
+  port: 45
+  terminator: none
+  encoding: ascii
+  reply: to-source
+  probe: '{"device":{"name":null}}'
+
+ports:
+  - { port: 45, protocol: udp, role: control }
+
+maps:
+  # The identify array names both bays; null leaves the other bay as it is.
+  bay_before: { "1": "", "2": "null," }
+  bay_after: { "1": ",null", "2": "" }
+
+models:
+  - id: chg-70n
+    name: Sennheiser CHG 70N network charger
+    supports: &all
+      [identify_bay, identify_device, set_storage_mode, set_device_name, set_location,
+       set_network_dhcp, set_network_manual, set_mdns, sync_transmitters, restart,
+       restore_factory_defaults]
+    verification: none
+  - id: chg-70n-c
+    name: Sennheiser CHG 70N-C network charger
+    supports: *all
+    verification: none
+
+commands:
+  identify_bay:
+    summary: Start or stop flashing one bay's LEDs (/bays/identify)
+    params:
+      bay: { type: int, min: 1, max: 2, required: true, label: Bay, description: "Charging bay, 1 (left) or 2 (right) as the API orders them." }
+      enabled: { type: bool, default: true, label: Identify, description: "On starts flashing the bay's LEDs, off stops it." }
+    send: '{"bays":{"identify":[{bay:map.bay_before}{enabled}{bay:map.bay_after}]}}'
+    expect: &reply { reply_contains: '"bays"', not_contains: '"error"' }
+    returns: ack
+
+  identify_device:
+    summary: Start or stop the charger's visual identification (/device/identification/visual)
+    params:
+      enabled: { type: bool, default: true, label: Identify, description: "On starts the visual identification, off stops it." }
+    send: '{"device":{"identification":{"visual":{enabled}}}}'
+    expect: &device_reply { reply_contains: '"device"', not_contains: '"error"' }
+    returns: ack
+
+  set_storage_mode:
+    summary: Start or stop storage mode (/device/storage_mode)
+    params:
+      enabled: { type: bool, required: true, label: Storage mode, description: "On brings the inserted batteries to their storage charge, off returns to normal charging." }
+    send: '{"device":{"storage_mode":{enabled}}}'
+    expect: *device_reply
+    returns: ack
+
+  set_device_name:
+    summary: Name the charger (/device/name)
+    params:
+      name: { type: string, max_length: 18, pattern: "^[A-Za-z0-9-]+$", required: true, label: Name, description: "Device name of up to 18 letters, digits and hyphens; it is also the charger's DNS-SD name." }
+    send: '{"device":{"name":{name:json}}}'
+    expect: *device_reply
+    returns: ack
+
+  set_location:
+    summary: Set the charger's location text (/device/location)
+    params:
+      location: { type: string, max_length: 400, pattern: "^[ -~]*$", required: true, label: Location, description: "Free text of up to 400 printable ASCII characters naming where the charger is." }
+    send: '{"device":{"location":{location:json}}}'
+    expect: *device_reply
+    returns: ack
+
+  set_network_dhcp:
+    summary: Take the IP address automatically, by DHCP or Auto-IP (/device/network/ipv4/auto true)
+    send: '{"device":{"network":{"ipv4":{"auto":true}}}}'
+    expect: *device_reply
+    returns: ack
+
+  set_network_manual:
+    summary: Set a static IP address, netmask and gateway (/device/network/ipv4 auto false and manual_*)
+    params:
+      ip: &ipv4 { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", required: true, label: IP address, description: "Static IPv4 address in dotted form, e.g. 192.168.1.203." }
+      netmask: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", required: true, label: Netmask, description: "IPv4 netmask in dotted form, e.g. 255.255.255.0." }
+      gateway: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", required: true, label: Gateway, description: "IPv4 gateway in dotted form, e.g. 192.168.1.1." }
+    send: '{"device":{"network":{"ipv4":{"auto":false,"manual_ipaddr":{ip:json},"manual_netmask":{netmask:json},"manual_gateway":{gateway:json}}}}}'
+    expect: *device_reply
+    returns: ack
+
+  set_mdns:
+    summary: Turn mDNS (DNS-SD announcement) on or off (/device/network/mdns)
+    params:
+      enabled: { type: bool, required: true, label: mDNS, description: "On announces the charger by DNS-SD, off stops it." }
+    send: '{"device":{"network":{"mdns":{enabled}}}}'
+    expect: *device_reply
+    returns: ack
+
+  sync_transmitters:
+    summary: >
+      Write sync settings to the transmitters in the bays (/bays/sync_settings,
+      write-only). settings is the document's array of objects, one per bay,
+      each with bay_id (0 or 1) and any of cable_emulation, frequency, led,
+      link_density_mode, lock, lowcut, name, mute_config, trim
+    params:
+      settings: { type: json, required: true, label: Sync settings, description: "JSON array of per-bay objects as the SSC guide documents them, e.g. [{\"bay_id\":0,\"name\":\"LEAD\",\"lock\":true}]." }
+    send: '{"bays":{"sync_settings":{settings}}}'
+    expect: *reply
+    returns: ack
+
+  restart:
+    summary: Restart the charger (/device/restart)
+    send: '{"device":{"restart":true}}'
+    returns: none
+
+  restore_factory_defaults:
+    summary: Restore every factory default (/device/restore FACTORY_DEFAULTS)
+    send: '{"device":{"restore":"FACTORY_DEFAULTS"}}'
+    expect: *device_reply
+    returns: ack
+
+telemetry:
+  subscribe:
+    send:
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"device":{"identification":{"visual":null},"network":{"ipv4":{"auto":null,"ipaddr":null,"netmask":null,"gateway":null,"manual_ipaddr":null,"manual_netmask":null,"manual_gateway":null},"mdns":null},"warnings":null,"storage_mode":null,"name":null,"location":null,"cascade":null}}]}}}'
+      - '{"osc":{"state":{"subscribe":[{"#":{"lifetime":60},"bays":{"update":{"progress":null,"error":null,"enable":null},"warnings":null,"version":null,"sync_error":null,"state":null,"serial":null,"identify":null,"device_type":null,"bat_timetofull":null,"bat_health":null,"bat_gauge":null,"bat_cycles":null}}]}}}'
+    every_ms: 20000
+  poll:
+    send:
+      - '{"device":{"identity":{"version":null,"serial":null,"product":null,"vendor":null},"network":{"ether":{"macs":null}}}}'
+  updates:
+    - json_match: { "$.device.name": "^(.*)$" }
+      state: { device.name: "{1}" }
+    - json_match: { "$.device.location": "^(.*)$" }
+      state: { device.location: "{1}" }
+    - json_match: { "$.device.identification.visual": "^(true|false)$" }
+      state: { device.identifying: "{1}" }
+    - json_match: { "$.device.storage_mode": "^(true|false)$" }
+      state: { device.storage_mode: "{1}" }
+    - json_match: { "$.device.warnings": "^(.*)$" }
+      state: { device.warnings: "{1}" }
+    - json_match: { "$.device.cascade": "^(\\[.*\\])$" }
+      state: { device.cascade: "{1}" }
+    - json_match: { "$.device.identity.version": "^(.*)$" }
+      state: { device.version: "{1}" }
+    - json_match: { "$.device.identity.serial": "^(.*)$" }
+      state: { device.serial: "{1}" }
+    - json_match: { "$.device.identity.product": "^(.*)$" }
+      state: { device.product: "{1}" }
+    - json_match: { "$.device.identity.vendor": "^(.*)$" }
+      state: { device.vendor: "{1}" }
+    - json_match: { "$.device.network.ipv4.auto": "^(true|false)$" }
+      state: { device.network.auto: "{1}" }
+    - json_match: { "$.device.network.ipv4.ipaddr": '^\[?"?([^"\]]*)"?\]?$' }
+      state: { device.network.ip: "{1}" }
+    - json_match: { "$.device.network.ipv4.netmask": '^\[?"?([^"\]]*)"?\]?$' }
+      state: { device.network.netmask: "{1}" }
+    - json_match: { "$.device.network.ipv4.gateway": '^\[?"?([^"\]]*)"?\]?$' }
+      state: { device.network.gateway: "{1}" }
+    - json_match: { "$.device.network.ipv4.manual_ipaddr": '^\[?"?([^"\]]*)"?\]?$' }
+      state: { device.network.manual_ip: "{1}" }
+    - json_match: { "$.device.network.ipv4.manual_netmask": '^\[?"?([^"\]]*)"?\]?$' }
+      state: { device.network.manual_netmask: "{1}" }
+    - json_match: { "$.device.network.ipv4.manual_gateway": '^\[?"?([^"\]]*)"?\]?$' }
+      state: { device.network.manual_gateway: "{1}" }
+    - json_match: { "$.device.network.mdns": "^(true|false)$" }
+      state: { device.network.mdns: "{1}" }
+    - json_match: { "$.device.network.ether.macs": '^\["?([^"\]]*)"?' }
+      state: { device.network.mac: "{1}" }
+    - json_match: { "$.bays.state": "^\\[" }
+      json_each: "$.bays.state"
+      json: { v: "$" }
+      state:
+        bays.{index:+1}.state: { value: "{v}", map: { NORMAL: normal, UPDATE: update, ERROR: error, DFU_MODE: dfu_mode } }
+    - json_match: { "$.bays.device_type": "^\\[" }
+      json_each: "$.bays.device_type"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.device_type": "{v}" }
+    - json_match: { "$.bays.identify": "^\\[" }
+      json_each: "$.bays.identify"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.identifying": "{v}" }
+    - json_match: { "$.bays.bat_gauge": "^\\[" }
+      json_each: "$.bays.bat_gauge"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.battery_percent": "{v}" }
+    - json_match: { "$.bays.bat_health": "^\\[" }
+      json_each: "$.bays.bat_health"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.battery_health_pct": "{v}" }
+    - json_match: { "$.bays.bat_cycles": "^\\[" }
+      json_each: "$.bays.bat_cycles"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.battery_cycles": "{v}" }
+    - json_match: { "$.bays.bat_timetofull": "^\\[" }
+      json_each: "$.bays.bat_timetofull"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.time_to_full_min": "{v}" }
+    - json_match: { "$.bays.warnings": "^\\[" }
+      json_each: "$.bays.warnings"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.warning": "{v}" }
+    - json_match: { "$.bays.version": "^\\[" }
+      json_each: "$.bays.version"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.version": "{v}" }
+    - json_match: { "$.bays.serial": "^\\[" }
+      json_each: "$.bays.serial"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.serial": "{v}" }
+    - json_match: { "$.bays.sync_error": "^\\[" }
+      json_each: "$.bays.sync_error"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.sync_error": "{v}" }
+    - json_match: { "$.bays.update.progress": "^\\[" }
+      json_each: "$.bays.update.progress"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.update.progress_pct": "{v}" }
+    - json_match: { "$.bays.update.error": "^\\[" }
+      json_each: "$.bays.update.error"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.update.error": "{v}" }
+    - json_match: { "$.bays.update.enable": "^\\[" }
+      json_each: "$.bays.update.enable"
+      json: { v: "$" }
+      state: { "bays.{index:+1}.update.enabled": "{v}" }
+
+state:
+  device.name:                 { type: string, description: "Device name, also its DNS-SD name" }
+  device.location:             { type: string, description: "Location text" }
+  device.identifying:          { type: bool, description: "Whether the charger's visual identification is running" }
+  device.storage_mode:         { type: bool, description: "Whether storage mode is on" }
+  device.warnings:             { type: string, description: "Device warnings as the charger sends them, e.g. CascadeComError" }
+  device.cascade:              { type: string, description: "The MAC addresses of the cascade's chargers, as the JSON array the charger sends" }
+  device.version:              { type: string, description: "Firmware version" }
+  device.serial:               { type: string, description: "Serial number" }
+  device.product:              { type: string, description: "Product label" }
+  device.vendor:               { type: string, description: "Vendor string" }
+  device.network.auto:         { type: bool, description: "Whether the address is taken automatically (DHCP and Auto-IP) rather than set manually" }
+  device.network.ip:           { type: string, description: "Current IPv4 address" }
+  device.network.netmask:      { type: string, description: "Current IPv4 netmask" }
+  device.network.gateway:      { type: string, description: "Current IPv4 gateway" }
+  device.network.manual_ip:    { type: string, description: "Static IPv4 address, used when auto is off" }
+  device.network.manual_netmask: { type: string, description: "Static IPv4 netmask" }
+  device.network.manual_gateway: { type: string, description: "Static IPv4 gateway" }
+  device.network.mdns:         { type: bool, description: "Whether mDNS announcement is on" }
+  device.network.mac:          { type: string, description: "Ethernet MAC address" }
+  bays.*.state:                { type: string, description: "Bay state: normal, update, error or dfu_mode; bays are 1 and 2 in the API's order" }
+  bays.*.device_type:          { type: string, description: "What is in the bay: EW-DX SK, EW-DX SK 3-pin, EW-DX SKM, EW-DX SKM-S, BA70, NONE or UNKNOWN" }
+  bays.*.identifying:          { type: bool, description: "Whether the bay's LEDs are flashing to identify it" }
+  bays.*.battery_percent:      { type: int, unit: "%", description: "State of charge of the battery in the bay, 0-100" }
+  bays.*.battery_health_pct:   { type: int, unit: "%", description: "State of health of the battery in the bay, 0-100" }
+  bays.*.battery_cycles:       { type: int, description: "Charge cycles of the battery in the bay" }
+  bays.*.time_to_full_min:     { type: int, unit: min, description: "Minutes until the battery in the bay is fully charged, 0-1000" }
+  bays.*.warning:              { type: string, description: "Why a bay is not charging: BatteryComError, BatteryNotChargeable, BatteryNotDischargeable, OvercurrentDetected or BatteryTempOutOfRange; empty when none" }
+  bays.*.version:              { type: string, description: "Firmware version of the transmitter in the bay" }
+  bays.*.serial:               { type: string, description: "Serial number of the transmitter in the bay" }
+  bays.*.sync_error:           { type: string, description: "SyncFailed when the last sync of the transmitter in the bay failed; empty otherwise" }
+  bays.*.update.progress_pct:  { type: int, unit: "%", description: "Firmware update progress of the transmitter in the bay, 0-100" }
+  bays.*.update.error:         { type: string, description: "NONE, or why the bay's transmitter firmware update failed" }
+  bays.*.update.enabled:       { type: bool, description: "The bay's firmware update enable flag, as the charger reports it" }
+
+quirks:
+  - models: [all]
+    severity: warning
+    text: >
+      SSCv1 is unencrypted and has no password: anyone on the network can
+      control the charger. Sennheiser recommends keeping it on a separate
+      control network.
+
+  - models: [all]
+    severity: info
+    text: >
+      Telemetry comes from two subscriptions with a 60 s lifetime, renewed
+      every 20 s. The charger accepts subscriptions from at most eight clients
+      at a time; a ninth is refused.
+
+  - models: [all]
+    severity: info
+    text: >
+      Each bay value is an array of two, one per bay. A bay with nothing in it
+      reports null, which leaves the last value in place: read device_type
+      (NONE) to know a bay is empty.
+
+  - models: [all]
+    severity: critical
+    text: >
+      restore_factory_defaults puts every setting back to its factory value,
+      including the network settings, and set_network_manual or
+      set_network_dhcp can move the charger to an address the core is not
+      using. Neither can be undone from here.
+
+  - models: [all]
+    severity: info
+    text: >
+      restart is not acknowledged: the charger goes away and comes back.
+
+  - models: [all]
+    severity: info
+    text: >
+      /bays/update/enable is read but not written: the guide gives it no
+      meaning beyond its type, and writing it may start a transmitter firmware
+      update. Firmware updates are done in Sennheiser's own software.

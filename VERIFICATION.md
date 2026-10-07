@@ -1135,6 +1135,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Vision, check whether command words such as MECUT and MEAUTO must use MLE instead of ME. ([specs/rosstalk.yaml:1202](specs/rosstalk.yaml#L1202))
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 
+## sennheiser-chg-70n — Sennheiser CHG 70N
+
+- [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
+- [ ] Confirm one bay can be identified with null in the other bay's place, leaving that bay as it is (Companion does this; the guide's example writes both). ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
+- [ ] Confirm one address tree may hold every /device method, and another every /bays method, in a single subscription, with a 60 s lifetime. ([specs/sennheiser-chg-70n.yaml:155](specs/sennheiser-chg-70n.yaml#L155))
+- [ ] Check whether a bay with nothing in it reports null, 0 or an empty string for its battery values. ([specs/sennheiser-chg-70n.yaml:313](specs/sennheiser-chg-70n.yaml#L313))
+- [ ] Check whether /bays/warnings gives one string per bay (as read) or a list of warnings per bay, and whether /device/warnings is a string or a list. ([specs/sennheiser-chg-70n.yaml:287](specs/sennheiser-chg-70n.yaml#L287))
+- [ ] Check whether the network fields (ipaddr and the others) come as plain strings or one-element arrays; both are read. ([specs/sennheiser-chg-70n.yaml:187](specs/sennheiser-chg-70n.yaml#L187))
+- [ ] Check the shape /bays/sync_settings accepts (the guide's example quotes a frequency oddly) and whether the charger answers it. ([specs/sennheiser-chg-70n.yaml:131](specs/sennheiser-chg-70n.yaml#L131))
+- [ ] Find out what /bays/update/enable does when written; it is read only. ([specs/sennheiser-chg-70n.yaml:293](specs/sennheiser-chg-70n.yaml#L293))
+- [ ] Check which characters /device/location accepts (the guide allows printable ASCII with escaped quote, slash and backslash). ([specs/sennheiser-chg-70n.yaml:99](specs/sennheiser-chg-70n.yaml#L99))
+- [ ] Confirm the name query used as the liveness probe is answered while nothing else is happening. ([specs/sennheiser-chg-70n.yaml:42](specs/sennheiser-chg-70n.yaml#L42))
+- [ ] Check whether restart is answered before the charger goes away. ([specs/sennheiser-chg-70n.yaml:328](specs/sennheiser-chg-70n.yaml#L328))
+
 ## sennheiser-digital-6000 — Sennheiser Digital 6000
 
 - [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:110](specs/sennheiser-digital-6000.yaml#L110))
@@ -1144,7 +1158,7 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-ew-dx — Sennheiser EW-DX
 
-- [ ] Confirm each resource added beyond RFDeck's six per channel (identify, signal strength, diversity, user preset bank, sync settings and their ignore flags, the transmitter and its warnings, and the device's site, state, identification, rf, transmission, encryption, legacyMode and firmware update state) can be subscribed and notifies on change, and that a refused batch leaves the later ones subscribed. ([specs/sennheiser-ew-dx.yaml:487](specs/sennheiser-ew-dx.yaml#L487))
+- [ ] Confirm each resource added beyond the six per channel tested on hardware (identify, signal strength, diversity, user preset bank, sync settings and their ignore flags, the transmitter and its warnings, and the device's site, state, identification, rf, transmission, encryption, legacyMode and firmware update state) can be subscribed and notifies on change, and that a refused batch leaves the later ones subscribed. ([specs/sennheiser-ew-dx.yaml:487](specs/sennheiser-ew-dx.yaml#L487))
 - [ ] Check whether select_preset's bank and preset, and channels.<n>.preset.bank and .channel, count from 0 or from 1, against the receiver's own preset display. ([specs/sennheiser-ew-dx.yaml:179](specs/sennheiser-ew-dx.yaml#L179))
 - [ ] Check whether /api/rf answers each range's step as stepSize (the schema) or stepsize (the document's example); both are read. ([specs/sennheiser-ew-dx.yaml:329](specs/sennheiser-ew-dx.yaml#L329))
 - [ ] Measure how long the receiver stays busy after set_link_density and set_encryption, whether it restarts or drops the HTTPS connection, and whether 10 s is enough for their answers. ([specs/sennheiser-ew-dx.yaml:429](specs/sennheiser-ew-dx.yaml#L429))
