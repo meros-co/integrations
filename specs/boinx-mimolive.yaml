@@ -1030,6 +1030,11 @@ state:
   layer-sets.*.name: { type: string, description: "Layer set name" }
   layer-sets.*.active: { type: bool, description: "Whether the layer stack matches the layer set" }
   layer-sets.*.document: { type: string, description: "ID of the document it belongs to" }
+  layer-sets.*.recall_on_show_start: { type: bool, description: "Whether the layer set is recalled when the show starts" }
+  layer-sets.*.recall_on_show_end: { type: bool, description: "Whether the layer set is recalled when the show ends" }
+  layer-sets.*.layers.*.layer_id: { type: string, description: "The layer set's entry at this position (0 first, in the API's order): ID of the layer it switches" }
+  layer-sets.*.layers.*.action: { type: string, description: "What recalling the set does to that layer: live, off or force-off" }
+  layer-sets.*.layers.*.variant: { type: string, description: "For a live entry, the variant it goes live with: edit-variant or a variant ID; absent for off and force-off" }
 
 telemetry:
   # mimoLive pushes each change on its websocket; it closes a client that
@@ -1064,7 +1069,7 @@ telemetry:
         width: "$.attributes.metadata.width"
         height: "$.attributes.metadata.height"
         framerate: "$.attributes.metadata.framerate"
-        index: "$.attributes.index"
+        stack_index: "$.attributes.index"
         volume: "$.attributes.volume"
         composition: "$.attributes.composition-id"
         tally: "$.attributes.tally-state"
@@ -1081,6 +1086,8 @@ telemetry:
         starts: "$.attributes.starts-with-show"
         stops: "$.attributes.stops-with-show"
         active: "$.attributes.active"
+        recall_start: "$.attributes.recall-on-show-start"
+        recall_end: "$.attributes.recall-on-show-end"
         document: "$.relationships.document.data.id"
         active_variant: "$.relationships.active-variant.data.id"
         live_variant: "$.relationships.live-variant.data.id"
@@ -1095,7 +1102,7 @@ telemetry:
         "{type}.{id}.width": "{width}"
         "{type}.{id}.height": "{height}"
         "{type}.{id}.framerate": "{framerate}"
-        "{type}.{id}.index": "{index}"
+        "{type}.{id}.index": "{stack_index}"
         "{type}.{id}.volume": "{volume}"
         "{type}.{id}.composition_id": "{composition}"
         "{type}.{id}.tally_state": "{tally}"
@@ -1112,6 +1119,8 @@ telemetry:
         "{type}.{id}.starts_with_show": "{starts}"
         "{type}.{id}.stops_with_show": "{stops}"
         "{type}.{id}.active": "{active}"
+        "{type}.{id}.recall_on_show_start": "{recall_start}"
+        "{type}.{id}.recall_on_show_end": "{recall_end}"
         "{type}.{id}.document": "{document}"
         "{type}.{id}.active_variant": "{active_variant}"
         "{type}.{id}.live_variant": "{live_variant}"
@@ -1139,7 +1148,7 @@ telemetry:
         width: "$.data.attributes.metadata.width"
         height: "$.data.attributes.metadata.height"
         framerate: "$.data.attributes.metadata.framerate"
-        index: "$.data.attributes.index"
+        stack_index: "$.data.attributes.index"
         volume: "$.data.attributes.volume"
         composition: "$.data.attributes.composition-id"
         tally: "$.data.attributes.tally-state"
@@ -1156,11 +1165,60 @@ telemetry:
         starts: "$.data.attributes.starts-with-show"
         stops: "$.data.attributes.stops-with-show"
         active: "$.data.attributes.active"
+        recall_start: "$.data.attributes.recall-on-show-start"
+        recall_end: "$.data.attributes.recall-on-show-end"
         document: "$.data.relationships.document.data.id"
         active_variant: "$.data.relationships.active-variant.data.id"
         live_variant: "$.data.relationships.live-variant.data.id"
         layer: "$.data.relationships.layer.data.id"
       state: *assign
+
+    # A layer set's layers, an array of {layer-id, action, variant}, kept by
+    # position as layer-sets.<id>.layers.<index>. Only layer-sets objects, and
+    # only when the object carries a layers attribute: an empty array clears
+    # the list, an object without one (an answer that leaves it out) keeps it.
+    # In a list reply (list_layer_sets) and sideloaded (the poll's included):
+    - path: "^/api/v1/"
+      json_each: "$.data"
+      each_match: &has_layers { "$.type": "^layer-sets$", "$.attributes.layers": "^\\[" }
+      json: { id: "$.id" }
+      replace: "layer-sets.{id}.layers"
+    - path: "^/api/v1/"
+      json_each: "$.data[*].attributes.layers"
+      each_match: &in_layer_set { "$^.type": "^layer-sets$" }
+      json: &entry { id: "$^.id", layer_id: "$.layer-id", action: "$.action", variant: "$.variant" }
+      state: &entry_state
+        "layer-sets.{id}.layers.{index}.layer_id": "{layer_id}"
+        "layer-sets.{id}.layers.{index}.action": &action { value: "{action}", map: { live: live, "off": "off", force-off: force-off } }
+        "layer-sets.{id}.layers.{index}.variant": "{variant}"
+    - path: "^/api/v1/"
+      json_each: "$.included"
+      each_match: *has_layers
+      json: { id: "$.id" }
+      replace: "layer-sets.{id}.layers"
+    - path: "^/api/v1/"
+      json_each: "$.included[*].attributes.layers"
+      each_match: *in_layer_set
+      json: *entry
+      state: *entry_state
+    # In a reply with one layer set in data: a GET of the set, and the PATCH
+    # answer if it carries the object.
+    - path: "^/api/v1/"
+      json_match: { "$.data.type": "^layer-sets$", "$.data.id": "^([^.]+)$", "$.data.attributes.layers": "^\\[" }
+      json_each: "$.data.attributes.layers"
+      json: &one_entry { layer_id: "$.layer-id", action: "$.action", variant: "$.variant" }
+      replace: "layer-sets.{1}.layers"
+      state:
+        "layer-sets.{1}.layers.{index}.layer_id": "{layer_id}"
+        "layer-sets.{1}.layers.{index}.action": *action
+        "layer-sets.{1}.layers.{index}.variant": "{variant}"
+    # set_layer_set_layers' PATCH, whatever it answers: the set is read back,
+    # so state holds the list as mimoLive keeps it.
+    - path: "^/api/v1/documents/([^/?]+)/layer-sets/([^/?]+)$"
+      request_match: { "$.data.attributes.layers": "^\\[" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/v1/documents/{1}/layer-sets/{2}" }
 
     # A document's built-in outputs, in the document object.
     - path: "^/api/v1/documents/([^/?]+)"
@@ -1176,6 +1234,21 @@ telemetry:
       json_each: "$.data.attributes.outputs"
       json: { output: "$.id", live: "$.live-state" }
       state: { "documents.{2}.outputs.{output}.live_state": "{live}" }
+    # Pushed: a layer set added or changed. Its layers are applied when the
+    # object carries them, and the set is read again either way, since what
+    # mimoLive pushes for layer sets is not documented.
+    - json_match: { "$.event": "^(added|changed)$", "$.type": "^layer-sets$", "$.data.id": "^([^.]+)$", "$.data.attributes.layers": "^\\[" }
+      json_each: "$.data.attributes.layers"
+      json: *one_entry
+      replace: "layer-sets.{2}.layers"
+      state:
+        "layer-sets.{2}.layers.{index}.layer_id": "{layer_id}"
+        "layer-sets.{2}.layers.{index}.action": *action
+        "layer-sets.{2}.layers.{index}.variant": "{variant}"
+    - json_match: { "$.event": "^(added|changed)$", "$.type": "^layer-sets$", "$.data.id": "^([^./?#]+)$", "$.data.relationships.document.data.id": "^([^./?#]+)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: "/api/v1/documents/{3}/layer-sets/{2}" }
     # Pushed: an object removed. It leaves state, with everything under it.
     - json_match: { "$.event": "^removed$", "$.type": "^(documents|layers|variants|sources|output-destinations|layer-sets)$", "$.id": "^([^.]+)$" }
       json: {}
@@ -1265,6 +1338,10 @@ quirks:
       object leaves state with everything under it. A layer's live_variant is not cleared when
       the layer goes off, so its live_state is the one to read. Layer variants enter the state
       from websocket events and get_layer replies, not from the poll, which cannot sideload them.
+      A layer set's entries are kept by position (layer-sets.<id>.layers.<index>.layer_id, action,
+      variant), replaced whole whenever an answer or a push carries the set's layers attribute
+      and left as they are when it does not; a pushed layer set and every set_layer_set_layers
+      PATCH have the set read again, since what mimoLive pushes for layer sets is not documented.
 
   - models: [all]
     severity: info
