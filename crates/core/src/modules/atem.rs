@@ -27,6 +27,15 @@
 //! the switcher ignores fields whose bit is clear (Sofie `CommandBase.ts:58-91`),
 //! so a setting command here sets exactly the parameters given.
 //!
+//! Feature areas beyond switching live in sibling files, each decoding its
+//! own state and building its own commands: `atem_keyers.rs` (keyer DVE,
+//! chroma, masks and flying keys), `atem_audio.rs` (Fairlight EQ,
+//! dynamics, inputs, routing and monitoring; classic audio monitoring),
+//! `atem_settings.rs` (media pool, recording and streaming settings,
+//! multiviewer, video mode, startup state, macro recording) and
+//! `atem_camera.rs` (camera control state and the commands beyond the basic
+//! lens and exposure ones).
+//!
 //! Opened for commands only (`monitor` false), the module neither polls the
 //! streaming and recording durations nor renews a Fairlight level
 //! subscription after reconnecting. The switcher still sends its whole state
@@ -42,6 +51,15 @@ use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
 };
 use crate::session::merge_patch;
+
+#[path = "atem_audio.rs"]
+mod audio;
+#[path = "atem_camera.rs"]
+mod camera;
+#[path = "atem_keyers.rs"]
+mod keyers;
+#[path = "atem_settings.rs"]
+mod settings;
 
 const PORT: u16 = 9910;
 const SOCKET: Key = "atem";
@@ -161,6 +179,7 @@ const LAYERS: [&str; 5] = ["background", "key1", "key2", "key3", "key4"];
 
 /// Camera control data types (camera-control and Sofie
 /// `CameraControlCommand.ts:6-14`).
+const CC_BOOL: u8 = 0x00;
 const CC_SINT8: u8 = 0x01;
 const CC_SINT16: u8 = 0x02;
 const CC_SINT32: u8 = 0x03;
@@ -217,6 +236,26 @@ struct Topology {
     fairlight_sources: BTreeMap<(u16, i64), u8>,
     /// Multiviewer windows seen, with their last source, for de-duplication.
     multiviewer_windows: BTreeMap<(u8, u8), u16>,
+    /// Fairlight (input, source) to its EQ band count (FASP).
+    fairlight_bands: BTreeMap<(u16, i64), u8>,
+    /// The Fairlight master's EQ band count (FAMP).
+    master_bands: u8,
+    /// Fairlight inputs seen (FAIP).
+    fairlight_inputs: BTreeSet<u16>,
+    /// Fairlight audio routing outputs and sources seen (AROP, ARSP).
+    routing_outputs: BTreeSet<u32>,
+    routing_sources: BTreeSet<u32>,
+    /// Video modes the switcher offers (_VMC).
+    video_modes: Vec<u8>,
+    /// Multiviewers reported by their properties (MvPr, VuMo).
+    multiviewers_seen: BTreeSet<u8>,
+    /// Recording disks reported (RTMD).
+    disks: BTreeSet<u32>,
+    /// Streaming video and audio bitrates, low and high (SRSU, STAB).
+    video_bitrates: Option<(u32, u32)>,
+    audio_bitrates: Option<(u32, u32)>,
+    /// The most frames each clip can hold (MPSp).
+    clip_max_frames: Option<[u16; 4]>,
     /// (M/E, keyer) to whether the keyer can fly (KeBP).
     usk_can_fly: BTreeMap<(u8, u8), bool>,
     /// M/E to its next-transition selection (TrSS byte 4).
@@ -448,6 +487,11 @@ fn scaled(params: &Params, name: &str, by: f64) -> Option<i64> {
     opt_num(params, name).map(|v| (v * by).round() as i64)
 }
 
+/// One command to send, from a feature area's builder.
+fn one(name: &[u8; 4], body: Vec<u8>) -> Result<Option<Out>, CommandError> {
+    Ok(Some(vec![(*name, body)]))
+}
+
 fn invalid(message: String) -> CommandError {
     CommandError::InvalidParams { message }
 }
@@ -485,6 +529,120 @@ fn fits(params: &Params, name: &str, max: usize) -> Result<Option<String>, Comma
     }
 }
 
+fn put32(b: &mut [u8], at: usize, v: u32) {
+    b[at..at + 4].copy_from_slice(&v.to_be_bytes());
+}
+
+/// A field's width on the wire.
+#[derive(Clone, Copy)]
+enum W {
+    U8,
+    U16,
+    I16,
+    U32,
+    I32,
+}
+
+fn put(b: &mut [u8], at: usize, w: W, v: i64) {
+    match w {
+        W::U8 => b[at] = v as u8,
+        W::U16 => put16(b, at, v as u16),
+        W::I16 => put_i16(b, at, v as i16),
+        W::U32 => put32(b, at, v as u32),
+        W::I32 => put_i32(b, at, v as i32),
+    }
+}
+
+fn get(b: &[u8], at: usize, w: W) -> i64 {
+    match w {
+        W::U8 => b[at] as i64,
+        W::U16 => u16_at(b, at) as i64,
+        W::I16 => i16_at(b, at) as i64,
+        W::U32 => u32_at(b, at) as i64,
+        W::I32 => i32_at(b, at) as i64,
+    }
+}
+
+/// A setting command's body: the fields given, and the mask of their bits.
+/// Fields not given stay zero and their bit clear, so the switcher keeps them.
+struct Body<'a> {
+    b: Vec<u8>,
+    mask: u32,
+    params: &'a Params,
+}
+
+impl<'a> Body<'a> {
+    fn new(params: &'a Params, len: usize) -> Body<'a> {
+        Body {
+            b: vec![0u8; len],
+            mask: 0,
+            params,
+        }
+    }
+
+    /// A fixed byte, such as an index.
+    fn at(&mut self, at: usize, v: u8) -> &mut Self {
+        self.b[at] = v;
+        self
+    }
+
+    /// A number scaled to the wire's fixed point.
+    fn num(&mut self, name: &str, bit: u32, at: usize, by: f64, w: W) -> &mut Self {
+        if let Some(v) = scaled(self.params, name, by) {
+            self.mask |= 1 << bit;
+            put(&mut self.b, at, w, v);
+        }
+        self
+    }
+
+    fn flag(&mut self, name: &str, bit: u32, at: usize) -> &mut Self {
+        if let Some(v) = opt_bool(self.params, name) {
+            self.mask |= 1 << bit;
+            self.b[at] = v as u8;
+        }
+        self
+    }
+
+    /// An enum parameter written as its position in `list`.
+    fn choice(
+        &mut self,
+        name: &str,
+        bit: u32,
+        at: usize,
+        list: &[&str],
+    ) -> Result<&mut Self, CommandError> {
+        if let Some(v) = enum_param(self.params, name, list)? {
+            self.mask |= 1 << bit;
+            self.b[at] = v;
+        }
+        Ok(self)
+    }
+
+    /// The body with its mask at `at`, or an error when nothing was given.
+    fn done(&mut self, at: usize, w: W) -> Result<Vec<u8>, CommandError> {
+        if self.mask == 0 {
+            return Err(nothing_to_set());
+        }
+        put(&mut self.b, at, w, self.mask as i64);
+        Ok(std::mem::take(&mut self.b))
+    }
+}
+
+/// Fields read from a body into a JSON object: (name, offset, width, divisor).
+fn fields(b: &[u8], list: &[(&str, usize, W, f64)]) -> Map<String, Value> {
+    let mut m = Map::new();
+    for &(name, at, w, by) in list {
+        let v = get(b, at, w);
+        let value = if by == 1.0 {
+            json!(v)
+        } else {
+            json!(v as f64 / by)
+        };
+        m.insert(name.into(), value);
+    }
+    m
+}
+
 /// The 16-byte camera control header and the values padded to 8 bytes
 /// (Sofie `CameraControlCommand.ts:54-157`): camera, category, parameter,
 /// relative, data type, then the count of 8-, 16-, 32- and 64-bit values at
@@ -498,7 +656,7 @@ fn camera_body(
     values: &[i64],
 ) -> Vec<u8> {
     let (width, count_at) = match kind {
-        CC_SINT8 => (1, 6),
+        CC_BOOL | CC_SINT8 => (1, 6),
         CC_SINT16 | CC_FLOAT => (2, 8),
         _ => (4, 10),
     };
@@ -977,10 +1135,11 @@ impl Atem {
                     "usk": {one(b[1]): {"on_air": b[2] != 0}},
                 }}}))
             }
-            // M/E, keyer, type, rsv, can fly, fly enabled, u16 fill, u16 key
-            // (Sofie `Key/MixEffectKeyPropertiesGetCommand.ts:18-35`).
+            // M/E, keyer, type, rsv, can fly, fly enabled, u16 fill, u16 key,
+            // mask enabled, rsv, i16 mask top, bottom, left, right (Sofie
+            // `Key/MixEffectKeyPropertiesGetCommand.ts:18-35`).
             b"KeBP" => {
-                need(10)?;
+                need(20)?;
                 self.topology.usk_can_fly.insert((b[0], b[1]), b[4] == 1);
                 Some(json!({"mes": {one(b[0]): {"usk": {one(b[1]): {
                     "type": named(&KEY_TYPES, b[2]),
@@ -988,6 +1147,7 @@ impl Atem {
                     "fly_enabled": b[5] == 1,
                     "fill_source": u16_at(b, 6),
                     "key_source": u16_at(b, 8),
+                    "mask": keyers::mask(b, 10, true),
                 }}}}}))
             }
             // Sofie `Key/MixEffectKeyLumaCommand.ts:52-60`.
@@ -1043,6 +1203,10 @@ impl Atem {
                     d["clip"] = json!(tenths(u16_at(b, 4)));
                     d["gain"] = json!(tenths(u16_at(b, 6)));
                     d["invert"] = json!(b[8] == 1);
+                }
+                // Then mask enabled and the i16 edges from 10.
+                if b.len() >= 18 {
+                    d["mask"] = keyers::mask(b, 9, false);
                 }
                 Some(json!({"dsks": {one(b[0]): d}}))
             }
@@ -1170,24 +1334,34 @@ impl Atem {
                 };
                 Some(json!({"audio": {"inputs": {input.to_string(): {
                     "source_type": kind,
+                    "port_type": audio::port_name(u16_at(b, 6)),
                     "mix_option": classic_mix(b[8]),
                     "gain": classic_db(u16_at(b, 10)),
                     "balance": classic_balance(i16_at(b, 12)),
                 }}}}))
             }
-            // u16 gain, i16 balance (Sofie `Audio/AudioMixerMasterCommand.ts:27-33`).
+            // u16 gain, i16 balance, follow fade to black (Sofie
+            // `Audio/AudioMixerMasterCommand.ts:27-33`).
             b"AMMO" => {
                 need(4)?;
-                Some(json!({"audio": {"master": {
+                let mut master = json!({
                     "gain": classic_db(u16_at(b, 0)),
                     "balance": classic_balance(i16_at(b, 2)),
-                }}}))
+                });
+                if b.len() >= 5 {
+                    master["follow_fade_to_black"] = json!(b[4] == 1);
+                }
+                Some(json!({"audio": {"master": master}}))
             }
-            // u16 input, rsv, i64 source at 8, gain i32 at 20, balance i16 at
-            // 40, fader gain i32 at 44, mix options at 48, mix option at 49,
-            // gains in hundredths of a dB (Sofie
-            // `Fairlight/FairlightMixerSourceCommand.ts:107-129`; Companion
-            // `actions/fairlightAudio.ts:298, 472`).
+            // u16 input, rsv, i64 source at 8, source type, maximum and
+            // current frames delay at 16 to 18, gain i32 at 20, has stereo
+            // simulation at 24, i16 stereo simulation at 26, EQ band count
+            // and EQ enabled at 28 and 29, i32 EQ gain at 32, i32 make-up
+            // gain at 36, balance i16 at 40, fader gain i32 at 44, mix
+            // options at 48, mix option at 49; gains in hundredths of a dB
+            // (Sofie `Fairlight/FairlightMixerSourceCommand.ts:107-129`;
+            // Companion `actions/fairlightAudio.ts:298, 472`; the LibAtem
+            // samples for the stereo simulation and EQ gain scaling).
             b"FASP" => {
                 need(50)?;
                 let input = u16_at(b, 0);
@@ -1195,10 +1369,22 @@ impl Atem {
                 self.topology
                     .fairlight_sources
                     .insert((input, source), b[48]);
+                self.topology.fairlight_bands.insert((input, source), b[28]);
                 Some(
                     json!({"fairlight": {"inputs": {input.to_string(): {"sources": {
                         source.to_string(): {
+                            "type": if b[16] == 1 { "stereo" } else { "mono" },
+                            "max_frames_delay": b[17],
+                            "frames_delay": b[18],
                             "gain": hundredths(i32_at(b, 20) as i64),
+                            "has_stereo_simulation": b[24] != 0,
+                            "stereo_simulation": hundredths(i16_at(b, 26) as i64),
+                            "equalizer": {
+                                "enabled": b[29] != 0,
+                                "gain": hundredths(i32_at(b, 32) as i64),
+                                "band_count": b[28],
+                            },
+                            "dynamics": {"make_up_gain": hundredths(i32_at(b, 36) as i64)},
                             "balance": hundredths(i16_at(b, 40) as i64),
                             "fader_gain": hundredths(i32_at(b, 44) as i64),
                             "mix_options": fairlight_mixes(b[48]),
@@ -1207,17 +1393,27 @@ impl Atem {
                     }}}}}),
                 )
             }
-            // Fader gain i32 at 12, follow fade to black at 16 (Sofie
+            // EQ band count, EQ enabled, 2 rsv, i32 EQ gain, i32 make-up
+            // gain, i32 fader gain, follow fade to black at 16 (Sofie
             // `Fairlight/FairlightMixerMasterCommand.ts:41-49`).
             b"FAMP" => {
                 need(17)?;
+                self.topology.master_bands = b[0];
                 Some(json!({"fairlight": {"master": {
+                    "equalizer": {
+                        "enabled": b[1] != 0,
+                        "gain": hundredths(i32_at(b, 4) as i64),
+                        "band_count": b[0],
+                    },
+                    "dynamics": {"make_up_gain": hundredths(i32_at(b, 8) as i64)},
                     "fader_gain": hundredths(i32_at(b, 12) as i64),
                     "follow_fade_to_black": b[16] != 0,
                 }}}))
             }
             // Levels in hundredths of a dB, sent only while subscribed:
-            // i64 source, u16 input, then the output levels and peaks at 32
+            // i64 source, u16 input, then the input levels and peaks at 10,
+            // the expander, compressor and limiter gain reductions at 18,
+            // the levels after dynamics at 24 and after the fader at 32
             // (Sofie `Fairlight/FairlightMixerSourceLevelsCommand.ts:17-39`;
             // Companion `audioLevels.ts:12`).
             b"FMLv" => {
@@ -1226,24 +1422,16 @@ impl Atem {
                 let input = u16_at(b, 8);
                 Some(
                     json!({"fairlight": {"inputs": {input.to_string(): {"sources": {
-                        source.to_string(): {"level": {
-                            "left": hundredths(i16_at(b, 32) as i64),
-                            "right": hundredths(i16_at(b, 34) as i64),
-                            "left_peak": hundredths(i16_at(b, 36) as i64),
-                            "right_peak": hundredths(i16_at(b, 38) as i64),
-                        }},
+                        source.to_string(): {"level": audio::levels(b, 10, true)},
                     }}}}}),
                 )
             }
-            // Master levels at 20 (Sofie `Fairlight/FairlightMixerMasterLevelsCommand.ts:9-28`).
+            // Master: input levels at 0, compressor and limiter gain
+            // reductions at 8, after dynamics at 12, after the fader at 20
+            // (Sofie `Fairlight/FairlightMixerMasterLevelsCommand.ts:9-28`).
             b"FDLv" => {
                 need(28)?;
-                Some(json!({"fairlight": {"master": {"level": {
-                    "left": hundredths(i16_at(b, 20) as i64),
-                    "right": hundredths(i16_at(b, 22) as i64),
-                    "left_peak": hundredths(i16_at(b, 24) as i64),
-                    "right_peak": hundredths(i16_at(b, 26) as i64),
-                }}}}))
+                Some(json!({"fairlight": {"master": {"level": audio::levels(b, 0, false)}}}))
             }
             // Multiviewer, window, u16 source (Sofie
             // `Settings/MultiViewerSourceCommand.ts:39-47`). Constellation HD
@@ -1259,9 +1447,14 @@ impl Atem {
                 if previous == Some(source) {
                     return None;
                 }
-                Some(json!({"multiviewers": {one(b[0]): {"windows": {one(b[1]): {
-                    "source": source,
-                }}}}}))
+                let mut w = json!({"source": source});
+                // Then whether the window can show audio meters and safe area
+                // markers (Sofie `Settings/MultiViewerSourceCommand.ts:44-46`).
+                if b.len() >= 6 {
+                    w["supports_vu_meter"] = json!(b[4] != 0);
+                    w["supports_safe_area"] = json!(b[5] != 0);
+                }
+                Some(json!({"multiviewers": {one(b[0]): {"windows": {one(b[1]): w}}}}))
             }
             b"TlSr" => {
                 need(2)?;
@@ -1290,8 +1483,19 @@ impl Atem {
                 if !used {
                     return Some(json!({"macros": {slot: null}}));
                 }
+                // u16 description length at 6, has unsupported steps at 3, the
+                // description after the name (Sofie `Macro/MacroPropertiesCommand.ts:14-30`).
                 let name = b.get(8..8 + name_len).map(String::from_utf8_lossy)?;
-                Some(json!({"macros": {slot: {"name": name}}}))
+                let description_len = u16_at(b, 6) as usize;
+                let description = b
+                    .get(8 + name_len..8 + name_len + description_len)
+                    .map(String::from_utf8_lossy)
+                    .unwrap_or_default();
+                Some(json!({"macros": {slot: {
+                    "name": name,
+                    "description": description,
+                    "unsupported_ops": b[3] != 0,
+                }}}))
             }
             // Bit 0 running, bit 1 waiting; loop; u16 index (Sofie
             // `Macro/MacroRunStatusCommand.ts:8-15`).
@@ -1323,7 +1527,16 @@ impl Atem {
                     "idle"
                 };
                 self.streaming_active = status & (4 | 32) != 0;
-                Some(json!({"streaming": {"state": state}}))
+                // Error bits: 16 invalid state, 32768 unknown (Sofie
+                // `enums/index.ts:303-307`).
+                let error = if status & 32768 != 0 {
+                    "unknown"
+                } else if status & 16 != 0 {
+                    "invalid_state"
+                } else {
+                    "none"
+                };
+                Some(json!({"streaming": {"state": state, "error": error}}))
             }
             b"RTMS" => {
                 need(2)?;
@@ -1372,39 +1585,20 @@ impl Atem {
             // put in the state.
             b"SRSU" => {
                 need(576)?;
-                Some(json!({"streaming": {
+                let mut s = json!({
                     "service_name": text(&b[..64]),
                     "url": text(&b[64..576]),
-                }}))
+                });
+                // Then the low and high video bitrates at 1088.
+                if b.len() >= 1096 {
+                    let (low, high) = (u32_at(b, 1088), u32_at(b, 1092));
+                    self.topology.video_bitrates = Some((low, high));
+                    s["video_bitrates"] = json!({"low": low, "high": high});
+                }
+                Some(json!({"streaming": s}))
             }
-            // Camera control: camera, category, parameter, type, the counts of
-            // 8-, 16-, 32- and 64-bit values at 4, 6, 8, 10, values from 16
-            // (Sofie `CameraControlCommand.ts:177-249`). Ids from
-            // camera-control `ids.d.ts`.
-            b"CCdP" => {
-                need(16)?;
-                let (camera, category, parameter, kind) = (b[0], b[1], b[2], b[3]);
-                let float = |n: usize| -> Option<f64> {
-                    (kind == CC_FLOAT && u16_at(b, 6) as usize >= n && b.len() >= 16 + 2 * n)
-                        .then(|| i16_at(b, 16 + 2 * (n - 1)) as f64 / 2048.0)
-                };
-                let field = match (category, parameter) {
-                    (0, 0) => json!({"focus": float(1)?}),
-                    (0, 3) => json!({"iris": float(1)?}),
-                    (0, 9) => json!({"zoom_speed": float(1)?}),
-                    (1, 2) if kind == CC_SINT16 && u16_at(b, 6) >= 2 && b.len() >= 20 => {
-                        json!({"white_balance": i16_at(b, 16), "tint": i16_at(b, 18)})
-                    }
-                    (1, 5) if kind == CC_SINT32 && u16_at(b, 8) >= 1 && b.len() >= 20 => {
-                        json!({"exposure_us": i32_at(b, 16)})
-                    }
-                    (1, 13) if kind == CC_SINT8 && u16_at(b, 4) >= 1 && b.len() >= 17 => {
-                        json!({"gain": b[16] as i8})
-                    }
-                    _ => return None,
-                };
-                Some(json!({"cameras": {camera.to_string(): field}}))
-            }
+            // Camera control (Sofie `CameraControlCommand.ts:177-249`).
+            b"CCdP" => self.decode_camera(b),
             b"InCm" => {
                 if self.phase == Phase::Loading {
                     self.phase = Phase::Ready;
@@ -1418,7 +1612,10 @@ impl Atem {
                 }
                 None
             }
-            _ => None,
+            _ => self
+                .decode_keyers(name, b)
+                .or_else(|| self.decode_audio(name, b))
+                .or_else(|| self.decode_settings(name, b)),
         }
     }
 
@@ -2167,6 +2364,10 @@ impl Atem {
                     b[0] |= 4;
                     put_i16(&mut b, 8, v as i16);
                 }
+                if let Some(v) = opt_bool(params, "rca_to_xlr") {
+                    b[0] |= 8;
+                    b[10] = v as u8;
+                }
                 if b[0] == 0 {
                     return Err(nothing_to_set());
                 }
@@ -2187,6 +2388,10 @@ impl Atem {
                     b[0] |= 2;
                     put_i16(&mut b, 4, v as i16);
                 }
+                if let Some(v) = opt_bool(params, "follow_fade_to_black") {
+                    b[0] |= 4;
+                    b[6] = v as u8;
+                }
                 if b[0] == 0 {
                     return Err(nothing_to_set());
                 }
@@ -2195,8 +2400,9 @@ impl Atem {
             // u16 mask, u16 input, 4 rsv, i64 source, frames delay, 3 rsv, i32
             // gain, i16 stereo simulation, eq enabled, rsv, i32 eq gain, i32
             // make-up gain, i16 balance, 2 rsv, i32 fader gain, mix option, 3
-            // rsv; mask bits 1 gain, 6 balance, 7 fader gain, 8 mix option
-            // (Sofie `Fairlight/FairlightMixerSourceCommand.ts:47-89`). Gains
+            // rsv; mask bits 0 frames delay, 1 gain, 2 stereo simulation, 3
+            // EQ enabled, 4 EQ gain, 5 make-up gain, 6 balance, 7 fader gain, 8
+            // mix option (Sofie `Fairlight/FairlightMixerSourceCommand.ts:47-89`). Gains
             // in hundredths of a dB, balance in hundredths (Companion
             // `actions/fairlightAudio.ts:298, 472, 562`).
             "set_fairlight_source" => {
@@ -2215,9 +2421,29 @@ impl Atem {
                 let mut mask = 0u16;
                 put16(&mut b, 2, input as u16);
                 b[8..16].copy_from_slice(&source.to_be_bytes());
+                if let Some(v) = opt_int(params, "frames_delay") {
+                    mask |= 1;
+                    b[16] = v as u8;
+                }
                 if let Some(v) = scaled(params, "gain", 100.0) {
                     mask |= 1 << 1;
                     put_i32(&mut b, 20, v as i32);
+                }
+                if let Some(v) = scaled(params, "stereo_simulation", 100.0) {
+                    mask |= 1 << 2;
+                    put_i16(&mut b, 24, v as i16);
+                }
+                if let Some(v) = opt_bool(params, "eq_enabled") {
+                    mask |= 1 << 3;
+                    b[26] = v as u8;
+                }
+                if let Some(v) = scaled(params, "eq_gain", 100.0) {
+                    mask |= 1 << 4;
+                    put_i32(&mut b, 28, v as i32);
+                }
+                if let Some(v) = scaled(params, "make_up_gain", 100.0) {
+                    mask |= 1 << 5;
+                    put_i32(&mut b, 32, v as i32);
                 }
                 if let Some(v) = scaled(params, "balance", 100.0) {
                     mask |= 1 << 6;
@@ -2244,14 +2470,27 @@ impl Atem {
                 put16(&mut b, 0, mask);
                 one(b"CFSP", b)
             }
-            // Mask (bit 3 fader gain, 4 follow FTB), eq enabled, 2 rsv, i32 eq
-            // gain, i32 make-up gain, i32 fader gain, follow FTB, 3 rsv (Sofie
+            // Mask (bit 0 EQ enabled, 1 EQ gain, 2 make-up gain, 3 fader gain,
+            // 4 follow FTB), eq enabled, 2 rsv, i32 eq gain, i32 make-up gain,
+            // i32 fader gain, follow FTB, 3 rsv (Sofie
             // `Fairlight/FairlightMixerMasterCommand.ts:12-33`).
             "set_fairlight_master" => {
                 if !self.topology.fairlight {
                     return Err(unsupported(name, "this switcher (no Fairlight mixer)"));
                 }
                 let mut b = vec![0u8; 20];
+                if let Some(v) = opt_bool(params, "eq_enabled") {
+                    b[0] |= 1;
+                    b[1] = v as u8;
+                }
+                if let Some(v) = scaled(params, "eq_gain", 100.0) {
+                    b[0] |= 1 << 1;
+                    put_i32(&mut b, 4, v as i32);
+                }
+                if let Some(v) = scaled(params, "make_up_gain", 100.0) {
+                    b[0] |= 1 << 2;
+                    put_i32(&mut b, 8, v as i32);
+                }
                 if let Some(v) = scaled(params, "fader_gain", 100.0) {
                     b[0] |= 1 << 3;
                     put_i32(&mut b, 12, v as i32);
@@ -2317,7 +2556,12 @@ impl Atem {
                     return Err(invalid(format!("macro {} is empty", slot as u16 + 1)));
                 }
                 let [hi, lo] = (slot as u16).to_be_bytes();
-                one(b"MAct", vec![hi, lo, 0, 0])
+                let run = (*b"MAct", vec![hi, lo, 0, 0]);
+                // With loop given, the loop setting goes first in the packet.
+                match opt_bool(params, "loop") {
+                    Some(l) => Ok(vec![(*b"MRCP", vec![1, l as u8, 0, 0]), run]),
+                    None => Ok(vec![run]),
+                }
             }
             "stop_macro" => one(b"MAct", vec![0xFF, 0xFF, 1, 0]),
             // Continue is action 4 with index 0xFFFF (Sofie
@@ -2364,6 +2608,28 @@ impl Atem {
                         b[0] |= 1 << bit;
                         b[at..at + s.len()].copy_from_slice(s.as_bytes());
                     }
+                }
+                // Bit 3: both video bitrates; one not given keeps the
+                // switcher's.
+                let (low, high) = (
+                    opt_int(params, "low_bitrate"),
+                    opt_int(params, "high_bitrate"),
+                );
+                if low.is_some() || high.is_some() {
+                    let Some((known_low, known_high)) = self.topology.video_bitrates else {
+                        if low.is_none() || high.is_none() {
+                            return Err(invalid(
+                                "give both bitrates until the switcher reports its own".into(),
+                            ));
+                        }
+                        b[0] |= 8;
+                        put32(&mut b, 1092, low.unwrap_or(0) as u32);
+                        put32(&mut b, 1096, high.unwrap_or(0) as u32);
+                        return one(b"CRSS", b);
+                    };
+                    b[0] |= 8;
+                    put32(&mut b, 1092, low.map_or(known_low, |v| v as u32));
+                    put32(&mut b, 1096, high.map_or(known_high, |v| v as u32));
                 }
                 if b[0] == 0 {
                     return Err(nothing_to_set());
@@ -2413,9 +2679,23 @@ impl Atem {
                 let values = [int(params, "exposure_us")];
                 one(b"CCmd", camera_body(cam, 1, 5, false, CC_SINT32, &values))
             }
-            other => Err(CommandError::UnknownCommand {
-                command: other.into(),
-            }),
+            other => {
+                if let Some(out) = self.build_keyers(other, params)? {
+                    return Ok(out);
+                }
+                if let Some(out) = self.build_audio(other, params)? {
+                    return Ok(out);
+                }
+                if let Some(out) = self.build_settings(other, params)? {
+                    return Ok(out);
+                }
+                if let Some(out) = self.build_camera(other, params)? {
+                    return Ok(out);
+                }
+                Err(CommandError::UnknownCommand {
+                    command: other.into(),
+                })
+            }
         }
     }
 }
@@ -2526,11 +2806,11 @@ mod tests {
 
     const HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 9));
 
-    fn atem() -> Atem {
+    pub(super) fn atem() -> Atem {
         Atem::for_device(SocketAddr::new(HOST, PORT))
     }
 
-    fn sent(actions: &[Action]) -> Vec<Vec<u8>> {
+    pub(super) fn sent(actions: &[Action]) -> Vec<Vec<u8>> {
         actions
             .iter()
             .filter_map(|a| match a {
@@ -2540,13 +2820,13 @@ mod tests {
             .collect()
     }
 
-    fn feed(m: &mut Atem, now: Millis, packet: Vec<u8>) -> Vec<Action> {
+    pub(super) fn feed(m: &mut Atem, now: Millis, packet: Vec<u8>) -> Vec<Action> {
         let mut cx = Cx::new(now);
         m.datagram(&mut cx, SOCKET, SocketAddr::new(m.host(), PORT), &packet);
         cx.take()
     }
 
-    fn state(actions: &[Action]) -> Value {
+    pub(super) fn state(actions: &[Action]) -> Value {
         let mut merged = json!({});
         for a in actions {
             if let Action::State(p) = a {
@@ -2557,7 +2837,7 @@ mod tests {
     }
 
     /// A switcher packet: reliable, with the given id and commands.
-    fn reliable(session: u16, id: u16, commands: &[Vec<u8>]) -> Vec<u8> {
+    pub(super) fn reliable(session: u16, id: u16, commands: &[Vec<u8>]) -> Vec<u8> {
         let payload: Vec<u8> = commands.concat();
         let mut p = header(FLAG_RELIABLE, HEADER + payload.len(), session, 0, id);
         p.extend_from_slice(&payload);
@@ -2566,20 +2846,20 @@ mod tests {
 
     /// A switcher command with non-zero bytes where the header's unused bytes
     /// are, as real switchers send.
-    fn cmd(name: &[u8; 4], body: &[u8]) -> Vec<u8> {
+    pub(super) fn cmd(name: &[u8; 4], body: &[u8]) -> Vec<u8> {
         let mut c = command(name, body);
         c[2] = 0xff;
         c[3] = 0xff;
         c
     }
 
-    fn syn_reply() -> Vec<u8> {
+    pub(super) fn syn_reply() -> Vec<u8> {
         let mut p = header(FLAG_SYN, HEADER + 8, 0x53ab, 0, 0);
         p.extend_from_slice(&[0x02, 0, 0, 0, 0, 0, 0, 0]);
         p
     }
 
-    fn input(id: u16, long: &str, short: &str, port: u8) -> Vec<u8> {
+    pub(super) fn input(id: u16, long: &str, short: &str, port: u8) -> Vec<u8> {
         let mut b = vec![0u8; 36];
         b[0..2].copy_from_slice(&id.to_be_bytes());
         b[2..2 + long.len()].copy_from_slice(long.as_bytes());
@@ -2591,7 +2871,7 @@ mod tests {
     /// The initial dump of a small 1 M/E switcher on protocol 2.30, with a
     /// Fairlight mixer, two media players, a SuperSource, a DVE, a stinger
     /// and camera control.
-    fn dump() -> Vec<Vec<u8>> {
+    pub(super) fn dump() -> Vec<Vec<u8>> {
         let mut pin = vec![0u8; 44];
         pin[..13].copy_from_slice(b"ATEM Mini Pro");
         pin[40] = 14;
@@ -2640,7 +2920,21 @@ mod tests {
     }
 
     /// A Fairlight source: input, source id, mix options offered, mix option.
-    fn fasp(input: u16, source: i64, options: u8, mix: u8) -> Vec<u8> {
+    /// Bytes written as "00-1F-...", as the LibAtem samples in Sofie's
+    /// `commands/__tests__/libatem-data.json` give them.
+    pub(super) fn hex(s: &str) -> Vec<u8> {
+        s.split('-')
+            .map(|b| u8::from_str_radix(b, 16).unwrap())
+            .collect()
+    }
+
+    /// The state one switcher packet of commands produces.
+    pub(super) fn decoded(m: &mut Atem, commands: &[Vec<u8>]) -> Value {
+        let id = (m.last_received + 1) % ID_MODULO;
+        state(&feed(m, 30, reliable(0x8001, id, commands)))
+    }
+
+    pub(super) fn fasp(input: u16, source: i64, options: u8, mix: u8) -> Vec<u8> {
         let mut b = vec![0u8; 52];
         put16(&mut b, 0, input);
         b[8..16].copy_from_slice(&source.to_be_bytes());
@@ -2650,7 +2944,7 @@ mod tests {
     }
 
     /// Hello, the switcher's answer, and the dump in one packet.
-    fn ready() -> (Atem, Vec<Action>) {
+    pub(super) fn ready() -> (Atem, Vec<Action>) {
         let mut m = atem();
         let mut cx = Cx::new(0);
         m.start(&mut cx);
@@ -2658,6 +2952,45 @@ mod tests {
         feed(&mut m, 10, syn_reply());
         let a = feed(&mut m, 20, reliable(0x8001, 1, &dump()));
         (m, a)
+    }
+
+    /// Every command the spec declares reaches a builder: given a value for
+    /// each declared parameter, none is unknown to the module.
+    #[test]
+    fn every_spec_command_is_known_to_the_module() {
+        let catalog = crate::catalog::Catalog::embedded();
+        let spec = catalog.device("blackmagic-atem").unwrap();
+        let (m, _) = ready();
+        for (name, command) in &spec.commands {
+            let mut params = Params::new();
+            for (p, decl) in &command.params {
+                let v = match decl.kind {
+                    crate::catalog::ParamType::Int => {
+                        json!(decl.min.unwrap_or(1.0).max(1.0) as i64)
+                    }
+                    crate::catalog::ParamType::Float => json!(decl.min.unwrap_or(0.0)),
+                    crate::catalog::ParamType::Bool => json!(true),
+                    crate::catalog::ParamType::Enum => {
+                        json!(decl.values.as_ref().unwrap()[0])
+                    }
+                    _ => json!("x"),
+                };
+                params.insert(p.clone(), v);
+            }
+            match m.build(name, &params) {
+                Err(CommandError::UnknownCommand { .. }) => {
+                    panic!("{name} is in the spec but unknown to the module")
+                }
+                // With every parameter given, a setting command that finds
+                // nothing to set reads names the spec does not declare.
+                Err(CommandError::InvalidParams { message })
+                    if message.starts_with("give at least") =>
+                {
+                    panic!("{name}: {message}")
+                }
+                _ => {}
+            }
+        }
     }
 
     #[test]
@@ -3025,7 +3358,7 @@ mod tests {
     }
 
     /// The one packet a command sends, after the packet header.
-    fn payload(m: &mut Atem, name: &str, params: Value) -> Vec<u8> {
+    pub(super) fn payload(m: &mut Atem, name: &str, params: Value) -> Vec<u8> {
         let mut cx = Cx::new(100);
         m.command(&mut cx, 1, name, params.as_object().unwrap());
         let a = cx.take();
@@ -3035,7 +3368,7 @@ mod tests {
         }
     }
 
-    fn refused(m: &mut Atem, name: &str, params: Value) -> CommandError {
+    pub(super) fn refused(m: &mut Atem, name: &str, params: Value) -> CommandError {
         let mut cx = Cx::new(100);
         m.command(&mut cx, 1, name, params.as_object().unwrap());
         let a = cx.take();
@@ -3046,7 +3379,7 @@ mod tests {
         }
     }
 
-    fn ready_with(dump: Vec<Vec<u8>>) -> Atem {
+    pub(super) fn ready_with(dump: Vec<Vec<u8>>) -> Atem {
         let mut m = atem();
         let mut cx = Cx::new(0);
         m.start(&mut cx);
@@ -3648,7 +3981,9 @@ mod tests {
         );
         assert_eq!(
             s["fairlight"]["master"],
-            json!({"fader_gain": -10.5, "follow_fade_to_black": true})
+            json!({"fader_gain": -10.5, "follow_fade_to_black": true,
+                   "equalizer": {"enabled": false, "gain": 0.0, "band_count": 0},
+                   "dynamics": {"make_up_gain": 0.0}})
         );
         let source = &s["fairlight"]["inputs"]["1"]["sources"]["-65280"];
         assert_eq!(source["level"]["left"], -20.0);
@@ -3727,7 +4062,8 @@ mod tests {
         assert_eq!(s["topology"]["audio"], "classic");
         assert_eq!(
             s["audio"]["inputs"]["1"],
-            json!({"source_type": "video", "mix_option": "on", "gain": 0.0, "balance": -25.0})
+            json!({"source_type": "video", "port_type": "sdi", "mix_option": "on", "gain": 0.0,
+                   "balance": -25.0})
         );
         let p = payload(
             &mut m,

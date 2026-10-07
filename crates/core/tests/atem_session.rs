@@ -225,6 +225,33 @@ async fn atem_end_to_end() {
         outcome,
         Err(CommandError::UnsupportedForModel { .. })
     ));
+    // Commands from the keyer and settings areas pass the spec's checks and
+    // are acknowledged.
+    for (name, p) in [
+        (
+            "set_usk_mask",
+            json!({"me": 1, "keyer": 1, "enabled": true, "top": 4.5}),
+        ),
+        ("set_dsk_mask", json!({"dsk": 1, "left": -8.0})),
+        ("set_video_mode", json!({"mode": "1080p50"})),
+        ("save_startup_state", json!({})),
+        ("macro_add_pause", json!({"frames": 25})),
+    ] {
+        assert_eq!(
+            core.execute(id, name, params(p)).await,
+            Ok(Outcome::Ack),
+            "{name}"
+        );
+    }
+    // A mask edge outside the frame is refused before anything is sent.
+    let outcome = core
+        .execute(
+            id,
+            "set_usk_mask",
+            params(json!({"me": 1, "keyer": 1, "top": 12.0})),
+        )
+        .await;
+    assert!(matches!(outcome, Err(CommandError::InvalidParams { .. })));
     // Classic audio is not listed for the ATEM Mini at all.
     let outcome = core
         .execute(id, "set_audio_master", params(json!({"gain": 0.0})))
