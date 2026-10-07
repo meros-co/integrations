@@ -29,8 +29,12 @@
 //!
 //! Feature areas beyond switching live in sibling files, each decoding its
 //! own state and building its own commands: `atem_keyers.rs` (keyer DVE,
-//! chroma, masks and flying keys) and `atem_audio.rs` (Fairlight EQ,
-//! dynamics, inputs, routing and monitoring; classic audio monitoring).
+//! chroma, masks and flying keys), `atem_audio.rs` (Fairlight EQ,
+//! dynamics, inputs, routing and monitoring; classic audio monitoring),
+//! `atem_settings.rs` (media pool, recording and streaming settings,
+//! multiviewer, video mode, startup state, macro recording) and
+//! `atem_camera.rs` (camera control state and the commands beyond the basic
+//! lens and exposure ones).
 //!
 //! Opened for commands only (`monitor` false), the module neither polls the
 //! streaming and recording durations nor renews a Fairlight level
@@ -50,8 +54,12 @@ use crate::session::merge_patch;
 
 #[path = "atem_audio.rs"]
 mod audio;
+#[path = "atem_camera.rs"]
+mod camera;
 #[path = "atem_keyers.rs"]
 mod keyers;
+#[path = "atem_settings.rs"]
+mod settings;
 
 const PORT: u16 = 9910;
 const SOCKET: Key = "atem";
@@ -171,6 +179,7 @@ const LAYERS: [&str; 5] = ["background", "key1", "key2", "key3", "key4"];
 
 /// Camera control data types (camera-control and Sofie
 /// `CameraControlCommand.ts:6-14`).
+const CC_BOOL: u8 = 0x00;
 const CC_SINT8: u8 = 0x01;
 const CC_SINT16: u8 = 0x02;
 const CC_SINT32: u8 = 0x03;
@@ -236,6 +245,17 @@ struct Topology {
     /// Fairlight audio routing outputs and sources seen (AROP, ARSP).
     routing_outputs: BTreeSet<u32>,
     routing_sources: BTreeSet<u32>,
+    /// Video modes the switcher offers (_VMC).
+    video_modes: Vec<u8>,
+    /// Multiviewers reported by their properties (MvPr, VuMo).
+    multiviewers_seen: BTreeSet<u8>,
+    /// Recording disks reported (RTMD).
+    disks: BTreeSet<u32>,
+    /// Streaming video and audio bitrates, low and high (SRSU, STAB).
+    video_bitrates: Option<(u32, u32)>,
+    audio_bitrates: Option<(u32, u32)>,
+    /// The most frames each clip can hold (MPSp).
+    clip_max_frames: Option<[u16; 4]>,
     /// (M/E, keyer) to whether the keyer can fly (KeBP).
     usk_can_fly: BTreeMap<(u8, u8), bool>,
     /// M/E to its next-transition selection (TrSS byte 4).
@@ -636,7 +656,7 @@ fn camera_body(
     values: &[i64],
 ) -> Vec<u8> {
     let (width, count_at) = match kind {
-        CC_SINT8 => (1, 6),
+        CC_BOOL | CC_SINT8 => (1, 6),
         CC_SINT16 | CC_FLOAT => (2, 8),
         _ => (4, 10),
     };
@@ -1427,9 +1447,14 @@ impl Atem {
                 if previous == Some(source) {
                     return None;
                 }
-                Some(json!({"multiviewers": {one(b[0]): {"windows": {one(b[1]): {
-                    "source": source,
-                }}}}}))
+                let mut w = json!({"source": source});
+                // Then whether the window can show audio meters and safe area
+                // markers (Sofie `Settings/MultiViewerSourceCommand.ts:44-46`).
+                if b.len() >= 6 {
+                    w["supports_vu_meter"] = json!(b[4] != 0);
+                    w["supports_safe_area"] = json!(b[5] != 0);
+                }
+                Some(json!({"multiviewers": {one(b[0]): {"windows": {one(b[1]): w}}}}))
             }
             b"TlSr" => {
                 need(2)?;
@@ -1458,8 +1483,19 @@ impl Atem {
                 if !used {
                     return Some(json!({"macros": {slot: null}}));
                 }
+                // u16 description length at 6, has unsupported steps at 3, the
+                // description after the name (Sofie `Macro/MacroPropertiesCommand.ts:14-30`).
                 let name = b.get(8..8 + name_len).map(String::from_utf8_lossy)?;
-                Some(json!({"macros": {slot: {"name": name}}}))
+                let description_len = u16_at(b, 6) as usize;
+                let description = b
+                    .get(8 + name_len..8 + name_len + description_len)
+                    .map(String::from_utf8_lossy)
+                    .unwrap_or_default();
+                Some(json!({"macros": {slot: {
+                    "name": name,
+                    "description": description,
+                    "unsupported_ops": b[3] != 0,
+                }}}))
             }
             // Bit 0 running, bit 1 waiting; loop; u16 index (Sofie
             // `Macro/MacroRunStatusCommand.ts:8-15`).
@@ -1491,7 +1527,16 @@ impl Atem {
                     "idle"
                 };
                 self.streaming_active = status & (4 | 32) != 0;
-                Some(json!({"streaming": {"state": state}}))
+                // Error bits: 16 invalid state, 32768 unknown (Sofie
+                // `enums/index.ts:303-307`).
+                let error = if status & 32768 != 0 {
+                    "unknown"
+                } else if status & 16 != 0 {
+                    "invalid_state"
+                } else {
+                    "none"
+                };
+                Some(json!({"streaming": {"state": state, "error": error}}))
             }
             b"RTMS" => {
                 need(2)?;
@@ -1540,39 +1585,20 @@ impl Atem {
             // put in the state.
             b"SRSU" => {
                 need(576)?;
-                Some(json!({"streaming": {
+                let mut s = json!({
                     "service_name": text(&b[..64]),
                     "url": text(&b[64..576]),
-                }}))
+                });
+                // Then the low and high video bitrates at 1088.
+                if b.len() >= 1096 {
+                    let (low, high) = (u32_at(b, 1088), u32_at(b, 1092));
+                    self.topology.video_bitrates = Some((low, high));
+                    s["video_bitrates"] = json!({"low": low, "high": high});
+                }
+                Some(json!({"streaming": s}))
             }
-            // Camera control: camera, category, parameter, type, the counts of
-            // 8-, 16-, 32- and 64-bit values at 4, 6, 8, 10, values from 16
-            // (Sofie `CameraControlCommand.ts:177-249`). Ids from
-            // camera-control `ids.d.ts`.
-            b"CCdP" => {
-                need(16)?;
-                let (camera, category, parameter, kind) = (b[0], b[1], b[2], b[3]);
-                let float = |n: usize| -> Option<f64> {
-                    (kind == CC_FLOAT && u16_at(b, 6) as usize >= n && b.len() >= 16 + 2 * n)
-                        .then(|| i16_at(b, 16 + 2 * (n - 1)) as f64 / 2048.0)
-                };
-                let field = match (category, parameter) {
-                    (0, 0) => json!({"focus": float(1)?}),
-                    (0, 3) => json!({"iris": float(1)?}),
-                    (0, 9) => json!({"zoom_speed": float(1)?}),
-                    (1, 2) if kind == CC_SINT16 && u16_at(b, 6) >= 2 && b.len() >= 20 => {
-                        json!({"white_balance": i16_at(b, 16), "tint": i16_at(b, 18)})
-                    }
-                    (1, 5) if kind == CC_SINT32 && u16_at(b, 8) >= 1 && b.len() >= 20 => {
-                        json!({"exposure_us": i32_at(b, 16)})
-                    }
-                    (1, 13) if kind == CC_SINT8 && u16_at(b, 4) >= 1 && b.len() >= 17 => {
-                        json!({"gain": b[16] as i8})
-                    }
-                    _ => return None,
-                };
-                Some(json!({"cameras": {camera.to_string(): field}}))
-            }
+            // Camera control (Sofie `CameraControlCommand.ts:177-249`).
+            b"CCdP" => self.decode_camera(b),
             b"InCm" => {
                 if self.phase == Phase::Loading {
                     self.phase = Phase::Ready;
@@ -1588,7 +1614,8 @@ impl Atem {
             }
             _ => self
                 .decode_keyers(name, b)
-                .or_else(|| self.decode_audio(name, b)),
+                .or_else(|| self.decode_audio(name, b))
+                .or_else(|| self.decode_settings(name, b)),
         }
     }
 
@@ -2529,7 +2556,12 @@ impl Atem {
                     return Err(invalid(format!("macro {} is empty", slot as u16 + 1)));
                 }
                 let [hi, lo] = (slot as u16).to_be_bytes();
-                one(b"MAct", vec![hi, lo, 0, 0])
+                let run = (*b"MAct", vec![hi, lo, 0, 0]);
+                // With loop given, the loop setting goes first in the packet.
+                match opt_bool(params, "loop") {
+                    Some(l) => Ok(vec![(*b"MRCP", vec![1, l as u8, 0, 0]), run]),
+                    None => Ok(vec![run]),
+                }
             }
             "stop_macro" => one(b"MAct", vec![0xFF, 0xFF, 1, 0]),
             // Continue is action 4 with index 0xFFFF (Sofie
@@ -2576,6 +2608,28 @@ impl Atem {
                         b[0] |= 1 << bit;
                         b[at..at + s.len()].copy_from_slice(s.as_bytes());
                     }
+                }
+                // Bit 3: both video bitrates; one not given keeps the
+                // switcher's.
+                let (low, high) = (
+                    opt_int(params, "low_bitrate"),
+                    opt_int(params, "high_bitrate"),
+                );
+                if low.is_some() || high.is_some() {
+                    let Some((known_low, known_high)) = self.topology.video_bitrates else {
+                        if low.is_none() || high.is_none() {
+                            return Err(invalid(
+                                "give both bitrates until the switcher reports its own".into(),
+                            ));
+                        }
+                        b[0] |= 8;
+                        put32(&mut b, 1092, low.unwrap_or(0) as u32);
+                        put32(&mut b, 1096, high.unwrap_or(0) as u32);
+                        return one(b"CRSS", b);
+                    };
+                    b[0] |= 8;
+                    put32(&mut b, 1092, low.map_or(known_low, |v| v as u32));
+                    put32(&mut b, 1096, high.map_or(known_high, |v| v as u32));
                 }
                 if b[0] == 0 {
                     return Err(nothing_to_set());
@@ -2630,6 +2684,12 @@ impl Atem {
                     return Ok(out);
                 }
                 if let Some(out) = self.build_audio(other, params)? {
+                    return Ok(out);
+                }
+                if let Some(out) = self.build_settings(other, params)? {
+                    return Ok(out);
+                }
+                if let Some(out) = self.build_camera(other, params)? {
                     return Ok(out);
                 }
                 Err(CommandError::UnknownCommand {
