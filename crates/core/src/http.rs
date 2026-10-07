@@ -2,7 +2,7 @@
 //!
 //! rustls on every platform, so TLS behaves identically wherever the core runs.
 //! TLS 1.2 is the floor: no device the core speaks HTTPS to has been found to
-//! need less (RFDeck `docs/INTEGRATIONS_CORE_REVIEW.md`, item D).
+//! need less (a consumer's integration review, item D).
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

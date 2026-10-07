@@ -1,6 +1,6 @@
 //! An EM 6000 simulated on real UDP, driven through the public API.
 //!
-//! Modelled on RFDeck's `fakeDigital6000Device.ts`: it answers subscriptions
+//! Modelled on a consumer's `fakeDigital6000Device.ts`: it answers subscriptions
 //! with the channel tree, streams the metering array, answers identity queries,
 //! and echoes control writes with the resulting values. Like that simulator it
 //! does not reflect `/osc/xid`, so replies are matched by path.

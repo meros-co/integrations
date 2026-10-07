@@ -280,17 +280,17 @@ mod tests {
 
     #[test]
     fn a_core_runs_only_the_protocols_that_find_its_devices() {
-        let rfdeck = Discovery::new(&catalog(&[
+        let wireless_only = Discovery::new(&catalog(&[
             "sennheiser-ew-g3-g4",
             "sennheiser-ew-dx",
             "shure-wireless",
         ]));
-        assert_eq!(rfdeck.protocols(), ["mcp"]);
-        assert_eq!(rfdeck.wanted(&request(&[])).unwrap(), ["mcp"]);
-        assert_eq!(rfdeck.wanted(&request(&["mcp"])).unwrap(), ["mcp"]);
-        let err = rfdeck.wanted(&request(&["ssdp"])).unwrap_err();
+        assert_eq!(wireless_only.protocols(), ["mcp"]);
+        assert_eq!(wireless_only.wanted(&request(&[])).unwrap(), ["mcp"]);
+        assert_eq!(wireless_only.wanted(&request(&["mcp"])).unwrap(), ["mcp"]);
+        let err = wireless_only.wanted(&request(&["ssdp"])).unwrap_err();
         assert!(err.contains("finds only sony-camera"), "{err}");
-        let err = rfdeck.wanted(&request(&["bonjour"])).unwrap_err();
+        let err = wireless_only.wanted(&request(&["bonjour"])).unwrap_err();
         assert!(err.contains("unknown discovery protocol"), "{err}");
 
         let none = Discovery::new(&catalog(&["shure-wireless"]));

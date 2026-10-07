@@ -49,7 +49,7 @@ _mx("set_log_level", {"level": "warn"}, "PATCH", "/v3/config/global/patch", body
 _mx("set_server_enabled", {"server": "rtmp", "enabled": False}, "PATCH", "/v3/config/global/patch",
     body='{"rtmp":false}')
 _USERS = [{"user": "any", "pass": "", "ips": [], "permissions": [{"action": "read", "path": ""}]},
-          {"user": "imperio", "pass": "s3cret", "ips": ["10.0.0.0/24"],
+          {"user": "operator", "pass": "s3cret", "ips": ["10.0.0.0/24"],
            "permissions": [{"action": "api"}, {"action": "publish", "path": ""}]}]
 _mx("set_auth_internal_users", {"users": _USERS}, "PATCH", "/v3/config/global/patch",
     body=_MXJ({"authInternalUsers": _USERS}))
@@ -170,7 +170,7 @@ _mx("list_playback_spans_between",
     "/list?path=cam1&start=2026-10-06T08%3A00%3A00Z&end=2026-10-06T18%3A00%3A00%2B01%3A00", port=9996)
 # A refused credential: terminal, reported as auth.
 V.append({"spec": MX, "command": "get_path", "file": "get_path-refused", "input": {"name": "cam1"},
-          "settings": {"auth": "basic", "username": "imperio", "password": "wrong"},
+          "settings": {"auth": "basic", "username": "operator", "password": "wrong"},
           "expect_request": {"method": "GET", "target": "/v3/paths/get/cam1"},
           "http_reply": {"status": 401, "body": _MXJ({"status": "error", "error": "authentication error"})},
           "expect_result": {"error": {"error": "auth"}}})
@@ -265,10 +265,10 @@ telemetry(MX, "path-configs", inbound_http={"path": "/v3/config/paths/list?items
                        "always_available": False}}})
 
 _RTSP = {"id": _MXID, "created": "2026-10-06T08:01:00Z", "remoteAddr": "10.0.0.50:51234", "state": "publish",
-         "path": "cam1", "query": "", "transport": "TCP", "profile": "AVP", "user": "imperio",
+         "path": "cam1", "query": "", "transport": "TCP", "profile": "AVP", "user": "operator",
          "bytesReceived": 1000, "bytesSent": 20, "inboundBytes": 1000, "outboundBytes": 20, "conns": []}
 _RTSPSTATE = {"path": "cam1", "state": "publish", "remote_addr": "10.0.0.50:51234", "transport": "TCP",
-              "user": "imperio", "created": "2026-10-06T08:01:00Z", "inbound_bytes": 1000, "outbound_bytes": 20}
+              "user": "operator", "created": "2026-10-06T08:01:00Z", "inbound_bytes": 1000, "outbound_bytes": 20}
 telemetry(MX, "rtsp-sessions", inbound_http={"path": "/v3/rtsp/sessions/list?itemsPerPage=1000",
                                              "body": _MXJ({"itemCount": 1, "pageCount": 1, "items": [_RTSP]})},
           # A closed session leaves.

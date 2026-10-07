@@ -2,7 +2,7 @@
 //!
 //! Resources, ranges and enumerations from Sennheiser's EW-DX 3rd-party
 //! OpenAPI 1.7; the subscription lifecycle from its SSCv2 specification. The
-//! resources RFDeck exercised on real receivers (/api/channel/{id}, its
+//! resources a consumer exercised on real receivers (/api/channel/{id}, its
 //! signalQualityIndicator, level and warnings, /api/rf/channels/{id} and
 //! /api/transmitters/{id}/battery) are subscribed first; the rest of the
 //! documented surface follows, and a batch the device refuses does not stop
@@ -229,7 +229,7 @@ impl SscDevice for EwdxDevice {
             "mute" => {
                 let id = channel()?;
                 // "Per SSCv2, a write is a PUT of that resource carrying only the
-                // properties to change" (RFDeck, verified on OpenAPI 1.7).
+                // properties to change" (a consumer, verified on OpenAPI 1.7).
                 let muted = boolean(params, "muted").unwrap_or(true);
                 Ok(put(format!("/api/channel/{id}"), json!({"mute": muted})))
             }
@@ -933,7 +933,7 @@ mod tests {
         let a = cx.take();
         assert!(unauthorized(&a));
         // No retry on any schedule: repeated failures can lock the device's
-        // third-party access (RFDeck review item O).
+        // third-party access (consumer review item O).
         assert!(!sends_anything(&a));
         assert!(a.contains(&Action::CancelTimer { key: RETRY }));
         // A stray retry timer does nothing either.
@@ -1444,7 +1444,7 @@ mod tests {
         assert_eq!(ch["rf"]["quality_pct"], 87);
         assert_eq!(ch["af"]["level_dbfs"], -42.5);
         assert_eq!(ch["frequency_khz"], 606500);
-        // A percentage, per EW-DX SSC §8.106 (RFDeck review item A).
+        // A percentage, per EW-DX SSC §8.106 (consumer review item A).
         assert_eq!(ch["transmitter"]["battery_percent"], 65);
     }
 

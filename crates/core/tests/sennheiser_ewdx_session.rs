@@ -326,7 +326,7 @@ async fn ewdx_end_to_end() {
 }
 
 /// A refused password is presented once and never again: repeated failures can
-/// lock the device's third-party access (RFDeck review item O).
+/// lock the device's third-party access (consumer review item O).
 #[tokio::test(flavor = "multi_thread")]
 async fn ewdx_wrong_password_is_unauthorized_and_never_retried() {
     let (port, device) = simulated_ewdx().await;

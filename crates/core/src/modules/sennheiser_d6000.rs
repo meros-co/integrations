@@ -1,6 +1,6 @@
 //! Sennheiser Digital 6000 (EM 6000, EM 6000 Dante) over SSC: JSON over UDP.
 //!
-//! Protocol from Sennheiser TI 1109 v2.2. Lifecycle from RFDeck's Digital 6000
+//! Protocol from Sennheiser TI 1109 v2.2. Lifecycle from a consumer's Digital 6000
 //! client: two subscriptions (a fixed-rate metering array and an on-change
 //! channel tree), renewed at a third of their lifetime, with a silence timeout
 //! underneath because a lapsed subscription is otherwise indistinguishable from

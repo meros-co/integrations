@@ -1,7 +1,7 @@
 //! Shure networked wireless over the command strings protocol, TCP 2202.
 //!
 //! From Shure's Axient Digital and ULX-D command string documents, with the
-//! SLX-D and PSM1000 dialects as RFDeck recorded them from Shure's documents
+//! SLX-D and PSM1000 dialects as a consumer recorded them from Shure's documents
 //! for those families (see the spec's sources):
 //!
 //! - Messages are ASCII in angle brackets, `< GET 1 CHAN_NAME >`, with no line

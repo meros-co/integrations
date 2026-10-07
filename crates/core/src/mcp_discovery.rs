@@ -1,5 +1,5 @@
 //! Finding Sennheiser EW G3/G4 receivers and IEM transmitters (MCP), from
-//! TI 1254 and RFDeck's discovery, which was hardened on real rigs (RFDeck
+//! TI 1254 and a consumer's discovery, which was hardened on real rigs (a consumer
 //! review items K and N). Compiled only with the `sennheiser-ew-g3-g4`
 //! integration, the one whose devices it finds.
 //!

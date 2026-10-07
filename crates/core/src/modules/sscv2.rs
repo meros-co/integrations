@@ -51,7 +51,7 @@ pub(crate) const RETRY_AFTER: Millis = 1_000;
 pub(crate) const QUIET_AFTER: Millis = 3_000;
 const LIVENESS_CHECK_EVERY: Millis = 1_000;
 const LIVENESS_STRIKES: u32 = 2;
-/// RFDeck subscribes in batches of four, which is what was tested on EW-DX
+/// A consumer subscribes in batches of four, which is what was tested on EW-DX
 /// hardware.
 pub(crate) const SUBSCRIBE_BATCH: usize = 4;
 
@@ -175,7 +175,7 @@ pub(crate) struct Sscv2<D: SscDevice> {
     /// Set once the device refuses the credential. Terminal: nothing is sent
     /// again. A refused password is never retried on any schedule, because
     /// repeated failed authentications have locked an EW-DX out until it was
-    /// re-adopted in Control Cockpit (RFDeck review item O). The host
+    /// re-adopted in Control Cockpit (consumer review item O). The host
     /// re-opens the device with a corrected password.
     refused: Option<String>,
 }
@@ -329,7 +329,7 @@ impl<D: SscDevice> Sscv2<D> {
     }
 
     /// Apply one notification: `{"<resource path>": {...}}` per SSCv2 §3.4.8,
-    /// or the `{"path": ..., "value": ...}` form RFDeck also handles.
+    /// or the `{"path": ..., "value": ...}` form a consumer also handles.
     pub(crate) fn apply(&self, cx: &mut Cx, data: &Value) {
         let mut patch = Map::new();
         match data {

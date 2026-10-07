@@ -381,7 +381,7 @@ async fn command_connection(mut stream: TcpStream, camera: Shared, events: mpsc:
         .map(|c| u16::from_le_bytes(*c))
         .take_while(|u| *u != 0)
         .collect();
-    assert_eq!(String::from_utf16(&name).unwrap(), "Imperio Cam Desk");
+    assert_eq!(String::from_utf16(&name).unwrap(), "Camera Desk");
     let mut ack = 7u32.to_le_bytes().to_vec();
     ack.extend_from_slice(&[0xAB; 16]);
     ack.extend(utf16z("ILCE-7SM3"));
@@ -669,7 +669,7 @@ async fn sony_camera_over_ptp_ip_end_to_end() {
         &core,
         "ilce-7sm3",
         port,
-        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000}),
+        json!({"friendly_name": "Camera Desk", "poll_ms": 60000}),
     )
     .await;
     let state = core.snapshot(id).unwrap().state;
@@ -887,7 +887,7 @@ async fn camera_control_ptp2_body() {
         &core,
         "ilce-7m3",
         port,
-        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000}),
+        json!({"friendly_name": "Camera Desk", "poll_ms": 60000}),
     )
     .await;
     {
@@ -941,7 +941,7 @@ async fn ftp_jobs_on_a_video_body() {
         &core,
         "ilme-fx6",
         port,
-        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000}),
+        json!({"friendly_name": "Camera Desk", "poll_ms": 60000}),
     )
     .await;
     // The job list is read as soon as its sync id is known.
@@ -989,7 +989,7 @@ async fn uploads_and_setting_files() {
         &core,
         "ilce-7sm3",
         port,
-        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000, "session_mode": "remote"}),
+        json!({"friendly_name": "Camera Desk", "poll_ms": 60000, "session_mode": "remote"}),
     )
     .await;
     let dir = std::env::temp_dir();
@@ -1084,7 +1084,7 @@ async fn live_view_stream_while_watched() {
         &core,
         "ilce-7sm3",
         port,
-        json!({"friendly_name": "Imperio Cam Desk", "session_mode": "remote", "poll_ms": 60000, "live_interval_ms": 20}),
+        json!({"friendly_name": "Camera Desk", "session_mode": "remote", "poll_ms": 60000, "live_interval_ms": 20}),
     )
     .await;
     let streams = &meros_integrations::json::catalog(&core)["devices"]["sony-camera"]["streams"];
@@ -1160,7 +1160,7 @@ async fn live_view_during_downloads_is_the_operators_choice() {
         &core,
         "ilce-7sm3",
         port,
-        json!({"friendly_name": "Imperio Cam Desk", "poll_ms": 60000, "live_interval_ms": 20}),
+        json!({"friendly_name": "Camera Desk", "poll_ms": 60000, "live_interval_ms": 20}),
     )
     .await;
     assert_eq!(

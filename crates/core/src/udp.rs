@@ -269,7 +269,7 @@ mod tests {
     const LOCAL: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
     /// At the OS default a sweep overflows the receive queue and telemetry from
-    /// devices already connected is dropped (RFDeck review item N.1).
+    /// devices already connected is dropped (consumer review item N.1).
     #[tokio::test]
     async fn buffers_are_enlarged_and_the_granted_size_is_read_back() {
         let plain = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
@@ -288,7 +288,7 @@ mod tests {
     }
 
     /// A second socket on the port would receive an undefined share of the
-    /// datagrams (RFDeck review item N.3).
+    /// datagrams (consumer review item N.3).
     #[tokio::test]
     async fn every_session_on_a_port_shares_one_socket() {
         let shared = SharedUdp::new(Arc::new(EventQueue::new(16)));

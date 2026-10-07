@@ -1,10 +1,10 @@
 //! Sennheiser evolution wireless G3/G4 over the Media Control Protocol.
 //!
-//! Wire format from Sennheiser TI 1254 v1.0. Lifecycle from RFDeck's G3/G4
+//! Wire format from Sennheiser TI 1254 v1.0. Lifecycle from a consumer's G3/G4
 //! client, which was tested against real racks: subscribe with Push, renew
 //! every 8 s, declare the device gone after 15 s of silence, and back off an
-//! address that never answers. Readings that differ from RFDeck were reviewed
-//! with it in RFDeck `docs/INTEGRATIONS_CORE_REVIEW.md`.
+//! address that never answers. Readings that differ from a consumer's client were reviewed
+//! with it in that consumer's integration review.
 //!
 //! Opened for commands only, it sends no Push and reads nothing on connecting.
 //! Without Push a receiver sends nothing unasked, so it is asked its name at
@@ -33,7 +33,7 @@ const SUBSCRIBE: &str = "Push 60 500 3";
 const LIVENESS_QUERY: &str = "Name";
 
 /// Renew well inside the 60 s subscription: some firmware drops it early while
-/// in RF-Mute (RFDeck, observed on hardware).
+/// in RF-Mute (a consumer, observed on hardware).
 const RESUBSCRIBE_EVERY: Millis = 8_000;
 /// 30 missed 500 ms cycles.
 const SILENCE_TIMEOUT: Millis = 15_000;
@@ -292,7 +292,7 @@ impl Mcp {
             }
             (_, "Frequency") => {
                 if let Some(v) = args.first().and_then(|v| v.parse::<f64>().ok()) {
-                    // kHz per TI 1254 p.15. RFDeck also accepts MHz below 1000,
+                    // kHz per TI 1254 p.15. That consumer also accepts MHz below 1000,
                     // a fallback kept because it cannot misread a kHz value.
                     let khz = if v < 1000.0 {
                         (v * 1000.0).round()
@@ -880,8 +880,8 @@ mod tests {
             .count()
     }
 
-    /// Every G3/G4 fault RFDeck found on a rig lived in a transition, so the
-    /// whole cycle is walked twice as one sequence (RFDeck review item N.4):
+    /// Every G3/G4 fault a consumer found on a rig lived in a transition, so the
+    /// whole cycle is walked twice as one sequence (consumer review item N.4):
     /// connect, loss, retries, backoff, recovery, and loss again. Each of these
     /// fails if its fix is removed: disconnect only reported before the first
     /// connection; recovery that runs once per lifetime; a retry counter that
