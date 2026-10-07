@@ -196,15 +196,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## behringer-wing — Behringer WING
 
-- [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:2467](specs/behringer-wing.yaml#L2467))
-- [ ] Check what gain and phantom sets do on a strip whose input source has no preamp. ([specs/behringer-wing.yaml:2478](specs/behringer-wing.yaml#L2478))
-- [ ] Find the separator between tags in a strip's tag string, so DCA assignment does not damage other tags. ([specs/behringer-wing.yaml:2494](specs/behringer-wing.yaml#L2494))
-- [ ] Find the tag names used for mute group assignment, which are not documented. ([specs/behringer-wing.yaml:2496](specs/behringer-wing.yaml#L2496))
-- [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:2528](specs/behringer-wing.yaml#L2528))
-- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:2537](specs/behringer-wing.yaml#L2537))
-- [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:2517](specs/behringer-wing.yaml#L2517))
-- [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:2508](specs/behringer-wing.yaml#L2508))
-- [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:2418](specs/behringer-wing.yaml#L2418))
+- [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:3344](specs/behringer-wing.yaml#L3344))
+- [ ] Check what gain and phantom sets do on a strip whose input source has no preamp. ([specs/behringer-wing.yaml:3351](specs/behringer-wing.yaml#L3351))
+- [ ] Find the separator between tags in a strip's tag string, so DCA assignment does not damage other tags. ([specs/behringer-wing.yaml:3368](specs/behringer-wing.yaml#L3368))
+- [ ] Find the tag names used for mute group assignment, which are not documented. ([specs/behringer-wing.yaml:3372](specs/behringer-wing.yaml#L3372))
+- [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:3405](specs/behringer-wing.yaml#L3405))
+- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:3413](specs/behringer-wing.yaml#L3413))
+- [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:3392](specs/behringer-wing.yaml#L3392))
+- [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:3385](specs/behringer-wing.yaml#L3385))
+- [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:3295](specs/behringer-wing.yaml#L3295))
+- [ ] Confirm set_node is answered on the node's address followed by * (/* for the root) with OK or one of the documented error strings, and that get_node's reply lists the node's children. ([specs/behringer-wing.yaml:3451](specs/behringer-wing.yaml#L3451))
+- [ ] Check on which address the console answers a query sent with a native hash (/#f50f69f8), which decides the key the params state uses for it, and whether a set of a [RO] parameter returns an error. ([specs/behringer-wing.yaml:3436](specs/behringer-wing.yaml#L3436))
 
 ## behringer-x32 — Behringer X32 / Midas M32
 

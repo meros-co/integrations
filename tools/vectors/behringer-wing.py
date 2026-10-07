@@ -10,6 +10,11 @@
 W = "behringer-wing"
 
 
+def _f32(x):
+    """A float as the console sends it: rounded to 32 bits."""
+    return struct.unpack(">f", struct.pack(">f", x))[0]
+
+
 def _q(spec_cmd, inp, address, reply_args, value):
     """A query: bare address out, the documented reply in, the value back."""
     binary(W, spec_cmd, inp, osc(address),
@@ -175,18 +180,25 @@ _iq("get_osc_read_only", {}, "/$ctl/OSC/ronly", 0)
 # a query returns (p.30): ,sff for floats, ,sfi for ints, ,s for strings.
 telemetry(W, "channel-fader", expect_connect_wire_hex=[hexs(osc("/*s")), hexs(osc("/ch/1/fdr"))],
           inbound_hex=hexs(osc("/ch/7/fdr", ("s", "-2.0"), ("f", 0.7), ("f", -2.0))),
-          expect_state={"channels": {"7": {"fader": -2.0}}})
+          expect_state={"channels": {"7": {"fader": -2.0}},
+                        "params": {"ch/7/fdr": {"text": "-2.0", "raw": _f32(0.7), "float": -2.0}}})
 
 
+# Every reported parameter is also kept under params, keyed by its address
+# without the leading / (the generic rules): text always, raw and float or
+# int for a number.
 def _tf(name, address, text, raw, v, state):
+    state = {**state, "params": {address[1:]: {"text": text, "raw": _f32(raw), "float": v}}}
     telemetry(W, name, inbound_hex=hexs(osc(address, ("s", text), ("f", raw), ("f", v))), expect_state=state)
 
 
 def _ti(name, address, v, state):
+    state = {**state, "params": {address[1:]: {"text": str(v), "raw": float(v), "int": v}}}
     telemetry(W, name, inbound_hex=hexs(osc(address, ("s", str(v)), ("f", float(v)), ("i", v))), expect_state=state)
 
 
 def _ts(name, address, v, state):
+    state = {**state, "params": {address[1:]: {"text": v}}}
     telemetry(W, name, inbound_hex=hexs(osc(address, ("s", v))), expect_state=state)
 
 
@@ -255,3 +267,27 @@ _ts("console-firmware", "/$syscfg/$firmware", "3.0.6-27", {"console": {"firmware
 _ts("console-serial", "/$syscfg/$serial", "S123", {"console": {"serial": "S123"}})
 _ts("console-model", "/$syscfg/$cnsmdl", "wing-rack", {"console": {"model": "wing-rack"}})
 _ti("osc-read-only", "/$ctl/OSC/ronly", 1, {"console": {"osc_read_only": True}})
+
+# Any parameter by its address (p.21-24): a set carries one argument of the
+# type chosen, a get is the bare address, a node set is the node's address
+# with one string, answered on the address followed by * with OK.
+binary(W, "set_parameter_float", {"path": "ch/2/fdr", "value": -3.0}, osc("/ch/2/fdr", ("f", -3.0)),
+       expect_result={"ok": {"kind": "unverified"}})
+binary(W, "set_parameter_int", {"path": "$ctl/user/1/1/enc/mode", "value": 6},
+       osc("/$ctl/user/1/1/enc/mode", ("i", 6)))
+binary(W, "set_parameter_string", {"path": "$ctl/user/1/1/enc/mode", "value": "FX"},
+       osc("/$ctl/user/1/1/enc/mode", ("s", "FX")))
+_q("get_parameter", {"path": "ch/1/mute"}, "/ch/1/mute", [("s", "1"), ("f", 1.0), ("i", 1)], "1")
+_q("get_parameter_value", {"path": "ch/2/fdr"}, "/ch/2/fdr", [("s", "-3.0"), ("f", 0.675), ("f", -3.0)], -3.0)
+_q("get_parameter_raw", {"path": "ch/2/fdr"}, "/ch/2/fdr", [("s", "-2.0"), ("f", 0.5), ("f", -2.0)], 0.5)
+binary(W, "get_node", {"node": "$ctl/user/1/1/enc"}, osc("/$ctl/user/1/1/enc"),
+       device_reply_hex=hexs(osc("/$ctl/user/1/1/enc", ("s", "mode"), ("s", "name"), ("s", "$fname"))),
+       expect_result={"ok": {"kind": "value", "value": '["mode","name","$fname"]'}})
+binary(W, "set_node", {"node": "ch/1", "assignments": "fdr=4,mute=1"}, osc("/ch/1", ("s", "fdr=4,mute=1")),
+       device_reply_hex=hexs(osc("/ch/1*", ("s", "OK"))), expect_result={"ok": {"kind": "ack"}})
+binary(W, "set_node", {"assignments": "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1"},
+       osc("/", ("s", "/ch.1.fdr=-1,mute=0,.2.fdr=0,mute=1")),
+       device_reply_hex=hexs(osc("/*", ("s", "OK"))), expect_result={"ok": {"kind": "ack"}}, file="set_node-root")
+_ts("param-enum", "/$ctl/user/1/1/enc/mode", "FX", {})
+_tf("param-float", "/cfg/mon/1/dim", "-20.0", 0.5, -20.0, {})
+_ti("param-int", "/ch/40/in/set/srcauto", 1, {})
