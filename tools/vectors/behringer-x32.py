@@ -356,6 +356,30 @@ telemetry(X, "param-int", inbound_hex=hexs(osc("/-prefs/clocksource", ("i", 1)))
 telemetry(X, "param-string", inbound_hex=hexs(osc("/-show/showfile/show/name", ("s", "Sunday"))), expect_state={})
 
 
+# ── EQ bands (p.26-37) ────────────────────────────────────────────────────
+# /<strip>/eq/<band>/type ,i; f, g and q ,f as the 0-1 wire position.
+_X32_EQ = [("channel", "channel", "/ch/05", 4, "channels", "5"),
+           ("aux", "aux", "/auxin/02", 4, "aux", "2"),
+           ("fx_return", "fx_return", "/fxrtn/08", 4, "fx_returns", "8"),
+           ("bus", "bus", "/bus/16", 6, "buses", "16"),
+           ("matrix", "matrix", "/mtx/06", 6, "matrices", "6"),
+           ("main", None, "/main/st", 6, "main", None),
+           ("mono", None, "/main/m", 6, "mono", None)]
+for stem, p, pre, nb, key, n in _X32_EQ:
+    idx = {p: int(n)} if p else {}
+    top = 13 if stem in ("matrix", "main", "mono") else 5
+    binary(X, f"set_{stem}_eq_band_type", {**idx, "band": nb, "type": top}, osc(f"{pre}/eq/{nb}/type", ("i", top)))
+    binary(X, f"set_{stem}_eq_band_frequency", {**idx, "band": 1, "frequency": 0.25}, osc(f"{pre}/eq/1/f", ("f", 0.25)))
+    binary(X, f"set_{stem}_eq_band_gain", {**idx, "band": 2, "gain": 0.75}, osc(f"{pre}/eq/2/g", ("f", 0.75)))
+    binary(X, f"set_{stem}_eq_band_q", {**idx, "band": 3, "q": 0.5}, osc(f"{pre}/eq/3/q", ("f", 0.5)))
+    tkey = f"{stem.replace('_', '-')}-eq-band"
+    for wire, field, val, t in [("type", "type", 2, "i"), ("f", "frequency", 0.5, "f"),
+                                ("g", "gain", 0.25, "f"), ("q", "q", 1.0, "f")]:
+        st = {"eq": {"bands": {"2": {field: val}}}}
+        telemetry(X, f"{tkey}-{field}", inbound_hex=hexs(osc(f"{pre}/eq/2/{wire}", (t, val))),
+                  expect_state={key: {n: st}} if n else {key: st})
+
+
 def _osc_args(packet):
     """Address, type tags and i/f/s arguments of one OSC message."""
     def string(pos):
