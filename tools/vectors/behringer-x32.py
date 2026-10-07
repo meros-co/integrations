@@ -424,6 +424,63 @@ for stem, p, pre, key, n in _X32_DYN_STRIPS:
 _x32_section("channel", "channel", "/ch/12", "channels", "12", "gate", _X32_GATE)
 
 
+# ── Preamp low cut, delay, automix, insert position (p.24-37) ─────────────
+binary(X, "set_channel_low_cut", {"channel": 3, "enabled": True}, osc("/ch/03/preamp/hpon", ("i", 1)))
+binary(X, "set_channel_low_cut_slope", {"channel": 3, "slope": 2}, osc("/ch/03/preamp/hpslope", ("i", 2)))
+binary(X, "set_channel_low_cut_frequency", {"channel": 3, "frequency": 0.25}, osc("/ch/03/preamp/hpf", ("f", 0.25)))
+binary(X, "set_channel_delay", {"channel": 32, "enabled": False}, osc("/ch/32/delay/on", ("i", 0)))
+binary(X, "set_channel_delay_time", {"channel": 32, "time": 0.5}, osc("/ch/32/delay/time", ("f", 0.5)))
+binary(X, "set_channel_automix_group", {"channel": 8, "group": 2}, osc("/ch/08/automix/group", ("i", 2)))
+binary(X, "set_channel_automix_weight", {"channel": 8, "weight": 0.5}, osc("/ch/08/automix/weight", ("f", 0.5)))
+binary(X, "set_automix_enable", {"group": "Y", "enabled": True}, osc("/config/amixenable/Y", ("i", 1)))
+for stem, p, pre in [("channel", "channel", "/ch/02"), ("bus", "bus", "/bus/09"), ("matrix", "matrix", "/mtx/04"),
+                     ("main", None, "/main/st"), ("mono", None, "/main/m")]:
+    binary(X, f"set_{stem}_insert_position", {**({p: int(pre[-2:])} if p else {}), "position": 1},
+           osc(f"{pre}/insert/pos", ("i", 1)))
+telemetry(X, "channel-low-cut", inbound_hex=hexs(osc("/ch/03/preamp/hpon", ("i", 1))),
+          expect_state={"channels": {"3": {"low_cut": True}}})
+telemetry(X, "channel-low-cut-slope", inbound_hex=hexs(osc("/ch/03/preamp/hpslope", ("i", 1))),
+          expect_state={"channels": {"3": {"low_cut_slope": 1}}})
+telemetry(X, "channel-low-cut-frequency", inbound_hex=hexs(osc("/ch/03/preamp/hpf", ("f", 0.5))),
+          expect_state={"channels": {"3": {"low_cut_frequency": 0.5}}})
+telemetry(X, "channel-delay-on", inbound_hex=hexs(osc("/ch/04/delay/on", ("i", 1))),
+          expect_state={"channels": {"4": {"delay_on": True}}})
+telemetry(X, "channel-delay-time", inbound_hex=hexs(osc("/ch/04/delay/time", ("f", 0.25))),
+          expect_state={"channels": {"4": {"delay_time": 0.25}}})
+telemetry(X, "channel-automix-group", inbound_hex=hexs(osc("/ch/01/automix/group", ("i", 1))),
+          expect_state={"channels": {"1": {"automix_group": 1}}})
+telemetry(X, "channel-automix-weight", inbound_hex=hexs(osc("/ch/01/automix/weight", ("f", 0.75))),
+          expect_state={"channels": {"1": {"automix_weight": 0.75}}})
+telemetry(X, "automix-enable", inbound_hex=hexs(osc("/config/amixenable/X", ("i", 1))),
+          expect_state={"automix": {"X": {"enabled": True}}})
+for stem, pre, key, n in [("channel", "/ch/02", "channels", "2"), ("bus", "/bus/09", "buses", "9"),
+                          ("matrix", "/mtx/04", "matrices", "4"), ("main", "/main/st", "main", None),
+                          ("mono", "/main/m", "mono", None)]:
+    st = {"insert_position": 0}
+    telemetry(X, f"{stem}-insert-position", inbound_hex=hexs(osc(f"{pre}/insert/pos", ("i", 0))),
+              expect_state={key: {n: st}} if n else {key: st})
+
+# ── Send pan, tap and pan follow on the odd send of a pair (p.26-37) ──────
+for stem, cstem, p, pre, dp, key, n, skey in [
+        ("channel", "send", "channel", "/ch/10", "bus", "channels", "10", "sends"),
+        ("aux", "send", "aux", "/auxin/01", "bus", "aux", "1", "sends"),
+        ("fx_return", "send", "fx_return", "/fxrtn/01", "bus", "fx_returns", "1", "sends"),
+        ("bus", "matrix_send", "bus", "/bus/16", "matrix", "buses", "16", "matrix_sends"),
+        ("main", "matrix_send", None, "/main/st", "matrix", "main", None, "matrix_sends"),
+        ("mono", "matrix_send", None, "/main/m", "matrix", "mono", None, "matrix_sends")]:
+    idx = {p: int(n)} if p else {}
+    last = 15 if dp == "bus" else 5
+    binary(X, f"set_{stem}_{cstem}_pan", {**idx, dp: last, "pan": 0.25}, osc(f"{pre}/mix/{last:02d}/pan", ("f", 0.25)))
+    binary(X, f"set_{stem}_{cstem}_tap", {**idx, dp: 1, "tap": 3}, osc(f"{pre}/mix/01/type", ("i", 3)))
+    binary(X, f"set_{stem}_{cstem}_pan_follow", {**idx, dp: 3, "enabled": True}, osc(f"{pre}/mix/03/panFollow", ("i", 1)))
+    for leaf, field, wire, value in [("pan", "pan", ("f", 0.75), 0.75), ("type", "tap", ("i", 4), 4),
+                                     ("panFollow", "pan_follow", ("i", 0), False)]:
+        st = {skey: {"5": {field: value}}}
+        telemetry(X, f"{stem.replace('_', '-')}-{cstem.replace('_', '-')}-{field.replace('_', '-')}",
+                  inbound_hex=hexs(osc(f"{pre}/mix/05/{leaf}", wire)),
+                  expect_state={key: {n: st}} if n else {key: st})
+
+
 def _osc_args(packet):
     """Address, type tags and i/f/s arguments of one OSC message."""
     def string(pos):
