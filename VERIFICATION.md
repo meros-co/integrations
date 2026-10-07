@@ -786,12 +786,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
-- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2541](specs/lightware-lw3.yaml#L2541))
-- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2530](specs/lightware-lw3.yaml#L2530))
-- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2582](specs/lightware-lw3.yaml#L2582))
-- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2594](specs/lightware-lw3.yaml#L2594))
-- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2615](specs/lightware-lw3.yaml#L2615))
-- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2564](specs/lightware-lw3.yaml#L2564))
+- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2640](specs/lightware-lw3.yaml#L2640))
+- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2622](specs/lightware-lw3.yaml#L2622))
+- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2674](specs/lightware-lw3.yaml#L2674))
+- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2692](specs/lightware-lw3.yaml#L2692))
+- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2712](specs/lightware-lw3.yaml#L2712))
+- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2656](specs/lightware-lw3.yaml#L2656))
+- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:2718](specs/lightware-lw3.yaml#L2718))
 
 ## magewell-proconvert — Magewell Pro Convert
 
