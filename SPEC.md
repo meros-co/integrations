@@ -1223,13 +1223,38 @@ lists of plain lines (Ultimatte's FILE LIST):
 ```
 
 `replace` is a path or a list of them, templates over the captures before
-`json_each` (the path's, the selectors'), each declared or leading to
+`json_each` (the path's, the selectors'; with `json_each`, each element's
+too, below), each declared or leading to
 declared paths. Consumers see the removal and the new list as two `state`
 events in a row. A rule may carry `replace` with no `state` when only some
 messages hold the whole list (Planning Center's first page with no `next`
 link): it sits beside the plain rule that writes the values for the same
 messages, and since every removal of a message is applied before any of its
 values, the order of the two rules does not matter.
+
+A reply can hold many lists, one in each element: mimoLive's layer sets each
+carry their `layers`. With `json_each`, `replace` is also rendered for each
+element from that element's captures (its `json` names, `{index}`), removing
+that element's subtree. `each_match` selects the elements, as `json_match`
+selects messages: a JSON path from the element (`$^.` the element one level
+out) to a regex its value must match, with captures numbered on after the
+path's and `json_match`'s; an element that does not match is skipped, for its
+values, `then_send` and `replace` alike. Matching `^\[` tests that an
+attribute is present and an array, so a set whose reply leaves `layers` out
+keeps its list, while an empty array clears it:
+
+```yaml
+    - path: "^/api/v1/"
+      json_each: "$.data"
+      each_match: { "$.type": "^layer-sets$", "$.attributes.layers": "^\\[" }
+      json: { id: "$.id" }
+      replace: "layer-sets.{id}.layers"
+    - path: "^/api/v1/"
+      json_each: "$.data[*].attributes.layers"
+      each_match: { "$^.type": "^layer-sets$" }
+      json: { id: "$^.id", action: "$.action" }
+      state: { "layer-sets.{id}.layers.{index}.action": "{action}" }
+```
 
 Over HTTP, `poll` requests and command requests alike have their replies
 offered to `path` rules, which match the request's path and query:

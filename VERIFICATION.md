@@ -373,13 +373,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## boinx-mimolive — Boinx mimoLive
 
-- [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:1233](specs/boinx-mimolive.yaml#L1233))
+- [ ] Confirm that writes with Content-Type application/vnd.api+json are accepted (Boinx's reference requires it; the manual's examples send application/json). ([specs/boinx-mimolive.yaml:1306](specs/boinx-mimolive.yaml#L1306))
 - [ ] Check the body shape PUT /documents/(DocumentID) takes for programOutputMasterVolume (a plain object assumed, as for layers). ([specs/boinx-mimolive.yaml:168](specs/boinx-mimolive.yaml#L168))
-- [ ] Check which body POST /documents/(DocumentID)/layers takes: the manual's layer-identifier, name and index, or the reference's data.attributes.composition-id. ([specs/boinx-mimolive.yaml:1244](specs/boinx-mimolive.yaml#L1244))
-- [ ] Confirm that GET /documents?include=layers (and sources, output-destinations, layer-sets) sideloads every document's objects in included, as the poll reads them. ([specs/boinx-mimolive.yaml:1046](specs/boinx-mimolive.yaml#L1046))
-- [ ] Record the websocket's added, changed and removed messages: that data is the whole object as the HTTP API returns it, and that a removed message carries type and id at the top level. ([specs/boinx-mimolive.yaml:1180](specs/boinx-mimolive.yaml#L1180))
-- [ ] Check whether closing a document also pushes the removal of its layers, variants and sources; only what mimoLive reports removed leaves state. ([specs/boinx-mimolive.yaml:1180](specs/boinx-mimolive.yaml#L1180))
-- [ ] Confirm that the websocket closes a client that sends nothing for 15 seconds and that {"event":"ping"} every 5 seconds keeps it open. ([specs/boinx-mimolive.yaml:1038](specs/boinx-mimolive.yaml#L1038))
+- [ ] Check which body POST /documents/(DocumentID)/layers takes: the manual's layer-identifier, name and index, or the reference's data.attributes.composition-id. ([specs/boinx-mimolive.yaml:1317](specs/boinx-mimolive.yaml#L1317))
+- [ ] Confirm that GET /documents?include=layers (and sources, output-destinations, layer-sets) sideloads every document's objects in included, as the poll reads them. ([specs/boinx-mimolive.yaml:1051](specs/boinx-mimolive.yaml#L1051))
+- [ ] Record the websocket's added, changed and removed messages: that data is the whole object as the HTTP API returns it, and that a removed message carries type and id at the top level. ([specs/boinx-mimolive.yaml:1253](specs/boinx-mimolive.yaml#L1253))
+- [ ] Check whether closing a document also pushes the removal of its layers, variants and sources; only what mimoLive reports removed leaves state. ([specs/boinx-mimolive.yaml:1253](specs/boinx-mimolive.yaml#L1253))
+- [ ] Confirm that the websocket closes a client that sends nothing for 15 seconds and that {"event":"ping"} every 5 seconds keeps it open. ([specs/boinx-mimolive.yaml:1043](specs/boinx-mimolive.yaml#L1043))
 - [ ] With a remote control password set, confirm that the X-MimoLive-Password-SHA256 header is accepted on the websocket's opening request, and that a wrong key answers 401 on HTTP. ([specs/boinx-mimolive.yaml:88](specs/boinx-mimolive.yaml#L88))
 - [ ] Check that output destination PATCH bodies are accepted with type and id, and layer set PATCH bodies without them. ([specs/boinx-mimolive.yaml:680](specs/boinx-mimolive.yaml#L680))
 - [ ] Check that layer set PATCH and POST bodies take the JSON:API data.attributes form shown in the manual. ([specs/boinx-mimolive.yaml:777](specs/boinx-mimolive.yaml#L777))
@@ -387,6 +387,10 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] Confirm the built-in outputs record, stream, playout and fullscreen in the document's outputs attribute, and their live-state values. ([specs/boinx-mimolive.yaml:177](specs/boinx-mimolive.yaml#L177))
 - [ ] Check that comments/new takes its parameters in the query of a POST. ([specs/boinx-mimolive.yaml:883](specs/boinx-mimolive.yaml#L883))
 - [ ] Check what a layer's live-variant relationship holds while the layer is off (null assumed, which leaves live_variant as it was). ([specs/boinx-mimolive.yaml:1008](specs/boinx-mimolive.yaml#L1008))
+- [ ] Check whether GET /documents/(DocumentID)/layer-sets and the poll's include=layer-sets carry each set's layers attribute (and recall-on-show-start and recall-on-show-end), or only a GET of one set does; a set answered without layers keeps the list it had. ([specs/boinx-mimolive.yaml:1183](specs/boinx-mimolive.yaml#L1183))
+- [ ] Record the websocket's added and changed messages for a layer set: whether data carries layers, and whether it carries relationships.document, which the re-read of the set needs. ([specs/boinx-mimolive.yaml:1248](specs/boinx-mimolive.yaml#L1248))
+- [ ] Check whether one layer can appear twice in a layer set's layers, and in what order mimoLive returns the entries; state keeps them by position as returned. ([specs/boinx-mimolive.yaml:1035](specs/boinx-mimolive.yaml#L1035))
+- [ ] Record what PATCH .../layer-sets/(LayerSetID) answers to a layers change (status 200 assumed; the body is not needed, since the set is read back after any 2xx answer), and whether mimoLive keeps the list as written. ([specs/boinx-mimolive.yaml:787](specs/boinx-mimolive.yaml#L787))
 
 ## brompton-tessera — Brompton Tessera
 

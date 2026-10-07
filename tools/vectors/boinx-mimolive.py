@@ -270,11 +270,94 @@ telemetry(ML, "pushed-layer-change", inbound_ws=json.dumps({
                                "active-variant": {"data": {"type": "variants", "id": _ML_VAR}}}}}),
     expect_state={"layers": {_ML_LAYER: {"name": "Lower Third", "live_state": "shutdown", "index": 2,
                                          "volume": 0.5, "document": _ML_DOC, "active_variant": _ML_VAR}}})
+# A layer set's layers (the manual's Data Types: layer-id, action live, off
+# or force-off, variant for a live entry), kept by position. A pushed set is
+# read again, since what mimoLive pushes for layer sets is not documented.
+_ML_SET2 = "1F2E3D4C-5B6A-4978-8695-A4B3C2D1E0F9"
+_ML_LAYER2 = "C3D4E5F6-0718-4293-A4B5-C6D7E8F90A1B"
+_ML_REREAD = [{"method": "GET", "target": _ML_LS}]
+_ml_entries_state = {"0": {"layer_id": _ML_LAYER, "action": "live", "variant": _ML_VAR},
+                     "1": {"layer_id": "YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY", "action": "force-off"}}
+
+
+def _ml_set(attributes, set_id=_ML_SET):
+    return {"type": "layer-sets", "id": set_id, "attributes": attributes,
+            "relationships": {"document": {"data": {"type": "documents", "id": _ML_DOC}}}}
+
+
 telemetry(ML, "pushed-layer-set", inbound_ws=json.dumps({
     "event": "added", "type": "layer-sets", "id": _ML_SET,
-    "data": {"type": "layer-sets", "id": _ML_SET, "attributes": {"name": "Intro Scene", "active": True},
-             "relationships": {"document": {"data": {"type": "documents", "id": _ML_DOC}}}}}),
-    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "active": True, "document": _ML_DOC}}})
+    "data": _ml_set({"name": "Intro Scene", "active": True, "recall-on-show-start": True,
+                     "recall-on-show-end": False, "layers": _ml_entries})}),
+    expect_then_send=_ML_REREAD,
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "active": True, "document": _ML_DOC,
+                                           "recall_on_show_start": True, "recall_on_show_end": False,
+                                           "layers": _ml_entries_state}}})
+# A push without layers leaves the list as it was, and still has it read.
+telemetry(ML, "pushed-layer-set-without-layers", inbound_ws=json.dumps({
+    "event": "changed", "type": "layer-sets", "id": _ML_SET,
+    "data": _ml_set({"name": "Intro Scene", "active": False})}),
+    state_before={"layer-sets": {_ML_SET: {"name": "Intro Scene", "active": True, "layers": _ml_entries_state}}},
+    expect_then_send=_ML_REREAD,
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "active": False, "document": _ML_DOC,
+                                           "layers": _ml_entries_state}}})
+# The poll's sideloaded sets: one with layers, one answered without them.
+telemetry(ML, "layer-sets-included", inbound_http={
+    "path": "/api/v1/documents?include=layer-sets",
+    "body": json.dumps({"data": [], "included": [
+        _ml_set({"name": "Intro Scene", "active": True, "layers": _ml_entries}),
+        _ml_set({"name": "Wide Shot", "active": False}, _ML_SET2)]})},
+    state_before={"layer-sets": {_ML_SET2: {"layers": {"0": {"layer_id": _ML_LAYER2, "action": "off"}}}}},
+    expect_state={"layer-sets": {
+        _ML_SET: {"name": "Intro Scene", "active": True, "document": _ML_DOC, "layers": _ml_entries_state},
+        _ML_SET2: {"name": "Wide Shot", "active": False, "document": _ML_DOC,
+                   "layers": {"0": {"layer_id": _ML_LAYER2, "action": "off"}}}}})
+# list_layer_sets with a shorter list: the entries it no longer has go, and
+# the variant of an entry that turned off with them.
+telemetry(ML, "layer-set-list-shrinks", inbound_http={
+    "path": _ML_D + "/layer-sets",
+    "body": json.dumps({"data": [_ml_set({"name": "Intro Scene", "layers": [
+        {"layer-id": _ML_LAYER2, "action": "off"}]})]})},
+    state_before={"layer-sets": {_ML_SET: {"name": "Intro Scene", "layers": {
+        **_ml_entries_state, "2": {"layer_id": _ML_LAYER2, "action": "live", "variant": "edit-variant"}}}}},
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "document": _ML_DOC,
+                                           "layers": {"0": {"layer_id": _ML_LAYER2, "action": "off"}}}}})
+# A GET of one set.
+telemetry(ML, "layer-set-reply", inbound_http={
+    "path": _ML_LS,
+    "body": json.dumps({"data": _ml_set({"name": "Intro Scene", "active": False, "recall-on-show-start": False,
+                                         "recall-on-show-end": True, "layers": [
+                                             {"layer-id": _ML_LAYER2, "action": "live",
+                                              "variant": "edit-variant"}]})})},
+    expect_state={"layer-sets": {_ML_SET: {
+        "name": "Intro Scene", "active": False, "document": _ML_DOC, "recall_on_show_start": False,
+        "recall_on_show_end": True,
+        "layers": {"0": {"layer_id": _ML_LAYER2, "action": "live", "variant": "edit-variant"}}}}})
+# An empty layers array clears the list.
+telemetry(ML, "layer-set-empty-layers", inbound_http={
+    "path": _ML_LS, "body": json.dumps({"data": _ml_set({"name": "Intro Scene", "layers": []})})},
+    state_before={"layer-sets": {_ML_SET: {"name": "Intro Scene", "layers": _ml_entries_state}}},
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "document": _ML_DOC}}})
+# set_layer_set_layers' PATCH: the list written reads back as the same state
+# from the answer's object, and the set is read again.
+telemetry(ML, "layer-set-layers-written", inbound_http={
+    "path": _ML_LS, "request": {"data": {"attributes": {"layers": _ml_entries}}},
+    "body": json.dumps({"data": _ml_set({"name": "Intro Scene", "layers": _ml_entries})})},
+    state_before={"layer-sets": {_ML_SET: {"name": "Intro Scene", "layers": {
+        "0": {"layer_id": _ML_LAYER2, "action": "off"}}}}},
+    expect_then_send=_ML_REREAD,
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "document": _ML_DOC,
+                                           "layers": _ml_entries_state}}})
+# Only layer-sets objects: a layers object, even one with a layers
+# attribute, keeps to its own generic state and touches no list.
+telemetry(ML, "layer-object-not-a-layer-set", inbound_http={
+    "path": "/api/v1/documents?include=layers",
+    "body": json.dumps({"data": [], "included": [{"type": "layers", "id": _ML_LAYER, "attributes": {
+        "name": "Lower Third", "live-state": "off", "layers": [{"layer-id": _ML_LAYER2, "action": "live"}]},
+        "relationships": {"document": {"data": {"type": "documents", "id": _ML_DOC}}}}]})},
+    state_before={"layer-sets": {_ML_SET: {"layers": _ml_entries_state}}},
+    expect_state={"layer-sets": {_ML_SET: {"layers": _ml_entries_state}},
+                  "layers": {_ML_LAYER: {"name": "Lower Third", "live_state": "off", "document": _ML_DOC}}})
 telemetry(ML, "pushed-document-outputs", inbound_ws=json.dumps({
     "event": "changed", "type": "documents", "id": _ML_DOC,
     "data": {"type": "documents", "id": _ML_DOC, "attributes": {
