@@ -557,28 +557,125 @@ fn read_inputs(root: Node, tree: &mut Map<String, Value>) -> BTreeMap<String, St
     let mut keys = BTreeMap::new();
     let mut inputs = Map::new();
     if let Some(list) = child(root, "inputs") {
-        for node in list.children().filter(|n| n.has_tag_name("input")) {
-            let Some(n) = node.attribute("number") else {
-                continue;
-            };
+        let nodes: Vec<Node> = list
+            .children()
+            .filter(|n| n.has_tag_name("input"))
+            .filter(|n| n.attribute("number").is_some())
+            .collect();
+        // Layers name their input by key.
+        let numbers: BTreeMap<&str, i64> = nodes
+            .iter()
+            .filter_map(|n| {
+                Some((
+                    n.attribute("key")?,
+                    n.attribute("number")?.parse::<i64>().ok()?,
+                ))
+            })
+            .collect();
+        for node in nodes {
+            let n = node.attribute("number").unwrap_or_default();
             keys.insert(
                 n.to_string(),
                 node.attribute("key").unwrap_or("").to_string(),
             );
-            inputs.insert(n.to_string(), Value::Object(read_input(node)));
+            inputs.insert(n.to_string(), Value::Object(read_input(node, &numbers)));
         }
     }
     tree.insert("inputs".into(), Value::Object(inputs));
     keys
 }
 
-fn read_input(node: Node) -> Map<String, Value> {
+/// Input attributes read into their own state; any other goes under
+/// `attributes`.
+const INPUT_ATTRIBUTES: [&str; 25] = [
+    "key",
+    "number",
+    "type",
+    "title",
+    "shortTitle",
+    "state",
+    "position",
+    "duration",
+    "loop",
+    "muted",
+    "volume",
+    "balance",
+    "solo",
+    "gainDb",
+    "meterF1",
+    "meterF2",
+    "audiobusses",
+    "selectedIndex",
+    "markIn",
+    "markOut",
+    "frameDelay",
+    "callPassword",
+    "callConnected",
+    "callVideoSource",
+    "callAudioSource",
+];
+
+/// `panX` to `pan_x`, `X1` to `x1`, `liftR` to `lift_r`.
+fn snake(name: &str) -> String {
+    let mut out = String::new();
+    let mut previous_lower = false;
+    for c in name.chars() {
+        if c.is_ascii_uppercase() && previous_lower {
+            out.push('_');
+        }
+        previous_lower = c.is_ascii_lowercase() || c.is_ascii_digit();
+        out.push(c.to_ascii_lowercase());
+    }
+    out
+}
+
+/// Every attribute of an element as a number, by its snake_case name:
+/// `<position panX="0" zoomX="1"/>`, `<crop X1="0" Y1="0" X2="1" Y2="1"/>`.
+fn numbers_of(node: Node) -> Map<String, Value> {
+    let mut out = Map::new();
+    for attribute in node.attributes() {
+        put(&mut out, &snake(attribute.name()), float(attribute.value()));
+    }
+    out
+}
+
+/// A layer's or an input's own position (as `transform`, beside the input's
+/// playback position), crop and colour correction, when vMix reports them.
+fn placement(node: Node, entry: &mut Map<String, Value>) {
+    for (element, key) in [("position", "transform"), ("crop", "crop"), ("cc", "cc")] {
+        if let Some(found) = child(node, element) {
+            let values = numbers_of(found);
+            if !values.is_empty() {
+                entry.insert(key.into(), Value::Object(values));
+            }
+        }
+    }
+}
+
+fn read_input(node: Node, numbers: &BTreeMap<&str, i64>) -> Map<String, Value> {
     let mut entry = Map::new();
     let attr = |name: &str| node.attribute(name);
     entry.insert("title".into(), json!(attr("title").unwrap_or("")));
     entry.insert("type".into(), json!(attr("type").unwrap_or("")));
     entry.insert("key".into(), json!(attr("key").unwrap_or("")));
     entry.insert("playing".into(), json!(attr("state") == Some("Running")));
+    put(
+        &mut entry,
+        "short_title",
+        attr("shortTitle").and_then(string),
+    );
+    put(&mut entry, "state", attr("state").and_then(string));
+    put(&mut entry, "position", attr("position").and_then(int));
+    put(&mut entry, "duration", attr("duration").and_then(int));
+    put(&mut entry, "loop", attr("loop").and_then(boolean));
+    put(&mut entry, "mark_in", attr("markIn").and_then(int));
+    put(&mut entry, "mark_out", attr("markOut").and_then(int));
+    put(
+        &mut entry,
+        "selected_index",
+        attr("selectedIndex").and_then(int),
+    );
+    put(&mut entry, "frame_delay", attr("frameDelay").and_then(int));
     put(&mut entry, "muted", attr("muted").and_then(boolean));
     put(&mut entry, "volume", attr("volume").and_then(float));
     put(&mut entry, "balance", attr("balance").and_then(float));
@@ -593,6 +690,95 @@ fn read_input(node: Node) -> Map<String, Value> {
         for bus in std::iter::once("M").chain(BUSES) {
             routing.insert(bus.into(), json!(on.contains(&bus)));
         }
+    }
+
+    // A video call's settings.
+    let mut call = Map::new();
+    put(&mut call, "password", attr("callPassword").and_then(string));
+    put(
+        &mut call,
+        "connected",
+        attr("callConnected").and_then(boolean),
+    );
+    put(
+        &mut call,
+        "video_source",
+        attr("callVideoSource").and_then(string),
+    );
+    put(
+        &mut call,
+        "audio_source",
+        attr("callAudioSource").and_then(string),
+    );
+    if !call.is_empty() {
+        entry.insert("call".into(), Value::Object(call));
+    }
+
+    for attribute in node.attributes() {
+        if !INPUT_ATTRIBUTES.contains(&attribute.name()) {
+            put(
+                object(&mut entry, "attributes"),
+                attribute.name(),
+                string(attribute.value()),
+            );
+        }
+    }
+
+    placement(node, &mut entry);
+
+    // Title fields, by index: `<text index="0" name="Headline.Text">Hello</text>`,
+    // and the same for images and colours.
+    for (element, key) in [("text", "texts"), ("image", "images"), ("color", "colors")] {
+        for field in node.children().filter(|n| n.has_tag_name(element)) {
+            let Some(index) = field.attribute("index") else {
+                continue;
+            };
+            object(&mut entry, key).insert(
+                index.into(),
+                json!({
+                    "name": field.attribute("name").unwrap_or(""),
+                    "value": field.text().unwrap_or(""),
+                }),
+            );
+        }
+    }
+
+    // A list input's items, numbered from 1 as its functions number them.
+    if let Some(list) = child(node, "list") {
+        let items = object(&mut entry, "list");
+        for (i, item) in list
+            .children()
+            .filter(|n| n.has_tag_name("item"))
+            .enumerate()
+        {
+            items.insert(
+                (i + 1).to_string(),
+                json!({
+                    "path": own_text(item),
+                    "selected": item.attribute("selected").and_then(boolean).unwrap_or(Value::Bool(false)),
+                }),
+            );
+        }
+    }
+
+    // Layers, numbered from 1 as SetLayerN and LayerOn number them:
+    // `<overlay index="0" key="..."><position .../><crop .../></overlay>`.
+    for layer in node.children().filter(|n| n.has_tag_name("overlay")) {
+        let Some(index) = layer.attribute("index").and_then(|i| i.parse::<u32>().ok()) else {
+            continue;
+        };
+        let mut found = Map::new();
+        put(&mut found, "key", layer.attribute("key").and_then(string));
+        put(
+            &mut found,
+            "input",
+            layer
+                .attribute("key")
+                .and_then(|k| numbers.get(k))
+                .map(|n| json!(n)),
+        );
+        placement(layer, &mut found);
+        object(&mut entry, "layers").insert((index + 1).to_string(), Value::Object(found));
     }
     entry
 }
@@ -871,6 +1057,14 @@ impl Vmix {
             }
             [name, input, v] if channel(name).is_some() => {
                 json!({"inputs": {*input: {"channel_mixer": {channel(name).unwrap(): percent(v)}}}})
+            }
+            [name, input, v] if on(v) && name.starts_with("VideoCallAudioSource") => {
+                let source = &name["VideoCallAudioSource".len()..];
+                json!({"inputs": {*input: {"call": {"audio_source": source}}}})
+            }
+            [name, input, v] if on(v) && name.starts_with("VideoCallSourceOutput") => {
+                let output = &name["VideoCallSource".len()..];
+                json!({"inputs": {*input: {"call": {"video_source": output}}}})
             }
             ["MasterVolume", v] => json!({"master": {"volume": percent(v)}}),
             ["MasterHeadphones", v] => json!({"master": {"headphones_volume": percent(v)}}),
@@ -1181,7 +1375,7 @@ mod tests {
         assert_eq!(
             s["inputs"]["1"],
             json!({"title": "Camera 1", "type": "Capture", "key": "26cae087-b7b7-43e6-a7b4-3c3a8a3ee7a5",
-                   "playing": true, "muted": false, "volume": 100.0})
+                   "playing": true, "state": "Running", "muted": false, "volume": 100.0})
         );
         assert_eq!(s["inputs"]["2"]["playing"], false);
         assert_eq!(s["inputs"]["2"].get("muted"), None);
@@ -1565,6 +1759,11 @@ mod tests {
         leaves(&s, Vec::new(), &mut paths);
         let events = "ACTS OK InputAudioAuto 1 1\r\nACTS OK InputVolumeChannelMixer2 1 1\r\nACTS OK InputBusAAudio 1 1\r\nACTS OK BusCSolo 1\r\nACTS OK MasterHeadphones 1\r\nACTS OK InputMix2 1 1\r\nACTS OK InputPreviewMix2 1 1\r\n";
         leaves(&state(&feed(&mut m, 100, events)), Vec::new(), &mut paths);
+        let (mut m, s) = connected_to(INPUTS_XML);
+        leaves(&s, Vec::new(), &mut paths);
+        let events =
+            "ACTS OK VideoCallAudioSourceBusA 4 1\r\nACTS OK VideoCallSourceOutput3 4 1\r\n";
+        leaves(&state(&feed(&mut m, 100, events)), Vec::new(), &mut paths);
         for path in paths {
             assert!(
                 declared.iter().any(|d| d.len() == path.len()
@@ -1677,5 +1876,115 @@ mod tests {
             a.extend(feed(m, now, "ACTS ER No Input\r\n"));
         }
         a
+    }
+
+    /// Inputs in the shape vMix 27 reports them: a clip, a GT title, a list,
+    /// a video call and an input with layers, position, crop and colour
+    /// correction.
+    const INPUTS_XML: &str = r#"<vmix><version>27.0.0.49</version><edition>Pro</edition><inputs><input key="clip" number="1" type="Video" title="Opener.mp4" shortTitle="Opener" state="Running" position="12345.6" duration="60000" loop="True" muted="False" volume="100" balance="0" solo="False" soloPFL="False" audiobusses="M" meterF1="0" meterF2="0" gainDb="0" selectedIndex="1" markIn="1000" markOut="50000" frameDelay="2" volumeF1="1" volumeF2="1">Opener.mp4</input><input key="gt" number="2" type="GT" title="Lower third.gtzip" shortTitle="Lower third" state="Paused" position="0" duration="0" loop="False" selectedIndex="0">Lower third.gtzip<text index="0" name="Headline.Text">Hello  world</text><text index="1" name="Description.Text"></text><image index="2" name="Logo.Source">C:\Logos\logo.png</image><color index="3" name="Bar.Fill.Color">#FF0000FF</color></input><input key="list" number="3" type="VideoList" title="Clips" state="Paused" position="0" duration="0" loop="False" selectedIndex="2">Clips<list><item>C:\Clips\a.mp4</item><item selected="true">C:\Clips\b.mp4</item></list></input><input key="call" number="4" type="VideoCall" title="Guest" state="Running" position="0" duration="0" loop="False" muted="False" volume="100" audiobusses="M" callPassword="secret" callConnected="True" callVideoSource="Output1" callAudioSource="Master">Guest</input><input key="pip" number="5" type="Colour" title="PiP" state="Paused" position="0" duration="0" loop="False">PiP<overlay index="0" key="clip"><position panX="-0.5" panY="0.5" zoomX="0.5" zoomY="0.5"/><crop X1="0" Y1="0" X2="1" Y2="0.9"/></overlay><overlay index="9" key="gone"/><position panX="0.1" zoomX="1.5" zoomY="1.5"/><crop X1="0.1" Y1="0" X2="1" Y2="1"/><cc hue="0.2" saturation="0" liftR="0.1" gainY="1.2"/></input></inputs><preview>2</preview><active>1</active></vmix>"#;
+
+    #[test]
+    fn inputs_are_read_in_full() {
+        let (_, s) = connected_to(INPUTS_XML);
+        let clip = &s["inputs"]["1"];
+        assert_eq!(clip["short_title"], "Opener");
+        assert_eq!(clip["state"], "Running");
+        assert_eq!(clip["position"], 12346);
+        assert_eq!(clip["duration"], 60000);
+        assert_eq!(clip["loop"], true);
+        assert_eq!(clip["mark_in"], 1000);
+        assert_eq!(clip["mark_out"], 50000);
+        assert_eq!(clip["selected_index"], 1);
+        assert_eq!(clip["frame_delay"], 2);
+        // Attributes the module does not know are kept as text.
+        assert_eq!(
+            clip["attributes"],
+            json!({"soloPFL": "False", "volumeF1": "1", "volumeF2": "1"})
+        );
+
+        let gt = &s["inputs"]["2"];
+        assert_eq!(
+            gt["texts"],
+            json!({"0": {"name": "Headline.Text", "value": "Hello  world"},
+                   "1": {"name": "Description.Text", "value": ""}})
+        );
+        assert_eq!(
+            gt["images"]["2"],
+            json!({"name": "Logo.Source", "value": r"C:\Logos\logo.png"})
+        );
+        assert_eq!(
+            gt["colors"]["3"],
+            json!({"name": "Bar.Fill.Color", "value": "#FF0000FF"})
+        );
+
+        assert_eq!(
+            s["inputs"]["3"]["list"],
+            json!({"1": {"path": r"C:\Clips\a.mp4", "selected": false},
+                   "2": {"path": r"C:\Clips\b.mp4", "selected": true}})
+        );
+
+        assert_eq!(
+            s["inputs"]["4"]["call"],
+            json!({"password": "secret", "connected": true,
+                   "video_source": "Output1", "audio_source": "Master"})
+        );
+
+        let pip = &s["inputs"]["5"];
+        assert_eq!(
+            pip["layers"]["1"],
+            json!({"key": "clip", "input": 1,
+                   "transform": {"pan_x": -0.5, "pan_y": 0.5, "zoom_x": 0.5, "zoom_y": 0.5},
+                   "crop": {"x1": 0.0, "y1": 0.0, "x2": 1.0, "y2": 0.9}})
+        );
+        // A layer whose input is not in the list keeps its key only.
+        assert_eq!(pip["layers"]["10"], json!({"key": "gone"}));
+        assert_eq!(
+            pip["transform"],
+            json!({"pan_x": 0.1, "zoom_x": 1.5, "zoom_y": 1.5})
+        );
+        assert_eq!(pip["crop"]["x1"], 0.1);
+        assert_eq!(
+            pip["cc"],
+            json!({"hue": 0.2, "saturation": 0.0, "lift_r": 0.1, "gain_y": 1.2})
+        );
+    }
+
+    #[test]
+    fn a_title_field_or_list_item_that_goes_is_removed() {
+        let (mut m, _) = connected_to(INPUTS_XML);
+        let fewer = INPUTS_XML
+            .replace(r#"<text index="1" name="Description.Text"></text>"#, "")
+            .replace(r#"<item>C:\Clips\a.mp4</item>"#, "")
+            .replace("Hello  world", "Goodbye");
+        // The list renumbers from 1, so item 1 changes and item 2 goes.
+        assert_eq!(
+            read(&mut m, 1_000, &fewer),
+            [json!({"inputs": {
+                "2": {"texts": {"0": {"value": "Goodbye"}, "1": null}},
+                "3": {"list": {"1": {"path": r"C:\Clips\b.mp4", "selected": true}, "2": null}}
+            }})]
+        );
+    }
+
+    #[test]
+    fn video_call_activators_update_the_call() {
+        let (mut m, _) = connected_to(INPUTS_XML);
+        let s = state(&feed(
+            &mut m,
+            100,
+            "ACTS OK VideoCallAudioSourceBusA 4 1\r\nACTS OK VideoCallSourceOutput3 4 1\r\nACTS OK VideoCallSourceOutput1 4 0\r\n",
+        ));
+        assert_eq!(
+            s["inputs"]["4"]["call"],
+            json!({"audio_source": "BusA", "video_source": "Output3"})
+        );
+    }
+
+    #[test]
+    fn names_become_snake_case() {
+        assert_eq!(snake("panX"), "pan_x");
+        assert_eq!(snake("X1"), "x1");
+        assert_eq!(snake("liftR"), "lift_r");
+        assert_eq!(snake("hue"), "hue");
     }
 }
