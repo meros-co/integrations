@@ -1365,11 +1365,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 - [ ] Capture a full XML state from vMix 27 or later (with a replay, a GT title, a list, a video call and layered inputs) so the parsing can be checked against the real shape; the shapes used here are inferred from vMix's old documented example and the MIT-licensed Companion module. ([specs/vmix.yaml:47](specs/vmix.yaml#L47))
 - [ ] Confirm that the mix elements of the XML are numbered from 2 (the first extra mix), one more than the Mix command parameter. ([specs/vmix.yaml:5035](specs/vmix.yaml#L5035))
-- [ ] Confirm that overlay numbers above 4 in the XML are the stingers, and what the preview attribute of an overlay means. ([specs/vmix.yaml:5045](specs/vmix.yaml#L5045))
-- [ ] Confirm the units of the recording element's duration attribute (seconds assumed) and the names of its file attributes (filename1, filename2). ([specs/vmix.yaml:5058](specs/vmix.yaml#L5058))
-- [ ] Confirm that the streaming element carries one channelN attribute per stream, numbered from 1. ([specs/vmix.yaml:5061](specs/vmix.yaml#L5061))
-- [ ] Confirm the outputs element (type, number, source, inputNumber, mix, ndi, omt, srt) and which vMix version first reports it. ([specs/vmix.yaml:5049](specs/vmix.yaml#L5049))
+- [ ] Confirm that overlay numbers above 4 in the XML are the stingers, and what the preview attribute of an overlay means. ([specs/vmix.yaml:5069](specs/vmix.yaml#L5069))
+- [ ] Confirm the units of the recording element's duration attribute (seconds assumed) and the names of its file attributes (filename1, filename2). ([specs/vmix.yaml:5082](specs/vmix.yaml#L5082))
+- [ ] Confirm that the streaming element carries one channelN attribute per stream, numbered from 1. ([specs/vmix.yaml:5085](specs/vmix.yaml#L5085))
+- [ ] Confirm the outputs element (type, number, source, inputNumber, mix, ndi, omt, srt) and which vMix version first reports it. ([specs/vmix.yaml:5073](specs/vmix.yaml#L5073))
 - [ ] Confirm that the InputMixN and InputPreviewMixN activators number mixes as the XML does (2 to 16). ([specs/vmix.yaml:5036](specs/vmix.yaml#L5036))
+- [ ] Confirm that activator volumes (InputVolume, MasterVolume, MasterHeadphones, BusXVolume, InputVolumeChannelMixerN) are the 0 to 100 volume divided by 100, so that multiplying by 100 matches the XML. ([specs/vmix.yaml:5048](specs/vmix.yaml#L5048))
+- [ ] Confirm that ACTS InputAudioAuto N and ACTS InputVolumeChannelMixerN N answer with the activator's current value for an input with audio, and what they answer for an input without. ([specs/vmix.yaml:5046](specs/vmix.yaml#L5046))
+- [ ] Confirm that meterF1 and meterF2 are the first and second channel's levels, linear from 0 (not dB). ([specs/vmix.yaml:5049](specs/vmix.yaml#L5049))
+- [ ] Confirm the audiobusses attribute's form (letters M and A to G, comma-separated). ([specs/vmix.yaml:5047](specs/vmix.yaml#L5047))
+- [ ] Confirm which attributes the audio element's master and bus elements carry (volume, muted, meterF1, meterF2, headphonesVolume, solo, sendToMaster assumed). ([specs/vmix.yaml:5053](specs/vmix.yaml#L5053))
 
 ## yamaha-cl-ql — Yamaha CL / QL
 

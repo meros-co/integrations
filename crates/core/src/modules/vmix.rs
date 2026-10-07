@@ -60,6 +60,11 @@ enum Request {
     },
     Subscribe(&'static str),
     Xml,
+    /// One activator's current value, for what only activators report.
+    Acts {
+        name: String,
+        input: String,
+    },
     /// Commands only: the version, by XPath, as the liveness check.
     Version,
 }
@@ -70,6 +75,7 @@ impl Request {
             Request::Function { line, .. } => line.clone(),
             Request::Subscribe(what) => format!("SUBSCRIBE {what}"),
             Request::Xml => "XML".into(),
+            Request::Acts { name, input } => format!("ACTS {name} {input}"),
             Request::Version => "XMLTEXT vmix/version".into(),
         }
     }
@@ -80,6 +86,7 @@ impl Request {
             Request::Function { .. } => "FUNCTION",
             Request::Subscribe(_) => "SUBSCRIBE",
             Request::Xml => "XML",
+            Request::Acts { .. } => "ACTS",
             Request::Version => "XMLTEXT",
         }
     }
@@ -356,6 +363,7 @@ fn read_xml(root: Node) -> (Map<String, Value>, BTreeMap<String, String>) {
     read_mixes(root, &mut tree);
     read_overlays(root, &mut tree);
     read_outputs(root, &mut tree);
+    read_audio(root, &mut tree);
     let keys = read_inputs(root, &mut tree);
 
     // Anything else vMix reports as plain text, by element name.
@@ -509,6 +517,41 @@ fn read_outputs(root: Node, tree: &mut Map<String, Value>) {
     }
 }
 
+/// The audio buses beside the master.
+const BUSES: [&str; 7] = ["A", "B", "C", "D", "E", "F", "G"];
+
+/// `<audio><master volume="100" muted="False" meterF1="0.1" meterF2="0.1"
+/// headphonesVolume="74"/><busA volume="100" muted="False" meterF1="0"
+/// meterF2="0" solo="False" sendToMaster="False"/></audio>`
+fn read_audio(root: Node, tree: &mut Map<String, Value>) {
+    let Some(audio) = child(root, "audio") else {
+        return;
+    };
+    for node in audio.children().filter(Node::is_element) {
+        let name = node.tag_name().name();
+        let target = if name == "master" {
+            object(tree, "master")
+        } else if let Some(bus) = name.strip_prefix("bus").filter(|b| BUSES.contains(b)) {
+            object(object(tree, "buses"), bus)
+        } else {
+            continue;
+        };
+        for attribute in node.attributes() {
+            let value = attribute.value();
+            match attribute.name() {
+                "volume" => put(target, "volume", float(value)),
+                "muted" => put(target, "muted", boolean(value)),
+                "solo" => put(target, "solo", boolean(value)),
+                "sendToMaster" => put(target, "send_to_master", boolean(value)),
+                "headphonesVolume" => put(target, "headphones_volume", float(value)),
+                "meterF1" => put(target, "meter_left", float(value)),
+                "meterF2" => put(target, "meter_right", float(value)),
+                other => put(object(target, "attributes"), other, string(value)),
+            }
+        }
+    }
+}
+
 /// Every input, keyed by number; returns each number's key.
 fn read_inputs(root: Node, tree: &mut Map<String, Value>) -> BTreeMap<String, String> {
     let mut keys = BTreeMap::new();
@@ -538,6 +581,19 @@ fn read_input(node: Node) -> Map<String, Value> {
     entry.insert("playing".into(), json!(attr("state") == Some("Running")));
     put(&mut entry, "muted", attr("muted").and_then(boolean));
     put(&mut entry, "volume", attr("volume").and_then(float));
+    put(&mut entry, "balance", attr("balance").and_then(float));
+    put(&mut entry, "solo", attr("solo").and_then(boolean));
+    put(&mut entry, "gain_db", attr("gainDb").and_then(float));
+    put(&mut entry, "meter_left", attr("meterF1").and_then(float));
+    put(&mut entry, "meter_right", attr("meterF2").and_then(float));
+    // `audiobusses="M,A,C"`: every bus, on or off.
+    if let Some(buses) = attr("audiobusses") {
+        let on: Vec<&str> = buses.split(',').map(str::trim).collect();
+        let routing = object(&mut entry, "audio_buses");
+        for bus in std::iter::once("M").chain(BUSES) {
+            routing.insert(bus.into(), json!(on.contains(&bus)));
+        }
+    }
     entry
 }
 
@@ -659,16 +715,31 @@ impl Vmix {
                 self.report(cx, json!({"device": {"version": message.rest}}));
                 return;
             }
-            // Only ever events: the core never sends TALLY or ACTS requests.
-            "TALLY" | "ACTS" => {
+            // Only ever an event: the core never sends TALLY requests.
+            "TALLY" => {
                 if message.status == Status::Ok {
-                    if message.command == "TALLY" {
-                        self.tally(cx, &message.rest);
-                    } else {
-                        self.activator(cx, &message.rest);
-                    }
+                    self.tally(cx, &message.rest);
                 }
                 return;
+            }
+            // An event, or the answer to an ACTS query, which has the same
+            // shape: either way it is applied.
+            "ACTS" => {
+                if message.status == Status::Ok {
+                    self.activator(cx, &message.rest);
+                }
+                let answers = match &self.current {
+                    Some(Request::Acts { name, input }) => {
+                        let mut parts = message.rest.split_whitespace();
+                        message.status != Status::Ok
+                            || (parts.next() == Some(name.as_str())
+                                && parts.next() == Some(input.as_str()))
+                    }
+                    _ => false,
+                };
+                if !answers {
+                    return;
+                }
             }
             _ => {}
         }
@@ -714,6 +785,8 @@ impl Vmix {
                     format!("vMix refused XML: {}", message.rest),
                 ),
             },
+            // Refused for an input that has no such activator: nothing to keep.
+            Request::Acts { .. } => {}
             Request::Version => {
                 if message.status == Status::Ok {
                     self.report(cx, json!({"device": {"version": message.rest}}));
@@ -745,6 +818,33 @@ impl Vmix {
     fn activator(&mut self, cx: &mut Cx, body: &str) {
         let parts: Vec<&str> = body.split_whitespace().collect();
         let on = |v: &str| v == "1";
+        // Volumes come as 0 to 1; the XML and the functions use 0 to 100.
+        let percent = |v: &str| {
+            v.parse::<f64>()
+                .ok()
+                .filter(|f| f.is_finite())
+                .map(|f| (f * 10_000.0).round() / 100.0)
+        };
+        let bus = |name: &str, suffix: &str| {
+            name.strip_prefix("Bus")
+                .and_then(|n| n.strip_suffix(suffix))
+                .filter(|b| BUSES.contains(b))
+                .map(str::to_string)
+        };
+        let input_bus = |name: &str| {
+            if name == "InputMasterAudio" {
+                return Some("M".to_string());
+            }
+            name.strip_prefix("InputBus")
+                .and_then(|n| n.strip_suffix("Audio"))
+                .filter(|b| BUSES.contains(b))
+                .map(str::to_string)
+        };
+        let channel = |name: &str| {
+            name.strip_prefix("InputVolumeChannelMixer")
+                .filter(|n| n.parse::<u32>().is_ok_and(|n| (1..=16).contains(&n)))
+                .map(str::to_string)
+        };
         let mix = |name: &str, prefix: &str| {
             name.strip_prefix(prefix)
                 .filter(|n| n.parse::<u32>().is_ok_and(|n| (2..=16).contains(&n)))
@@ -763,6 +863,27 @@ impl Vmix {
             }
             ["InputPlaying", input, v] => json!({"inputs": {*input: {"playing": on(v)}}}),
             ["InputAudio", input, v] => json!({"inputs": {*input: {"muted": !on(v)}}}),
+            ["InputSolo", input, v] => json!({"inputs": {*input: {"solo": on(v)}}}),
+            ["InputAudioAuto", input, v] => json!({"inputs": {*input: {"audio_auto": on(v)}}}),
+            ["InputVolume", input, v] => json!({"inputs": {*input: {"volume": percent(v)}}}),
+            [name, input, v] if input_bus(name).is_some() => {
+                json!({"inputs": {*input: {"audio_buses": {input_bus(name).unwrap(): on(v)}}}})
+            }
+            [name, input, v] if channel(name).is_some() => {
+                json!({"inputs": {*input: {"channel_mixer": {channel(name).unwrap(): percent(v)}}}})
+            }
+            ["MasterVolume", v] => json!({"master": {"volume": percent(v)}}),
+            ["MasterHeadphones", v] => json!({"master": {"headphones_volume": percent(v)}}),
+            ["MasterAudio", v] => json!({"master": {"muted": !on(v)}}),
+            [name, v] if bus(name, "Volume").is_some() => {
+                json!({"buses": {bus(name, "Volume").unwrap(): {"volume": percent(v)}}})
+            }
+            [name, v] if bus(name, "Audio").is_some() => {
+                json!({"buses": {bus(name, "Audio").unwrap(): {"muted": !on(v)}}})
+            }
+            [name, v] if bus(name, "Solo").is_some() => {
+                json!({"buses": {bus(name, "Solo").unwrap(): {"solo": on(v)}}})
+            }
             ["Recording", v] => json!({"recording": on(v)}),
             ["Streaming", v] => json!({"streaming": on(v)}),
             ["External", v] => json!({"external": on(v)}),
@@ -789,6 +910,11 @@ impl Vmix {
 
         // A number that now holds another input (inputs were added, removed
         // or moved) loses everything it had, including what only events set.
+        let fresh: Vec<String> = keys
+            .iter()
+            .filter(|(n, key)| self.input_keys.get(*n) != Some(*key))
+            .map(|(n, _)| n.clone())
+            .collect();
         let moved: Map<String, Value> = keys
             .iter()
             .filter(|(n, key)| self.input_keys.get(*n).is_some_and(|k| k != *key))
@@ -811,6 +937,25 @@ impl Vmix {
         let tree = Value::Object(tree);
         if let Some(patch) = diff(Some(&self.xml_last), Some(&self.view), &tree) {
             self.report(cx, patch);
+        }
+        // Automixing and the channel mixer are reported only by activators,
+        // which say nothing until they change: ask once for each new input
+        // with audio.
+        for n in fresh {
+            if tree["inputs"][&n].get("muted").is_none() {
+                continue;
+            }
+            let names = std::iter::once("InputAudioAuto".to_string())
+                .chain((1..=16).map(|c| format!("InputVolumeChannelMixer{c}")));
+            for name in names {
+                self.enqueue(
+                    cx,
+                    Request::Acts {
+                        name,
+                        input: n.clone(),
+                    },
+                );
+            }
         }
         self.xml_last = tree;
     }
@@ -967,6 +1112,7 @@ mod tests {
             13,
             &format!("XML {}\r\n{XML}\r\n", XML.len() + 2),
         ));
+        a.extend(settle(&mut m, 14));
         (m, a)
     }
 
@@ -1241,6 +1387,7 @@ mod tests {
         a.extend(feed(&mut m, 11, "SUBSCRIBE OK TALLY\r\n"));
         a.extend(feed(&mut m, 12, "SUBSCRIBE OK ACTS\r\n"));
         a.extend(feed(&mut m, 13, &xml_reply(xml)));
+        a.extend(settle(&mut m, 14));
         (m, state(&a))
     }
 
@@ -1414,6 +1561,10 @@ mod tests {
         let mut paths = Vec::new();
         leaves(&connected_to(STATUS_XML).1, Vec::new(), &mut paths);
         leaves(&state(&connected().1), Vec::new(), &mut paths);
+        let (mut m, s) = connected_to(AUDIO_XML);
+        leaves(&s, Vec::new(), &mut paths);
+        let events = "ACTS OK InputAudioAuto 1 1\r\nACTS OK InputVolumeChannelMixer2 1 1\r\nACTS OK InputBusAAudio 1 1\r\nACTS OK BusCSolo 1\r\nACTS OK MasterHeadphones 1\r\nACTS OK InputMix2 1 1\r\nACTS OK InputPreviewMix2 1 1\r\n";
+        leaves(&state(&feed(&mut m, 100, events)), Vec::new(), &mut paths);
         for path in paths {
             assert!(
                 declared.iter().any(|d| d.len() == path.len()
@@ -1422,5 +1573,109 @@ mod tests {
                 path.join(".")
             );
         }
+    }
+
+    /// Audio, in the shape vMix 27 reports it: an input with audio, one
+    /// without, the master and two buses.
+    const AUDIO_XML: &str = r#"<vmix><version>27.0.0.49</version><edition>Pro</edition><inputs><input key="a" number="1" type="Capture" title="Camera 1" state="Running" position="0" duration="0" loop="False" muted="False" volume="80.5" balance="-0.25" solo="True" soloPFL="False" audiobusses="M,B" meterF1="0.0912" meterF2="0.0837" gainDb="6">Camera 1</input><input key="b" number="2" type="Colour" title="Black" state="Paused" position="0" duration="0" loop="False">Black</input></inputs><preview>2</preview><active>1</active><audio><master volume="100" muted="False" meterF1="0.0844" meterF2="0.0799" headphonesVolume="74.5"/><busA volume="90" muted="True" meterF1="0" meterF2="0" solo="False" sendToMaster="True"/><busB volume="100" muted="False" meterF1="0.0912" meterF2="0.0837" solo="True" sendToMaster="False"/></audio></vmix>"#;
+
+    #[test]
+    fn audio_is_read_for_inputs_the_master_and_the_buses() {
+        let (_, s) = connected_to(AUDIO_XML);
+        let one = &s["inputs"]["1"];
+        assert_eq!(one["volume"], 80.5);
+        assert_eq!(one["balance"], -0.25);
+        assert_eq!(one["solo"], true);
+        assert_eq!(one["gain_db"], 6.0);
+        assert_eq!(one["meter_left"], 0.0912);
+        assert_eq!(one["meter_right"], 0.0837);
+        assert_eq!(
+            one["audio_buses"],
+            json!({"M": true, "A": false, "B": true, "C": false, "D": false,
+                   "E": false, "F": false, "G": false})
+        );
+        // No audio, no audio state.
+        assert_eq!(s["inputs"]["2"].get("audio_buses"), None);
+        assert_eq!(s["inputs"]["2"].get("volume"), None);
+        assert_eq!(
+            s["master"],
+            json!({"volume": 100.0, "muted": false, "meter_left": 0.0844,
+                   "meter_right": 0.0799, "headphones_volume": 74.5})
+        );
+        assert_eq!(
+            s["buses"]["A"],
+            json!({"volume": 90.0, "muted": true, "meter_left": 0.0, "meter_right": 0.0,
+                   "solo": false, "send_to_master": true})
+        );
+        assert_eq!(s["buses"]["B"]["solo"], true);
+    }
+
+    #[test]
+    fn what_only_activators_report_is_asked_for_each_new_input_with_audio() {
+        let mut m = vmix();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        feed(&mut m, 11, "SUBSCRIBE OK TALLY\r\n");
+        feed(&mut m, 12, "SUBSCRIBE OK ACTS\r\n");
+        // Input 1 has audio, input 2 has not.
+        let a = feed(&mut m, 13, &xml_reply(AUDIO_XML));
+        assert_eq!(sent(&a), ["ACTS InputAudioAuto 1\r\n"]);
+        // An event in between is applied and is not the answer.
+        let a = feed(&mut m, 14, "ACTS OK InputAudio 1 0\r\n");
+        assert!(sent(&a).is_empty());
+        assert_eq!(state(&a)["inputs"]["1"]["muted"], true);
+        let a = feed(&mut m, 15, "ACTS OK InputAudioAuto 1 1\r\n");
+        assert_eq!(state(&a)["inputs"]["1"]["audio_auto"], true);
+        assert_eq!(sent(&a), ["ACTS InputVolumeChannelMixer1 1\r\n"]);
+        let a = feed(&mut m, 16, "ACTS OK InputVolumeChannelMixer1 1 0.5\r\n");
+        assert_eq!(state(&a)["inputs"]["1"]["channel_mixer"]["1"], 50.0);
+        assert_eq!(sent(&a), ["ACTS InputVolumeChannelMixer2 1\r\n"]);
+        // A refusal answers too.
+        let a = feed(&mut m, 17, "ACTS ER No Input\r\n");
+        assert_eq!(sent(&a), ["ACTS InputVolumeChannelMixer3 1\r\n"]);
+        let rest = settle(&mut m, 18);
+        assert_eq!(sent(&rest).len(), 13);
+        assert!(m.current.is_none());
+
+        // The same inputs again: nothing more is asked.
+        let mut cx = Cx::new(1_000);
+        m.timer(&mut cx, POLL);
+        cx.take();
+        let a = feed(&mut m, 1_010, &xml_reply(AUDIO_XML));
+        assert!(sent(&a).is_empty());
+        // What only activators set survives the read.
+        assert_eq!(patches(&a), [json!({"inputs": {"1": {"muted": false}}})]);
+    }
+
+    #[test]
+    fn audio_activators_update_inputs_and_buses() {
+        let (mut m, _) = connected_to(AUDIO_XML);
+        let s = state(&feed(
+            &mut m,
+            100,
+            "ACTS OK InputVolume 1 0.25\r\nACTS OK InputSolo 1 0\r\nACTS OK InputBusAAudio 1 1\r\nACTS OK InputMasterAudio 1 0\r\nACTS OK InputVolumeChannelMixer16 1 1\r\nACTS OK MasterVolume 0.9\r\nACTS OK MasterAudio 0\r\nACTS OK MasterHeadphones 0.5\r\nACTS OK BusAVolume 0.123456\r\nACTS OK BusAAudio 1\r\nACTS OK BusGSolo 1\r\n",
+        ));
+        let one = &s["inputs"]["1"];
+        assert_eq!(one["volume"], 25.0);
+        assert_eq!(one["solo"], false);
+        assert_eq!(one["audio_buses"], json!({"A": true, "M": false}));
+        assert_eq!(one["channel_mixer"]["16"], 100.0);
+        assert_eq!(
+            s["master"],
+            json!({"volume": 90.0, "muted": true, "headphones_volume": 50.0})
+        );
+        assert_eq!(s["buses"]["A"], json!({"volume": 12.35, "muted": false}));
+        assert_eq!(s["buses"]["G"], json!({"solo": true}));
+    }
+
+    /// Answers every outstanding ACTS query with a refusal.
+    fn settle(m: &mut Vmix, now: Millis) -> Vec<Action> {
+        let mut a = Vec::new();
+        while let Some(Request::Acts { .. }) = &m.current {
+            a.extend(feed(m, now, "ACTS ER No Input\r\n"));
+        }
+        a
     }
 }
