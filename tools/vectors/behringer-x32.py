@@ -330,3 +330,67 @@ telemetry(X, "channel-fader-db", inbound_hex=hexs(osc("/ch/05/mix/fader", ("f", 
           expect_state={"channels": {"5": {"fader": 0.375, "fader_db": -20.0}}})
 telemetry(X, "dca-fader-minus-infinity", inbound_hex=hexs(osc("/dca/1/fader", ("f", 0.0))),
           expect_state={"dcas": {"1": {"fader": 0.0, "fader_db": -90.0}}})
+
+
+# ── Any parameter by its address ─────────────────────────────────────────
+# Set: the address with one argument of the type chosen; get: the bare
+# address, answered on it with the value (p.8). /node with the node as a
+# string is answered on "node" (no leading /) with one line of text; a /
+# set is echoed back (p.78).
+binary(X, "set_parameter_float", {"path": "ch/01/mix/fader", "value": 0.75}, osc("/ch/01/mix/fader", ("f", 0.75)),
+       expect_result={"ok": {"kind": "unverified"}})
+binary(X, "set_parameter_int", {"path": "ch/01/mix/on", "value": 0}, osc("/ch/01/mix/on", ("i", 0)))
+binary(X, "set_parameter_string", {"path": "ch/01/config/name", "value": "Vox"},
+       osc("/ch/01/config/name", ("s", "Vox")))
+binary(X, "get_parameter", {"path": "ch/01/mix/fader"}, osc("/ch/01/mix/fader"),
+       device_reply_hex=hexs(osc("/ch/01/mix/fader", ("f", 0.5))),
+       expect_result={"ok": {"kind": "value", "value": 0.5}})
+binary(X, "get_node", {"node": "headamp/124"}, osc("/node", ("s", "headamp/124")),
+       device_reply_hex=hexs(osc("node", ("s", "/headamp/124 +0.0 OFF\n"))),
+       expect_result={"ok": {"kind": "value", "value": "/headamp/124 +0.0 OFF\n"}})
+binary(X, "set_node", {"text": "ch/01/config Vox 1 RD 1"}, osc("/", ("s", "ch/01/config Vox 1 RD 1")),
+       device_reply_hex=hexs(osc("/", ("s", "ch/01/config Vox 1 RD 1"))),
+       expect_result={"ok": {"kind": "ack"}})
+telemetry(X, "param-float", inbound_hex=hexs(osc("/ch/01/gate/thr", ("f", 0.5))), expect_state={})
+telemetry(X, "param-int", inbound_hex=hexs(osc("/-prefs/clocksource", ("i", 1))), expect_state={})
+telemetry(X, "param-string", inbound_hex=hexs(osc("/-show/showfile/show/name", ("s", "Sunday"))), expect_state={})
+
+
+def _osc_args(packet):
+    """Address, type tags and i/f/s arguments of one OSC message."""
+    def string(pos):
+        end = packet.index(b"\0", pos)
+        return packet[pos:end].decode(), (end + 4) & ~3
+    address, pos = string(0)
+    tags, pos = string(pos)
+    args = []
+    for t in tags[1:]:
+        if t == "i":
+            args.append(struct.unpack(">i", packet[pos:pos + 4])[0]); pos += 4
+        elif t == "f":
+            args.append(struct.unpack(">f", packet[pos:pos + 4])[0]); pos += 4
+        elif t == "s":
+            v, pos = string(pos); args.append(v)
+        else:
+            return address, tags[1:], None
+    return address, tags[1:], args
+
+
+def _with_params(spec):
+    """Every single-argument parameter the console reports is also kept
+    under params, keyed by its address without the leading /, in the field
+    of its OSC type (the generic rules)."""
+    import re
+    for v in V:
+        if v.get("spec") != spec or "inbound_hex" not in v or "expect_state" not in v:
+            continue
+        address, tags, args = _osc_args(bytes.fromhex(v["inbound_hex"]))
+        if args is None or tags not in ("f", "i", "s"):
+            continue
+        if not re.fullmatch(r"/[A-Za-z0-9_-][A-Za-z0-9_/-]*", address):
+            continue
+        field = {"f": "float", "i": "int", "s": "string"}[tags]
+        v["expect_state"] = {**v["expect_state"], "params": {address[1:]: {field: args[0]}}}
+
+
+_with_params(X)
