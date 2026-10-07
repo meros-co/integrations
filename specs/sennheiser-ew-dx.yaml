@@ -11,6 +11,22 @@ reason: >
   sends.
 
 source:
+  - title: EW-DX 3rd-party API, OpenAPI 1.7 (EW-DX_openapi_3rdparty_release_1.7.yaml)
+    author: Sennheiser
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/open-api-ew-dx.html
+    note: >
+      Manufacturer OpenAPI document for EW-DX firmware 4.x, served by the
+      Sennheiser 3rd Party API portal (v6.2, 08/2026). Every resource the core
+      reads, subscribes and writes: /api/channel/{id} (name, mute, gain,
+      outputLevel, mates, audio, eventCounter) and its identify, restore,
+      channelSorting, warnings, signalStrengthIndicator,
+      signalQualityIndicator, diversityIndicator and level;
+      /api/rf, /api/rf/transmission, /api/rf/encryption, /api/rf/channels/{id}
+      and its frequency and preset; the user and factory preset banks;
+      /api/syncSettings/{id} and its ignore; /api/transmitters/{id}, its
+      battery and warnings; /api/device/site, state, identification and
+      identity; /api/ssc/legacyMode; /api/firmware/update/state. Ranges and
+      enumerations are the document's.
   - title: Sennheiser Sound Control Protocol v2 (SSCv2), 06/2023
     author: Sennheiser
     url: https://www.sennheiser.com/globalassets/digizuite/40447-en-06_2023_sennheiser_sound_control_protocol_v2_tccm_en.pdf
@@ -18,7 +34,7 @@ source:
       HTTPS on port 443, HTTP Basic authentication as user "api", and the
       subscription lifecycle: GET /api/ssc/state/subscriptions opens the stream,
       and PUT .../{sessionUUID}/add subscribes resources.
-  - title: Sennheiser Control Cockpit, Sennheiser Sound Control Protocols (SSCv1 and SSCv2)
+  - title: Sennheiser Control Cockpit, Sennheiser Sound Control Protocols (SSCv1 and SSCv2), v9.2 04/2026
     url: https://docs.cloud.sennheiser.com/en-us/control-cockpit/control-cockpit/ssc-protocols.html
     note: SSCv2 uses HTTPS (TLS 1.3) and is enabled per device under 3rd Party Access.
   - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for EW-DX, 03/2023
@@ -41,37 +57,213 @@ models:
   - id: em-2
     name: Sennheiser EW-DX EM 2 receiver
     channels: 2
-    supports: [mute]
+    supports: &all
+      [mute, set_channel_name, set_gain, set_af_out, identify, identify_device,
+       restore_channel_audio_defaults, acknowledge_channel_sorting, set_frequency,
+       select_preset, set_user_presets, get_factory_presets, set_link_density,
+       set_encryption, set_transmitter_sync, set_transmitter_sync_ignore]
     verification: none
   - id: em-2-dante
     name: Sennheiser EW-DX EM 2 Dante receiver
     channels: 2
-    supports: [mute]
+    supports: *all
     verification: none
   - id: em-4-dante
     name: Sennheiser EW-DX EM 4 Dante receiver
     channels: 4
-    supports: [mute]
+    supports: *all
     verification: none
 
 commands:
   mute:
-    summary: Mute or unmute a receiver channel
+    summary: Mute or unmute a receiver channel (PUT /api/channel/{id} mute)
     params:
-      channel: { type: int, min: 1, max: 4, required: true, label: Channel, description: "Receiver channel, numbered from 1 as on the receiver; an EM 2 has channels 1 and 2." }
+      channel: &channel { type: int, min: 1, max: 4, required: true, label: Channel, description: "Receiver channel, numbered from 1 as on the receiver; an EM 2 has channels 1 and 2." }
       muted:   { type: bool, default: true, label: Mute, description: "On mutes the receiver channel, off unmutes it." }
     returns: ack
 
+  set_channel_name:
+    summary: Name a receiver channel (PUT /api/channel/{id} name)
+    params:
+      channel: *channel
+      name: { type: string, max_length: 8, pattern: "^[ #*+,;/<=|>0-9A-Z-]*$", required: true, label: Name, description: "Channel name of up to 8 characters: capitals, digits, space and # * + , ; - / < = | >." }
+    returns: ack
+
+  set_gain:
+    summary: Set a receiver channel's gain (PUT /api/channel/{id} gain)
+    params:
+      channel: *channel
+      gain_db: { type: int, min: -3, max: 42, required: true, label: Gain, description: "Receiver channel gain in dB, from -3 to +42 in steps of 3." }
+    returns: ack
+
+  set_af_out:
+    summary: Set a receiver channel's AF output level (PUT /api/channel/{id} outputLevel)
+    params:
+      channel: *channel
+      level_db: { type: int, min: -24, max: 18, required: true, label: Output level, description: "Audio output level in dB, from -24 to +18 in steps of 6." }
+    returns: ack
+
+  identify:
+    summary: Start or stop a receiver channel's identification (PUT /api/channel/{id}/identify)
+    params:
+      channel: *channel
+      enabled: &identify_enabled { type: bool, default: true, label: Identify, description: "On starts the visual identification, off stops it." }
+    returns: ack
+
+  identify_device:
+    summary: Start or stop the receiver's own identification (PUT /api/device/identification visual)
+    params:
+      enabled: *identify_enabled
+    returns: ack
+
+  restore_channel_audio_defaults:
+    summary: Restore a receiver channel's audio default settings (PUT /api/channel/{id}/restore, AudioDefault)
+    params:
+      channel: *channel
+    returns: ack
+
+  acknowledge_channel_sorting:
+    summary: Acknowledge a receiver channel's channel sorting (PUT /api/channel/{id}/channelSorting sorted)
+    params:
+      channel: *channel
+    returns: ack
+
+  set_frequency:
+    summary: Tune a receiver channel (PUT /api/rf/channels/{id}/frequency)
+    params:
+      channel: *channel
+      frequency_khz: { type: int, min: 470200, max: 1999000, required: true, label: Frequency, description: "Carrier frequency in kHz, a multiple of 25 kHz within the receiver's frequency ranges (device.rf.ranges)." }
+    returns: ack
+
+  select_preset:
+    summary: Tune a receiver channel to a preset of a factory or user bank (PUT /api/rf/channels/{id}/preset)
+    params:
+      channel: *channel
+      bank_type: { type: enum, values: [factory, user], required: true, label: Bank type, description: "Factory picks from the factory frequency bank, user from the channel's user bank." }
+      bank: { type: int, min: 0, max: 0, default: 0, label: Bank, description: "Preset bank, numbered from 0 as in the API; the API documents bank 0 only." }
+      preset: { type: int, min: 0, max: 99, required: true, label: Preset, description: "Preset in the bank, as the API numbers it (see channels.<n>.preset.channel)." }
+    returns: ack
+
+  set_user_presets:
+    summary: Replace a receiver channel's user preset bank (PUT /api/rf/presets/user/channels/{id}/banks/0, an array of 1 to 100 frequencies in kHz)
+    params:
+      channel: *channel
+      frequencies_khz: { type: json, required: true, label: Frequencies, description: "The whole user bank as a JSON array of 1 to 100 carrier frequencies in kHz, each a multiple of 25." }
+    returns: ack
+
+  get_factory_presets:
+    summary: Read a factory preset bank (GET /api/rf/presets/factory/banks/{bank}), an array of frequencies in kHz
+    params:
+      bank: { type: int, min: 0, max: 0, default: 0, label: Bank, description: "Factory bank, numbered from 0 as in the API; the API documents bank 0 only." }
+    returns: value
+
+  set_link_density:
+    summary: Switch the RF transmission mode between Link Density and Standard (PUT /api/rf/transmission mode)
+    params:
+      enabled: { type: bool, required: true, label: Link Density, description: "On selects Link Density mode, which doubles the possible channels at a closer preset spacing; off selects Standard." }
+    returns: ack
+
+  set_encryption:
+    summary: Turn RF (AES 256) encryption on or off (PUT /api/rf/encryption enabled)
+    params:
+      enabled: { type: bool, required: true, label: Encryption, description: "On encrypts the RF link; transmitters must be synced again to follow." }
+    returns: ack
+
+  set_transmitter_sync:
+    summary: >
+      Change the settings a receiver channel gives its transmitter when it is
+      synced (PUT /api/syncSettings/{id} with only the fields given; at least
+      one is needed)
+    params:
+      channel: *channel
+      mute_config: { type: enum, values: ["off", rf_mute, af_mute], label: Mute mode, description: "What the transmitter's mute switch does: nothing, mute the RF, or mute the audio." }
+      cable_emulation: { type: enum, values: ["off", type1, type2, type3], label: Cable emulation, description: "Guitar cable emulation of a bodypack's instrument input, off or one of three cable types." }
+      lowcut: { type: enum, values: ["off", 30hz, 60hz, 80hz, 100hz, 120hz], label: Low cut, description: "Transmitter low-cut filter frequency, or off; handhelds and table stands offer 60 to 120 Hz only." }
+      lock: { type: bool, label: Auto lock, description: "On locks the transmitter's controls automatically, off leaves them unlocked." }
+      trim_db: { type: int, min: -12, max: 6, label: Trim, description: "Transmitter input trim in dB, from -12 to +6 in steps of 1." }
+      led: { type: bool, label: LED, description: "On lets the transmitter's status LED light, off keeps it dark." }
+      mute_config_table_stand: { type: enum, values: [af_mute, "off", push_to_talk, push_to_mute], label: Table stand mute mode, description: "What a table stand's button does: mute the audio, nothing, push to talk or push to mute." }
+    returns: ack
+
+  set_transmitter_sync_ignore:
+    summary: >
+      Choose which sync settings a receiver channel leaves out when syncing its
+      transmitter (PUT /api/syncSettings/{id}/ignore with only the fields
+      given; at least one is needed)
+    params:
+      channel: *channel
+      mute_config: &ignore { type: bool, label: Ignore, description: "On leaves this setting out of a sync, so the transmitter keeps its own; off includes it." }
+      cable_emulation: *ignore
+      lowcut: *ignore
+      lock: *ignore
+      trim: *ignore
+      led: *ignore
+      name: *ignore
+      frequency: *ignore
+    returns: ack
+
 state:
-  device.identity:                   { type: object, description: "The /api/device/identity resource as the device returns it" }
+  device.identity:                   { type: object, description: "The /api/device/identity resource as the device returns it: product (EWDX2CHS, EWDX2CHDS, EWDX4CHDS), hardwareRevision, serial, vendor" }
+  device.name:                       { type: string, description: "Device name, from /api/device/site" }
+  device.location:                   { type: string, description: "Device location, from /api/device/site" }
+  device.state:                      { type: string, description: "Overall state: normal, identifying, firmware_update or busy (starting, applying a long operation such as a Link Density change, or powering off)" }
+  device.warnings:                   { type: array, description: "Device warnings, as the device names them" }
+  device.identifying:                { type: bool, description: "Whether the receiver's own visual identification is running" }
+  device.rf.code:                    { type: string, description: "Country-specific frequency range code, e.g. Q1-9" }
+  device.rf.ranges:                  { type: array, description: "The receiver's frequency ranges, each {start_khz, end_khz, step_khz}" }
+  device.link_density:               { type: bool, description: "Whether the RF transmission mode is Link Density (true) or Standard (false)" }
+  device.preset_spacing_khz:         { type: int, unit: kHz, description: "Preset spacing, which depends on the transmission mode" }
+  device.encryption:                 { type: bool, description: "Whether RF encryption is on" }
+  device.legacy_mode:                { type: bool, description: "Whether the unencrypted SSCv1 legacy third-party access is enabled on the receiver" }
+  device.firmware.version:           { type: string, description: "Running firmware version" }
+  device.firmware.dante_version:     { type: string, description: "Running Dante firmware version (Dante models)" }
+  device.firmware.update_state:      { type: string, description: "idle or updating" }
+  device.firmware.update_progress_pct: { type: int, unit: "%", description: "Firmware update progress, 0-100" }
+  device.firmware.last_status:       { type: string, description: "Result of the last firmware update since boot: None, or an error such as Invalid firmware package" }
   channels.*.name:                   { type: string, description: "Channel name" }
   channels.*.mute:                   { type: bool, description: "Receiver mute" }
+  channels.*.gain_db:                { type: int, unit: dB, description: "Receiver channel gain, -3 to +42 in steps of 3" }
+  channels.*.af_out_db:              { type: int, unit: dB, description: "AF output level, -24 to +18 in steps of 6" }
+  channels.*.mate:                   { type: string, description: "The transmitter slot linked to the channel, e.g. TX1" }
+  channels.*.output:                 { type: string, description: "The audio output of the channel, e.g. Out1" }
+  channels.*.sorting_event_counter:  { type: int, description: "Channel sorting event counter" }
+  channels.*.identifying:            { type: bool, description: "Whether the channel's visual identification is running" }
   channels.*.frequency_khz:          { type: int, unit: kHz, description: "Carrier frequency, from /api/rf/channels/{id}" }
-  channels.*.rf.quality_pct:         { type: int, unit: "%", description: "Signal quality indicator, 0-100" }
+  channels.*.preset.type:            { type: string, description: "Active preset bank type: factory, user or none" }
+  channels.*.preset.bank:            { type: int, description: "Active preset bank as the API numbers it; null when the type is none" }
+  channels.*.preset.channel:         { type: int, description: "Active preset in the bank as the API numbers it; null when the type is none" }
+  channels.*.user_presets_khz:       { type: array, unit: kHz, description: "The channel's user preset bank 0, as frequencies in kHz" }
+  channels.*.rf.quality_pct:         { type: int, unit: "%", description: "Signal quality indicator (RSQI), 0-100" }
+  channels.*.rf.strength_dbm:        { type: float, unit: dBm, description: "Signal strength indicator (RSSI), -107 to 0" }
+  channels.*.rf.antenna:             { type: string, description: "Active diversity antenna: none, a or b" }
   channels.*.af.level_dbfs:          { type: float, unit: dBFS, description: "Audio level" }
-  channels.*.warnings:               { type: object, description: "The /api/channel/{id}/warnings resource as the device returns it" }
-  channels.*.transmitter:            { type: object, description: "Absent until known; null when no transmitter is linked (the battery resource answers 422)" }
+  channels.*.warnings:               { type: array, description: "Active channel warnings: Aes256Error, LowSignal, NoLink, RfPeak, AfPeak" }
+  channels.*.sync.mute_config:       { type: string, description: "Sync setting: transmitter mute mode, off, rf_mute or af_mute" }
+  channels.*.sync.cable_emulation:   { type: string, description: "Sync setting: cable emulation, off or type1-type3" }
+  channels.*.sync.lowcut:            { type: string, description: "Sync setting: low cut, off, 30hz, 60hz, 80hz, 100hz or 120hz" }
+  channels.*.sync.lock:              { type: bool, description: "Sync setting: transmitter auto lock" }
+  channels.*.sync.trim_db:           { type: int, unit: dB, description: "Sync setting: transmitter trim, -12 to +6" }
+  channels.*.sync.led:               { type: bool, description: "Sync setting: transmitter LED on" }
+  channels.*.sync.mute_config_table_stand: { type: string, description: "Sync setting: table stand mute mode, af_mute, off, push_to_talk or push_to_mute" }
+  channels.*.sync.ignore.*:          { type: bool, description: "Whether a sync leaves this setting out: mute_config, cable_emulation, lowcut, lock, trim, led, name or frequency" }
+  channels.*.transmitter:            { type: object, description: "Absent until known; null when no transmitter is linked (its resources answer 422)" }
+  channels.*.transmitter.type:       { type: string, description: "Transmitter type as the API names it, e.g. EW_DX_SKM, EW_DX_SK, EW_DX_TS_5_PIN, EW_D_SKP" }
+  channels.*.transmitter.capsule:    { type: string, description: "Mounted capsule as the API names it, e.g. MMD_935, KK_205, Unknown, None" }
+  channels.*.transmitter.version:    { type: string, description: "Transmitter firmware version" }
+  channels.*.transmitter.name:       { type: string, description: "Transmitter name" }
+  channels.*.transmitter.mute:       { type: bool, description: "Transmitter mute switch state" }
+  channels.*.transmitter.identifying: { type: bool, description: "Whether the transmitter is identifying" }
+  channels.*.transmitter.lowcut:     { type: string, description: "Transmitter low cut: off, 30hz, 60hz, 80hz, 100hz or 120hz" }
+  channels.*.transmitter.trim_db:    { type: int, unit: dB, description: "Transmitter trim, -12 to +6" }
+  channels.*.transmitter.cable_emulation: { type: string, description: "Transmitter cable emulation: off or type1-type3 (bodypacks)" }
+  channels.*.transmitter.led:        { type: bool, description: "Transmitter LED on" }
+  channels.*.transmitter.lock:       { type: bool, description: "Transmitter auto lock on" }
+  channels.*.transmitter.mute_config: { type: string, description: "Transmitter mute mode: off, rf_mute or af_mute" }
+  channels.*.transmitter.mute_config_table_stand: { type: string, description: "Table stand mute mode: af_mute, off, push_to_talk or push_to_mute" }
   channels.*.transmitter.battery_percent: { type: int, unit: "%", description: "Battery gauge, 0-100" }
+  channels.*.transmitter.battery_type: { type: string, description: "battery (rechargeable pack), primary_cell or no_battery" }
+  channels.*.transmitter.battery_lifetime_min: { type: int, unit: min, description: "Remaining battery lifetime" }
+  channels.*.transmitter.warnings:   { type: array, description: "Transmitter warnings: LowBattery, AfPeak" }
 
 quirks:
   - models: [all]
@@ -94,12 +286,36 @@ quirks:
       authenticated; on an untrusted network another host could impersonate it.
 
   - models: [all]
-    severity: warning
+    severity: critical
     text: >
-      Only mute is exposed. Gain, frequency, identify and network settings have
-      no documented SSCv2 path, and the legacy paths RFDeck used for them are the
-      scheme that returned 404 for mute on OpenAPI 1.7 firmware. They are omitted
-      rather than sent to paths that may fail.
+      set_link_density changes the RF transmission mode. The receiver reports
+      itself busy while it applies it (under SSCv1 the same change reboots the
+      receiver), audio stops meanwhile, and the transmitters must be synced
+      again. set_encryption likewise needs every transmitter synced again
+      before its link comes back. Neither can be undone live.
+
+  - models: [all]
+    severity: critical
+    text: >
+      restore_channel_audio_defaults puts a channel's audio settings back to
+      their defaults at once; the earlier values are not kept.
+
+  - models: [all]
+    severity: info
+    text: >
+      Over SSCv2 the device name and location are read-only
+      (/api/device/site has no write), and restart, factory reset, display
+      brightness, the receiver's own key lock, network and Dante settings have
+      no SSCv2 resource at all. Transmitter settings cannot be written
+      directly either: set_transmitter_sync sets what the receiver gives a
+      transmitter at its next sync, and the transmitter's own values arrive in
+      channels.<n>.transmitter.
+
+  - models: [all]
+    severity: info
+    text: >
+      Battery health and charge cycles are not reported by the receiver; they
+      are read from a network charger such as the CHG 70N.
 
   - models: [all]
     severity: info
@@ -111,8 +327,23 @@ quirks:
   - models: [all]
     severity: info
     text: >
+      Resources from older OpenAPI versions come first in the subscription, and
+      a batch the device refuses does not stop the later ones, so firmware
+      lacking a resource (sync settings arrived with OpenAPI 1.6, transmitters
+      with 1.5) still keeps the rest current.
+
+  - models: [all]
+    severity: info
+    text: >
       A receiver with both a control and a Dante interface answers on both with
       the same identity. Open it by its control interface address.
+
+  - models: [all]
+    severity: info
+    text: >
+      Out-of-step values are refused before sending: gain in steps of 3 dB, AF
+      output in steps of 6 dB, frequencies in steps of 25 kHz, as the API
+      declares them.
 
   - models: [em-4-dante]
     severity: info

@@ -3,7 +3,8 @@
 //!
 //! The simulated device implements the SSCv2 surface the core uses: Basic
 //! authentication as "api", /api/ssc/version, /api/device/identity, the
-//! subscription stream and its /add endpoint, the channel resources, and mute.
+//! subscription stream and its /add endpoint, the channel resources, and the
+//! channel and sync-settings writes.
 
 #![cfg(feature = "sennheiser-ew-dx")]
 
@@ -26,6 +27,8 @@ const GOOD_AUTH: &str = "Basic YXBpOnNlY3JldA==";
 struct Device {
     mute: [bool; 2],
     subscribed: Vec<String>,
+    /// Writes other than subscriptions: path and body.
+    writes: Vec<(String, Value)>,
     /// Requests that carried the wrong credential.
     refused: usize,
 }
@@ -178,7 +181,7 @@ async fn simulated_ewdx() -> (u16, Arc<Mutex<Device>>) {
                         }
                         ("GET", p) if p.starts_with("/api/transmitters/") => {
                             // Channel 2 has no transmitter linked.
-                            if p.contains("/1/") {
+                            if p.starts_with("/api/transmitters/1") {
                                 respond(422, json!({}))
                             } else {
                                 respond(200, json!({"gauge": 65}))
@@ -190,11 +193,26 @@ async fn simulated_ewdx() -> (u16, Arc<Mutex<Device>>) {
                         ("GET", p) if p.ends_with("/level") => {
                             respond(200, json!({"value": -40.0}))
                         }
-                        ("PUT", p) if p.starts_with("/api/channel/") => {
+                        ("PUT", p) if p.starts_with("/api/channel/") && !p[13..].contains('/') => {
                             let id: usize = p[13..].parse().unwrap();
-                            let muted = body["mute"].as_bool().unwrap();
-                            device.lock().unwrap().mute[id] = muted;
-                            let _ = notify.send(json!({ p: {"mute": muted} }));
+                            if let Some(muted) = body["mute"].as_bool() {
+                                device.lock().unwrap().mute[id] = muted;
+                            }
+                            device
+                                .lock()
+                                .unwrap()
+                                .writes
+                                .push((p.to_string(), body.clone()));
+                            let _ = notify.send(json!({ p: body }));
+                            respond(200, json!({}))
+                        }
+                        ("PUT", p) if p.starts_with("/api/syncSettings/") => {
+                            device
+                                .lock()
+                                .unwrap()
+                                .writes
+                                .push((p.to_string(), body.clone()));
+                            let _ = notify.send(json!({ p: body }));
                             respond(200, json!({}))
                         }
                         _ => respond(404, json!({})),
@@ -255,8 +273,8 @@ async fn ewdx_end_to_end() {
     assert_eq!(state["channels"]["1"]["frequency_khz"], 606500);
     assert_eq!(state["channels"]["1"]["transmitter"]["battery_percent"], 65);
     assert_eq!(state["channels"]["2"]["transmitter"], Value::Null);
-    // Six resources per channel, both channels.
-    assert_eq!(device.lock().unwrap().subscribed.len(), 12);
+    // Fourteen resources per channel, both channels, and eight of the device.
+    assert_eq!(device.lock().unwrap().subscribed.len(), 36);
 
     let outcome = core
         .execute(id, "mute", params(json!({"channel": 2, "muted": true})))
@@ -268,6 +286,41 @@ async fn ewdx_end_to_end() {
     )
     .await;
     assert!(device.lock().unwrap().mute[1]);
+
+    // Gain and a transmitter sync setting, each the documented PUT.
+    let outcome = core
+        .execute(id, "set_gain", params(json!({"channel": 1, "gain_db": 24})))
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    wait_for(
+        &core,
+        |e| matches!(e, Event::State { patch, .. } if patch["channels"]["1"]["gain_db"] == 24),
+    )
+    .await;
+    let outcome = core
+        .execute(
+            id,
+            "set_transmitter_sync",
+            params(json!({"channel": 2, "lowcut": "60hz", "trim_db": -4})),
+        )
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    wait_for(
+        &core,
+        |e| matches!(e, Event::State { patch, .. } if patch["channels"]["2"]["sync"]["lowcut"] == "60hz"),
+    )
+    .await;
+    assert_eq!(
+        device.lock().unwrap().writes,
+        [
+            ("/api/channel/1".to_string(), json!({"mute": true})),
+            ("/api/channel/0".to_string(), json!({"gain": 24})),
+            (
+                "/api/syncSettings/1".to_string(),
+                json!({"lowcut": "60Hz", "trim": -4})
+            ),
+        ]
+    );
 
     core.close(id).await;
 }
