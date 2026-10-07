@@ -14,15 +14,27 @@ source:
       status updates from QLab (/updates and the /update/... messages), Replies from
       QLab (/reply/... with a JSON string argument), Application messages, Workspace
       messages, Show Control Broadcast messages (/listen, QLab 5.3 and later), Cue
-      messages, Group cue/List/Cart messages, Audio cue messages (level, sliderLevel,
-      rate, mute).
+      messages, Workspace Settings messages, Group cue/List/Cart messages, Audio, Mic,
+      Video, Camera, Text, Light, Fade, Network, MIDI, MIDI File, Timecode, Reset,
+      Devamp and Script cue messages, valuesForKeys.
   - title: QLab 4 Documentation, Scripting, "QLab's OSC Dictionary"
     author: Figure 53
     url: https://qlab.app/docs/v4/scripting/osc-dictionary-v4/
     note: >
       Manufacturer-documented. Retrieved 2026-09-30. Sections used: Transport layer,
       Reply format, Update format, Application methods, Workspace methods, Cue
-      methods, Group cue/Cue List/Cart methods, Audio cue methods.
+      methods, Settings methods, Group cue/Cue List/Cart methods, Audio, Mic, Video,
+      Camera, Text, Light, Fade, Network, MIDI, MIDI File, Devamp and Script cue
+      methods.
+  - title: companion-module-figure53-qlab-advance
+    author: Bitfocus Companion contributors
+    url: https://github.com/bitfocus/companion-module-figure53-qlab-advance
+    note: >
+      MIT. Retrieved 2026-10-07. Read as corroboration only, no code used: a
+      client keeping current asks every cue for one valuesForKeys key list
+      whatever its type, re-reads a cue on /update/.../cue_id/{id}, gets no
+      answer for a deleted cue, and receives /update/.../cue_id/__root__
+      (QLab 5.5; earlier [root group of cue lists]) when the cue lists change.
 
 # QLab answers queries with /reply/<address> carrying a JSON string, and pushes
 # /update/... and /qlab/event/... messages to subscribed clients. Over TCP these
@@ -3796,7 +3808,7 @@ commands:
     returns: none
 
 state:
-  workspaces.*.cue_lists.*.playhead_id: { type: string, description: "Unique ID of the cue standing by in a cue list, keyed by workspace and cue list unique ID (/update ... /playbackPosition)" }
+  workspaces.*.cue_lists.*.playhead_id: { type: string, description: "Unique ID of the cue standing by in a cue list, keyed by workspace and cue list unique ID; absent when none is (/update ... /playbackPosition)" }
   playhead.number: { type: string, description: "Cue number at the playhead (show control broadcast, QLab 5.3 and later)" }
   playhead.name:   { type: string, description: "Name of the cue at the playhead" }
   playhead.id:     { type: string, description: "Unique ID of the cue at the playhead" }
@@ -3814,12 +3826,78 @@ state:
   last_stopped.id:     { type: string, description: "Unique ID of the most recently stopped cue" }
   last_stopped.type:   { type: string, description: "Type of the most recently stopped cue" }
   cues.*.running:  { type: bool, description: "True after a cue start event, false after a cue stop event, keyed by cue unique ID (QLab 5.3 and later)" }
+  workspaces.*.name: { type: string, description: "Display name of an open workspace, keyed by its unique ID" }
+  workspaces.*.version: { type: string, description: "QLab version the workspace reports (QLab 5)" }
+  workspaces.*.port: { type: int, description: "OSC port the workspace listens on (QLab 5)" }
+  workspaces.*.has_passcode: { type: bool, description: "Whether the workspace has an OSC passcode (QLab 4)" }
+  workspaces.*.cue_lists.*.index: { type: int, description: "Position of a cue list or cart in the sidebar, from 0" }
+  workspaces.*.active.*: { type: string, description: "Unique IDs of the running or paused cues, in Active Cues order from 0" }
+  workspaces.*.cues.*.index: { type: int, description: "Position of the cue in its list, cart or Group, from 0" }
+  workspaces.*.cues.*.children.*: { type: string, description: "Unique IDs of a list's, cart's or Group's children, in order from 0" }
+  workspaces.*.cues.*.number: { type: string, description: "Cue number; empty when the cue has none" }
+  workspaces.*.cues.*.name: { type: string, description: "Cue name" }
+  workspaces.*.cues.*.list_name: { type: string, description: "Name as the cue list shows it (the default name when the cue has no name)" }
+  workspaces.*.cues.*.display_name: { type: string, description: "Display name of the cue" }
+  workspaces.*.cues.*.type: { type: string, description: "Cue type: Audio, Video, Group, Cue List, Cart, Fade, ..." }
+  workspaces.*.cues.*.color: { type: string, description: "Colour name (none, red, orange, green, blue, purple, and in QLab 5 more)" }
+  workspaces.*.cues.*.color_live: { type: string, description: "Live colour name, which a reset clears" }
+  workspaces.*.cues.*.second_color: { type: string, description: "Second colour name (QLab 5.2 and later)" }
+  workspaces.*.cues.*.use_second_color: { type: bool, description: "Whether the second colour is shown (QLab 5.2 and later)" }
+  workspaces.*.cues.*.flagged: { type: bool, description: "Whether the cue is flagged" }
+  workspaces.*.cues.*.armed: { type: bool, description: "Whether the cue is armed" }
+  workspaces.*.cues.*.notes: { type: string, description: "Notes of the cue" }
+  workspaces.*.cues.*.auto_load: { type: bool, description: "Whether the cue auto-loads" }
+  workspaces.*.cues.*.continue_mode: { type: int, description: "Continue mode: 0 none, 1 auto-continue, 2 auto-follow" }
+  workspaces.*.cues.*.pre_wait: { type: float, unit: s, description: "Pre-wait in seconds" }
+  workspaces.*.cues.*.post_wait: { type: float, unit: s, description: "Post-wait in seconds" }
+  workspaces.*.cues.*.duration: { type: float, unit: s, description: "Duration in seconds" }
+  workspaces.*.cues.*.current_duration: { type: float, unit: s, description: "Duration in seconds now, with a temporary duration or rate applied" }
+  workspaces.*.cues.*.parent: { type: string, description: "Unique ID of the Group cue, cue list or cart the cue is in (for a cue list, QLab's root group)" }
+  workspaces.*.cues.*.cue_target_id: { type: string, description: "Unique ID of the cue's target cue; empty when it has none" }
+  workspaces.*.cues.*.cue_target_number: { type: string, description: "Number of the cue's target cue" }
+  workspaces.*.cues.*.file_target: { type: string, description: "Path of the cue's file target" }
+  workspaces.*.cues.*.target_mode: { type: int, description: "Fade and Reset cues: 0 targets a cue, 1 a patch" }
+  workspaces.*.cues.*.patch_target_id: { type: string, description: "Unique ID of the patch a Fade or Reset cue targets" }
+  workspaces.*.cues.*.duck_others: { type: bool, description: "Whether the cue ducks other audio" }
+  workspaces.*.cues.*.duck_level: { type: float, unit: dB, description: "Duck level in dB (QLab 5)" }
+  workspaces.*.cues.*.duck_time: { type: float, unit: s, description: "Duck time in seconds" }
+  workspaces.*.cues.*.fade_and_stop_others: { type: int, description: "Fade and stop others: 0 none, 1 peers, 2 list or cart, 3 all" }
+  workspaces.*.cues.*.fade_and_stop_others_time: { type: float, unit: s, description: "Fade and stop others time in seconds" }
+  workspaces.*.cues.*.second_trigger_action: { type: int, description: "Second trigger action: 0 none, 1 panic, 2 stop, 3 hard stop, 4 pause, 5 devamp, 6 and 7 playlist (QLab 5)" }
+  workspaces.*.cues.*.second_trigger_on_release: { type: bool, description: "Whether the second trigger fires on release" }
+  workspaces.*.cues.*.skip_if_disarmed: { type: bool, description: "Whether the cue is skipped while disarmed (QLab 5)" }
+  workspaces.*.cues.*.rate: { type: float, description: "Playback rate, 1 normal" }
+  workspaces.*.cues.*.infinite_loop: { type: bool, description: "Whether the cue loops forever" }
+  workspaces.*.cues.*.has_file_targets: { type: bool, description: "Whether the cue can have a file target" }
+  workspaces.*.cues.*.has_cue_targets: { type: bool, description: "Whether the cue can have a cue target" }
+  workspaces.*.cues.*.levels: { type: string, description: "Crosspoint levels in dB, JSON text: rows, main row first" }
+  workspaces.*.cues.*.slider_levels: { type: string, description: "Output slider levels in dB, JSON text: main first" }
+  workspaces.*.cues.*.running: { type: bool, description: "Whether the cue is running" }
+  workspaces.*.cues.*.paused: { type: bool, description: "Whether the cue is paused" }
+  workspaces.*.cues.*.loaded: { type: bool, description: "Whether the cue is loaded" }
+  workspaces.*.cues.*.broken: { type: bool, description: "Whether the cue is broken" }
+  workspaces.*.cues.*.auditioning: { type: bool, description: "Whether the cue is auditioning" }
+  workspaces.*.cues.*.panicking: { type: bool, description: "Whether the cue is panicking" }
+  workspaces.*.cues.*.tailing_out: { type: bool, description: "Whether the cue is tailing out" }
+  workspaces.*.cues.*.action_running: { type: bool, description: "Whether the cue's action is running (after its pre-wait)" }
+  workspaces.*.cues.*.overridden: { type: bool, description: "Whether an override blocks the cue" }
+  workspaces.*.cues.*.warning: { type: bool, description: "Whether the cue shows a warning (QLab 5)" }
+  workspaces.*.cues.*.action_elapsed: { type: float, unit: s, description: "Seconds of the action elapsed; remaining is current_duration minus this" }
+  workspaces.*.cues.*.percent_action_elapsed: { type: float, description: "Fraction of the action elapsed, 0 to 1" }
+  workspaces.*.cues.*.pre_wait_elapsed: { type: float, unit: s, description: "Seconds of the pre-wait elapsed" }
+  workspaces.*.cues.*.percent_pre_wait_elapsed: { type: float, description: "Fraction of the pre-wait elapsed, 0 to 1" }
+  workspaces.*.cues.*.post_wait_elapsed: { type: float, unit: s, description: "Seconds of the post-wait elapsed" }
+  workspaces.*.cues.*.percent_post_wait_elapsed: { type: float, description: "Fraction of the post-wait elapsed, 0 to 1" }
+  workspaces.*.cues.*.current_file_time: { type: float, unit: s, description: "Playback time in the target file, in seconds" }
+  workspaces.*.show_mode: { type: bool, description: "Whether the workspace is in show mode" }
 
 telemetry:
   # /updates 1 subscribes this client to /update/... pushes (QLab 5: application
   # message; QLab 4: workspace message, so rootless it reaches the front-most
   # workspace). /listen/... asks for show control broadcast events (QLab 5.3 and
-  # later). Over TCP the subscription lasts as long as the connection.
+  # later). /workspaces is answered with the open workspaces, and each one's
+  # cue lists, cues and settings are read from there. Over TCP the subscription
+  # lasts as long as the connection.
   subscribe:
     send:
       - { address: /updates, args: [ { value: "1", type: int } ] }
@@ -3827,9 +3905,374 @@ telemetry:
       - /listen/playhead
       - /listen/cue/start
       - /listen/cue/stop
+      - /workspaces
+  # The active cues of every workspace, and each one's times, once a second.
+  poll:
+    send:
+      - { address: /runningOrPausedCues/shallow, reply_address: "^/reply/runningOrPausedCues/shallow$" }
+    every_ms: 1000
   updates:
+    # The open workspaces; each one's cue lists and settings are read.
+    - address: "^/reply/workspaces$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { name: "$.displayName", version: "$.version", port: "$.port", has_passcode: "$.hasPasscode" }
+      state:
+        "workspaces.{1}.name": "{name}"
+        "workspaces.{1}.version": "{version}"
+        "workspaces.{1}.port": "{port}"
+        "workspaces.{1}.has_passcode": { value: "{has_passcode}", map: { "true": true, "false": false, "1": true, "0": false } }
+      then_send: &workspace_reads
+        - { address: "/workspace/{1}/cueLists", reply_address: "^/reply/workspace/[^/]+/cueLists$" }
+        - { address: "/workspace/{1}/showMode", reply_address: "^/reply/workspace/[^/]+/showMode$" }
+    # A workspace changed: its cue lists (and settings) are read again.
+    - address: "^/update/workspace/([A-Za-z0-9-]+)$"
+      then_send: *workspace_reads
+    # QLab 5.5 reports a change to the cue lists themselves as one to the root group.
+    - address: "^/update/workspace/([A-Za-z0-9-]+)/cue_id/(?:__root__|\\[root group of cue lists\\])$"
+      then_send:
+        - { address: "/workspace/{1}/cueLists", reply_address: "^/reply/workspace/[^/]+/cueLists$" }
+    # The workspace is closing: everything known about it goes.
+    - address: "^/update/workspace/([A-Za-z0-9-]+)/disconnect$"
+      state:
+        "workspaces.{1}": { delete: true }
+    # A cue changed: its values, and its children if it is a list, cart or Group.
+    - address: "^/update/workspace/([A-Za-z0-9-]+)/cue_id/([A-Za-z0-9-]+)$"
+      then_send:
+        - &values_for_keys { address: "/workspace/{1}/cue_id/{2}/valuesForKeys", args: [{ value: "[\"uniqueID\",\"number\",\"name\",\"listName\",\"displayName\",\"type\",\"colorName\",\"colorName/live\",\"secondColorName\",\"useSecondColor\",\"flagged\",\"armed\",\"notes\",\"autoLoad\",\"continueMode\",\"preWait\",\"postWait\",\"duration\",\"currentDuration\",\"parent\",\"cueTargetID\",\"cueTargetNumber\",\"fileTarget\",\"targetMode\",\"patchTargetID\",\"duckOthers\",\"duckLevel\",\"duckTime\",\"fadeAndStopOthers\",\"fadeAndStopOthersTime\",\"secondTriggerAction\",\"secondTriggerOnRelease\",\"skipIfDisarmed\",\"rate\",\"infiniteLoop\",\"hasFileTargets\",\"hasCueTargets\",\"levels\",\"sliderLevels\",\"isRunning\",\"isPaused\",\"isLoaded\",\"isBroken\",\"isAuditioning\",\"isPanicking\",\"isTailingOut\",\"isActionRunning\",\"isOverridden\",\"isWarning\",\"actionElapsed\",\"percentActionElapsed\",\"preWaitElapsed\",\"percentPreWaitElapsed\",\"postWaitElapsed\",\"percentPostWaitElapsed\",\"currentFileTime\",\"cueTargetId\"]", type: string }], reply_address: "^/reply/workspace/[^/]+/cue_id/[^/]+/valuesForKeys$" }
+        - { address: "/workspace/{1}/cue_id/{2}/children/shallow", reply_address: "^/reply/workspace/[^/]+/cue_id/[^/]+/children/shallow$" }
     - address: "^/update/workspace/([^/]+)/cueList/([^/]+)/playbackPosition$"
+      arg_types: s
       state: { "workspaces.{1}.cue_lists.{2}.playhead_id": "{arg0}" }
+    # No argument: the list's playhead is unset.
+    - address: "^/update/workspace/([^/]+)/cueList/([^/]+)/playbackPosition$"
+      arg_types: ""
+      state: { "workspaces.{1}.cue_lists.{2}.playhead_id": { delete: true } }
+    # The cue lists and carts of a workspace, in order; the whole tree is replaced.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed" }
+      replace: ["workspaces.{1}.cues", "workspaces.{1}.cue_lists"]
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cue_lists.{2}.index": "{index}"
+      then_send:
+        - *values_for_keys
+        - { address: "/workspace/{1}/cue_id/{2}/playheadID", reply_address: "^/reply/workspace/[^/]+/cue_id/[^/]+/playheadID$", models: [qlab-5] }
+        - { address: "/workspace/{1}/cue_id/{2}/playheadId", reply_address: "^/reply/workspace/[^/]+/cue_id/[^/]+/playheadId$", models: [qlab-4] }
+    # Cues 1 level down: in a list or cart.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # Cues 2 levels down: in a list or cart, then in Group cues.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # Cues 3 levels down: in a list or cart, then in Group cues.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # Cues 4 levels down: in a list or cart, then in Group cues.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # Cues 5 levels down: in a list or cart, then in Group cues.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues[*].cues[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # Cues 6 levels down: in a list or cart, then in Group cues.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues[*].cues[*].cues[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # Cues 7 levels down: in a list or cart, then in Group cues.
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues[*].cues[*].cues[*].cues[*].cues[*].cues[*].cues"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed", parent: "$^.uniqueID" }
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.index": "{index}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{parent}.children.{index}": "{2}"
+      then_send:
+        - *values_for_keys
+    # The children of a list, cart or Group, after it changed.
+    - address: "^/reply/workspace/([^/]+)/cue_id/([A-Za-z0-9-]+)/children/shallow$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: { number: "$.number", name: "$.name", list_name: "$.listName", type: "$.type", color: "$.colorName", color_live: "$.colorName/live", flagged: "$.flagged", armed: "$.armed" }
+      replace: "workspaces.{1}.cues.{2}.children"
+      state:
+        "workspaces.{1}.cues.{3}.number": "{number}"
+        "workspaces.{1}.cues.{3}.name": "{name}"
+        "workspaces.{1}.cues.{3}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{3}.type": "{type}"
+        "workspaces.{1}.cues.{3}.color": "{color}"
+        "workspaces.{1}.cues.{3}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{3}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{3}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{3}.index": "{index}"
+        "workspaces.{1}.cues.{3}.parent": "{2}"
+        "workspaces.{1}.cues.{2}.children.{index}": "{3}"
+    # A cue list's playhead, read with its cue lists.
+    - address: "^/reply/workspace/([^/]+)/cue_id/([A-Za-z0-9-]+)/playhead(?:ID|Id)$"
+      json_match: { "$.status": "^ok$", "$.data": "^([A-Za-z0-9]+-[A-Za-z0-9-]+)$" }
+      state: { "workspaces.{1}.cue_lists.{2}.playhead_id": "{3}" }
+    - address: "^/reply/workspace/([^/]+)/cue_id/([A-Za-z0-9-]+)/playhead(?:ID|Id)$"
+      json_match: { "$.status": "^ok$", "$.data": "^none$" }
+      state: { "workspaces.{1}.cue_lists.{2}.playhead_id": { delete: true } }
+    # A cue's values, as valuesForKeys answers: every key that applies to its type.
+    - address: "^/reply/workspace/([^/]+)/cue_id/([A-Za-z0-9-]+)/valuesForKeys$"
+      json_match: { "$.status": "^ok$" }
+      json:
+        number: "$.data.number"
+        name: "$.data.name"
+        list_name: "$.data.listName"
+        display_name: "$.data.displayName"
+        type: "$.data.type"
+        color: "$.data.colorName"
+        color_live: "$.data.colorName/live"
+        second_color: "$.data.secondColorName"
+        use_second_color: "$.data.useSecondColor"
+        flagged: "$.data.flagged"
+        armed: "$.data.armed"
+        notes: "$.data.notes"
+        auto_load: "$.data.autoLoad"
+        continue_mode: "$.data.continueMode"
+        pre_wait: "$.data.preWait"
+        post_wait: "$.data.postWait"
+        duration: "$.data.duration"
+        current_duration: "$.data.currentDuration"
+        parent: "$.data.parent"
+        cue_target_id: "$.data.cueTargetID"
+        cue_target_number: "$.data.cueTargetNumber"
+        file_target: "$.data.fileTarget"
+        target_mode: "$.data.targetMode"
+        patch_target_id: "$.data.patchTargetID"
+        duck_others: "$.data.duckOthers"
+        duck_level: "$.data.duckLevel"
+        duck_time: "$.data.duckTime"
+        fade_and_stop_others: "$.data.fadeAndStopOthers"
+        fade_and_stop_others_time: "$.data.fadeAndStopOthersTime"
+        second_trigger_action: "$.data.secondTriggerAction"
+        second_trigger_on_release: "$.data.secondTriggerOnRelease"
+        skip_if_disarmed: "$.data.skipIfDisarmed"
+        rate: "$.data.rate"
+        infinite_loop: "$.data.infiniteLoop"
+        has_file_targets: "$.data.hasFileTargets"
+        has_cue_targets: "$.data.hasCueTargets"
+        levels: "$.data.levels"
+        slider_levels: "$.data.sliderLevels"
+        running: "$.data.isRunning"
+        paused: "$.data.isPaused"
+        loaded: "$.data.isLoaded"
+        broken: "$.data.isBroken"
+        auditioning: "$.data.isAuditioning"
+        panicking: "$.data.isPanicking"
+        tailing_out: "$.data.isTailingOut"
+        action_running: "$.data.isActionRunning"
+        overridden: "$.data.isOverridden"
+        warning: "$.data.isWarning"
+        action_elapsed: "$.data.actionElapsed"
+        percent_action_elapsed: "$.data.percentActionElapsed"
+        pre_wait_elapsed: "$.data.preWaitElapsed"
+        percent_pre_wait_elapsed: "$.data.percentPreWaitElapsed"
+        post_wait_elapsed: "$.data.postWaitElapsed"
+        percent_post_wait_elapsed: "$.data.percentPostWaitElapsed"
+        current_file_time: "$.data.currentFileTime"
+      state:
+        "workspaces.{1}.cues.{2}.number": "{number}"
+        "workspaces.{1}.cues.{2}.name": "{name}"
+        "workspaces.{1}.cues.{2}.list_name": "{list_name}"
+        "workspaces.{1}.cues.{2}.display_name": "{display_name}"
+        "workspaces.{1}.cues.{2}.type": "{type}"
+        "workspaces.{1}.cues.{2}.color": "{color}"
+        "workspaces.{1}.cues.{2}.color_live": "{color_live}"
+        "workspaces.{1}.cues.{2}.second_color": "{second_color}"
+        "workspaces.{1}.cues.{2}.use_second_color": { value: "{use_second_color}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.flagged": { value: "{flagged}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.armed": { value: "{armed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.notes": "{notes}"
+        "workspaces.{1}.cues.{2}.auto_load": { value: "{auto_load}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.continue_mode": "{continue_mode}"
+        "workspaces.{1}.cues.{2}.pre_wait": "{pre_wait}"
+        "workspaces.{1}.cues.{2}.post_wait": "{post_wait}"
+        "workspaces.{1}.cues.{2}.duration": "{duration}"
+        "workspaces.{1}.cues.{2}.current_duration": "{current_duration}"
+        "workspaces.{1}.cues.{2}.parent": "{parent}"
+        "workspaces.{1}.cues.{2}.cue_target_id": "{cue_target_id}"
+        "workspaces.{1}.cues.{2}.cue_target_number": "{cue_target_number}"
+        "workspaces.{1}.cues.{2}.file_target": "{file_target}"
+        "workspaces.{1}.cues.{2}.target_mode": "{target_mode}"
+        "workspaces.{1}.cues.{2}.patch_target_id": "{patch_target_id}"
+        "workspaces.{1}.cues.{2}.duck_others": { value: "{duck_others}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.duck_level": "{duck_level}"
+        "workspaces.{1}.cues.{2}.duck_time": "{duck_time}"
+        "workspaces.{1}.cues.{2}.fade_and_stop_others": "{fade_and_stop_others}"
+        "workspaces.{1}.cues.{2}.fade_and_stop_others_time": "{fade_and_stop_others_time}"
+        "workspaces.{1}.cues.{2}.second_trigger_action": "{second_trigger_action}"
+        "workspaces.{1}.cues.{2}.second_trigger_on_release": { value: "{second_trigger_on_release}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.skip_if_disarmed": { value: "{skip_if_disarmed}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.rate": "{rate}"
+        "workspaces.{1}.cues.{2}.infinite_loop": { value: "{infinite_loop}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.has_file_targets": { value: "{has_file_targets}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.has_cue_targets": { value: "{has_cue_targets}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.levels": "{levels}"
+        "workspaces.{1}.cues.{2}.slider_levels": "{slider_levels}"
+        "workspaces.{1}.cues.{2}.running": { value: "{running}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.paused": { value: "{paused}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.loaded": { value: "{loaded}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.broken": { value: "{broken}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.auditioning": { value: "{auditioning}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.panicking": { value: "{panicking}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.tailing_out": { value: "{tailing_out}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.action_running": { value: "{action_running}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.overridden": { value: "{overridden}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.warning": { value: "{warning}", map: { "true": true, "false": false, "1": true, "0": false } }
+        "workspaces.{1}.cues.{2}.action_elapsed": "{action_elapsed}"
+        "workspaces.{1}.cues.{2}.percent_action_elapsed": "{percent_action_elapsed}"
+        "workspaces.{1}.cues.{2}.pre_wait_elapsed": "{pre_wait_elapsed}"
+        "workspaces.{1}.cues.{2}.percent_pre_wait_elapsed": "{percent_pre_wait_elapsed}"
+        "workspaces.{1}.cues.{2}.post_wait_elapsed": "{post_wait_elapsed}"
+        "workspaces.{1}.cues.{2}.percent_post_wait_elapsed": "{percent_post_wait_elapsed}"
+        "workspaces.{1}.cues.{2}.current_file_time": "{current_file_time}"
+    # QLab 4 spells the target's key cueTargetId.
+    - address: "^/reply/workspace/([^/]+)/cue_id/([A-Za-z0-9-]+)/valuesForKeys$"
+      json_match: { "$.status": "^ok$" }
+      json: { target: "$.data.cueTargetId" }
+      state: { "workspaces.{1}.cues.{2}.cue_target_id": "{target}" }
+    # The active (running or paused) cues of each workspace; their times are read.
+    - address: "^/reply/runningOrPausedCues/shallow$"
+      json_match: { "$.workspace_id": "^([A-Za-z0-9-]+)$", "$.status": "^ok$" }
+      replace: "workspaces.{1}.active"
+      json_each: "$.data"
+      each_match: { "$.uniqueID": "^([A-Za-z0-9-]+)$" }
+      json: {}
+      state: { "workspaces.{1}.active.{index}": "{2}" }
+      then_send:
+        - { address: "/workspace/{1}/cue_id/{2}/valuesForKeys", args: [{ value: "[\"isRunning\",\"isPaused\",\"isLoaded\",\"isBroken\",\"isAuditioning\",\"isPanicking\",\"isTailingOut\",\"isActionRunning\",\"isOverridden\",\"isWarning\",\"actionElapsed\",\"percentActionElapsed\",\"preWaitElapsed\",\"percentPreWaitElapsed\",\"postWaitElapsed\",\"percentPostWaitElapsed\",\"currentFileTime\",\"currentDuration\"]", type: string }], reply_address: "^/reply/workspace/[^/]+/cue_id/[^/]+/valuesForKeys$" }
+    - address: "^/reply/workspace/([^/]+)/showMode$"
+      json_match: { "$.status": "^ok$" }
+      json: { value: "$.data" }
+      state:
+        "workspaces.{1}.show_mode": { value: "{value}", map: { "true": true, "false": false, "1": true, "0": false } }
+    # Show control broadcast events (QLab 5.3 and later).
     - address: "^/qlab/event/workspace/playhead$"
       state:
         playhead.number: "{arg0}"
@@ -3947,17 +4390,22 @@ quirks:
   - models: [all]
     severity: warning
     text: >
-      State comes from two subscriptions sent on connecting. /updates gives the
-      playback position of each cue list; when a list's playhead is unset the
-      message has no argument, which the format cannot turn into an empty value, so
-      the previous ID stays. Its other messages (/update/workspace/{id} and
-      /update/workspace/{id}/cue_id/{cue_id}) only tell the client to reload and
-      carry no data, so they produce no state. The /listen events (playhead, GO, cue
-      start and stop) exist from QLab 5.3; QLab 4 and earlier QLab 5 send none, and
-      those state paths stay empty. The dictionary does not say whether a cue that
-      completes on its own produces a stop event, nor how pause, panic, stop-all
-      and reset-all events are addressed, so those are not used. The rules expect
-      the default event format; changing it with /eventFormat breaks them.
+      State is read as QLab's dictionary describes for a client keeping current.
+      On connecting the client subscribes to /updates and asks for /workspaces;
+      each open workspace's cue lists are read (/workspace/{id}/cueLists, the
+      whole tree, which replaces what was known), then every cue's values with
+      valuesForKeys and every cue list's playhead. /update/workspace/{id} reads
+      the cue lists again, /update/.../cue_id/{id} reads that cue's values and
+      its children, /update/.../playbackPosition sets or clears a list's
+      playhead, and /update/.../disconnect drops the workspace. The running or
+      paused cues are polled once a second (/runningOrPausedCues/shallow) and
+      each one's elapsed times read. A full re-read empties the cue tree for
+      the moment it takes to arrive, and asks each cue's values again, one
+      query per cue: a large workspace takes a while. The /listen events
+      (playhead, GO, cue start and stop) exist from QLab 5.3; the rules expect
+      the default event format, and changing it with /eventFormat breaks them.
+      The dictionary does not say how pause, panic, stop-all and reset-all
+      events are addressed, so those are not used.
 
   - models: [all]
     severity: info
@@ -3965,3 +4413,48 @@ quirks:
       go_to_cue on a cue inside a cart, or on a number that matches no cue, does
       nothing: carts have no playhead. Use start_cue there. The cue_list parameter
       of the cue list playhead commands must name a cue list.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The cue tree goes eight levels deep: cue lists and carts, then up to seven
+      levels of nested Group cues. Cues nested deeper are not in state from the
+      cue lists, though an update to one still reads its values. A cue deleted
+      from inside a list or Group leaves the parent's children list at once,
+      but its own entry stays until the workspace's cue lists are next read in
+      full, since QLab answers no query about a deleted cue.
+
+  - models: [all]
+    severity: info
+    text: >
+      valuesForKeys asks every cue for one list of keys; a cue answers with
+      the ones that apply to its type (start time for Audio, opacity for Video
+      and so on), and the rest stay absent from its state. Values QLab reports
+      as arrays or dictionaries (levels, slice markers, crop, objects, text
+      format, quaternion) are kept as JSON text. Elapsed times are polled once
+      a second, so they step; remaining time is current_duration minus
+      action_elapsed. Cue-specific state covers the properties QLab can read;
+      for Text cues the format runs, for Light cues the command text.
+
+  - models: [all]
+    severity: info
+    text: >
+      API limits (not in QLab's OSC dictionary): a Script cue's source can be
+      read but not written; the light patch, the video stages' regions and the
+      audio maps can be read but only partly written; a Fade cue's curve shape
+      cannot be set, only its type (1D curve or 2D path) and its points
+      (Network cues); and the audio output patch a cue uses is edited through
+      the workspace settings commands, by patch unique ID, rather than through
+      the cue. Video effects are addressed by their position in the cue's list.
+      A Timecode cue's start and end times are timecode text, set with
+      set_cue_timecode_start_time and set_cue_timecode_end_time; the same keys
+      read as seconds on Audio and Video cues, so start_time and end_time are
+      text in state.
+
+  - models: [all]
+    severity: info
+    text: >
+      Increment and decrement (/+ and /-), /toggle on booleans (QLab 5.2) and
+      OSC wildcards in cue numbers are not offered: every command sets an
+      absolute value, and the cue pattern refuses * ? [ ]. QLab's own toggle
+      messages are offered where the dictionary has them.

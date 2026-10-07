@@ -1024,8 +1024,15 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## qlab — QLab
 
-- [ ] Check whether a cue that completes on its own produces a stop event, and how pause, panic, stop-all and reset-all events are addressed. ([specs/qlab.yaml:3954](specs/qlab.yaml#L3954))
-- [ ] Confirm the /updates message with no argument when a cue list's playhead is unset. ([specs/qlab.yaml:3948](specs/qlab.yaml#L3948))
+- [ ] Check whether a cue that completes on its own produces a stop event, and how pause, panic, stop-all and reset-all events are addressed. ([specs/qlab.yaml:4407](specs/qlab.yaml#L4407))
+- [ ] Confirm that /update/.../playbackPosition arrives with no argument when a cue list's playhead is unset. ([specs/qlab.yaml:3950](specs/qlab.yaml#L3950))
+- [ ] Confirm that /workspaces lists every open workspace, and that /workspace/{id}/... reads reach a workspace listening on another port. ([specs/qlab.yaml:3916](specs/qlab.yaml#L3916))
+- [ ] Check that a workspace-addressed reply (/reply/workspace/{id}/cueLists and the like) arrives on that address, and that the rootless /runningOrPausedCues/shallow reply carries workspace_id, once per workspace. ([specs/qlab.yaml:4261](specs/qlab.yaml#L4261))
+- [ ] Check that valuesForKeys answers a cue with the keys that apply to its type when the list holds others too, whether the others are left out or null, and that keys holding a slash (colorName/live) are accepted. ([specs/qlab.yaml:4141](specs/qlab.yaml#L4141))
+- [ ] Check that QLab sends /update/.../cue_id/{id} when a cue starts, pauses, loads or stops, and for a newly created cue, so its values are read again. ([specs/qlab.yaml:3941](specs/qlab.yaml#L3941))
+- [ ] Confirm the address of an update to the cue lists themselves: /update/workspace/{id}/cue_id/__root__ (QLab 5.5) or [root group of cue lists] before. ([specs/qlab.yaml:3933](specs/qlab.yaml#L3933))
+- [ ] Check whether /cueLists reports flagged and armed as numbers or booleans (the dictionary shows both). ([specs/qlab.yaml:3955](specs/qlab.yaml#L3955))
+- [ ] Check that a cue list's playheadID answers none when no cue stands by. ([specs/qlab.yaml:4138](specs/qlab.yaml#L4138))
 
 ## qsys — Q-SYS
 

@@ -247,11 +247,13 @@ for stem, method, model in [("get_cue_list_playhead", "playhead", None),
     q(stem + "_by_id", {"cue_list_id": LIST_UID}, f"/cue_id/{LIST_UID}/{method}", **m)
 
 # Telemetry. On connecting (no passcode configured, so no /connect): /updates 1,
-# then the show control broadcast subscriptions (QLab 5.3).
+# the show control broadcast subscriptions (QLab 5.3), /workspaces, then the
+# first poll of the active cues.
 telemetry(Q, "playback-position",
           expect_connect_wire_hex=[hexs(slip(osc("/updates", ("i", 1)))), hexs(slip(osc("/listen/go"))),
                                    hexs(slip(osc("/listen/playhead"))), hexs(slip(osc("/listen/cue/start"))),
-                                   hexs(slip(osc("/listen/cue/stop")))],
+                                   hexs(slip(osc("/listen/cue/stop"))), hexs(slip(osc("/workspaces"))),
+                                   hexs(slip(osc("/runningOrPausedCues/shallow")))],
           inbound_hex=hexs(osc(f"/update/workspace/{UID}/cueList/{LIST_UID}/playbackPosition", ("s", CUE_UID))),
           expect_state={"workspaces": {UID: {"cue_lists": {LIST_UID: {"playhead_id": CUE_UID}}}}})
 # /qlab/event/workspace/playhead "{cue number}" "{cue name}" "{cue uniqueID}" "{cue type}"
@@ -273,3 +275,130 @@ telemetry(Q, "cue-stop",
                                ("s", CUE_UID), ("s", "Audio"))),
           expect_state={"last_stopped": {"number": "12.5", "name": "Overture", "id": CUE_UID, "type": "Audio"},
                         "cues": {CUE_UID: {"running": False}}})
+
+
+# ── Full control ─────────────────────────────────────────────────────────
+# Cue-type properties and workspace settings, from the QLab 5 dictionary
+# (QLab 4 where marked): each setter with its documented argument types, each
+# getter as the bare address, live forms with /live appended.
+
+# State. Workspace and cue IDs as QLab reports them (uniqueID, UUID strings).
+WS = UID
+L1, C1, G1, C2 = LIST_UID, CUE_UID, "6A000001-0000-4000-8000-0000000000C3", "6A000001-0000-4000-8000-0000000000C4"
+VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","cueTargetId"]'
+TIMING_KEYS = '["isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","currentDuration"]'
+
+
+def framed(address, *args):
+    return hexs(slip(osc(address, *args)))
+
+
+def reply(address, data, status="ok", workspace=True):
+    body = {"address": address, "status": status, "data": data}
+    if workspace:
+        body = {"workspace_id": WS, **body}
+    return hexs(osc("/reply" + address, ("s", json.dumps(body))))
+
+
+def workspace_reads(ws):
+    """What a workspace's discovery or update reads, in the spec's order (QLab 5)."""
+    reads = [framed(f"/workspace/{ws}/{m}") for m in ['cueLists', 'showMode']]
+    reads += [framed(f"/{m}") for m in []]
+    if False:
+        reads.append(framed(f"/workspace/{ws}/settings/audio/patchList"))
+    return reads
+
+
+# /workspaces: each open workspace is kept and read.
+telemetry(Q, "workspaces",
+          inbound_hex=reply("/workspaces", [{"uniqueID": WS, "displayName": "show", "port": 53000,
+                                              "udpReplyPort": 53001, "version": "5.5.4"}], workspace=False),
+          expect_state={"workspaces": {WS: {"name": "show", "version": "5.5.4", "port": 53000}}},
+          expect_then_send_hex=workspace_reads(WS))
+telemetry(Q, "workspace-update", inbound_hex=hexs(osc(f"/update/workspace/{WS}")),
+          expect_state={}, expect_then_send_hex=workspace_reads(WS))
+telemetry(Q, "root-group-update", inbound_hex=hexs(osc(f"/update/workspace/{WS}/cue_id/__root__")),
+          expect_state={}, expect_then_send_hex=[framed(f"/workspace/{WS}/cueLists")])
+telemetry(Q, "workspace-disconnect", inbound_hex=hexs(osc(f"/update/workspace/{WS}/disconnect")),
+          state_before={"workspaces": {WS: {"name": "show"}, "OTHER-1": {"name": "other"}}},
+          expect_state={"workspaces": {"OTHER-1": {"name": "other"}}})
+# A cue changed: its values and its children are read.
+telemetry(Q, "cue-update", inbound_hex=hexs(osc(f"/update/workspace/{WS}/cue_id/{C1}")),
+          expect_state={},
+          expect_then_send_hex=[framed(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", ("s", VFK)),
+                                framed(f"/workspace/{WS}/cue_id/{C1}/children/shallow")])
+# No argument: the playhead is unset.
+telemetry(Q, "playback-position-none",
+          inbound_hex=hexs(osc(f"/update/workspace/{WS}/cueList/{L1}/playbackPosition")),
+          state_before={"workspaces": {WS: {"cue_lists": {L1: {"playhead_id": C1, "index": 0}}}}},
+          expect_state={"workspaces": {WS: {"cue_lists": {L1: {"index": 0}}}}})
+# The cue lists: the tree replaces what was known; every cue's values are read.
+telemetry(Q, "cue-lists",
+          inbound_hex=reply(f"/workspace/{WS}/cueLists", [
+              {"uniqueID": L1, "number": "", "name": "Main Cue List", "listName": "Main Cue List",
+               "type": "Cue List", "colorName": "none", "colorName/live": "none", "flagged": False, "armed": True,
+               "cues": [
+                   {"uniqueID": C1, "number": "1", "name": "Intro", "listName": "Intro", "type": "Audio",
+                    "colorName": "red", "colorName/live": "red", "flagged": 1, "armed": 1},
+                   {"uniqueID": G1, "number": "2", "name": "", "listName": "Group", "type": "Group",
+                    "colorName": "none", "colorName/live": "none", "flagged": 0, "armed": 1,
+                    "cues": [{"uniqueID": C2, "number": "2.1", "type": "Video"}]}]}]),
+          state_before={"workspaces": {WS: {"name": "show", "cues": {"OLD-1": {"name": "Deleted"}},
+                                             "cue_lists": {"OLD-2": {"index": 1, "playhead_id": "OLD-1"}}}}},
+          expect_state={"workspaces": {WS: {
+              "name": "show",
+              "cues": {
+                  L1: {"number": "", "name": "Main Cue List", "list_name": "Main Cue List", "type": "Cue List",
+                       "color": "none", "color_live": "none", "flagged": False, "armed": True, "index": 0,
+                       "children": {"0": C1, "1": G1}},
+                  C1: {"number": "1", "name": "Intro", "list_name": "Intro", "type": "Audio", "color": "red",
+                       "color_live": "red", "flagged": True, "armed": True, "index": 0, "parent": L1},
+                  G1: {"number": "2", "name": "", "list_name": "Group", "type": "Group", "color": "none",
+                       "color_live": "none", "flagged": False, "armed": True, "index": 1, "parent": L1,
+                       "children": {"0": C2}},
+                  C2: {"number": "2.1", "type": "Video", "index": 0, "parent": G1}},
+              "cue_lists": {L1: {"index": 0}}}}},
+          expect_then_send_hex=[framed(f"/workspace/{WS}/cue_id/{L1}/valuesForKeys", ("s", VFK)),
+                                framed(f"/workspace/{WS}/cue_id/{L1}/playheadID"),
+                                framed(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", ("s", VFK)),
+                                framed(f"/workspace/{WS}/cue_id/{G1}/valuesForKeys", ("s", VFK)),
+                                framed(f"/workspace/{WS}/cue_id/{C2}/valuesForKeys", ("s", VFK))])
+# A Group's children after it changed: its children list is replaced.
+telemetry(Q, "children",
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{G1}/children/shallow", [
+              {"uniqueID": C2, "number": "2.1", "name": "Logo", "listName": "Logo", "type": "Video",
+               "colorName": "blue", "colorName/live": "blue", "flagged": False, "armed": False}]),
+          state_before={"workspaces": {WS: {"cues": {G1: {"children": {"0": "OLD-1", "1": C2}}}}}},
+          expect_state={"workspaces": {WS: {"cues": {
+              G1: {"children": {"0": C2}},
+              C2: {"number": "2.1", "name": "Logo", "list_name": "Logo", "type": "Video", "color": "blue",
+                   "color_live": "blue", "flagged": False, "armed": False, "index": 0, "parent": G1}}}}})
+telemetry(Q, "list-playhead",
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{L1}/playheadID", C1),
+          expect_state={"workspaces": {WS: {"cue_lists": {L1: {"playhead_id": C1}}}}})
+telemetry(Q, "list-playhead-none",
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{L1}/playheadID", "none"),
+          state_before={"workspaces": {WS: {"cue_lists": {L1: {"playhead_id": C1}}}}},
+          expect_state={"workspaces": {WS: {"cue_lists": {L1: {}}}}})
+# A cue's values: the keys that apply to it.
+telemetry(Q, "cue-values",
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {
+              "uniqueID": C1, "number": "1", "name": "Intro", "type": "Audio", "flagged": 0, "armed": True,
+              "continueMode": 2, "preWait": 1.5, "postWait": 0, "duration": 182.25, "parent": L1,
+              "colorName/live": "green", "isRunning": True, "isPaused": False, "actionElapsed": 12.5,
+              "percentActionElapsed": 0.0686, "cueTargetID": "", "levels": [[0, -6], [-3, 0]], "notes": None}),
+          expect_state={"workspaces": {WS: {"cues": {C1: {
+              "number": "1", "name": "Intro", "type": "Audio", "flagged": False, "armed": True,
+              "continue_mode": 2, "pre_wait": 1.5, "post_wait": 0.0, "duration": 182.25, "parent": L1,
+              "color_live": "green", "running": True, "paused": False, "action_elapsed": 12.5,
+              "percent_action_elapsed": 0.0686, "cue_target_id": "", "levels": "[[0,-6],[-3,0]]"}}}}})
+# The active cues, polled: the list is replaced and each one's times read.
+telemetry(Q, "active-cues",
+          inbound_hex=reply("/runningOrPausedCues/shallow", [{"uniqueID": C1, "number": "1"}, {"uniqueID": C2}]),
+          state_before={"workspaces": {WS: {"active": {"0": "OLD-1", "1": "OLD-2", "2": "OLD-3"}}}},
+          expect_state={"workspaces": {WS: {"active": {"0": C1, "1": C2}}}},
+          expect_then_send_hex=[framed(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", ("s", TIMING_KEYS)),
+                                framed(f"/workspace/{WS}/cue_id/{C2}/valuesForKeys", ("s", TIMING_KEYS))])
+telemetry(Q, "show-mode", inbound_hex=reply(f"/workspace/{WS}/showMode", True),
+          expect_state={"workspaces": {WS: {"show_mode": True}}})
+
