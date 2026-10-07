@@ -14,6 +14,8 @@ category: other
 # 3 seconds, and every protocol's sessions, the configuration and the
 # server's version every 10 seconds. Lists are read whole (1000 items a page)
 # and replace what state held, so removed paths and closed sessions leave it.
+# Recorded time spans are listed from the playback server, a second HTTP
+# server on port 9996 (playback: yes).
 #
 # Two models: MediaMTX 1.21 and later serve the endpoints grouped by
 # protocol (/v3/rtsp/sessions/list); 1.2 to 1.20 serve the same API under
@@ -81,6 +83,22 @@ source:
       (hot reloading), environment variables or the Control API. Metrics are
       served on :9998 in Prometheus format, pprof on :9999, the playback
       server on :9996 (/list and /get of recorded time spans).
+  - title: MediaMTX Playback API OpenAPI definition (api/playback.openapi.yaml, v1.21.1) and "Playback recorded streams" (docs/2-features/10-playback.md)
+    author: bluenviron (MediaMTX, MIT licence)
+    url: https://github.com/bluenviron/mediamtx/blob/v1.21.1/api/playback.openapi.yaml
+    note: >
+      The project's own definition of the playback server, retrieved
+      2026-10-06, with its documentation page. Enabled with playback: yes,
+      playbackAddress :9996, playbackEncryption for HTTPS; no security of its
+      own beyond MediaMTX's authentication (the playback action, per path;
+      the default configuration grants it to anyone). GET /list with path
+      (required), start and end (RFC 3339, optional) answers an array of
+      {start, duration (seconds), url}, 404 when no time span matches, 400 or
+      500 with {status: error, error}. GET /get with path, start, duration
+      and format (fmp4 or mp4) answers the recording itself as MP4, without
+      byte ranges. Release notes: playback server 1.5.0, /list 1.5.1, the
+      url field 1.9.0, start and end filters 1.11.0, 404 for an empty list
+      1.11.1, JSON errors 1.18.0, the OpenAPI definition 1.20.0.
   - title: MediaMTX mediamtx.yml (v1.21.1) and release notes v0.17.0 to v1.21.1
     author: bluenviron (MediaMTX)
     url: https://github.com/bluenviron/mediamtx/releases
@@ -109,6 +127,13 @@ transport:
   auth: { setting: auth }
   refusal_status: [401]
   timeout_ms: 5000
+  # The playback server: a second HTTP server of the same process, with its
+  # own address, encryption and permission (SPEC.md §2, Endpoints).
+  endpoints:
+    playback:
+      port: { setting: playback_port }
+      scheme: { setting: playback_scheme }
+      auth: { setting: playback_auth }
   # Every release from 1.2 serves it; one item keeps it small.
   probe: { method: GET, path: /v3/paths/list, query: { itemsPerPage: "1" } }
 
@@ -128,11 +153,21 @@ settings:
   token: { type: string, secret: true, max_length: 8192, default: "",
            label: Token,
            description: "A JWT from the identity server MediaMTX trusts, with the api action in its permissions claim, sent as a Bearer token when the credential type is bearer." }
+  playback_port: { type: int, min: 1, max: 65535, default: 9996,
+                   label: Playback port,
+                   description: "The port of the playback server's playbackAddress, which lists recorded time spans; 9996 by default." }
+  playback_scheme: { type: enum, values: [http, https], default: http,
+                     label: Playback scheme,
+                     description: "https when the server sets playbackEncryption: yes, otherwise http; its certificate is accepted without being checked." }
+  playback_auth: { type: enum, values: [none, inherit], default: none,
+                   label: Playback credential,
+                   description: "none to ask the playback server without credentials, as the default configuration allows anyone; inherit to send the API credential, whose user then needs the playback permission too." }
 
 ports:
   - { port: 9997, protocol: http, role: control, when: "scheme http" }
   - { port: 9997, protocol: https, role: control, setting: scheme, when: "scheme https" }
-  - { port: 9996, protocol: http, role: control, note: "not used by this integration: MediaMTX's playback server (playback: yes), which lists and serves recorded time spans at /list and /get" }
+  - { port: 9996, protocol: http, role: control, setting: playback_port, when: "playback_scheme http", note: "MediaMTX's playback server (playback: yes), for the recorded time span lists" }
+  - { port: 9996, protocol: https, role: control, setting: playback_port, when: "playback_scheme https", note: "MediaMTX's playback server with playbackEncryption: yes" }
   - { port: 9998, protocol: http, role: control, note: "not used by this integration: MediaMTX's Prometheus metrics server (metrics: yes)" }
   - { port: 9999, protocol: http, role: control, note: "not used by this integration: MediaMTX's pprof profiling server (pprof: yes)" }
 
@@ -154,7 +189,8 @@ models:
        list_webrtc_sessions, get_webrtc_session, kick_webrtc_session,
        list_hls_muxers, get_hls_muxer, list_hls_sessions, get_hls_session, kick_hls_session,
        list_moq_sessions, get_moq_session, kick_moq_session,
-       list_recordings, get_recordings, delete_recording_segment]
+       list_recordings, get_recordings, delete_recording_segment,
+       list_playback_spans, list_playback_spans_between]
     verification: none
     notes: >
       The endpoint names grouped by protocol, introduced in 1.21.0.
@@ -175,7 +211,8 @@ models:
        list_webrtc_sessions, get_webrtc_session, kick_webrtc_session,
        list_hls_muxers, get_hls_muxer, list_hls_sessions, get_hls_session, kick_hls_session,
        list_moq_sessions, get_moq_session, kick_moq_session,
-       list_recordings, get_recordings, delete_recording_segment]
+       list_recordings, get_recordings, delete_recording_segment,
+       list_playback_spans, list_playback_spans_between]
     verification: none
     notes: >
       The Control API v3 under its earlier endpoint names. Some endpoints
@@ -807,6 +844,28 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  # ── Playback server (port 9996) ───────────────────────────────────────────
+  list_playback_spans:
+    summary: A path's recorded time spans from the playback server, each with its start, duration in seconds and download URL (GET /list on port 9996, 1.5.1 and later)
+    params: { path: *path_name }
+    send: { endpoint: playback, method: GET, path: /list, query: { path: "{path}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
+  list_playback_spans_between:
+    summary: A path's recorded time spans that start at or after one time and end at or before another (GET /list with start and end on port 9996, 1.11.0 and later)
+    params:
+      path: *path_name
+      start: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$", max_length: 64, required: true,
+               label: From,
+               description: "The earliest start, an RFC 3339 time such as 2026-10-06T14:00:00Z or 2026-10-06T15:00:00+01:00." }
+      end: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$", max_length: 64, required: true,
+             label: Until,
+             description: "The latest end, an RFC 3339 time such as 2026-10-06T18:00:00Z." }
+    send: { endpoint: playback, method: GET, path: /list, query: { path: "{path}", start: "{start}", end: "{end}" } }
+    expect: { status: 200, json_path: "$" }
+    returns: value
+
 quirks:
   - models: [all]
     severity: warning
@@ -881,6 +940,25 @@ quirks:
       slashes (live/stage), sent percent-encoded in the request path. Sessions
       and connections are keyed by their UUID, HLS muxers by their path.
       Byte counters are totals since the path or session started.
+
+  - models: [all]
+    severity: warning
+    text: >
+      The playback commands ask MediaMTX's playback server, a second HTTP
+      server on port 9996 (playback_port), which is off by default: set
+      playback: yes. It has its own address, encryption (playbackEncryption,
+      chosen with playback_scheme) and permission: MediaMTX's playback
+      action, which the default configuration grants to anyone, so by
+      default the playback commands send no credential (playback_auth none).
+      Where playback is restricted, choose inherit to send the API
+      credential, whose user then needs the playback permission for the
+      path; a 401 there is then a refusal of that credential and, as for the
+      API, terminal. A path with no recording in the range answers 404
+      (1.11.1 and later), which fails the command. The playback server not
+      running fails those commands only: the device stays connected through
+      the API. The recordings themselves (GET /get, an MP4 file without byte
+      ranges) are not fetched by this integration; each listed span's url
+      (1.9.0 and later) is the address a player downloads it from.
 
   - models: [mediamtx-1-2]
     severity: info

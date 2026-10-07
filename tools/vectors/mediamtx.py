@@ -11,8 +11,10 @@ _MXID2 = "0b7e2d11-5f3c-4f6a-8e21-7c4d9a1b2e30"
 _MXJ = lambda o: json.dumps(o, separators=(",", ":"))
 
 
-def _mx(command, input, method, target, body=None, model=None, file=None, **extra):
+def _mx(command, input, method, target, body=None, model=None, file=None, port=None, **extra):
     request = {"method": method, "target": target}
+    if port is not None:
+        request["port"] = port
     if body is not None:
         request["body"] = body
     v = {"spec": MX, "command": command, "input": input, "expect_request": request, **extra}
@@ -135,6 +137,37 @@ _mx("get_recordings", {"name": "cam1"}, "GET", "/v3/recordings/get/cam1",
 _mx2("delete_recording_segment", {"path": "cam1", "start": "2026-10-06T08:00:00.000123+01:00"}, "DELETE",
      "/v3/recordings/segments/delete?path=cam1&start=2026-10-06T08%3A00%3A00.000123%2B01%3A00",
      "/v3/recordings/deletesegment?path=cam1&start=2026-10-06T08%3A00%3A00.000123%2B01%3A00")
+# The playback server: another port of the same host (api/playback.openapi.yaml).
+_SPANS = [{"start": "2026-10-06T08:00:00.000123+01:00", "duration": 60.0,
+           "url": "http://192.0.2.10:9996/get?path=cam1&start=2026-10-06T08%3A00%3A00.000123%2B01%3A00&duration=60"}]
+_mx("list_playback_spans", {"path": "live/stage"}, "GET", "/list?path=live%2Fstage", port=9996,
+    http_reply={"status": 200, "body": _MXJ(_SPANS)},
+    expect_result={"ok": {"kind": "value", "value": _SPANS}})
+V.append({"spec": MX, "command": "list_playback_spans", "file": "list_playback_spans-other-port",
+          "input": {"path": "cam1"}, "settings": {"playback_port": 8996, "playback_scheme": "https"},
+          "expect_request": {"method": "GET", "port": 8996, "target": "/list?path=cam1"}})
+# No recording in the range: 404 with a JSON error (1.11.1 and later).
+V.append({"spec": MX, "command": "list_playback_spans", "file": "list_playback_spans-none",
+          "input": {"path": "cam1"},
+          "expect_request": {"method": "GET", "port": 9996, "target": "/list?path=cam1"},
+          "http_reply": {"status": 404, "body": _MXJ({"status": "error", "error": "no recordings found"})},
+          "expect_result": {"error": {"error": "device_error", "code": "404"}}})
+# Without the credential (playback_auth none) a 401 is that command's answer;
+# with it (inherit) it is the API credential refused, terminal.
+V.append({"spec": MX, "command": "list_playback_spans", "file": "list_playback_spans-401-uncredentialed",
+          "input": {"path": "cam1"}, "settings": {"auth": "basic", "username": "operator", "password": "pw"},
+          "expect_request": {"method": "GET", "port": 9996, "target": "/list?path=cam1"},
+          "http_reply": {"status": 401, "body": _MXJ({"status": "error", "error": "authentication error"})},
+          "expect_result": {"error": {"error": "device_error", "code": "401"}}})
+V.append({"spec": MX, "command": "list_playback_spans", "file": "list_playback_spans-refused",
+          "input": {"path": "cam1"},
+          "settings": {"auth": "basic", "username": "operator", "password": "wrong", "playback_auth": "inherit"},
+          "expect_request": {"method": "GET", "port": 9996, "target": "/list?path=cam1"},
+          "http_reply": {"status": 401, "body": _MXJ({"status": "error", "error": "authentication error"})},
+          "expect_result": {"error": {"error": "auth"}}})
+_mx("list_playback_spans_between",
+    {"path": "cam1", "start": "2026-10-06T08:00:00Z", "end": "2026-10-06T18:00:00+01:00"}, "GET",
+    "/list?path=cam1&start=2026-10-06T08%3A00%3A00Z&end=2026-10-06T18%3A00%3A00%2B01%3A00", port=9996)
 # A refused credential: terminal, reported as auth.
 V.append({"spec": MX, "command": "get_path", "file": "get_path-refused", "input": {"name": "cam1"},
           "settings": {"auth": "basic", "username": "imperio", "password": "wrong"},
