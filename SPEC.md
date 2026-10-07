@@ -1166,7 +1166,7 @@ of:
 | `header` + `each_line` | A block whose first line matches `header`; `each_line` is applied to each following line | per line: `{1}`, `{2}`, … |
 | `header` + `fields` | A block whose first line matches `header`; the following lines are `name: value` | `fields` maps each name to a state path |
 | `address` | An OSC message whose address matches | `{1}`, … from the address; `{arg0}`, `{arg1}`, … the arguments |
-| `address` + `json` | As `address`, where the string argument at `json_arg` (default 0) holds JSON | as `address`, plus `json` names by JSON path |
+| `address` + `json` | As `address`, where the string argument at `json_arg` (default 0) holds JSON; with `json_match`, `json_each` and `each_match` it is read as a JSON message is (below) | as `address`, then `json_match`'s, plus `json` names by JSON path |
 
 `state` maps a path template to a value template. Both use the template rules
 of §4: a numeric capture is an integer, so `{1:+1}` converts a 0-based wire
@@ -1394,6 +1394,21 @@ to the text rules and, when they are JSON, to `json_match` rules:
       state: { composition.master: "{value}" }
 ```
 
+An OSC device that answers with JSON in a string argument (QLab's
+`/reply/...`) is read the same way by an `address` rule: `json_match`
+selects on that JSON (its captures numbered on after the address's),
+`json_each` and `each_match` go through its arrays, and `replace` and
+`then_send` apply as for any rule. QLab's cue lists, groups nested in them:
+
+```yaml
+    - address: "^/reply/workspace/([^/]+)/cueLists$"
+      json_match: { "$.status": "^ok$" }
+      json_each: "$.data[*].cues"
+      json: { id: "$.uniqueID", parent: "$^.uniqueID" }
+      replace: "workspaces.{1}.cues"
+      state: { "workspaces.{1}.cues.{id}.parent": "{parent}" }
+```
+
 #### A push websocket beside the transport
 
 `telemetry.websocket` opens a websocket when the device is opened and keeps
@@ -1516,7 +1531,8 @@ seconds:
 
 Nothing is queued while the device is open for commands only. A telemetry
 vector names what a message queues with `expect_then_send`, a list of
-requests as `expect_request` gives them.
+requests as `expect_request` gives them, or of line messages as text; binary
+messages (OSC) are `expect_then_send_hex`, each framed as it is sent.
 
 #### An event stream beside an HTTP transport
 

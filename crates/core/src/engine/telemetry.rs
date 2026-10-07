@@ -43,8 +43,10 @@ enum Matcher {
         fields: BTreeMap<String, Assign>,
     },
     /// An OSC message whose address matches; arguments are `{arg0}`, `{arg1}`.
-    /// With `json`, the string argument at `json_arg` is parsed as JSON and
-    /// the named paths become captures too.
+    /// With `json`, `json_match` or `json_each`, the string argument at
+    /// `json_arg` is parsed as JSON (QLab's replies) and read as a JSON
+    /// message is: `select` must match it, and `json` names values, once per
+    /// element of `each` when it is set.
     Osc {
         address: Regex,
         json: BTreeMap<String, String>,
@@ -52,6 +54,9 @@ enum Matcher {
         /// The message's OSC type tags must be exactly these (`sis`), for a
         /// device that sends different shapes on one address (grandMA3).
         arg_types: Option<String>,
+        select: Vec<(String, Regex)>,
+        each: Option<String>,
+        each_select: Vec<(String, Regex)>,
     },
     /// A JSON message on a websocket. Every `select` JSON path must hold a
     /// value matching its regex; their captures are `{1}`, `{2}`, ... in
@@ -498,6 +503,12 @@ impl Telemetry {
                         .get("arg_types")
                         .and_then(Value::as_str)
                         .map(str::to_string),
+                    select: selectors(rule.get("json_match"), "json_match")?,
+                    each: rule
+                        .get("json_each")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    each_select: selectors(rule.get("each_match"), "each_match")?,
                 }
             } else if let Some(p) = rule.get("path") {
                 let path = regex(p, "path")?;
@@ -855,6 +866,9 @@ impl Telemetry {
                         json,
                         json_arg,
                         arg_types,
+                        select: selectors,
+                        each,
+                        each_select,
                     },
                     Inbound::Osc {
                         address,
@@ -865,24 +879,37 @@ impl Telemetry {
                     if arg_types.as_deref().is_some_and(|t| t != *types) {
                         continue;
                     }
-                    if let Some(caps) = re.captures(address) {
-                        let mut values = captures(&caps);
-                        for (i, a) in args.iter().enumerate() {
-                            values.push((format!("arg{i}"), a.clone()));
-                        }
-                        if !json.is_empty() {
-                            let Some(doc) = args
-                                .get(*json_arg)
-                                .and_then(Value::as_str)
-                                .and_then(|s| serde_json::from_str::<Value>(s).ok())
-                            else {
-                                continue;
-                            };
-                            for (name, path) in json {
-                                if let Some(v) = present(super::expect::json_path(&doc, path)) {
-                                    values.push((name.clone(), v.clone()));
-                                }
-                            }
+                    let Some(caps) = re.captures(address) else {
+                        continue;
+                    };
+                    let mut base = captures(&caps);
+                    let reads_json = !json.is_empty() || !selectors.is_empty() || each.is_some();
+                    let doc = match reads_json {
+                        false => Value::Null,
+                        true => match args
+                            .get(*json_arg)
+                            .and_then(Value::as_str)
+                            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                        {
+                            Some(doc) => doc,
+                            None => continue,
+                        },
+                    };
+                    // `json_match` captures are numbered on after the address's.
+                    if !select(&doc, selectors, &mut base) {
+                        continue;
+                    }
+                    for (i, a) in args.iter().enumerate() {
+                        base.push((format!("arg{i}"), a.clone()));
+                    }
+                    self.clear(rule, &base, cleared);
+                    if !reads_json {
+                        any |= self.matched(rule, &base, &mut patch, triggers);
+                        continue;
+                    }
+                    for values in each_values(&doc, each.as_deref(), each_select, json, &base) {
+                        if each.is_some() {
+                            self.clear(rule, &values, cleared);
                         }
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
@@ -1261,6 +1288,72 @@ mod tests {
             }),
             None
         );
+    }
+
+    #[test]
+    fn a_list_in_an_osc_argument_replaces_the_last_one() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                {"address": "^/reply/(?:workspace/[^/]+/)?cueLists$",
+                 "json_match": {"$.workspace_id": "^([A-Z0-9-]+)$", "$.status": "^ok$"},
+                 "json_each": "$.data", "json": {"id": "$.uniqueID", "name": "$.name"},
+                 "replace": "ws.{1}.cues",
+                 "state": {"ws.{1}.cues.{id}.name": "{name}", "ws.{1}.cues.{id}.index": "{index}"},
+                 "then_send": [{"address": "/workspace/{1}/cue_id/{id}/valuesForKeys"}]},
+                {"address": "^/reply/(?:workspace/[^/]+/)?cueLists$",
+                 "json_match": {"$.workspace_id": "^([A-Z0-9-]+)$"},
+                 "json_each": "$.data[*].cues", "each_match": {"$.type": "^(Audio)$"},
+                 "json": {"id": "$.uniqueID", "parent": "$^.uniqueID"},
+                 "state": {"ws.{1}.cues.{id}.parent": "{parent}", "ws.{1}.cues.{id}.type": "{2}"}},
+            ]})),
+            &state(json!({
+                "ws.*.cues.*.name": {"type": "string", "description": "x"},
+                "ws.*.cues.*.index": {"type": "int", "description": "x"},
+                "ws.*.cues.*.parent": {"type": "string", "description": "x"},
+                "ws.*.cues.*.type": {"type": "string", "description": "x"},
+            })),
+            Conversions::new(),
+        )
+        .unwrap();
+        let reply = json!({"workspace_id": "W1", "status": "ok", "data": [
+            {"uniqueID": "L1", "name": "Main", "cues": [
+                {"uniqueID": "C1", "type": "Audio"}, {"uniqueID": "C2", "type": "Wait"}]},
+        ]})
+        .to_string();
+        let mut cleared = json!({});
+        let mut triggers = Vec::new();
+        let patch = t.apply_into(
+            &Inbound::Osc {
+                address: "/reply/cueLists",
+                types: "s",
+                args: &[json!(reply)],
+            },
+            &mut triggers,
+            &mut cleared,
+        );
+        assert_eq!(cleared, json!({"ws": {"W1": {"cues": null}}}));
+        assert_eq!(
+            patch,
+            Some(json!({"ws": {"W1": {"cues": {
+                "L1": {"name": "Main", "index": 0},
+                "C1": {"parent": "L1", "type": "Audio"},
+            }}}}))
+        );
+        assert_eq!(triggers.len(), 1);
+        assert_eq!(triggers[0].params.get("id"), Some(&json!("L1")));
+        // A reply whose status does not match is not read, and replaces nothing.
+        let denied = json!({"workspace_id": "W1", "status": "denied", "data": []}).to_string();
+        let mut cleared = json!({});
+        let patch = t.apply_into(
+            &Inbound::Osc {
+                address: "/reply/cueLists",
+                types: "s",
+                args: &[json!(denied)],
+            },
+            &mut Vec::new(),
+            &mut cleared,
+        );
+        assert_eq!((cleared, patch), (json!({}), None));
     }
 
     #[test]

@@ -635,7 +635,7 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                     re.compile(pattern)
                 except re.error as e:
                     errors.append(f"{where}.{key}: {e}")
-        if "json_match" in rule and "path" not in rule and not has_json:
+        if "json_match" in rule and "path" not in rule and "address" not in rule and not has_json:
             errors.append(f"{where}: json_match reads JSON messages; the spec has no websocket, "
                           "event stream or line transport")
         if isinstance(asked, dict) and "path" not in rule:
