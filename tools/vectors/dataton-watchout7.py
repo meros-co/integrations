@@ -55,6 +55,12 @@ _wo7("send_msc", {"commands": [{"command": {"go": {}}}]}, "POST", "/v0/msc", '[{
      http_reply={"status": 400, "body": "MSC Cue not found"},
      expect_result={"error": {"error": "device_error", "code": "400"}})
 _wo7("load_show", {"show": {"showName": "Demo"}}, "POST", "/v0/show", '{"showName":"Demo"}')
+# The node's Process Manager on port 3017 (the same page's node management
+# section): POST, no body.
+for _cmd, _path in [("restart_node_services", "/v0/services/restart"), ("reboot_node", "/v0/reboot"),
+                    ("shut_down_node", "/v0/shutdown")]:
+    V.append({"spec": WO7, "command": _cmd, "input": {},
+              "expect_request": {"method": "POST", "port": 3017, "target": _path}, **_OK7})
 
 # ── Telemetry: /v2/sse ──
 telemetry(WO7, "playback-state", inbound_sse={"data": json.dumps({"kind": "playbackState", "value": {

@@ -12,7 +12,8 @@ category: playback
 # pushed on the server-sent event stream /v2/sse; the whole playback state
 # (/v0/state) is read as well, so removed timelines leave. WATCHOUT 7's WATCHOUT 6
 # compatibility layer is the dataton-watchout6 integration's watchout7-compat
-# model.
+# model. The node's own shutdown, reboot and service restart go to its
+# Process Manager on port 3017.
 
 source:
   - title: WATCHOUT User Guide, "HTTP REST API" (generated July 2026, WATCHOUT 7.8.2)
@@ -65,9 +66,13 @@ transport:
   auth: none
   timeout_ms: 5000
   probe: { method: GET, path: /info }
+  # The Process Manager on every node (SPEC.md §2, Endpoints).
+  endpoints:
+    node: { port: 3017 }
 
 ports:
   - { port: 3019, protocol: http, role: control }
+  - { port: 3017, protocol: http, role: control, note: "the node's Process Manager: shutdown, reboot and service restart" }
   - { port: 3019, protocol: http, role: push, note: "server-sent events" }
 
 models:
@@ -77,7 +82,8 @@ models:
                play_timeline, pause_timeline, stop_timeline, set_timeline_state, set_timeline_state_at,
                jump_to_time, jump_to_cue, set_input, set_inputs, get_cue_sets_by_id,
                get_cue_sets_by_name, set_cue_set_by_id, set_cue_set_by_name, set_cue_sets_by_id,
-               set_cue_sets_by_name, reset_cue_sets, hit_test, send_msc, load_show]
+               set_cue_sets_by_name, reset_cue_sets, hit_test, send_msc, load_show,
+               restart_node_services, reboot_node, shut_down_node]
     verification: none
   - id: watchout7-early
     name: WATCHOUT 7 before 7.8
@@ -85,7 +91,8 @@ models:
                play_timeline, pause_timeline, stop_timeline, set_timeline_state, set_timeline_state_at,
                jump_to_time, jump_to_cue, set_input, set_inputs, get_cue_sets_by_id,
                get_cue_sets_by_name, set_cue_set_by_id, set_cue_set_by_name, set_cue_sets_by_id,
-               set_cue_sets_by_name, reset_cue_sets, send_msc, load_show]
+               set_cue_sets_by_name, reset_cue_sets, send_msc, load_show,
+               restart_node_services, reboot_node, shut_down_node]
     verification: none
     notes: >
       No /v0/hittest and no v2 event stream (both 7.8), so playback state is not
@@ -302,6 +309,25 @@ commands:
     expect: { status: 200 }
     returns: ack
 
+  # ── The node (Process Manager, port 3017) ────────────────────────────────
+  restart_node_services:
+    summary: Restart the WATCHOUT services on the node (POST /v0/services/restart on port 3017); see quirks
+    send: { endpoint: node, method: POST, path: /v0/services/restart }
+    expect: { status: 200 }
+    returns: ack
+
+  reboot_node:
+    summary: Reboot the node's operating system (POST /v0/reboot on port 3017); see quirks
+    send: { endpoint: node, method: POST, path: /v0/reboot }
+    expect: { status: 200 }
+    returns: ack
+
+  shut_down_node:
+    summary: Shut down the node's operating system (POST /v0/shutdown on port 3017); see quirks
+    send: { endpoint: node, method: POST, path: /v0/shutdown }
+    expect: { status: 200 }
+    returns: ack
+
 telemetry:
   # Version 2 of the event stream sends playback changes as differences per
   # timeline, countdowns to cues and the show revision.
@@ -404,7 +430,21 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Uploading a .watch file (POST /v0/showfile, binary), and node shutdown,
-      reboot and service restart (port 3017 of each node) are not included: the
-      first needs a binary request body and the others a second port. Media
-      presets appear in the show and the event stream, but no endpoint selects one.
+      Uploading a .watch file (POST /v0/showfile, binary) is not included: it
+      needs a binary request body. Media presets appear in the show and the
+      event stream, but no endpoint selects one.
+  - models: [all]
+    severity: critical
+    text: >
+      shut_down_node, reboot_node and restart_node_services act on the node this
+      device was opened with, through its Process Manager on port 3017 (a
+      second port of the same host, which Dataton addresses per node), and
+      cannot be undone from here. Shutting down or rebooting the Director's node
+      stops the show and every output it drives; a shut-down node stays off
+      until someone powers it on. Restarting the services stops playback on that
+      node until they are back. To act on another node of the show, open that
+      node as its own device. Dataton documents neither an answer nor a status
+      for these requests, so success is taken to be HTTP 200; a node that goes
+      down before answering fails the command with a transport error or a
+      timeout although it acted. Port 3017 not answering fails these commands
+      only: the device stays connected through port 3019.
