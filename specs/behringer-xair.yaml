@@ -164,7 +164,8 @@ models:
                set_fx_send_fader_db, get_fx_send_fader_db, set_main_fader_db, get_main_fader_db,
                set_channel_send_level_db, get_channel_send_level_db, set_aux_send_level_db,
                get_aux_send_level_db, set_fx_return_send_level_db, get_fx_return_send_level_db,
-               set_dca_fader_db, get_dca_fader_db]
+               set_dca_fader_db, get_dca_fader_db,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter]
     verification: none
     notes: >
       Rack. 16 MIDAS mic preamps, stereo aux line in 17-18 (TRS), 6 aux outputs, ULTRANET, 18x18 USB audio interface (manual p.32-33). /info reports XR18.
@@ -246,7 +247,8 @@ models:
                set_fx_send_fader_db, get_fx_send_fader_db, set_main_fader_db, get_main_fader_db,
                set_channel_send_level_db, get_channel_send_level_db, set_aux_send_level_db,
                get_aux_send_level_db, set_fx_return_send_level_db, get_fx_return_send_level_db,
-               set_dca_fader_db, get_dca_fader_db]
+               set_dca_fader_db, get_dca_fader_db,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter]
     verification: none
     notes: >
       Desk version of the XR18: the same processing and I/O, aux line in on RCA, extra RCA monitor outputs (manual p.32-33). /info reports X18.
@@ -328,7 +330,8 @@ models:
                set_fx_send_fader_db, get_fx_send_fader_db, set_main_fader_db, get_main_fader_db,
                set_channel_send_level_db, get_channel_send_level_db, set_aux_send_level_db,
                get_aux_send_level_db, set_fx_return_send_level_db, get_fx_return_send_level_db,
-               set_dca_fader_db, get_dca_fader_db]
+               set_dca_fader_db, get_dca_fader_db,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter]
     verification: none
     notes: >
       8 MIDAS mic preamps (channels 1-8), 8 line inputs (9-16), 4 aux outputs, USB stick stereo recorder in place of the USB interface, no ULTRANET (manual p.13, p.34). /info reports XR16.
@@ -410,7 +413,8 @@ models:
                set_fx_send_fader_db, get_fx_send_fader_db, set_main_fader_db, get_main_fader_db,
                set_channel_send_level_db, get_channel_send_level_db, set_aux_send_level_db,
                get_aux_send_level_db, set_fx_return_send_level_db, get_fx_return_send_level_db,
-               set_dca_fader_db, get_dca_fader_db]
+               set_dca_fader_db, get_dca_fader_db,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter]
     verification: none
     notes: >
       4 MIDAS mic preamps (channels 1-4), 8 line inputs (5-12); processing channels 13-16 are fed from any input 1-12. 2 aux outputs, USB stick stereo recorder, no ULTRANET (manual p.13, p.34). /info reports XR12.
@@ -492,7 +496,8 @@ models:
                set_fx_send_fader_db, get_fx_send_fader_db, set_main_fader_db, get_main_fader_db,
                set_channel_send_level_db, get_channel_send_level_db, set_aux_send_level_db,
                get_aux_send_level_db, set_fx_return_send_level_db, get_fx_return_send_level_db,
-               set_dca_fader_db, get_dca_fader_db]
+               set_dca_fader_db, get_dca_fader_db,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter]
     verification: none
     notes: >
       Midas counterpart of the XR18: 16 MIDAS PRO preamps, 6 aux outputs, ULTRANET, 18x18 USB interface (MR manual p.32). /info reports MR18.
@@ -574,7 +579,8 @@ models:
                set_fx_send_fader_db, get_fx_send_fader_db, set_main_fader_db, get_main_fader_db,
                set_channel_send_level_db, get_channel_send_level_db, set_aux_send_level_db,
                get_aux_send_level_db, set_fx_return_send_level_db, get_fx_return_send_level_db,
-               set_dca_fader_db, get_dca_fader_db]
+               set_dca_fader_db, get_dca_fader_db,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter]
     verification: none
     notes: >
       Midas counterpart of the XR12: 4 MIDAS PRO preamps, 8 line inputs, 2 aux outputs, USB stick stereo recorder (MR manual p.33). /info reports MR12.
@@ -3869,6 +3875,58 @@ commands:
     expect: { address: "/dca/{dca}/fader", arg: 0, convert: x32_fader }
     returns: value
 
+  set_parameter_float:
+    summary: "Set any parameter by its OSC address to a float (,f), such as a 0-1 fader position (protocol document p.1)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9_-][A-Za-z0-9_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address without its leading /, such as ch/01/mix/fader." }
+      value: { type: float, required: true,
+        label: Value,
+        description: "The value as the console takes it, usually 0.0 to 1.0 for a level, frequency or other continuous parameter." }
+    send:
+      address: "/{path}"
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_parameter_int:
+    summary: "Set any parameter by its OSC address to an int (,i): a switch, an enumeration's index or an integer (protocol document p.1)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9_-][A-Za-z0-9_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address without its leading /, such as ch/01/mix/fader." }
+      value: { type: int, required: true,
+        label: Value,
+        description: "The integer value, such as 0 or 1 for a switch or an enumeration's index counted from 0." }
+    send:
+      address: "/{path}"
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_parameter_string:
+    summary: "Set any parameter by its OSC address to a string (,s), such as a name (protocol document p.1)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9_-][A-Za-z0-9_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address without its leading /, such as ch/01/mix/fader." }
+      value: { type: string, max_length: 128, required: true,
+        label: Value,
+        description: "The text value, such as a scribble-strip or scene name." }
+    send:
+      address: "/{path}"
+      args: [ { value: "{value}", type: string } ]
+    returns: none
+
+  get_parameter:
+    summary: "Read any parameter by its OSC address, its value as the console sends it: a float, an int or a string (protocol document p.1)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9_-][A-Za-z0-9_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address without its leading /, such as ch/01/mix/fader." }
+    send: { address: "/{path}" }
+    expect: { address: "/{path}", arg: 0 }
+    returns: value
+
 telemetry:
   # /xremote asks the mixer to send every parameter change to this client for
   # 10 seconds, to at most eight clients (protocol document p.1); renewed every 9.
@@ -4458,6 +4516,19 @@ telemetry:
       state: { "fx_returns.{1}.sends.{2}.level_db": "{arg0:from.x32_fader:.1f}" }
     - address: "^/dca/([1-4])/fader$"
       state: { "dcas.{1}.fader_db": "{arg0:from.x32_fader:.1f}" }
+    # Every parameter the console reports by /xremote or in reply to a
+    # query, by its address, as the one argument of its own type. Replies
+    # with several arguments (/info, /status), node text and meters (blobs)
+    # are not kept.
+    - address: "^/([A-Za-z0-9_-][A-Za-z0-9_/-]*)$"
+      arg_types: f
+      state: { "params.{1}.float": "{arg0}" }
+    - address: "^/([A-Za-z0-9_-][A-Za-z0-9_/-]*)$"
+      arg_types: i
+      state: { "params.{1}.int": "{arg0}" }
+    - address: "^/([A-Za-z0-9_-][A-Za-z0-9_/-]*)$"
+      arg_types: s
+      state: { "params.{1}.string": "{arg0}" }
 
 state:
   channels.*.mute:                   { type: bool, description: "Input channel muted (mix/on inverted)" }
@@ -4673,6 +4744,9 @@ state:
   aux.sends.*.level_db: { type: float, unit: dB, description: "Aux/USB return send level to bus N (1-6 mix buses, 7-10 FX sends) in dB, to 0.1 dB (-90 is -oo)" }
   fx_returns.*.sends.*.level_db: { type: float, unit: dB, description: "FX return send level to bus N (1-6 mix buses, 7-10 FX sends) in dB, to 0.1 dB (-90 is -oo)" }
   dcas.*.fader_db: { type: float, unit: dB, description: "DCA fader in dB, to 0.1 dB (-90 is -oo)" }
+  params.*.float: { type: float, description: "Any parameter's last value reported as a float, keyed by its OSC address without the leading / (ch/01/mix/fader)" }
+  params.*.int: { type: int, description: "Any parameter's last value reported as an int, keyed by its OSC address without the leading /" }
+  params.*.string: { type: string, description: "Any parameter's last value reported as a string, keyed by its OSC address without the leading /" }
 
 quirks:
   - models: [all]
@@ -4839,3 +4913,18 @@ quirks:
       get_firmware_version. /xinfo answers with the IP address in place of the
       server version; the document's wording leaves the order unclear, so it
       is not used.
+
+  - models: [all]
+    severity: info
+    text: >
+      Any parameter can be set and read by its address (protocol document
+      p.1): set_parameter_float, set_parameter_int and set_parameter_string
+      send one argument of that type, which must be the parameter's own
+      (levels and other continuous values are 0-1 floats, switches ints, p.2);
+      get_parameter returns the value as sent. Every single-argument parameter
+      the mixer reports, by /xremote or in reply to a query, is also kept
+      under params, keyed by its address without the leading /
+      (params["ch/01/mix/fader"].float), in the field of its OSC type. The
+      format cannot turn the address's / into nested keys, so the address is
+      one key. The manufacturer document does not describe the X32's /node
+      and / text commands for the X AIR, so they are not offered.

@@ -224,20 +224,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## behringer-xair — Behringer X AIR
 
-- [ ] Confirm the mute sense of mix/on (0 muted, 1 passing audio), which is taken from the X32. ([specs/behringer-xair.yaml:3832](specs/behringer-xair.yaml#L3832))
-- [ ] Check whether the mixer echoes a set back to the client that sent it. ([specs/behringer-xair.yaml:3859](specs/behringer-xair.yaml#L3859))
-- [ ] Confirm the snapshot node is /-snap/ (not /snap/ as the manufacturer document writes it), and whether /-snap/load replies. ([specs/behringer-xair.yaml:3849](specs/behringer-xair.yaml#L3849))
-- [ ] Confirm the fader taper is the X32's four segments (0.75 = 0 dB), which the X AIR document does not state. ([specs/behringer-xair.yaml:3901](specs/behringer-xair.yaml#L3901))
-- [ ] Confirm headamp gain range is -12 to +60 dB (the community list says -12 to +20 dB). ([specs/behringer-xair.yaml:3914](specs/behringer-xair.yaml#L3914))
-- [ ] Find how line inputs and the stereo aux input are addressed for gain, which is not documented. ([specs/behringer-xair.yaml:3911](specs/behringer-xair.yaml#L3911))
-- [ ] Find which /ch/NN/config/insrc value is OFF, if any, within 0-15. ([specs/behringer-xair.yaml:3941](specs/behringer-xair.yaml#L3941))
-- [ ] Find the order of gate modes 0-4 (GATE, EXP2, EXP3, EXP4, DUCK or the X32's EXP2, EXP3, EXP4, GATE, DUCK). ([specs/behringer-xair.yaml:3949](specs/behringer-xair.yaml#L3949))
-- [ ] Confirm the copy-error resolutions: bus pan and insert ranges, bus compressor filter type 0-8, /bus/N/grp, USB routing 1-18. ([specs/behringer-xair.yaml:3955](specs/behringer-xair.yaml#L3955))
-- [ ] Check the main LR insert address, FX return EQ on/off, the GEQ indexing and whether FX parameters are int or float, which are not covered because sources disagree. ([specs/behringer-xair.yaml:3967](specs/behringer-xair.yaml#L3967))
-- [ ] Check the order of /xinfo's reply strings. ([specs/behringer-xair.yaml:3991](specs/behringer-xair.yaml#L3991))
-- [ ] Check whether /-action/setclock is ignored on XR18, X18 and MR18. ([specs/behringer-xair.yaml:3933](specs/behringer-xair.yaml#L3933))
-- [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2255](specs/behringer-xair.yaml#L2255))
-- [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:2295](specs/behringer-xair.yaml#L2295))
+- [ ] Confirm the mute sense of mix/on (0 muted, 1 passing audio), which is taken from the X32. ([specs/behringer-xair.yaml:4755](specs/behringer-xair.yaml#L4755))
+- [ ] Check whether the mixer echoes a set back to the client that sent it. ([specs/behringer-xair.yaml:4779](specs/behringer-xair.yaml#L4779))
+- [ ] Confirm the snapshot node is /-snap/ (not /snap/ as the manufacturer document writes it), and whether /-snap/load replies. ([specs/behringer-xair.yaml:4772](specs/behringer-xair.yaml#L4772))
+- [ ] Confirm the fader taper is the X32's four segments (0.75 = 0 dB), which the X AIR document does not state. ([specs/behringer-xair.yaml:4820](specs/behringer-xair.yaml#L4820))
+- [ ] Confirm headamp gain range is -12 to +60 dB (the community list says -12 to +20 dB). ([specs/behringer-xair.yaml:4837](specs/behringer-xair.yaml#L4837))
+- [ ] Find how line inputs and the stereo aux input are addressed for gain, which is not documented. ([specs/behringer-xair.yaml:4834](specs/behringer-xair.yaml#L4834))
+- [ ] Find which /ch/NN/config/insrc value is OFF, if any, within 0-15. ([specs/behringer-xair.yaml:4862](specs/behringer-xair.yaml#L4862))
+- [ ] Find the order of gate modes 0-4 (GATE, EXP2, EXP3, EXP4, DUCK or the X32's EXP2, EXP3, EXP4, GATE, DUCK). ([specs/behringer-xair.yaml:4870](specs/behringer-xair.yaml#L4870))
+- [ ] Confirm the copy-error resolutions: bus pan and insert ranges, bus compressor filter type 0-8, /bus/N/grp, USB routing 1-18. ([specs/behringer-xair.yaml:4878](specs/behringer-xair.yaml#L4878))
+- [ ] Check the main LR insert address, FX return EQ on/off, the GEQ indexing and whether FX parameters are int or float, which are not covered because sources disagree. ([specs/behringer-xair.yaml:4890](specs/behringer-xair.yaml#L4890))
+- [ ] Check the order of /xinfo's reply strings. ([specs/behringer-xair.yaml:4913](specs/behringer-xair.yaml#L4913))
+- [ ] Check whether /-action/setclock is ignored on XR18, X18 and MR18. ([specs/behringer-xair.yaml:4856](specs/behringer-xair.yaml#L4856))
+- [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2882](specs/behringer-xair.yaml#L2882))
+- [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:2938](specs/behringer-xair.yaml#L2938))
+- [ ] Check whether the mixer answers /node and the / text set as the X32 does, which the manufacturer document does not describe and this spec does not offer. ([specs/behringer-xair.yaml:4920](specs/behringer-xair.yaml#L4920))
 
 ## biamp-tesira — Biamp Tesira
 

@@ -428,3 +428,22 @@ _t("console-name", "/-prefs/name", ("s", "XR18-1A-2B-3C"), {"console": {"name": 
 # Levels in dB: the X32 family's fader law (behringer-x32.py, _fader_db_vectors).
 _fader_db_vectors(XA)
 _t("channel-fader-db", "/ch/02/mix/fader", ("f", 0.875), {"channels": {"2": {"fader": 0.875, "fader_db": 5.0}}})
+
+
+# ── Any parameter by its address ─────────────────────────────────────────
+# Set: the address with one argument of the type chosen; get: the bare
+# address, answered on it with the value (protocol document p.1-2).
+binary(XA, "set_parameter_float", {"path": "ch/01/mix/fader", "value": 0.75}, osc("/ch/01/mix/fader", ("f", 0.75)),
+       expect_result=UNVERIFIED)
+binary(XA, "set_parameter_int", {"path": "ch/01/mix/on", "value": 0}, osc("/ch/01/mix/on", ("i", 0)))
+binary(XA, "set_parameter_string", {"path": "ch/01/config/name", "value": "Vox"},
+       osc("/ch/01/config/name", ("s", "Vox")))
+binary(XA, "get_parameter", {"path": "ch/01/config/name"}, osc("/ch/01/config/name"),
+       device_reply_hex=hexs(osc("/ch/01/config/name", ("s", "Vox"))),
+       expect_result={"ok": {"kind": "value", "value": "Vox"}})
+telemetry(XA, "param-float", inbound_hex=hexs(osc("/-prefs/lamp", ("f", 0.5))), expect_state={})
+telemetry(XA, "param-int", inbound_hex=hexs(osc("/-prefs/hardmute", ("i", 1))), expect_state={})
+telemetry(XA, "param-string", inbound_hex=hexs(osc("/-usb/path", ("s", "SONGS"))), expect_state={})
+
+# The X32's helper (behringer-x32.py): the generic params rules.
+_with_params(XA)
