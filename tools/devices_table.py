@@ -56,7 +56,7 @@ NATIVE = {
     "probel-swp08": "SW-P-08 binary frames over TCP (2008 by default)",
     "qsys": "QRC JSON-RPC over TCP 1710",
     "sennheiser-digital-6000": "SSC over UDP 45",
-    "sennheiser-ew-dx": "HTTPS + SSE (SSCv2)",
+    "sennheiser-ew-dx": "HTTPS + SSE (SSCv2); UDP (SSCv1 legacy mode)",
     "sennheiser-ew-g3-g4": "MCP over UDP 53212",
     "sennheiser-spectera": "HTTPS + SSE (SSCv2)",
     "shure-wireless": "Command strings over TCP 2202",

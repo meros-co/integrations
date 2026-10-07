@@ -347,3 +347,87 @@ async fn ewdx_wrong_password_is_unauthorized_and_never_retried() {
     assert_eq!(device.lock().unwrap().refused, 1);
     core.close(id).await;
 }
+
+/// SSCv1 legacy mode beside SSCv2: a UDP responder that answers each request
+/// with its xid and the value written, and records what it was sent.
+async fn simulated_legacy() -> (u16, Arc<Mutex<Vec<Value>>>) {
+    let socket = tokio::net::UdpSocket::bind(SocketAddr::new(IpAddr::V4(DEVICE_IP), 0))
+        .await
+        .unwrap();
+    let port = socket.local_addr().unwrap().port();
+    let received = Arc::new(Mutex::new(Vec::new()));
+    let log = received.clone();
+    tokio::spawn(async move {
+        let mut buf = [0u8; 4096];
+        loop {
+            let Ok((n, from)) = socket.recv_from(&mut buf).await else {
+                return;
+            };
+            let Ok(message) = serde_json::from_slice::<Value>(&buf[..n]) else {
+                continue;
+            };
+            log.lock().unwrap().push(message.clone());
+            // A subscription is answered with the values it names.
+            let reply = if message.pointer("/osc/state/subscribe").is_some() {
+                json!({"device": {"name": "EWDXEM2", "brightness": 5, "lock": false}})
+            } else {
+                message
+            };
+            let _ = socket.send_to(reply.to_string().as_bytes(), from).await;
+        }
+    });
+    (port, received)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ewdx_legacy_mode_carries_what_sscv2_cannot() {
+    let (port, _device) = simulated_ewdx().await;
+    let (legacy_port, received) = simulated_legacy().await;
+    let core = Core::new().unwrap();
+    let id = core
+        .open(OpenRequest {
+            device: "sennheiser-ew-dx".into(),
+            model: "em-2".into(),
+            host: DEVICE_IP.to_string(),
+            port: Some(port),
+            settings: params(json!({
+                "password": "secret", "legacy_mode": true, "legacy_port": legacy_port,
+            })),
+            monitor: true,
+        })
+        .unwrap();
+    wait_for(&core, |e| {
+        matches!(e, Event::Connection { device, connection: Connection::Connected } if *device == id)
+    })
+    .await;
+    // The legacy subscription's answer reaches the state (it may come before
+    // SSCv2 connects, so the snapshot is read).
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while core.snapshot(id).unwrap().state["device"]["brightness"] != 5 {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("legacy state within 10 s");
+
+    let outcome = core
+        .execute(id, "set_brightness", params(json!({"level": 2})))
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    let outcome = core
+        .execute(id, "set_device_name", params(json!({"name": "STAGE1"})))
+        .await;
+    assert_eq!(outcome, Ok(Outcome::Ack));
+    let state = core.snapshot(id).unwrap().state;
+    assert_eq!(state["device"]["brightness"], 2);
+    assert_eq!(state["device"]["name"], "STAGE1");
+
+    let sent = received.lock().unwrap().clone();
+    assert!(sent[0]
+        .pointer("/osc/state/subscribe/0/device/brightness")
+        .is_some());
+    assert!(sent
+        .iter()
+        .any(|m| m["device"]["brightness"] == 2 && m["osc"]["xid"].is_u64()));
+    core.close(id).await;
+}

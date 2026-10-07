@@ -1144,14 +1144,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-ew-dx — Sennheiser EW-DX
 
-- [ ] Confirm each resource added beyond RFDeck's six per channel (identify, signal strength, diversity, user preset bank, sync settings and their ignore flags, the transmitter and its warnings, and the device's site, state, identification, rf, transmission, encryption, legacyMode and firmware update state) can be subscribed and notifies on change, and that a refused batch leaves the later ones subscribed. ([specs/sennheiser-ew-dx.yaml:330](specs/sennheiser-ew-dx.yaml#L330))
-- [ ] Check whether select_preset's bank and preset, and channels.<n>.preset.bank and .channel, count from 0 or from 1, against the receiver's own preset display. ([specs/sennheiser-ew-dx.yaml:138](specs/sennheiser-ew-dx.yaml#L138))
-- [ ] Check whether /api/rf answers each range's step as stepSize (the schema) or stepsize (the document's example); both are read. ([specs/sennheiser-ew-dx.yaml:213](specs/sennheiser-ew-dx.yaml#L213))
-- [ ] Measure how long the receiver stays busy after set_link_density and set_encryption, whether it restarts or drops the HTTPS connection, and whether 10 s is enough for their answers. ([specs/sennheiser-ew-dx.yaml:291](specs/sennheiser-ew-dx.yaml#L291))
-- [ ] Confirm /api/transmitters/{id} and its warnings answer 422 like the battery when no transmitter is linked, and what the stream sends when a transmitter links or unlinks. ([specs/sennheiser-ew-dx.yaml:249](specs/sennheiser-ew-dx.yaml#L249))
-- [ ] Check what set_user_presets does with frequencies outside the receiver's ranges or off its preset spacing, and whether the bank must be in order. ([specs/sennheiser-ew-dx.yaml:147](specs/sennheiser-ew-dx.yaml#L147))
-- [ ] On an EM 4 Dante, confirm subscriptions and every channel command work on channels 3 and 4 (only channels 1 and 2 have been tested on hardware). ([specs/sennheiser-ew-dx.yaml:351](specs/sennheiser-ew-dx.yaml#L351))
-- [ ] Confirm a 3 s silence check against /api/ssc/version does not lose a healthy connection. ([specs/sennheiser-ew-dx.yaml:323](specs/sennheiser-ew-dx.yaml#L323))
+- [ ] Confirm each resource added beyond RFDeck's six per channel (identify, signal strength, diversity, user preset bank, sync settings and their ignore flags, the transmitter and its warnings, and the device's site, state, identification, rf, transmission, encryption, legacyMode and firmware update state) can be subscribed and notifies on change, and that a refused batch leaves the later ones subscribed. ([specs/sennheiser-ew-dx.yaml:487](specs/sennheiser-ew-dx.yaml#L487))
+- [ ] Check whether select_preset's bank and preset, and channels.<n>.preset.bank and .channel, count from 0 or from 1, against the receiver's own preset display. ([specs/sennheiser-ew-dx.yaml:179](specs/sennheiser-ew-dx.yaml#L179))
+- [ ] Check whether /api/rf answers each range's step as stepSize (the schema) or stepsize (the document's example); both are read. ([specs/sennheiser-ew-dx.yaml:329](specs/sennheiser-ew-dx.yaml#L329))
+- [ ] Measure how long the receiver stays busy after set_link_density and set_encryption, whether it restarts or drops the HTTPS connection, and whether 10 s is enough for their answers. ([specs/sennheiser-ew-dx.yaml:429](specs/sennheiser-ew-dx.yaml#L429))
+- [ ] Confirm /api/transmitters/{id} and its warnings answer 422 like the battery when no transmitter is linked, and what the stream sends when a transmitter links or unlinks. ([specs/sennheiser-ew-dx.yaml:387](specs/sennheiser-ew-dx.yaml#L387))
+- [ ] Check what set_user_presets does with frequencies outside the receiver's ranges or off its preset spacing, and whether the bank must be in order. ([specs/sennheiser-ew-dx.yaml:188](specs/sennheiser-ew-dx.yaml#L188))
+- [ ] On firmware 4, confirm that SSCv1 answers on UDP 45 while Secure (SSCv2) access is also on once Legacy is enabled (Control Cockpit presents Secure and Legacy as a choice; Companion's help says Legacy Mode runs beside it), and where Legacy is switched on. ([specs/sennheiser-ew-dx.yaml:444](specs/sennheiser-ew-dx.yaml#L444))
+- [ ] Confirm an SSCv1 reply carries the request's /osc/xid back, as the Digital 6000's does; commands are matched to replies by it alone. ([specs/sennheiser-ew-dx.yaml:444](specs/sennheiser-ew-dx.yaml#L444))
+- [ ] Check whether /device/network/ipv4/ipaddr and the other control-network fields are answered as plain strings or one-element arrays (the guide's count: 1); both are read. ([specs/sennheiser-ew-dx.yaml:343](specs/sennheiser-ew-dx.yaml#L343))
+- [ ] Check whether restart and restore_factory_defaults are answered before the receiver goes away, or time out after 2 s although they worked. ([specs/sennheiser-ew-dx.yaml:276](specs/sennheiser-ew-dx.yaml#L276))
+- [ ] Check what set_auto_lock (/device/lock) locks: the guide says the receiver's keys, Companion calls it auto lock. ([specs/sennheiser-ew-dx.yaml:264](specs/sennheiser-ew-dx.yaml#L264))
+- [ ] Check the location limit: SSCv2's site allows 255 characters without quotes, slash or backslash, SSCv1's /device/location 400; the stricter one is enforced. ([specs/sennheiser-ew-dx.yaml:252](specs/sennheiser-ew-dx.yaml#L252))
+- [ ] Check whether set_network and set_dante_network take effect at once or after a restart, and whether a static address may be written while auto is on. ([specs/sennheiser-ew-dx.yaml:284](specs/sennheiser-ew-dx.yaml#L284))
+- [ ] On an EM 4 Dante, confirm subscriptions and every channel command work on channels 3 and 4 (only channels 1 and 2 have been tested on hardware). ([specs/sennheiser-ew-dx.yaml:508](specs/sennheiser-ew-dx.yaml#L508))
+- [ ] Confirm a 3 s silence check against /api/ssc/version does not lose a healthy connection. ([specs/sennheiser-ew-dx.yaml:480](specs/sennheiser-ew-dx.yaml#L480))
 
 ## sennheiser-ew-g3-g4 — Sennheiser ew G3 / G4
 

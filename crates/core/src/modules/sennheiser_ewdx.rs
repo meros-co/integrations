@@ -14,14 +14,25 @@
 //! the device's subscription sessions) and reads nothing on connecting: the
 //! version request that finds the device, repeated whenever it has been quiet
 //! for 3 s, is the liveness check.
+//!
+//! What SSCv2 cannot do (the device name and location, which it only reads,
+//! display brightness, auto lock, the booster supply, restart, factory reset,
+//! network and Dante network settings) goes over SSCv1 legacy mode when the
+//! `legacy_mode` setting says the receiver has it enabled: see
+//! [`super::sennheiser_ewdx_legacy`]. SSCv2 alone decides whether the device
+//! is connected.
 
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use serde_json::{json, Map, Value};
 
+use super::sennheiser_ewdx_legacy::{self as legacy, Legacy};
 use super::sscv2::{object, Call, SscDevice, Sscv2};
 use crate::catalog::Params;
-use crate::module::{CommandError, Cx, Level, Millis, OpenContext};
+use crate::module::{
+    CommandError, CommandId, Cx, HttpResponse, Key, Level, Millis, Module, OpenContext, RequestId,
+    SseInput,
+};
 
 const WRITE_TIMEOUT: Millis = 3_000;
 /// Link Density and encryption changes make the receiver busy for a while.
@@ -49,6 +60,99 @@ impl Sscv2<EwdxDevice> {
 
     fn for_device(host: IpAddr, port: u16, password: &str, channels: u32) -> Ewdx {
         Sscv2::new(host, port, password, EwdxDevice { channels })
+    }
+}
+
+/// The SSCv1 port (SSC guide §6.1), unless the `legacy_port` setting moves it.
+const LEGACY_PORT: u16 = 45;
+
+/// An EW-DX receiver: SSCv2, and SSCv1 legacy mode beside it when the
+/// `legacy_mode` setting says the receiver has it enabled.
+pub(crate) struct EwdxReceiver {
+    v2: Ewdx,
+    legacy: Option<Legacy>,
+}
+
+impl EwdxReceiver {
+    pub(crate) fn from_context(ctx: OpenContext) -> EwdxReceiver {
+        let enabled = ctx
+            .settings
+            .get("legacy_mode")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let port = ctx
+            .settings
+            .get("legacy_port")
+            .and_then(Value::as_u64)
+            .and_then(|p| u16::try_from(p).ok())
+            .unwrap_or(LEGACY_PORT);
+        let legacy =
+            enabled.then(|| Legacy::new(SocketAddr::new(ctx.host, port), &ctx.model, ctx.monitor));
+        EwdxReceiver {
+            v2: Ewdx::from_context(ctx),
+            legacy,
+        }
+    }
+}
+
+impl Module for EwdxReceiver {
+    fn start(&mut self, cx: &mut Cx) {
+        self.v2.start(cx);
+        if let Some(legacy) = &mut self.legacy {
+            legacy.start(cx);
+        }
+    }
+
+    fn command(&mut self, cx: &mut Cx, id: CommandId, name: &str, params: &Params) {
+        if !legacy::COMMANDS.contains(&name) {
+            self.v2.command(cx, id, name, params);
+            return;
+        }
+        match &mut self.legacy {
+            Some(legacy) => legacy.command(cx, id, name, params),
+            None => cx.complete(
+                id,
+                Err(CommandError::InvalidParams {
+                    message: format!(
+                        "{name} needs SSCv1 legacy mode: enable Legacy third-party access for the receiver and set legacy_mode"
+                    ),
+                }),
+            ),
+        }
+    }
+
+    fn datagram(&mut self, cx: &mut Cx, socket: Key, from: SocketAddr, data: &[u8]) {
+        if let (legacy::SOCKET, Some(legacy)) = (socket, &mut self.legacy) {
+            legacy.datagram(cx, from, data);
+        }
+    }
+
+    fn socket_error(&mut self, cx: &mut Cx, socket: Key, message: &str) {
+        // SSCv2 decides the connection; the legacy socket's failure is logged.
+        cx.log(Level::Warning, format!("SSCv1 socket {socket}: {message}"));
+    }
+
+    fn http_response(&mut self, cx: &mut Cx, id: RequestId, result: Result<HttpResponse, String>) {
+        self.v2.http_response(cx, id, result);
+    }
+
+    fn sse(&mut self, cx: &mut Cx, stream: Key, input: SseInput) {
+        self.v2.sse(cx, stream, input);
+    }
+
+    fn timer(&mut self, cx: &mut Cx, key: Key) {
+        match (key, &mut self.legacy) {
+            (legacy::RENEW | legacy::REPLY, Some(legacy)) => legacy.timer(cx, key),
+            (legacy::RENEW | legacy::REPLY, None) => {}
+            _ => self.v2.timer(cx, key),
+        }
+    }
+
+    fn stop(&mut self, cx: &mut Cx) {
+        self.v2.stop(cx);
+        if let Some(legacy) = &mut self.legacy {
+            legacy.stop(cx);
+        }
     }
 }
 
@@ -1504,5 +1608,88 @@ mod tests {
         }));
         // The last known state stays; the connection status says it is stale.
         assert!(!a.iter().any(|x| matches!(x, Action::State(_))));
+    }
+
+    fn receiver(settings: Value, monitor: bool) -> EwdxReceiver {
+        EwdxReceiver::from_context(OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            host_name: None,
+            port: None,
+            model: "em-4-dante".into(),
+            channels: Some(4),
+            settings: params(settings),
+            monitor,
+        })
+    }
+
+    #[test]
+    fn legacy_commands_need_legacy_mode() {
+        let mut d = receiver(json!({"password": "secret"}), true);
+        let mut cx = Cx::new(0);
+        d.start(&mut cx);
+        // SSCv2 only: no UDP socket.
+        assert!(!cx
+            .take()
+            .iter()
+            .any(|a| matches!(a, Action::UdpOpen { .. })));
+        let mut cx = Cx::new(10);
+        d.command(&mut cx, 1, "set_brightness", &params(json!({"level": 3})));
+        assert!(matches!(
+            completed(&cx.take())[0],
+            (1, Err(CommandError::InvalidParams { .. }))
+        ));
+    }
+
+    #[test]
+    fn legacy_commands_go_over_udp_and_the_rest_over_https() {
+        let mut d = receiver(
+            json!({"password": "secret", "legacy_mode": true, "legacy_port": 4545}),
+            false,
+        );
+        let mut cx = Cx::new(0);
+        d.start(&mut cx);
+        let a = cx.take();
+        assert!(a.iter().any(|a| matches!(a, Action::UdpOpen { .. })));
+        let probe = requests(&a)[0].0;
+        let mut cx = Cx::new(10);
+        d.http_response(&mut cx, probe, ok(json!({"protocol": "2.0"})));
+        cx.take();
+
+        let mut cx = Cx::new(20);
+        d.command(&mut cx, 2, "set_booster", &params(json!({"enabled": true})));
+        d.command(&mut cx, 3, "mute", &params(json!({"channel": 4})));
+        let a = cx.take();
+        let udp: Vec<_> = a
+            .iter()
+            .filter_map(|a| match a {
+                Action::UdpSend { to, data, .. } => Some((*to, data.clone())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(udp.len(), 1);
+        assert_eq!(udp[0].0.port(), 4545);
+        let sent: Value = serde_json::from_slice(&udp[0].1).unwrap();
+        assert_eq!(sent["device"]["booster"], true);
+        assert_eq!(requests(&a)[0].1.url, "https://10.0.0.5:443/api/channel/3");
+
+        // The reply completes the legacy command.
+        let mut cx = Cx::new(30);
+        d.datagram(
+            &mut cx,
+            legacy::SOCKET,
+            udp[0].0,
+            json!({"osc": {"xid": sent["osc"]["xid"]}, "device": {"booster": true}})
+                .to_string()
+                .as_bytes(),
+        );
+        let a = cx.take();
+        assert_eq!(completed(&a), [(2, Ok(Outcome::Ack))]);
+        assert!(a.contains(&Action::State(json!({"device": {"booster": true}}))));
+
+        let mut cx = Cx::new(40);
+        d.stop(&mut cx);
+        assert!(cx.take().contains(&Action::UdpClose {
+            socket: legacy::SOCKET
+        }));
     }
 }

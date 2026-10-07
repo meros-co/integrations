@@ -41,6 +41,28 @@ source:
     author: Sennheiser
     url: https://www.sennheiser.com/globalassets/digizuite/40838-en-ew-dx_sound_control_protocol_03_2023_en.pdf
     note: Units for the same quantities under SSCv1 (frequency in kHz, battery gauge in percent).
+  - title: Sennheiser Sound Control Protocol (SSC) — Developer's guide for EW-DX, firmware 3.0.x, 03/2024
+    author: Sennheiser
+    url: https://docs.cloud.sennheiser.com/en-us/api-docs/api-docs/resources/ew-dx-sound-control-protocol-3-0-x.pdf
+    note: >
+      Manufacturer document for SSCv1 (legacy mode): JSON over UDP port 45
+      (§6), /osc/xid, subscriptions and their lifetime (§5), and the methods
+      used for what SSCv2 lacks (§8): /device/name, location, brightness,
+      lock, booster (EM 4 Dante), restart, restore, network/ipv4/*,
+      network/mdns, network/ether/macs and network/dante/* (Dante models).
+  - title: Sennheiser Control Cockpit, Access for EW-DX devices
+    url: https://docs.cloud.sennheiser.com/en-us/control-cockpit/control-cockpit/ew-dx-access.html
+    note: >
+      Third-party access is off by default and is set to Secure (SSCv2) or
+      Legacy (SSCv1) under the receiver's Access page.
+  - title: Bitfocus Companion, companion-module-sennheiser-ewdx
+    url: https://github.com/bitfocus/companion-module-sennheiser-ewdx
+    note: >
+      MIT-licensed; read as corroboration only. Its help says firmware 4
+      receivers need Legacy Mode enabled (it names Wireless Systems Manager)
+      for SSCv1; it writes the control network fields as plain strings and
+      the Dante ones as [primary, secondary] pairs with null for the side
+      left alone.
   - title: RFDeck EW-DX client (SSCClient.ts)
     note: >
       Meros. Tested against real EW-DX receivers on OpenAPI 1.7 firmware: the
@@ -49,9 +71,12 @@ source:
 
 settings:
   password: { type: string, secret: true, required: true, label: Password, description: "The third-party access password set for the receiver in Sennheiser Control Cockpit." }
+  legacy_mode: { type: bool, default: false, label: Legacy mode, description: "On when the receiver also has Legacy (SSCv1) third-party access enabled, which the device name, location, brightness, auto lock, booster, restart, factory reset and network commands need." }
+  legacy_port: { type: int, min: 1, max: 65535, default: 45, label: Legacy port, description: "UDP port of the receiver's SSCv1 server, 45 unless it advertises another by DNS-SD." }
 
 ports:
   - { port: 443, protocol: https, role: control }
+  - { port: 45, protocol: udp, role: control, setting: legacy_port, when: "legacy_mode", note: "SSCv1 legacy mode, unencrypted and without a password" }
 
 models:
   - id: em-2
@@ -61,17 +86,33 @@ models:
       [mute, set_channel_name, set_gain, set_af_out, identify, identify_device,
        restore_channel_audio_defaults, acknowledge_channel_sorting, set_frequency,
        select_preset, set_user_presets, get_factory_presets, set_link_density,
-       set_encryption, set_transmitter_sync, set_transmitter_sync_ignore]
+       set_encryption, set_transmitter_sync, set_transmitter_sync_ignore,
+       set_device_name, set_location, set_brightness, set_auto_lock, restart,
+       restore_factory_defaults, set_network, set_mdns]
     verification: none
   - id: em-2-dante
     name: Sennheiser EW-DX EM 2 Dante receiver
     channels: 2
-    supports: *all
+    supports: &dante
+      [mute, set_channel_name, set_gain, set_af_out, identify, identify_device,
+       restore_channel_audio_defaults, acknowledge_channel_sorting, set_frequency,
+       select_preset, set_user_presets, get_factory_presets, set_link_density,
+       set_encryption, set_transmitter_sync, set_transmitter_sync_ignore,
+       set_device_name, set_location, set_brightness, set_auto_lock, restart,
+       restore_factory_defaults, set_network, set_mdns, set_dante_network,
+       set_dante_interface_mapping]
     verification: none
   - id: em-4-dante
     name: Sennheiser EW-DX EM 4 Dante receiver
     channels: 4
-    supports: *all
+    supports:
+      [mute, set_channel_name, set_gain, set_af_out, identify, identify_device,
+       restore_channel_audio_defaults, acknowledge_channel_sorting, set_frequency,
+       select_preset, set_user_presets, get_factory_presets, set_link_density,
+       set_encryption, set_transmitter_sync, set_transmitter_sync_ignore,
+       set_device_name, set_location, set_brightness, set_auto_lock, restart,
+       restore_factory_defaults, set_network, set_mdns, set_dante_network,
+       set_dante_interface_mapping, set_booster]
     verification: none
 
 commands:
@@ -202,6 +243,81 @@ commands:
       frequency: *ignore
     returns: ack
 
+  set_device_name:
+    summary: Name the receiver (SSCv1 /device/name; needs legacy mode)
+    params:
+      name: { type: string, max_length: 18, pattern: "^[A-Za-z0-9]+$", required: true, label: Name, description: "Device name of up to 18 letters and digits; it is also the receiver's DNS-SD name." }
+    returns: ack
+
+  set_location:
+    summary: Set the receiver's location text (SSCv1 /device/location; needs legacy mode)
+    params:
+      location: { type: string, max_length: 255, pattern: "^[ !#-&(-.0-\\[\\]-~]*$", required: true, label: Location, description: "Free text of up to 255 printable ASCII characters other than quotes, slash and backslash, naming where the receiver is." }
+    returns: ack
+
+  set_brightness:
+    summary: Set the display brightness (SSCv1 /device/brightness; needs legacy mode)
+    params:
+      level: { type: int, min: 1, max: 5, required: true, label: Brightness, description: "Display brightness from 1 (20%) to 5 (100%) in steps of 20%." }
+    returns: ack
+
+  set_auto_lock:
+    summary: Lock or unlock the receiver's keys (SSCv1 /device/lock; needs legacy mode)
+    params:
+      locked: { type: bool, required: true, label: Auto lock, description: "On locks the receiver's front-panel keys, off unlocks them." }
+    returns: ack
+
+  set_booster:
+    summary: Turn the power supply for an external antenna booster on or off (SSCv1 /device/booster; EM 4 Dante; needs legacy mode)
+    params:
+      enabled: { type: bool, required: true, label: Booster supply, description: "On powers an external antenna booster through the antenna input, off stops it." }
+    returns: ack
+
+  restart:
+    summary: Restart the receiver (SSCv1 /device/restart; needs legacy mode)
+    returns: ack
+
+  restore_factory_defaults:
+    summary: Restore every factory default (SSCv1 /device/restore FACTORY_DEFAULTS; needs legacy mode)
+    returns: ack
+
+  set_network:
+    summary: >
+      Set the control interface's addressing (SSCv1 /device/network/ipv4;
+      needs legacy mode): automatic, or a static address with ip, netmask and
+      gateway all given
+    params:
+      auto: { type: bool, required: true, label: Automatic, description: "On takes the address by DHCP or Auto-IP; off uses the static address given." }
+      ip: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", label: IP address, description: "Static IPv4 address in dotted form, needed when automatic is off." }
+      netmask: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", label: Netmask, description: "IPv4 netmask in dotted form, needed when automatic is off." }
+      gateway: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", label: Gateway, description: "IPv4 gateway in dotted form, needed when automatic is off." }
+    returns: ack
+
+  set_mdns:
+    summary: Turn mDNS (DNS-SD announcement) on or off (SSCv1 /device/network/mdns; needs legacy mode)
+    params:
+      enabled: { type: bool, required: true, label: mDNS, description: "On announces the receiver by DNS-SD, off stops it." }
+    returns: ack
+
+  set_dante_network:
+    summary: >
+      Set one Dante interface's addressing (SSCv1 /device/network/dante/ipv4;
+      Dante models; needs legacy mode): automatic, or a static address with
+      ip, netmask and gateway all given
+    params:
+      interface: { type: enum, values: [primary, secondary], required: true, label: Dante interface, description: "The primary or secondary Dante interface; the other is left as it is." }
+      auto: { type: bool, required: true, label: Automatic, description: "On takes the address by DHCP or Auto-IP; off uses the static address given." }
+      ip: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", label: IP address, description: "Static IPv4 address in dotted form, needed when automatic is off." }
+      netmask: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", label: Netmask, description: "IPv4 netmask in dotted form, needed when automatic is off." }
+      gateway: { type: string, pattern: "^(\\d{1,3}\\.){3}\\d{1,3}$", label: Gateway, description: "IPv4 gateway in dotted form, needed when automatic is off." }
+    returns: ack
+
+  set_dante_interface_mapping:
+    summary: Choose how the receiver's network ports are shared between control and Dante (SSCv1 /device/network/dante/interface_mapping; Dante models; needs legacy mode)
+    params:
+      mapping: { type: enum, values: [single_cable, split1, split2, split, audio_redundancy], required: true, label: Port mapping, description: "Single cable carries control and Dante on every port; the split mappings separate control from Dante; audio redundancy adds a secondary Dante network." }
+    returns: ack
+
 state:
   device.identity:                   { type: object, description: "The /api/device/identity resource as the device returns it: product (EWDX2CHS, EWDX2CHDS, EWDX4CHDS), hardwareRevision, serial, vendor" }
   device.name:                       { type: string, description: "Device name, from /api/device/site" }
@@ -220,6 +336,28 @@ state:
   device.firmware.update_state:      { type: string, description: "idle or updating" }
   device.firmware.update_progress_pct: { type: int, unit: "%", description: "Firmware update progress, 0-100" }
   device.firmware.last_status:       { type: string, description: "Result of the last firmware update since boot: None, or an error such as Invalid firmware package" }
+  device.brightness:                 { type: int, description: "Display brightness, 1 (20%) to 5 (100%); legacy mode" }
+  device.auto_lock:                  { type: bool, description: "Whether the receiver's keys are locked; legacy mode" }
+  device.booster:                    { type: bool, description: "Whether the external antenna booster supply is on (EM 4 Dante); legacy mode" }
+  device.network.auto:               { type: bool, description: "Whether the control interface takes its address automatically; legacy mode" }
+  device.network.ip:                 { type: string, description: "Current IPv4 address; legacy mode" }
+  device.network.netmask:            { type: string, description: "Current IPv4 netmask; legacy mode" }
+  device.network.gateway:            { type: string, description: "Current IPv4 gateway; legacy mode" }
+  device.network.manual_ip:          { type: string, description: "Static IPv4 address, used when auto is off; legacy mode" }
+  device.network.manual_netmask:     { type: string, description: "Static IPv4 netmask; legacy mode" }
+  device.network.manual_gateway:     { type: string, description: "Static IPv4 gateway; legacy mode" }
+  device.network.mdns:               { type: bool, description: "Whether mDNS announcement is on; legacy mode" }
+  device.network.macs:               { type: array, description: "Control interface MAC addresses; legacy mode" }
+  device.dante.version:              { type: string, description: "Dante software version (Dante models); legacy mode" }
+  device.dante.auto:                 { type: array, description: "[primary, secondary]: whether each Dante interface takes its address automatically; legacy mode" }
+  device.dante.ip:                   { type: array, description: "[primary, secondary] current Dante IPv4 addresses; legacy mode" }
+  device.dante.netmask:              { type: array, description: "[primary, secondary] current Dante netmasks; legacy mode" }
+  device.dante.gateway:              { type: array, description: "[primary, secondary] current Dante gateways; legacy mode" }
+  device.dante.manual_ip:            { type: array, description: "[primary, secondary] static Dante IPv4 addresses; legacy mode" }
+  device.dante.manual_netmask:       { type: array, description: "[primary, secondary] static Dante netmasks; legacy mode" }
+  device.dante.manual_gateway:       { type: array, description: "[primary, secondary] static Dante gateways; legacy mode" }
+  device.dante.macs:                 { type: array, description: "Dante interface MAC addresses; legacy mode" }
+  device.dante.interface_mapping:    { type: string, description: "Network port mapping: single_cable, split1, split2, split or audio_redundancy; legacy mode" }
   channels.*.name:                   { type: string, description: "Channel name" }
   channels.*.mute:                   { type: bool, description: "Receiver mute" }
   channels.*.gain_db:                { type: int, unit: dB, description: "Receiver channel gain, -3 to +42 in steps of 3" }
@@ -301,15 +439,34 @@ quirks:
       their defaults at once; the earlier values are not kept.
 
   - models: [all]
-    severity: info
+    severity: warning
     text: >
       Over SSCv2 the device name and location are read-only
       (/api/device/site has no write), and restart, factory reset, display
-      brightness, the receiver's own key lock, network and Dante settings have
-      no SSCv2 resource at all. Transmitter settings cannot be written
-      directly either: set_transmitter_sync sets what the receiver gives a
-      transmitter at its next sync, and the transmitter's own values arrive in
-      channels.<n>.transmitter.
+      brightness, auto lock, the booster supply, network and Dante settings
+      have no SSCv2 resource at all. Those commands go over SSCv1 (JSON over
+      UDP port 45) and need Legacy third-party access enabled for the
+      receiver (Control Cockpit: the receiver's Access page, 3rd party access,
+      Edit, Legacy; Wireless Systems Manager calls it Legacy Mode) and the
+      legacy_mode setting on. SSCv1 is unencrypted and has no password. With
+      legacy_mode off they fail at once; with it on and the receiver not
+      answering on UDP, they time out after 2 s.
+
+  - models: [all]
+    severity: critical
+    text: >
+      restore_factory_defaults resets every setting, including third-party
+      access and the network, and restart, set_network and
+      set_dante_interface_mapping take the receiver off the network for a
+      while or move it to an address the core is not using. None can be
+      undone from here.
+
+  - models: [all]
+    severity: info
+    text: >
+      Transmitter settings cannot be written directly: set_transmitter_sync
+      sets what the receiver gives a transmitter at its next sync, and the
+      transmitter's own values arrive in channels.<n>.transmitter.
 
   - models: [all]
     severity: info
