@@ -528,6 +528,72 @@ for leaf, field, wire, value in [("src", "source", ("i", 4), 4), ("pos", "tap", 
               expect_state={"outputs": {kind: {"16": {field: value}}}})
 
 
+# ── Monitor, solo, talkback, oscillator, links, DP48 (p.20-24) ────────────
+# (command, input, address, wire argument, state key under monitor, pushed value, state value)
+for cmd, inp, leaf, wire, key, pushed, value in [
+        ("set_monitor_level", {"level": 0.75}, "level", ("f", 0.75), "level", ("f", 0.5), 0.5),
+        ("set_monitor_source", {"source": 6}, "source", ("i", 6), "source", ("i", 3), 3),
+        ("set_monitor_source_trim", {"trim": 0.5}, "sourcetrim", ("f", 0.5), "source_trim", ("f", 1.0), 1.0),
+        ("set_monitor_channel_mode", {"mode": 1}, "chmode", ("i", 1), "channel_mode", ("i", 0), 0),
+        ("set_monitor_bus_mode", {"mode": 0}, "busmode", ("i", 0), "bus_mode", ("i", 1), 1),
+        ("set_monitor_dca_mode", {"mode": 1}, "dcamode", ("i", 1), "dca_mode", ("i", 1), 1),
+        ("set_solo_exclusive", {"enabled": True}, "exclusive", ("i", 1), "exclusive", ("i", 1), True),
+        ("set_solo_follows_select", {"enabled": False}, "followsel", ("i", 0), "follows_select", ("i", 1), True),
+        ("set_select_follows_solo", {"enabled": True}, "followsolo", ("i", 1), "select_follows_solo", ("i", 0), False),
+        ("set_monitor_dim", {"enabled": True}, "dim", ("i", 1), "dim", ("i", 1), True),
+        ("set_monitor_mono", {"enabled": False}, "mono", ("i", 0), "mono", ("i", 0), False),
+        ("set_monitor_delay", {"enabled": True}, "delay", ("i", 1), "delay", ("i", 1), True),
+        ("set_monitor_master_control", {"enabled": True}, "masterctrl", ("i", 1), "master_control", ("i", 0), False),
+        ("set_monitor_pfl_dim", {"enabled": True}, "dimpfl", ("i", 1), "pfl_dim", ("i", 1), True),
+        ("mute_monitor", {"enabled": True}, "mute", ("i", 1), "mute", ("i", 1), True),
+        ("set_monitor_dim_gain", {"attenuation": 0.25}, "dimatt", ("f", 0.25), "dim_gain", ("f", 0.75), 0.75),
+        ("set_monitor_delay_time", {"time": 1.0}, "delaytime", ("f", 1.0), "delay_time", ("f", 0.0), 0.0)]:
+    binary(X, cmd, inp, osc(f"/config/solo/{leaf}", wire))
+    telemetry(X, f"monitor-{key.replace('_', '-')}", inbound_hex=hexs(osc(f"/config/solo/{leaf}", pushed)),
+              expect_state={"monitor": {key: value}})
+binary(X, "set_talkback_enable", {"enabled": True}, osc("/config/talk/enable", ("i", 1)))
+binary(X, "set_talkback_dim", {"talkback": "B", "enabled": False}, osc("/config/talk/B/dim", ("i", 0)))
+telemetry(X, "talkback-enable", inbound_hex=hexs(osc("/config/talk/enable", ("i", 0))), expect_state={"talkback": {"enabled": False}})
+telemetry(X, "talkback-dim", inbound_hex=hexs(osc("/config/talk/A/dim", ("i", 1))), expect_state={"talkback": {"A": {"dim": True}}})
+telemetry(X, "talkback-latch", inbound_hex=hexs(osc("/config/talk/B/latch", ("i", 1))), expect_state={"talkback": {"B": {"latch": True}}})
+telemetry(X, "talkback-destinations", inbound_hex=hexs(osc("/config/talk/A/destmap", ("i", 3))),
+          expect_state={"talkback": {"A": {"destinations": 3}}})
+telemetry(X, "talkback-source", inbound_hex=hexs(osc("/config/talk/source", ("i", 1))), expect_state={"talkback": {"source": 1}})
+binary(X, "set_oscillator_level", {"level": 0.5}, osc("/config/osc/level", ("f", 0.5)))
+binary(X, "set_oscillator_frequency", {"slot": "f2", "frequency": 0.5}, osc("/config/osc/f2", ("f", 0.5)))
+binary(X, "set_oscillator_frequency_select", {"selection": 1}, osc("/config/osc/fsel", ("i", 1)))
+binary(X, "set_oscillator_type", {"type": 1}, osc("/config/osc/type", ("i", 1)))
+binary(X, "set_oscillator_destination", {"destination": 25}, osc("/config/osc/dest", ("i", 25)))
+telemetry(X, "oscillator-level", inbound_hex=hexs(osc("/config/osc/level", ("f", 0.25))), expect_state={"oscillator": {"level": 0.25}})
+telemetry(X, "oscillator-frequency", inbound_hex=hexs(osc("/config/osc/f1", ("f", 0.75))),
+          expect_state={"oscillator": {"frequencies": {"f1": 0.75}}})
+telemetry(X, "oscillator-frequency-select", inbound_hex=hexs(osc("/config/osc/fsel", ("i", 0))),
+          expect_state={"oscillator": {"frequency_select": 0}})
+telemetry(X, "oscillator-type", inbound_hex=hexs(osc("/config/osc/type", ("i", 2))), expect_state={"oscillator": {"type": 2}})
+telemetry(X, "oscillator-destination", inbound_hex=hexs(osc("/config/osc/dest", ("i", 18))),
+          expect_state={"oscillator": {"destination": 18}})
+binary(X, "set_mono_mode", {"mode": 1}, osc("/config/mono/mode", ("i", 1)))
+binary(X, "set_mono_link", {"enabled": True}, osc("/config/mono/link", ("i", 1)))
+telemetry(X, "mono-mode", inbound_hex=hexs(osc("/config/mono/mode", ("i", 0))), expect_state={"mono": {"mode": 0}})
+telemetry(X, "mono-link", inbound_hex=hexs(osc("/config/mono/link", ("i", 0))), expect_state={"mono": {"link": False}})
+for stem, leaf, pair, key in [("channel", "chlink", "31-32", "channel_links"), ("aux", "auxlink", "7-8", "aux_links"),
+                              ("fx_return", "fxlink", "1-2", "fx_return_links"), ("bus", "buslink", "15-16", "bus_links"),
+                              ("matrix", "mtxlink", "5-6", "matrix_links")]:
+    binary(X, f"set_{stem}_link", {"pair": pair, "enabled": True}, osc(f"/config/{leaf}/{pair}", ("i", 1)))
+    telemetry(X, f"{stem.replace('_', '-')}-link", inbound_hex=hexs(osc(f"/config/{leaf}/{pair}", ("i", 1))),
+              expect_state={key: {pair: True}})
+binary(X, "set_link_preference", {"element": "fdrmute", "enabled": False}, osc("/config/linkcfg/fdrmute", ("i", 0)))
+telemetry(X, "link-preference", inbound_hex=hexs(osc("/config/linkcfg/eq", ("i", 1))), expect_state={"link_preferences": {"eq": True}})
+binary(X, "set_dp48_assign", {"channel": 48, "group": 12}, osc("/config/dp48/assign/48", ("i", 12)))
+binary(X, "set_dp48_group_name", {"group": 1, "name": "Drums"}, osc("/config/dp48/grpname/01", ("s", "Drums")))
+binary(X, "set_dp48_scope", {"scope": 15}, osc("/config/dp48/scope", ("i", 15)))
+binary(X, "broadcast_dp48", {}, osc("/config/dp48/broadcast", ("i", 1)))
+telemetry(X, "dp48-assign", inbound_hex=hexs(osc("/config/dp48/assign/07", ("i", 3))), expect_state={"dp48": {"assign": {"7": 3}}})
+telemetry(X, "dp48-group-name", inbound_hex=hexs(osc("/config/dp48/grpname/12", ("s", "Vox"))),
+          expect_state={"dp48": {"group_names": {"12": "Vox"}}})
+telemetry(X, "dp48-scope", inbound_hex=hexs(osc("/config/dp48/scope", ("i", 3))), expect_state={"dp48": {"scope": 3}})
+
+
 def _osc_args(packet):
     """Address, type tags and i/f/s arguments of one OSC message."""
     def string(pos):
