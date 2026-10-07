@@ -50,9 +50,35 @@ enum Wire {
     Bytes(Vec<u8>),
     Http {
         method: String,
+        /// The port the request went to: the transport's own, or an
+        /// endpoint's (`transport.endpoints`).
+        port: u16,
         target: String,
         body: Option<String>,
     },
+}
+
+/// The port a URL names.
+fn url_port(url: &str) -> u16 {
+    let authority = url
+        .split_once("://")
+        .map_or(url, |(_, rest)| rest)
+        .split('/')
+        .next()
+        .unwrap_or("");
+    authority
+        .rsplit_once(':')
+        .and_then(|(_, p)| p.parse().ok())
+        .unwrap_or(0)
+}
+
+/// The transport's own HTTP port, which a vector's request goes to unless it
+/// names another.
+fn main_port(engine: &SpecEngine) -> u16 {
+    match &engine.transport {
+        super::Transport::Http { base, .. } => url_port(base),
+        _ => 0,
+    }
 }
 
 fn wire(actions: &[Action]) -> Vec<Wire> {
@@ -70,6 +96,7 @@ fn wire(actions: &[Action]) -> Vec<Wire> {
                 let after_host = request.url.splitn(4, '/').nth(3).unwrap_or("");
                 Some(Wire::Http {
                     method: request.method.to_string(),
+                    port: url_port(&request.url),
                     target: format!("/{after_host}"),
                     body: request
                         .body
@@ -92,7 +119,9 @@ fn http_ids(actions: &[Action]) -> Vec<u64> {
         .collect()
 }
 
-fn expected_wire(v: &Value) -> Option<Vec<Wire>> {
+/// The wire a vector states; an HTTP request without `port` goes to
+/// `main_port`.
+fn expected_wire(v: &Value, main_port: u16) -> Option<Vec<Wire>> {
     let list = |x: &Value| -> Vec<Value> {
         match x {
             Value::Array(a) => a.clone(),
@@ -121,6 +150,10 @@ fn expected_wire(v: &Value) -> Option<Vec<Wire>> {
                 .iter()
                 .map(|r| Wire::Http {
                     method: r["method"].as_str().unwrap().to_string(),
+                    port: r
+                        .get("port")
+                        .and_then(Value::as_u64)
+                        .map_or(main_port, |p| p as u16),
                     target: r["target"].as_str().unwrap().to_string(),
                     body: r.get("body").and_then(Value::as_str).map(String::from),
                 })
@@ -212,10 +245,10 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
         }
     }
     let expect_connect = if let Some(w) = v.get("expect_connect_wire") {
-        Some(expected_wire(&json!({ "expect_wire": w })).unwrap())
+        Some(expected_wire(&json!({ "expect_wire": w }), 0).unwrap())
     } else {
         v.get("expect_connect_wire_hex")
-            .map(|w| expected_wire(&json!({ "expect_wire_hex": w })).unwrap())
+            .map(|w| expected_wire(&json!({ "expect_wire_hex": w }), 0).unwrap())
     };
     if let Some(expected) = expect_connect {
         let sent = wire(&connected);
@@ -306,7 +339,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             let flight = engine.prepare(&job)?;
             for (outgoing, _, _) in flight.messages {
                 match outgoing {
-                    super::Outgoing::Http(request) => {
+                    super::Outgoing::Http(request, _) => {
                         sent.extend(wire(&[Action::Http { id: 0, request }]))
                     }
                     super::Outgoing::Bytes(bytes) => sent.push(Wire::Bytes(bytes)),
@@ -319,7 +352,7 @@ fn run_telemetry(v: &Value, catalog: &Catalog) -> Result<(), String> {
             Some(Value::String(_)) => "expect_wire",
             _ => "expect_request",
         };
-        let expected = expected_wire(&json!({ key: expected })).unwrap();
+        let expected = expected_wire(&json!({ key: expected }), main_port(&engine)).unwrap();
         if sent != expected {
             return Err(format!(
                 "then_send mismatch\n  expected {expected:?}\n  sent     {sent:?}"
@@ -566,7 +599,7 @@ fn run(path: &PathBuf, catalog: &Catalog) -> Result<(), String> {
     let actions = cx.take();
     let sent = wire(&actions);
 
-    if let Some(expected) = expected_wire(&v) {
+    if let Some(expected) = expected_wire(&v, main_port(&engine)) {
         if sent != expected {
             let show = |w: &[Wire]| -> Vec<String> {
                 w.iter()

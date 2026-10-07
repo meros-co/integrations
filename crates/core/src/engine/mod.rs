@@ -115,6 +115,9 @@ enum Transport {
         /// whose body matches them all is a refusal too, whatever its status
         /// (the Graph API's `error.code` 190 under HTTP 400).
         refusal_json: Vec<(String, Regex)>,
+        /// `transport.endpoints`: other HTTP servers of the same device, on
+        /// other ports, by name (MediaMTX's playback server).
+        endpoints: BTreeMap<String, Endpoint>,
     },
     /// Text messages over a websocket, usually JSON.
     Ws {
@@ -126,6 +129,107 @@ enum Transport {
         /// in order.
         reply_match: Option<Regex>,
     },
+}
+
+/// A second HTTP server of the device (`transport.endpoints`): the same host,
+/// another port and scheme.
+#[derive(Debug, Clone)]
+struct Endpoint {
+    /// `scheme://host:port`.
+    base: String,
+    /// `auth: inherit`: the transport's credential and `headers` go there
+    /// too; `auth: none` sends neither.
+    credentialed: bool,
+}
+
+/// Where an HTTP request goes: the transport's own port, or an endpoint.
+/// Only the main one decides whether the device is connected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Route {
+    Main,
+    Endpoint { credentialed: bool },
+}
+
+/// `transport.endpoints`, resolved against the settings.
+fn endpoints_of(
+    t: &Value,
+    settings: &Params,
+    host: &str,
+    scheme: &str,
+) -> Result<BTreeMap<String, Endpoint>, String> {
+    let Some(map) = t.get("endpoints") else {
+        return Ok(BTreeMap::new());
+    };
+    let map = map
+        .as_object()
+        .ok_or("transport.endpoints maps names to endpoints")?;
+    let mut out = BTreeMap::new();
+    for (name, e) in map {
+        let valid = !name.is_empty()
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+        if !valid {
+            return Err(format!(
+                "transport.endpoints: '{name}' is not a snake_case name"
+            ));
+        }
+        let port = match e.get("port") {
+            Some(Value::Object(o)) => {
+                let setting = o.get("setting").and_then(Value::as_str).ok_or(format!(
+                    "transport.endpoints.{name}.port is a port or {{setting: name}}"
+                ))?;
+                settings.get(setting).and_then(Value::as_u64)
+            }
+            Some(v) => v.as_u64(),
+            None => return Err(format!("transport.endpoints.{name} has no port")),
+        };
+        let port = match port {
+            Some(p @ 1..=65535) => p,
+            _ => return Err(format!("transport.endpoints.{name}.port is not a port")),
+        };
+        let scheme = match e.get("scheme") {
+            None => scheme.to_string(),
+            Some(_) => scheme_of(e, settings, "http", "https")
+                .map_err(|m| format!("transport.endpoints.{name}: {m}"))?,
+        };
+        let auth = match e.get("auth") {
+            None => "inherit".to_string(),
+            Some(Value::String(s)) => s.clone(),
+            Some(Value::Object(o)) => {
+                let setting = o.get("setting").and_then(Value::as_str).ok_or(format!(
+                    "transport.endpoints.{name}.auth is inherit, none or {{setting: name}}"
+                ))?;
+                settings
+                    .get(setting)
+                    .and_then(Value::as_str)
+                    .unwrap_or("inherit")
+                    .to_string()
+            }
+            Some(_) => {
+                return Err(format!(
+                    "transport.endpoints.{name}.auth is inherit, none or {{setting: name}}"
+                ))
+            }
+        };
+        let credentialed = match auth.as_str() {
+            "inherit" => true,
+            "none" => false,
+            other => {
+                return Err(format!(
+                    "transport.endpoints.{name}.auth '{other}' is not inherit or none"
+                ))
+            }
+        };
+        out.insert(
+            name.clone(),
+            Endpoint {
+                base: format!("{scheme}://{host}:{port}"),
+                credentialed,
+            },
+        );
+    }
+    Ok(out)
 }
 
 /// `transport.session`: a login whose answer carries a session (a cookie or a
@@ -389,7 +493,8 @@ impl Transport {
 #[derive(Debug)]
 enum Outgoing {
     Bytes(Vec<u8>),
-    Http(HttpRequest),
+    /// A request, and whether it goes to the transport's port or an endpoint.
+    Http(HttpRequest, Route),
     Ws(String),
 }
 
@@ -464,6 +569,9 @@ struct InFlight {
     /// The job, kept to send again after a fresh login
     /// (`transport.session.relogin`).
     job: Job,
+    /// Where the HTTP request now awaiting its reply went: one sent to an
+    /// endpoint says nothing about whether the device is connected.
+    route: Route,
 }
 
 #[derive(Debug, Clone)]
@@ -839,6 +947,23 @@ impl SpecEngine {
         if kind != "http" && t.get("refusal_json").is_some() {
             return Err("transport.refusal_json is for the http transport".into());
         }
+        if kind != "http" && t.get("endpoints").is_some() {
+            return Err("transport.endpoints is for the http transport".into());
+        }
+        // Liveness and the session are the transport's own port's.
+        let names_endpoint = |v: Option<&Value>| match v {
+            Some(Value::Array(items)) => items.iter().any(|i| i.get("endpoint").is_some()),
+            Some(one) => one.get("endpoint").is_some(),
+            None => false,
+        };
+        if names_endpoint(t.get("probe")) {
+            return Err("transport.probe goes to the transport's own port, not an endpoint".into());
+        }
+        if names_endpoint(t.get("session").and_then(|s| s.get("login"))) {
+            return Err(
+                "transport.session.login goes to the transport's own port, not an endpoint".into(),
+            );
+        }
         let transport = match kind {
             "line-tcp" => {
                 let framing = str_field(&t, "framing").unwrap_or("terminated");
@@ -965,6 +1090,7 @@ impl SpecEngine {
                 let host = url_host(&ctx);
                 Transport::Http {
                     base: format!("{scheme}://{host}:{port}"),
+                    endpoints: endpoints_of(&t, &ctx.settings, &host, &scheme)?,
                     auth,
                     headers: header_templates(&t)?,
                     refusal_json: refusal_json(&t)?,
@@ -1342,8 +1468,31 @@ impl SpecEngine {
                 auth,
                 accept_invalid_certs,
                 headers: extra,
+                endpoints,
                 ..
             } => {
+                // `endpoint`: another HTTP server of the device, on the same
+                // host; the transport's credential and headers go there only
+                // with `auth: inherit`, and the session never does.
+                let (base, route) = match str_field(item, "endpoint") {
+                    None => (base, Route::Main),
+                    Some(name) => {
+                        let e = endpoints.get(name).ok_or_else(|| {
+                            format!("no endpoint '{name}' in transport.endpoints")
+                        })?;
+                        (
+                            &e.base,
+                            Route::Endpoint {
+                                credentialed: e.credentialed,
+                            },
+                        )
+                    }
+                };
+                let credentialed = route
+                    != Route::Endpoint {
+                        credentialed: false,
+                    };
+                let auth = if credentialed { *auth } else { HttpAuth::None };
                 let method = str_field(item, "method").unwrap_or("GET");
                 let method: &'static str = match method {
                     "GET" => "GET",
@@ -1371,12 +1520,14 @@ impl SpecEngine {
                     url.push('?');
                     url.push_str(&pairs.join("&"));
                 }
-                let mut headers = auth_headers(*auth, &self.auth_header, &self.settings);
-                headers.extend(render_headers(extra, values)?);
+                let mut headers = auth_headers(auth, &self.auth_header, &self.settings);
+                if credentialed {
+                    headers.extend(render_headers(extra, values)?);
+                }
                 // The session held (`transport.session`), on every request
                 // but one sent without it.
                 if let Some((name, value)) = &self.session_token {
-                    if item.get("session") != Some(&Value::Bool(false)) {
+                    if item.get("session") != Some(&Value::Bool(false)) && route == Route::Main {
                         headers.push((name.clone(), value.clone()));
                     }
                 }
@@ -1395,22 +1546,25 @@ impl SpecEngine {
                 if let Some(ct) = str_field(item, "content_type") {
                     headers.push(("Content-Type".into(), ct.into()));
                 }
-                Ok(Outgoing::Http(HttpRequest {
-                    method,
-                    url,
-                    headers,
-                    body,
-                    timeout: Some(self.timeout),
-                    accept_invalid_certs: *accept_invalid_certs,
-                    // Basic devices that answer with a Digest challenge get it
-                    // answered too (SPEC.md §2).
-                    digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(
-                        Credentials {
-                            username: user,
-                            password: pass,
-                        },
-                    ),
-                }))
+                Ok(Outgoing::Http(
+                    HttpRequest {
+                        method,
+                        url,
+                        headers,
+                        body,
+                        timeout: Some(self.timeout),
+                        accept_invalid_certs: *accept_invalid_certs,
+                        // Basic devices that answer with a Digest challenge get it
+                        // answered too (SPEC.md §2).
+                        digest: matches!(auth, HttpAuth::Basic | HttpAuth::Digest).then_some(
+                            Credentials {
+                                username: user,
+                                password: pass,
+                            },
+                        ),
+                    },
+                    route,
+                ))
             }
         }
     }
@@ -1509,6 +1663,7 @@ impl SpecEngine {
             retry: None,
             refreshed: false,
             job: job.clone(),
+            route: Route::Main,
         })
     }
 
@@ -1543,9 +1698,10 @@ impl SpecEngine {
             (None, Some(item)) => vec![item.clone()],
             (Some(_), _) => self.command_items(&job.name).unwrap_or_default(),
         };
+        // A request to an endpoint carries no session (SPEC.md §2, Endpoints).
         items
             .iter()
-            .any(|i| i.get("session") != Some(&Value::Bool(false)))
+            .any(|i| i.get("session") != Some(&Value::Bool(false)) && i.get("endpoint").is_none())
     }
 
     // ── Running commands ─────────────────────────────────────────────────
@@ -1633,7 +1789,8 @@ impl SpecEngine {
                         _ => Await::Osc(address),
                     }
                 }
-                Outgoing::Http(request) => {
+                Outgoing::Http(request, route) => {
+                    flight.route = route;
                     if self.oauth.is_some() {
                         flight.last_http = Some(request.clone());
                     }
@@ -1942,14 +2099,19 @@ impl SpecEngine {
         let Some(flight) = self.current.as_mut() else {
             return;
         };
-        if flight.awaiting.take().is_some() {
+        // An endpoint's answer is not the device's latency or liveness: those
+        // are the transport's own port's.
+        let main = flight.route == Route::Main;
+        if flight.awaiting.take().is_some() && main {
             cx.round_trip(cx.now().saturating_sub(flight.sent_at));
         }
 
         if flight.id.is_none() {
-            // Probe answered.
+            // Probe (or a queued query) answered.
             self.current = None;
-            self.heard(cx);
+            if main {
+                self.heard(cx);
+            }
             self.pump(cx);
             return;
         }
@@ -2254,7 +2416,7 @@ impl SpecEngine {
             match self.build(&item, &values) {
                 Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
                 Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
-                Ok(Outgoing::Http(request)) => {
+                Ok(Outgoing::Http(request, _)) => {
                     let id = self.next_request;
                     self.next_request += 1;
                     cx.http(id, request);
@@ -2372,7 +2534,7 @@ impl SpecEngine {
             match self.build(&item, &values) {
                 Ok(Outgoing::Bytes(bytes)) => self.transmit(cx, bytes),
                 Ok(Outgoing::Ws(text)) => cx.ws_send(SOCKET, text),
-                Ok(Outgoing::Http(_)) => {
+                Ok(Outgoing::Http(..)) => {
                     cx.log(Level::Warning, "telemetry over HTTP is not implemented")
                 }
                 Err(e) => cx.log(Level::Warning, format!("telemetry message not sent: {e}")),
@@ -3052,6 +3214,7 @@ impl Module for SpecEngine {
             return;
         }
         // Any credential the device can refuse: Basic, Digest or a token.
+        let route = self.current.as_ref().map_or(Route::Main, |f| f.route);
         let refused = match (&self.transport, &result) {
             (
                 Transport::Http {
@@ -3062,7 +3225,12 @@ impl Module for SpecEngine {
                 },
                 Ok(response),
             ) => {
-                *auth != HttpAuth::None
+                // An endpoint sent the credential only with `auth: inherit`.
+                let credentialed = match route {
+                    Route::Main => *auth != HttpAuth::None,
+                    Route::Endpoint { credentialed } => credentialed && *auth != HttpAuth::None,
+                };
+                credentialed
                     && (refusal.contains(&response.status)
                         || refused_by_body(refusal_json, response.status, &response.body))
             }
@@ -3115,6 +3283,13 @@ impl Module for SpecEngine {
                 let flight = self.current.take().unwrap();
                 match flight.id {
                     Some(id) => cx.complete(id, Err(CommandError::Transport { message })),
+                    // An endpoint that cannot be reached fails its request,
+                    // not the device: the transport's port says whether the
+                    // device is there.
+                    None if flight.route != Route::Main => cx.log(
+                        Level::Warning,
+                        format!("request to an endpoint failed: {message}"),
+                    ),
                     None => self.set_link(cx, Connection::Disconnected { reason: message }),
                 }
                 self.pump(cx);
@@ -3139,7 +3314,7 @@ impl Module for SpecEngine {
                 match flight.id {
                     Some(id) => cx.complete(id, Err(CommandError::Timeout)),
                     None => {
-                        if !self.transport.is_stream() {
+                        if !self.transport.is_stream() && flight.route == Route::Main {
                             self.set_link(
                                 cx,
                                 Connection::Disconnected {
@@ -4669,7 +4844,7 @@ mod tests {
         let empty = Params::new();
         let specs = BTreeMap::new();
         let values = e.values(&empty, &specs);
-        let Outgoing::Http(request) = e
+        let Outgoing::Http(request, _) = e
             .build(
                 &json!({"method": "PATCH", "path": "/v1/x", "body": "{}"}),
                 &values,
@@ -5620,5 +5795,291 @@ mod tests {
             completed(&a),
             vec![(3, Ok(Outcome::Value { value: json!("01") }))]
         );
+    }
+
+    /// A device with two more HTTP servers: `media` on a port setting,
+    /// credentialed like the transport, and `node` on a fixed port over
+    /// HTTPS without the credential.
+    const ENDPOINTS: &str = r#"
+spec: 1
+id: endpoints-test
+name: Endpoints test
+vendor: Test
+category: other
+source: [{ title: test }]
+transport:
+  type: http
+  port: 9997
+  auth: basic
+  headers: { X-Client: "{settings.client}" }
+  probe: { method: GET, path: /v3/info }
+  endpoints:
+    media: { port: { setting: media_port } }
+    node: { port: 3017, scheme: https, auth: { setting: node_auth } }
+settings:
+  username: { type: string, default: admin }
+  password: { type: string, secret: true, default: s3cret }
+  client: { type: string, default: console-1 }
+  media_port: { type: int, min: 1, max: 65535, default: 9996 }
+  node_auth: { type: enum, values: [inherit, none], default: none }
+ports:
+  - { port: 9997, protocol: http, role: control }
+  - { port: 9996, protocol: http, role: control, setting: media_port }
+  - { port: 3017, protocol: https, role: control }
+models: [{ id: m, name: M, supports: [info, list, reboot], verification: none }]
+commands:
+  info: { send: { method: GET, path: /v3/info }, expect: { status: 200 }, returns: ack }
+  list: { send: { endpoint: media, method: GET, path: /list, query: { path: cam1 } }, expect: { status: 200 }, returns: ack }
+  reboot: { send: { endpoint: node, method: POST, path: /v0/reboot }, expect: { status: 200 }, returns: ack }
+telemetry:
+  poll: { send: [{ endpoint: media, method: GET, path: /list, query: { path: all } }], every_ms: 60000 }
+  updates:
+    - path: "^/list\\?path=all$"
+      json: { n: "$.n" }
+      state: { spans: "{n}" }
+state:
+  spans: { type: int, description: "Spans listed" }
+"#;
+
+    fn endpoints_device(port: Option<u16>, settings: Value, monitor: bool) -> SpecEngine {
+        let spec: DeviceSpec = serde_yaml::from_str(ENDPOINTS).unwrap();
+        let settings =
+            crate::catalog::validate(&spec.settings, settings.as_object().unwrap()).unwrap();
+        SpecEngine::new(
+            Arc::new(spec),
+            OpenContext {
+                host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                host_name: None,
+                port,
+                model: "m".into(),
+                channels: None,
+                settings,
+                monitor,
+            },
+        )
+        .unwrap()
+    }
+
+    fn header<'a>(r: &'a HttpRequest, name: &str) -> Option<&'a str> {
+        r.headers
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// The device answered its probe: connected, nothing queued.
+    fn endpoints_connected(e: &mut SpecEngine) {
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        let (probe, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(1);
+        e.http_response(&mut cx, probe, answer("{}", None));
+        assert!(connected(&cx.take()));
+    }
+
+    #[test]
+    fn requests_on_an_endpoint_go_to_its_port_with_or_without_the_credential() {
+        // The port given when opening moves the transport's port only.
+        let mut e = endpoints_device(Some(19997), json!({}), false);
+        endpoints_connected(&mut e);
+        let mut sent = Vec::new();
+        for (id, name) in [(1, "info"), (2, "list"), (3, "reboot")] {
+            let mut cx = Cx::new(2);
+            e.command(&mut cx, id, name, &Params::new());
+            let (rid, request) = requests(&cx.take()).remove(0);
+            let mut cx = Cx::new(3);
+            e.http_response(&mut cx, rid, answer("{}", None));
+            assert_eq!(completed(&cx.take()), vec![(id, Ok(Outcome::Ack))]);
+            sent.push(request);
+        }
+        assert_eq!(sent[0].url, "http://127.0.0.1:19997/v3/info");
+        assert_eq!(sent[1].url, "http://127.0.0.1:9996/list?path=cam1");
+        assert_eq!(sent[2].url, "https://127.0.0.1:3017/v0/reboot");
+        // auth: inherit, the default: the credential and headers go along.
+        for r in &sent[..2] {
+            assert!(header(r, "Authorization").is_some_and(|v| v.starts_with("Basic ")));
+            assert_eq!(header(r, "X-Client"), Some("console-1"));
+            assert!(r.digest.is_some());
+        }
+        // auth: none: neither does.
+        assert_eq!(header(&sent[2], "Authorization"), None);
+        assert_eq!(header(&sent[2], "X-Client"), None);
+        assert!(sent[2].digest.is_none());
+
+        // The settings choose another port and the credential for `node`.
+        let mut e = endpoints_device(
+            None,
+            json!({"media_port": 8996, "node_auth": "inherit"}),
+            false,
+        );
+        endpoints_connected(&mut e);
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "list", &Params::new());
+        e.command(&mut cx, 2, "reboot", &Params::new());
+        let (rid, request) = requests(&cx.take()).remove(0);
+        assert_eq!(request.url, "http://127.0.0.1:8996/list?path=cam1");
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, rid, answer("{}", None));
+        let (_, request) = requests(&cx.take()).remove(0);
+        assert!(header(&request, "Authorization").is_some());
+    }
+
+    #[test]
+    fn an_endpoint_neither_connects_nor_disconnects_the_device() {
+        let mut e = endpoints_device(None, json!({}), true);
+        let mut cx = Cx::new(0);
+        e.start(&mut cx);
+        // The poll on the endpoint goes first, the probe behind it.
+        let (poll, request) = requests(&cx.take()).remove(0);
+        assert_eq!(request.url, "http://127.0.0.1:9996/list?path=all");
+        // Its answer goes to the rules, but is neither liveness nor latency.
+        let mut cx = Cx::new(1);
+        e.http_response(&mut cx, poll, answer(r#"{"n": 3}"#, None));
+        let a = cx.take();
+        assert!(a.contains(&Action::State(json!({"spans": 3}))));
+        assert!(!a.iter().any(|a| matches!(
+            a,
+            Action::Connection(_) | Action::RoundTrip(_) | Action::Alive
+        )));
+        // The probe, on the transport's port, connects the device.
+        let (probe, request) = requests(&a).remove(0);
+        assert!(request.url.ends_with(":9997/v3/info"));
+        let mut cx = Cx::new(2);
+        e.http_response(&mut cx, probe, answer("{}", None));
+        assert!(connected(&cx.take()));
+
+        // An endpoint that cannot be reached, or does not answer, fails its
+        // command and its poll, not the device.
+        let mut cx = Cx::new(3);
+        e.command(&mut cx, 2, "list", &Params::new());
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(4);
+        e.http_response(&mut cx, rid, Err("connection refused".into()));
+        let a = cx.take();
+        assert!(matches!(
+            &completed(&a)[..],
+            [(2, Err(CommandError::Transport { .. }))]
+        ));
+        assert!(!a.iter().any(|a| matches!(a, Action::Connection(_))));
+        let mut cx = Cx::new(60_000);
+        e.timer(&mut cx, POLL);
+        let (poll, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(60_001);
+        e.http_response(&mut cx, poll, Err("connection refused".into()));
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::Connection(_))));
+        let mut cx = Cx::new(120_000);
+        e.timer(&mut cx, POLL);
+        assert_eq!(requests(&cx.take()).len(), 1);
+        let mut cx = Cx::new(122_000);
+        e.timer(&mut cx, REPLY);
+        assert!(!cx.take().iter().any(|a| matches!(a, Action::Connection(_))));
+        assert!(e.current.is_none());
+        assert_eq!(e.link, Connection::Connected);
+    }
+
+    #[test]
+    fn a_refusal_on_an_endpoint_is_terminal_only_with_the_credential() {
+        let mut e = endpoints_device(None, json!({}), false);
+        endpoints_connected(&mut e);
+        let refused = || {
+            Ok(HttpResponse {
+                status: 401,
+                headers: Vec::new(),
+                body: Vec::new(),
+            })
+        };
+        // auth: none: the 401 is that request's answer.
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "reboot", &Params::new());
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, rid, refused());
+        let a = cx.take();
+        assert!(
+            matches!(
+                &completed(&a)[..],
+                [(1, Err(CommandError::DeviceError { .. }))]
+            ),
+            "{a:?}"
+        );
+        assert!(e.refused.is_none());
+        // auth: inherit: the same credential, refused.
+        let mut cx = Cx::new(4);
+        e.command(&mut cx, 2, "list", &Params::new());
+        let (rid, _) = requests(&cx.take()).remove(0);
+        let mut cx = Cx::new(5);
+        e.http_response(&mut cx, rid, refused());
+        let a = cx.take();
+        assert!(a
+            .iter()
+            .any(|a| matches!(a, Action::Connection(Connection::Unauthorized { .. }))));
+        assert!(matches!(
+            &completed(&a)[..],
+            [(2, Err(CommandError::Auth { .. }))]
+        ));
+    }
+
+    #[test]
+    fn an_endpoint_carries_no_session_and_the_probe_names_none() {
+        let mut spec: DeviceSpec = serde_yaml::from_str(ENDPOINTS).unwrap();
+        let t = spec.transport.as_mut().unwrap();
+        t["session"] = json!({"login": {"method": "POST", "path": "/login"}});
+        let ctx = OpenContext {
+            host: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            host_name: None,
+            port: None,
+            model: "m".into(),
+            channels: None,
+            settings: crate::catalog::validate(&spec.settings, &Params::new()).unwrap(),
+            monitor: false,
+        };
+        let mut e = SpecEngine::new(Arc::new(spec.clone()), ctx.clone()).unwrap();
+        endpoints_connected(&mut e);
+        // No login before an endpoint's request, and no session on it.
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "list", &Params::new());
+        let (rid, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.ends_with(":9996/list?path=cam1"));
+        let mut cx = Cx::new(3);
+        e.http_response(&mut cx, rid, answer("{}", None));
+        assert_eq!(completed(&cx.take()), vec![(1, Ok(Outcome::Ack))]);
+        // The transport's own requests log in, and carry the session.
+        let mut cx = Cx::new(4);
+        e.command(&mut cx, 2, "info", &Params::new());
+        let (login, request) = requests(&cx.take()).remove(0);
+        assert!(request.url.ends_with(":9997/login"));
+        let mut cx = Cx::new(5);
+        e.http_response(&mut cx, login, answer("{}", Some("sid=a")));
+        let (rid, request) = requests(&cx.take()).remove(0);
+        assert_eq!(cookie_of(&request), Some("sid=a"));
+        let mut cx = Cx::new(6);
+        e.http_response(&mut cx, rid, answer("{}", None));
+        cx.take();
+        let mut cx = Cx::new(7);
+        e.command(&mut cx, 3, "list", &Params::new());
+        let (_, request) = requests(&cx.take()).remove(0);
+        assert_eq!(cookie_of(&request), None);
+
+        // Liveness and the login stay on the transport's port.
+        let mut probe = spec.clone();
+        probe.transport.as_mut().unwrap()["probe"]["endpoint"] = json!("media");
+        let err = SpecEngine::new(Arc::new(probe), ctx.clone()).err().unwrap();
+        assert!(err.contains("probe"), "{err}");
+        let mut login = spec.clone();
+        login.transport.as_mut().unwrap()["session"]["login"]["endpoint"] = json!("media");
+        let err = SpecEngine::new(Arc::new(login), ctx.clone()).err().unwrap();
+        assert!(err.contains("login"), "{err}");
+        // A command naming no declared endpoint is refused before sending.
+        let mut unknown = spec;
+        unknown.commands.get_mut("list").unwrap().send =
+            Some(json!({"endpoint": "nope", "method": "GET", "path": "/"}));
+        let mut e = SpecEngine::new(Arc::new(unknown), ctx).unwrap();
+        endpoints_connected(&mut e);
+        let mut cx = Cx::new(2);
+        e.command(&mut cx, 1, "list", &Params::new());
+        assert!(matches!(
+            &completed(&cx.take())[..],
+            [(1, Err(CommandError::InvalidParams { .. }))]
+        ));
     }
 }

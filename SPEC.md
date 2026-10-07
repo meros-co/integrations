@@ -430,6 +430,58 @@ websocket and event-stream URLs, so the certificate is checked against the
 name and `Host` carries it. A cloud API is opened that way: Planning Center's
 `api.planningcenteronline.com` or YouTube's `www.googleapis.com` on port 443.
 
+#### Endpoints
+
+A device serving a second HTTP API on another port (MediaMTX's playback
+server on 9996 beside its Control API on 9997; WATCHOUT 7's node management
+on 3017 beside its control API on 3019) names it under `endpoints`, and a
+request item sends to it with `endpoint`:
+
+```yaml
+transport:
+  type: http
+  port: 9997
+  endpoints:
+    playback:
+      port: { setting: playback_port }       # or a number
+      scheme: { setting: playback_scheme }   # http | https | {setting: name}
+      auth: { setting: playback_auth }       # inherit | none | {setting: name}
+commands:
+  list_playback_spans:
+    params: { path: { type: string, required: true } }
+    send: { endpoint: playback, method: GET, path: /list, query: { path: "{path}" } }
+```
+
+A request on an endpoint goes to the same host as every other request (the
+host name the device was opened with, so TLS checks the certificate against
+it), on the endpoint's port and scheme. `scheme` defaults to the transport's,
+and `accept_invalid_certs` is the transport's. `port` is a number or an
+integer setting; the port given when opening the device changes only the
+transport's own port, never an endpoint's. With `auth: inherit` (the default)
+the transport's credential (`auth`, its Digest answer, an OAuth token and its
+refresh) and `headers` go with each request, and a refusal of them is the
+terminal refusal above, as on the transport's port: it is the same credential.
+With `auth: none` neither goes, and a 401 or 403 is that request's answer
+only. An `auth` setting is an enum of `inherit` and `none`, for a server whose
+access the operator configures apart from the main one.
+
+`endpoint` may be named by command messages, telemetry `poll`, `subscribe` and
+`then_send` items and `on_connect` steps. It may not be named by the `probe`
+or a session's `login`: liveness, latency and the session belong to the
+transport's own port. So an endpoint's request never carries the session
+(`transport.session`), never logs in first and is never answered with a fresh
+login; its answers are not the device's round-trip time and do not report the
+device connected; and a request to an endpoint that cannot be reached, or
+does not answer in time, fails that command (`transport`, or `timeout`), or is
+logged for a poll, without reporting the device disconnected. Replies go to
+the telemetry rules like any other, matched by their path: an endpoint's
+paths should not be the transport's own.
+
+Each endpoint is a `control` entry in `ports` (below), with its `setting` when
+its port comes from one; `tools/validate.py` checks the pairing, that each
+`endpoint` named is declared, and that the probe and login name none. A
+vector for a request on an endpoint gives its `port` in `expect_request`.
+
 ### `ws`
 
 Text messages over a WebSocket, usually JSON.
@@ -497,13 +549,15 @@ ports:
 |---|---|
 | `port` | The default. `null` when there is none and one must be given; a `note` then says so |
 | `protocol` | `tcp`, `udp`, `http`, `https`, `ws`, `wss`, `tls` or `ssh` |
-| `role` | `control` (where commands go; the port given when opening a device overrides it), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
+| `role` | `control` (where commands go; the port given when opening a device overrides the transport's, not an HTTP endpoint's), `push` (a websocket or event stream beside it), `feedback` (where the device sends replies or changes), `notification` (pushed status the device starts), `discovery` |
 | `listener` | Who listens: `device` (the default) or `core` |
 | `setting` | The setting that changes this port, if any |
 | `when` | When the entry applies, if not always: a setting's value or a model |
 
 There is always at least one `control` entry. For a spec-driven device the
-transport's `port` must be one of them, `listen_port` needs a `feedback`
+transport's `port` must be one of them, each HTTP endpoint (§2, Endpoints)
+needs one too (naming its setting, at the setting's default, when its port
+comes from one), `listen_port` needs a `feedback`
 entry naming its setting, and a push channel needs a `push` entry;
 `tools/validate.py` checks this. A test checks that each native module,
 opened without a port, uses its unconditional control default.
