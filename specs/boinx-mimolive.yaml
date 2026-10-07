@@ -1444,7 +1444,9 @@ commands:
 # reply and every websocket event updates it the same way whatever endpoint it
 # came from: documents.<id>, layers.<id>, variants.<id>, sources.<id>,
 # filters.<id>, output-destinations.<id>, layer-sets.<id>, devices.<id> and
-# accounts.<id>; beside them zoom.participants.<user id> and mlController's
+# accounts.<id>; beside them the type catalogs types.layers.<index>,
+# types.sources.<index> and types.output-destinations.<index> (by position, since
+# type identifiers hold dots), zoom.participants.<user id> and mlController's
 # mlcontroller.*.
 state:
   documents.*.name: { type: string, description: "Document name, the .tvshow file's name" }
@@ -1539,6 +1541,15 @@ state:
   devices.*.device_type: { type: string, description: "Device kind: com.boinx.devicetype.avfoundation (local) or com.boinx.devicetype.ndi (NDI on the network)" }
   devices.*.tally_state: { type: string, description: "Highest use of the device: off, in-use, effect, preview or program" }
   devices.*.input_channels: { type: string, description: "An audio device's input channel names as JSON text, such as [\"Ch. 1\", \"Ch. 2\"], which a source's channel map takes" }
+  types.layers.*.id: { type: string, description: "A layer type's identifier, the composition-id add_layer takes, at this position in the layer type list (0 first)" }
+  types.layers.*.name: { type: string, description: "The layer type's name, as the layer type list reports it" }
+  types.layers.*.attributes: { type: string, description: "Everything the layer type list reports for the type, as JSON text; get_layer_type gives its input parameters" }
+  types.sources.*.id: { type: string, description: "A source type's identifier, the source-type add_source takes, at this position in the source type list (0 first)" }
+  types.sources.*.name: { type: string, description: "The source type's name, as the source type list reports it" }
+  types.sources.*.attributes: { type: string, description: "Everything the source type list reports for the type, as JSON text; get_source_type gives its settings" }
+  types.output-destinations.*.id: { type: string, description: "An output destination type's identifier, the output-destination-type add_output_destination takes, at this position in the type list (0 first)" }
+  types.output-destinations.*.name: { type: string, description: "The output destination type's name, as the type list reports it" }
+  types.output-destinations.*.attributes: { type: string, description: "Everything the output destination type list reports for the type, as JSON text; get_output_destination_type gives its settings" }
   accounts.*.name: { type: string, description: "A web service account's name in mimoLive's Accounts settings, which zoom_join takes (mimoLive 6.19 and later)" }
   accounts.*.account_type: { type: string, description: "The service: Zoom, YouTube, Facebook, Twitch or Boinx Connect" }
   accounts.*.identifier: { type: string, description: "The account's identifier on the service, when known" }
@@ -1568,7 +1579,8 @@ telemetry:
   # Everything, once on connecting and then every minute as a safety net:
   # the document list with each kind of object sideloaded, one kind per
   # request so a version that refuses one include still answers the others;
-  # the devices, the accounts (6.19), the Zoom meeting's participants, and
+  # the devices, the accounts (6.19), the layer, source and output
+  # destination type catalogs, the Zoom meeting's participants, and
   # mlController's status where it is installed.
   poll:
     send:
@@ -1578,6 +1590,9 @@ telemetry:
       - { method: GET, path: /api/v1/documents, query: { include: layer-sets } }
       - { method: GET, path: /api/v1/devices }
       - { method: GET, path: /api/v1/accounts }
+      - { method: GET, path: /api/v1/layertypes }
+      - { method: GET, path: /api/v1/sourcetypes }
+      - { method: GET, path: /api/v1/outputdestinationtypes }
       - { method: GET, path: /api/v1/zoom/participants }
       - { endpoint: mlcontroller, method: GET, path: /api/status }
     every_ms: 60000
@@ -1881,6 +1896,36 @@ telemetry:
         "accounts.{id}.identifier": "{identifier}"
         "accounts.{id}.email": "{email}"
 
+    # The layer, source and output destination type catalogs, whole, each
+    # type kept by its position in the list (its identifier, such as
+    # com.boinx.mimoLive.sources.deviceVideoSource, holds dots, which a state
+    # key cannot): a type no longer listed leaves state. A GET of one type
+    # (/layertypes/(TypeID)) does not match and is returned to the caller.
+    - path: "^/api/v1/layertypes(\\?.*)?$"
+      json_each: "$.data"
+      json: &type_entry { id: "$.id", name: "$.attributes.name", attributes: "$.attributes" }
+      replace: types.layers
+      state:
+        "types.layers.{index}.id": "{id}"
+        "types.layers.{index}.name": "{name}"
+        "types.layers.{index}.attributes": "{attributes}"
+    - path: "^/api/v1/sourcetypes(\\?.*)?$"
+      json_each: "$.data"
+      json: *type_entry
+      replace: types.sources
+      state:
+        "types.sources.{index}.id": "{id}"
+        "types.sources.{index}.name": "{name}"
+        "types.sources.{index}.attributes": "{attributes}"
+    - path: "^/api/v1/outputdestinationtypes(\\?.*)?$"
+      json_each: "$.data"
+      json: *type_entry
+      replace: types.output-destinations
+      state:
+        "types.output-destinations.{index}.id": "{id}"
+        "types.output-destinations.{index}.name": "{name}"
+        "types.output-destinations.{index}.attributes": "{attributes}"
+
     # The Zoom meeting's participants, whole, by numeric user ID: none while
     # no meeting is joined. Read again after joining, leaving and each
     # meeting action.
@@ -2074,6 +2119,33 @@ quirks:
       participants and mlController's status are read every minute, each list replaced whole;
       the participants are read again after each Zoom command, and talking and hand_raised are
       only as current as that read. A device whose ID holds a dot is not kept in state.
+
+  - models: [all]
+    severity: info
+    text: >
+      The layer, source and output destination types (GET /layertypes, /sourcetypes and
+      /outputdestinationtypes) are read on connecting and every minute, each list replaced whole,
+      and kept by position (types.sources.<index>.id, name, and everything else the list reports
+      as JSON text in attributes), because type identifiers such as
+      com.boinx.mimoLive.sources.deviceVideoSource hold dots, which a state key cannot. The
+      shape of these lists is not documented beyond each type's id; the JSON:API form the rest of
+      the API answers with is assumed. A type's parameters and settings come from get_layer_type,
+      get_source_type and get_output_destination_type, which return them to the caller and are
+      not kept in state. add_output_destination takes the ten type identifiers the manual lists;
+      add_output_destination_with_attributes takes any other the type list gives.
+
+  - models: [all]
+    severity: info
+    text: >
+      Which video and audio device a camera or device source uses, and its channel map, can be
+      written (set_source_video_device, set_source_video_device_id, set_source_audio_device,
+      set_source_audio_device_id, set_source_channel_map, set_source_channel_map_by_name) but not
+      read back: neither the manual's sources data type nor Boinx's reference lists
+      video-device-id, video-device-name, audio-device-id, audio-device-name or channel-map among
+      the attributes a source reports, so state does not hold them. A source reports only whether
+      its video and audio hardware is connected (video_connected, audio_connected) and its
+      summary, which for a camera source shows the device's name. An unknown device or channel
+      name is ignored without an error.
 
   - models: [all]
     severity: info
