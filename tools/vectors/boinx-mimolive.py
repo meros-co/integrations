@@ -28,8 +28,10 @@ _ML_GONE = {"http_reply": {"status": 204}, "expect_result": {"ok": {"kind": "ack
 _ML_MADE = {"http_reply": {"status": 201, "body": "{}"}, "expect_result": {"ok": {"kind": "ack"}}}
 
 
-def _ml(command, input, method, target, body=None, **extra):
+def _ml(command, input, method, target, body=None, port=None, **extra):
     request = {"method": method, "target": target}
+    if port is not None:
+        request["port"] = port
     if body is not None:
         request["body"] = body if isinstance(body, str) else json.dumps(body, separators=(",", ":"))
     V.append({"spec": ML, "command": command, "input": input, "expect_request": request, **extra})
@@ -369,3 +371,256 @@ telemetry(ML, "pushed-removal", inbound_ws=json.dumps({"event": "removed", "type
           state_before={"variants": {_ML_VAR: {"name": "Lower third", "layer": "L1"}, "V2": {"name": "Other"}}},
           expect_state={"variants": {"V2": {"name": "Other"}}})
 telemetry(ML, "pong-is-not-state", inbound_ws='{"event":"pong"}', expect_state={})
+
+# ── Full control: the document, show metadata, sources, output destinations,
+# layer sets, types, comments and Zoom (the manual's Endpoints and Data
+# Types; Boinx's reference for the metadata fields, the single type reads,
+# /settings, the comment parameters and webinartoken).
+_ml("set_document_name", {**D_, "name": "Sunday Show"}, "PUT", _ML_D, {"name": "Sunday Show"})
+_ml("set_show_title", {**D_, "title": 'The "Sunday" Show'}, "PUT", _ML_D, {"metadata": {"title": 'The "Sunday" Show'}})
+_ml("set_show_author", {**D_, "author": "Jane Doe"}, "PUT", _ML_D, {"metadata": {"author": "Jane Doe"}})
+_ml("set_show_comments", {**D_, "comments": "Second camera on the left"}, "PUT", _ML_D,
+    {"metadata": {"comments": "Second camera on the left"}})
+_ml("set_show_name", {**D_, "show": "Sunday"}, "PUT", _ML_D, {"metadata": {"show": "Sunday"}})
+_ml("set_show_planned_duration", {**D_, "seconds": 3600}, "PUT", _ML_D, {"metadata": {"duration": 3600}})
+_ml("set_document_resolution", {**D_, "width": 1920, "height": 1080}, "PUT", _ML_D,
+    {"metadata": {"width": 1920, "height": 1080}})
+_ml("set_document_framerate", {**D_, "framerate": 29.97}, "PUT", _ML_D, '{"metadata":{"framerate":29.970}}')
+_ml("set_document_samplerate", {**D_, "samplerate": 48000}, "PUT", _ML_D, {"metadata": {"samplerate": 48000}})
+_ml("set_document_metadata", {**D_, "metadata": {"title": "Sunday", "comments": "Line one\nLine two"}}, "PUT",
+    _ML_D, {"metadata": {"title": "Sunday", "comments": "Line one\nLine two"}})
+_ml("get_server_settings", {}, "GET", "/api/v1/settings",
+    http_reply={"status": 200, "body": '{"tracking":true}'},
+    expect_result={"ok": {"kind": "value", "value": {"tracking": True}}})
+_ml("add_layer_with_inputs", {**D_, "layer_type": "com.boinx.mimoLive.layer.lowerthird", "name": "Guest",
+                              "index": 0, "values": {"tvIn_Title": "John Doe"}}, "POST", _ML_D + "/layers",
+    {"layer-identifier": "com.boinx.mimoLive.layer.lowerthird", "index": 0, "name": "Guest",
+     "input-values": {"tvIn_Title": "John Doe"}}, **_ML_MADE)
+_ml("set_source_channel_map_by_name", {**DS, "left": "Ch. 3", "right": "Ch. 4"}, "PUT", _ML_S,
+    {"channel-map": ["Ch. 3", "Ch. 4"]})
+_ml("set_source_video_device_id", {**DS, "device_id": "none"}, "PUT", _ML_S, {"video-device-id": "none"})
+_ml("set_source_audio_device_id", {**DS, "device_id": "BuiltInMicrophoneDevice"}, "PUT", _ML_S,
+    {"audio-device-id": "BuiltInMicrophoneDevice"})
+_ml("set_mimocall_video_codec", {**DS, "codec": "h264"}, "PATCH", _ML_S, {"video-codec": "h264"})
+_ml("set_mimocall_high_quality_audio", {**DS, "enabled": True}, "PATCH", _ML_S,
+    {"prefers-high-quality-audio": True})
+_ml("set_mimocall_partner_sees", {**DS, "video": "program-output"}, "PATCH", _ML_S,
+    {"partner-sees": {"type": "program-output"}})
+_ML_SRC2 = _ML_DOC + "-7A6B5C4D-3E2F-4A1B-9C8D-7E6F5A4B3C2D"
+_ml("set_mimocall_partner_sees_source", {**DS, "video_source": _ML_SRC2}, "PATCH", _ML_S,
+    {"partner-sees": {"type": "source", "source-id": _ML_SRC2}})
+_ml("set_mimocall_partner_sees_above_layer", {**DS, "layer_index": 3}, "PATCH", _ML_S,
+    {"partner-sees": {"type": "above-layer", "layer-index": 3}})
+_ml("set_mimocall_partner_hears", {**DS, "audio": "master-mix"}, "PATCH", _ML_S,
+    {"partner-hears": {"type": "master-mix"}})
+_ml("set_mimocall_partner_hears_custom_mix", {**DS, "mix": "Audio Mix 2"}, "PATCH", _ML_S,
+    {"partner-hears": {"type": "custom-mix", "mix-name": "Audio Mix 2"}})
+_ml("set_mimocall_partner_hears_solo_source", {**DS, "audio_source": _ML_SRC2}, "PATCH", _ML_S,
+    {"partner-hears": {"type": "solo-source", "source-id": _ML_SRC2}})
+_ml("add_source_with_attributes", {**D_, "attributes": {"source-type": "com.boinx.mimoLive.sources.deviceVideoSource",
+                                                        "name": "Main Camera",
+                                                        "video-device-name": "Logitech StreamCam"}},
+    "POST", _ML_D + "/sources", {"source-type": "com.boinx.mimoLive.sources.deviceVideoSource",
+                                 "name": "Main Camera", "video-device-name": "Logitech StreamCam"}, **_ML_MADE)
+_ml("get_filter", {**DS, "filter": _ML_FLT}, "GET", _ML_S + "/filters/" + _ML_FLT)
+_ml("set_streaming_public_url", {**DO, "public_url": "https://www.youtube.com/watch?v=abc"}, "PATCH", _ML_O,
+    _ml_od({"settings": {"publicurl": "https://www.youtube.com/watch?v=abc"}}))
+_ml("reset_recording_location", DO, "PATCH", _ML_O, _ml_od({"settings": {"location": None}}))
+_ml("reset_recording_filename", DO, "PATCH", _ML_O, _ml_od({"settings": {"filename": None}}))
+_ml("add_output_destination_at", {**D_, "output_type": "com.boinx.mimoLive.outputDestination.fileRecording",
+                                  "index": 0}, "POST", _ML_D + "/output-destinations",
+    {"output-destination-type": "com.boinx.mimoLive.outputDestination.fileRecording", "index": 0}, **_ML_MADE)
+_ml_new_od = {"data": {"attributes": {"output-destination-type": "com.boinx.mimoLive.outputDestination.liveStreaming",
+                                      "title": "My Stream",
+                                      "settings": {"rtmpurl": "rtmp://fb.live/1234567", "streamingkey": "abc"}}}}
+_ml("add_output_destination_with_attributes", {**D_, "attributes": _ml_new_od}, "POST",
+    _ML_D + "/output-destinations", _ml_new_od, **_ML_MADE)
+_ml("get_layer_set", DLS, "GET", _ML_LS)
+_ml("set_layer_set_recall_on_show_start", {**DLS, "enabled": True}, "PATCH", _ML_LS,
+    {"data": {"attributes": {"recall-on-show-start": True}}})
+_ml("set_layer_set_recall_on_show_end", {**DLS, "enabled": False}, "PATCH", _ML_LS,
+    {"data": {"attributes": {"recall-on-show-end": False}}})
+_ml("add_layer_set_with_layers", {**D_, "name": "Interview Scene", "recall_on_show_start": True,
+                                  "recall_on_show_end": False, "layers": _ml_entries}, "POST",
+    _ML_D + "/layer-sets", {"data": {"attributes": {"name": "Interview Scene", "recall-on-show-start": True,
+                                                    "recall-on-show-end": False, "layers": _ml_entries}}},
+    **_ML_MADE)
+_ml("get_layer_type", {"type_id": "com.boinx.mimoLive.layer.lowerthird"}, "GET",
+    "/api/v1/layertypes/com.boinx.mimoLive.layer.lowerthird")
+_ml("get_source_type", {"type_id": "com.boinx.mimoLive.sources.deviceVideoSource"}, "GET",
+    "/api/v1/sourcetypes/com.boinx.mimoLive.sources.deviceVideoSource")
+_ml("get_output_destination_type", {"type_id": "com.boinx.mimoLive.outputDestination.fileRecording"}, "GET",
+    "/api/v1/outputdestinationtypes/com.boinx.mimoLive.outputDestination.fileRecording")
+_ml("inject_comment_with_details", {"username": "Jane", "comment": "Hello", "platform": "twitch",
+                                    "date": "2026-10-07T18:30:00Z", "favorite": True,
+                                    "user_image_url": "https://example.com/jane.png"}, "POST",
+    "/api/v1/comments/new?username=Jane&comment=Hello&platform=twitch&date=2026-10-07T18%3A30%3A00Z"
+    "&favorite=true&userimageurl=https%3A%2F%2Fexample.com%2Fjane.png")
+_ml("zoom_join_webinar", {"meeting": "123456789", "account": "My Work Account", "webinar_token": "tk-1",
+                          "display_name": "mimoLive", "virtual_camera": False}, "GET",
+    "/api/v1/zoom/join?meetingid=123456789&zoomaccountname=My%20Work%20Account&webinartoken=tk-1"
+    "&displayname=mimoLive&virtualcamera=false")
+
+# mlController (its Services/WebServer.swift): port 8990, every answer 200
+# with JSON, no mimoLive key sent.
+_ML_STATUS = {"availableMimoLiveApps": [{"name": "mimoLive (6.15)", "path": "/Applications/mimoLive.app"}],
+              "localDocuments": ["/Users/me/Documents/show1.tvshow"],
+              "openDocuments": [{"id": _ML_DOC, "name": "My Show", "path": "/Users/me/Documents/show1.tvshow"}],
+              "running": True, "selectedMimoLive": "mimoLive (6.15)",
+              "selectedMimoLivePath": "/Applications/mimoLive.app"}
+_ml("mlcontroller_status", {}, "GET", "/api/status", port=8990,
+    http_reply={"status": 200, "body": json.dumps(_ML_STATUS)},
+    expect_result={"ok": {"kind": "value", "value": _ML_STATUS}})
+_ml("launch_mimolive", {}, "POST", "/api/start", port=8990,
+    http_reply={"status": 200, "body": '{"status":"starting"}'}, expect_result={"ok": {"kind": "ack"}})
+_ml("quit_mimolive", {}, "POST", "/api/stop", port=8990)
+_ml("restart_mimolive", {}, "POST", "/api/restart", port=8990)
+_ml("open_document", {"path": "/Users/me/Documents/show1.tvshow"}, "POST", "/api/open",
+    '{"path":"/Users/me/Documents/show1.tvshow"}', port=8990)
+_ml("select_mimolive_app", {"path": ""}, "POST", "/api/select", '{"path":""}', port=8990)
+# mlController's own password set: its 401 answers that command only.
+V.append({"spec": ML, "command": "launch_mimolive", "file": "launch_mimolive-401",
+          "input": {}, "settings": {"token": "a" * 64},
+          "expect_request": {"method": "POST", "port": 8990, "target": "/api/start"},
+          "http_reply": {"status": 401, "body": "Unauthorized"},
+          "expect_result": {"error": {"error": "device_error", "code": "401"}}})
+V.append({"spec": ML, "command": "mlcontroller_status", "file": "mlcontroller_status-other-port",
+          "input": {}, "settings": {"mlcontroller_port": 9100},
+          "expect_request": {"method": "GET", "port": 9100, "target": "/api/status"}})
+
+# ── Telemetry for full control ───────────────────────────────────────────
+# The show metadata (the manual's Data Types, documents).
+telemetry(ML, "document-metadata", inbound_http={
+    "path": _ML_D,
+    "body": json.dumps({"data": {"type": "documents", "id": _ML_DOC, "attributes": {
+        "name": "Show.tvshow", "live-state": "off", "metadata": {
+            "title": "Sunday", "comments": "Two cameras", "author": "Jane Doe", "show": "Weekly",
+            "width": 1920, "height": 1080, "framerate": 25, "samplerate": 48000, "duration": 3600}}}})},
+    expect_state={"documents": {_ML_DOC: {
+        "name": "Show.tvshow", "live_state": "off", "show_title": "Sunday", "show_comments": "Two cameras",
+        "show_author": "Jane Doe", "show_name": "Weekly", "width": 1920, "height": 1080, "framerate": 25.0,
+        "samplerate": 48000, "planned_duration": 3600}}})
+# Input and output values, kept whole as JSON text.
+telemetry(ML, "pushed-layer-input-values", inbound_ws=json.dumps({
+    "event": "changed", "type": "layers", "id": _ML_LAYER,
+    "data": {"type": "layers", "id": _ML_LAYER, "attributes": {
+        "name": "Lower Third", "live-state": "live",
+        "input-values": {"tvIn_Title": "Jane Smith", "tvIn_Visible": True},
+        "output-values": {"tvOut_SettingName": "Lower Third"}}}}),
+    expect_state={"layers": {_ML_LAYER: {
+        "name": "Lower Third", "live_state": "live",
+        "input_values": '{"tvIn_Title":"Jane Smith","tvIn_Visible":true}',
+        "output_values": '{"tvOut_SettingName":"Lower Third"}'}}})
+# Zoom participant and mimoCall source attributes (the manual's mimoCall
+# source properties; Boinx's reference for the Zoom ones).
+telemetry(ML, "sources-zoom-and-mimocall", inbound_http={
+    "path": _ML_D + "/sources",
+    "body": json.dumps({"data": [
+        {"type": "sources", "id": _ML_SRC, "attributes": {
+            "name": "Zoom 1", "source-type": "com.boinx.mimoLive.sources.zoomparticipant",
+            "is-hidden": False, "is-static": False, "zoom-userid": 16786432, "zoom-username": "John Doe",
+            "zoom-userselectiontype": 1, "zoom-videoresolution": "1080p"}},
+        {"type": "sources", "id": _ML_SRC2, "attributes": {
+            "name": "Guest", "source-type": "com.boinx.mimoLive.sources.webRTCSource",
+            "video-codec": "vp9", "prefers-high-quality-audio": True,
+            "partner-sees": {"type": "above-layer", "layer-index": 3},
+            "partner-hears": {"type": "custom-mix", "mix-name": "Audio Mix 2"},
+            "available-actions": ["reconnect"]}}]})},
+    expect_state={"sources": {
+        _ML_SRC: {"name": "Zoom 1", "source_type": "com.boinx.mimoLive.sources.zoomparticipant",
+                  "hidden": False, "static": False, "zoom_user_id": 16786432, "zoom_user_name": "John Doe",
+                  "zoom_selection_type": 1, "zoom_video_resolution": "1080p"},
+        _ML_SRC2: {"name": "Guest", "source_type": "com.boinx.mimoLive.sources.webRTCSource",
+                   "video_codec": "vp9", "high_quality_audio": True, "partner_sees": "above-layer",
+                   "partner_sees_layer_index": 3, "partner_hears": "custom-mix",
+                   "partner_hears_mix": "Audio Mix 2", "available_actions": '["reconnect"]'}}})
+# A source's filters sideloaded in a GET of the source, and a filter removed.
+telemetry(ML, "source-filters-included", inbound_http={
+    "path": _ML_S,
+    "body": json.dumps({"data": {"type": "sources", "id": _ML_SRC, "attributes": {
+        "name": "Camera 1", "filepath": "/Users/me/Pictures/logo.png"}},
+        "included": [{"type": "filters", "id": _ML_FLT, "attributes": {
+            "name": "Color Correction", "composition-id": "com.boinx.filter.colorcorrection",
+            "input-values": {"tvIn_Amount": 0.5}},
+            "relationships": {"source": {"data": {"type": "sources", "id": _ML_SRC}}}}]})},
+    expect_state={"sources": {_ML_SRC: {"name": "Camera 1", "filepath": "/Users/me/Pictures/logo.png"}},
+                  "filters": {_ML_FLT: {"name": "Color Correction",
+                                        "composition_id": "com.boinx.filter.colorcorrection",
+                                        "source": _ML_SRC, "input_values": '{"tvIn_Amount":0.5}'}}})
+telemetry(ML, "pushed-filter-removal", inbound_ws=json.dumps({"event": "removed", "type": "filters", "id": _ML_FLT}),
+          state_before={"filters": {_ML_FLT: {"name": "Color Correction"}, "F2": {"name": "Blur"}}},
+          expect_state={"filters": {"F2": {"name": "Blur"}}})
+# An output destination's settings.
+telemetry(ML, "output-destination-settings", inbound_http={
+    "path": _ML_D + "/output-destinations",
+    "body": json.dumps({"data": [
+        {"type": "output-destinations", "id": _ML_OUT, "attributes": {
+            "title": "File Recording", "output-destination-type": "com.boinx.mimoLive.outputDestination.fileRecording",
+            "settings": {"location": "~/Movies", "filename": "%show %year-%month-%day.%extension"}}},
+        {"type": "output-destinations", "id": "S1", "attributes": {
+            "title": "Stream", "settings": {"rtmpurl": "rtmp://a.rtmp.youtube.com/l***", "streamingkey": "****",
+                                            "publicurl": "https://youtu.be/abc"}}}]})},
+    expect_state={"output-destinations": {
+        _ML_OUT: {"title": "File Recording",
+                  "output_type": "com.boinx.mimoLive.outputDestination.fileRecording",
+                  "location": "~/Movies", "filename": "%show %year-%month-%day.%extension"},
+        "S1": {"title": "Stream", "rtmp_url": "rtmp://a.rtmp.youtube.com/l***",
+               "public_url": "https://youtu.be/abc"}}})
+# The device list, whole: a device no longer listed leaves state.
+telemetry(ML, "devices-list", inbound_http={
+    "path": "/api/v1/devices",
+    "body": json.dumps({"data": [{"type": "devices", "id": "BuiltInMicrophoneDevice", "attributes": {
+        "name": "MacBook Pro Microphone", "connected": True, "video": False, "audio": True,
+        "device-type": "com.boinx.devicetype.avfoundation", "tally-state": "off",
+        "input-channels": ["Ch. 1"]}}]})},
+    state_before={"devices": {"OldCam": {"name": "Old Camera", "connected": False}}},
+    expect_state={"devices": {"BuiltInMicrophoneDevice": {
+        "name": "MacBook Pro Microphone", "connected": True, "video": False, "audio": True,
+        "device_type": "com.boinx.devicetype.avfoundation", "tally_state": "off",
+        "input_channels": '["Ch. 1"]'}}})
+telemetry(ML, "accounts-list", inbound_http={
+    "path": "/api/v1/accounts",
+    "body": json.dumps({"data": [{"type": "accounts", "id": "6995291F-E0C3-4307-84E0-BEA3A3EA7A8E", "attributes": {
+        "name": "Jane Doe", "account-type": "Zoom", "identifier": "aBcDeFgHiJ", "email": "jane@example.com"}}]})},
+    expect_state={"accounts": {"6995291F-E0C3-4307-84E0-BEA3A3EA7A8E": {
+        "name": "Jane Doe", "account_type": "Zoom", "identifier": "aBcDeFgHiJ", "email": "jane@example.com"}}})
+# The Zoom meeting's participants (Boinx's reference), whole; an empty list
+# (no meeting) clears them.
+telemetry(ML, "zoom-participants", inbound_http={
+    "path": "/api/v1/zoom/participants",
+    "body": json.dumps({"data": [{"id": 16786432, "name": "John Doe", "userRole": "Host", "isHost": True,
+                                  "isCoHost": False, "isVideoOn": True, "isAudioOn": True, "isTalking": False,
+                                  "isRaisingHand": False}]})},
+    state_before={"zoom": {"participants": {"5": {"name": "Gone"}}}},
+    expect_state={"zoom": {"participants": {"16786432": {
+        "name": "John Doe", "role": "Host", "host": True, "co_host": False, "video_on": True, "audio_on": True,
+        "talking": False, "hand_raised": False}}}})
+telemetry(ML, "zoom-participants-none", inbound_http={
+    "path": "/api/v1/zoom/participants", "body": '{"data":[]}'},
+    state_before={"zoom": {"participants": {"16786432": {"name": "John Doe"}}}},
+    expect_state={"zoom": {}})
+telemetry(ML, "zoom-action-rereads-participants", inbound_http={
+    "path": "/api/v1/zoom/meetingaction?command=muteAll", "body": "{}"},
+    expect_then_send=[{"method": "GET", "target": "/api/v1/zoom/participants"}],
+    expect_state={})
+# mlController's status.
+telemetry(ML, "mlcontroller-status", inbound_http={"path": "/api/status", "body": json.dumps(_ML_STATUS)},
+          expect_state={"mlcontroller": {
+              "running": True, "selected_app": "mimoLive (6.15)",
+              "selected_app_path": "/Applications/mimoLive.app",
+              "available_apps": '[{"name":"mimoLive (6.15)","path":"/Applications/mimoLive.app"}]',
+              "open_documents": '[{"id":"' + _ML_DOC + '","name":"My Show","path":"/Users/me/Documents/show1.tvshow"}]',
+              "local_documents": '["/Users/me/Documents/show1.tvshow"]'}})
+# A recall flag PATCH has the set read again, like a layers PATCH.
+telemetry(ML, "layer-set-recall-flag-written", inbound_http={
+    "path": _ML_LS, "request": {"data": {"attributes": {"recall-on-show-start": True}}},
+    "body": json.dumps({"data": _ml_set({"name": "Intro Scene", "recall-on-show-start": True})})},
+    expect_then_send=_ML_REREAD,
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "document": _ML_DOC,
+                                           "recall_on_show_start": True}}})
+# A GET of the set (no request body) is not read again.
+telemetry(ML, "layer-set-get-not-reread", inbound_http={
+    "path": _ML_LS, "body": json.dumps({"data": _ml_set({"name": "Intro Scene", "recall-on-show-end": True})})},
+    expect_then_send=[],
+    expect_state={"layer-sets": {_ML_SET: {"name": "Intro Scene", "document": _ML_DOC,
+                                           "recall_on_show_end": True}}})
