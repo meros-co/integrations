@@ -153,3 +153,105 @@ telemetry(DG, "live-transport", expect_connect_ws=[LIVE_SUB],
                                  "engaged": True, "volume": 1.0, "brightness": 0.75}})
 telemetry(DG, "live-error", inbound_ws='{"error":"Unable to subscribe to transportmanager:default"}',
           expect_state={"live": {"error": "Unable to subscribe to transportmanager:default"}})
+
+# ── Transports, status and failover: the rest of what they read ──
+_dg("apply_default_routing", {}, "POST", "/api/session/failover/applydefaultrouting", **_OK)
+UNDERSTUDIES = {"understudy-1": {"targets": [{"uid": "4411", "name": "actor-1"}, {"uid": "4412", "name": "actor-2"}]}}
+_dg("get_understudy_targets", {}, "GET", "/api/session/failover/understudytargets",
+    http_reply={"status": 200, "body": json.dumps({"status": {"code": 0, "message": ""},
+                                                   "understudies": UNDERSTUDIES})},
+    expect_result={"ok": {"kind": "value", "value": UNDERSTUDIES}})
+
+
+def _envelope(**fields):
+    return json.dumps({"status": {"code": 0, "message": "", "details": []}, **fields})
+
+
+def _compact(value):
+    return json.dumps(value, separators=(",", ":"))
+
+
+telemetry(DG, "transports-current-track-annotations", inbound_http={
+    "path": "/api/session/transport/transports", "body": json.dumps(TRANSPORTS)},
+    expect_then_send=[{"method": "GET", "target": "/api/session/transport/annotations?uid=123"}],
+    expect_state={"transports": {"2276480868532234653": {
+        "name": "default", "engaged": True, "volume": 0.5, "brightness": 1.0, "playmode": "Stop",
+        "current_track": "track 1", "receiving_timecode": False, "setlist": "Show"}}})
+telemetry(DG, "multitransports", inbound_http={"path": "/api/session/transport/transports", "body": _envelope(
+    transports=[], multitransports=[{"uid": "5001", "name": "All screens", "engaged": True,
+                                     "transports": ["2276480868532234653", "2276480868532234654"]}])},
+    state_before={"multitransports": {"5000": {"name": "old", "engaged": False}}},
+    expect_state={"multitransports": {"5001": {
+        "name": "All screens", "engaged": True,
+        "transports": '["2276480868532234653","2276480868532234654"]'}}})
+telemetry(DG, "active-transport", inbound_http={"path": "/api/session/transport/activetransport",
+                                                "body": _envelope(result=ACTIVE)},
+          state_before={"active_transport": {"99": {"name": "other"}}},
+          expect_state={"active_transport": {"2276480868532234653": {"name": "default"}}})
+telemetry(DG, "tracks", inbound_http={"path": "/api/session/transport/tracks", "body": _envelope(result=[
+    {"uid": "123", "name": "track 1", "length": 300.0, "crossfade": "Off"},
+    {"uid": "124", "name": "track 2", "length": 95.5, "crossfade": "Fade"}])},
+    state_before={"tracks": {"9": {"name": "deleted"}}},
+    expect_state={"tracks": {"123": {"name": "track 1", "length": 300.0, "crossfade": "Off"},
+                             "124": {"name": "track 2", "length": 95.5, "crossfade": "Fade"}}})
+telemetry(DG, "setlists", inbound_http={"path": "/api/session/transport/setlists", "body": _envelope(result=[
+    {"uid": "77", "name": "Show", "tracks": [{"uid": "123", "name": "track 1", "length": 300.0, "crossfade": "Off"},
+                                            {"uid": "124", "name": "track 2", "length": 95.5,
+                                             "crossfade": "Fade"}]}])},
+    state_before={"setlists": {"77": {"name": "Show", "tracks": {"2": {"uid": "125", "name": "cut"}}}}},
+    expect_state={"setlists": {"77": {"name": "Show", "tracks": {"0": {"uid": "123", "name": "track 1"},
+                                                                 "1": {"uid": "124", "name": "track 2"}}}}})
+ANNOTATIONS = {"notes": [{"time": 10.0, "text": "Act 1"}],
+               "tags": [{"time": 10.0, "type": "CUE", "value": "1.2.5"}],
+               "sections": [{"time": 0.0, "index": "0"}, {"time": 10.0, "index": "1"}]}
+telemetry(DG, "annotations", inbound_http={
+    "path": "/api/session/transport/annotations?uid=123", "body": _envelope(result={
+        "uid": "123", "name": "track 1", "annotations": ANNOTATIONS})},
+    expect_state={"annotations": {"123": {k: _compact(v) for k, v in ANNOTATIONS.items()}}})
+telemetry(DG, "transport-command-reread", inbound_http={"path": "/api/session/transport/gototrack",
+                                                        "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/transport/transports"}],
+          expect_state={})
+telemetry(DG, "health-states", inbound_http={"path": "/api/session/status/health", "body": _envelope(result=[
+    {"machine": {"uid": "2", "name": "understudy", "hostname": "VX4-02"},
+     "runningAsMachine": {"uid": "1", "name": "actor-1", "hostname": "VX4-01"},
+     "status": {"averageFPS": 60.0, "videoDroppedFrames": 0, "videoMissedFrames": 0, "states": [
+         {"name": "Genlock", "detail": "No reference", "category": "genlock", "severity": "warning"}]}}])},
+    expect_state={"machines": {"understudy": {
+        "hostname": "VX4-02", "running_as": "actor-1", "average_fps": 60.0, "video_dropped_frames": 0.0,
+        "video_missed_frames": 0.0, "states": {"0": {"name": "Genlock", "detail": "No reference",
+                                                     "category": "genlock", "severity": "warning"}}}}})
+telemetry(DG, "notifications", inbound_http={"path": "/api/session/status/notifications", "body": _envelope(result=[
+    {"machine": {"uid": "1", "name": "director", "hostname": "VX4-01"},
+     "notifications": [{"summary": "Missing media", "detail": "objects/videofile/intro.mov"}]}])},
+    state_before={"notifications": {"actor-1": {"0": {"summary": "gone", "detail": ""}}}},
+    expect_state={"notifications": {"director": {"0": {"summary": "Missing media",
+                                                       "detail": "objects/videofile/intro.mov"}}}})
+telemetry(DG, "session", inbound_http={"path": "/api/session/status/session", "body": _envelope(result={
+    "isRunningSolo": False, "isDirectorDedicated": True,
+    "director": {"uid": "11", "name": "director", "hostname": "VX4-01", "type": "Vx4", "guiMode": "AlwaysOn",
+                 "guiVisible": True},
+    "actors": [{"uid": "12", "name": "actor-1", "hostname": "VX4-02", "type": "Vx4", "guiMode": "OffWhenActor",
+                "guiVisible": False}],
+    "understudies": [{"uid": "13", "name": "understudy", "hostname": "VX4-03", "type": "Vx4",
+                      "guiMode": "AlwaysOff", "guiVisible": False}]})},
+    state_before={"session": {"machines": {"old-actor": {"role": "actor"}}}},
+    expect_state={"session": {"solo": False, "director_dedicated": True, "director": "director", "machines": {
+        "director": {"role": "director", "uid": "11", "hostname": "VX4-01", "type": "Vx4", "gui_mode": "AlwaysOn",
+                     "gui_visible": True},
+        "actor-1": {"role": "actor", "uid": "12", "hostname": "VX4-02", "type": "Vx4", "gui_mode": "OffWhenActor",
+                    "gui_visible": False},
+        "understudy": {"role": "understudy", "uid": "13", "hostname": "VX4-03", "type": "Vx4",
+                       "gui_mode": "AlwaysOff", "gui_visible": False}}}})
+telemetry(DG, "gui-mode-reread", inbound_http={"path": "/api/session/status/setguimode", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/status/session"}], expect_state={})
+telemetry(DG, "failover-settings", inbound_http={"path": "/api/session/failover/settings", "body": _envelope(
+    timeout=2.5, normalPreset="normal", currentPreset="failed over")},
+    expect_state={"failover": {"timeout": 2.5, "normal_preset": "normal", "current_preset": "failed over"}})
+telemetry(DG, "understudy-targets", inbound_http={"path": "/api/session/failover/understudytargets",
+                                                  "body": _envelope(understudies=UNDERSTUDIES)},
+          expect_state={"failover": {"understudy_targets": _compact(UNDERSTUDIES)}})
+telemetry(DG, "failover-reread", inbound_http={"path": "/api/session/failover/failovermachine", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/status/health"},
+                            {"method": "GET", "target": "/api/session/status/session"},
+                            {"method": "GET", "target": "/api/session/failover/settings"}], expect_state={})

@@ -118,7 +118,8 @@ models:
                go_to_frame, go_to_timecode, set_engaged, set_volume, set_brightness,
                get_active_transport, get_transports, get_tracks, get_setlists, get_annotations,
                get_health, get_notifications, get_project, get_session, set_gui_mode,
-               get_failover_settings, failover_machine, restore_machine,
+               get_failover_settings, failover_machine, restore_machine, apply_default_routing,
+               get_understudy_targets,
                detect_systems, get_os_info, get_network_adapters, get_gpu_outputs, get_projects,
                start_project, quit_project, restart_project, force_quit_project]
     verification: none
@@ -492,6 +493,18 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  apply_default_routing:
+    summary: Put the matrix feed routing back to its default after a machine is restored (failover/applydefaultrouting)
+    send: { method: POST, path: /api/session/failover/applydefaultrouting }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  get_understudy_targets:
+    summary: The machines each understudy can take over, keyed by understudy (failover/understudytargets)
+    send: { method: GET, path: /api/session/failover/understudytargets }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.understudies" }
+    returns: value
+
   # ── Service API: systems and projects ────────────────────────────────────
   detect_systems:
     summary: The disguise systems on the network, with type, version, running project and which services run (system/detectsystems)
@@ -558,12 +571,25 @@ commands:
     returns: ack
 
 telemetry:
+  # What changes during a show, every 10 seconds.
   poll:
     every_ms: 10000
     send:
       - { method: GET, path: /api/session/transport/transports }
+      - { method: GET, path: /api/session/transport/activetransport }
       - { method: GET, path: /api/session/status/health }
+      - { method: GET, path: /api/session/status/notifications }
+  # What an operator changes in the project, and the machines' set-up, every
+  # minute (and on connecting).
+  subscribe:
+    every_ms: 60000
+    send:
       - { method: GET, path: /api/session/status/project }
+      - { method: GET, path: /api/session/status/session }
+      - { method: GET, path: /api/session/failover/settings }
+      - { method: GET, path: /api/session/failover/understudytargets }
+      - { method: GET, path: /api/session/transport/tracks }
+      - { method: GET, path: /api/session/transport/setlists }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -595,6 +621,72 @@ telemetry:
         transports.{uid}.current_track: "{track}"
         transports.{uid}.receiving_timecode: "{timecode}"
         transports.{uid}.setlist: "{setlist}"
+    # Each transport's current track has its notes, tags and sections read.
+    - path: "^/api/session/transport/transports$"
+      json_each: "$.transports"
+      each_match: { "$.currentTrack.uid": "^([0-9]+)$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/transport/annotations, query: { uid: "{1}" } }
+    - path: "^/api/session/transport/transports$"
+      json_match: { "$.multitransports": "^\\[" }
+      replace: multitransports
+      json_each: "$.multitransports"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        engaged: "$.engaged"
+        members: "$.transports"
+      state:
+        multitransports.{uid}.name: "{name}"
+        multitransports.{uid}.engaged: "{engaged}"
+        multitransports.{uid}.transports: "{members}"
+    - path: "^/api/session/transport/activetransport$"
+      json_match: { "$.result": "^\\[" }
+      replace: active_transport
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        active_transport.{uid}.name: "{name}"
+    - path: "^/api/session/transport/tracks$"
+      json_match: { "$.result": "^\\[" }
+      replace: tracks
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", length: "$.length", crossfade: "$.crossfade" }
+      state:
+        tracks.{uid}.name: "{name}"
+        tracks.{uid}.length: "{length}"
+        tracks.{uid}.crossfade: "{crossfade}"
+    - path: "^/api/session/transport/setlists$"
+      json_match: { "$.result": "^\\[" }
+      replace: setlists
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        setlists.{uid}.name: "{name}"
+    - path: "^/api/session/transport/setlists$"
+      json_each: "$.result[*].tracks"
+      json: { setlist: "$^.uid", uid: "$.uid", name: "$.name" }
+      state:
+        setlists.{setlist}.tracks.{index}.uid: "{uid}"
+        setlists.{setlist}.tracks.{index}.name: "{name}"
+    # A track's annotations, whether the poll or get_annotations asked.
+    - path: "^/api/session/transport/annotations\\?"
+      json_match: { "$.result.uid": "^([0-9]+)$" }
+      json:
+        notes: "$.result.annotations.notes"
+        tags: "$.result.annotations.tags"
+        sections: "$.result.annotations.sections"
+      state:
+        annotations.{1}.notes: "{notes}"
+        annotations.{1}.tags: "{tags}"
+        annotations.{1}.sections: "{sections}"
+    # A transport command that succeeded has every transport read again.
+    - path: "^/api/session/transport/(play|playsection|playloopsection|stop|returntostart|goto[a-z]+|engaged|volume|brightness)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/transport/transports }
     - path: "^/api/session/status/health$"
       json_match: { "$.result": "^\\[" }
       replace: machines
@@ -602,14 +694,37 @@ telemetry:
       json:
         machine: "$.machine.name"
         hostname: "$.machine.hostname"
+        running_as: "$.runningAsMachine.name"
         fps: "$.status.averageFPS"
         dropped: "$.status.videoDroppedFrames"
         missed: "$.status.videoMissedFrames"
       state:
         machines.{machine}.hostname: "{hostname}"
+        machines.{machine}.running_as: "{running_as}"
         machines.{machine}.average_fps: "{fps}"
         machines.{machine}.video_dropped_frames: "{dropped}"
         machines.{machine}.video_missed_frames: "{missed}"
+    - path: "^/api/session/status/health$"
+      json_each: "$.result[*].status.states"
+      json:
+        machine: "$^.machine.name"
+        name: "$.name"
+        detail: "$.detail"
+        category: "$.category"
+        severity: "$.severity"
+      state:
+        machines.{machine}.states.{index}.name: "{name}"
+        machines.{machine}.states.{index}.detail: "{detail}"
+        machines.{machine}.states.{index}.category: "{category}"
+        machines.{machine}.states.{index}.severity: "{severity}"
+    - path: "^/api/session/status/notifications$"
+      json_match: { "$.result": "^\\[" }
+      replace: notifications
+      json_each: "$.result[*].notifications"
+      json: { machine: "$^.machine.name", summary: "$.summary", detail: "$.detail" }
+      state:
+        notifications.{machine}.{index}.summary: "{summary}"
+        notifications.{machine}.{index}.detail: "{detail}"
     - path: "^/api/session/status/project$"
       json:
         path: "$.result.projectPath"
@@ -617,9 +732,83 @@ telemetry:
         minor: "$.result.version.minor"
         hotfix: "$.result.version.hotfix"
         revision: "$.result.version.revision"
+        release: "$.result.version.releaseType"
       state:
         project.path: "{path}"
         project.version: "{major}.{minor}.{hotfix}.{revision}"
+        project.release_type: "{release}"
+    # The session: whether it runs solo, and its Director, actors and
+    # understudies by machine name.
+    - path: "^/api/session/status/session$"
+      json_match: { "$.result": "^\\{" }
+      replace: session.machines
+      json: { solo: "$.result.isRunningSolo", dedicated: "$.result.isDirectorDedicated" }
+      state:
+        session.solo: "{solo}"
+        session.director_dedicated: "{dedicated}"
+    - path: "^/api/session/status/session$"
+      json_match: { "$.result.director.name": "^(.+)$" }
+      json:
+        uid: "$.result.director.uid"
+        hostname: "$.result.director.hostname"
+        type: "$.result.director.type"
+        gui_mode: "$.result.director.guiMode"
+        gui_visible: "$.result.director.guiVisible"
+      state:
+        session.director: "{1}"
+        session.machines.{1}.role: director
+        session.machines.{1}.uid: "{uid}"
+        session.machines.{1}.hostname: "{hostname}"
+        session.machines.{1}.type: "{type}"
+        session.machines.{1}.gui_mode: "{gui_mode}"
+        session.machines.{1}.gui_visible: "{gui_visible}"
+    - path: "^/api/session/status/session$"
+      json_each: "$.result.actors"
+      json: { name: "$.name", uid: "$.uid", hostname: "$.hostname", type: "$.type", gui_mode: "$.guiMode", gui_visible: "$.guiVisible" }
+      state:
+        session.machines.{name}.role: actor
+        session.machines.{name}.uid: "{uid}"
+        session.machines.{name}.hostname: "{hostname}"
+        session.machines.{name}.type: "{type}"
+        session.machines.{name}.gui_mode: "{gui_mode}"
+        session.machines.{name}.gui_visible: "{gui_visible}"
+    - path: "^/api/session/status/session$"
+      json_each: "$.result.understudies"
+      json: { name: "$.name", uid: "$.uid", hostname: "$.hostname", type: "$.type", gui_mode: "$.guiMode", gui_visible: "$.guiVisible" }
+      state:
+        session.machines.{name}.role: understudy
+        session.machines.{name}.uid: "{uid}"
+        session.machines.{name}.hostname: "{hostname}"
+        session.machines.{name}.type: "{type}"
+        session.machines.{name}.gui_mode: "{gui_mode}"
+        session.machines.{name}.gui_visible: "{gui_visible}"
+    # A GUI mode set is read back.
+    - path: "^/api/session/status/setguimode$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/status/session }
+    - path: "^/api/session/failover/settings$"
+      json_match: { "$.status.code": "^0$" }
+      json: { timeout: "$.timeout", normal: "$.normalPreset", current: "$.currentPreset" }
+      state:
+        failover.timeout: "{timeout}"
+        failover.normal_preset: "{normal}"
+        failover.current_preset: "{current}"
+    - path: "^/api/session/failover/understudytargets$"
+      json_match: { "$.status.code": "^0$" }
+      json: { targets: "$.understudies" }
+      state:
+        failover.understudy_targets: "{targets}"
+    # A failover, a restore or the default routing changes which machine
+    # outputs: health, the session and the failover preset are read again.
+    - path: "^/api/session/failover/(failovermachine|restoremachine|applydefaultrouting)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/status/health }
+        - { method: GET, path: /api/session/status/session }
+        - { method: GET, path: /api/session/failover/settings }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -652,12 +841,46 @@ state:
   transports.*.current_track:      { type: string, description: "Name of the transport's current track" }
   transports.*.receiving_timecode: { type: bool, description: "The transport is receiving timecode" }
   transports.*.setlist:            { type: string, description: "Name of the transport's set list" }
+  multitransports.*.name:          { type: string, description: "Multitransport name, keyed by its uid" }
+  multitransports.*.engaged:       { type: bool, description: "The multitransport is engaged" }
+  multitransports.*.transports:    { type: string, description: "The uids of the multitransport's transports, as a JSON array" }
+  active_transport.*.name:         { type: string, description: "A transport selected in Designer's state bar (every member when a multitransport is selected), keyed by uid" }
+  tracks.*.name:                   { type: string, description: "Track name, keyed by the track's uid" }
+  tracks.*.length:                 { type: float, unit: s, description: "Track length, as Designer reports it (seconds, which Designer also calls beats)" }
+  tracks.*.crossfade:              { type: string, description: "Track crossfade mode: Off, Fade, TrackSection or Unknown" }
+  setlists.*.name:                 { type: string, description: "Set list name, keyed by the set list's uid" }
+  setlists.*.tracks.*.uid:         { type: string, description: "uid of the set list's track at this position, from 0" }
+  setlists.*.tracks.*.name:        { type: string, description: "Name of the set list's track at this position, from 0" }
+  annotations.*.notes:             { type: string, description: "A track's notes, keyed by the track's uid: a JSON array of {time, text}. Read for each transport's current track, and for any track get_annotations asks for" }
+  annotations.*.tags:              { type: string, description: "A track's tags: a JSON array of {time, type (TC, MIDI or CUE), value}" }
+  annotations.*.sections:          { type: string, description: "A track's sections: a JSON array of {time, index}" }
   machines.*.hostname:             { type: string, description: "Machine host name, keyed by machine name" }
+  machines.*.running_as:           { type: string, description: "Name of the machine this one is running as: another's after it has taken over in a failover" }
   machines.*.average_fps:          { type: float, unit: fps, description: "Machine's average frame rate" }
   machines.*.video_dropped_frames: { type: float, description: "Dropped video frames reported by the machine" }
   machines.*.video_missed_frames:  { type: float, description: "Missed video frames reported by the machine" }
+  machines.*.states.*.name:        { type: string, description: "A health indicator state of the machine, numbered from 0: its name" }
+  machines.*.states.*.detail:      { type: string, description: "The health state's detail" }
+  machines.*.states.*.category:    { type: string, description: "The health indicator it belongs to: connection, output, genlock or devices" }
+  machines.*.states.*.severity:    { type: string, description: "Its severity: ready (or ok), warning, error, busy or offline" }
+  notifications.*.*.summary:       { type: string, description: "A notification of a machine, keyed by machine name and numbered from 0: its summary" }
+  notifications.*.*.detail:        { type: string, description: "The notification's detail" }
   project.path:                    { type: string, description: "Path of the running project" }
   project.version:                 { type: string, description: "Designer version, major.minor.hotfix.revision" }
+  project.release_type:            { type: string, description: "Designer release type: Pro or Starter" }
+  session.solo:                    { type: bool, description: "The project runs solo, on this machine alone rather than in a session" }
+  session.director_dedicated:      { type: bool, description: "The Director only controls the actors and does not output to the stage" }
+  session.director:                { type: string, description: "Name of the session's Director" }
+  session.machines.*.role:         { type: string, description: "The machine's role in the session, keyed by machine name: director, actor or understudy" }
+  session.machines.*.uid:          { type: string, description: "The machine's uid" }
+  session.machines.*.hostname:     { type: string, description: "The machine's host name" }
+  session.machines.*.type:         { type: string, description: "The machine's type as Designer names it, such as Designer, Vx4, Gx3, Rx or EX3" }
+  session.machines.*.gui_mode:     { type: string, description: "When the machine shows Designer's interface: OffWhenActor, AlwaysOn or AlwaysOff (set_gui_mode)" }
+  session.machines.*.gui_visible:  { type: bool, description: "The machine shows Designer's interface now" }
+  failover.timeout:                { type: float, unit: s, description: "Session failover timeout" }
+  failover.normal_preset:          { type: string, description: "The session's normal feed preset" }
+  failover.current_preset:         { type: string, description: "The feed preset in use now, which differs from the normal one after a failover" }
+  failover.understudy_targets:     { type: string, description: "The machines each understudy can take over: a JSON object keyed by understudy, each {targets: [{uid, name}]}" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -731,7 +954,20 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      REST has no push and disguise discourages frequent polling, so transports,
-      machine health and the project are read every 10 seconds; the playhead of
-      the transport named by live_transport comes over Live Update. The Python
-      execution endpoints are not included: they run arbitrary code in Designer.
+      REST has no push and disguise discourages frequent polling. Transports,
+      the active transport, machine health and notifications are read every 10
+      seconds, with the notes, tags and sections of each transport's current
+      track; the project, the session, the failover settings and understudy
+      targets, tracks and set lists every minute. A command that succeeds has
+      what it changed read back at once. The playhead of the transport named by
+      live_transport comes over Live Update. Another track's annotations are
+      read only when get_annotations asks for them.
+  - models: [all]
+    severity: info
+    text: >
+      API limits: the Session API cannot create, rename or edit transports,
+      tracks, set lists or annotations, choose a transport's set list or the
+      active transport, or change the failover timeout and presets; it reads
+      them only. Those are edited in Designer. The understudy targets come keyed
+      as Designer keys them, which disguise does not document, so they are kept
+      whole as JSON text.

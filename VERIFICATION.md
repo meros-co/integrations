@@ -575,14 +575,18 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## disguise — disguise Designer
 
-- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:614](specs/disguise.yaml#L614))
-- [ ] Check that a Locator with only a name (no uid key) is accepted by every transport and failover command. ([specs/disguise.yaml:575](specs/disguise.yaml#L575))
-- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:586](specs/disguise.yaml#L586))
-- [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:568](specs/disguise.yaml#L568))
-- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:588](specs/disguise.yaml#L588))
-- [ ] Check which Designer release added each endpoint used here; the Swagger documents carry no version markers. ([specs/disguise.yaml:107](specs/disguise.yaml#L107))
-- [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:540](specs/disguise.yaml#L540))
-- [ ] Confirm /api/session/transport/transports lists every transport and /api/session/status/health every machine of the session: each poll replaces transports and machines. ([specs/disguise.yaml:577](specs/disguise.yaml#L577))
+- [ ] Confirm the Live Update subscription to one Python dictionary property of transportmanager:<name> (player.playing, player.tRender, player.playMode.state, player.track.description, engaged, volume, brightness) and the valuesChanged messages it produces. ([specs/disguise.yaml:597](specs/disguise.yaml#L597))
+- [ ] Check that a Locator with only a name (no uid key) is accepted by every command that names a resource. ([specs/disguise.yaml:912](specs/disguise.yaml#L912))
+- [ ] Check that gototime takes seconds and gotoframe a frame count, and the units of track length and annotation times. ([specs/disguise.yaml:922](specs/disguise.yaml#L922))
+- [ ] Check the status.code values Designer returns (4000 seen for a rejected play mode) and the shape of status.details. ([specs/disguise.yaml:907](specs/disguise.yaml#L907))
+- [ ] Check whether volume and brightness outside 0 to 1 are ignored, as reported for r34. ([specs/disguise.yaml:923](specs/disguise.yaml#L923))
+- [ ] Check which Designer release added each endpoint used here; the Swagger documents carry no version markers. ([specs/disguise.yaml:115](specs/disguise.yaml#L115))
+- [ ] Check the health severity values (ready in the Swagger document, ok in the monitoring guide). ([specs/disguise.yaml:865](specs/disguise.yaml#L865))
+- [ ] Confirm /api/session/transport/transports lists every transport and /api/session/status/health every machine of the session: each poll replaces transports and machines. ([specs/disguise.yaml:603](specs/disguise.yaml#L603))
+- [ ] Confirm a successful request answers with status.code 0 written out (not left out as a proto3 default), and that empty lists (multitransports, actors, states) come as [] rather than being left out: every read-back and list replacement keys on them. ([specs/disguise.yaml:684](specs/disguise.yaml#L684))
+- [ ] Check how failover/understudytargets keys its understudies map (by machine name or uid), kept whole as JSON text. ([specs/disguise.yaml:802](specs/disguise.yaml#L802))
+- [ ] Confirm that runningAsMachine names the machine an understudy has taken over after a failover, and the machine itself otherwise. ([specs/disguise.yaml:858](specs/disguise.yaml#L858))
+- [ ] Confirm that transport/annotations accepts a track's uid in the query (uid=...), as the current track's annotations are read that way. ([specs/disguise.yaml:624](specs/disguise.yaml#L624))
 
 ## emberplus — Ember+
 
