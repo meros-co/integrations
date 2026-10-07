@@ -210,19 +210,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## behringer-x32 — Behringer X32 / Midas M32
 
-- [ ] Check dB rounding on get: set a range of fader and send levels in dB, read them back, and record how far the console's rounding to its nearest step moves them. ([specs/behringer-x32.yaml:5275](specs/behringer-x32.yaml#L5275))
-- [ ] Check whether recall_scene, recall_snippet and recall_cue produce any reply. ([specs/behringer-x32.yaml:5229](specs/behringer-x32.yaml#L5229))
-- [ ] Check how long after the /load reply the load actually completes. ([specs/behringer-x32.yaml:5233](specs/behringer-x32.yaml#L5233))
-- [ ] Check what the console does when an empty scene, snippet or cue slot is recalled over OSC. ([specs/behringer-x32.yaml:5237](specs/behringer-x32.yaml#L5237))
-- [ ] Confirm a recall produces /xremote updates for every changed parameter. ([specs/behringer-x32.yaml:5236](specs/behringer-x32.yaml#L5236))
-- [ ] Check how many local headamps each model has within the 1-32 range. ([specs/behringer-x32.yaml:5295](specs/behringer-x32.yaml#L5295))
-- [ ] Check what a type above 33 sent to effect slots 5-8 does (passes validation, presumably ignored). ([specs/behringer-x32.yaml:5312](specs/behringer-x32.yaml#L5312))
-- [ ] Find which bit of the 18-bit talkback destination bitmap is which destination. ([specs/behringer-x32.yaml:5342](specs/behringer-x32.yaml#L5342))
-- [ ] Check the user-control button numbering 5-12 on Compact and Producer. ([specs/behringer-x32.yaml:5326](specs/behringer-x32.yaml#L5326))
-- [ ] Confirm /node is answered on the address node (without the leading /) and that a / set is echoed back to the client that sent it, as get_node and set_node expect. ([specs/behringer-x32.yaml:5362](specs/behringer-x32.yaml#L5362))
-- [ ] Check whether /xremote pushes any parameter with more than one argument, which the params rules do not keep. ([specs/behringer-x32.yaml:5348](specs/behringer-x32.yaml#L5348))
-- [ ] Confirm an EQ band Q of 0.0 on the wire is Q 10 (narrow) and 1.0 is Q 0.3 (wide), the document giving the range as [10.000, 0.3, 72]. ([specs/behringer-x32.yaml:5376](specs/behringer-x32.yaml#L5376))
-- [ ] Check what a matrix or main EQ does with bands 2 and 5 when a crossover type (6-13) is selected, which the document says can make them unavailable. ([specs/behringer-x32.yaml:5382](specs/behringer-x32.yaml#L5382))
+- [ ] Check dB rounding on get: set a range of fader and send levels in dB, read them back, and record how far the console's rounding to its nearest step moves them. ([specs/behringer-x32.yaml:8078](specs/behringer-x32.yaml#L8078))
+- [ ] Check whether recall_scene, recall_snippet and recall_cue produce any reply. ([specs/behringer-x32.yaml:8032](specs/behringer-x32.yaml#L8032))
+- [ ] Check how long after the /load reply the load actually completes. ([specs/behringer-x32.yaml:8036](specs/behringer-x32.yaml#L8036))
+- [ ] Check what the console does when an empty scene, snippet or cue slot is recalled over OSC. ([specs/behringer-x32.yaml:8040](specs/behringer-x32.yaml#L8040))
+- [ ] Confirm a recall produces /xremote updates for every changed parameter. ([specs/behringer-x32.yaml:8039](specs/behringer-x32.yaml#L8039))
+- [ ] Check how many local headamps each model has within the 1-32 range. ([specs/behringer-x32.yaml:8098](specs/behringer-x32.yaml#L8098))
+- [ ] Check what a type above 33 sent to effect slots 5-8 does (passes validation, presumably ignored). ([specs/behringer-x32.yaml:8115](specs/behringer-x32.yaml#L8115))
+- [ ] Find which bit of the 18-bit talkback destination bitmap is which destination. ([specs/behringer-x32.yaml:8145](specs/behringer-x32.yaml#L8145))
+- [ ] Check the user-control button numbering 5-12 on Compact and Producer. ([specs/behringer-x32.yaml:8129](specs/behringer-x32.yaml#L8129))
+- [ ] Confirm /node is answered on the address node (without the leading /) and that a / set is echoed back to the client that sent it, as get_node and set_node expect. ([specs/behringer-x32.yaml:8165](specs/behringer-x32.yaml#L8165))
+- [ ] Check whether /xremote pushes any parameter with more than one argument, which the params rules do not keep. ([specs/behringer-x32.yaml:8151](specs/behringer-x32.yaml#L8151))
+- [ ] Confirm an EQ band Q of 0.0 on the wire is Q 10 (narrow) and 1.0 is Q 0.3 (wide), the document giving the range as [10.000, 0.3, 72]. ([specs/behringer-x32.yaml:8179](specs/behringer-x32.yaml#L8179))
+- [ ] Check what a matrix or main EQ does with bands 2 and 5 when a crossover type (6-13) is selected, which the document says can make them unavailable. ([specs/behringer-x32.yaml:8185](specs/behringer-x32.yaml#L8185))
+- [ ] Confirm the X32 gate mode order 0 EXP2, 1 EXP3, 2 EXP4, 3 GATE, 4 DUCK as the document lists it (the X AIR community list orders them differently). ([specs/behringer-x32.yaml:3981](specs/behringer-x32.yaml#L3981))
+- [ ] Confirm the dynamics and gate wire ranges (threshold, knee, makeup gain, attack, hold, release, mix, gate range) map as the document's linear and logarithmic laws state. ([specs/behringer-x32.yaml:8190](specs/behringer-x32.yaml#L8190))
 
 ## behringer-xair — Behringer X AIR
 

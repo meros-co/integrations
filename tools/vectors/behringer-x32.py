@@ -351,7 +351,8 @@ binary(X, "get_node", {"node": "headamp/124"}, osc("/node", ("s", "headamp/124")
 binary(X, "set_node", {"text": "ch/01/config Vox 1 RD 1"}, osc("/", ("s", "ch/01/config Vox 1 RD 1")),
        device_reply_hex=hexs(osc("/", ("s", "ch/01/config Vox 1 RD 1"))),
        expect_result={"ok": {"kind": "ack"}})
-telemetry(X, "param-float", inbound_hex=hexs(osc("/ch/01/gate/thr", ("f", 0.5))), expect_state={})
+telemetry(X, "param-float", inbound_hex=hexs(osc("/ch/01/gate/thr", ("f", 0.5))),
+          expect_state={"channels": {"1": {"gate": {"threshold": 0.5}}}})
 telemetry(X, "param-int", inbound_hex=hexs(osc("/-prefs/clocksource", ("i", 1))), expect_state={})
 telemetry(X, "param-string", inbound_hex=hexs(osc("/-show/showfile/show/name", ("s", "Sunday"))), expect_state={})
 
@@ -378,6 +379,49 @@ for stem, p, pre, nb, key, n in _X32_EQ:
         st = {"eq": {"bands": {"2": {field: val}}}}
         telemetry(X, f"{tkey}-{field}", inbound_hex=hexs(osc(f"{pre}/eq/2/{wire}", (t, val))),
                   expect_state={key: {n: st}} if n else {key: st})
+
+
+# ── Dynamics and gate (p.25-37) ───────────────────────────────────────────
+# /<strip>/dyn/... and /ch/NN/gate/...: enumerations and switches ,i, the
+# rest ,f as the 0-1 wire position.
+_X32_DYN_STRIPS = [("channel", "channel", "/ch/07", "channels", "7"), ("bus", "bus", "/bus/03", "buses", "3"),
+                   ("matrix", "matrix", "/mtx/02", "matrices", "2"), ("main", None, "/main/st", "main", None),
+                   ("mono", None, "/main/m", "mono", None)]
+# (command key, address leaf, wire type, value sent, value pushed back)
+_X32_DYN = [("mode", "mode", "i", 1, 0), ("detector", "det", "i", 1, 1), ("envelope", "env", "i", 0, 1),
+            ("threshold", "thr", "f", 0.5, 0.25), ("ratio", "ratio", "i", 11, 6), ("knee", "knee", "f", 0.2, 0.25),
+            ("makeup_gain", "mgain", "f", 0.125, 0.5), ("attack", "attack", "f", 0.25, 0.75),
+            ("hold", "hold", "f", 0.5, 0.5), ("release", "release", "f", 1.0, 0.0),
+            ("position", "pos", "i", 1, 0), ("key_source", "keysrc", "i", 64, 33), ("mix", "mix", "f", 0.5, 1.0),
+            ("auto", "auto", "b", True, 1), ("filter_on", "filter/on", "b", False, 0),
+            ("filter_type", "filter/type", "i", 8, 4), ("filter_frequency", "filter/f", "f", 0.75, 0.5)]
+_X32_GATE = [("mode", "mode", "i", 3, 4), ("threshold", "thr", "f", 0.5, 0.75), ("range", "range", "f", 0.25, 1.0),
+             ("attack", "attack", "f", 0.0, 0.5), ("hold", "hold", "f", 0.5, 0.25), ("release", "release", "f", 0.75, 0.5),
+             ("key_source", "keysrc", "i", 1, 64), ("filter_on", "filter/on", "b", True, 1),
+             ("filter_type", "filter/type", "i", 0, 8), ("filter_frequency", "filter/f", "f", 0.25, 1.0)]
+
+
+def _x32_section(stem, p, pre, key, n, section, table):
+    idx = {p: int(n)} if p else {}
+    for cmd, leaf, t, sent, pushed in table:
+        if t == "b":
+            binary(X, f"set_{stem}_{section}_{cmd}", {**idx, "enabled": sent},
+                   osc(f"{pre}/{section}/{leaf}", ("i", 1 if sent else 0)))
+            value = pushed == 1
+            wire = ("i", pushed)
+        else:
+            binary(X, f"set_{stem}_{section}_{cmd}", {**idx, "value": sent}, osc(f"{pre}/{section}/{leaf}", (t, sent)))
+            value = pushed
+            wire = (t, pushed)
+        st = {section: {cmd: value}}
+        telemetry(X, f"{stem.replace('_', '-')}-{section}-{cmd.replace('_', '-')}",
+                  inbound_hex=hexs(osc(f"{pre}/{section}/{leaf}", wire)),
+                  expect_state={key: {n: st}} if n else {key: st})
+
+
+for stem, p, pre, key, n in _X32_DYN_STRIPS:
+    _x32_section(stem, p, pre, key, n, "dyn", _X32_DYN)
+_x32_section("channel", "channel", "/ch/12", "channels", "12", "gate", _X32_GATE)
 
 
 def _osc_args(packet):
