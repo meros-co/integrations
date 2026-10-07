@@ -578,6 +578,43 @@ telemetry(ML, "devices-list", inbound_http={
         "name": "MacBook Pro Microphone", "connected": True, "video": False, "audio": True,
         "device_type": "com.boinx.devicetype.avfoundation", "tally_state": "off",
         "input_channels": '["Ch. 1"]'}}})
+# The type catalogs (Boinx's reference: each id is what the create call
+# takes), kept by position since the identifiers hold dots; a list replaces
+# the one before, and a GET of one type leaves state alone.
+telemetry(ML, "source-types-list", inbound_http={
+    "path": "/api/v1/sourcetypes",
+    "body": json.dumps({"data": [
+        {"type": "sourcetypes", "id": "com.boinx.mimoLive.sources.deviceVideoSource",
+         "attributes": {"name": "Camera"}},
+        {"type": "sourcetypes", "id": "com.boinx.mimoLive.sources.imageSource",
+         "attributes": {"name": "Image"}}]})},
+    state_before={"types": {"sources": {"2": {"id": "com.boinx.old", "name": "Old"}}}},
+    expect_state={"types": {"sources": {
+        "0": {"id": "com.boinx.mimoLive.sources.deviceVideoSource", "name": "Camera",
+              "attributes": '{"name":"Camera"}'},
+        "1": {"id": "com.boinx.mimoLive.sources.imageSource", "name": "Image",
+              "attributes": '{"name":"Image"}'}}}})
+telemetry(ML, "layer-types-list", inbound_http={
+    "path": "/api/v1/layertypes",
+    "body": json.dumps({"data": [
+        {"type": "layertypes", "id": "com.boinx.layer.lowerthird", "attributes": {"name": "Lower Third"}}]})},
+    expect_state={"types": {"layers": {"0": {
+        "id": "com.boinx.layer.lowerthird", "name": "Lower Third", "attributes": '{"name":"Lower Third"}'}}}})
+telemetry(ML, "output-destination-types-list", inbound_http={
+    "path": "/api/v1/outputdestinationtypes",
+    "body": json.dumps({"data": [
+        {"type": "outputdestinationtypes", "id": "com.boinx.mimoLive.outputDestination.ndi",
+         "attributes": {"name": "NDI"}}]})},
+    expect_state={"types": {"output-destinations": {"0": {
+        "id": "com.boinx.mimoLive.outputDestination.ndi", "name": "NDI", "attributes": '{"name":"NDI"}'}}}})
+telemetry(ML, "source-types-empty", inbound_http={"path": "/api/v1/sourcetypes", "body": '{"data":[]}'},
+          state_before={"types": {"sources": {"0": {"id": "com.boinx.old", "name": "Old"}}}},
+          expect_state={"types": {}})
+telemetry(ML, "one-source-type-not-state", inbound_http={
+    "path": "/api/v1/sourcetypes/com.boinx.mimoLive.sources.imageSource",
+    "body": json.dumps({"data": {"type": "sourcetypes", "id": "com.boinx.mimoLive.sources.imageSource",
+                                 "attributes": {"name": "Image"}}})},
+    expect_state={})
 telemetry(ML, "accounts-list", inbound_http={
     "path": "/api/v1/accounts",
     "body": json.dumps({"data": [{"type": "accounts", "id": "6995291F-E0C3-4307-84E0-BEA3A3EA7A8E", "attributes": {
