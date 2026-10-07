@@ -145,6 +145,12 @@ models:
     name: 'Lightware MX2 matrix switchers (MX2-4x4 to MX2-48x48, HDMI 2.0 / DisplayPort)'
     supports:
       - get_serial
+      - get_property
+      - set_property
+      - call_method
+      - get_manual
+      - open_node
+      - close_node
       - get_product_name
       - get_device_label_uid
       - set_device_label_uid
@@ -196,6 +202,12 @@ models:
     name: 'Lightware UMX-HDMI-140 / UMX-HDMI-140-Plus universal switchers'
     supports:
       - get_serial
+      - get_property
+      - set_property
+      - call_method
+      - get_manual
+      - open_node
+      - close_node
       - get_product_name
       - get_device_label_uid
       - set_device_label_uid
@@ -236,6 +248,12 @@ models:
     name: 'Lightware MMX2 matrix switchers (MMX2-4x1-H20, MMX2-4x3-H20)'
     supports:
       - get_serial
+      - get_property
+      - set_property
+      - call_method
+      - get_manual
+      - open_node
+      - close_node
       - get_firmware_version
       - get_device_label
       - set_device_label
@@ -288,6 +306,12 @@ models:
     name: 'Lightware Taurus UCX switchers (UCX-2x1, 2x2, 4x2, 4x3; HC30/HC40/HC60, -LCC)'
     supports:
       - get_serial
+      - get_property
+      - set_property
+      - call_method
+      - get_manual
+      - open_node
+      - close_node
       - get_firmware_version
       - get_device_label
       - set_device_label
@@ -344,6 +368,12 @@ models:
     name: 'Other Lightware products on the /V1 LW3 tree (DCX, UCX-TPX and similar)'
     supports:
       - get_serial
+      - get_property
+      - set_property
+      - call_method
+      - get_manual
+      - open_node
+      - close_node
       - get_firmware_version
       - get_device_label
       - set_device_label
@@ -1372,6 +1402,58 @@ commands:
     expect: { matches: '^pw /MEDIA/AUDIO/I\d+\.Balance=' }
     returns: ack
 
+  # Any node, property or method by its path (MX2 9.3.4, MMX2 7.4.4): every
+  # tree, so every model.
+  get_property:
+    summary: 'Read any property by its path, the node and the property name joined by a dot (GET, MX2 9.3.4); returns the value as the device sends it, escapes included'
+    params:
+      path: { type: string, max_length: 255, pattern: '^/[A-Za-z0-9_/@-]*\.[A-Za-z0-9_]+$', required: true, label: Property, description: "The property's path, such as /V1/MEDIA/VIDEO/I1.SignalPresent or /.SerialNumber, from the product's LW3 reference; names are case-sensitive." }
+    send: 'GET {path}'
+    expect: { matches: '^p[rw] [^=]*=(.*)$' }
+    returns: value
+
+  set_property:
+    summary: 'Set any read-write property by its path (SET, MX2 9.3.4); answered with the property and its new value (pw), or pE with an error'
+    params:
+      path: { type: string, max_length: 255, pattern: '^/[A-Za-z0-9_/@-]*\.[A-Za-z0-9_]+$', required: true, label: Property, description: "The property's path, such as /V1/MEDIA/VIDEO/XP/O1.Lock, from the product's LW3 reference; names are case-sensitive." }
+      value: { type: string, max_length: 500, pattern: '^[^\\{}#%()]*$', default: '', label: Value, description: "The new value as the reference writes it, such as true or 50.00; the protocol characters \\ { } # % ( ) are refused rather than escaped." }
+    send: 'SET {path}={value}'
+    expect: { matches: '^pw [^=]*=' }
+    returns: ack
+
+  call_method:
+    summary: 'Call any method by its path, the node and the method name joined by a colon, with its arguments as the reference writes them (CALL, MX2 9.3.4); returns what follows = in the mO answer, if anything'
+    params:
+      method: { type: string, max_length: 255, pattern: '^/[A-Za-z0-9_/@-]*:[A-Za-z0-9_]+$', required: true, label: Method, description: "The method's path, such as /V1/MEDIA/VIDEO/XP:switch or /V1/MANAGEMENT/UI:identifyMe, from the product's LW3 reference." }
+      arguments: { type: string, max_length: 500, pattern: '^[^\\{}#%()]*$', default: '', label: Arguments, description: "The arguments inside the parentheses, such as I2:O1 or I1:O1;I2:O2, empty for none; the protocol characters \\ { } # % ( ) are refused rather than escaped." }
+    send: 'CALL {method}({arguments})'
+    expect: { matches: '^mO [^=\s]+(?:=(.*))?$' }
+    returns: value
+
+  get_manual:
+    summary: "Read the device's own one-line manual for a property or method: its value format and a description (MAN, MX2 9.3.4)"
+    params:
+      path: { type: string, max_length: 255, pattern: '^/[A-Za-z0-9_/@-]*[.:][A-Za-z0-9_]+$', required: true, label: Property or method, description: "The path of a property (node.Property) or a method (node:method), such as /MEDIA/PORTS/VIDEO/I1/SETTINGS.EnablePower." }
+    send: 'MAN {path}'
+    expect: { matches: '^[pm]m \S+ ?(.*)$' }
+    returns: value
+
+  open_node:
+    summary: 'Subscribe to a node, or with /* to it and its children, so its property changes arrive as CHG lines kept in state (OPEN, MX2 9.3.9); lasts until the connection closes'
+    params:
+      node: { type: string, max_length: 255, pattern: '^/[A-Za-z0-9_/@-]*(/\*)?$', required: true, label: Node, description: "The node's path, such as /V1/MEDIA/AUDIO/O3, or ending in /* for the node and its children." }
+    send: 'OPEN {node}'
+    expect: { matches: '^o- ' }
+    returns: ack
+
+  close_node:
+    summary: 'Unsubscribe from a node, or with /* from it and its children (CLOSE, MX2 9.3.9)'
+    params:
+      node: { type: string, max_length: 255, pattern: '^/[A-Za-z0-9_/@-]*(/\*)?$', required: true, label: Node, description: "The node's path as it was opened, such as /V1/MEDIA/AUDIO/O3 or /V1/MEDIA/VIDEO/*." }
+    send: 'CLOSE {node}'
+    expect: { matches: '^c- ' }
+    returns: ack
+
 state:
   device.serial:            { type: string, description: "Serial number (/.SerialNumber)" }
   device.product_name:      { type: string, description: "Product name (/.ProductName)" }
@@ -1415,6 +1497,7 @@ state:
   usb.hubs.*.locked:        { type: bool, description: "The USB hub port is locked" }
   usb.hosts.*.locked:       { type: bool, description: "The USB host port is locked" }
   edid.status:              { type: string, description: "Emulated EDID per input as the device lists it (EdidStatus)" }
+  nodes.*.*:                { type: string, description: "Any property's last value as the device sent it, keyed by node path and property name (nodes[\"/V1/MEDIA/VIDEO/I1\"].SignalPresent); from GET and SET answers and CHG lines" }
 
 telemetry:
   # Subscriptions are per connection and lost when it closes (MX2 9.3.9,
@@ -1498,6 +1581,10 @@ telemetry:
   # alike. Values end the line, so an error answer (pE ... %E...) is never
   # taken as state.
   updates:
+    # Every property read, set or changed, by its node path and name (the
+    # generic subtree): GET and SET answers and CHG lines alike.
+    - match: '^(?:CHG|p[rw]) (/[^=.\s]*)\.([A-Za-z0-9_]+)=(.*)$'
+      state: { "nodes.{1}.{2}": "{3}" }
     - match: '^(?:CHG|pr) /\.SerialNumber=(\S+)$'
       state: { "device.serial": "{1}" }
     - match: '^(?:CHG|pr) /\.ProductName=(.+)$'
@@ -2624,3 +2711,18 @@ quirks:
       connection breaks. Set the password setting and the core logs in on
       every connect. The failure answer is not documented, so a wrong password
       is not recognised as a refusal; later commands fail with errors.
+
+  - models: [all]
+    severity: info
+    text: >
+      get_property, set_property and call_method reach any property or method
+      in the product's LW3 reference by its path (GET, SET, CALL; MX2 9.3.4),
+      and get_manual reads the device's own description of one. open_node and
+      close_node subscribe to any node (OPEN, CLOSE; MX2 9.3.9). Every property
+      value the device answers or pushes is also kept under nodes, keyed by
+      the node's path and the property's name, as the text sent (escapes
+      included). A node opened with open_node stays subscribed until the
+      connection closes; after a reconnect only the spec's own subscriptions
+      are sent again. GET on a node, GETALL and OPEN without a node answer with
+      several lines, which the core would take as the answers to later
+      commands, so they are not offered.

@@ -196,44 +196,49 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## behringer-wing — Behringer WING
 
-- [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:2467](specs/behringer-wing.yaml#L2467))
-- [ ] Check what gain and phantom sets do on a strip whose input source has no preamp. ([specs/behringer-wing.yaml:2478](specs/behringer-wing.yaml#L2478))
-- [ ] Find the separator between tags in a strip's tag string, so DCA assignment does not damage other tags. ([specs/behringer-wing.yaml:2494](specs/behringer-wing.yaml#L2494))
-- [ ] Find the tag names used for mute group assignment, which are not documented. ([specs/behringer-wing.yaml:2496](specs/behringer-wing.yaml#L2496))
-- [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:2528](specs/behringer-wing.yaml#L2528))
-- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:2537](specs/behringer-wing.yaml#L2537))
-- [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:2517](specs/behringer-wing.yaml#L2517))
-- [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:2508](specs/behringer-wing.yaml#L2508))
-- [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:2418](specs/behringer-wing.yaml#L2418))
+- [ ] Confirm that solo, talkback on, monitor level, solo dim and mono, input gain and phantom ($-prefixed parameters) can be set over OSC. ([specs/behringer-wing.yaml:3344](specs/behringer-wing.yaml#L3344))
+- [ ] Check what gain and phantom sets do on a strip whose input source has no preamp. ([specs/behringer-wing.yaml:3351](specs/behringer-wing.yaml#L3351))
+- [ ] Find the separator between tags in a strip's tag string, so DCA assignment does not damage other tags. ([specs/behringer-wing.yaml:3368](specs/behringer-wing.yaml#L3368))
+- [ ] Find the tag names used for mute group assignment, which are not documented. ([specs/behringer-wing.yaml:3372](specs/behringer-wing.yaml#L3372))
+- [ ] Check what GONEXT and GOPREV do, since they are listed without description. ([specs/behringer-wing.yaml:3405](specs/behringer-wing.yaml#L3405))
+- [ ] Check whether a set sent while /$ctl/OSC/ronly is on returns an error. ([specs/behringer-wing.yaml:3413](specs/behringer-wing.yaml#L3413))
+- [ ] Check which models allow set_monitor_level (settable on Compact and Rack, read-only on the full-size WING). ([specs/behringer-wing.yaml:3392](specs/behringer-wing.yaml#L3392))
+- [ ] On WING Rack, check whether main sends 5-8 (the headphone outputs) are reachable. ([specs/behringer-wing.yaml:3385](specs/behringer-wing.yaml#L3385))
+- [ ] Confirm the 9-second /*s renewal keeps the subscription alive and the connection open, and that another subscribing client takes changes away as described. ([specs/behringer-wing.yaml:3295](specs/behringer-wing.yaml#L3295))
+- [ ] Confirm set_node is answered on the node's address followed by * (/* for the root) with OK or one of the documented error strings, and that get_node's reply lists the node's children. ([specs/behringer-wing.yaml:3451](specs/behringer-wing.yaml#L3451))
+- [ ] Check on which address the console answers a query sent with a native hash (/#f50f69f8), which decides the key the params state uses for it, and whether a set of a [RO] parameter returns an error. ([specs/behringer-wing.yaml:3436](specs/behringer-wing.yaml#L3436))
 
 ## behringer-x32 — Behringer X32 / Midas M32
 
-- [ ] Check dB rounding on get: set a range of fader and send levels in dB, read them back, and record how far the console's rounding to its nearest step moves them. ([specs/behringer-x32.yaml:3284](specs/behringer-x32.yaml#L3284))
-- [ ] Check whether recall_scene, recall_snippet and recall_cue produce any reply. ([specs/behringer-x32.yaml:3239](specs/behringer-x32.yaml#L3239))
-- [ ] Check how long after the /load reply the load actually completes. ([specs/behringer-x32.yaml:3240](specs/behringer-x32.yaml#L3240))
-- [ ] Check what the console does when an empty scene, snippet or cue slot is recalled over OSC. ([specs/behringer-x32.yaml:3245](specs/behringer-x32.yaml#L3245))
-- [ ] Confirm a recall produces /xremote updates for every changed parameter. ([specs/behringer-x32.yaml:3244](specs/behringer-x32.yaml#L3244))
-- [ ] Check how many local headamps each model has within the 1-32 range. ([specs/behringer-x32.yaml:3303](specs/behringer-x32.yaml#L3303))
-- [ ] Check what a type above 33 sent to effect slots 5-8 does (passes validation, presumably ignored). ([specs/behringer-x32.yaml:3320](specs/behringer-x32.yaml#L3320))
-- [ ] Find which bit of the 18-bit talkback destination bitmap is which destination. ([specs/behringer-x32.yaml:3350](specs/behringer-x32.yaml#L3350))
-- [ ] Check the user-control button numbering 5-12 on Compact and Producer. ([specs/behringer-x32.yaml:3334](specs/behringer-x32.yaml#L3334))
+- [ ] Check dB rounding on get: set a range of fader and send levels in dB, read them back, and record how far the console's rounding to its nearest step moves them. ([specs/behringer-x32.yaml:3394](specs/behringer-x32.yaml#L3394))
+- [ ] Check whether recall_scene, recall_snippet and recall_cue produce any reply. ([specs/behringer-x32.yaml:3348](specs/behringer-x32.yaml#L3348))
+- [ ] Check how long after the /load reply the load actually completes. ([specs/behringer-x32.yaml:3352](specs/behringer-x32.yaml#L3352))
+- [ ] Check what the console does when an empty scene, snippet or cue slot is recalled over OSC. ([specs/behringer-x32.yaml:3356](specs/behringer-x32.yaml#L3356))
+- [ ] Confirm a recall produces /xremote updates for every changed parameter. ([specs/behringer-x32.yaml:3355](specs/behringer-x32.yaml#L3355))
+- [ ] Check how many local headamps each model has within the 1-32 range. ([specs/behringer-x32.yaml:3414](specs/behringer-x32.yaml#L3414))
+- [ ] Check what a type above 33 sent to effect slots 5-8 does (passes validation, presumably ignored). ([specs/behringer-x32.yaml:3431](specs/behringer-x32.yaml#L3431))
+- [ ] Find which bit of the 18-bit talkback destination bitmap is which destination. ([specs/behringer-x32.yaml:3461](specs/behringer-x32.yaml#L3461))
+- [ ] Check the user-control button numbering 5-12 on Compact and Producer. ([specs/behringer-x32.yaml:3445](specs/behringer-x32.yaml#L3445))
+- [ ] Confirm /node is answered on the address node (without the leading /) and that a / set is echoed back to the client that sent it, as get_node and set_node expect. ([specs/behringer-x32.yaml:3481](specs/behringer-x32.yaml#L3481))
+- [ ] Check whether /xremote pushes any parameter with more than one argument, which the params rules do not keep. ([specs/behringer-x32.yaml:3467](specs/behringer-x32.yaml#L3467))
 
 ## behringer-xair — Behringer X AIR
 
-- [ ] Confirm the mute sense of mix/on (0 muted, 1 passing audio), which is taken from the X32. ([specs/behringer-xair.yaml:3832](specs/behringer-xair.yaml#L3832))
-- [ ] Check whether the mixer echoes a set back to the client that sent it. ([specs/behringer-xair.yaml:3859](specs/behringer-xair.yaml#L3859))
-- [ ] Confirm the snapshot node is /-snap/ (not /snap/ as the manufacturer document writes it), and whether /-snap/load replies. ([specs/behringer-xair.yaml:3849](specs/behringer-xair.yaml#L3849))
-- [ ] Confirm the fader taper is the X32's four segments (0.75 = 0 dB), which the X AIR document does not state. ([specs/behringer-xair.yaml:3901](specs/behringer-xair.yaml#L3901))
-- [ ] Confirm headamp gain range is -12 to +60 dB (the community list says -12 to +20 dB). ([specs/behringer-xair.yaml:3914](specs/behringer-xair.yaml#L3914))
-- [ ] Find how line inputs and the stereo aux input are addressed for gain, which is not documented. ([specs/behringer-xair.yaml:3911](specs/behringer-xair.yaml#L3911))
-- [ ] Find which /ch/NN/config/insrc value is OFF, if any, within 0-15. ([specs/behringer-xair.yaml:3941](specs/behringer-xair.yaml#L3941))
-- [ ] Find the order of gate modes 0-4 (GATE, EXP2, EXP3, EXP4, DUCK or the X32's EXP2, EXP3, EXP4, GATE, DUCK). ([specs/behringer-xair.yaml:3949](specs/behringer-xair.yaml#L3949))
-- [ ] Confirm the copy-error resolutions: bus pan and insert ranges, bus compressor filter type 0-8, /bus/N/grp, USB routing 1-18. ([specs/behringer-xair.yaml:3955](specs/behringer-xair.yaml#L3955))
-- [ ] Check the main LR insert address, FX return EQ on/off, the GEQ indexing and whether FX parameters are int or float, which are not covered because sources disagree. ([specs/behringer-xair.yaml:3967](specs/behringer-xair.yaml#L3967))
-- [ ] Check the order of /xinfo's reply strings. ([specs/behringer-xair.yaml:3991](specs/behringer-xair.yaml#L3991))
-- [ ] Check whether /-action/setclock is ignored on XR18, X18 and MR18. ([specs/behringer-xair.yaml:3933](specs/behringer-xair.yaml#L3933))
-- [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2255](specs/behringer-xair.yaml#L2255))
-- [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:2295](specs/behringer-xair.yaml#L2295))
+- [ ] Confirm the mute sense of mix/on (0 muted, 1 passing audio), which is taken from the X32. ([specs/behringer-xair.yaml:4755](specs/behringer-xair.yaml#L4755))
+- [ ] Check whether the mixer echoes a set back to the client that sent it. ([specs/behringer-xair.yaml:4779](specs/behringer-xair.yaml#L4779))
+- [ ] Confirm the snapshot node is /-snap/ (not /snap/ as the manufacturer document writes it), and whether /-snap/load replies. ([specs/behringer-xair.yaml:4772](specs/behringer-xair.yaml#L4772))
+- [ ] Confirm the fader taper is the X32's four segments (0.75 = 0 dB), which the X AIR document does not state. ([specs/behringer-xair.yaml:4820](specs/behringer-xair.yaml#L4820))
+- [ ] Confirm headamp gain range is -12 to +60 dB (the community list says -12 to +20 dB). ([specs/behringer-xair.yaml:4837](specs/behringer-xair.yaml#L4837))
+- [ ] Find how line inputs and the stereo aux input are addressed for gain, which is not documented. ([specs/behringer-xair.yaml:4834](specs/behringer-xair.yaml#L4834))
+- [ ] Find which /ch/NN/config/insrc value is OFF, if any, within 0-15. ([specs/behringer-xair.yaml:4862](specs/behringer-xair.yaml#L4862))
+- [ ] Find the order of gate modes 0-4 (GATE, EXP2, EXP3, EXP4, DUCK or the X32's EXP2, EXP3, EXP4, GATE, DUCK). ([specs/behringer-xair.yaml:4870](specs/behringer-xair.yaml#L4870))
+- [ ] Confirm the copy-error resolutions: bus pan and insert ranges, bus compressor filter type 0-8, /bus/N/grp, USB routing 1-18. ([specs/behringer-xair.yaml:4878](specs/behringer-xair.yaml#L4878))
+- [ ] Check the main LR insert address, FX return EQ on/off, the GEQ indexing and whether FX parameters are int or float, which are not covered because sources disagree. ([specs/behringer-xair.yaml:4890](specs/behringer-xair.yaml#L4890))
+- [ ] Check the order of /xinfo's reply strings. ([specs/behringer-xair.yaml:4913](specs/behringer-xair.yaml#L4913))
+- [ ] Check whether /-action/setclock is ignored on XR18, X18 and MR18. ([specs/behringer-xair.yaml:4856](specs/behringer-xair.yaml#L4856))
+- [ ] Check the low-cut frequency mapping of 0-1 (the community list gives 20 to 200 Hz). ([specs/behringer-xair.yaml:2882](specs/behringer-xair.yaml#L2882))
+- [ ] Check the automix weight range (-24 to +24 or -12 to +12). ([specs/behringer-xair.yaml:2938](specs/behringer-xair.yaml#L2938))
+- [ ] Check whether the mixer answers /node and the / text set as the X32 does, which the manufacturer document does not describe and this spec does not offer. ([specs/behringer-xair.yaml:4920](specs/behringer-xair.yaml#L4920))
 
 ## biamp-tesira — Biamp Tesira
 
@@ -538,14 +543,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
-- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:2684](specs/digico-sd.yaml#L2684))
-- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:2692](specs/digico-sd.yaml#L2692))
-- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:2701](specs/digico-sd.yaml#L2701))
-- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:2709](specs/digico-sd.yaml#L2709))
-- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:2639](specs/digico-sd.yaml#L2639))
-- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:776](specs/digico-sd.yaml#L776))
-- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:832](specs/digico-sd.yaml#L832))
-- [ ] Check the addresses left out (Channel_Input/main/alt_in, CGs_level, CGs_mute, Matrix_Inputs sends, Multis) and what they do. ([specs/digico-sd.yaml:2722](specs/digico-sd.yaml#L2722))
+- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:4033](specs/digico-sd.yaml#L4033))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4041](specs/digico-sd.yaml#L4041))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4050](specs/digico-sd.yaml#L4050))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4058](specs/digico-sd.yaml#L4058))
+- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:3760](specs/digico-sd.yaml#L3760))
+- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:833](specs/digico-sd.yaml#L833))
+- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:917](specs/digico-sd.yaml#L917))
+- [ ] Confirm /sd/Input_Channels/N/Channel_Input/main/alt_in is the address (the table's row is garbled) and that 1 selects the alternate input and 0 the main input. ([specs/digico-sd.yaml:3788](specs/digico-sd.yaml#L3788))
+- [ ] Check what CGs_level and CGs_mute do on input channels and aux, group and matrix outputs (taken as the level and mute a strip takes from its control groups), and what a CGs_level position means in dB. ([specs/digico-sd.yaml:3800](specs/digico-sd.yaml#L3800))
+- [ ] Confirm Matrix_Inputs/N/Matrix_Send/M sends matrix input N to matrix output M, both numbered from 1, and how many matrix inputs each console has. ([specs/digico-sd.yaml:3896](specs/digico-sd.yaml#L3896))
+- [ ] Find what a multi is on current SD and Quantum software, how many exist, and whether Multis/N solo, fader, mute and name act on them as the list's rows read. ([specs/digico-sd.yaml:3926](specs/digico-sd.yaml#L3926))
 
 ## disguise — disguise Designer
 
@@ -781,12 +789,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## lightware-lw3 — Lightware LW3 matrices, switchers and extenders
 
-- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2541](specs/lightware-lw3.yaml#L2541))
-- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2530](specs/lightware-lw3.yaml#L2530))
-- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2582](specs/lightware-lw3.yaml#L2582))
-- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2594](specs/lightware-lw3.yaml#L2594))
-- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2615](specs/lightware-lw3.yaml#L2615))
-- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2564](specs/lightware-lw3.yaml#L2564))
+- [ ] Check whether "OPEN <node>/*" also subscribes to grandchild nodes. ([specs/lightware-lw3.yaml:2640](specs/lightware-lw3.yaml#L2640))
+- [ ] Record the answers to OPEN, GET and CALL on each tree, including the error lines for another tree's paths. ([specs/lightware-lw3.yaml:2622](specs/lightware-lw3.yaml#L2622))
+- [ ] On MX2, confirm the preset, device label and muteSource syntax where the manual contradicts itself, and the /MEDIA/NAMES/VIDEO port names. ([specs/lightware-lw3.yaml:2674](specs/lightware-lw3.yaml#L2674))
+- [ ] On MMX2, check whether method replies are mO (the manual prints m0 in places). ([specs/lightware-lw3.yaml:2692](specs/lightware-lw3.yaml#L2692))
+- [ ] On UMX-HDMI-140-Plus, record the answer to a wrong Cleartext login password. ([specs/lightware-lw3.yaml:2712](specs/lightware-lw3.yaml#L2712))
+- [ ] Record the MX2 and UMX port status letters and bytes on a live port. ([specs/lightware-lw3.yaml:2656](specs/lightware-lw3.yaml#L2656))
+- [ ] Check that MAN on a property or a method is answered with one line (pm, mm) on each tree, as get_manual expects, and that a method answered mO without = returns nothing. ([specs/lightware-lw3.yaml:2718](specs/lightware-lw3.yaml#L2718))
 
 ## magewell-proconvert — Magewell Pro Convert
 

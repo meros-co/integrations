@@ -98,7 +98,8 @@ models:
                get_talkback_matrix_assign, set_talkback_main_assign, get_talkback_main_assign,
                get_monitor_level, set_monitor_source, get_monitor_source, set_solo_dim, get_solo_dim,
                set_solo_mono, get_solo_mono, get_solo_active, get_console_info, set_console_name,
-               get_console_name, get_firmware, get_serial, get_console_model, get_osc_read_only]
+               get_console_name, get_firmware, get_serial, get_console_model, get_osc_read_only,
+               set_parameter_float, set_parameter_int, set_parameter_string, get_parameter, get_parameter_value, get_parameter_raw, get_node, set_node]
     verification: none
   - id: wing-compact
     name: Behringer WING Compact
@@ -158,7 +159,8 @@ models:
                set_monitor_level, get_monitor_level, set_monitor_source, get_monitor_source, set_solo_dim,
                get_solo_dim, set_solo_mono, get_solo_mono, get_solo_active, get_console_info,
                set_console_name, get_console_name, get_firmware, get_serial, get_console_model,
-               get_osc_read_only]
+               get_osc_read_only, set_parameter_float, set_parameter_int, set_parameter_string,
+               get_parameter, get_parameter_value, get_parameter_raw, get_node, set_node]
     verification: none
   - id: wing-rack
     name: Behringer WING Rack
@@ -218,7 +220,8 @@ models:
                set_monitor_level, get_monitor_level, set_monitor_source, get_monitor_source, set_solo_dim,
                get_solo_dim, set_solo_mono, get_solo_mono, get_solo_active, get_console_info,
                set_console_name, get_console_name, get_firmware, get_serial, get_console_model,
-               get_osc_read_only]
+               get_osc_read_only, set_parameter_float, set_parameter_int, set_parameter_string,
+               get_parameter, get_parameter_value, get_parameter_raw, get_node, set_node]
     verification: none
 
 commands:
@@ -3181,6 +3184,103 @@ commands:
     expect: { address: "/$ctl/OSC/ronly", arg: 2 }
     returns: value
 
+  set_parameter_float:
+    summary: "Set any parameter by its OSC address to a float (,f); the console converts it to the parameter's own type (p.22)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address from the Remote Protocols command lists without its leading /, such as ch/1/fdr, or its native hash as #f50f69f8." }
+      value: { type: float, required: true,
+        label: Value,
+        description: "The value in the parameter's own unit as the command lists give it, such as dB for a fader." }
+    send:
+      address: "/{path}"
+      args: [ { value: "{value}", type: float } ]
+    returns: none
+
+  set_parameter_int:
+    summary: "Set any parameter by its OSC address to an int (,i): a switch, an integer or an enumeration's index; -1 toggles a 0/1 switch (p.22)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address from the Remote Protocols command lists without its leading /, such as ch/1/fdr, or its native hash as #f50f69f8." }
+      value: { type: int, required: true,
+        label: Value,
+        description: "The integer value, an enumeration's index in its list counted from 0, or -1 to toggle a 0/1 switch." }
+    send:
+      address: "/{path}"
+      args: [ { value: "{value}", type: int } ]
+    returns: none
+
+  set_parameter_string:
+    summary: "Set any parameter by its OSC address to a string (,s): a name, an enumeration's value, or a number as text (p.22)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address from the Remote Protocols command lists without its leading /, such as ch/1/fdr, or its native hash as #f50f69f8." }
+      value: { type: string, max_length: 128, required: true,
+        label: Value,
+        description: "The value as text, such as a name, an enumeration's value like FX, or a number like -2." }
+    send:
+      address: "/{path}"
+      args: [ { value: "{value}", type: string } ]
+    returns: none
+
+  get_parameter:
+    summary: "Read any parameter by its OSC address as the console's display text, which every parameter type has (p.21)"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address from the Remote Protocols command lists without its leading /, such as ch/1/fdr, or its native hash as #f50f69f8." }
+    send: { address: "/{path}" }
+    expect: { address: "/{path}", arg: 0 }
+    returns: value
+
+  get_parameter_value:
+    summary: "Read a float or int parameter's value by its OSC address, the third value of its ,sff or ,sfi reply (p.21); empty for a string"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address from the Remote Protocols command lists without its leading /, such as ch/1/fdr, or its native hash as #f50f69f8." }
+    send: { address: "/{path}" }
+    expect: { address: "/{path}", arg: 2 }
+    returns: value
+
+  get_parameter_raw:
+    summary: "Read a float or int parameter's raw 0-1 position by its OSC address, the second value of its ,sff or ,sfi reply (p.21); empty for a string"
+    params:
+      path: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*$', required: true,
+        label: Address,
+        description: "The parameter's OSC address from the Remote Protocols command lists without its leading /, such as ch/1/fdr, or its native hash as #f50f69f8." }
+    send: { address: "/{path}" }
+    expect: { address: "/{path}", arg: 1 }
+    returns: value
+
+  get_node:
+    summary: "List a node's children by its OSC address (empty for the root): the reply's strings as a JSON array, such as [\"mode\",\"name\",\"$fname\"] (p.20, p.22)"
+    params:
+      node: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$_/-]*$', default: "",
+        label: Node,
+        description: "The node's OSC address without its leading /, such as ch/1 or $ctl/user/1/1/enc; empty for the root." }
+    send: { address: "/{node}" }
+    expect: { address: "/{node}" }
+    returns: text
+
+  set_node:
+    summary: "Set several parameters under a node in one message, as name=value pairs separated by commas (ch/1 with \"fdr=4,mute=1\"); answered OK or an error such as NODE NOT FOUND (p.23-24)"
+    params:
+      node: { type: string, max_length: 128, pattern: '^[A-Za-z0-9$_/-]*$', default: "",
+        label: Node,
+        description: "The node the names are relative to, without its leading /, such as ch/1; empty for the root of the parameter tree." }
+      assignments: { type: string, max_length: 1024, required: true,
+        label: Assignments,
+        description: "name=value pairs separated by commas, where a . moves down the tree and a leading / returns to the root, such as fdr=4,mute=1 or /ch.1.fdr=-1,mute=0,.2.fdr=0." }
+    send:
+      address: "/{node}"
+      args: [ { value: "{assignments}", type: string } ]
+    expect: { address: "/{node}*", matches: '^\["OK"\]$' }
+    returns: ack
+
 quirks:
   - models: [all]
     severity: warning
@@ -3330,6 +3430,31 @@ quirks:
       bundles are not supported, ? and * in addresses are not wildcards, and a
       UDP packet is at most 32 KB (p.19, p.23).
 
+  - models: [all]
+    severity: info
+    text: >
+      Any parameter in the document's command lists can be set and read by its
+      address: set_parameter_float, set_parameter_int and set_parameter_string
+      send one argument of that type, which the console converts to the
+      parameter's own (p.22); get_parameter reads the display text, and
+      get_parameter_value and get_parameter_raw the value and the 0-1 position
+      of a float or int. Every parameter the console reports, by the /*s
+      subscription or in reply to a query, is also kept under params, keyed by
+      its address without the leading / (params["ch/1/fdr"]): text always, raw and float
+      for a ,sff reply, raw and int for a ,sfi reply. The format cannot turn
+      the address's / into nested keys, so the address is one key. These sets
+      are not echoed either, and [RO] parameters ignore them.
+
+  - models: [all]
+    severity: warning
+    text: >
+      set_node sets several parameters in one message (p.23-24). The console
+      answers on the node's address followed by * (/ch/1*, or /* for the root)
+      with OK, or with NODE NOT FOUND, VALUE ERROR, BUFFER OVERFLOW, NODE IS
+      NOT PAR, INCOMPLETE DATA or STACK EMPTY, which fail the command. A node
+      too large for one 32 KB UDP packet is answered with an error instead of
+      its contents (p.23); get_node lists only the children's names.
+
 state:
   "channels.*.fader": { type: float, description: "Fader level in dB, -144 (-oo) to +10" }
   "channels.*.mute": { type: bool, description: "Muted" }
@@ -3455,6 +3580,10 @@ state:
   "console.serial": { type: string, description: "Serial number" }
   "console.model": { type: string, description: "Console model, e.g. ngc-full, wing-rack, wing-compact" }
   "console.osc_read_only": { type: bool, description: "OSC read-only switch on" }
+  "params.*.text": { type: string, description: "Any parameter's display text, keyed by its OSC address without the leading / (ch/1/fdr): a string or enumeration's value, or a number as the console shows it" }
+  "params.*.raw": { type: float, description: "A float or int parameter's raw position, 0 to 1, keyed by its OSC address" }
+  "params.*.float": { type: float, description: "A float parameter's value in its own unit (dB for a fader), keyed by its OSC address" }
+  "params.*.int": { type: int, description: "An int parameter's value (0/1 for a switch), keyed by its OSC address" }
 
 telemetry:
   # /*s makes the console push every parameter change to this client as the
@@ -9062,3 +9191,17 @@ telemetry:
       state: { "console.model": "{arg0}" }
     - address: "^/\\$ctl/OSC/ronly$"
       state: { "console.osc_read_only": { value: "{arg2}", map: { "0": false, "1": true } } }
+    # Every parameter the console reports, by its address (Remote Protocols
+    # p.21): ,s for strings and enumerations, ,sff (text, raw, value) for
+    # floats, ,sfi (text, raw, value) for ints. Node lists (,sss...), the /?
+    # identification and node-set answers (/ch/1*) have other shapes or
+    # addresses and are not kept.
+    - address: "^/([A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*)$"
+      arg_types: s
+      state: { "params.{1}.text": "{arg0}" }
+    - address: "^/([A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*)$"
+      arg_types: sff
+      state: { "params.{1}.text": "{arg0}", "params.{1}.raw": "{arg1}", "params.{1}.float": "{arg2}" }
+    - address: "^/([A-Za-z0-9$#_-][A-Za-z0-9$#_/-]*)$"
+      arg_types: sfi
+      state: { "params.{1}.text": "{arg0}", "params.{1}.raw": "{arg1}", "params.{1}.int": "{arg2}" }

@@ -958,7 +958,10 @@ commands:
     returns: value
 ```
 
-Inbound messages on other addresses are not the reply.
+Inbound messages on other addresses are not the reply. The reply address
+is usually the query's or another `/`-prefixed one, but it is matched as
+written: the X32 answers `/node` on `node`, without the leading `/` OSC
+requires.
 
 ### Multi-message commands
 

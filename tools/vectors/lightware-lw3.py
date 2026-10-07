@@ -20,6 +20,10 @@ _LW_STRINGS = {
     "^[ED][FPLS]?$": "E",
     "^[FUD][1-9][0-9]{0,2}$": "F47",
     "^((I[1-9][0-9]?|0)?;){0,47}(I[1-9][0-9]?|0)?$": "I1;I2;0;I3",
+    "^/[A-Za-z0-9_/@-]*\\.[A-Za-z0-9_]+$": "/V1/MEDIA/VIDEO/I1.SignalPresent",
+    "^/[A-Za-z0-9_/@-]*:[A-Za-z0-9_]+$": "/V1/MEDIA/VIDEO/XP:switch",
+    "^/[A-Za-z0-9_/@-]*[.:][A-Za-z0-9_]+$": "/MEDIA/PORTS/VIDEO/I1/SETTINGS.EnablePower",
+    "^/[A-Za-z0-9_/@-]*(/\\*)?$": "/V1/MEDIA/VIDEO/*",
 }
 
 
@@ -139,3 +143,42 @@ telemetry(LW, "mx2-power", inbound="CHG /MANAGEMENT/POWER.Operation=STANDBY\r\n"
           expect_state={"device": {"power_mode": "STANDBY"}})
 telemetry(LW, "error-not-state", inbound="pE /V1/MEDIA/VIDEO/I9.SignalPresent %E002:Not exist\r\n",
           expect_state={})
+
+# Any node, property or method by its path (MX2 9.3.4, 9.3.9; answers from
+# the manual's examples).
+text(LW, "get_property", {"path": "/.SerialNumber"}, "GET /.SerialNumber\r\n",
+     device_reply="pr /.SerialNumber=87654321\r\n", expect_result=_v("87654321"), **MX)
+text(LW, "set_property", {"path": "/MEDIA/PORTS/VIDEO/I1/SETTINGS.Conversion", "value": "OFF"},
+     "SET /MEDIA/PORTS/VIDEO/I1/SETTINGS.Conversion=OFF\r\n",
+     device_reply="pw /MEDIA/PORTS/VIDEO/I1/SETTINGS.Conversion=OFF\r\n", expect_result=ACK, **MX)
+text(LW, "call_method", {"method": "/MEDIA/XP/VIDEO:switch", "arguments": "I1:O1"},
+     "CALL /MEDIA/XP/VIDEO:switch(I1:O1)\r\n", device_reply="mO /MEDIA/XP/VIDEO:switch\r\n",
+     expect_result=_v(None), **MX)
+text(LW, "call_method", {"method": "/MEDIA/XP/VIDEO:switch", "arguments": "IA:O1"},
+     "CALL /MEDIA/XP/VIDEO:switch(IA:O1)\r\n", device_reply="mE /MEDIA/XP/VIDEO:switch %E004:Invalid value\r\n",
+     expect_result=ERR, file="call_method-error", **MX)
+text(LW, "get_manual", {"path": "/MEDIA/PORTS/VIDEO/I1/SETTINGS.EnablePower"},
+     "MAN /MEDIA/PORTS/VIDEO/I1/SETTINGS.EnablePower\r\n",
+     device_reply="pm /MEDIA/PORTS/VIDEO/I1/SETTINGS.EnablePower [true|false] Enables or disables 3v3 powering on DP_PWR pin\r\n",
+     expect_result=_v("[true|false] Enables or disables 3v3 powering on DP_PWR pin"), **MX)
+text(LW, "open_node", {"node": "/MEDIA/VIDEO/*"}, "OPEN /MEDIA/VIDEO/*\r\n",
+     device_reply="o- /MEDIA/VIDEO/*\r\n", expect_result=ACK, **MX)
+text(LW, "close_node", {"node": "/MEDIA/VIDEO"}, "CLOSE /MEDIA/VIDEO\r\n",
+     device_reply="c- /MEDIA/VIDEO\r\n", expect_result=ACK, **MX)
+telemetry(LW, "any-property", inbound="CHG /MEDIA/AUDIO/O3.VolumePercent=50.00\r\n", expect_state={})
+telemetry(LW, "any-property-root", inbound="pr /.SerialNumber=87654321\r\n",
+          expect_state={"device": {"serial": "87654321"}})
+
+
+def _lw_nodes():
+    """Every property line (GET and SET answers, CHG) is also kept under
+    nodes, by node path and property name (the generic rule)."""
+    for v in V:
+        if v.get("spec") != LW or "inbound" not in v:
+            continue
+        m = _re.match(r"^(?:CHG|p[rw]) (/[^=.\s]*)\.([A-Za-z0-9_]+)=(.*)$", v["inbound"].rstrip("\r\n"))
+        if m:
+            v["expect_state"] = {**v["expect_state"], "nodes": {m.group(1): {m.group(2): m.group(3)}}}
+
+
+_lw_nodes()
