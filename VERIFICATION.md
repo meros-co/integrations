@@ -1144,6 +1144,20 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Vision, check whether command words such as MECUT and MEAUTO must use MLE instead of ME. ([specs/rosstalk.yaml:1202](specs/rosstalk.yaml#L1202))
 - [ ] On Acuity, record the reply CAPTURE sends when the capture completes. ([specs/rosstalk.yaml:1221](specs/rosstalk.yaml#L1221))
 
+## sennheiser-chg-70n — Sennheiser CHG 70N
+
+- [ ] Confirm the charger answers a command datagram with the method's new value (or an /osc/error entry) to the sender's port, so each command is acknowledged by its reply. ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
+- [ ] Confirm one bay can be identified with null in the other bay's place, leaving that bay as it is (Companion does this; the guide's example writes both). ([specs/sennheiser-chg-70n.yaml:66](specs/sennheiser-chg-70n.yaml#L66))
+- [ ] Confirm one address tree may hold every /device method, and another every /bays method, in a single subscription, with a 60 s lifetime. ([specs/sennheiser-chg-70n.yaml:155](specs/sennheiser-chg-70n.yaml#L155))
+- [ ] Check whether a bay with nothing in it reports null, 0 or an empty string for its battery values. ([specs/sennheiser-chg-70n.yaml:313](specs/sennheiser-chg-70n.yaml#L313))
+- [ ] Check whether /bays/warnings gives one string per bay (as read) or a list of warnings per bay, and whether /device/warnings is a string or a list. ([specs/sennheiser-chg-70n.yaml:287](specs/sennheiser-chg-70n.yaml#L287))
+- [ ] Check whether the network fields (ipaddr and the others) come as plain strings or one-element arrays; both are read. ([specs/sennheiser-chg-70n.yaml:187](specs/sennheiser-chg-70n.yaml#L187))
+- [ ] Check the shape /bays/sync_settings accepts (the guide's example quotes a frequency oddly) and whether the charger answers it. ([specs/sennheiser-chg-70n.yaml:131](specs/sennheiser-chg-70n.yaml#L131))
+- [ ] Find out what /bays/update/enable does when written; it is read only. ([specs/sennheiser-chg-70n.yaml:293](specs/sennheiser-chg-70n.yaml#L293))
+- [ ] Check which characters /device/location accepts (the guide allows printable ASCII with escaped quote, slash and backslash). ([specs/sennheiser-chg-70n.yaml:99](specs/sennheiser-chg-70n.yaml#L99))
+- [ ] Confirm the name query used as the liveness probe is answered while nothing else is happening. ([specs/sennheiser-chg-70n.yaml:42](specs/sennheiser-chg-70n.yaml#L42))
+- [ ] Check whether restart is answered before the charger goes away. ([specs/sennheiser-chg-70n.yaml:328](specs/sennheiser-chg-70n.yaml#L328))
+
 ## sennheiser-digital-6000 — Sennheiser Digital 6000
 
 - [ ] Confirm the SSC port is 45 (the Companion module defaults to 6970). ([specs/sennheiser-digital-6000.yaml:110](specs/sennheiser-digital-6000.yaml#L110))
@@ -1153,9 +1167,21 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## sennheiser-ew-dx — Sennheiser EW-DX
 
-- [ ] Check whether gain, frequency, identify and network settings have SSCv2 paths on the firmware in use. ([specs/sennheiser-ew-dx.yaml:96](specs/sennheiser-ew-dx.yaml#L96))
-- [ ] On an EM 4 Dante, confirm subscriptions and mute work on channels 3 and 4 (only channels 1 and 2 have been tested on hardware). ([specs/sennheiser-ew-dx.yaml:118](specs/sennheiser-ew-dx.yaml#L118))
-- [ ] Confirm a 3 s silence check against /api/ssc/version does not lose a healthy connection. ([specs/sennheiser-ew-dx.yaml:104](specs/sennheiser-ew-dx.yaml#L104))
+- [ ] Confirm each resource added beyond the six per channel tested on hardware (identify, signal strength, diversity, user preset bank, sync settings and their ignore flags, the transmitter and its warnings, and the device's site, state, identification, rf, transmission, encryption, legacyMode and firmware update state) can be subscribed and notifies on change, and that a refused batch leaves the later ones subscribed. ([specs/sennheiser-ew-dx.yaml:487](specs/sennheiser-ew-dx.yaml#L487))
+- [ ] Check whether select_preset's bank and preset, and channels.<n>.preset.bank and .channel, count from 0 or from 1, against the receiver's own preset display. ([specs/sennheiser-ew-dx.yaml:179](specs/sennheiser-ew-dx.yaml#L179))
+- [ ] Check whether /api/rf answers each range's step as stepSize (the schema) or stepsize (the document's example); both are read. ([specs/sennheiser-ew-dx.yaml:329](specs/sennheiser-ew-dx.yaml#L329))
+- [ ] Measure how long the receiver stays busy after set_link_density and set_encryption, whether it restarts or drops the HTTPS connection, and whether 10 s is enough for their answers. ([specs/sennheiser-ew-dx.yaml:429](specs/sennheiser-ew-dx.yaml#L429))
+- [ ] Confirm /api/transmitters/{id} and its warnings answer 422 like the battery when no transmitter is linked, and what the stream sends when a transmitter links or unlinks. ([specs/sennheiser-ew-dx.yaml:387](specs/sennheiser-ew-dx.yaml#L387))
+- [ ] Check what set_user_presets does with frequencies outside the receiver's ranges or off its preset spacing, and whether the bank must be in order. ([specs/sennheiser-ew-dx.yaml:188](specs/sennheiser-ew-dx.yaml#L188))
+- [ ] On firmware 4, confirm that SSCv1 answers on UDP 45 while Secure (SSCv2) access is also on once Legacy is enabled (Control Cockpit presents Secure and Legacy as a choice; Companion's help says Legacy Mode runs beside it), and where Legacy is switched on. ([specs/sennheiser-ew-dx.yaml:444](specs/sennheiser-ew-dx.yaml#L444))
+- [ ] Confirm an SSCv1 reply carries the request's /osc/xid back, as the Digital 6000's does; commands are matched to replies by it alone. ([specs/sennheiser-ew-dx.yaml:444](specs/sennheiser-ew-dx.yaml#L444))
+- [ ] Check whether /device/network/ipv4/ipaddr and the other control-network fields are answered as plain strings or one-element arrays (the guide's count: 1); both are read. ([specs/sennheiser-ew-dx.yaml:343](specs/sennheiser-ew-dx.yaml#L343))
+- [ ] Check whether restart and restore_factory_defaults are answered before the receiver goes away, or time out after 2 s although they worked. ([specs/sennheiser-ew-dx.yaml:276](specs/sennheiser-ew-dx.yaml#L276))
+- [ ] Check what set_auto_lock (/device/lock) locks: the guide says the receiver's keys, Companion calls it auto lock. ([specs/sennheiser-ew-dx.yaml:264](specs/sennheiser-ew-dx.yaml#L264))
+- [ ] Check the location limit: SSCv2's site allows 255 characters without quotes, slash or backslash, SSCv1's /device/location 400; the stricter one is enforced. ([specs/sennheiser-ew-dx.yaml:252](specs/sennheiser-ew-dx.yaml#L252))
+- [ ] Check whether set_network and set_dante_network take effect at once or after a restart, and whether a static address may be written while auto is on. ([specs/sennheiser-ew-dx.yaml:284](specs/sennheiser-ew-dx.yaml#L284))
+- [ ] On an EM 4 Dante, confirm subscriptions and every channel command work on channels 3 and 4 (only channels 1 and 2 have been tested on hardware). ([specs/sennheiser-ew-dx.yaml:508](specs/sennheiser-ew-dx.yaml#L508))
+- [ ] Confirm a 3 s silence check against /api/ssc/version does not lose a healthy connection. ([specs/sennheiser-ew-dx.yaml:480](specs/sennheiser-ew-dx.yaml#L480))
 
 ## sennheiser-ew-g3-g4 — Sennheiser ew G3 / G4
 

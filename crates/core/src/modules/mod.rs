@@ -90,6 +90,8 @@ mod resolume_push;
 mod sennheiser_d6000;
 #[cfg(feature = "sennheiser-ew-dx")]
 mod sennheiser_ewdx;
+#[cfg(feature = "sennheiser-ew-dx")]
+mod sennheiser_ewdx_legacy;
 #[cfg(feature = "sennheiser-ew-g3-g4")]
 mod sennheiser_mcp;
 #[cfg(feature = "sennheiser-spectera")]
@@ -258,7 +260,9 @@ pub(crate) fn construct(
         #[cfg(feature = "http-snapshot")]
         "http-snapshot" => Ok(Box::new(http_snapshot::HttpSnapshot::new(context)?)),
         #[cfg(feature = "sennheiser-ew-dx")]
-        "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::Ewdx::from_context(context))),
+        "sennheiser-ew-dx" => Ok(Box::new(sennheiser_ewdx::EwdxReceiver::from_context(
+            context,
+        ))),
         #[cfg(feature = "sennheiser-spectera")]
         "sennheiser-spectera" => Ok(Box::new(sennheiser_spectera::Spectera::from_context(
             context,
