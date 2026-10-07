@@ -29,7 +29,8 @@
 //!
 //! Feature areas beyond switching live in sibling files, each decoding its
 //! own state and building its own commands: `atem_keyers.rs` (keyer DVE,
-//! chroma, masks and flying keys).
+//! chroma, masks and flying keys) and `atem_audio.rs` (Fairlight EQ,
+//! dynamics, inputs, routing and monitoring; classic audio monitoring).
 //!
 //! Opened for commands only (`monitor` false), the module neither polls the
 //! streaming and recording durations nor renews a Fairlight level
@@ -47,6 +48,8 @@ use crate::module::{
 };
 use crate::session::merge_patch;
 
+#[path = "atem_audio.rs"]
+mod audio;
 #[path = "atem_keyers.rs"]
 mod keyers;
 
@@ -224,6 +227,15 @@ struct Topology {
     fairlight_sources: BTreeMap<(u16, i64), u8>,
     /// Multiviewer windows seen, with their last source, for de-duplication.
     multiviewer_windows: BTreeMap<(u8, u8), u16>,
+    /// Fairlight (input, source) to its EQ band count (FASP).
+    fairlight_bands: BTreeMap<(u16, i64), u8>,
+    /// The Fairlight master's EQ band count (FAMP).
+    master_bands: u8,
+    /// Fairlight inputs seen (FAIP).
+    fairlight_inputs: BTreeSet<u16>,
+    /// Fairlight audio routing outputs and sources seen (AROP, ARSP).
+    routing_outputs: BTreeSet<u32>,
+    routing_sources: BTreeSet<u32>,
     /// (M/E, keyer) to whether the keyer can fly (KeBP).
     usk_can_fly: BTreeMap<(u8, u8), bool>,
     /// M/E to its next-transition selection (TrSS byte 4).
@@ -1302,24 +1314,34 @@ impl Atem {
                 };
                 Some(json!({"audio": {"inputs": {input.to_string(): {
                     "source_type": kind,
+                    "port_type": audio::port_name(u16_at(b, 6)),
                     "mix_option": classic_mix(b[8]),
                     "gain": classic_db(u16_at(b, 10)),
                     "balance": classic_balance(i16_at(b, 12)),
                 }}}}))
             }
-            // u16 gain, i16 balance (Sofie `Audio/AudioMixerMasterCommand.ts:27-33`).
+            // u16 gain, i16 balance, follow fade to black (Sofie
+            // `Audio/AudioMixerMasterCommand.ts:27-33`).
             b"AMMO" => {
                 need(4)?;
-                Some(json!({"audio": {"master": {
+                let mut master = json!({
                     "gain": classic_db(u16_at(b, 0)),
                     "balance": classic_balance(i16_at(b, 2)),
-                }}}))
+                });
+                if b.len() >= 5 {
+                    master["follow_fade_to_black"] = json!(b[4] == 1);
+                }
+                Some(json!({"audio": {"master": master}}))
             }
-            // u16 input, rsv, i64 source at 8, gain i32 at 20, balance i16 at
-            // 40, fader gain i32 at 44, mix options at 48, mix option at 49,
-            // gains in hundredths of a dB (Sofie
-            // `Fairlight/FairlightMixerSourceCommand.ts:107-129`; Companion
-            // `actions/fairlightAudio.ts:298, 472`).
+            // u16 input, rsv, i64 source at 8, source type, maximum and
+            // current frames delay at 16 to 18, gain i32 at 20, has stereo
+            // simulation at 24, i16 stereo simulation at 26, EQ band count
+            // and EQ enabled at 28 and 29, i32 EQ gain at 32, i32 make-up
+            // gain at 36, balance i16 at 40, fader gain i32 at 44, mix
+            // options at 48, mix option at 49; gains in hundredths of a dB
+            // (Sofie `Fairlight/FairlightMixerSourceCommand.ts:107-129`;
+            // Companion `actions/fairlightAudio.ts:298, 472`; the LibAtem
+            // samples for the stereo simulation and EQ gain scaling).
             b"FASP" => {
                 need(50)?;
                 let input = u16_at(b, 0);
@@ -1327,10 +1349,22 @@ impl Atem {
                 self.topology
                     .fairlight_sources
                     .insert((input, source), b[48]);
+                self.topology.fairlight_bands.insert((input, source), b[28]);
                 Some(
                     json!({"fairlight": {"inputs": {input.to_string(): {"sources": {
                         source.to_string(): {
+                            "type": if b[16] == 1 { "stereo" } else { "mono" },
+                            "max_frames_delay": b[17],
+                            "frames_delay": b[18],
                             "gain": hundredths(i32_at(b, 20) as i64),
+                            "has_stereo_simulation": b[24] != 0,
+                            "stereo_simulation": hundredths(i16_at(b, 26) as i64),
+                            "equalizer": {
+                                "enabled": b[29] != 0,
+                                "gain": hundredths(i32_at(b, 32) as i64),
+                                "band_count": b[28],
+                            },
+                            "dynamics": {"make_up_gain": hundredths(i32_at(b, 36) as i64)},
                             "balance": hundredths(i16_at(b, 40) as i64),
                             "fader_gain": hundredths(i32_at(b, 44) as i64),
                             "mix_options": fairlight_mixes(b[48]),
@@ -1339,17 +1373,27 @@ impl Atem {
                     }}}}}),
                 )
             }
-            // Fader gain i32 at 12, follow fade to black at 16 (Sofie
+            // EQ band count, EQ enabled, 2 rsv, i32 EQ gain, i32 make-up
+            // gain, i32 fader gain, follow fade to black at 16 (Sofie
             // `Fairlight/FairlightMixerMasterCommand.ts:41-49`).
             b"FAMP" => {
                 need(17)?;
+                self.topology.master_bands = b[0];
                 Some(json!({"fairlight": {"master": {
+                    "equalizer": {
+                        "enabled": b[1] != 0,
+                        "gain": hundredths(i32_at(b, 4) as i64),
+                        "band_count": b[0],
+                    },
+                    "dynamics": {"make_up_gain": hundredths(i32_at(b, 8) as i64)},
                     "fader_gain": hundredths(i32_at(b, 12) as i64),
                     "follow_fade_to_black": b[16] != 0,
                 }}}))
             }
             // Levels in hundredths of a dB, sent only while subscribed:
-            // i64 source, u16 input, then the output levels and peaks at 32
+            // i64 source, u16 input, then the input levels and peaks at 10,
+            // the expander, compressor and limiter gain reductions at 18,
+            // the levels after dynamics at 24 and after the fader at 32
             // (Sofie `Fairlight/FairlightMixerSourceLevelsCommand.ts:17-39`;
             // Companion `audioLevels.ts:12`).
             b"FMLv" => {
@@ -1358,24 +1402,16 @@ impl Atem {
                 let input = u16_at(b, 8);
                 Some(
                     json!({"fairlight": {"inputs": {input.to_string(): {"sources": {
-                        source.to_string(): {"level": {
-                            "left": hundredths(i16_at(b, 32) as i64),
-                            "right": hundredths(i16_at(b, 34) as i64),
-                            "left_peak": hundredths(i16_at(b, 36) as i64),
-                            "right_peak": hundredths(i16_at(b, 38) as i64),
-                        }},
+                        source.to_string(): {"level": audio::levels(b, 10, true)},
                     }}}}}),
                 )
             }
-            // Master levels at 20 (Sofie `Fairlight/FairlightMixerMasterLevelsCommand.ts:9-28`).
+            // Master: input levels at 0, compressor and limiter gain
+            // reductions at 8, after dynamics at 12, after the fader at 20
+            // (Sofie `Fairlight/FairlightMixerMasterLevelsCommand.ts:9-28`).
             b"FDLv" => {
                 need(28)?;
-                Some(json!({"fairlight": {"master": {"level": {
-                    "left": hundredths(i16_at(b, 20) as i64),
-                    "right": hundredths(i16_at(b, 22) as i64),
-                    "left_peak": hundredths(i16_at(b, 24) as i64),
-                    "right_peak": hundredths(i16_at(b, 26) as i64),
-                }}}}))
+                Some(json!({"fairlight": {"master": {"level": audio::levels(b, 0, false)}}}))
             }
             // Multiviewer, window, u16 source (Sofie
             // `Settings/MultiViewerSourceCommand.ts:39-47`). Constellation HD
@@ -1550,7 +1586,9 @@ impl Atem {
                 }
                 None
             }
-            _ => self.decode_keyers(name, b),
+            _ => self
+                .decode_keyers(name, b)
+                .or_else(|| self.decode_audio(name, b)),
         }
     }
 
@@ -2299,6 +2337,10 @@ impl Atem {
                     b[0] |= 4;
                     put_i16(&mut b, 8, v as i16);
                 }
+                if let Some(v) = opt_bool(params, "rca_to_xlr") {
+                    b[0] |= 8;
+                    b[10] = v as u8;
+                }
                 if b[0] == 0 {
                     return Err(nothing_to_set());
                 }
@@ -2319,6 +2361,10 @@ impl Atem {
                     b[0] |= 2;
                     put_i16(&mut b, 4, v as i16);
                 }
+                if let Some(v) = opt_bool(params, "follow_fade_to_black") {
+                    b[0] |= 4;
+                    b[6] = v as u8;
+                }
                 if b[0] == 0 {
                     return Err(nothing_to_set());
                 }
@@ -2327,8 +2373,9 @@ impl Atem {
             // u16 mask, u16 input, 4 rsv, i64 source, frames delay, 3 rsv, i32
             // gain, i16 stereo simulation, eq enabled, rsv, i32 eq gain, i32
             // make-up gain, i16 balance, 2 rsv, i32 fader gain, mix option, 3
-            // rsv; mask bits 1 gain, 6 balance, 7 fader gain, 8 mix option
-            // (Sofie `Fairlight/FairlightMixerSourceCommand.ts:47-89`). Gains
+            // rsv; mask bits 0 frames delay, 1 gain, 2 stereo simulation, 3
+            // EQ enabled, 4 EQ gain, 5 make-up gain, 6 balance, 7 fader gain, 8
+            // mix option (Sofie `Fairlight/FairlightMixerSourceCommand.ts:47-89`). Gains
             // in hundredths of a dB, balance in hundredths (Companion
             // `actions/fairlightAudio.ts:298, 472, 562`).
             "set_fairlight_source" => {
@@ -2347,9 +2394,29 @@ impl Atem {
                 let mut mask = 0u16;
                 put16(&mut b, 2, input as u16);
                 b[8..16].copy_from_slice(&source.to_be_bytes());
+                if let Some(v) = opt_int(params, "frames_delay") {
+                    mask |= 1;
+                    b[16] = v as u8;
+                }
                 if let Some(v) = scaled(params, "gain", 100.0) {
                     mask |= 1 << 1;
                     put_i32(&mut b, 20, v as i32);
+                }
+                if let Some(v) = scaled(params, "stereo_simulation", 100.0) {
+                    mask |= 1 << 2;
+                    put_i16(&mut b, 24, v as i16);
+                }
+                if let Some(v) = opt_bool(params, "eq_enabled") {
+                    mask |= 1 << 3;
+                    b[26] = v as u8;
+                }
+                if let Some(v) = scaled(params, "eq_gain", 100.0) {
+                    mask |= 1 << 4;
+                    put_i32(&mut b, 28, v as i32);
+                }
+                if let Some(v) = scaled(params, "make_up_gain", 100.0) {
+                    mask |= 1 << 5;
+                    put_i32(&mut b, 32, v as i32);
                 }
                 if let Some(v) = scaled(params, "balance", 100.0) {
                     mask |= 1 << 6;
@@ -2376,14 +2443,27 @@ impl Atem {
                 put16(&mut b, 0, mask);
                 one(b"CFSP", b)
             }
-            // Mask (bit 3 fader gain, 4 follow FTB), eq enabled, 2 rsv, i32 eq
-            // gain, i32 make-up gain, i32 fader gain, follow FTB, 3 rsv (Sofie
+            // Mask (bit 0 EQ enabled, 1 EQ gain, 2 make-up gain, 3 fader gain,
+            // 4 follow FTB), eq enabled, 2 rsv, i32 eq gain, i32 make-up gain,
+            // i32 fader gain, follow FTB, 3 rsv (Sofie
             // `Fairlight/FairlightMixerMasterCommand.ts:12-33`).
             "set_fairlight_master" => {
                 if !self.topology.fairlight {
                     return Err(unsupported(name, "this switcher (no Fairlight mixer)"));
                 }
                 let mut b = vec![0u8; 20];
+                if let Some(v) = opt_bool(params, "eq_enabled") {
+                    b[0] |= 1;
+                    b[1] = v as u8;
+                }
+                if let Some(v) = scaled(params, "eq_gain", 100.0) {
+                    b[0] |= 1 << 1;
+                    put_i32(&mut b, 4, v as i32);
+                }
+                if let Some(v) = scaled(params, "make_up_gain", 100.0) {
+                    b[0] |= 1 << 2;
+                    put_i32(&mut b, 8, v as i32);
+                }
                 if let Some(v) = scaled(params, "fader_gain", 100.0) {
                     b[0] |= 1 << 3;
                     put_i32(&mut b, 12, v as i32);
@@ -2547,6 +2627,9 @@ impl Atem {
             }
             other => {
                 if let Some(out) = self.build_keyers(other, params)? {
+                    return Ok(out);
+                }
+                if let Some(out) = self.build_audio(other, params)? {
                     return Ok(out);
                 }
                 Err(CommandError::UnknownCommand {
@@ -3838,7 +3921,9 @@ mod tests {
         );
         assert_eq!(
             s["fairlight"]["master"],
-            json!({"fader_gain": -10.5, "follow_fade_to_black": true})
+            json!({"fader_gain": -10.5, "follow_fade_to_black": true,
+                   "equalizer": {"enabled": false, "gain": 0.0, "band_count": 0},
+                   "dynamics": {"make_up_gain": 0.0}})
         );
         let source = &s["fairlight"]["inputs"]["1"]["sources"]["-65280"];
         assert_eq!(source["level"]["left"], -20.0);
@@ -3917,7 +4002,8 @@ mod tests {
         assert_eq!(s["topology"]["audio"], "classic");
         assert_eq!(
             s["audio"]["inputs"]["1"],
-            json!({"source_type": "video", "mix_option": "on", "gain": 0.0, "balance": -25.0})
+            json!({"source_type": "video", "port_type": "sdi", "mix_option": "on", "gain": 0.0,
+                   "balance": -25.0})
         );
         let p = payload(
             &mut m,
