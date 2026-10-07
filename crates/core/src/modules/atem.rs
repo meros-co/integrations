@@ -27,6 +27,10 @@
 //! the switcher ignores fields whose bit is clear (Sofie `CommandBase.ts:58-91`),
 //! so a setting command here sets exactly the parameters given.
 //!
+//! Feature areas beyond switching live in sibling files, each decoding its
+//! own state and building its own commands: `atem_keyers.rs` (keyer DVE,
+//! chroma, masks and flying keys).
+//!
 //! Opened for commands only (`monitor` false), the module neither polls the
 //! streaming and recording durations nor renews a Fairlight level
 //! subscription after reconnecting. The switcher still sends its whole state
@@ -42,6 +46,9 @@ use crate::module::{
     Bind, CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
 };
 use crate::session::merge_patch;
+
+#[path = "atem_keyers.rs"]
+mod keyers;
 
 const PORT: u16 = 9910;
 const SOCKET: Key = "atem";
@@ -448,6 +455,11 @@ fn scaled(params: &Params, name: &str, by: f64) -> Option<i64> {
     opt_num(params, name).map(|v| (v * by).round() as i64)
 }
 
+/// One command to send, from a feature area's builder.
+fn one(name: &[u8; 4], body: Vec<u8>) -> Result<Option<Out>, CommandError> {
+    Ok(Some(vec![(*name, body)]))
+}
+
 fn invalid(message: String) -> CommandError {
     CommandError::InvalidParams { message }
 }
@@ -483,6 +495,120 @@ fn fits(params: &Params, name: &str, max: usize) -> Result<Option<String>, Comma
         ))),
         other => Ok(other.map(str::to_owned)),
     }
+}
+
+fn put32(b: &mut [u8], at: usize, v: u32) {
+    b[at..at + 4].copy_from_slice(&v.to_be_bytes());
+}
+
+/// A field's width on the wire.
+#[derive(Clone, Copy)]
+enum W {
+    U8,
+    U16,
+    I16,
+    U32,
+    I32,
+}
+
+fn put(b: &mut [u8], at: usize, w: W, v: i64) {
+    match w {
+        W::U8 => b[at] = v as u8,
+        W::U16 => put16(b, at, v as u16),
+        W::I16 => put_i16(b, at, v as i16),
+        W::U32 => put32(b, at, v as u32),
+        W::I32 => put_i32(b, at, v as i32),
+    }
+}
+
+fn get(b: &[u8], at: usize, w: W) -> i64 {
+    match w {
+        W::U8 => b[at] as i64,
+        W::U16 => u16_at(b, at) as i64,
+        W::I16 => i16_at(b, at) as i64,
+        W::U32 => u32_at(b, at) as i64,
+        W::I32 => i32_at(b, at) as i64,
+    }
+}
+
+/// A setting command's body: the fields given, and the mask of their bits.
+/// Fields not given stay zero and their bit clear, so the switcher keeps them.
+struct Body<'a> {
+    b: Vec<u8>,
+    mask: u32,
+    params: &'a Params,
+}
+
+impl<'a> Body<'a> {
+    fn new(params: &'a Params, len: usize) -> Body<'a> {
+        Body {
+            b: vec![0u8; len],
+            mask: 0,
+            params,
+        }
+    }
+
+    /// A fixed byte, such as an index.
+    fn at(&mut self, at: usize, v: u8) -> &mut Self {
+        self.b[at] = v;
+        self
+    }
+
+    /// A number scaled to the wire's fixed point.
+    fn num(&mut self, name: &str, bit: u32, at: usize, by: f64, w: W) -> &mut Self {
+        if let Some(v) = scaled(self.params, name, by) {
+            self.mask |= 1 << bit;
+            put(&mut self.b, at, w, v);
+        }
+        self
+    }
+
+    fn flag(&mut self, name: &str, bit: u32, at: usize) -> &mut Self {
+        if let Some(v) = opt_bool(self.params, name) {
+            self.mask |= 1 << bit;
+            self.b[at] = v as u8;
+        }
+        self
+    }
+
+    /// An enum parameter written as its position in `list`.
+    fn choice(
+        &mut self,
+        name: &str,
+        bit: u32,
+        at: usize,
+        list: &[&str],
+    ) -> Result<&mut Self, CommandError> {
+        if let Some(v) = enum_param(self.params, name, list)? {
+            self.mask |= 1 << bit;
+            self.b[at] = v;
+        }
+        Ok(self)
+    }
+
+    /// The body with its mask at `at`, or an error when nothing was given.
+    fn done(&mut self, at: usize, w: W) -> Result<Vec<u8>, CommandError> {
+        if self.mask == 0 {
+            return Err(nothing_to_set());
+        }
+        put(&mut self.b, at, w, self.mask as i64);
+        Ok(std::mem::take(&mut self.b))
+    }
+}
+
+/// Fields read from a body into a JSON object: (name, offset, width, divisor).
+fn fields(b: &[u8], list: &[(&str, usize, W, f64)]) -> Map<String, Value> {
+    let mut m = Map::new();
+    for &(name, at, w, by) in list {
+        let v = get(b, at, w);
+        let value = if by == 1.0 {
+            json!(v)
+        } else {
+            json!(v as f64 / by)
+        };
+        m.insert(name.into(), value);
+    }
+    m
 }
 
 /// The 16-byte camera control header and the values padded to 8 bytes
@@ -977,10 +1103,11 @@ impl Atem {
                     "usk": {one(b[1]): {"on_air": b[2] != 0}},
                 }}}))
             }
-            // M/E, keyer, type, rsv, can fly, fly enabled, u16 fill, u16 key
-            // (Sofie `Key/MixEffectKeyPropertiesGetCommand.ts:18-35`).
+            // M/E, keyer, type, rsv, can fly, fly enabled, u16 fill, u16 key,
+            // mask enabled, rsv, i16 mask top, bottom, left, right (Sofie
+            // `Key/MixEffectKeyPropertiesGetCommand.ts:18-35`).
             b"KeBP" => {
-                need(10)?;
+                need(20)?;
                 self.topology.usk_can_fly.insert((b[0], b[1]), b[4] == 1);
                 Some(json!({"mes": {one(b[0]): {"usk": {one(b[1]): {
                     "type": named(&KEY_TYPES, b[2]),
@@ -988,6 +1115,7 @@ impl Atem {
                     "fly_enabled": b[5] == 1,
                     "fill_source": u16_at(b, 6),
                     "key_source": u16_at(b, 8),
+                    "mask": keyers::mask(b, 10, true),
                 }}}}}))
             }
             // Sofie `Key/MixEffectKeyLumaCommand.ts:52-60`.
@@ -1043,6 +1171,10 @@ impl Atem {
                     d["clip"] = json!(tenths(u16_at(b, 4)));
                     d["gain"] = json!(tenths(u16_at(b, 6)));
                     d["invert"] = json!(b[8] == 1);
+                }
+                // Then mask enabled and the i16 edges from 10.
+                if b.len() >= 18 {
+                    d["mask"] = keyers::mask(b, 9, false);
                 }
                 Some(json!({"dsks": {one(b[0]): d}}))
             }
@@ -1418,7 +1550,7 @@ impl Atem {
                 }
                 None
             }
-            _ => None,
+            _ => self.decode_keyers(name, b),
         }
     }
 
@@ -2413,9 +2545,14 @@ impl Atem {
                 let values = [int(params, "exposure_us")];
                 one(b"CCmd", camera_body(cam, 1, 5, false, CC_SINT32, &values))
             }
-            other => Err(CommandError::UnknownCommand {
-                command: other.into(),
-            }),
+            other => {
+                if let Some(out) = self.build_keyers(other, params)? {
+                    return Ok(out);
+                }
+                Err(CommandError::UnknownCommand {
+                    command: other.into(),
+                })
+            }
         }
     }
 }
@@ -2526,11 +2663,11 @@ mod tests {
 
     const HOST: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 9));
 
-    fn atem() -> Atem {
+    pub(super) fn atem() -> Atem {
         Atem::for_device(SocketAddr::new(HOST, PORT))
     }
 
-    fn sent(actions: &[Action]) -> Vec<Vec<u8>> {
+    pub(super) fn sent(actions: &[Action]) -> Vec<Vec<u8>> {
         actions
             .iter()
             .filter_map(|a| match a {
@@ -2540,13 +2677,13 @@ mod tests {
             .collect()
     }
 
-    fn feed(m: &mut Atem, now: Millis, packet: Vec<u8>) -> Vec<Action> {
+    pub(super) fn feed(m: &mut Atem, now: Millis, packet: Vec<u8>) -> Vec<Action> {
         let mut cx = Cx::new(now);
         m.datagram(&mut cx, SOCKET, SocketAddr::new(m.host(), PORT), &packet);
         cx.take()
     }
 
-    fn state(actions: &[Action]) -> Value {
+    pub(super) fn state(actions: &[Action]) -> Value {
         let mut merged = json!({});
         for a in actions {
             if let Action::State(p) = a {
@@ -2557,7 +2694,7 @@ mod tests {
     }
 
     /// A switcher packet: reliable, with the given id and commands.
-    fn reliable(session: u16, id: u16, commands: &[Vec<u8>]) -> Vec<u8> {
+    pub(super) fn reliable(session: u16, id: u16, commands: &[Vec<u8>]) -> Vec<u8> {
         let payload: Vec<u8> = commands.concat();
         let mut p = header(FLAG_RELIABLE, HEADER + payload.len(), session, 0, id);
         p.extend_from_slice(&payload);
@@ -2566,20 +2703,20 @@ mod tests {
 
     /// A switcher command with non-zero bytes where the header's unused bytes
     /// are, as real switchers send.
-    fn cmd(name: &[u8; 4], body: &[u8]) -> Vec<u8> {
+    pub(super) fn cmd(name: &[u8; 4], body: &[u8]) -> Vec<u8> {
         let mut c = command(name, body);
         c[2] = 0xff;
         c[3] = 0xff;
         c
     }
 
-    fn syn_reply() -> Vec<u8> {
+    pub(super) fn syn_reply() -> Vec<u8> {
         let mut p = header(FLAG_SYN, HEADER + 8, 0x53ab, 0, 0);
         p.extend_from_slice(&[0x02, 0, 0, 0, 0, 0, 0, 0]);
         p
     }
 
-    fn input(id: u16, long: &str, short: &str, port: u8) -> Vec<u8> {
+    pub(super) fn input(id: u16, long: &str, short: &str, port: u8) -> Vec<u8> {
         let mut b = vec![0u8; 36];
         b[0..2].copy_from_slice(&id.to_be_bytes());
         b[2..2 + long.len()].copy_from_slice(long.as_bytes());
@@ -2591,7 +2728,7 @@ mod tests {
     /// The initial dump of a small 1 M/E switcher on protocol 2.30, with a
     /// Fairlight mixer, two media players, a SuperSource, a DVE, a stinger
     /// and camera control.
-    fn dump() -> Vec<Vec<u8>> {
+    pub(super) fn dump() -> Vec<Vec<u8>> {
         let mut pin = vec![0u8; 44];
         pin[..13].copy_from_slice(b"ATEM Mini Pro");
         pin[40] = 14;
@@ -2640,7 +2777,21 @@ mod tests {
     }
 
     /// A Fairlight source: input, source id, mix options offered, mix option.
-    fn fasp(input: u16, source: i64, options: u8, mix: u8) -> Vec<u8> {
+    /// Bytes written as "00-1F-...", as the LibAtem samples in Sofie's
+    /// `commands/__tests__/libatem-data.json` give them.
+    pub(super) fn hex(s: &str) -> Vec<u8> {
+        s.split('-')
+            .map(|b| u8::from_str_radix(b, 16).unwrap())
+            .collect()
+    }
+
+    /// The state one switcher packet of commands produces.
+    pub(super) fn decoded(m: &mut Atem, commands: &[Vec<u8>]) -> Value {
+        let id = (m.last_received + 1) % ID_MODULO;
+        state(&feed(m, 30, reliable(0x8001, id, commands)))
+    }
+
+    pub(super) fn fasp(input: u16, source: i64, options: u8, mix: u8) -> Vec<u8> {
         let mut b = vec![0u8; 52];
         put16(&mut b, 0, input);
         b[8..16].copy_from_slice(&source.to_be_bytes());
@@ -2650,7 +2801,7 @@ mod tests {
     }
 
     /// Hello, the switcher's answer, and the dump in one packet.
-    fn ready() -> (Atem, Vec<Action>) {
+    pub(super) fn ready() -> (Atem, Vec<Action>) {
         let mut m = atem();
         let mut cx = Cx::new(0);
         m.start(&mut cx);
@@ -2658,6 +2809,45 @@ mod tests {
         feed(&mut m, 10, syn_reply());
         let a = feed(&mut m, 20, reliable(0x8001, 1, &dump()));
         (m, a)
+    }
+
+    /// Every command the spec declares reaches a builder: given a value for
+    /// each declared parameter, none is unknown to the module.
+    #[test]
+    fn every_spec_command_is_known_to_the_module() {
+        let catalog = crate::catalog::Catalog::embedded();
+        let spec = catalog.device("blackmagic-atem").unwrap();
+        let (m, _) = ready();
+        for (name, command) in &spec.commands {
+            let mut params = Params::new();
+            for (p, decl) in &command.params {
+                let v = match decl.kind {
+                    crate::catalog::ParamType::Int => {
+                        json!(decl.min.unwrap_or(1.0).max(1.0) as i64)
+                    }
+                    crate::catalog::ParamType::Float => json!(decl.min.unwrap_or(0.0)),
+                    crate::catalog::ParamType::Bool => json!(true),
+                    crate::catalog::ParamType::Enum => {
+                        json!(decl.values.as_ref().unwrap()[0])
+                    }
+                    _ => json!("x"),
+                };
+                params.insert(p.clone(), v);
+            }
+            match m.build(name, &params) {
+                Err(CommandError::UnknownCommand { .. }) => {
+                    panic!("{name} is in the spec but unknown to the module")
+                }
+                // With every parameter given, a setting command that finds
+                // nothing to set reads names the spec does not declare.
+                Err(CommandError::InvalidParams { message })
+                    if message.starts_with("give at least") =>
+                {
+                    panic!("{name}: {message}")
+                }
+                _ => {}
+            }
+        }
     }
 
     #[test]
@@ -3025,7 +3215,7 @@ mod tests {
     }
 
     /// The one packet a command sends, after the packet header.
-    fn payload(m: &mut Atem, name: &str, params: Value) -> Vec<u8> {
+    pub(super) fn payload(m: &mut Atem, name: &str, params: Value) -> Vec<u8> {
         let mut cx = Cx::new(100);
         m.command(&mut cx, 1, name, params.as_object().unwrap());
         let a = cx.take();
@@ -3035,7 +3225,7 @@ mod tests {
         }
     }
 
-    fn refused(m: &mut Atem, name: &str, params: Value) -> CommandError {
+    pub(super) fn refused(m: &mut Atem, name: &str, params: Value) -> CommandError {
         let mut cx = Cx::new(100);
         m.command(&mut cx, 1, name, params.as_object().unwrap());
         let a = cx.take();
@@ -3046,7 +3236,7 @@ mod tests {
         }
     }
 
-    fn ready_with(dump: Vec<Vec<u8>>) -> Atem {
+    pub(super) fn ready_with(dump: Vec<Vec<u8>>) -> Atem {
         let mut m = atem();
         let mut cx = Cx::new(0);
         m.start(&mut cx);
