@@ -143,3 +143,29 @@ binary(DG, "fire_next_snapshot", {}, osc("/sd/Snapshots/Fire_Next_Snapshot", ("i
 binary(DG, "fire_previous_snapshot", {}, osc("/sd/Snapshots/Fire_Prev_Snapshot", ("i", 0)))
 # Macro 1 is button 0 on the wire (range 0-255).
 binary(DG, "press_macro", {"macro": 1}, osc("/sd/Macros/Buttons/press", ("i", 0)))
+
+# The families the list explains by name only (quirks): main/alt_in, the
+# strips' CGs_level and CGs_mute, Matrix_Inputs sends and Multis, as the
+# list's rows read (pages 1-12).
+binary(DG, "set_input_alt_in", {"channel": 3, "alternate": True},
+       osc("/sd/Input_Channels/3/Channel_Input/main/alt_in", ("i", 1)), expect_result=UNVERIFIED)
+for stem, p, n, prefix in [("input", "channel", 1, "/sd/Input_Channels/1"), ("aux", "aux", 192, "/sd/Aux_Outputs/192"),
+                           ("group", "group", 2, "/sd/Group_Outputs/2"), ("matrix", "matrix", 64, "/sd/Matrix_Outputs/64")]:
+    binary(DG, f"set_{stem}_cgs_level", {p: n, "level": 0.25}, osc(f"{prefix}/CGs_level", ("f", 0.25)))
+    binary(DG, f"set_{stem}_cgs_mute", {p: n, "muted": False}, osc(f"{prefix}/CGs_mute", ("i", 0)))
+binary(DG, "set_matrix_input_send_level", {"input": 2, "matrix": 64, "value": 0.5},
+       osc("/sd/Matrix_Inputs/2/Matrix_Send/64/send_level", ("f", 0.5)))
+binary(DG, "set_matrix_input_send_on", {"input": 64, "matrix": 1, "enabled": True},
+       osc("/sd/Matrix_Inputs/64/Matrix_Send/1/send_on", ("i", 1)))
+binary(DG, "solo_multi", {"multi": 1, "soloed": True}, osc("/sd/Multis/1/solo", ("i", 1)))
+binary(DG, "set_multi_fader", {"multi": 4, "level": 0.75}, osc("/sd/Multis/4/fader", ("f", 0.75)))
+binary(DG, "mute_multi", {"multi": 4, "muted": True}, osc("/sd/Multis/4/mute", ("i", 1)))
+binary(DG, "set_multi_name", {"multi": 2, "name": "Band"}, osc("/sd/Multis/2/name", ("s", "Band")))
+
+# Any address of the list with an argument of the row's type.
+binary(DG, "set_parameter_float", {"path": "sd/Input_Channels/1/fader", "value": 1.0},
+       osc("/sd/Input_Channels/1/fader", ("f", 1.0)), expect_result=UNVERIFIED)
+binary(DG, "set_parameter_int", {"path": "sd/Input_Channels/1/mute", "value": 1},
+       osc("/sd/Input_Channels/1/mute", ("i", 1)))
+binary(DG, "set_parameter_string", {"path": "sd/Input_Channels/1/Channel_Input/name", "value": "FRED"},
+       osc("/sd/Input_Channels/1/Channel_Input/name", ("s", "FRED")))

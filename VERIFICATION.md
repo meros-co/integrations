@@ -543,14 +543,17 @@ can drift as specs change. The quirk text in the spec is the reference.
 ## digico-sd — DiGiCo SD and Quantum consoles
 
 - [ ] Confirm that current SD and Quantum software still accepts the 2014 Other OSC list's /sd/ addresses, on an SD-series console and on a Quantum (225, 338, 5, 7 or 852). ([specs/digico-sd.yaml:18](specs/digico-sd.yaml#L18))
-- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:2684](specs/digico-sd.yaml#L2684))
-- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:2692](specs/digico-sd.yaml#L2692))
-- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:2701](specs/digico-sd.yaml#L2701))
-- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:2709](specs/digico-sd.yaml#L2709))
-- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:2639](specs/digico-sd.yaml#L2639))
-- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:776](specs/digico-sd.yaml#L776))
-- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:832](specs/digico-sd.yaml#L832))
-- [ ] Check the addresses left out (Channel_Input/main/alt_in, CGs_level, CGs_mute, Matrix_Inputs sends, Multis) and what they do. ([specs/digico-sd.yaml:2722](specs/digico-sd.yaml#L2722))
+- [ ] Check whether the console sends anything back to an Other OSC device (changes made on the surface, or echoes of received messages), and on which port. ([specs/digico-sd.yaml:4033](specs/digico-sd.yaml#L4033))
+- [ ] Record the fader position for 0 dB and a few other levels, and what the 0.0-1.0 range covers for trim, analogue gain, EQ frequency and gain, and delay. ([specs/digico-sd.yaml:4041](specs/digico-sd.yaml#L4041))
+- [ ] Check what a message for a strip the session does not have does (ignored, or something else), and the real strip limits per console. ([specs/digico-sd.yaml:4050](specs/digico-sd.yaml#L4050))
+- [ ] Confirm press_macro sends macro 1 as 0 (the list's 0-255 range and the Companion module), not 1. ([specs/digico-sd.yaml:4058](specs/digico-sd.yaml#L4058))
+- [ ] Check that fire_snapshot takes the snapshot number shown on the console (and what happens for a number with no snapshot, or a decimal-numbered snapshot). ([specs/digico-sd.yaml:3760](specs/digico-sd.yaml#L3760))
+- [ ] Check the meaning of the Int ranges taken as given: input phase 0-3, EQ curve 1-4, compressor knee 0-2, dynamic EQ over/under 0-1. ([specs/digico-sd.yaml:833](specs/digico-sd.yaml#L833))
+- [ ] Check the longest channel name the console accepts, and what it does with a longer one. ([specs/digico-sd.yaml:917](specs/digico-sd.yaml#L917))
+- [ ] Confirm /sd/Input_Channels/N/Channel_Input/main/alt_in is the address (the table's row is garbled) and that 1 selects the alternate input and 0 the main input. ([specs/digico-sd.yaml:3788](specs/digico-sd.yaml#L3788))
+- [ ] Check what CGs_level and CGs_mute do on input channels and aux, group and matrix outputs (taken as the level and mute a strip takes from its control groups), and what a CGs_level position means in dB. ([specs/digico-sd.yaml:3800](specs/digico-sd.yaml#L3800))
+- [ ] Confirm Matrix_Inputs/N/Matrix_Send/M sends matrix input N to matrix output M, both numbered from 1, and how many matrix inputs each console has. ([specs/digico-sd.yaml:3896](specs/digico-sd.yaml#L3896))
+- [ ] Find what a multi is on current SD and Quantum software, how many exist, and whether Multis/N solo, fader, mute and name act on them as the list's rows read. ([specs/digico-sd.yaml:3926](specs/digico-sd.yaml#L3926))
 
 ## disguise — disguise Designer
 
