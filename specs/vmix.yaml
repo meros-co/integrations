@@ -30,16 +30,51 @@ source:
       optional because vMix applies its own defaults. Transitions are
       functions named as in vMix's interface: cut and fade, and
       run_transition for any other.
+  - title: vMix Help, HTTP Web API
+    author: StudioCoast
+    url: https://www.vmix.com/help29/DeveloperAPI.html
+    note: >
+      Manufacturer document. The XML state's documented example (version,
+      inputs with key, number, type, title, state, position, duration, muted,
+      loop, selectedIndex, text fields and layers; overlays; preview; active;
+      fadeToBlack; transitions; recording; external; streaming; playList;
+      multiCorder), Input by number, title or key, and Mix numbering.
+  - title: vMix Help, Activators (Add/Edit Activator)
+    author: StudioCoast
+    url: https://www.vmix.com/help29/ActivatorsEdit.html
+    note: >
+      Manufacturer document. The activator events (Input, InputPreview,
+      InputPlaying, InputVolume, InputAudio, InputSolo, InputBusXAudio,
+      InputMasterAudio, MasterVolume, MasterAudio, MasterHeadphones, BusXVolume,
+      BusXAudio, FadeToBlack, Recording, Streaming, External, Fullscreen) that
+      ACTS reports.
   - title: Bitfocus Companion, companion-module-studiocoast-vmix
     url: https://github.com/bitfocus/companion-module-studiocoast-vmix
     note: >
       MIT-licensed; cross-check only. The unsolicited VERSION OK line on
       connect, activator message shapes, and URL-encoded function values.
+      src/data.ts and src/activators.ts (read October 2026) corroborate the
+      XML state of current vMix versions beyond the documented example
+      (shortTitle, balance, solo, gainDb, audiobusses, meterF1/F2, markIn,
+      markOut, frameDelay, list items, layer position and crop, input
+      position, crop and cc, GT image and color fields, video call
+      attributes, the replay element, outputs, mix elements numbered from 2,
+      the audio element, dynamic, preset, recording duration and files,
+      streaming channels, fullscreen) and the activators beyond the
+      documented list (InputMixN, InputPreviewMixN, InputAudioAuto,
+      InputVolumeChannelMixerN, BusXSolo, Replay*, VideoCall*).
   - title: TallyArbiter vMix source
     url: https://github.com/josephdadams/TallyArbiter
     note: MIT-licensed; the tally string's first digit is input 1.
   - title: Tally vMix client (tally/vMix.cpp)
     note: Meros. SUBSCRIBE TALLY and the digit-per-input tally line.
+
+settings:
+  # How often the whole XML state is read. Positions, meters and everything
+  # vMix pushes no event for change only this often.
+  state_poll_ms: { type: int, min: 250, max: 60000, default: 1000,
+                   label: State read interval,
+                   description: "Milliseconds between reads of vMix's whole XML state, which carries everything its events do not." }
 
 ports:
   - { port: 8099, protocol: tcp, role: control }
@@ -5021,23 +5056,118 @@ commands:
 
 state:
   device.version:          { type: string, description: "vMix version" }
-  device.edition:          { type: string, description: "vMix edition" }
-  program:                 { type: int, description: "Input number on program" }
-  preview:                 { type: int, description: "Input number on preview" }
+  device.edition:          { type: string, description: "vMix edition, such as Basic HD, HD, 4K or Pro" }
+  device.preset:           { type: string, description: "Path of the preset file open in vMix, on the vMix computer; absent when none has been saved or opened" }
+  program:                 { type: int, description: "Input number on program (main mix)" }
+  preview:                 { type: int, description: "Input number on preview (main mix)" }
+  mixes.*.program:         { type: int, description: "Input number on program in another mix, keyed by mix number as the XML numbers them (2 to 16; the mix command parameter is this number less 1)" }
+  mixes.*.preview:         { type: int, description: "Input number on preview in another mix, keyed as mixes.*.program" }
   inputs.*.title:          { type: string, description: "Input title, keyed by input number" }
   inputs.*.type:           { type: string, description: "Input type, such as Capture, Video or GT" }
   inputs.*.key:            { type: string, description: "Input GUID, stable across renumbering" }
   inputs.*.playing:        { type: bool, description: "Input playing" }
+  inputs.*.short_title:    { type: string, description: "Input title as vMix shows it, without the file extension" }
+  inputs.*.state:          { type: string, description: "Playback state as vMix names it: Running, Paused or Completed" }
+  inputs.*.position:       { type: int, unit: ms, description: "Playback position, as of the last XML read" }
+  inputs.*.duration:       { type: int, unit: ms, description: "Length of the input's media; 0 for live inputs" }
+  inputs.*.loop:           { type: bool, description: "Input loops" }
+  inputs.*.mark_in:        { type: int, unit: ms, description: "Mark in point; absent when not set" }
+  inputs.*.mark_out:       { type: int, unit: ms, description: "Mark out point; absent when not set" }
+  inputs.*.selected_index: { type: int, description: "Selected item: the list item (from 1), virtual set preset or title page" }
+  inputs.*.frame_delay:    { type: int, unit: frames, description: "Video frame delay" }
+  inputs.*.texts.*.name:   { type: string, description: "Title text field name, keyed by its index (the SelectedIndex of SetText), such as Headline.Text" }
+  inputs.*.texts.*.value:  { type: string, description: "Title text field's text" }
+  inputs.*.images.*.name:  { type: string, description: "Title image field name, keyed by its index, such as Logo.Source" }
+  inputs.*.images.*.value: { type: string, description: "Title image field's file, on the vMix computer" }
+  inputs.*.colors.*.name:  { type: string, description: "Title colour field name, keyed by its index" }
+  inputs.*.colors.*.value: { type: string, description: "Title colour field's colour, as vMix writes it (#AARRGGBB or #RRGGBB)" }
+  inputs.*.list.*.path:    { type: string, description: "List input item's file, keyed by position from 1 as ListRemove and SelectIndex number it" }
+  inputs.*.list.*.selected: { type: bool, description: "List item selected" }
+  inputs.*.layers.*.key:   { type: string, description: "Key of the input in the layer, keyed by layer number from 1 (SetLayerN, LayerOn)" }
+  inputs.*.layers.*.input: { type: int, description: "Number of the input in the layer; absent when that input is not in the list" }
+  inputs.*.layers.*.transform.*: { type: float, description: "Layer position as vMix reports it, in snake_case: pan_x and pan_y (-2 to 2), zoom_x and zoom_y (1 = 100%), x, y, width and height (pixels)" }
+  inputs.*.layers.*.crop.*: { type: float, description: "Layer crop: x1 and y1 (0 = none) and x2 and y2 (1 = none)" }
+  inputs.*.transform.*:    { type: float, description: "Input position, as layers.*.transform" }
+  inputs.*.crop.*:         { type: float, description: "Input crop, as layers.*.crop" }
+  inputs.*.cc.*:           { type: float, description: "Colour correction in snake_case: hue, saturation, lift_r, lift_g, lift_b, lift_y, gamma_r to gamma_y (-1 to 1, 0 the original), gain_r to gain_y (0 to 2, 1 the original)" }
+  inputs.*.call.password:  { type: string, description: "Video call password" }
+  inputs.*.call.connected: { type: bool, description: "Video call guest connected" }
+  inputs.*.call.video_source: { type: string, description: "What the guest sees: Output1 to Output4, or None" }
+  inputs.*.call.audio_source: { type: string, description: "What the guest hears: Master, Headphones, or BusA to BusG" }
+  inputs.*.attributes.*:   { type: string, description: "Any other attribute vMix reports for the input, by name, as text (soloPFL, volumeF1, and those of later versions)" }
   inputs.*.muted:          { type: bool, description: "Input audio muted; absent for inputs without audio" }
-  inputs.*.volume:         { type: float, description: "Input volume, 0 to 100; absent for inputs without audio" }
+  inputs.*.volume:         { type: float, unit: percent, description: "Input volume, 0 to 100; absent for inputs without audio" }
+  inputs.*.balance:        { type: float, description: "Input audio balance, -1 (left) to 1 (right), 0 centred" }
+  inputs.*.solo:           { type: bool, description: "Input audio soloed" }
+  inputs.*.gain_db:        { type: float, unit: dB, description: "Input audio gain, 0 to 24" }
+  inputs.*.audio_auto:     { type: bool, description: "Input audio follows the input on and off program (Audio Auto); from its activator, asked for once per new input with audio" }
+  inputs.*.audio_buses.*:  { type: bool, description: "Input audio sent to the bus, keyed M (master) and A to G" }
+  inputs.*.channel_mixer.*: { type: float, unit: percent, description: "Channel mixer volume, 0 to 100, keyed by channel 1 to 16; from its activator, asked for once per new input with audio" }
+  inputs.*.meter_left:     { type: float, description: "Input audio level of the first channel (meterF1), linear from 0, as of the last XML read" }
+  inputs.*.meter_right:    { type: float, description: "Input audio level of the second channel (meterF2), linear from 0, as of the last XML read" }
   tally.*.program:         { type: bool, description: "Input on program, keyed by input number (main mix)" }
   tally.*.preview:         { type: bool, description: "Input on preview (main mix)" }
-  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by overlay number; absent when empty" }
+  master.volume:           { type: float, unit: percent, description: "Master volume, 0 to 100" }
+  master.muted:            { type: bool, description: "Master muted" }
+  master.headphones_volume: { type: float, unit: percent, description: "Headphones volume, 0 to 100" }
+  master.meter_left:       { type: float, description: "Master level of the first channel (meterF1), linear from 0, as of the last XML read" }
+  master.meter_right:      { type: float, description: "Master level of the second channel (meterF2), linear from 0, as of the last XML read" }
+  master.solo:             { type: bool, description: "Master soloed, when vMix reports it" }
+  master.send_to_master:   { type: bool, description: "As buses.*.send_to_master, when vMix reports it for the master" }
+  master.attributes.*:     { type: string, description: "Any other attribute of the master's XML element, by name, as vMix reports it" }
+  buses.*.volume:          { type: float, unit: percent, description: "Bus volume, 0 to 100, keyed by bus A to G; absent for buses the edition lacks" }
+  buses.*.muted:           { type: bool, description: "Bus muted" }
+  buses.*.solo:            { type: bool, description: "Bus soloed" }
+  buses.*.send_to_master:  { type: bool, description: "Bus also sent to the master" }
+  buses.*.headphones_volume: { type: float, unit: percent, description: "As master.headphones_volume, when vMix reports it for a bus" }
+  buses.*.meter_left:      { type: float, description: "Bus level of the first channel (meterF1), linear from 0, as of the last XML read" }
+  buses.*.meter_right:     { type: float, description: "Bus level of the second channel (meterF2), linear from 0, as of the last XML read" }
+  buses.*.attributes.*:    { type: string, description: "Any other attribute of the bus's XML element, by name, as vMix reports it" }
+  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by overlay number (1 to 4 the overlay channels, higher numbers the stingers); absent when empty" }
+  overlays.*.preview:      { type: bool, description: "The overlay is shown on preview only, not on program" }
+  transitions.*.effect:    { type: string, description: "Effect of the transition button, keyed by button number (1 to 4), such as Fade, Merge or Wipe" }
+  transitions.*.duration:  { type: int, unit: ms, description: "Duration of the transition button's effect" }
+  outputs.*.type:          { type: string, description: "Output or Fullscreen, keyed by type and number in lower case (output1 to output4, fullscreen1, fullscreen2)" }
+  outputs.*.number:        { type: int, description: "The output's number within its type" }
+  outputs.*.source:        { type: string, description: "What the output shows: Output, Preview, MultiView, Replay, Mix or Input" }
+  outputs.*.input:         { type: int, description: "Input shown, when the source is Input" }
+  outputs.*.mix:           { type: int, description: "Mix shown, when the source is Mix, as the XML numbers it" }
+  outputs.*.ndi:           { type: bool, description: "The output is also sent as NDI" }
+  outputs.*.omt:           { type: bool, description: "The output is also sent as OMT" }
+  outputs.*.srt:           { type: bool, description: "The output is also sent as SRT" }
   recording:               { type: bool, description: "Recording" }
+  recording_duration:      { type: int, unit: s, description: "Time recording so far" }
+  recording_files.*:       { type: string, description: "File being recorded, keyed 1 and 2 (the second recording), on the vMix computer" }
   streaming:               { type: bool, description: "Streaming (any stream)" }
+  streams.*:               { type: bool, description: "Stream running, keyed by stream number from 1" }
   external:                { type: bool, description: "External output running" }
   multicorder:             { type: bool, description: "MultiCorder running" }
+  playlist:                { type: bool, description: "Playlist running" }
+  fullscreen:              { type: bool, description: "Fullscreen output on" }
   fade_to_black:           { type: bool, description: "Faded to black" }
+  dynamic.inputs.*:        { type: string, description: "Dynamic input 1 to 4, as SetDynamicInputN set it" }
+  dynamic.values.*:        { type: string, description: "Dynamic value 1 to 4, as SetDynamicValueN set it" }
+  replay.input:            { type: int, description: "Number of the replay input (the first, if there are several); the replay state is absent without one" }
+  replay.live:             { type: bool, description: "Replay showing live" }
+  replay.recording:        { type: bool, description: "Replay recording" }
+  replay.playing:          { type: bool, description: "Replay playing an event or the recording; from its activator" }
+  replay.direction:        { type: string, description: "forward or backward, the direction last played; from its activators" }
+  replay.quad_mode:        { type: bool, description: "Replay in quad mode; from its activator" }
+  replay.channel_mode:     { type: string, description: "Channels in use: AB, A or B" }
+  replay.events:           { type: int, description: "Event list selected, as the XML gives it" }
+  replay.events_a:         { type: int, description: "Event list selected on channel A" }
+  replay.events_b:         { type: int, description: "Event list selected on channel B" }
+  replay.camera:           { type: int, description: "Camera angle selected on the current channel, from 1; from its activator" }
+  replay.camera_a:         { type: int, description: "Camera angle selected on channel A, from 1" }
+  replay.camera_b:         { type: int, description: "Camera angle selected on channel B, from 1" }
+  replay.speed:            { type: float, description: "Replay speed, 1 being 100%" }
+  replay.speed_a:          { type: float, description: "Replay speed on channel A" }
+  replay.speed_b:          { type: float, description: "Replay speed on channel B" }
+  replay.timecode:         { type: string, description: "Replay timecode as vMix writes it (yyyy-MM-ddTHH:mm:ss.fff)" }
+  replay.timecode_a:       { type: string, description: "Channel A timecode" }
+  replay.timecode_b:       { type: string, description: "Channel B timecode" }
+  replay.attributes.*:     { type: string, description: "Any other attribute of the replay element, by name, as text" }
+  other.*:                 { type: string, description: "Any other top-level XML element holding text only, keyed by element name, as vMix reports it" }
 
 quirks:
   - models: [all]
@@ -5050,9 +5180,33 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Tally, program, preview, playing, mute and the output flags are pushed as
-      they change (SUBSCRIBE TALLY and ACTS). Titles, volumes and overlays come
-      from the full XML state, read on connection and every 10 seconds.
+      Tally, program and preview (every mix), playing, mute and the output
+      flags are pushed as they change (SUBSCRIBE TALLY and ACTS). Everything
+      else comes from the full XML state, read on connection and every
+      state_poll_ms (1 s by default); a read reports only what changed since
+      the state last held it. Overlays come from the XML only: their
+      activators do not tell an overlay on preview from one on program.
+
+  - models: [all]
+    severity: info
+    text: >
+      Not everything a function sets is reported back: the XML state and the
+      activators carry no T-bar position (SetFader), audio plugin state,
+      streaming destinations (StreamingSetURL, StreamingSetKey and the like),
+      playback rate, alpha, picture effects, MultiView overlays, layer on/off
+      beyond the layers listed, PTZ positions, NDI or OMT source selection,
+      scripts, data source rows, browser addresses or replay event contents.
+      These are limits of vMix's API. Attributes a later vMix adds to an input,
+      a bus or the replay element are kept as text under attributes, and other
+      plain top-level elements under other.
+
+  - models: [all]
+    severity: info
+    text: >
+      Automixing (inputs.*.audio_auto) and the channel mixer
+      (inputs.*.channel_mixer) are reported only by activators, which say
+      nothing until they change; the module asks ACTS for both once for each
+      new input with audio (17 short requests per input, after commands).
 
   - models: [all]
     severity: info
