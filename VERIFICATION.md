@@ -1361,6 +1361,16 @@ can drift as specs change. The quirk text in the spec is the reference.
 - [ ] On Canon, confirm replies go to UDP 52381 with the default response port setting. ([specs/visca.yaml:1004](specs/visca.yaml#L1004))
 - [ ] On Datavideo, find the IP framing and port, which the document does not give (52381 with Sony framing assumed). ([specs/visca.yaml:1012](specs/visca.yaml#L1012))
 
+## vmix — vMix
+
+- [ ] Capture a full XML state from vMix 27 or later (with a replay, a GT title, a list, a video call and layered inputs) so the parsing can be checked against the real shape; the shapes used here are inferred from vMix's old documented example and the MIT-licensed Companion module. ([specs/vmix.yaml:47](specs/vmix.yaml#L47))
+- [ ] Confirm that the mix elements of the XML are numbered from 2 (the first extra mix), one more than the Mix command parameter. ([specs/vmix.yaml:5035](specs/vmix.yaml#L5035))
+- [ ] Confirm that overlay numbers above 4 in the XML are the stingers, and what the preview attribute of an overlay means. ([specs/vmix.yaml:5045](specs/vmix.yaml#L5045))
+- [ ] Confirm the units of the recording element's duration attribute (seconds assumed) and the names of its file attributes (filename1, filename2). ([specs/vmix.yaml:5058](specs/vmix.yaml#L5058))
+- [ ] Confirm that the streaming element carries one channelN attribute per stream, numbered from 1. ([specs/vmix.yaml:5061](specs/vmix.yaml#L5061))
+- [ ] Confirm the outputs element (type, number, source, inputNumber, mix, ndi, omt, srt) and which vMix version first reports it. ([specs/vmix.yaml:5049](specs/vmix.yaml#L5049))
+- [ ] Confirm that the InputMixN and InputPreviewMixN activators number mixes as the XML does (2 to 16). ([specs/vmix.yaml:5036](specs/vmix.yaml#L5036))
+
 ## yamaha-cl-ql — Yamaha CL / QL
 
 - [ ] Confirm the command set beyond scene recall and input fader, ON and pan (get and its reply, OK/OKm acknowledgements, ERROR codes, NOTIFY set pushes, devinfo, devstatus, scpmode keepalive), which Yamaha publishes only for DME7 and RM. ([specs/yamaha-cl-ql.yaml:409](specs/yamaha-cl-ql.yaml#L409))
@@ -1436,4 +1446,4 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## Integrations with no open items
 
-Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio, tsl-umd-display, vmix.
+Nothing specific is listed for these yet, but test results are still welcome: generic-http, generic-osc, generic-tcp-udp, http-snapshot, obs-studio, tsl-umd-display.

@@ -7,14 +7,21 @@
 //! including between a request and its reply. vMix also sends an unrequested
 //! `VERSION OK <version>` line on connection.
 //!
+//! The state comes from two places. Tally and activator events (SUBSCRIBE
+//! TALLY and ACTS) carry the fast changes as they happen; the whole XML state
+//! (XML), read on connecting and every `state_poll_ms`, carries everything
+//! else. The module keeps what it last reported and sends only what an XML
+//! read changes, with removals for what the read no longer has.
+//!
 //! Opened for commands only (`monitor` false), the module subscribes to
 //! nothing and never reads the XML state; `XMLTEXT vmix/version` every 10 s
 //! is its liveness check, since vMix sends nothing unasked without a
 //! subscription.
 
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::net::SocketAddr;
 
+use roxmltree::Node;
 use serde_json::{json, Map, Value};
 
 use super::vmix_functions::FUNCTIONS;
@@ -24,14 +31,20 @@ use crate::module::{
     CommandError, CommandId, Connection, Cx, Key, Level, Millis, Module, OpenContext, Outcome,
     TcpInput,
 };
+use crate::session::merge_patch;
 
 const PORT: u16 = 8099;
 const SOCKET: Key = "vmix";
 
 const REPLY_TIMEOUT: Millis = 5_000;
-/// The full XML state is read this often; the read doubles as the liveness
-/// check, since events only arrive when something changes.
-const POLL_EVERY: Millis = 10_000;
+/// The XML state is read this often by default (`state_poll_ms`); the read
+/// doubles as the liveness check, since events only arrive when something
+/// changes.
+const STATE_POLL_DEFAULT: Millis = 1_000;
+const STATE_POLL_MIN: Millis = 250;
+const STATE_POLL_MAX: Millis = 60_000;
+/// Commands only: how often the version is asked for, as the liveness check.
+const LIVENESS_EVERY: Millis = 10_000;
 const RETRY_MIN: Millis = 1_000;
 const RETRY_MAX: Millis = 30_000;
 
@@ -146,9 +159,17 @@ pub(crate) struct Vmix {
     sent_at: Millis,
     /// False: commands only, no subscriptions and no state reads.
     monitor: bool,
+    /// How often the XML state is read.
+    state_poll: Millis,
     retry_after: Millis,
-    /// Input numbers in the last XML state, to report removed inputs.
-    inputs: BTreeSet<String>,
+    /// The state as last reported, from XML reads and events alike: an XML
+    /// read reports only what differs from it.
+    view: Value,
+    /// What the last XML read reported, to find what a read no longer has.
+    xml_last: Value,
+    /// Input key by input number, from the last XML read: a number that now
+    /// holds another input starts again from nothing.
+    input_keys: BTreeMap<String, String>,
     tally_inputs: usize,
 }
 
@@ -204,14 +225,353 @@ fn function_for(name: &str, params: &Params) -> Option<String> {
     Some(function_line(&function, &query))
 }
 
-fn is_true(s: &str) -> bool {
-    s.trim().eq_ignore_ascii_case("true")
+// --- XML values ------------------------------------------------------------
+
+/// vMix writes booleans as True and False.
+fn boolean(s: &str) -> Option<Value> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "true" => Some(Value::Bool(true)),
+        "false" => Some(Value::Bool(false)),
+        _ => None,
+    }
+}
+
+fn float(s: &str) -> Option<Value> {
+    let f: f64 = s.trim().parse().ok()?;
+    f.is_finite().then(|| json!(f))
+}
+
+/// A whole number; vMix writes some (positions) with a fraction.
+fn int(s: &str) -> Option<Value> {
+    let f: f64 = s.trim().parse().ok()?;
+    f.is_finite().then(|| json!(f.round() as i64))
+}
+
+fn string(s: &str) -> Option<Value> {
+    Some(Value::String(s.to_string()))
+}
+
+fn put(map: &mut Map<String, Value>, key: &str, value: Option<Value>) {
+    if let Some(v) = value {
+        map.insert(key.to_string(), v);
+    }
+}
+
+fn child<'a, 'i>(node: Node<'a, 'i>, name: &str) -> Option<Node<'a, 'i>> {
+    node.children().find(|n| n.has_tag_name(name))
+}
+
+/// An element's own text, without its children's.
+fn own_text(node: Node) -> String {
+    node.children()
+        .filter(|n| n.is_text())
+        .filter_map(|n| n.text())
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// The objects under `map[key]`, created if missing.
+fn object<'m>(map: &'m mut Map<String, Value>, key: &str) -> &'m mut Map<String, Value> {
+    let entry = map
+        .entry(key.to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !entry.is_object() {
+        *entry = Value::Object(Map::new());
+    }
+    entry.as_object_mut().unwrap()
+}
+
+/// Booleans of the status elements: element, state key.
+const FLAGS: [(&str, &str); 7] = [
+    ("fadeToBlack", "fade_to_black"),
+    ("recording", "recording"),
+    ("streaming", "streaming"),
+    ("external", "external"),
+    ("multiCorder", "multicorder"),
+    ("playList", "playlist"),
+    ("fullscreen", "fullscreen"),
+];
+
+/// Top-level elements read into their own state; any other element with
+/// text only goes under `other`.
+const KNOWN: [&str; 19] = [
+    "version",
+    "edition",
+    "preset",
+    "inputs",
+    "overlays",
+    "preview",
+    "active",
+    "fadeToBlack",
+    "transitions",
+    "recording",
+    "external",
+    "streaming",
+    "playList",
+    "multiCorder",
+    "fullscreen",
+    "mix",
+    "audio",
+    "dynamic",
+    "outputs",
+];
+
+/// The whole XML state as the state tree it maps to, with each input
+/// number's key.
+fn read_xml(root: Node) -> (Map<String, Value>, BTreeMap<String, String>) {
+    let mut tree = Map::new();
+    let text_of = |name: &str| child(root, name).map(own_text);
+
+    let mut device = Map::new();
+    put(
+        &mut device,
+        "version",
+        text_of("version").and_then(|s| string(&s)),
+    );
+    put(
+        &mut device,
+        "edition",
+        text_of("edition").and_then(|s| string(&s)),
+    );
+    put(
+        &mut device,
+        "preset",
+        text_of("preset").and_then(|s| string(&s)),
+    );
+    tree.insert("device".into(), Value::Object(device));
+    put(
+        &mut tree,
+        "program",
+        text_of("active").and_then(|s| int(&s)),
+    );
+    put(
+        &mut tree,
+        "preview",
+        text_of("preview").and_then(|s| int(&s)),
+    );
+
+    read_status(root, &mut tree);
+    read_transitions(root, &mut tree);
+    read_mixes(root, &mut tree);
+    read_overlays(root, &mut tree);
+    read_outputs(root, &mut tree);
+    let keys = read_inputs(root, &mut tree);
+
+    // Anything else vMix reports as plain text, by element name.
+    let mut other = Map::new();
+    for node in root.children().filter(Node::is_element) {
+        let name = node.tag_name().name();
+        if KNOWN.contains(&name) || node.children().any(|c| c.is_element()) {
+            continue;
+        }
+        other.insert(name.to_string(), Value::String(own_text(node)));
+    }
+    if !other.is_empty() {
+        tree.insert("other".into(), Value::Object(other));
+    }
+    (tree, keys)
+}
+
+/// Recording, streaming and the other outputs' flags, with the recording's
+/// duration and files and each stream's own flag.
+fn read_status(root: Node, tree: &mut Map<String, Value>) {
+    for (element, key) in FLAGS {
+        if let Some(node) = child(root, element) {
+            put(tree, key, boolean(&own_text(node)));
+        }
+    }
+    if let Some(node) = child(root, "recording") {
+        put(
+            tree,
+            "recording_duration",
+            node.attribute("duration").and_then(int),
+        );
+        for n in ["1", "2"] {
+            if let Some(file) = node
+                .attribute(format!("filename{n}").as_str())
+                .filter(|f| !f.is_empty())
+            {
+                object(tree, "recording_files").insert(n.into(), json!(file));
+            }
+        }
+    }
+    if let Some(node) = child(root, "streaming") {
+        for attribute in node.attributes() {
+            if let Some(n) = attribute.name().strip_prefix("channel") {
+                if n.parse::<u32>().is_ok() {
+                    put(object(tree, "streams"), n, boolean(attribute.value()));
+                }
+            }
+        }
+    }
+}
+
+/// `<transition number="1" effect="Fade" duration="500"/>`
+fn read_transitions(root: Node, tree: &mut Map<String, Value>) {
+    let Some(list) = child(root, "transitions") else {
+        return;
+    };
+    let transitions = object(tree, "transitions");
+    for node in list.children().filter(|n| n.has_tag_name("transition")) {
+        let Some(n) = node.attribute("number") else {
+            continue;
+        };
+        let mut entry = Map::new();
+        put(
+            &mut entry,
+            "effect",
+            node.attribute("effect").and_then(string),
+        );
+        put(
+            &mut entry,
+            "duration",
+            node.attribute("duration").and_then(int),
+        );
+        transitions.insert(n.into(), Value::Object(entry));
+    }
+}
+
+/// `<mix number="2"><preview>3</preview><active>4</active></mix>`: the mixes
+/// beside the main one, numbered from 2 as the XML numbers them.
+fn read_mixes(root: Node, tree: &mut Map<String, Value>) {
+    for node in root.children().filter(|n| n.has_tag_name("mix")) {
+        let Some(n) = node.attribute("number") else {
+            continue;
+        };
+        let mut entry = Map::new();
+        put(
+            &mut entry,
+            "program",
+            child(node, "active").and_then(|a| int(&own_text(a))),
+        );
+        put(
+            &mut entry,
+            "preview",
+            child(node, "preview").and_then(|p| int(&own_text(p))),
+        );
+        object(tree, "mixes").insert(n.into(), Value::Object(entry));
+    }
+}
+
+/// `<overlay number="1" preview="True">2</overlay>`: an overlay channel (or
+/// stinger) and the input in it; absent when empty.
+fn read_overlays(root: Node, tree: &mut Map<String, Value>) {
+    let Some(list) = child(root, "overlays") else {
+        return;
+    };
+    let overlays = object(tree, "overlays");
+    for node in list.children().filter(|n| n.has_tag_name("overlay")) {
+        let (Some(n), Some(input)) = (node.attribute("number"), int(&own_text(node))) else {
+            continue;
+        };
+        let preview = node.attribute("preview").and_then(boolean);
+        overlays.insert(
+            n.into(),
+            json!({"input": input, "preview": preview.unwrap_or(Value::Bool(false))}),
+        );
+    }
+}
+
+/// `<output type="Output" number="2" source="Input" inputNumber="3" mix="0"
+/// ndi="True" omt="False" srt="False"/>`, keyed by type and number
+/// (`output2`, `fullscreen1`).
+fn read_outputs(root: Node, tree: &mut Map<String, Value>) {
+    let Some(list) = child(root, "outputs") else {
+        return;
+    };
+    let outputs = object(tree, "outputs");
+    for node in list.children().filter(|n| n.has_tag_name("output")) {
+        let (Some(kind), Some(n)) = (node.attribute("type"), node.attribute("number")) else {
+            continue;
+        };
+        let mut entry = Map::new();
+        entry.insert("type".into(), json!(kind));
+        put(&mut entry, "number", int(n));
+        put(
+            &mut entry,
+            "source",
+            node.attribute("source").and_then(string),
+        );
+        put(
+            &mut entry,
+            "input",
+            node.attribute("inputNumber").and_then(int),
+        );
+        put(&mut entry, "mix", node.attribute("mix").and_then(int));
+        for flag in ["ndi", "omt", "srt"] {
+            put(&mut entry, flag, node.attribute(flag).and_then(boolean));
+        }
+        outputs.insert(
+            format!("{}{n}", kind.to_ascii_lowercase()),
+            Value::Object(entry),
+        );
+    }
+}
+
+/// Every input, keyed by number; returns each number's key.
+fn read_inputs(root: Node, tree: &mut Map<String, Value>) -> BTreeMap<String, String> {
+    let mut keys = BTreeMap::new();
+    let mut inputs = Map::new();
+    if let Some(list) = child(root, "inputs") {
+        for node in list.children().filter(|n| n.has_tag_name("input")) {
+            let Some(n) = node.attribute("number") else {
+                continue;
+            };
+            keys.insert(
+                n.to_string(),
+                node.attribute("key").unwrap_or("").to_string(),
+            );
+            inputs.insert(n.to_string(), Value::Object(read_input(node)));
+        }
+    }
+    tree.insert("inputs".into(), Value::Object(inputs));
+    keys
+}
+
+fn read_input(node: Node) -> Map<String, Value> {
+    let mut entry = Map::new();
+    let attr = |name: &str| node.attribute(name);
+    entry.insert("title".into(), json!(attr("title").unwrap_or("")));
+    entry.insert("type".into(), json!(attr("type").unwrap_or("")));
+    entry.insert("key".into(), json!(attr("key").unwrap_or("")));
+    entry.insert("playing".into(), json!(attr("state") == Some("Running")));
+    put(&mut entry, "muted", attr("muted").and_then(boolean));
+    put(&mut entry, "volume", attr("volume").and_then(float));
+    entry
+}
+
+/// What `new` changes in `view`, and removals of what `old` had and `new`
+/// has not, as a merge patch; None when nothing changes.
+fn diff(old: Option<&Value>, view: Option<&Value>, new: &Value) -> Option<Value> {
+    match new {
+        Value::Object(fields) => {
+            let mut out = Map::new();
+            for (k, v) in fields {
+                if let Some(d) = diff(old.and_then(|o| o.get(k)), view.and_then(|w| w.get(k)), v) {
+                    out.insert(k.clone(), d);
+                }
+            }
+            if let Some(Value::Object(before)) = old {
+                for k in before.keys() {
+                    if !fields.contains_key(k) {
+                        out.insert(k.clone(), Value::Null);
+                    }
+                }
+            }
+            (!out.is_empty()).then_some(Value::Object(out))
+        }
+        leaf => (view != Some(leaf)).then(|| leaf.clone()),
+    }
 }
 
 impl Vmix {
     pub(crate) fn new(ctx: OpenContext) -> Vmix {
         let mut m = Vmix::for_device(SocketAddr::new(ctx.host, ctx.port.unwrap_or(PORT)));
         m.monitor = ctx.monitor;
+        if let Some(ms) = ctx.settings.get("state_poll_ms").and_then(Value::as_u64) {
+            m.state_poll = (ms as Millis).clamp(STATE_POLL_MIN, STATE_POLL_MAX);
+        }
         m
     }
 
@@ -224,14 +584,28 @@ impl Vmix {
             current: None,
             sent_at: 0,
             monitor: true,
+            state_poll: STATE_POLL_DEFAULT,
             retry_after: RETRY_MIN,
-            inputs: BTreeSet::new(),
+            view: json!({}),
+            xml_last: json!({}),
+            input_keys: BTreeMap::new(),
             tally_inputs: 0,
         }
     }
 
     fn enqueue(&mut self, cx: &mut Cx, request: Request) {
         self.queue.push_back(request);
+        self.pump(cx);
+    }
+
+    /// Commands go ahead of queued reads, so an operator never waits for them.
+    fn enqueue_command(&mut self, cx: &mut Cx, request: Request) {
+        let at = self
+            .queue
+            .iter()
+            .position(|r| !matches!(r, Request::Function { .. }))
+            .unwrap_or(self.queue.len());
+        self.queue.insert(at, request);
         self.pump(cx);
     }
 
@@ -246,6 +620,12 @@ impl Vmix {
         cx.set_timer(REPLY, REPLY_TIMEOUT);
         self.sent_at = cx.now();
         self.current = Some(request);
+    }
+
+    /// Reports a patch and keeps it in the view.
+    fn report(&mut self, cx: &mut Cx, patch: Value) {
+        merge_patch(&mut self.view, &patch);
+        cx.state(patch);
     }
 
     fn lost(&mut self, cx: &mut Cx, reason: String) {
@@ -276,7 +656,7 @@ impl Vmix {
         match message.command.as_str() {
             // Unrequested, on connection.
             "VERSION" => {
-                cx.state(json!({"device": {"version": message.rest}}));
+                self.report(cx, json!({"device": {"version": message.rest}}));
                 return;
             }
             // Only ever events: the core never sends TALLY or ACTS requests.
@@ -336,7 +716,7 @@ impl Vmix {
             },
             Request::Version => {
                 if message.status == Status::Ok {
-                    cx.state(json!({"device": {"version": message.rest}}));
+                    self.report(cx, json!({"device": {"version": message.rest}}));
                 }
             }
         }
@@ -358,17 +738,28 @@ impl Vmix {
             tally.insert((i + 1).to_string(), Value::Null);
         }
         self.tally_inputs = digits.trim().len();
-        cx.state(json!({"tally": tally}));
+        self.report(cx, json!({"tally": tally}));
     }
 
     /// `ACTS OK <Name> [<input>] <value>`, value 0 to 1.
     fn activator(&mut self, cx: &mut Cx, body: &str) {
         let parts: Vec<&str> = body.split_whitespace().collect();
         let on = |v: &str| v == "1";
+        let mix = |name: &str, prefix: &str| {
+            name.strip_prefix(prefix)
+                .filter(|n| n.parse::<u32>().is_ok_and(|n| (2..=16).contains(&n)))
+                .map(str::to_string)
+        };
         let patch = match parts.as_slice() {
             ["Input", input, v] if on(v) => json!({"program": input.parse::<u32>().ok()}),
             ["InputPreview", input, v] if on(v) => {
                 json!({"preview": input.parse::<u32>().ok()})
+            }
+            [name, input, v] if on(v) && mix(name, "InputMix").is_some() => {
+                json!({"mixes": {mix(name, "InputMix").unwrap(): {"program": input.parse::<u32>().ok()}}})
+            }
+            [name, input, v] if on(v) && mix(name, "InputPreviewMix").is_some() => {
+                json!({"mixes": {mix(name, "InputPreviewMix").unwrap(): {"preview": input.parse::<u32>().ok()}}})
             }
             ["InputPlaying", input, v] => json!({"inputs": {*input: {"playing": on(v)}}}),
             ["InputAudio", input, v] => json!({"inputs": {*input: {"muted": !on(v)}}}),
@@ -376,10 +767,11 @@ impl Vmix {
             ["Streaming", v] => json!({"streaming": on(v)}),
             ["External", v] => json!({"external": on(v)}),
             ["MultiCorder", v] => json!({"multicorder": on(v)}),
+            ["Fullscreen", v] => json!({"fullscreen": on(v)}),
             ["FadeToBlack", v] => json!({"fade_to_black": on(v)}),
             _ => return,
         };
-        cx.state(patch);
+        self.report(cx, patch);
     }
 
     fn xml(&mut self, cx: &mut Cx, document: &str) {
@@ -393,79 +785,34 @@ impl Vmix {
                 return;
             }
         };
-        let root = doc.root_element();
-        let child = |name: &str| {
-            root.children()
-                .find(|n| n.has_tag_name(name))
-                .and_then(|n| n.text())
-                .unwrap_or("")
-                .trim()
-                .to_string()
-        };
-        let number = |s: String| s.parse::<u32>().ok();
+        let (tree, keys) = read_xml(doc.root_element());
 
-        let mut patch = json!({
-            "device": {"version": child("version"), "edition": child("edition")},
-            "program": number(child("active")),
-            "preview": number(child("preview")),
-            "recording": is_true(&child("recording")),
-            "streaming": is_true(&child("streaming")),
-            "external": is_true(&child("external")),
-            "multicorder": is_true(&child("multiCorder")),
-            "fade_to_black": is_true(&child("fadeToBlack")),
-        });
-
-        let mut inputs = Map::new();
-        let mut seen = BTreeSet::new();
-        if let Some(list) = root.children().find(|n| n.has_tag_name("inputs")) {
-            for input in list.children().filter(|n| n.has_tag_name("input")) {
-                let Some(n) = input.attribute("number") else {
-                    continue;
-                };
-                seen.insert(n.to_string());
-                let mut entry = json!({
-                    "title": input.attribute("title").unwrap_or(""),
-                    "type": input.attribute("type").unwrap_or(""),
-                    "key": input.attribute("key").unwrap_or(""),
-                    "playing": input.attribute("state") == Some("Running"),
-                });
-                if let Some(muted) = input.attribute("muted") {
-                    entry["muted"] = json!(is_true(muted));
-                }
-                if let Some(volume) = input
-                    .attribute("volume")
-                    .and_then(|v| v.parse::<f64>().ok())
+        // A number that now holds another input (inputs were added, removed
+        // or moved) loses everything it had, including what only events set.
+        let moved: Map<String, Value> = keys
+            .iter()
+            .filter(|(n, key)| self.input_keys.get(*n).is_some_and(|k| k != *key))
+            .map(|(n, _)| (n.clone(), Value::Null))
+            .collect();
+        if !moved.is_empty() {
+            for n in moved.keys() {
+                if let Some(inputs) = self
+                    .xml_last
+                    .get_mut("inputs")
+                    .and_then(Value::as_object_mut)
                 {
-                    entry["volume"] = json!(volume);
+                    inputs.remove(n);
                 }
-                inputs.insert(n.to_string(), entry);
             }
+            self.report(cx, json!({"inputs": moved}));
         }
-        for gone in self.inputs.difference(&seen) {
-            inputs.insert(gone.clone(), Value::Null);
-        }
-        self.inputs = seen;
-        patch["inputs"] = Value::Object(inputs);
+        self.input_keys = keys;
 
-        if let Some(list) = root.children().find(|n| n.has_tag_name("overlays")) {
-            let mut overlays = Map::new();
-            for overlay in list.children().filter(|n| n.has_tag_name("overlay")) {
-                let Some(n) = overlay.attribute("number") else {
-                    continue;
-                };
-                let input = overlay.text().and_then(|t| t.trim().parse::<u32>().ok());
-                overlays.insert(
-                    n.to_string(),
-                    match input {
-                        Some(i) => json!({"input": i}),
-                        None => Value::Null,
-                    },
-                );
-            }
-            patch["overlays"] = Value::Object(overlays);
+        let tree = Value::Object(tree);
+        if let Some(patch) = diff(Some(&self.xml_last), Some(&self.view), &tree) {
+            self.report(cx, patch);
         }
-        // An unparseable program or preview is null, which removes it.
-        cx.state(patch);
+        self.xml_last = tree;
     }
 }
 
@@ -481,7 +828,7 @@ impl Module for Vmix {
             return;
         }
         match function_for(name, params) {
-            Some(line) => self.enqueue(cx, Request::Function { id, line }),
+            Some(line) => self.enqueue_command(cx, Request::Function { id, line }),
             None => cx.complete(
                 id,
                 Err(CommandError::UnknownCommand {
@@ -498,10 +845,13 @@ impl Module for Vmix {
                     self.enqueue(cx, Request::Subscribe("TALLY"));
                     self.enqueue(cx, Request::Subscribe("ACTS"));
                     self.enqueue(cx, Request::Xml);
+                    cx.set_timer(POLL, self.state_poll);
+                } else {
+                    // Commands only: the first liveness request goes at the
+                    // first poll; the unrequested VERSION line shows vMix is
+                    // there.
+                    cx.set_timer(POLL, LIVENESS_EVERY);
                 }
-                // Commands only: the first liveness request goes at the
-                // first poll; the unrequested VERSION line shows vMix is there.
-                cx.set_timer(POLL, POLL_EVERY);
             }
             TcpInput::Data(data) => {
                 cx.alive();
@@ -522,15 +872,15 @@ impl Module for Vmix {
             // A missing reply leaves every later reply unpaired: start again.
             REPLY => self.lost(cx, "no reply from vMix within 5 s".into()),
             POLL => {
-                let request = if self.monitor {
-                    Request::Xml
+                let (request, every) = if self.monitor {
+                    (Request::Xml, self.state_poll)
                 } else {
-                    Request::Version
+                    (Request::Version, LIVENESS_EVERY)
                 };
                 if !self.queue.contains(&request) && self.current.as_ref() != Some(&request) {
                     self.enqueue(cx, request);
                 }
-                cx.set_timer(POLL, POLL_EVERY);
+                cx.set_timer(POLL, every);
             }
             _ => {}
         }
@@ -580,6 +930,20 @@ mod tests {
             }
         }
         merged
+    }
+
+    fn patches(actions: &[Action]) -> Vec<Value> {
+        actions
+            .iter()
+            .filter_map(|a| match a {
+                Action::State(p) => Some(p.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn xml_reply(xml: &str) -> String {
+        format!("XML {}\r\n{xml}\r\n", xml.len() + 2)
     }
 
     fn params(v: Value) -> Params {
@@ -675,29 +1039,27 @@ mod tests {
         );
         assert_eq!(s["inputs"]["2"]["playing"], false);
         assert_eq!(s["inputs"]["2"].get("muted"), None);
-        assert_eq!(s["overlays"], json!({"1": {"input": 2}}));
+        assert_eq!(s["overlays"], json!({"1": {"input": 2, "preview": false}}));
     }
 
     #[test]
     fn removed_inputs_are_removed_from_the_state() {
-        let (mut m, _) = connected();
+        let (mut m, a) = connected();
+        let mut s = state(&a);
         let mut cx = Cx::new(20_000);
         m.timer(&mut cx, POLL);
         assert_eq!(sent(&cx.take()), ["XML\r\n"]);
-        let one = r#"<vmix><version>27</version><inputs><input key="k" number="1" type="Capture" title="Camera 1" state="Running"/></inputs></vmix>"#;
-        let a = feed(
-            &mut m,
-            20_010,
-            &format!("XML {}\r\n{one}\r\n", one.len() + 2),
+        let one = XML.replace(
+            r#"<input key="5a5b0b2b-2f7a-4d1e-8d44-6a3e8b3b1f00" number="2" type="GT" title="Lower third" state="Paused">Lower third</input>"#,
+            "",
         );
-        let patch = a
-            .iter()
-            .find_map(|x| match x {
-                Action::State(p) => Some(p.clone()),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(patch["inputs"]["2"], Value::Null);
+        let a = feed(&mut m, 20_010, &xml_reply(&one));
+        // Only what changed: input 2 has gone.
+        assert_eq!(patches(&a), [json!({"inputs": {"2": null}})]);
+        for p in patches(&a) {
+            merge_patch(&mut s, &p);
+        }
+        assert_eq!(s["inputs"].as_object().unwrap().len(), 1);
     }
 
     #[test]
@@ -831,17 +1193,22 @@ mod tests {
         assert!(sent(&a).is_empty());
 
         // The poll asks only for the version.
-        let mut cx = Cx::new(POLL_EVERY);
+        let mut cx = Cx::new(LIVENESS_EVERY);
         m.timer(&mut cx, POLL);
-        assert_eq!(sent(&cx.take()), ["XMLTEXT vmix/version\r\n"]);
-        let a = feed(&mut m, POLL_EVERY + 5, "XMLTEXT OK 27.0.0.49\r\n");
+        let a = cx.take();
+        assert_eq!(sent(&a), ["XMLTEXT vmix/version\r\n"]);
+        assert!(a.contains(&Action::SetTimer {
+            key: POLL,
+            after: LIVENESS_EVERY
+        }));
+        let a = feed(&mut m, LIVENESS_EVERY + 5, "XMLTEXT OK 27.0.0.49\r\n");
         assert_eq!(state(&a)["device"]["version"], "27.0.0.49");
 
         // Commands work as before.
-        let mut cx = Cx::new(POLL_EVERY + 10);
+        let mut cx = Cx::new(LIVENESS_EVERY + 10);
         m.command(&mut cx, 3, "cut", &params(json!({})));
         assert_eq!(sent(&cx.take()), ["FUNCTION Cut\r\n"]);
-        let a = feed(&mut m, POLL_EVERY + 20, "FUNCTION OK Completed\r\n");
+        let a = feed(&mut m, LIVENESS_EVERY + 20, "FUNCTION OK Completed\r\n");
         assert!(a.contains(&Action::Complete {
             id: 3,
             result: Ok(Outcome::Ack)
@@ -859,5 +1226,201 @@ mod tests {
         assert!(!a.iter().any(|x| matches!(x, Action::RoundTrip(_))));
         let a = feed(&mut m, 137, "FUNCTION OK Completed\r\n");
         assert!(a.contains(&Action::RoundTrip(37)));
+    }
+
+    /// The status, transitions, mixes and outputs, in the shape vMix 27
+    /// reports them.
+    const STATUS_XML: &str = r#"<vmix><version>27.0.0.49</version><edition>4K</edition><preset>C:\Shows\Sunday.vmix</preset><inputs><input key="a" number="1" type="Capture" title="Camera 1" state="Running"/><input key="b" number="2" type="Capture" title="Camera 2" state="Running"/><input key="c" number="3" type="Video" title="Clip" state="Paused"/></inputs><overlays><overlay number="1"/><overlay number="2" preview="True">3</overlay><overlay number="3"/><overlay number="4"/><overlay number="5"/><overlay number="6"/><overlay number="7"/><overlay number="8"/></overlays><preview>2</preview><active>1</active><fadeToBlack>False</fadeToBlack><transitions><transition number="1" effect="Fade" duration="500"/><transition number="2" effect="Merge" duration="1000"/><transition number="3" effect="Wipe" duration="500"/><transition number="4" effect="CubeZoom" duration="3000"/></transitions><recording duration="125" filename1="D:\Rec\capture.mp4">True</recording><external>False</external><streaming channel1="True" channel2="False" channel3="False">True</streaming><playList>False</playList><multiCorder>False</multiCorder><fullscreen>True</fullscreen><mix number="2"><preview>1</preview><active>3</active></mix><mix number="3"><preview>2</preview><active>2</active></mix><outputs><output type="Output" number="1" source="Output" ndi="True" omt="False" srt="False"/><output type="Output" number="2" source="Input" inputNumber="3" ndi="False" omt="False" srt="True"/><output type="Output" number="3" source="Mix" mix="1" ndi="False" omt="False" srt="False"/><output type="Fullscreen" number="1" source="Output"/></outputs><audioOutput>Speakers</audioOutput></vmix>"#;
+
+    fn connected_to(xml: &str) -> (Vmix, Value) {
+        let mut m = vmix();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        let mut a = cx.take();
+        a.extend(feed(&mut m, 11, "SUBSCRIBE OK TALLY\r\n"));
+        a.extend(feed(&mut m, 12, "SUBSCRIBE OK ACTS\r\n"));
+        a.extend(feed(&mut m, 13, &xml_reply(xml)));
+        (m, state(&a))
+    }
+
+    /// Polls and answers with `xml`, returning the patches.
+    fn read(m: &mut Vmix, now: Millis, xml: &str) -> Vec<Value> {
+        let mut cx = Cx::new(now);
+        m.timer(&mut cx, POLL);
+        assert_eq!(sent(&cx.take()), ["XML\r\n"]);
+        patches(&feed(m, now + 10, &xml_reply(xml)))
+    }
+
+    #[test]
+    fn status_transitions_mixes_and_outputs_are_read() {
+        let (_, s) = connected_to(STATUS_XML);
+        assert_eq!(s["device"]["preset"], r"C:\Shows\Sunday.vmix");
+        assert_eq!(s["recording"], true);
+        assert_eq!(s["recording_duration"], 125);
+        assert_eq!(s["recording_files"], json!({"1": r"D:\Rec\capture.mp4"}));
+        assert_eq!(s["streaming"], true);
+        assert_eq!(s["streams"], json!({"1": true, "2": false, "3": false}));
+        assert_eq!(s["playlist"], false);
+        assert_eq!(s["fullscreen"], true);
+        assert_eq!(
+            s["transitions"]["2"],
+            json!({"effect": "Merge", "duration": 1000})
+        );
+        assert_eq!(s["transitions"].as_object().unwrap().len(), 4);
+        assert_eq!(
+            s["mixes"],
+            json!({"2": {"program": 3, "preview": 1}, "3": {"program": 2, "preview": 2}})
+        );
+        assert_eq!(s["overlays"], json!({"2": {"input": 3, "preview": true}}));
+        assert_eq!(
+            s["outputs"]["output2"],
+            json!({"type": "Output", "number": 2, "source": "Input", "input": 3,
+                   "ndi": false, "omt": false, "srt": true})
+        );
+        assert_eq!(s["outputs"]["output3"]["mix"], 1);
+        assert_eq!(
+            s["outputs"]["fullscreen1"],
+            json!({"type": "Fullscreen", "number": 1, "source": "Output"})
+        );
+        // An element the module does not know, kept by name.
+        assert_eq!(s["other"]["audioOutput"], "Speakers");
+    }
+
+    #[test]
+    fn a_read_reports_only_what_changed() {
+        let (mut m, _) = connected_to(STATUS_XML);
+        assert!(read(&mut m, 1_000, STATUS_XML).is_empty());
+
+        let changed = STATUS_XML
+            .replace(r#"duration="125""#, r#"duration="126""#)
+            .replace(
+                r#"<overlay number="2" preview="True">3</overlay>"#,
+                r#"<overlay number="2"/>"#,
+            );
+        assert_eq!(
+            read(&mut m, 2_000, &changed),
+            [json!({"recording_duration": 126, "overlays": {"2": null}})]
+        );
+    }
+
+    #[test]
+    fn a_number_that_holds_another_input_starts_again() {
+        let (mut m, _) = connected_to(STATUS_XML);
+        // Input 2 is removed, so the clip becomes input 2.
+        let moved = STATUS_XML.replace(
+            r#"<input key="b" number="2" type="Capture" title="Camera 2" state="Running"/><input key="c" number="3" type="Video" title="Clip" state="Paused"/>"#,
+            r#"<input key="c" number="2" type="Video" title="Clip" state="Paused"/>"#,
+        );
+        let p = read(&mut m, 1_000, &moved);
+        assert_eq!(p[0], json!({"inputs": {"2": null}}));
+        assert_eq!(p[1]["inputs"]["2"]["key"], "c");
+        assert_eq!(p[1]["inputs"]["2"]["title"], "Clip");
+        assert_eq!(p[1]["inputs"]["3"], Value::Null);
+    }
+
+    #[test]
+    fn commands_go_ahead_of_queued_reads() {
+        let mut m = vmix();
+        let mut cx = Cx::new(0);
+        m.start(&mut cx);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        cx.take();
+        feed(&mut m, 5, "VERSION OK 27.0.0.49\r\n");
+        let mut cx = Cx::new(6);
+        m.command(&mut cx, 9, "cut", &params(json!({})));
+        assert!(sent(&cx.take()).is_empty());
+        // SUBSCRIBE TALLY is answered; the command goes before ACTS and XML.
+        assert_eq!(
+            sent(&feed(&mut m, 10, "SUBSCRIBE OK TALLY\r\n")),
+            ["FUNCTION Cut\r\n"]
+        );
+        assert_eq!(
+            sent(&feed(&mut m, 11, "FUNCTION OK Completed\r\n")),
+            ["SUBSCRIBE ACTS\r\n"]
+        );
+    }
+
+    #[test]
+    fn the_state_is_read_as_often_as_set() {
+        let ctx = |settings: Value| OpenContext {
+            host: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 4)),
+            host_name: None,
+            port: None,
+            model: "vmix".into(),
+            channels: None,
+            settings: params(settings),
+            monitor: true,
+        };
+        assert_eq!(Vmix::new(ctx(json!({}))).state_poll, STATE_POLL_DEFAULT);
+        assert_eq!(
+            Vmix::new(ctx(json!({"state_poll_ms": 5000}))).state_poll,
+            5000
+        );
+        assert_eq!(
+            Vmix::new(ctx(json!({"state_poll_ms": 10}))).state_poll,
+            STATE_POLL_MIN
+        );
+        let mut m = Vmix::new(ctx(json!({"state_poll_ms": 5000})));
+        let mut cx = Cx::new(0);
+        m.tcp(&mut cx, SOCKET, TcpInput::Connected);
+        assert!(cx.take().contains(&Action::SetTimer {
+            key: POLL,
+            after: 5000
+        }));
+    }
+
+    #[test]
+    fn other_mixes_follow_their_activators() {
+        let (mut m, _) = connected_to(STATUS_XML);
+        let s = state(&feed(
+            &mut m,
+            100,
+            "ACTS OK InputMix2 1 1\r\nACTS OK InputPreviewMix3 3 1\r\nACTS OK InputMix2 3 0\r\nACTS OK Fullscreen 0\r\n",
+        ));
+        assert_eq!(s["mixes"]["2"]["program"], 1);
+        assert_eq!(s["mixes"]["3"]["preview"], 3);
+        assert_eq!(s["fullscreen"], false);
+        // The read that follows disagrees, so reports what differs.
+        assert_eq!(
+            read(&mut m, 1_000, STATUS_XML),
+            [json!({"fullscreen": true, "mixes": {"2": {"program": 3}, "3": {"preview": 2}}})]
+        );
+    }
+
+    /// Every leaf path of a state value.
+    fn leaves(v: &Value, at: Vec<String>, out: &mut Vec<Vec<String>>) {
+        match v {
+            Value::Object(m) => {
+                for (k, v) in m {
+                    let mut next = at.clone();
+                    next.push(k.clone());
+                    leaves(v, next, out);
+                }
+            }
+            _ => out.push(at),
+        }
+    }
+
+    #[test]
+    fn every_state_path_written_is_declared_in_the_spec() {
+        let catalog = crate::catalog::Catalog::embedded();
+        let spec = catalog.device("vmix").unwrap();
+        let declared: Vec<Vec<String>> = spec
+            .state
+            .keys()
+            .map(|k| k.split('.').map(str::to_string).collect())
+            .collect();
+        let mut paths = Vec::new();
+        leaves(&connected_to(STATUS_XML).1, Vec::new(), &mut paths);
+        leaves(&state(&connected().1), Vec::new(), &mut paths);
+        for path in paths {
+            assert!(
+                declared.iter().any(|d| d.len() == path.len()
+                    && d.iter().zip(&path).all(|(a, b)| a == "*" || a == b)),
+                "{} is not declared",
+                path.join(".")
+            );
+        }
     }
 }

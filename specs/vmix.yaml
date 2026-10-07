@@ -41,6 +41,13 @@ source:
   - title: Tally vMix client (tally/vMix.cpp)
     note: Meros. SUBSCRIBE TALLY and the digit-per-input tally line.
 
+settings:
+  # How often the whole XML state is read. Positions, meters and everything
+  # vMix pushes no event for change only this often.
+  state_poll_ms: { type: int, min: 250, max: 60000, default: 1000,
+                   label: State read interval,
+                   description: "Milliseconds between reads of vMix's whole XML state, which carries everything its events do not." }
+
 ports:
   - { port: 8099, protocol: tcp, role: control }
 
@@ -5021,23 +5028,43 @@ commands:
 
 state:
   device.version:          { type: string, description: "vMix version" }
-  device.edition:          { type: string, description: "vMix edition" }
-  program:                 { type: int, description: "Input number on program" }
-  preview:                 { type: int, description: "Input number on preview" }
+  device.edition:          { type: string, description: "vMix edition, such as Basic HD, HD, 4K or Pro" }
+  device.preset:           { type: string, description: "Path of the preset file open in vMix, on the vMix computer; absent when none has been saved or opened" }
+  program:                 { type: int, description: "Input number on program (main mix)" }
+  preview:                 { type: int, description: "Input number on preview (main mix)" }
+  mixes.*.program:         { type: int, description: "Input number on program in another mix, keyed by mix number as the XML numbers them (2 to 16; the mix command parameter is this number less 1)" }
+  mixes.*.preview:         { type: int, description: "Input number on preview in another mix, keyed as mixes.*.program" }
   inputs.*.title:          { type: string, description: "Input title, keyed by input number" }
   inputs.*.type:           { type: string, description: "Input type, such as Capture, Video or GT" }
   inputs.*.key:            { type: string, description: "Input GUID, stable across renumbering" }
   inputs.*.playing:        { type: bool, description: "Input playing" }
   inputs.*.muted:          { type: bool, description: "Input audio muted; absent for inputs without audio" }
-  inputs.*.volume:         { type: float, description: "Input volume, 0 to 100; absent for inputs without audio" }
+  inputs.*.volume:         { type: float, unit: percent, description: "Input volume, 0 to 100; absent for inputs without audio" }
   tally.*.program:         { type: bool, description: "Input on program, keyed by input number (main mix)" }
   tally.*.preview:         { type: bool, description: "Input on preview (main mix)" }
-  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by overlay number; absent when empty" }
+  overlays.*.input:        { type: int, description: "Input in the overlay channel, keyed by overlay number (1 to 4 the overlay channels, higher numbers the stingers); absent when empty" }
+  overlays.*.preview:      { type: bool, description: "The overlay is shown on preview only, not on program" }
+  transitions.*.effect:    { type: string, description: "Effect of the transition button, keyed by button number (1 to 4), such as Fade, Merge or Wipe" }
+  transitions.*.duration:  { type: int, unit: ms, description: "Duration of the transition button's effect" }
+  outputs.*.type:          { type: string, description: "Output or Fullscreen, keyed by type and number in lower case (output1 to output4, fullscreen1, fullscreen2)" }
+  outputs.*.number:        { type: int, description: "The output's number within its type" }
+  outputs.*.source:        { type: string, description: "What the output shows: Output, Preview, MultiView, Replay, Mix or Input" }
+  outputs.*.input:         { type: int, description: "Input shown, when the source is Input" }
+  outputs.*.mix:           { type: int, description: "Mix shown, when the source is Mix, as the XML numbers it" }
+  outputs.*.ndi:           { type: bool, description: "The output is also sent as NDI" }
+  outputs.*.omt:           { type: bool, description: "The output is also sent as OMT" }
+  outputs.*.srt:           { type: bool, description: "The output is also sent as SRT" }
   recording:               { type: bool, description: "Recording" }
+  recording_duration:      { type: int, unit: s, description: "Time recording so far" }
+  recording_files.*:       { type: string, description: "File being recorded, keyed 1 and 2 (the second recording), on the vMix computer" }
   streaming:               { type: bool, description: "Streaming (any stream)" }
+  streams.*:               { type: bool, description: "Stream running, keyed by stream number from 1" }
   external:                { type: bool, description: "External output running" }
   multicorder:             { type: bool, description: "MultiCorder running" }
+  playlist:                { type: bool, description: "Playlist running" }
+  fullscreen:              { type: bool, description: "Fullscreen output on" }
   fade_to_black:           { type: bool, description: "Faded to black" }
+  other.*:                 { type: string, description: "Any other top-level XML element holding text only, keyed by element name, as vMix reports it" }
 
 quirks:
   - models: [all]
@@ -5050,9 +5077,12 @@ quirks:
   - models: [all]
     severity: info
     text: >
-      Tally, program, preview, playing, mute and the output flags are pushed as
-      they change (SUBSCRIBE TALLY and ACTS). Titles, volumes and overlays come
-      from the full XML state, read on connection and every 10 seconds.
+      Tally, program and preview (every mix), playing, mute and the output
+      flags are pushed as they change (SUBSCRIBE TALLY and ACTS). Everything
+      else comes from the full XML state, read on connection and every
+      state_poll_ms (1 s by default); a read reports only what changed since
+      the state last held it. Overlays come from the XML only: their
+      activators do not tell an overlay on preview from one on program.
 
   - models: [all]
     severity: info
