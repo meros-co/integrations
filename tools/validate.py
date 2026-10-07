@@ -446,6 +446,47 @@ def cross_field_checks(doc: dict, path: str) -> list[str]:
 
     errors += per_model_checks(doc, model_ids)
     errors += session_checks(doc)
+    errors += endpoint_checks(doc)
+    return errors
+
+
+def endpoint_checks(doc: dict) -> list[str]:
+    """`transport.endpoints` and the request items naming one (SPEC.md §2,
+    Endpoints): settings exist and fit, names resolve, and liveness and the
+    session stay on the transport's own port."""
+    errors: list[str] = []
+    transport = doc.get("transport") or {}
+    settings = doc.get("settings") or {}
+    endpoints = transport.get("endpoints") or {}
+    for name, e in endpoints.items():
+        where = f"transport.endpoints.{name}"
+        for key, kind, values in (("port", "int", None), ("scheme", "enum", {"http", "https"}),
+                                  ("auth", "enum", {"inherit", "none"})):
+            ref = e.get(key)
+            if not isinstance(ref, dict):
+                continue
+            decl = settings.get(ref.get("setting"))
+            if decl is None:
+                errors.append(f"{where}.{key} names unknown setting '{ref.get('setting')}'")
+            elif decl.get("type") != kind or (values and set(decl.get("values", [])) - values):
+                errors.append(f"{where}.{key}'s setting must be "
+                              + ("an int" if kind == "int" else f"an enum of {' and '.join(sorted(values))}"))
+    telemetry = doc.get("telemetry") or {}
+    places = [(f"commands.{n}.send", c.get("send")) for n, c in (doc.get("commands") or {}).items()]
+    places += [("telemetry.poll.send", (telemetry.get("poll") or {}).get("send")),
+               ("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send"))]
+    places += [(f"on_connect[{i}]", step.get("send") if isinstance(step, dict) and "send" in step else step)
+               for i, step in enumerate(doc.get("on_connect") or [])]
+    places += [(f"telemetry.updates[{i}].then_send", rule.get("then_send"))
+               for i, rule in enumerate(telemetry.get("updates") or [])]
+    for where, send in places:
+        for i, item in enumerate(items_of(send)):
+            if isinstance(item, dict) and "endpoint" in item and item["endpoint"] not in endpoints:
+                errors.append(f"{where}[{i}]: endpoint '{item['endpoint']}' is not in transport.endpoints")
+    for where, send in (("transport.probe", transport.get("probe")),
+                        ("transport.session.login", (transport.get("session") or {}).get("login"))):
+        if any(isinstance(i, dict) and "endpoint" in i for i in items_of(send)):
+            errors.append(f"{where}: goes to the transport's own port; it cannot name an endpoint")
     return errors
 
 
@@ -670,6 +711,19 @@ def port_checks(doc: dict) -> list[str]:
             errors.append(f"ports: no entry for the listen port setting '{listen['setting']}'")
         if isinstance(listen, int) and not any(e["port"] == listen and e.get("listener") == "core" for e in ports):
             errors.append(f"ports: no core-listener entry for listen_port {listen}")
+        # Each endpoint is a control port: its default, or its setting.
+        for name, ep in (t.get("endpoints") or {}).items():
+            port = ep.get("port")
+            if isinstance(port, dict):
+                setting = port.get("setting")
+                entries = [e for e in control if e.get("setting") == setting]
+                default = (settings.get(setting) or {}).get("default")
+                if not entries:
+                    errors.append(f"ports: no control entry with setting '{setting}' for endpoint '{name}'")
+                elif default is not None and not any(e["port"] == default for e in entries):
+                    errors.append(f"ports: endpoint '{name}''s control entry is not at its setting's default {default}")
+            elif not any(e["port"] == port for e in control):
+                errors.append(f"ports: endpoint '{name}''s port {port} is not a control port")
         tel = doc.get("telemetry") or {}
         if ("websocket" in tel or "sse" in tel) and not any(e["role"] == "push" for e in ports):
             errors.append("ports: the push channel has no push entry")

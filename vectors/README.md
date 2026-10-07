@@ -31,6 +31,9 @@ settings: {}                 # optional device settings
 expect_wire: "< GET 1 CHAN_NAME >"            # text, framing included
 expect_wire_hex: "2f63682f…"                  # binary (OSC, including any TCP framing)
 expect_request: { method: GET, target: "/cgi-bin/ptzctrl.cgi?ptzcmd&home" }   # HTTP
+# A request to an HTTP endpoint (SPEC.md §2, Endpoints) adds its port, the
+# default of any setting giving it: { method: GET, port: 9996, target: /list?path=cam1 }.
+# Without `port`, the request must go to the transport's own port.
 # A command sending several messages lists them: expect_wire: [ …, … ]
 
 # Optionally, a reply to feed back and the result it must produce:

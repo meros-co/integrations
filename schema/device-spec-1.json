@@ -1321,6 +1321,90 @@
                 "type": "string"
               }
             },
+            "endpoints": {
+              "type": "object",
+              "description": "Other HTTP servers of the same device, on other ports, by name (MediaMTX's playback server on 9996). A request item names one with endpoint: it goes to the same host, on that port and scheme; the transport's credential and headers go there unless auth is none, the session never does, and its answers do not decide whether the device is connected (SPEC.md §2, Endpoints).",
+              "propertyNames": {
+                "pattern": "^[a-z0-9_]+$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "port"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "port": {
+                    "description": "The endpoint's port, or {setting: name} naming an int setting. The port given when opening the device does not change it.",
+                    "oneOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "setting"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "setting": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "scheme": {
+                    "description": "http or https, or {setting: name} naming an enum setting of the two; the transport's scheme when absent.",
+                    "oneOf": [
+                      {
+                        "enum": [
+                          "http",
+                          "https"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "setting"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "setting": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "auth": {
+                    "description": "inherit (the default): the transport's credential and headers go with every request to the endpoint; none: neither does. Or {setting: name} naming an enum setting of the two.",
+                    "oneOf": [
+                      {
+                        "enum": [
+                          "inherit",
+                          "none"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "setting"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                          "setting": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
             "auth_header": {
               "type": "string",
               "pattern": "^[A-Za-z0-9-]+$",
@@ -1857,6 +1941,10 @@
         "session": {
           "type": "boolean",
           "description": "false: sent without the session of transport.session, and needing none, so it does not log in first (a ping)."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "Sent to this endpoint of transport.endpoints (another port of the same host) instead of the transport's port. Not on the probe or the session login (SPEC.md §2, Endpoints)."
         }
       },
       "not": {
