@@ -481,6 +481,53 @@ for stem, cstem, p, pre, dp, key, n, skey in [
                   expect_state={key: {n: st}} if n else {key: st})
 
 
+# ── Routing and output patching (p.22-24, p.40-42) ────────────────────────
+binary(X, "set_routing_mode", {"mode": 1}, osc("/config/routing/routswitch", ("i", 1)))
+binary(X, "set_routing_input", {"block": "9-16", "source": 23}, osc("/config/routing/IN/9-16", ("i", 23)))
+binary(X, "set_routing_input_aux", {"source": 15}, osc("/config/routing/IN/AUX", ("i", 15)))
+binary(X, "set_routing_playback", {"block": "25-32", "source": 0}, osc("/config/routing/PLAY/25-32", ("i", 0)))
+binary(X, "set_routing_playback_aux", {"source": 3}, osc("/config/routing/PLAY/AUX", ("i", 3)))
+binary(X, "set_routing_aes50", {"port": "B", "block": "41-48", "source": 35}, osc("/config/routing/AES50B/41-48", ("i", 35)))
+binary(X, "set_routing_card", {"block": "1-8", "source": 20}, osc("/config/routing/CARD/1-8", ("i", 20)))
+binary(X, "set_routing_output", {"block": "13-16", "source": 24}, osc("/config/routing/OUT/13-16", ("i", 24)))
+binary(X, "set_user_routing_output", {"slot": 48, "source": 208}, osc("/config/userrout/out/48", ("i", 208)))
+binary(X, "set_user_routing_input", {"slot": 1, "source": 168}, osc("/config/userrout/in/01", ("i", 168)))
+for stem, kind, n in [("output", "main", 16), ("aux_output", "aux", 6), ("p16_output", "p16", 16),
+                      ("aes_output", "aes", 2), ("rec_output", "rec", 2)]:
+    binary(X, f"set_{stem}_source", {"output": n, "source": 76}, osc(f"/outputs/{kind}/{n:02d}/src", ("i", 76)))
+    binary(X, f"set_{stem}_tap", {"output": 1, "tap": 8}, osc(f"/outputs/{kind}/01/pos", ("i", 8)))
+    if kind != "rec":
+        binary(X, f"set_{stem}_invert", {"output": 2, "inverted": True}, osc(f"/outputs/{kind}/02/invert", ("i", 1)))
+binary(X, "set_output_delay", {"output": 5, "enabled": True}, osc("/outputs/main/05/delay/on", ("i", 1)))
+binary(X, "set_output_delay_time", {"output": 5, "time": 0.5}, osc("/outputs/main/05/delay/time", ("f", 0.5)))
+binary(X, "set_p16_output_iq_group", {"output": 3, "group": 2}, osc("/outputs/p16/03/iQ/group", ("i", 2)))
+binary(X, "set_p16_output_iq_speaker", {"output": 3, "speaker": 6}, osc("/outputs/p16/03/iQ/speaker", ("i", 6)))
+binary(X, "set_p16_output_iq_eq", {"output": 3, "eq": 4}, osc("/outputs/p16/03/iQ/eq", ("i", 4)))
+binary(X, "set_p16_output_iq_model", {"output": 3, "model": 7}, osc("/outputs/p16/03/iQ/model", ("i", 7)))
+telemetry(X, "routing-mode", inbound_hex=hexs(osc("/config/routing/routswitch", ("i", 0))), expect_state={"routing": {"mode": 0}})
+telemetry(X, "routing-input", inbound_hex=hexs(osc("/config/routing/IN/17-24", ("i", 2))),
+          expect_state={"routing": {"input": {"17-24": 2}}})
+telemetry(X, "routing-playback-aux", inbound_hex=hexs(osc("/config/routing/PLAY/AUX", ("i", 0))),
+          expect_state={"routing": {"playback": {"AUX": 0}}})
+telemetry(X, "routing-aes50", inbound_hex=hexs(osc("/config/routing/AES50A/33-40", ("i", 26))),
+          expect_state={"routing": {"aes50": {"A": {"33-40": 26}}}})
+telemetry(X, "routing-card", inbound_hex=hexs(osc("/config/routing/CARD/25-32", ("i", 3))),
+          expect_state={"routing": {"card": {"25-32": 3}}})
+telemetry(X, "routing-output", inbound_hex=hexs(osc("/config/routing/OUT/5-8", ("i", 1))),
+          expect_state={"routing": {"outputs": {"5-8": 1}}})
+telemetry(X, "user-routing-out", inbound_hex=hexs(osc("/config/userrout/out/12", ("i", 207))),
+          expect_state={"routing": {"user_out": {"12": 207}}})
+telemetry(X, "user-routing-in", inbound_hex=hexs(osc("/config/userrout/in/32", ("i", 1))),
+          expect_state={"routing": {"user_in": {"32": 1}}})
+for leaf, field, wire, value in [("src", "source", ("i", 4), 4), ("pos", "tap", ("i", 6), 6), ("invert", "invert", ("i", 1), True),
+                                 ("delay/on", "delay_on", ("i", 0), False), ("delay/time", "delay_time", ("f", 0.25), 0.25),
+                                 ("iQ/group", "iq_group", ("i", 1), 1), ("iQ/speaker", "iq_speaker", ("i", 2), 2),
+                                 ("iQ/eq", "iq_eq", ("i", 3), 3), ("iQ/model", "iq_model", ("i", 0), 0)]:
+    kind = "p16" if leaf.startswith("iQ") else "main"
+    telemetry(X, f"output-{field.replace('_', '-')}", inbound_hex=hexs(osc(f"/outputs/{kind}/16/{leaf}", wire)),
+              expect_state={"outputs": {kind: {"16": {field: value}}}})
+
+
 def _osc_args(packet):
     """Address, type tags and i/f/s arguments of one OSC message."""
     def string(pos):
