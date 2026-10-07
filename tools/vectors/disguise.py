@@ -255,3 +255,34 @@ telemetry(DG, "failover-reread", inbound_http={"path": "/api/session/failover/fa
           expect_then_send=[{"method": "GET", "target": "/api/session/status/health"},
                             {"method": "GET", "target": "/api/session/status/session"},
                             {"method": "GET", "target": "/api/session/failover/settings"}], expect_state={})
+
+# ── Sequencing: indirections ──
+INDIRECTIONS = [{"uid": "301", "name": "main content", "resourceType": "VideoClip",
+                 "currentResource": {"uid": "401", "name": "intro.mov"}}]
+_dg("get_indirections", {}, "GET", "/api/session/sequencing/indirections",
+    http_reply={"status": 200, "body": _envelope(result=INDIRECTIONS)},
+    expect_result={"ok": {"kind": "value", "value": INDIRECTIONS}})
+_dg("get_indirection_resources", {"indirection": "main content"}, "GET",
+    "/api/session/sequencing/indirectionresources?name=main%20content")
+_dg("change_indirection", {"indirection": "main content", "resource": "act 2.mov"}, "POST",
+    "/api/session/sequencing/changeindirections",
+    '{"changes":[{"indirection":{"name":"main content"},"resource":{"name":"act 2.mov"}}]}', **_OK)
+_dg("change_indirections", {"changes": [{"indirection": {"uid": "301"}, "resource": {"uid": "402"}},
+                                        {"indirection": {"name": "logo"}, "resource": {"name": "logo b"}}]},
+    "POST", "/api/session/sequencing/changeindirections",
+    '{"changes":[{"indirection":{"uid":"301"},"resource":{"uid":"402"}},'
+    '{"indirection":{"name":"logo"},"resource":{"name":"logo b"}}]}', **_OK)
+telemetry(DG, "indirections", inbound_http={"path": "/api/session/sequencing/indirections",
+                                            "body": _envelope(result=INDIRECTIONS)},
+          state_before={"indirections": {"300": {"name": "removed"}}},
+          expect_then_send=[{"method": "GET", "target": "/api/session/sequencing/indirectionresources?uid=301"}],
+          expect_state={"indirections": {"301": {"name": "main content", "resource_type": "VideoClip",
+                                                 "resource_uid": "401", "resource": "intro.mov"}}})
+telemetry(DG, "indirection-resources", inbound_http={
+    "path": "/api/session/sequencing/indirectionresources?uid=301",
+    "body": _envelope(result=[{"uid": "401", "name": "intro.mov"}, {"uid": "402", "name": "act 2.mov"}])},
+    state_before={"indirection_resources": {"301": {"400": "old.mov"}}},
+    expect_state={"indirection_resources": {"301": {"401": "intro.mov", "402": "act 2.mov"}}})
+telemetry(DG, "indirection-change-reread", inbound_http={"path": "/api/session/sequencing/changeindirections",
+                                                         "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": "/api/session/sequencing/indirections"}], expect_state={})

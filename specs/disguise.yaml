@@ -121,7 +121,8 @@ models:
                get_failover_settings, failover_machine, restore_machine, apply_default_routing,
                get_understudy_targets,
                detect_systems, get_os_info, get_network_adapters, get_gpu_outputs, get_projects,
-               start_project, quit_project, restart_project, force_quit_project]
+               start_project, quit_project, restart_project, force_quit_project,
+               get_indirections, get_indirection_resources, change_indirection, change_indirections]
     verification: none
 
 commands:
@@ -570,6 +571,49 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── Sequencing: indirections ─────────────────────────────────────────────
+  get_indirections:
+    summary: Every indirection with its resource type and the resource it points to now (sequencing/indirections)
+    send: { method: GET, path: /api/session/sequencing/indirections }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_indirection_resources:
+    summary: The resources an indirection can point to, by the indirection's name (sequencing/indirectionresources)
+    params:
+      indirection: { type: string, max_length: 256, required: true,
+                     label: Indirection,
+                     description: "Indirection name as shown in Designer." }
+    send: { method: GET, path: /api/session/sequencing/indirectionresources, query: { name: "{indirection}" } }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  change_indirection:
+    summary: Point an indirection at another resource, both by name (sequencing/changeindirections); the change is live at once
+    params:
+      indirection: { type: string, max_length: 256, required: true,
+                     label: Indirection,
+                     description: "Indirection name as shown in Designer." }
+      resource:    { type: string, max_length: 256, required: true,
+                     label: Resource,
+                     description: "Name of the resource to point the indirection at, one of those get_indirection_resources lists." }
+    send: { method: POST, path: /api/session/sequencing/changeindirections, body: '{"changes":[{"indirection":{"name":{indirection:json}},"resource":{"name":{resource:json}}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  change_indirections:
+    summary: >
+      Change several indirections in one request (sequencing/changeindirections,
+      sequencingChangeIndirectionsRequest): changes is an array of {indirection,
+      resource}, each a Locator {uid} or {name}
+    params:
+      changes: { type: json, required: true,
+                 label: Changes,
+                 description: "JSON array of {\"indirection\": Locator, \"resource\": Locator}, each Locator {\"uid\": \"...\"} or {\"name\": \"...\"}." }
+    send: { method: POST, path: /api/session/sequencing/changeindirections, body: '{"changes":{changes}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -579,6 +623,7 @@ telemetry:
       - { method: GET, path: /api/session/transport/activetransport }
       - { method: GET, path: /api/session/status/health }
       - { method: GET, path: /api/session/status/notifications }
+      - { method: GET, path: /api/session/sequencing/indirections }
   # What an operator changes in the project, and the machines' set-up, every
   # minute (and on connecting).
   subscribe:
@@ -809,6 +854,36 @@ telemetry:
         - { method: GET, path: /api/session/status/health }
         - { method: GET, path: /api/session/status/session }
         - { method: GET, path: /api/session/failover/settings }
+    # Indirections, and for each the resources it can point to.
+    - path: "^/api/session/sequencing/indirections$"
+      json_match: { "$.result": "^\\[" }
+      replace: indirections
+      json_each: "$.result"
+      json:
+        uid: "$.uid"
+        name: "$.name"
+        type: "$.resourceType"
+        resource_uid: "$.currentResource.uid"
+        resource_name: "$.currentResource.name"
+      state:
+        indirections.{uid}.name: "{name}"
+        indirections.{uid}.resource_type: "{type}"
+        indirections.{uid}.resource_uid: "{resource_uid}"
+        indirections.{uid}.resource: "{resource_name}"
+      then_send:
+        - { method: GET, path: /api/session/sequencing/indirectionresources, query: { uid: "{uid}" } }
+    - path: "^/api/session/sequencing/indirectionresources\\?uid=([0-9]+)$"
+      json_match: { "$.result": "^\\[" }
+      replace: indirection_resources.{1}
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name" }
+      state:
+        indirection_resources.{1}.{uid}: "{name}"
+    - path: "^/api/session/sequencing/changeindirections$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/sequencing/indirections }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -881,6 +956,11 @@ state:
   failover.normal_preset:          { type: string, description: "The session's normal feed preset" }
   failover.current_preset:         { type: string, description: "The feed preset in use now, which differs from the normal one after a failover" }
   failover.understudy_targets:     { type: string, description: "The machines each understudy can take over: a JSON object keyed by understudy, each {targets: [{uid, name}]}" }
+  indirections.*.name:             { type: string, description: "Indirection name, keyed by the indirection's uid" }
+  indirections.*.resource_type:    { type: string, description: "Type of resource the indirection points to, as Designer names it" }
+  indirections.*.resource_uid:     { type: string, description: "uid of the resource the indirection points to now (change_indirection)" }
+  indirections.*.resource:         { type: string, description: "Name of the resource the indirection points to now (change_indirection)" }
+  indirection_resources.*.*:       { type: string, description: "A resource an indirection can point to, keyed by the indirection's uid then the resource's uid: its name" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -971,3 +1051,10 @@ quirks:
       them only. Those are edited in Designer. The understudy targets come keyed
       as Designer keys them, which disguise does not document, so they are kept
       whole as JSON text.
+  - models: [all]
+    severity: warning
+    text: >
+      change_indirection and change_indirections switch what every layer using
+      the indirection shows, at once and on every machine. Indirections, and
+      the resources each can point to, are read every 10 seconds; the API
+      cannot create indirections or change which resources they offer.
