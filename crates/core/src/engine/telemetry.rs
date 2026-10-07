@@ -60,6 +60,8 @@ enum Matcher {
         select: Vec<(String, Regex)>,
         json: BTreeMap<String, String>,
         each: Option<String>,
+        /// `each_match`: selectors each element must match.
+        each_select: Vec<(String, Regex)>,
     },
     /// The JSON reply to an HTTP request whose path matches; `json` names the
     /// values to take, by JSON path. `select` (`json_match`) must match the
@@ -74,6 +76,9 @@ enum Matcher {
         /// A JSON path to an array: the rule matches once per element, and
         /// `json` paths are taken from the element.
         each: Option<String>,
+        /// `each_match`: selectors on each element (`$^.` for the one it
+        /// lies in); an element that does not match is skipped.
+        each_select: Vec<(String, Regex)>,
         /// `headers`: capture names to response header names. A rule with
         /// only these reads no body, so the body need not be JSON.
         headers: BTreeMap<String, String>,
@@ -131,13 +136,30 @@ fn each_items<'a>(doc: &'a Value, each: &str) -> Vec<EachItem<'a>> {
     out
 }
 
+/// The value at a JSON path from an element `json_each` reached: `$.` is the
+/// element's, `$^.` the element one level out's (`$^^.` two).
+fn element_path<'a>(e: &EachItem<'a>, path: &str) -> Option<&'a Value> {
+    let up = path
+        .strip_prefix('$')
+        .map_or(0, |rest| rest.len() - rest.trim_start_matches('^').len());
+    match up {
+        0 => super::expect::json_path(e.item, path),
+        n => {
+            let node = e.outer.len().checked_sub(n).map(|i| e.outer[i])?;
+            super::expect::json_path(node, &format!("${}", &path[1 + n..]))
+        }
+    }
+}
+
 /// The captures of each match of a JSON rule: `base` (the path's and the
-/// selectors'), then its `json` names. With `json_each`, once per element:
+/// selectors'), then its `json` names. With `json_each`, once per element
+/// that `each_match` selects (its captures numbered on after `base`'s):
 /// `json` paths are the element's, `$^.` names the element one level out
 /// (`$^^.` two), and `{index}` is the element's index in its array.
 fn each_values(
     doc: &Value,
     each: Option<&str>,
+    each_select: &[(String, Regex)],
     json: &BTreeMap<String, String>,
     base: &[(String, Value)],
 ) -> Vec<Vec<(String, Value)>> {
@@ -151,27 +173,33 @@ fn each_values(
     };
     items
         .into_iter()
-        .map(|e| {
+        .filter_map(|e| {
             let mut values = base.to_vec();
+            let mut offset = base
+                .iter()
+                .filter(|(k, _)| k.bytes().all(|b| b.is_ascii_digit()))
+                .count();
+            for (path, re) in each_select {
+                let text = match element_path(&e, path)? {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                let caps = re.captures(&text)?;
+                for (i, v) in captures(&caps) {
+                    let i: usize = i.parse().unwrap_or(0);
+                    values.push(((i + offset).to_string(), v));
+                }
+                offset += caps.len() - 1;
+            }
             if each.is_some() {
                 values.push(("index".to_string(), Value::from(e.index)));
             }
             for (name, path) in json {
-                let up = path
-                    .strip_prefix('$')
-                    .map_or(0, |rest| rest.len() - rest.trim_start_matches('^').len());
-                let (node, path) = match up {
-                    0 => (Some(e.item), path.clone()),
-                    n => (
-                        e.outer.len().checked_sub(n).map(|i| e.outer[i]),
-                        format!("${}", &path[1 + n..]),
-                    ),
-                };
-                if let Some(v) = present(node.and_then(|n| super::expect::json_path(n, &path))) {
+                if let Some(v) = present(element_path(&e, path)) {
                     values.push((name.clone(), v.clone()));
                 }
             }
-            values
+            Some(values)
         })
         .collect()
 }
@@ -241,9 +269,10 @@ struct Rule {
     /// `then_send`: requests queued when the rule matches, templates over
     /// its captures and the settings (a re-read the push only announces).
     then_send: Vec<Value>,
-    /// `replace`: state subtrees (templates over the captures before
-    /// `json_each`) the rule's values replace: removed whenever the rule's
-    /// message arrives, before its values are applied.
+    /// `replace`: state subtrees the rule's values replace: removed whenever
+    /// the rule's message arrives, before its values are applied. Templates
+    /// over the captures before `json_each`, and with it also rendered for
+    /// each element from that element's captures.
     replace: Vec<String>,
 }
 
@@ -496,6 +525,7 @@ impl Telemetry {
                         request: selectors(rule.get("request_match"), "request_match")?,
                         json,
                         each,
+                        each_select: selectors(rule.get("each_match"), "each_match")?,
                         headers,
                     }
                 } else if let Some(e) = rule.get("xml_each").and_then(Value::as_str) {
@@ -514,6 +544,7 @@ impl Telemetry {
                         .get("json_each")
                         .and_then(Value::as_str)
                         .map(str::to_string),
+                    each_select: selectors(rule.get("each_match"), "each_match")?,
                 }
             } else if let Some(h) = rule.get("header") {
                 let header = regex(h, "header")?;
@@ -732,6 +763,7 @@ impl Telemetry {
                         request: request_select,
                         json,
                         each,
+                        each_select,
                         headers: header_names,
                     },
                     Inbound::Http {
@@ -765,7 +797,10 @@ impl Telemetry {
                         continue;
                     }
                     self.clear(rule, &base, cleared);
-                    for values in each_values(&doc, each.as_deref(), json, &base) {
+                    for values in each_values(&doc, each.as_deref(), each_select, json, &base) {
+                        if each.is_some() {
+                            self.clear(rule, &values, cleared);
+                        }
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
@@ -798,6 +833,7 @@ impl Telemetry {
                         select: selectors,
                         json,
                         each,
+                        each_select,
                     },
                     Inbound::Json(doc),
                 ) => {
@@ -806,7 +842,10 @@ impl Telemetry {
                         continue;
                     }
                     self.clear(rule, &base, cleared);
-                    for values in each_values(doc, each.as_deref(), json, &base) {
+                    for values in each_values(doc, each.as_deref(), each_select, json, &base) {
+                        if each.is_some() {
+                            self.clear(rule, &values, cleared);
+                        }
                         any |= self.matched(rule, &values, &mut patch, triggers);
                     }
                 }
@@ -1511,6 +1550,50 @@ mod tests {
         crate::session::merge_patch(&mut s, &cleared);
         crate::session::merge_patch(&mut s, &patch.unwrap());
         assert_eq!(s, json!({"files": {"0": "B.ult"}}));
+    }
+
+    #[test]
+    fn each_element_selected_and_its_own_list_replaced() {
+        let t = Telemetry::parse(
+            Some(&json!({"updates": [
+                // Each set that carries a list (empty or not) has it replaced.
+                {"path": "^/sets$", "json_each": "$.data", "json": {"id": "$.id"},
+                 "each_match": {"$.type": "^sets$", "$.list": "^\\["},
+                 "replace": "sets.{id}.list"},
+                // Each entry of each set's list, sets only.
+                {"path": "^/sets$", "json_each": "$.data[*].list",
+                 "each_match": {"$^.type": "^(sets)$"}, "json": {"id": "$^.id", "v": "$.v"},
+                 "state": {"{1}.{id}.list.{index}": "{v}"}},
+            ]})),
+            &state(json!({"sets.*.list.*": {"type": "string", "description": "x"}})),
+            Conversions::new(),
+        )
+        .unwrap();
+        let body = br#"{"data": [
+            {"type": "sets", "id": "a", "list": [{"v": "x"}, {"v": "y"}]},
+            {"type": "sets", "id": "b", "list": []},
+            {"type": "sets", "id": "c"},
+            {"type": "other", "id": "d", "list": [{"v": "z"}]}]}"#;
+        let mut cleared = json!({});
+        let patch = t.apply_into(
+            &Inbound::Http {
+                path: "/sets",
+                headers: &[],
+                body,
+                request: None,
+            },
+            &mut Vec::new(),
+            &mut cleared,
+        );
+        // c has no list: kept. d is not a set: neither cleared nor written.
+        assert_eq!(
+            cleared,
+            json!({"sets": {"a": {"list": null}, "b": {"list": null}}})
+        );
+        assert_eq!(
+            patch,
+            Some(json!({"sets": {"a": {"list": {"0": "x", "1": "y"}}}}))
+        );
     }
 
     #[test]

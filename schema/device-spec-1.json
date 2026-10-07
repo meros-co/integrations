@@ -578,6 +578,14 @@
                 "type": "string",
                 "description": "With path or json_match, and json: a JSON path to an array; the rule matches once per element, json paths relative to it. [*] in the path goes through every element of an array on the way ($.data[*].ingest_streams); $^. names the element one level out, $^^. two, and {index} is the element's index in its array (SPEC.md §8)."
               },
+              "each_match": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "With json_each: JSON path from each element ($^. for the element one level out) to an RE2-safe regex its value must match, as json_match does for the message; an element that does not match is skipped, values, then_send and replace alike. Its captures are numbered on after the path's and json_match's (SPEC.md §8, Lists)."
+              },
               "arg_types": {
                 "type": "string",
                 "pattern": "^[ifsbhdTFN]*$",
@@ -625,7 +633,7 @@
                 "description": "Messages queued when the rule matches, as poll items are: templates over the rule's captures ({1}, json and headers names) and settings. A message already waiting is not queued again. For a push that only says something changed (SPEC.md §8, Re-reads on a push)."
               },
               "replace": {
-                "description": "State subtrees the rule's values replace: removed whenever the rule's message arrives (its path, header or selectors match, even with no element), before its values are applied, so a list that shrinks or empties leaves nothing behind. Templates over the captures before json_each. Alone (no state), beside the plain rule that writes the values, when only some messages hold the whole list (SPEC.md §8, Lists).",
+                "description": "State subtrees the rule's values replace: removed whenever the rule's message arrives (its path, header or selectors match, even with no element), before its values are applied, so a list that shrinks or empties leaves nothing behind. Templates over the captures before json_each; with json_each, also rendered for each element from its captures (its json names, {index}, each_match), removing that element's subtree. Alone (no state), beside the plain rule that writes the values, when only some messages hold the whole list (SPEC.md §8, Lists).",
                 "oneOf": [
                   {
                     "type": "string"

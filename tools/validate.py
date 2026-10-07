@@ -623,7 +623,9 @@ def telemetry_checks(doc: dict, conversions: dict | None = None) -> list[str]:
                 errors.append(f"{where}.request_match: {e}")
             if "match" not in rule or transport_type not in ("line-tcp", "line-udp"):
                 errors.append(f"{where}: a request_match regex goes with match, on a line transport")
-        for key in ("json_match", "request_match"):
+        if "each_match" in rule and "json_each" not in rule:
+            errors.append(f"{where}: each_match selects elements of json_each")
+        for key in ("json_match", "request_match", "each_match"):
             if not isinstance(rule.get(key) or {}, dict):
                 continue
             for jpath, pattern in (rule.get(key) or {}).items():
