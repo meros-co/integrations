@@ -487,11 +487,65 @@ cue('set_cue_video_input_patch_id', 'videoInputPatchID', {'patch_id': 'none'}, [
 cue('get_cue_video_input_patch_id', 'videoInputPatchID', {}, [])
 cue('set_cue_camera_patch_qlab4', 'cameraPatch', {'patch': 2}, [('i', 2)], model="qlab-4")
 cue('get_cue_camera_patch_qlab4', 'cameraPatch', {}, [], model="qlab-4")
+cue('set_cue_text', 'text', {'text': 'Act One'}, [('s', 'Act One')])
+cue('set_cue_text_live', 'text/live', {'text': 'Act One'}, [('s', 'Act One')])
+cue('get_cue_text', 'text', {}, [])
+cue('set_cue_text_live_qlab4', 'liveText', {'text': 'Act One'}, [('s', 'Act One')], model="qlab-4")
+cue('set_cue_fixed_width', 'fixedWidth', {'width': 800.0}, [('f', 800.0)])
+cue('get_cue_fixed_width', 'fixedWidth', {}, [])
+cue('set_cue_text_format', 'text/format', {'format': '[{"fontSize":72}]'}, [('s', '[{"fontSize":72}]')])
+cue('set_cue_text_format_live', 'text/format/live', {'format': '[{"fontSize":72}]'}, [('s', '[{"fontSize":72}]')])
+cue('get_cue_text_format', 'text/format', {}, [])
+cue('set_cue_text_alignment', 'text/format/alignment', {'alignment': 'center'}, [('s', 'center')])
+cue('set_cue_text_alignment_live', 'text/format/alignment/live', {'alignment': 'center'}, [('s', 'center')])
+cue('get_cue_text_alignment', 'text/format/alignment', {}, [])
+cue('set_cue_text_color', 'text/format/color', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('set_cue_text_color_live', 'text/format/color/live', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('get_cue_text_color', 'text/format/color', {}, [])
+cue('set_cue_text_background_color', 'text/format/backgroundColor', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('set_cue_text_background_color_live', 'text/format/backgroundColor/live', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('get_cue_text_background_color', 'text/format/backgroundColor', {}, [])
+cue('set_cue_text_shadow_color', 'text/format/shadowColor', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('set_cue_text_shadow_color_live', 'text/format/shadowColor/live', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('get_cue_text_shadow_color', 'text/format/shadowColor', {}, [])
+cue('set_cue_text_strikethrough_color', 'text/format/strikethroughColor', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('set_cue_text_strikethrough_color_live', 'text/format/strikethroughColor/live', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('get_cue_text_strikethrough_color', 'text/format/strikethroughColor', {}, [])
+cue('set_cue_text_underline_color', 'text/format/underlineColor', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('set_cue_text_underline_color_live', 'text/format/underlineColor/live', {'red': 1.0, 'green': 0.5, 'blue': 0.0, 'alpha': 1.0}, [('f', 1.0), ('f', 0.5), ('f', 0.0), ('f', 1.0)])
+cue('get_cue_text_underline_color', 'text/format/underlineColor', {}, [])
+cue('get_cue_text_font_family', 'text/format/fontFamily', {}, [])
+cue('get_cue_text_font_style', 'text/format/fontStyle', {}, [])
+cue('set_cue_text_font_family_and_style', 'text/format/fontFamilyAndStyle', {'family': 'Helvetica', 'style': 'Bold'}, [('s', 'Helvetica'), ('s', 'Bold')])
+cue('set_cue_text_font_family_and_style_live', 'text/format/fontFamilyAndStyle/live', {'family': 'Helvetica', 'style': 'Bold'}, [('s', 'Helvetica'), ('s', 'Bold')])
+cue('get_cue_text_font_family_and_style', 'text/format/fontFamilyAndStyle', {}, [])
+cue('set_cue_text_font_name', 'text/format/fontName', {'font': 'Helvetica-Bold'}, [('s', 'Helvetica-Bold')])
+cue('set_cue_text_font_name_live', 'text/format/fontName/live', {'font': 'Helvetica-Bold'}, [('s', 'Helvetica-Bold')])
+cue('get_cue_text_font_name', 'text/format/fontName', {}, [])
+cue('set_cue_text_font_size', 'text/format/fontSize', {'size': 72.0}, [('f', 72.0)])
+cue('set_cue_text_font_size_live', 'text/format/fontSize/live', {'size': 72.0}, [('f', 72.0)])
+cue('get_cue_text_font_size', 'text/format/fontSize', {}, [])
+cue('set_cue_text_line_spacing', 'text/format/lineSpacing', {'spacing': 1.2}, [('f', 1.2)])
+cue('set_cue_text_line_spacing_live', 'text/format/lineSpacing/live', {'spacing': 1.2}, [('f', 1.2)])
+cue('get_cue_text_line_spacing', 'text/format/lineSpacing', {}, [])
+cue('set_cue_text_shadow_blur_radius', 'text/format/shadowBlurRadius', {'radius': 4.0}, [('f', 4.0)])
+cue('set_cue_text_shadow_blur_radius_live', 'text/format/shadowBlurRadius/live', {'radius': 4.0}, [('f', 4.0)])
+cue('get_cue_text_shadow_blur_radius', 'text/format/shadowBlurRadius', {}, [])
+cue('set_cue_text_shadow_offset', 'text/format/shadowOffset', {'width': 3.0, 'height': -3.0}, [('f', 3.0), ('f', -3.0)])
+cue('set_cue_text_shadow_offset_live', 'text/format/shadowOffset/live', {'width': 3.0, 'height': -3.0}, [('f', 3.0), ('f', -3.0)])
+cue('get_cue_text_shadow_offset', 'text/format/shadowOffset', {}, [])
+cue('set_cue_text_strikethrough_style', 'text/format/strikethroughStyle', {'style': 'single'}, [('s', 'single')])
+cue('set_cue_text_strikethrough_style_live', 'text/format/strikethroughStyle/live', {'style': 'single'}, [('s', 'single')])
+cue('get_cue_text_strikethrough_style', 'text/format/strikethroughStyle', {}, [])
+cue('set_cue_text_underline_style', 'text/format/underlineStyle', {'style': 'double'}, [('s', 'double')])
+cue('set_cue_text_underline_style_live', 'text/format/underlineStyle/live', {'style': 'double'}, [('s', 'double')])
+cue('get_cue_text_underline_style', 'text/format/underlineStyle', {}, [])
+cue('get_cue_text_output_size', 'text/outputSize', {}, [])
 
 # State. Workspace and cue IDs as QLab reports them (uniqueID, UUID strings).
 WS = UID
 L1, C1, G1, C2 = LIST_UID, CUE_UID, "6A000001-0000-4000-8000-0000000000C3", "6A000001-0000-4000-8000-0000000000C4"
-VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","startTime","endTime","playCount","lastSlicePlayCount","lastSliceInfiniteLoop","preservePitch","doPitchShift","doFade","lockFadeToCue","sliceMarkers","muteChannels","soloChannels","numChannelsIn","audioOutputPatchName","audioOutputPatchNumber","audioOutputPatchID","patch","audioMapID","objects","audioInputPatchName","audioInputPatchID","channelOffset","channels","anchor/x","anchor/y","blendMode","clockType","cropTop","cropBottom","cropLeft","cropRight","cueSize","fillStage","fullSurface","fillStyle","holdLastFrame","layer","opacity","preserveAspectRatio","quaternion","scale/x","scale/y","smooth","stageID","stageName","surfaceID","translation/x","translation/y","videoEffects","videoInputPatchName","videoInputPatchID","cameraPatch","cueTargetId"]'
+VFK = '["uniqueID","number","name","listName","displayName","type","colorName","colorName/live","secondColorName","useSecondColor","flagged","armed","notes","autoLoad","continueMode","preWait","postWait","duration","currentDuration","parent","cueTargetID","cueTargetNumber","fileTarget","targetMode","patchTargetID","duckOthers","duckLevel","duckTime","fadeAndStopOthers","fadeAndStopOthersTime","secondTriggerAction","secondTriggerOnRelease","skipIfDisarmed","rate","infiniteLoop","hasFileTargets","hasCueTargets","levels","sliderLevels","isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","startTime","endTime","playCount","lastSlicePlayCount","lastSliceInfiniteLoop","preservePitch","doPitchShift","doFade","lockFadeToCue","sliceMarkers","muteChannels","soloChannels","numChannelsIn","audioOutputPatchName","audioOutputPatchNumber","audioOutputPatchID","patch","audioMapID","objects","audioInputPatchName","audioInputPatchID","channelOffset","channels","anchor/x","anchor/y","blendMode","clockType","cropTop","cropBottom","cropLeft","cropRight","cueSize","fillStage","fullSurface","fillStyle","holdLastFrame","layer","opacity","preserveAspectRatio","quaternion","scale/x","scale/y","smooth","stageID","stageName","surfaceID","translation/x","translation/y","videoEffects","videoInputPatchName","videoInputPatchID","cameraPatch","text","fixedWidth","text/format","text/format/alignment","cueTargetId"]'
 TIMING_KEYS = '["isRunning","isPaused","isLoaded","isBroken","isAuditioning","isPanicking","isTailingOut","isActionRunning","isOverridden","isWarning","actionElapsed","percentActionElapsed","preWaitElapsed","percentPreWaitElapsed","postWaitElapsed","percentPostWaitElapsed","currentFileTime","currentDuration"]'
 
 
@@ -617,4 +671,9 @@ telemetry(Q, 'cue-values-audio',
 telemetry(Q, 'cue-values-video',
           inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'anchor/x': 1.5, 'anchor/y': 1.5, 'blendMode': 'x', 'clockType': 'x', 'cropTop': 1.5, 'cropBottom': 1.5, 'cropLeft': 1.5, 'cropRight': 1.5, 'cueSize': 'x', 'fillStage': True, 'fullSurface': True, 'fillStyle': 2, 'holdLastFrame': True, 'layer': 2, 'opacity': 1.5, 'preserveAspectRatio': True, 'quaternion': 'x', 'scale/x': 1.5, 'scale/y': 1.5, 'smooth': True, 'stageID': 'x', 'stageName': 'x', 'surfaceID': 2, 'translation/x': 1.5, 'translation/y': 1.5, 'videoEffects': 'x', 'videoInputPatchName': 'x', 'videoInputPatchID': 'x', 'cameraPatch': 2}),
           expect_state={"workspaces": {WS: {"cues": {C1: {'anchor_x': 1.5, 'anchor_y': 1.5, 'blend_mode': 'x', 'clock_type': 'x', 'crop_top': 1.5, 'crop_bottom': 1.5, 'crop_left': 1.5, 'crop_right': 1.5, 'cue_size': 'x', 'fill_stage': True, 'full_surface': True, 'fill_style': 2, 'hold_last_frame': True, 'layer': 2, 'opacity': 1.5, 'preserve_aspect_ratio': True, 'quaternion': 'x', 'scale_x': 1.5, 'scale_y': 1.5, 'smooth': True, 'stage_id': 'x', 'stage_name': 'x', 'surface_id': 2, 'translation_x': 1.5, 'translation_y': 1.5, 'video_effects': 'x', 'video_input_patch_name': 'x', 'video_input_patch_id': 'x', 'camera_patch': 2}}}}})
+
+# The text keys of a cue's values (sample values by type).
+telemetry(Q, 'cue-values-text',
+          inbound_hex=reply(f"/workspace/{WS}/cue_id/{C1}/valuesForKeys", {'text': 'x', 'fixedWidth': 1.5, 'text/format': 'x', 'text/format/alignment': 'x'}),
+          expect_state={"workspaces": {WS: {"cues": {C1: {'text': 'x', 'fixed_width': 1.5, 'text_format': 'x', 'text_alignment': 'x'}}}}})
 
