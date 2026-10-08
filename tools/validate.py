@@ -505,7 +505,9 @@ def per_model_checks(doc: dict, model_ids: set) -> list[str]:
                ("transport.session.login", (transport.get("session") or {}).get("login")),
                ("telemetry.poll.send", (telemetry.get("poll") or {}).get("send")),
                ("telemetry.subscribe.send", (telemetry.get("subscribe") or {}).get("send")),
-               ("on_connect", doc.get("on_connect"))]
+               ("on_connect", doc.get("on_connect")),
+               # Update rules naming `models` (SPEC.md §8, Rules per model).
+               ("telemetry.updates", telemetry.get("updates"))]
     for where, send in places:
         for i, item in enumerate(items_of(send)):
             if isinstance(item, dict) and "models" in item:
