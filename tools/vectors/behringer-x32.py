@@ -354,7 +354,7 @@ binary(X, "set_node", {"text": "ch/01/config Vox 1 RD 1"}, osc("/", ("s", "ch/01
 telemetry(X, "param-float", inbound_hex=hexs(osc("/ch/01/gate/thr", ("f", 0.5))),
           expect_state={"channels": {"1": {"gate": {"threshold": 0.5}}}})
 telemetry(X, "param-int", inbound_hex=hexs(osc("/-prefs/clocksource", ("i", 1))), expect_state={})
-telemetry(X, "param-string", inbound_hex=hexs(osc("/-show/showfile/show/name", ("s", "Sunday"))), expect_state={})
+telemetry(X, "param-string", inbound_hex=hexs(osc("/-prefs/style", ("s", "Patrick"))), expect_state={})
 
 
 # ── EQ bands (p.26-37) ────────────────────────────────────────────────────
@@ -592,6 +592,79 @@ telemetry(X, "dp48-assign", inbound_hex=hexs(osc("/config/dp48/assign/07", ("i",
 telemetry(X, "dp48-group-name", inbound_hex=hexs(osc("/config/dp48/grpname/12", ("s", "Vox"))),
           expect_state={"dp48": {"group_names": {"12": "Vox"}}})
 telemetry(X, "dp48-scope", inbound_hex=hexs(osc("/config/dp48/scope", ("i", 3))), expect_state={"dp48": {"scope": 3}})
+
+
+# ── Show, scene, snippet, cue and library management (p.43-52) ────────────
+# /save, /load, /rename, /delete, /copy and /add are answered on their own
+# address with ,si <type> <status>: the document's examples, p.49-52.
+def _op(cmd, inp, verb, args, kind, status=1):
+    binary(X, cmd, inp, osc(f"/{verb}", *args), device_reply_hex=hexs(osc(f"/{verb}", ("s", kind), ("i", status))),
+           expect_result={"ok": {"kind": "value", "value": status}})
+
+
+_op("save_scene", {"index": 45, "name": "test", "note": "note"}, "save",
+    [("s", "scene"), ("i", 45), ("s", "test"), ("s", "note")], "scene")
+_op("save_snippet", {"index": 0, "name": "Aaa"}, "save", [("s", "snippet"), ("i", 0), ("s", "Aaa")], "snippet")
+_op("save_channel_preset", {"index": 3, "name": "Kick", "strip": 1}, "save",
+    [("s", "libchan"), ("i", 3), ("s", "Kick"), ("i", 0)], "libchan")
+_op("save_fx_preset", {"index": 99, "name": "Hall", "slot": 8}, "save", [("s", "libfx"), ("i", 99), ("s", "Hall"), ("i", 7)], "libfx")
+_op("save_routing_preset", {"index": 1, "name": "Tour"}, "save", [("s", "librout"), ("i", 1), ("s", "Tour")], "librout", 0)
+_op("save_dp48_preset", {"index": 2, "name": "Band"}, "save", [("s", "libmon"), ("i", 2), ("s", "Band")], "libmon")
+_op("load_channel_preset", {"index": 3, "strip": 72, "scope": 63}, "load",
+    [("s", "libchan"), ("i", 3), ("i", 71), ("i", 63)], "libchan")
+_op("load_fx_preset", {"index": 5, "slot": 1}, "load", [("s", "libfx"), ("i", 5), ("i", 0)], "libfx")
+_op("load_routing_preset", {"index": 0}, "load", [("s", "librout"), ("i", 0)], "librout")
+_op("load_dp48_preset", {"index": 9}, "load", [("s", "libmon"), ("i", 9)], "libmon")
+_op("rename_library_item", {"kind": "scene", "index": 99, "name": "myScene"}, "rename",
+    [("s", "scene"), ("i", 99), ("s", "myScene")], "scene")
+_op("delete_library_item", {"kind": "scene", "index": 99}, "delete", [("s", "scene"), ("i", 99)], "scene")
+_op("copy_library_item", {"kind": "libchan", "source": 45, "destination": 48}, "copy",
+    [("s", "libchan"), ("i", 45), ("i", 48)], "libchan")
+_op("add_cue", {"number": 1252, "name": "Ccc"}, "add", [("s", "cue"), ("i", 1252), ("s", "Ccc")], "cue")
+binary(X, "set_show_name", {"name": "MyShow"}, osc("/-show/showfile/show/name", ("s", "MyShow")))
+binary(X, "set_scene_safes", {"group": "inputs", "bitmap": 36}, osc("/-show/showfile/show/inputs", ("i", 36)))
+for cmd, inp, leaf, wire in [("set_cue_number", {"number": 10327}, "numb", ("i", 10327)),
+                             ("set_cue_name", {"name": "Intro"}, "name", ("s", "Intro")),
+                             ("set_cue_skip", {"skip": True}, "skip", ("i", 1)),
+                             ("set_cue_scene", {"scene": -1}, "scene", ("i", -1)),
+                             ("set_cue_snippet", {"snippet": 3}, "bit", ("i", 3)),
+                             ("set_cue_midi_type", {"type": 1}, "miditype", ("i", 1)),
+                             ("set_cue_midi_channel", {"channel": 16}, "midichan", ("i", 16)),
+                             ("set_cue_midi_param1", {"value": 127}, "midipara1", ("i", 127)),
+                             ("set_cue_midi_param2", {"value": 0}, "midipara2", ("i", 0))]:
+    binary(X, cmd, {"index": 2, **inp}, osc(f"/-show/showfile/cue/002/{leaf}", wire))
+binary(X, "set_scene_name", {"index": 1, "name": "AAA"}, osc("/-show/showfile/scene/001/name", ("s", "AAA")))
+binary(X, "set_scene_notes", {"index": 1, "notes": "aaa"}, osc("/-show/showfile/scene/001/notes", ("s", "aaa")))
+binary(X, "set_scene_safe_groups", {"index": 1, "bitmap": 262}, osc("/-show/showfile/scene/001/safes", ("i", 262)))
+binary(X, "set_snippet_name", {"index": 0, "name": "Aaa"}, osc("/-show/showfile/snippet/000/name", ("s", "Aaa")))
+binary(X, "set_snippet_filters", {"index": 0, "bitmap": 1}, osc("/-show/showfile/snippet/000/eventtyp", ("i", 1)))
+binary(X, "set_snippet_channels", {"index": 0, "bitmap": -1}, osc("/-show/showfile/snippet/000/channels", ("i", -1)))
+binary(X, "set_snippet_aux_buses", {"index": 0, "bitmap": 65536}, osc("/-show/showfile/snippet/000/auxbuses", ("i", 65536)))
+binary(X, "set_snippet_main_groups", {"index": 0, "bitmap": 32768}, osc("/-show/showfile/snippet/000/maingrps", ("i", 32768)))
+telemetry(X, "show-name", inbound_hex=hexs(osc("/-show/showfile/show/name", ("s", "Sunday"))), expect_state={"show": {"name": "Sunday"}})
+telemetry(X, "show-safes", inbound_hex=hexs(osc("/-show/showfile/show/effects", ("i", 255))),
+          expect_state={"show": {"safes": {"effects": 255}}})
+for leaf, key, wire, value in [("numb", "number", ("i", 200), 200), ("skip", "skip", ("i", 1), True), ("scene", "scene", ("i", 2), 2),
+                               ("bit", "snippet", ("i", -1), -1), ("miditype", "midi_type", ("i", 3), 3),
+                               ("midichan", "midi_channel", ("i", 1), 1), ("midipara1", "midi_param1", ("i", 64), 64),
+                               ("midipara2", "midi_param2", ("i", 127), 127)]:
+    telemetry(X, f"cue-{key.replace('_', '-')}", inbound_hex=hexs(osc(f"/-show/showfile/cue/099/{leaf}", wire)),
+              expect_state={"cues": {"99": {key: value}}})
+telemetry(X, "scene-notes", inbound_hex=hexs(osc("/-show/showfile/scene/002/notes", ("s", "bbb"))),
+          expect_state={"scenes": {"2": {"notes": "bbb"}}})
+telemetry(X, "scene-safes", inbound_hex=hexs(osc("/-show/showfile/scene/002/safes", ("i", 2))), expect_state={"scenes": {"2": {"safes": 2}}})
+telemetry(X, "scene-has-data", inbound_hex=hexs(osc("/-show/showfile/scene/002/hasdata", ("i", 1))),
+          expect_state={"scenes": {"2": {"has_data": True}}})
+for leaf, key in [("eventtyp", "filters"), ("channels", "channels"), ("auxbuses", "aux_buses"), ("maingrps", "main_groups")]:
+    telemetry(X, f"snippet-{key.replace('_', '-')}", inbound_hex=hexs(osc(f"/-show/showfile/snippet/000/{leaf}", ("i", 3))),
+              expect_state={"snippets": {"0": {key: 3}}})
+telemetry(X, "snippet-has-data", inbound_hex=hexs(osc("/-show/showfile/snippet/000/hasdata", ("i", 0))),
+          expect_state={"snippets": {"0": {"has_data": False}}})
+for lib, key in [("ch", "channel"), ("fx", "fx"), ("r", "routing"), ("mon", "dp48")]:
+    telemetry(X, f"preset-{key}-name", inbound_hex=hexs(osc(f"/-libs/{lib}/001/name", ("s", "Preset"))),
+              expect_state={"presets": {key: {"1": {"name": "Preset"}}}})
+    telemetry(X, f"preset-{key}-has-data", inbound_hex=hexs(osc(f"/-libs/{lib}/100/hasdata", ("i", 1))),
+              expect_state={"presets": {key: {"100": {"has_data": True}}}})
 
 
 def _osc_args(packet):
