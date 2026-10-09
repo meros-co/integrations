@@ -968,9 +968,13 @@ can drift as specs change. The quirk text in the spec is the reference.
 
 ## panasonic-ptz — Panasonic PTZ
 
-- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:4325](specs/panasonic-ptz.yaml#L4325))
-- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:4331](specs/panasonic-ptz.yaml#L4331))
-- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:4310](specs/panasonic-ptz.yaml#L4310))
+- [ ] Confirm the menu keys need DUP:1 (the AW-UE usage examples send DUP). ([specs/panasonic-ptz.yaml:6538](specs/panasonic-ptz.yaml#L6538))
+- [ ] Confirm colour correction Yl_Yl_G uses OSD:1C/OSD:1D, not OSJ. ([specs/panasonic-ptz.yaml:6544](specs/panasonic-ptz.yaml#L6544))
+- [ ] Confirm the AWB A/B numbering difference between control (1, 2) and query (2, 3), and get_scene 0-3 for scenes 1-4. ([specs/panasonic-ptz.yaml:6523](specs/panasonic-ptz.yaml#L6523))
+- [ ] Confirm the AW-UE155 answers the AW-UE150 command set (assumed from the shared firmware; there is no AW-UE155 interface specification). ([specs/panasonic-ptz.yaml:716](specs/panasonic-ptz.yaml#L716))
+- [ ] Confirm the AW-UE150 pan/tilt speed modes: the document lists 0 Normal (60 deg/s), 1 Fast (180), 2 Quick (60), where the other documents give 0 normal 60, 1 fast1 90, 2 fast2 180. ([specs/panasonic-ptz.yaml:5086](specs/panasonic-ptz.yaml#L5086))
+- [ ] Confirm what awb_color_temperature (OSJ:4A) takes on AW-UE150/HE145/UE100: the usage example sends OSJ:4A:0, the command column OSJ:4A:[Data1]:[Data2]. ([specs/panasonic-ptz.yaml:1403](specs/panasonic-ptz.yaml#L1403))
+- [ ] Confirm flip_detect_angle sends #FDA (the AW-UE150 usage example shows #SPF5A). ([specs/panasonic-ptz.yaml:4905](specs/panasonic-ptz.yaml#L4905))
 
 ## pjlink — PJLink
 
