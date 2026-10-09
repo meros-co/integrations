@@ -468,3 +468,52 @@ _dg("execute_python", {"script": "return resourceManager.allResources(Track)[0].
 _dg("register_python_module", {"module": "helpers", "contents": "from d3 import *\ndef tracks():\n    return 1\n"},
     "POST", "/api/session/python/registermodule",
     '{"moduleName":"helpers","contents":"from d3 import *\\ndef tracks():\\n    return 1\\n"}', **_OK)
+
+# ── Mixed reality ──
+_MR = "/api/session/mixedreality/"
+_dg("get_mr_cameras", {}, "GET", _MR + "cameras")
+_dg("get_mr_sets", {}, "GET", _MR + "mrsets")
+_dg("get_spatial_calibrations", {}, "GET", _MR + "spatialcalibrations")
+_dg("get_capture_progress", {}, "GET", _MR + "captureprogress",
+    http_reply={"status": 200, "body": _envelope(result=True)}, expect_result={"ok": {"kind": "value", "value": True}})
+_dg("select_mr_camera", {"mr_set": "xr stage", "camera": "cam 2"}, "POST", _MR + "selectcamera",
+    '{"mrSet":{"name":"xr stage"},"cameraOverride":{"name":"cam 2"}}', **_OK)
+_dg("select_spatial_calibration", {"camera": "cam 2", "calibration": "cam 2 cal"}, "POST",
+    _MR + "selectspatialcalibration", '{"camera":{"name":"cam 2"},"spatialCalibration":{"name":"cam 2 cal"}}', **_OK)
+_dg("capture_observation", {"camera": "cam 2", "calibration": "cam 2 cal"}, "POST", _MR + "captureobservation",
+    '{"camera":{"name":"cam 2"},"spatialCalibration":{"name":"cam 2 cal"}}', **_OK)
+_dg("enable_observation", {"observation": "1901", "enable": False}, "POST", _MR + "enableobservations",
+    '{"observations":[{"uid":"1901","enable":false}]}', **_OK)
+_dg("delete_observation", {"observation": "1901"}, "POST", _MR + "deleteobservations",
+    '{"observations":["1901"]}', **_OK)
+_dg("delete_all_observations", {"calibration": "cam 2 cal"}, "POST", _MR + "deleteallobservations",
+    '{"spatialCalibration":{"name":"cam 2 cal"}}', **_OK)
+telemetry(DG, "mr-cameras", inbound_http={"path": _MR + "cameras", "body": _envelope(result=[
+    {"uid": "1801", "name": "cam 2", "spatialCalibration": {"uid": "1851", "name": "cam 2 cal"}}])},
+    state_before={"mixed_reality": {"cameras": {"1800": {"name": "gone"}}}},
+    expect_state={"mixed_reality": {"cameras": {"1801": {"name": "cam 2", "spatial_calibration": "cam 2 cal"}}}})
+telemetry(DG, "mr-sets", inbound_http={"path": _MR + "mrsets", "body": _envelope(result=[
+    {"uid": "1871", "name": "xr stage", "currentCamera": {"uid": "1801", "name": "cam 2"},
+     "isCameraOverride": True}])},
+    expect_state={"mixed_reality": {"sets": {"1871": {"name": "xr stage", "current_camera": "cam 2",
+                                                      "camera_override": True}}}})
+POSE = {"position": {"x": 1.0, "y": 2.0, "z": -3.5}, "rotation": {"x": 0.0, "y": 90.0, "z": 0.0}}
+telemetry(DG, "spatial-calibrations", inbound_http={"path": _MR + "spatialcalibrations", "body": _envelope(result=[
+    {"uid": "1851", "name": "cam 2 cal", "mrsets": [{"uid": "1871", "name": "xr stage"}],
+     "observations": [{"uid": "1901", "name": "obs 1", "trackedPose": POSE, "solvedPose": POSE, "isEnabled": True,
+                       "zoom": 0.25, "focus": 0.5, "type": "Primary", "rmsError": 0.8}]}])},
+    state_before={"mixed_reality": {"calibrations": {"1851": {"observations": {"1900": {"name": "deleted"}}}}}},
+    expect_state={"mixed_reality": {"calibrations": {"1851": {
+        "name": "cam 2 cal", "mr_sets": _compact([{"uid": "1871", "name": "xr stage"}]), "observations": {"1901": {
+            "name": "obs 1", "enabled": True, "zoom": 0.25, "focus": 0.5, "type": "Primary", "rms_error": 0.8,
+            "tracked_pose": _compact(POSE), "solved_pose": _compact(POSE)}}}}}})
+telemetry(DG, "capture-progress", inbound_http={"path": _MR + "captureprogress", "body": _envelope(result=False)},
+          expect_state={"mixed_reality": {"capturing": False}})
+telemetry(DG, "mr-select-camera-reread", inbound_http={"path": _MR + "selectcamera", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _MR + "mrsets"}], expect_state={})
+telemetry(DG, "mr-select-calibration-reread", inbound_http={"path": _MR + "selectspatialcalibration",
+                                                            "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _MR + "cameras"}], expect_state={})
+telemetry(DG, "mr-observations-reread", inbound_http={"path": _MR + "deleteobservations", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _MR + "captureprogress"},
+                            {"method": "GET", "target": _MR + "spatialcalibrations"}], expect_state={})

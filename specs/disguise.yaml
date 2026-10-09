@@ -141,7 +141,10 @@ models:
                get_cdls, set_cdl,
                get_notes, get_note, set_note,
                get_shot_recorders, record_shot,
-               execute_python, register_python_module]
+               execute_python, register_python_module,
+               get_mr_cameras, get_mr_sets, get_spatial_calibrations, get_capture_progress, select_mr_camera,
+               select_spatial_calibration, capture_observation, enable_observation, delete_observation,
+               delete_all_observations]
     verification: none
 
 commands:
@@ -932,6 +935,103 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── Mixed reality ────────────────────────────────────────────────────────
+  get_mr_cameras:
+    summary: The cameras on the current stage with the spatial calibration each uses (mixedreality/cameras)
+    send: { method: GET, path: /api/session/mixedreality/cameras }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_mr_sets:
+    summary: The mixed reality sets on the current stage with each one's current camera and whether it is overridden (mixedreality/mrsets)
+    send: { method: GET, path: /api/session/mixedreality/mrsets }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_spatial_calibrations:
+    summary: Every spatial calibration with its MR sets and observations (poses, zoom, focus, type, RMS error, enabled) (mixedreality/spatialcalibrations)
+    send: { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_capture_progress:
+    summary: Whether an observation capture is running; only one runs at a time (mixedreality/captureprogress)
+    send: { method: GET, path: /api/session/mixedreality/captureprogress }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  select_mr_camera:
+    summary: Override the current camera of an MR set, both by name (mixedreality/selectcamera)
+    params:
+      mr_set: { type: string, max_length: 256, required: true,
+                label: MR set,
+                description: "Name of the mixed reality set as shown in Designer." }
+      camera: { type: string, max_length: 256, required: true,
+                label: Camera,
+                description: "Name of the camera the set is to use." }
+    send: { method: POST, path: /api/session/mixedreality/selectcamera, body: '{"mrSet":{"name":{mr_set:json}},"cameraOverride":{"name":{camera:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  select_spatial_calibration:
+    summary: Set the spatial calibration a camera uses, both by name (mixedreality/selectspatialcalibration)
+    params:
+      camera:      { type: string, max_length: 256, required: true,
+                     label: Camera,
+                     description: "Name of the camera as shown in Designer." }
+      calibration: { type: string, max_length: 256, required: true,
+                     label: Spatial calibration,
+                     description: "Name of the spatial calibration the camera is to use." }
+    send: { method: POST, path: /api/session/mixedreality/selectspatialcalibration, body: '{"camera":{"name":{camera:json}},"spatialCalibration":{"name":{calibration:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  capture_observation:
+    summary: Capture an observation on a camera into a spatial calibration, both by name (mixedreality/captureobservation); get_capture_progress tells when it is done
+    params:
+      camera:      { type: string, max_length: 256, required: true,
+                     label: Camera,
+                     description: "Name of the camera to capture on." }
+      calibration: { type: string, max_length: 256, required: true,
+                     label: Spatial calibration,
+                     description: "Name of the spatial calibration the observation is added to." }
+    send: { method: POST, path: /api/session/mixedreality/captureobservation, body: '{"camera":{"name":{camera:json}},"spatialCalibration":{"name":{calibration:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  enable_observation:
+    summary: Enable or disable one observation of a spatial calibration, by its uid (mixedreality/enableobservations)
+    params:
+      observation: { type: string, pattern: "^[0-9]{1,20}$", required: true,
+                     label: Observation,
+                     description: "uid of the observation, from the spatial_calibrations state." }
+      enable:      { type: bool, default: true,
+                     label: Enabled,
+                     description: "True uses the observation in the calibration; false leaves it out." }
+    send: { method: POST, path: /api/session/mixedreality/enableobservations, body: '{"observations":[{"uid":"{observation}","enable":{enable}}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  delete_observation:
+    summary: Delete one observation of a spatial calibration, by its uid (mixedreality/deleteobservations)
+    params:
+      observation: { type: string, pattern: "^[0-9]{1,20}$", required: true,
+                     label: Observation,
+                     description: "uid of the observation to delete, from the spatial_calibrations state." }
+    send: { method: POST, path: /api/session/mixedreality/deleteobservations, body: '{"observations":["{observation}"]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  delete_all_observations:
+    summary: Delete every observation of a spatial calibration, by its name (mixedreality/deleteallobservations)
+    params:
+      calibration: { type: string, max_length: 256, required: true,
+                     label: Spatial calibration,
+                     description: "Name of the spatial calibration whose observations are all deleted." }
+    send: { method: POST, path: /api/session/mixedreality/deleteallobservations, body: '{"spatialCalibration":{"name":{calibration:json}}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -961,6 +1061,10 @@ telemetry:
       - { method: GET, path: /api/session/sockpuppet/easingfunctions }
       - { method: GET, path: /api/session/colour/cdls }
       - { method: GET, path: /api/session/notes }
+      - { method: GET, path: /api/session/mixedreality/cameras }
+      - { method: GET, path: /api/session/mixedreality/mrsets }
+      - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
+      - { method: GET, path: /api/session/mixedreality/captureprogress }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1455,6 +1559,76 @@ telemetry:
       json: {}
       then_send:
         - { method: GET, path: /api/session/shotrecorder/recorders }
+    # Mixed reality cameras, sets and spatial calibrations, keyed by uid.
+    - path: "^/api/session/mixedreality/cameras$"
+      json_match: { "$.result": "^\\[" }
+      replace: mixed_reality.cameras
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", calibration: "$.spatialCalibration.name" }
+      state:
+        mixed_reality.cameras.{uid}.name: "{name}"
+        mixed_reality.cameras.{uid}.spatial_calibration: "{calibration}"
+    - path: "^/api/session/mixedreality/mrsets$"
+      json_match: { "$.result": "^\\[" }
+      replace: mixed_reality.sets
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", camera: "$.currentCamera.name", override: "$.isCameraOverride" }
+      state:
+        mixed_reality.sets.{uid}.name: "{name}"
+        mixed_reality.sets.{uid}.current_camera: "{camera}"
+        mixed_reality.sets.{uid}.camera_override: "{override}"
+    - path: "^/api/session/mixedreality/spatialcalibrations$"
+      json_match: { "$.result": "^\\[" }
+      replace: mixed_reality.calibrations
+      json_each: "$.result"
+      json: { uid: "$.uid", name: "$.name", sets: "$.mrsets" }
+      state:
+        mixed_reality.calibrations.{uid}.name: "{name}"
+        mixed_reality.calibrations.{uid}.mr_sets: "{sets}"
+    - path: "^/api/session/mixedreality/spatialcalibrations$"
+      json_each: "$.result[*].observations"
+      json:
+        calibration: "$^.uid"
+        uid: "$.uid"
+        name: "$.name"
+        enabled: "$.isEnabled"
+        zoom: "$.zoom"
+        focus: "$.focus"
+        type: "$.type"
+        rms: "$.rmsError"
+        tracked: "$.trackedPose"
+        solved: "$.solvedPose"
+      state:
+        mixed_reality.calibrations.{calibration}.observations.{uid}.name: "{name}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.enabled: "{enabled}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.zoom: "{zoom}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.focus: "{focus}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.type: "{type}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.rms_error: "{rms}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.tracked_pose: "{tracked}"
+        mixed_reality.calibrations.{calibration}.observations.{uid}.solved_pose: "{solved}"
+    - path: "^/api/session/mixedreality/captureprogress$"
+      json_match: { "$.status.code": "^0$" }
+      json: { busy: "$.result" }
+      state:
+        mixed_reality.capturing: "{busy}"
+    # A selection or an observation change is read back.
+    - path: "^/api/session/mixedreality/(selectcamera)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/mixedreality/mrsets }
+    - path: "^/api/session/mixedreality/selectspatialcalibration$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/mixedreality/cameras }
+    - path: "^/api/session/mixedreality/(captureobservation|enableobservations|deleteobservations|deleteallobservations)$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/mixedreality/captureprogress }
+        - { method: GET, path: /api/session/mixedreality/spatialcalibrations }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1602,6 +1776,22 @@ state:
   shot_recorders.*.recording: { type: bool, description: "The shot recorder is recording, keyed by its name (record_shot)" }
   shot_recorders.*.slate:     { type: string, description: "The slate the recorder records under" }
   shot_recorders.*.take:      { type: int, description: "The take number the recorder records under" }
+  mixed_reality.cameras.*.name:                { type: string, description: "Camera on the current stage, keyed by its uid: its name" }
+  mixed_reality.cameras.*.spatial_calibration: { type: string, description: "The spatial calibration the camera uses (select_spatial_calibration)" }
+  mixed_reality.sets.*.name:                   { type: string, description: "Mixed reality set on the current stage, keyed by its uid: its name" }
+  mixed_reality.sets.*.current_camera:         { type: string, description: "The set's current camera (select_mr_camera)" }
+  mixed_reality.sets.*.camera_override:        { type: bool, description: "The set's camera is overridden rather than chosen by the set" }
+  mixed_reality.calibrations.*.name:           { type: string, description: "Spatial calibration, keyed by its uid: its name" }
+  mixed_reality.calibrations.*.mr_sets:        { type: string, description: "The MR sets the calibration belongs to, as a JSON array of {uid, name}" }
+  mixed_reality.calibrations.*.observations.*.name:         { type: string, description: "An observation of the calibration, keyed by its uid: its name" }
+  mixed_reality.calibrations.*.observations.*.enabled:      { type: bool, description: "The observation is used in the calibration (enable_observation)" }
+  mixed_reality.calibrations.*.observations.*.zoom:         { type: float, description: "The lens zoom when the observation was captured" }
+  mixed_reality.calibrations.*.observations.*.focus:        { type: float, description: "The lens focus when the observation was captured" }
+  mixed_reality.calibrations.*.observations.*.type:         { type: string, description: "Primary or Secondary" }
+  mixed_reality.calibrations.*.observations.*.rms_error:    { type: float, description: "The observation's RMS error" }
+  mixed_reality.calibrations.*.observations.*.tracked_pose: { type: string, description: "The tracked camera pose: JSON {position: {x, y, z}, rotation: {x, y, z}}" }
+  mixed_reality.calibrations.*.observations.*.solved_pose:  { type: string, description: "The solved camera pose, in the same form" }
+  mixed_reality.capturing:                     { type: bool, description: "An observation capture is running (capture_observation)" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1758,3 +1948,13 @@ quirks:
       module of the same name. Nothing here reads state from Python: every
       state key comes from the documented endpoints. The script and module source
       are JSON strings, since a text parameter here cannot hold a line break.
+  - models: [all]
+    severity: critical
+    text: >
+      delete_observation and delete_all_observations cannot be undone through
+      the API, and change a spatial calibration in use; select_mr_camera and
+      select_spatial_calibration change what an MR set shows at once. Cameras,
+      MR sets, spatial calibrations and capture progress are read every minute,
+      and again after each of these commands. The API has no way to clear a
+      camera override or to create cameras, sets or calibrations, and no
+      calibration solve: those are done in Designer.
