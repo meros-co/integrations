@@ -356,3 +356,50 @@ telemetry(DG, "renderstream-failover-reread", inbound_http={"path": _RS + "failo
           expect_then_send=[{"method": "GET", "target": _RS + "layers"},
                             {"method": "GET", "target": "/api/session/status/health"},
                             {"method": "GET", "target": _RS + "pools"}], expect_state={})
+
+# ── Sockpuppet ──
+_SP = "/api/session/sockpuppet/"
+_dg("get_sockpuppet_patches", {}, "GET", _SP + "patches")
+_dg("get_easing_functions", {}, "GET", _SP + "easingfunctions",
+    http_reply={"status": 200, "body": json.dumps({"easingFunctions": ["linear", "easeInOutQuad"]})},
+    expect_result={"ok": {"kind": "value", "value": ["linear", "easeInOutQuad"]}})
+_dg("set_live_float", {"patch": "/stage/wall", "field": "brightness", "value": 0.5, "duration": 2.0,
+                       "easing": "easeInOutQuad"}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"brightness","floatValue":{"value":0.500000,'
+    '"duration":2.000,"easingFunction":"easeInOutQuad"}}]}]}', **_OK)
+_dg("set_live_float", {"patch": "/stage/wall", "field": "x", "value": -12.25}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"x","floatValue":{"value":-12.250000,'
+    '"duration":0.000,"easingFunction":""}}]}]}', file="set_live_float_now")
+_dg("set_live_string", {"patch": "/stage/wall", "field": "blend", "value": "add"}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"blend","stringValue":"add"}]}]}', **_OK)
+_dg("set_live_resource", {"patch": "/stage/wall", "field": "video", "resource": "intro.mov"}, "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"video","resourceValue":{"name":"intro.mov"}}]}]}',
+    **_OK)
+_dg("send_live_changes", {"patches": [{"address": "/stage/wall", "changes": [{"field": "blend",
+                                                                              "stringValue": "add"}]}]},
+    "POST", _SP + "live",
+    '{"patches":[{"address":"/stage/wall","changes":[{"field":"blend","stringValue":"add"}]}]}', **_OK)
+FIELDS = [
+    {"name": "brightness", "displayName": "Brightness", "type": "float",
+     "floatMeta": {"min": 0.0, "max": 1.0, "defaultValue": 1.0, "step": 0.01},
+     "floatValue": {"value": 0.5, "duration": 2.0, "easingFunction": "linear", "startValue": 1.0,
+                    "currentValue": 0.75}},
+    {"name": "blend", "displayName": "Blend mode", "type": "string",
+     "stringMeta": {"options": ["over", "add"]}, "stringValue": "add"},
+    {"name": "video", "displayName": "Video", "type": "resource", "resourceMeta": {"type": "VideoClip"},
+     "resourceValue": {"uid": "401", "name": "intro.mov"}}]
+telemetry(DG, "sockpuppet-patches", inbound_http={"path": _SP + "patches", "body": _envelope(result=[
+    {"address": "/stage/wall", "uid": "1501", "description": "LED wall", "fields": FIELDS}])},
+    state_before={"sockpuppet": {"patches": {"1500": {"address": "/old"}}}},
+    expect_state={"sockpuppet": {"patches": {"1501": {"address": "/stage/wall", "description": "LED wall", "fields": {
+        "0": {"name": "brightness", "display_name": "Brightness", "type": "float", "value": 0.5,
+              "current_value": 0.75, "min": 0.0, "max": 1.0, "default": 1.0, "step": 0.01},
+        "1": {"name": "blend", "display_name": "Blend mode", "type": "string", "text": "add",
+              "options": '["over","add"]'},
+        "2": {"name": "video", "display_name": "Video", "type": "resource", "resource": "intro.mov",
+              "resource_uid": "401", "resource_type": "VideoClip"}}}}}})
+telemetry(DG, "easing-functions", inbound_http={"path": _SP + "easingfunctions",
+                                                "body": json.dumps({"easingFunctions": ["linear", "easeIn"]})},
+          expect_state={"sockpuppet": {"easing_functions": '["linear","easeIn"]'}})
+telemetry(DG, "sockpuppet-live-reread", inbound_http={"path": _SP + "live", "body": _ENV_OK},
+          expect_then_send=[{"method": "GET", "target": _SP + "patches"}], expect_state={})

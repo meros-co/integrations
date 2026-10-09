@@ -126,7 +126,9 @@ models:
                get_renderstream_layers, get_renderstream_layer_status, get_renderstream_layer_config,
                get_renderstream_pools, get_renderstream_assigners, start_renderstream_layer,
                stop_renderstream_layer, restart_renderstream_layer, sync_renderstream_layer,
-               renderstream_failover_machine, renderstream_failover_pool]
+               renderstream_failover_machine, renderstream_failover_pool,
+               get_sockpuppet_patches, get_easing_functions, set_live_float, set_live_string,
+               set_live_resource, send_live_changes]
     verification: none
 
 commands:
@@ -717,6 +719,87 @@ commands:
     expect: { status: 200, json_equals: { "$.status.code": 0 } }
     returns: ack
 
+  # ── Sockpuppet: live parameter control ───────────────────────────────────
+  get_sockpuppet_patches:
+    summary: Every HTTP Sockpuppet patch with its fields, their kinds, ranges and options, and the latest value of each (sockpuppet/patches)
+    send: { method: GET, path: /api/session/sockpuppet/patches }
+    expect: { status: 200, json_equals: { "$.status.code": 0 }, json_path: "$.result" }
+    returns: value
+
+  get_easing_functions:
+    summary: The easing functions a timed float change can use (sockpuppet/easingfunctions)
+    send: { method: GET, path: /api/session/sockpuppet/easingfunctions }
+    expect: { status: 200, json_path: "$.easingFunctions" }
+    returns: value
+
+  set_live_float:
+    summary: Set a float field of a Sockpuppet patch live, at once or eased over a duration (sockpuppet/live)
+    params:
+      patch:    { type: string, max_length: 1024, required: true,
+                  label: Patch address,
+                  description: "Address of the HTTP Sockpuppet patch, as get_sockpuppet_patches lists it." }
+      field:    { type: string, max_length: 256, required: true,
+                  label: Field,
+                  description: "Name of the field to set (not its display name)." }
+      value:    { type: float, required: true,
+                  label: Value,
+                  description: "New value, within the field's min and max." }
+      duration: { type: float, min: 0.0, default: 0.0,
+                  label: Duration,
+                  description: "Time in seconds to ease from the current value to the new one; 0 sets it at once." }
+      easing:   { type: string, max_length: 64, default: "",
+                  label: Easing,
+                  description: "Easing function for a timed change, one of get_easing_functions; empty for Designer's default." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":[{"address":{patch:json},"changes":[{"field":{field:json},"floatValue":{"value":{value:.6f},"duration":{duration:.3f},"easingFunction":{easing:json}}}]}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  set_live_string:
+    summary: Set a text or option field of a Sockpuppet patch live (sockpuppet/live)
+    params:
+      patch: { type: string, max_length: 1024, required: true,
+               label: Patch address,
+               description: "Address of the HTTP Sockpuppet patch, as get_sockpuppet_patches lists it." }
+      field: { type: string, max_length: 256, required: true,
+               label: Field,
+               description: "Name of the field to set (not its display name)." }
+      value: { type: string, max_length: 4096, required: true,
+               label: Value,
+               description: "New text; for a field with options, one of them." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":[{"address":{patch:json},"changes":[{"field":{field:json},"stringValue":{value:json}}]}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  set_live_resource:
+    summary: Point a resource field of a Sockpuppet patch (a video clip, a mesh) at another resource, by its name (sockpuppet/live)
+    params:
+      patch:    { type: string, max_length: 1024, required: true,
+                  label: Patch address,
+                  description: "Address of the HTTP Sockpuppet patch, as get_sockpuppet_patches lists it." }
+      field:    { type: string, max_length: 256, required: true,
+                  label: Field,
+                  description: "Name of the field to set (not its display name)." }
+      resource: { type: string, max_length: 1024, required: true,
+                  label: Resource,
+                  description: "Name of the resource to use, of the type the field takes." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":[{"address":{patch:json},"changes":[{"field":{field:json},"resourceValue":{"name":{resource:json}}}]}]}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
+  send_live_changes:
+    summary: >
+      Send several live changes to several Sockpuppet patches in one request
+      (sockpuppet/live, sockpuppetLiveRequest): patches is an array of {address
+      or uid, changes: [{field, floatValue {value, duration, easingFunction} |
+      stringValue | resourceValue Locator}]}
+    params:
+      patches: { type: json, required: true,
+                 label: Patches,
+                 description: "JSON array of sockpuppetLivePatch objects: {\"address\", \"changes\": [{\"field\", and one of floatValue, stringValue or resourceValue}]}." }
+    send: { method: POST, path: /api/session/sockpuppet/live, body: '{"patches":{patches}}', content_type: application/json }
+    expect: { status: 200, json_equals: { "$.status.code": 0 } }
+    returns: ack
+
 telemetry:
   # What changes during a show, every 10 seconds.
   poll:
@@ -728,6 +811,7 @@ telemetry:
       - { method: GET, path: /api/session/status/notifications }
       - { method: GET, path: /api/session/sequencing/indirections }
       - { method: GET, path: /api/session/renderstream/layers }
+      - { method: GET, path: /api/session/sockpuppet/patches }
   # What an operator changes in the project, and the machines' set-up, every
   # minute (and on connecting).
   subscribe:
@@ -741,6 +825,7 @@ telemetry:
       - { method: GET, path: /api/session/transport/setlists }
       - { method: GET, path: /api/session/renderstream/pools }
       - { method: GET, path: /api/session/renderstream/assigners }
+      - { method: GET, path: /api/session/sockpuppet/easingfunctions }
   websocket:
     path: /api/session/liveupdate
     send:
@@ -1115,6 +1200,58 @@ telemetry:
       then_send:
         - { method: GET, path: /api/session/status/health }
         - { method: GET, path: /api/session/renderstream/pools }
+    # Sockpuppet patches, keyed by uid, with every field's latest value.
+    - path: "^/api/session/sockpuppet/patches$"
+      json_match: { "$.result": "^\\[" }
+      replace: sockpuppet.patches
+      json_each: "$.result"
+      json: { uid: "$.uid", address: "$.address", description: "$.description" }
+      state:
+        sockpuppet.patches.{uid}.address: "{address}"
+        sockpuppet.patches.{uid}.description: "{description}"
+    - path: "^/api/session/sockpuppet/patches$"
+      json_each: "$.result[*].fields"
+      json:
+        patch: "$^.uid"
+        name: "$.name"
+        display: "$.displayName"
+        type: "$.type"
+        value: "$.floatValue.value"
+        current: "$.floatValue.currentValue"
+        min: "$.floatMeta.min"
+        max: "$.floatMeta.max"
+        default: "$.floatMeta.defaultValue"
+        step: "$.floatMeta.step"
+        text: "$.stringValue"
+        options: "$.stringMeta.options"
+        resource: "$.resourceValue.name"
+        resource_uid: "$.resourceValue.uid"
+        resource_type: "$.resourceMeta.type"
+      state:
+        sockpuppet.patches.{patch}.fields.{index}.name: "{name}"
+        sockpuppet.patches.{patch}.fields.{index}.display_name: "{display}"
+        sockpuppet.patches.{patch}.fields.{index}.type: "{type}"
+        sockpuppet.patches.{patch}.fields.{index}.value: "{value}"
+        sockpuppet.patches.{patch}.fields.{index}.current_value: "{current}"
+        sockpuppet.patches.{patch}.fields.{index}.min: "{min}"
+        sockpuppet.patches.{patch}.fields.{index}.max: "{max}"
+        sockpuppet.patches.{patch}.fields.{index}.default: "{default}"
+        sockpuppet.patches.{patch}.fields.{index}.step: "{step}"
+        sockpuppet.patches.{patch}.fields.{index}.text: "{text}"
+        sockpuppet.patches.{patch}.fields.{index}.options: "{options}"
+        sockpuppet.patches.{patch}.fields.{index}.resource: "{resource}"
+        sockpuppet.patches.{patch}.fields.{index}.resource_uid: "{resource_uid}"
+        sockpuppet.patches.{patch}.fields.{index}.resource_type: "{resource_type}"
+    - path: "^/api/session/sockpuppet/easingfunctions$"
+      json_match: { "$.easingFunctions": "^\\[" }
+      json: { list: "$.easingFunctions" }
+      state:
+        sockpuppet.easing_functions: "{list}"
+    - path: "^/api/session/sockpuppet/live$"
+      json_match: { "$.status.code": "^0$" }
+      json: {}
+      then_send:
+        - { method: GET, path: /api/session/sockpuppet/patches }
     # Live Update: the one subscribed property is a dictionary of the
     # transport's playback values.
     - json_match: { "$.valuesChanged": "^\\[" }
@@ -1229,6 +1366,23 @@ state:
   renderstream.assigners.*.padding_pixels: { type: int, unit: px, description: "Padding around the assigner's tiles" }
   renderstream.assigners.*.network_ip:     { type: string, description: "Address of the assigner's preferred network" }
   renderstream.assigners.*.network:        { type: string, description: "Name of the assigner's preferred network" }
+  sockpuppet.patches.*.address:     { type: string, description: "An HTTP Sockpuppet patch, keyed by its uid: the address the set_live_ commands name" }
+  sockpuppet.patches.*.description: { type: string, description: "The patch's description" }
+  sockpuppet.patches.*.fields.*.name:          { type: string, description: "A field of the patch, numbered from 0: the name the set_live_ commands take" }
+  sockpuppet.patches.*.fields.*.display_name:  { type: string, description: "The field's name as Designer shows it" }
+  sockpuppet.patches.*.fields.*.type:          { type: string, description: "The field's kind, as Designer names it (float, string or resource)" }
+  sockpuppet.patches.*.fields.*.value:         { type: float, description: "A float field's target value (set_live_float)" }
+  sockpuppet.patches.*.fields.*.current_value: { type: float, description: "A float field's value now, which moves towards the target during a timed change" }
+  sockpuppet.patches.*.fields.*.min:           { type: float, description: "A float field's minimum" }
+  sockpuppet.patches.*.fields.*.max:           { type: float, description: "A float field's maximum" }
+  sockpuppet.patches.*.fields.*.default:       { type: float, description: "A float field's default value" }
+  sockpuppet.patches.*.fields.*.step:          { type: float, description: "A float field's step" }
+  sockpuppet.patches.*.fields.*.text:          { type: string, description: "A string field's value (set_live_string)" }
+  sockpuppet.patches.*.fields.*.options:       { type: string, description: "A string field's options, as a JSON array; empty for free text" }
+  sockpuppet.patches.*.fields.*.resource:      { type: string, description: "Name of the resource a resource field points to (set_live_resource)" }
+  sockpuppet.patches.*.fields.*.resource_uid:  { type: string, description: "uid of the resource a resource field points to" }
+  sockpuppet.patches.*.fields.*.resource_type: { type: string, description: "The type of resource a resource field takes" }
+  sockpuppet.easing_functions:      { type: string, description: "The easing functions set_live_float takes, as a JSON array" }
   live.playing:                    { type: bool, description: "The Live Update transport (setting live_transport) is playing" }
   live.time:                       { type: float, unit: s, description: "Playhead time of the Live Update transport on its track" }
   live.play_mode:                  { type: string, description: "Play mode of the Live Update transport, as Designer words it" }
@@ -1337,3 +1491,13 @@ quirks:
       and assigners every minute. The API cannot create layers, change a layer's
       asset, pool, mappings or assigners, or edit pools and assigners: those are
       edited in Designer.
+  - models: [all]
+    severity: warning
+    text: >
+      The set_live_ commands change what a Sockpuppet patch outputs at once,
+      over every source that drives it (an HTTP Sockpuppet patch is driven only
+      through this API). Patches and their fields' latest values are read every
+      10 seconds and after each live change; a timed float change keeps moving
+      after it is read, so current_value lags it. The API cannot create patches
+      or fields: they are set up in Designer. A patch is kept by its uid; a
+      patch whose uid comes back empty is not kept.
